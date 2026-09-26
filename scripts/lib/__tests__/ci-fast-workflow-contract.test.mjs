@@ -35,6 +35,7 @@ import {
   structuralLocks,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
+import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -1217,8 +1218,17 @@ describe('ci-fast bounded parallel workflow', () => {
     const preflight = jobBlock('ci-lockfile-preflight', 'ci-path-changes');
     expect(preflight).toContain('name: Lockfile Specifier Preflight');
     expect(preflight).toContain(
-      'run: pnpm exec node scripts/lockfile-specifier-preflight.mjs'
+      'run: node scripts/lockfile-specifier-preflight.mjs'
     );
+    expect(preflight).toContain(
+      'run: node scripts/verify-workflow-references.mjs'
+    );
+    // Dependency-free preflight: plain setup-node from .nvmrc, no pnpm install.
+    expect(preflight).toMatch(
+      /uses: actions\/setup-node@[0-9a-f]{40} # v\d+[\s\S]*node-version-file: '\.nvmrc'/
+    );
+    expect(preflight).not.toContain('setup-node-pnpm');
+    expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
         /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
@@ -1227,21 +1237,26 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
-    const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
-
-    expect(controlTest).toContain(
-      'scripts/symphony/tests/control-bundle-manifest.test.mjs'
+    expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
+      'node scripts/run-affected-tests.mjs --control'
     );
-    expect(controlTest).toContain(
-      '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs'
-    );
-    expect(controlTest).toContain('--test-coverage-lines=90');
-    expect(controlTest).toContain('--test-coverage-branches=75');
-    expect(controlTest).toContain('--test-coverage-functions=90');
-    expect(controlTest).toContain(
-      '&& node scripts/run-affected-tests.mjs --control'
-    );
-    expect(controlTest).toContain('&& pnpm run test:rolling-ci-fx:coverage');
+    const controlStages = buildControlTestCommands();
+    expect(controlStages).toContainEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=75',
+        '--test-coverage-functions=90',
+        'scripts/symphony/tests/control-bundle-manifest.test.mjs',
+      ],
+    ]);
+    expect(controlStages).toContainEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
     const fxCoverage = PACKAGE_JSON.scripts['test:rolling-ci-fx:coverage'];
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx.test.mjs');
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx-finish.test.mjs');
@@ -2179,6 +2194,45 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   expect(CI_FAST_SOURCE).toContain(
     '--coverage.include=lib/ovie/summer-admissions.ts'
   );
+});
+
+describe('invariant-scanned PR structural selection', () => {
+  // #18182 changed apps/desktop/src/main.ts (JOV-INV-031 scope) without any
+  // invariant run; PR structural selection must derive from the scan roots.
+  it('selects structural for every invariant-scanned path on source PRs', () => {
+    const addition =
+      'STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"';
+    const decision = WORKFLOW.slice(
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
+    );
+    expect(decision).toContain(addition);
+    expect(decision.indexOf(addition)).toBeLessThan(
+      decision.indexOf('if git diff --name-only')
+    );
+
+    const ere = execFileSync(
+      process.execPath,
+      [resolve(REPO_ROOT, 'scripts/invariants/scanned-paths.mjs'), '--ere'],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    ).trim();
+    const selects = path =>
+      spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
+    for (const path of [
+      'apps/desktop/src/main.ts',
+      'apps/web/lib/chat/knowledge/topics.ts',
+      'apps/web/app/[username]/page.tsx',
+      'scripts/invariants/latency-sensitive-execution-allowlist.json',
+    ]) {
+      expect(selects(path), path).toBe(true);
+    }
+    for (const path of [
+      'apps/desktop/src-other/main.ts',
+      'apps/web/tests/e2e/public-profile-smoke.spec.ts',
+    ]) {
+      expect(selects(path), path).toBe(false);
+    }
+  });
 });
 
 describe('CI diff selection on a divergent PR', () => {

@@ -123,8 +123,8 @@ Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the r
 |--------|-----|-------------|
 | `text-black` without `dark:text-*` | Black text invisible in dark mode | `text-foreground` |
 | `text-white` without `dark:text-*` | White text invisible in light mode | `text-foreground` or `text-primary-token` |
-| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-background` or `bg-surface-1` |
-| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-background` |
+| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-base` or `bg-surface-1` |
+| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-base` |
 | `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
 
 **Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.

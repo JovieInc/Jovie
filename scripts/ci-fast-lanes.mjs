@@ -34,6 +34,7 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
+import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
 import {
   affectsJovieTypecheck,
   classifyCiRepoLanes,
@@ -194,6 +195,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  '.claude/hooks/post-task-validate.test.mjs',
   'scripts/agent-context/check.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
@@ -207,13 +209,16 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/runtime-state.test.mjs',
   'scripts/backlog-orchestrator/__tests__/shipping-observability.test.mjs',
   'scripts/backlog-orchestrator/__tests__/summer-live-state.test.mjs',
+  'scripts/ci-cache-policy.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
+  'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
+  'scripts/ios-ci-cache-contract.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
   'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
   'scripts/lib/observability-fingerprint.test.mjs',
@@ -269,6 +274,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pipeline-scoreboard.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
+  'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-label-override.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
@@ -286,6 +292,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/ship-ledger.test.mjs',
   'scripts/lib/__tests__/spawn-resource.test.mjs',
+  'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
   'scripts/lib/__tests__/story-coverage-ratchet.test.mjs',
   'scripts/lib/__tests__/taste-classifier.test.mjs',
   'scripts/lib/__tests__/taste-label-guard.test.mjs',
@@ -956,10 +963,11 @@ function runGuardrails() {
     ...(selected.has('operations')
       ? [
           'node scripts/design-authority-guard.mjs',
+          'node --test scripts/dev-loop-latency.test.mjs',
           // Exercise retention executables and subprocess coverage before other guards.
           'node --test --test-timeout=45000 --experimental-test-coverage --test-coverage-include="scripts/*retention.mjs" --test-coverage-lines=75 --test-coverage-functions=70 --test-coverage-branches=75 scripts/local-runtime-retention.test.mjs scripts/generated-artifact-retention.test.mjs scripts/cleanup-safety.test.mjs scripts/setup-cache-cleanup.test.mjs',
           'pnpm design:logo-assets:check',
-          'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs',
+          'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs scripts/dev-loop-contract.test.mjs',
         ]
       : []),
     ...(selected.has('web')
@@ -1425,6 +1433,19 @@ export async function runStructural(opts = {}) {
   }
 
   const selected = selectedProductLanes();
+  // invariants:check lives in operationsParts, but invariant-scanned sources
+  // such as apps/desktop/src/main.ts classify as mac/web only (#18182 reached
+  // main red that way). Unreadable or empty diffs fail closed.
+  const changed =
+    event === 'workflow_dispatch'
+      ? null
+      : (opts.changedFileList ?? listAllChangedFiles());
+  const invariantParts =
+    !selected.has('operations') &&
+    (selected.has('web') || selected.has('mac')) &&
+    (!changed?.length || changed.some(file => isInvariantScannedPath(file)))
+      ? ['pnpm invariants:check']
+      : [];
   const operationsParts = [
     ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
@@ -1534,6 +1555,7 @@ export async function runStructural(opts = {}) {
           `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
         ]
       : []),
+    ...invariantParts,
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),

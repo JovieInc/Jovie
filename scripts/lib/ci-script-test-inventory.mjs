@@ -52,12 +52,8 @@ export const RUNNER_ONLY_EXCEPTIONS = Object.freeze({});
 export const KNOWN_RED_ORPHANS = Object.freeze({
   'scripts/backlog-orchestrator/__tests__/symphony-launcher.test.mjs':
     'red on main: 7 of 11 launcher subprocess cases exit non-zero (24s file).',
-  'scripts/ci-cache-policy.test.mjs':
-    'red on main: #16891 cache steps were dropped when its merge restaged ci.yml, desktop-release.yml and ios-ci.yml at main; restore in the cache-policy follow-up PR.',
   'scripts/generate-llms-design-manifest.test.mjs':
     'red on main: "--check detects drift" reports no drift.',
-  'scripts/ios-ci-cache-contract.test.mjs':
-    'red on main: ios-ci.yml lost the "Restore Swift package cache" step in the #16891 merge; restore in the cache-policy follow-up PR.',
   'scripts/repo-hygiene-guard.test.mjs':
     'red on main: 3 cleanup --apply cases no longer remove the fixture caches/packs.',
   'scripts/summer-commissioning/architecture-freshness.test.mjs':
@@ -96,6 +92,9 @@ export function listScriptTestFiles(repoRoot) {
     }
   };
   walk(join(repoRoot, 'scripts'));
+  // Claude Code hooks gate every agent session; their contracts must run too.
+  const hooksDir = join(repoRoot, '.claude/hooks');
+  if (existsSync(hooksDir)) walk(hooksDir);
   return out.sort();
 }
 
@@ -210,11 +209,16 @@ export async function collectCiCommands(repoRoot, options = {}) {
       (async () => {
         const runner = await import('../run-affected-tests.mjs');
         return runner
-          .buildControlCoverageCommands()
+          .buildControlTestCommands()
           .map(([bin, args]) => [bin, ...args].join(' '));
       });
-    for (const text of await loadControl())
-      commands.push({ source: 'run-affected-tests.mjs --control', text });
+    // `--control` runs every buildControlTestCommands() stage, including
+    // `pnpm run <script>` stages, so follow those scripts too.
+    const control = (await loadControl()).map(text => ({
+      source: 'run-affected-tests.mjs --control',
+      text,
+    }));
+    commands.push(...control, ...expandPackageScripts(control, packageScripts));
   }
   return commands;
 }

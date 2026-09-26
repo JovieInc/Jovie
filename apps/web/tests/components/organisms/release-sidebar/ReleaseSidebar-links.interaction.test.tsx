@@ -115,28 +115,37 @@ vi.mock('@/components/molecules/drawer', () => ({
         {footer}
       </div>
     ),
-  EntityHeaderCard: ({
+  EntityHeader: ({
+    thumbnail,
     title,
-    subtitle,
-    meta,
+    details,
+    statusGlyph,
     actions,
-    image,
-    stableLayout,
+    'data-testid': testId,
   }: {
+    thumbnail?: React.ReactNode;
     title: string;
-    subtitle?: React.ReactNode;
-    meta?: React.ReactNode;
+    details?: React.ReactNode;
+    statusGlyph?: React.ReactNode;
     actions?: React.ReactNode;
-    image?: React.ReactNode;
-    stableLayout?: boolean;
+    'data-testid'?: string;
   }) => (
-    <div data-testid='entity-header-card' data-stable-layout={stableLayout}>
-      {image}
-      <h2 className='text-sm line-clamp-1 min-h-6'>{title}</h2>
-      {subtitle}
-      <div data-testid='entity-header-meta-slot'>{meta}</div>
+    <div data-testid={testId ?? 'entity-header'}>
+      {thumbnail}
+      <h2 className='truncate text-sm font-semibold'>{title}</h2>
+      <div data-testid='entity-header-details-row'>
+        {details}
+        {statusGlyph}
+      </div>
       {actions}
     </div>
+  ),
+  EntityHeaderStatusGlyph: ({ label }: { label?: string }) => (
+    <span
+      data-testid='entity-header-status-glyph'
+      role='img'
+      aria-label={label}
+    />
   ),
   DrawerInlineNote: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
@@ -633,10 +642,7 @@ describe('ReleaseSidebar inspector cards', () => {
 
     const header = screen.getByTestId('release-header-card');
     expect(header).not.toHaveAttribute('data-surface-variant');
-    expect(within(header).getByTestId('entity-header-card')).toHaveAttribute(
-      'data-stable-layout',
-      'true'
-    );
+    expect(within(header).getByTestId('entity-header')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(
@@ -650,8 +656,8 @@ describe('ReleaseSidebar inspector cards', () => {
     const header = screen.getByTestId('release-header-card');
     expect(
       within(header).getByRole('heading', { name: mockRelease.title })
-    ).toHaveClass('text-sm', 'line-clamp-1', 'min-h-6');
-    expect(screen.getByTestId('entity-header-meta-slot')).toBeInTheDocument();
+    ).toHaveClass('text-sm', 'truncate', 'font-semibold');
+    expect(screen.getByTestId('release-header-meta-strip')).toBeInTheDocument();
   });
 
   it('keeps static artwork fit and hover radius on the 40px contract', () => {

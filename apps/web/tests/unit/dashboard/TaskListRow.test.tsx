@@ -81,7 +81,11 @@ describe('TaskListRow', () => {
       />
     );
 
-    fireEvent.click(getByRole('button', { name: 'QA Release' }));
+    const releaseButton = getByRole('button', { name: 'QA Release' });
+    expect(releaseButton.querySelector('svg')).toHaveClass('lucide-layers');
+    expect(releaseButton.querySelector('svg')).not.toHaveClass('lucide-disc-3');
+
+    fireEvent.click(releaseButton);
 
     expect(onOpenRelease).toHaveBeenCalledWith(mockTask);
     expect(getByTestId('task-list-row-task-1')).toHaveAttribute(

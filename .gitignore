@@ -220,6 +220,7 @@ apps/desktop/src/*
 !apps/desktop/src/ipc-sender.ts
 !apps/desktop/src/nightly-update-launch-agent.ts
 !apps/desktop/src/window-state-store.ts
+!apps/desktop/src/main-liveness.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs
 !apps/desktop/scripts/
 !apps/desktop/scripts/desktop-csp-watchdog.test.ts
