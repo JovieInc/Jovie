@@ -175,6 +175,23 @@ export function affectsJovieTypecheck(file) {
   return /\.(?:ts|tsx|mts|cts)$/i.test(normalized);
 }
 
+const WEB_TESTS_TYPECHECK_BASELINE = 'apps/web/typecheck-tests-baseline.json';
+
+/**
+ * apps/web/tsconfig.test.json also compiles JS helpers (allowJs) that tests
+ * import from apps/web/scripts, scripts/ and .github/scripts, and its ratchet
+ * reads the committed baseline. Source-PR typecheck preselection (which gates
+ * dependency hydration) must include these inputs, or a JS-only PR skips the
+ * test-graph ratchet until the merge queue.
+ */
+export function affectsWebTestTypecheck(file) {
+  const normalized = normalizeFile(file);
+  if (!normalized) return false;
+  if (affectsJovieTypecheck(normalized)) return true;
+  if (normalized === WEB_TESTS_TYPECHECK_BASELINE) return true;
+  return /\.(?:js|jsx|mjs|cjs)$/i.test(normalized);
+}
+
 function normalizeFile(file) {
   return String(file || '')
     .trim()
@@ -232,7 +249,7 @@ export function classifyCiRepoLanes(files) {
     runJovieProduct: lanes.has(CI_LANES.JOVIE_PRODUCT),
     runJovieTypecheck:
       lanes.has(CI_LANES.JOVIE_PRODUCT) &&
-      changed.some(file => affectsJovieTypecheck(file)),
+      changed.some(file => affectsWebTestTypecheck(file)),
     runSymphonyControl: lanes.has(CI_LANES.SYMPHONY_CONTROL),
     runSummerOps: lanes.has(CI_LANES.SUMMER_OPS),
   };

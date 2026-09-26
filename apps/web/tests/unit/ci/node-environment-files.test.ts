@@ -135,7 +135,7 @@ describe('tests/node-environment-files.json', () => {
     for (const snippet of [
       "import('@testing-library/jest-dom/matchers')",
       "import('@testing-library/react')",
-      'expect.extend(matchers);',
+      'expect.extend(jestDomMatchers);',
       'cleanup();',
     ]) {
       expect(setup.indexOf(snippet)).toBeGreaterThan(guard);

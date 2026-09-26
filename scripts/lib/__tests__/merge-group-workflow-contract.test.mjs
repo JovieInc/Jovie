@@ -223,6 +223,10 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-profile-admission-browser',
 ]);
 
+// Jobs whose full base fetch runs in the background during dependency
+// install; "Fetch base-branch history" then awaits it before any consumer.
+const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
+
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
@@ -862,7 +866,12 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain('fetch-depth: 1');
       expect(job, jobId).toContain('persist-credentials: false');
       expect(job, jobId).not.toContain('filter: blob:none');
-      const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+      const fetchScript = getStepRunScript(
+        job,
+        BACKGROUND_BASE_FETCH_JOBS.has(jobId)
+          ? 'Start base-branch history fetch'
+          : 'Fetch base-branch history'
+      );
       // These jobs read history only through a tree diff (the profile-browser
       // selector's --name-only --no-renames diff, and Exact-head Coverage's
       // ratchet diff), so they skip historical blobs (each pinned separately
@@ -881,6 +890,46 @@ describe('merge_group workflow contract', () => {
         job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
       );
     }
+  });
+
+  it('overlaps the full ci-fast (remaining) base fetch with dependency install and fails closed', () => {
+    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const start = getStepRunScript(job, 'Start base-branch history fetch');
+    const wait = getStepRunScript(job, 'Fetch base-branch history');
+    const startAt = job.indexOf('- name: Start base-branch history fetch');
+    const setupAt = job.indexOf('- uses: ./.github/actions/setup-node-pnpm');
+    const waitAt = job.indexOf('- name: Fetch base-branch history');
+    const firstConsumer = job.search(
+      /pnpm ci:incident-contract:validate|git diff|ci-fast-lanes\.mjs/
+    );
+    // start -> dependency install -> await -> every history consumer.
+    expect(startAt).toBeGreaterThan(-1);
+    expect(setupAt).toBeGreaterThan(startAt);
+    expect(waitAt).toBeGreaterThan(setupAt);
+    expect(firstConsumer).toBeGreaterThan(waitAt);
+    // Guards here read historical blobs, so the fetch must stay full.
+    expect(start).not.toContain('--filter=blob:none');
+    expect(start).toContain('set -euo pipefail');
+    // The exit status is published atomically only after git fetch returns.
+    expect(start).toMatch(
+      /echo "\$\?" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
+    );
+    expect(start).toContain('< /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &');
+    // The awaiting step holds no token and fails closed on every failure mode.
+    const waitStep = job.slice(waitAt, firstConsumer);
+    expect(waitStep).not.toContain('GH_TOKEN');
+    expect(waitStep).toContain('timeout-minutes: 10');
+    expect(wait).toContain('set -euo pipefail');
+    expect(wait).toContain('did not finish within 540s');
+    expect(wait).toMatch(
+      /if \[\[ "\$fetch_status" != '0' \]\]; then[^]*?exit 1/
+    );
+    expect(wait).toMatch(
+      /git rev-parse --is-shallow-repository\)" != 'false' \]\]; then[^]*?exit 1/
+    );
+    expect(wait).toMatch(
+      /git rev-parse --verify --quiet "refs\/remotes\/origin\/\$\{BASE_BRANCH\}\^\{commit\}"[^]*?exit 1/
+    );
   });
 
   it('keeps the blobless profile-browser selector a blob-free tree diff', () => {

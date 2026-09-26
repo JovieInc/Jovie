@@ -27,6 +27,19 @@ import {
 } from 'node:path';
 import { validPlaywrightPng } from '../../scripts/lib/playwright-png.mjs';
 
+/**
+ * Environment whose credential-bearing values must never reach artifacts.
+ * @typedef {Readonly<Record<string, string | undefined>>} ArtifactEnvironment
+ */
+/**
+ * @typedef {object} ArtifactInspectOptions
+ * @property {string} [workspace]
+ * @property {boolean} [allowEmptyPaths]
+ * @property {boolean} [allowMarkdown]
+ * @property {boolean} [allowImages]
+ * @property {boolean} [omitImages]
+ */
+
 const SENSITIVE =
   /(?:^|_)(?:SECRET|PASSWORD|PASSPHRASE|PRIVATE_KEY(?!_ID(?:_|$))|API_KEY(?!_(?:ID|SID)(?:_|$))|ACCESS_KEY(?!_ID(?:_|$))|HASH_KEY(?!_ID(?:_|$))|DATABASE_URL|DSN|AUTHORIZATION|COOKIE|COOKIES|PROTECTION_BYPASS|ENCRYPT_KEY|ENCRYPTION_KEY|SIGNING_KEY(?!_ID(?:_|$))|SIGNER_KEY(?!_ID(?:_|$))|WEBHOOK_URL|DEPLOY_HOOK(?!_ID(?:_|$))|CAPABILITY_URL|(?:CERTIFICATE|PRIVATE_KEY|SIGNING_KEY|SIGNER_KEY)_(?:BASE64|B64)|CSC_LINK|GITLEAKS_LICENSE)(?:_|$)/;
 const EXACT_PUBLIC_IDENTIFIERS = new Set([
@@ -325,6 +338,11 @@ const hasShortCredentialValue = environment =>
       value.length < 4
   );
 
+/**
+ * @param {string} text
+ * @param {ArtifactEnvironment} [environment]
+ * @param {boolean} [parse]
+ */
 export function artifactContainsSecret(
   text,
   environment = process.env,
@@ -356,6 +374,10 @@ export function artifactContainsSecret(
   );
 }
 
+/**
+ * @param {string} text
+ * @param {ArtifactEnvironment} [environment]
+ */
 export function redactSecretValues(text, environment = process.env) {
   return secretValues(environment)
     .toSorted((left, right) => right.length - left.length)
@@ -381,6 +403,10 @@ function markdownRetainsSecret(text) {
   );
 }
 
+/**
+ * @param {string} text
+ * @param {ArtifactEnvironment} [environment]
+ */
 export function markdownContainsSecret(text, environment = process.env) {
   return markdownRetainsSecret(redactSecretValues(text, environment));
 }
@@ -473,6 +499,11 @@ function inspect(paths, environment, options = {}) {
   };
 }
 
+/**
+ * @param {readonly string[]} paths
+ * @param {ArtifactEnvironment} [environment]
+ * @param {ArtifactInspectOptions} [options]
+ */
 export function inspectPlaywrightArtifacts(
   paths,
   environment = process.env,
@@ -481,6 +512,11 @@ export function inspectPlaywrightArtifacts(
   return inspect(paths, environment, options).findings;
 }
 
+/**
+ * @param {readonly string[]} paths
+ * @param {ArtifactEnvironment} [environment]
+ * @param {ArtifactInspectOptions} [options]
+ */
 export function guardPlaywrightArtifacts(
   paths,
   environment = process.env,
