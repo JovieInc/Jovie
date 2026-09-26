@@ -17,7 +17,7 @@ export const SUPPORT_SEO_COPY = {
 export const SUPPORT_FAQ_ITEMS = [
   {
     question: 'How do I get started with Jovie?',
-    answer: `Start with Find yourself and follow the setup steps for your profile. Full walkthrough at ${DOCS_URL}/getting-started.`,
+    answer: `Start with Find yourself and follow the setup steps for your profile. Full walkthrough at ${DOCS_URL}/docs/jovie-essentials/start-here.`,
   },
   {
     question: 'How do music smart links work?',
