@@ -1,6 +1,10 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryClient,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   deleteRelease,
   formatReleaseLyrics,
@@ -17,6 +21,40 @@ import {
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from './keys';
+
+/**
+ * Keep the release detail cache (`useReleaseEntityQuery`) aligned with matrix
+ * writes. The detail query seeds from the matrix row via initialData, which
+ * only applies at query creation — without this, an already-mounted detail
+ * view keeps serving the stale title/artwork after a mutation updates the row.
+ */
+function syncReleaseDetailCache(
+  queryClient: QueryClient,
+  profileId: string,
+  release: ReleaseViewModel
+): void {
+  queryClient.setQueryData<ReleaseViewModel>(
+    queryKeys.releases.detail(profileId, release.id),
+    release
+  );
+}
+
+/**
+ * After a matrix refetch settles, copy the authoritative row into the detail
+ * cache so optimistic edits converge to the server result.
+ */
+function convergeReleaseDetailCache(
+  queryClient: QueryClient,
+  profileId: string,
+  releaseId: string
+): void {
+  const row = queryClient
+    .getQueryData<ReleaseViewModel[]>(queryKeys.releases.matrix(profileId))
+    ?.find(r => r.id === releaseId);
+  if (row) {
+    syncReleaseDetailCache(queryClient, profileId, row);
+  }
+}
 
 /**
  * Optimistically update a release's provider URL in the cache.
@@ -89,6 +127,9 @@ export function useSaveProviderOverrideMutation() {
       const previousReleases = queryClient.getQueryData<ReleaseViewModel[]>(
         queryKeys.releases.matrix(variables.profileId)
       );
+      const previousDetail = queryClient.getQueryData<ReleaseViewModel>(
+        queryKeys.releases.detail(variables.profileId, variables.releaseId)
+      );
 
       // Optimistically update the cache
       if (previousReleases) {
@@ -102,10 +143,20 @@ export function useSaveProviderOverrideMutation() {
           queryKeys.releases.matrix(variables.profileId),
           optimisticReleases
         );
+        const optimisticRelease = optimisticReleases.find(
+          r => r.id === variables.releaseId
+        );
+        if (optimisticRelease) {
+          syncReleaseDetailCache(
+            queryClient,
+            variables.profileId,
+            optimisticRelease
+          );
+        }
       }
 
-      // Return context with the snapshotted value
-      return { previousReleases };
+      // Return context with the snapshotted values
+      return { previousReleases, previousDetail };
     },
 
     // On error, rollback to the previous value
@@ -116,6 +167,13 @@ export function useSaveProviderOverrideMutation() {
           context.previousReleases
         );
       }
+      if (context?.previousDetail) {
+        syncReleaseDetailCache(
+          queryClient,
+          variables.profileId,
+          context.previousDetail
+        );
+      }
     },
 
     // Always refetch after error or success to ensure cache consistency
@@ -123,6 +181,11 @@ export function useSaveProviderOverrideMutation() {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
+      convergeReleaseDetailCache(
+        queryClient,
+        variables.profileId,
+        variables.releaseId
+      );
     },
   });
 }
@@ -145,6 +208,9 @@ export function useResetProviderOverrideMutation() {
       const previousReleases = queryClient.getQueryData<ReleaseViewModel[]>(
         queryKeys.releases.matrix(variables.profileId)
       );
+      const previousDetail = queryClient.getQueryData<ReleaseViewModel>(
+        queryKeys.releases.detail(variables.profileId, variables.releaseId)
+      );
 
       // For reset, we can't know the original ingested URL optimistically,
       // so we just mark the source as 'ingested' to show the UI state change
@@ -165,9 +231,19 @@ export function useResetProviderOverrideMutation() {
           queryKeys.releases.matrix(variables.profileId),
           optimisticReleases
         );
+        const optimisticRelease = optimisticReleases.find(
+          r => r.id === variables.releaseId
+        );
+        if (optimisticRelease) {
+          syncReleaseDetailCache(
+            queryClient,
+            variables.profileId,
+            optimisticRelease
+          );
+        }
       }
 
-      return { previousReleases };
+      return { previousReleases, previousDetail };
     },
 
     onError: (_err, variables, context) => {
@@ -177,12 +253,24 @@ export function useResetProviderOverrideMutation() {
           context.previousReleases
         );
       }
+      if (context?.previousDetail) {
+        syncReleaseDetailCache(
+          queryClient,
+          variables.profileId,
+          context.previousDetail
+        );
+      }
     },
 
     onSettled: async (_data, _error, variables) => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
+      convergeReleaseDetailCache(
+        queryClient,
+        variables.profileId,
+        variables.releaseId
+      );
     },
   });
 }
@@ -222,6 +310,7 @@ export function useRefreshReleaseMutation(profileId: string) {
             current.map(r => (r.id === result.release.id ? result.release : r))
           );
         }
+        syncReleaseDetailCache(queryClient, profileId, result.release);
       }
     },
   });
@@ -247,6 +336,7 @@ export function useRescanIsrcLinksMutation(profileId: string) {
             current.map(r => (r.id === result.release.id ? result.release : r))
           );
         }
+        syncReleaseDetailCache(queryClient, profileId, result.release);
       }
     },
   });
@@ -289,7 +379,12 @@ export function useDeleteReleaseMutation(profileId: string) {
       }
     },
 
-    onSettled: async () => {
+    onSettled: async (_data, error, variables) => {
+      if (!error) {
+        queryClient.removeQueries({
+          queryKey: queryKeys.releases.detail(profileId, variables.releaseId),
+        });
+      }
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(profileId),
       });
@@ -316,6 +411,7 @@ function useReleaseMutation<T>(
           current.map(r => (r.id === updated.id ? updated : r))
         );
       }
+      syncReleaseDetailCache(queryClient, profileId, updated);
     },
   });
 }
@@ -355,6 +451,7 @@ export function useFormatReleaseLyricsMutation(profileId: string) {
           current.map(r => (r.id === release.id ? release : r))
         );
       }
+      syncReleaseDetailCache(queryClient, profileId, release);
     },
   });
 }

@@ -178,6 +178,11 @@ export function PersistentAudioBar() {
     );
   }, [router, searchParams]);
 
+  const prefetchLyricsRoute = useCallback(() => {
+    if (!playbackState.activeTrackId || !playbackState.hasLyrics) return;
+    router.prefetch(buildLyricsRoute(playbackState.activeTrackId));
+  }, [playbackState.activeTrackId, playbackState.hasLyrics, router]);
+
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
     const lyricsBasePath = buildLyricsRoute(playbackState.activeTrackId);
@@ -479,6 +484,7 @@ export function PersistentAudioBar() {
               onOpenLyrics={
                 playbackState.hasLyrics ? handleOpenLyrics : undefined
               }
+              onLyricsIntent={prefetchLyricsRoute}
               track={shellTrack}
               className='min-w-0 px-0 py-0'
             />

@@ -88,6 +88,7 @@ export function AudioBar({
   onToggleWaveform,
   lyricsActive,
   onOpenLyrics,
+  onLyricsIntent,
   track,
   className,
 }: {
@@ -107,6 +108,7 @@ export function AudioBar({
   readonly onToggleWaveform?: () => void;
   readonly lyricsActive?: boolean;
   readonly onOpenLyrics?: () => void;
+  readonly onLyricsIntent?: () => void;
   readonly track: AudioBarTrack;
   readonly className?: string;
 }) {
@@ -172,6 +174,8 @@ export function AudioBar({
           label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
           shortcut={SHORTCUTS.toggleLyrics}
           onClick={onOpenLyrics}
+          onPointerEnter={onLyricsIntent}
+          onFocus={onLyricsIntent}
           active={lyricsActive}
           tooltipSide='top'
           tone='ghost'
