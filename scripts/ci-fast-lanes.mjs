@@ -156,7 +156,7 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
  * @param {string} body
  */
 const structuralPythonRegression = body =>
-  `if python3 -c "import coverage, pytest" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi`;
+  `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
 
 /** Files of the structural pytest suite (one collection, sharded below). */
 export const STRUCTURAL_PYTEST_FILES = Object.freeze([
@@ -183,8 +183,12 @@ export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
   'TestDrainPrQueueWiring or TestNativeAdmissionReceiptReconciliation';
 
 /** @param {string} shard @param {string} expression */
+// The suite spawns thousands of short-lived jq/gh/node processes, so it is
+// CPU-bound on process startup: pytest-xdist spreads each shard over two
+// workers. Two, not auto: both shards run concurrently in the structural pool
+// on 4 vCPU, and a fourth concurrent worker measured slower (JovieInc/Jovie#18657).
 const structuralPytestShard = (shard, expression) =>
-  `python3 -m pytest --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
+  `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
 
 export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
   structuralPytestShard('a', STRUCTURAL_PYTEST_SHARD_EXPRESSION),

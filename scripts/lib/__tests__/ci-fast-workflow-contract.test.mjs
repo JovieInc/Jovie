@@ -138,16 +138,18 @@ describe('ci-fast bounded parallel workflow', () => {
             : `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`;
         expect(pytestInvocation).toBe(
           [
-            '-m pytest --durations=20 -v -p no:cacheprovider',
+            '-m pytest -n 2 --durations=20 -v -p no:cacheprovider',
             `--basetemp=${tmpdir()}/jovie-structural-pytest-${shard}`,
             `-k ${expression}`,
             ...STRUCTURAL_PYTEST_FILES,
           ].join(' ')
         );
       } else {
-        expect(invoked.trim()).toBe('-c import coverage, pytest');
+        expect(invoked.trim()).toBe('-c import coverage, pytest, xdist');
         if (scenario.ci === 'true') {
-          expect(result.stderr).toContain('::error::pytest/coverage missing');
+          expect(result.stderr).toContain(
+            '::error::pytest/coverage/xdist missing'
+          );
         } else {
           expect(result.stdout).toContain('skip local structural regressions');
         }
@@ -155,6 +157,33 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('installs the pytest-xdist the structural suite parallelizes with from hashed pins', () => {
+    const requirementsIn = readFileSync(
+      join(REPO_ROOT, '.github/requirements/pytest.in'),
+      'utf8'
+    );
+    const requirementsTxt = readFileSync(
+      join(REPO_ROOT, '.github/requirements/pytest.txt'),
+      'utf8'
+    );
+    const version = /^pytest-xdist==(\S+)$/mu.exec(requirementsIn)?.[1];
+    expect(version).toBeTruthy();
+    // xdist and its execnet dependency must be hash-pinned: the structural
+    // step installs with --require-hashes and `-n 2` fails without xdist.
+    for (const pkg of [`pytest-xdist==${version}`, 'execnet==']) {
+      const start = requirementsTxt.indexOf(`\n${pkg}`);
+      expect(start, `${pkg} missing from pytest.txt`).toBeGreaterThan(-1);
+      expect(requirementsTxt.slice(start + 1).split('\n')[1]).toMatch(
+        /^\s+--hash=sha256:[0-9a-f]{64}/u
+      );
+    }
+    expect(
+      jobBlock('ci-fast-remaining', 'ci-profile-admission-browser')
+    ).toContain(
+      'python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt'
+    );
   });
 
   it('partitions the structural pytest suite into exactly complementary shards', () => {
@@ -182,6 +211,8 @@ describe('ci-fast bounded parallel workflow', () => {
     for (const shard of shards) {
       expect(shard.files).toEqual([...STRUCTURAL_PYTEST_FILES]);
       expect(shard.command).toContain('--durations=20 -v');
+      // Each shard fans out over two xdist workers (both shards overlap).
+      expect(shard.command).toContain('-m pytest -n 2 ');
       // Shards overlap in the pool: no shared .pytest_cache or basetemp.
       expect(shard.command).toContain('-p no:cacheprovider');
       expect(structuralLocks(shard.command)).toEqual([]);
