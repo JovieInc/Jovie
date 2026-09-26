@@ -327,12 +327,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const { playbackState } = useTrackAudioPlayer();
   const isActiveTrack = playbackState.activeTrackId === release.id;
   const [actionsOpen, setActionsOpen] = useState(false);
-  // Optional context read: rows also render in stories/tests without a
-  // QueryClientProvider — prefetch is a no-op there.
+  // Optional: rows also render without a provider (stories/tests).
   const queryClient = useContext(QueryClientContext);
-
-  // Warm the drawer's only cold fetch (the track list) on genuine
-  // hover/focus intent so row-to-detail opens feel immediate.
   const prefetchDetail = useCallback(() => {
     if (queryClient) prefetchReleaseDetailData(queryClient, release);
   }, [queryClient, release]);

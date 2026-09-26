@@ -5,11 +5,11 @@ import { useCallback, useEffect, useState } from 'react';
 export interface AudioTrackSource {
   readonly id: string;
   readonly title: string;
-  /** Owning release id — lets catalog mutations refresh now-playing metadata. */
+  /** Owning release id — lets mutations refresh now-playing metadata. */
   readonly releaseId?: string;
-  /** Required when loading a new track; omit when resuming the same track. */
+  /** Required for a new track; omit when resuming the same track. */
   readonly audioUrl?: string;
-  /** ISRC code for the track — used to fetch a fresh preview URL if the stored one expires. */
+  /** ISRC — used to fetch a fresh preview URL if the stored one expires. */
   readonly isrc?: string | null;
   readonly releaseTitle?: string;
   readonly artistName?: string;
@@ -22,7 +22,7 @@ export interface AudioTrackSource {
 }
 
 export interface ToggleTrackOptions {
-  /** Ordered playable context for next/previous transport in the shell player. */
+  /** Ordered playable context for next/previous transport. */
   readonly queue?: readonly AudioTrackSource[];
 }
 
@@ -42,9 +42,9 @@ interface PlaybackState {
   readonly artistName: string | null;
   readonly artworkUrl: string | null;
   readonly hasLyrics: boolean;
-  /** Analyzed tempo for the active track, when known. Null when absent — never fabricated. */
+  /** Analyzed tempo for the active track — null when absent, never fabricated. */
   readonly bpm: number | null;
-  /** Musical/Camelot key for the active track, when known. Null when absent — never fabricated. */
+  /** Musical/Camelot key — null when absent, never fabricated. */
   readonly musicalKey: string | null;
   readonly queueLength: number;
   readonly queueIndex: number;
@@ -53,17 +53,17 @@ interface PlaybackState {
 }
 
 let _audio: HTMLAudioElement | null = null;
-/** Monotonically increasing token — guards against stale play() promises from prior track switches. */
+/** Guards against stale play() promises from prior track switches. */
 let _playToken = 0;
-/** ISRC of the currently active track — used for preview URL refresh on expiration. */
+/** Active track's ISRC — used for preview URL refresh on expiration. */
 let _activeTrackIsrc: string | null = null;
-/** Release id of the currently active track — used to sync now-playing metadata on catalog mutations. */
+/** Active track's release id — syncs now-playing metadata on mutations. */
 let _activeTrackReleaseId: string | null = null;
-/** Whether we already attempted a preview URL refresh for this track. Prevents infinite retry loops. */
+/** Whether a preview URL refresh was already attempted (prevents loops). */
 let _hasRetriedRefresh = false;
 let _queue: readonly AudioTrackSource[] = [];
 let _queueIndex = -1;
-/** Nested audio-focus holds (dictation / local preview). Resume is opt-in. */
+/** Nested audio-focus holds (dictation/local preview). Resume is opt-in. */
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
 let _mediaSessionBound = false;
@@ -353,10 +353,9 @@ async function advanceQueueToIndex(index: number): Promise<void> {
 }
 
 function bindAudioEvents(el: HTMLAudioElement): void {
-  // -Infinity (not 0): with performance.now() clocked from process start, a
-  // timeupdate fired within the first PROGRESS_NOTIFY_MS of uptime would be
-  // swallowed by the throttle when initialized to 0, dropping the first
-  // progress update (surfaced as a shard-order-dependent unit test flake).
+  // -Infinity (not 0): performance.now() is clocked from process start, so a
+  // timeupdate within the first PROGRESS_NOTIFY_MS of uptime would otherwise
+  // be swallowed by the throttle.
   let lastNotifiedAt = -Infinity;
   el.addEventListener('timeupdate', () => {
     // ~4 Hz keeps cross-surface scrub bars smooth without rAF thrash.
@@ -380,9 +379,8 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   el.addEventListener('pause', () =>
     setState({
       isPlaying: false,
-      // Media events are dispatched asynchronously: a pause() issued inside
-      // handlePlaybackFailure lands here after the error state is set, and
-      // must not downgrade it to 'idle' (error UI would flash and vanish).
+      // A pause() queued inside handlePlaybackFailure lands here after the
+      // error state is set and must not downgrade it to 'idle'.
       playbackStatus: state.activeTrackId
         ? 'paused'
         : state.playbackStatus === 'error'
@@ -418,16 +416,13 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
   el.addEventListener('error', () => {
-    // Guard: only handle errors when a track is actively loaded.
-    // The audio element can fire stale error events (e.g., after tab
-    // backgrounding/resuming) even when src is already cleared.
+    // Only handle errors while a track is loaded — the element can fire
+    // stale error events after src is cleared.
     if (!state.activeTrackId) return;
 
-    // Only attempt a preview URL refresh for network errors (code 2),
-    // which indicate an expired Deezer token (403). Decode errors (code 3)
-    // and unsupported source errors (code 4) won't be fixed by a fresh URL.
-    // Use numeric literal (2) instead of MediaError.MEDIA_ERR_NETWORK since
-    // the MediaError global is unavailable in some test environments (jsdom).
+    // Only network errors (code 2, e.g. expired Deezer token) justify a
+    // preview URL refresh; decode/source errors won't be fixed by one.
+    // Numeric literal because MediaError is unavailable in jsdom.
     const MEDIA_ERR_NETWORK = 2;
     const isNetworkError = el.error?.code === MEDIA_ERR_NETWORK;
 
@@ -442,9 +437,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
           (
             data: { previewUrl: string | null; source: string | null } | null
           ) => {
-            // Guard: only act if the same track is still active.
-            // If the user switched tracks while the fetch was in-flight,
-            // the new track owns the audio element. Do nothing.
+            // Only act if the same track still owns the audio element.
             if (state.activeTrackId !== trackIdAtError) return;
 
             if (data?.previewUrl) {
@@ -504,10 +497,9 @@ export function resumePlaybackAfterInterruption(
 }
 
 /**
- * Refresh now-playing metadata when a catalog mutation updates the release
- * the active track belongs to. Only display fields change — the audio
- * element, source URL, position, and queue are untouched, so playback never
- * resets. Source replacement is intentionally out of scope (JOV-3689).
+ * Refresh now-playing metadata when a mutation updates the active track's
+ * release. Only display fields change — source, position, and queue are
+ * untouched, so playback never resets. (Source swap: JOV-3689.)
  */
 export function updateNowPlayingForRelease(release: {
   readonly id: string;
@@ -522,8 +514,8 @@ export function updateNowPlayingForRelease(release: {
   if (!isActiveRelease) return;
 
   setState({
-    // Release-level previews use the release id as the track id and the
-    // release title as the track label — only they pick up the new title.
+    // Release-level previews use the release id as the track id — only they
+    // adopt the release title as their label.
     trackTitle:
       state.activeTrackId === release.id ? release.title : state.trackTitle,
     releaseTitle: release.title,

@@ -148,9 +148,7 @@ describe('MobileReleaseList', () => {
         />
       </QueryClientProvider>
     );
-
     fireEvent.focus(screen.getByTestId('mobile-release-row-release-1'));
-
     expect(prefetchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         queryKey: queryKeys.releases.tracks('release-1'),
@@ -166,10 +164,7 @@ describe('MobileReleaseList', () => {
         onEdit={vi.fn()}
       />
     );
-
-    expect(() =>
-      fireEvent.focus(screen.getByTestId('mobile-release-row-release-1'))
-    ).not.toThrow();
+    fireEvent.focus(screen.getByTestId('mobile-release-row-release-1'));
   });
 
   it('uses the shell release typography tokens for mobile scanning', () => {

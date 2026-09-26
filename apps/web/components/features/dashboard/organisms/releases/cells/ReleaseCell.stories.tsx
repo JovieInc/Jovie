@@ -12,7 +12,6 @@ const release: ReleaseViewModel = {
   status: 'released',
   releaseType: 'single',
   isExplicit: false,
-  releaseDate: '2026-01-01',
   totalTracks: 1,
   providers: [],
   smartLinkPath: '/smart/skyline-dreams',
@@ -43,10 +42,4 @@ export const Default: Story = {};
 
 export const Selectable: Story = {
   args: { onSelect: fn() },
-};
-
-export const NoPreview: Story = {
-  args: {
-    release: { ...release, previewUrl: null },
-  },
 };

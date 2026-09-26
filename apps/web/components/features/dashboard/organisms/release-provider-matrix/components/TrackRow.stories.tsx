@@ -1,11 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { ComponentType } from 'react';
 import type {
   ProviderKey,
   ReleaseViewModel,
   TrackViewModel,
 } from '@/lib/discography/types';
-import { TrackRow, TrackRowsContainer } from './TrackRow';
+import { TrackRow } from './TrackRow';
 
 const providerConfig = {
   spotify: { label: 'Spotify', accent: '#1DB954' },
@@ -15,8 +14,8 @@ const providerConfig = {
 const allProviders: ProviderKey[] = ['spotify', 'apple_music'];
 
 const release: ReleaseViewModel = {
-  profileId: 'profile-1',
-  id: 'release-1',
+  profileId: 'p1',
+  id: 'r1',
   title: 'Summer Lights',
   artistNames: ['Jovie Artist'],
   slug: 'summer-lights',
@@ -26,16 +25,16 @@ const release: ReleaseViewModel = {
   releaseDate: '2026-06-15',
   totalTracks: 2,
   providers: [],
-  smartLinkPath: '/smart/summer-lights',
+  smartLinkPath: '/s/summer-lights',
 };
 
 const track: TrackViewModel = {
-  id: 'track-1',
-  releaseId: 'release-1',
+  id: 't1',
+  releaseId: 'r1',
   releaseSlug: 'summer-lights',
   title: 'Open Skies',
   slug: 'open-skies',
-  smartLinkPath: '/smart/summer-lights/open-skies',
+  smartLinkPath: '/s/summer-lights/open-skies',
   trackNumber: 1,
   discNumber: 1,
   durationMs: 214000,
@@ -57,33 +56,16 @@ const track: TrackViewModel = {
   ],
 };
 
-const tracks: TrackViewModel[] = [
-  track,
-  {
-    ...track,
-    id: 'track-2',
-    title: 'Night Drive',
-    slug: 'night-drive',
-    trackNumber: 2,
-    isrc: 'USRC17607840',
-    isExplicit: true,
-    providers: [],
-  },
-];
-
-const padded = [
-  (Story: ComponentType) => (
-    <div className='w-full max-w-md'>
-      <Story />
-    </div>
-  ),
-];
+const padded = (Story: React.ComponentType) => (
+  <div className='w-full max-w-md'>
+    <Story />
+  </div>
+);
 
 const meta = {
   title: 'Features/Dashboard/Release Provider Matrix/TrackRow',
   component: TrackRow,
   parameters: { layout: 'padded' },
-  decorators: padded,
   args: {
     track,
     release,
@@ -92,14 +74,13 @@ const meta = {
     columnCount: 11,
     renderMode: 'stack',
   },
+  decorators: [padded],
 } satisfies Meta<typeof TrackRow>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Stack: Story = {};
-
-export const StackSelected: Story = { args: { isSelected: true } };
 
 export const Table: Story = {
   args: {
@@ -122,17 +103,4 @@ export const Table: Story = {
       </table>
     ),
   ],
-};
-
-export const ContainerStack: Story = {
-  render: () => (
-    <TrackRowsContainer
-      tracks={tracks}
-      release={release}
-      providerConfig={providerConfig}
-      allProviders={allProviders}
-      columnCount={11}
-      renderMode='stack'
-    />
-  ),
 };

@@ -105,19 +105,7 @@ function renderTrackRow(props: Partial<ComponentProps<typeof TrackRow>> = {}) {
 
 describe('TrackRow', () => {
   it('marks selected rows with the selected state contract', () => {
-    render(
-      <table>
-        <tbody>
-          <TrackRow
-            track={createTrack()}
-            providerConfig={providerConfig}
-            allProviders={['spotify', 'apple_music']}
-            columnCount={11}
-            isSelected={true}
-          />
-        </tbody>
-      </table>
-    );
+    renderTrackRow({ isSelected: true });
 
     const row = screen.getByTestId('track-row-track-1');
     expect(row).toHaveAttribute('data-state', 'selected');

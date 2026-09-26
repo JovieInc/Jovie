@@ -175,7 +175,6 @@ describe('TrackSidebar', () => {
 
   it('passes the owning release id when toggling preview playback', async () => {
     const user = userEvent.setup();
-
     render(
       <TrackSidebar
         track={buildTrack({
@@ -185,10 +184,8 @@ describe('TrackSidebar', () => {
         onClose={vi.fn()}
       />
     );
-
     await user.click(screen.getByTestId('drawer-tab-assets'));
     await user.click(screen.getByRole('button', { name: 'Play preview' }));
-
     expect(audioPlayer.toggleTrack).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'track-1',

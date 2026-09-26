@@ -5,15 +5,8 @@ import { queryKeys } from './keys';
 import { fetchReleaseTracks } from './useReleaseTracksQuery';
 
 /**
- * Intent-driven prefetch for the release detail drawer.
- *
- * The drawer seeds its entity data from the matrix cache via
- * `useReleaseEntityQuery`'s initialData, so the track list is the only cold
- * fetch on open. Call this on genuine pointer-hover or keyboard-focus intent
- * (never on mount — that would issue one request per row in long lists).
- * TanStack dedupes repeat prefetches inside `STANDARD_CACHE.staleTime`, so
- * rapid hover/focus churn does not fan out requests. Touch entry is covered
- * by the drawer's own fetch — no hover exists there.
+ * Warm the drawer's only cold fetch (the track list) on real hover/focus
+ * intent — never on mount. TanStack dedupes within `STANDARD_CACHE.staleTime`.
  */
 export function prefetchReleaseDetailData(
   queryClient: QueryClient,

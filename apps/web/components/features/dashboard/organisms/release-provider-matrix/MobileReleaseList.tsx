@@ -234,12 +234,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
-  // Optional context read: rows may render without a QueryClientProvider
-  // (tests/stories) — prefetch is a no-op there.
+  // Optional: rows may render without a provider (tests/stories).
   const queryClient = useContext(QueryClientContext);
-
-  // Warm the drawer's track list on focus intent (keyboard/touch focus fires
-  // before the tap opens the drawer).
   const prefetchDetail = useCallback(() => {
     if (queryClient) prefetchReleaseDetailData(queryClient, release);
   }, [queryClient, release]);

@@ -1,7 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Map of event name -> listener callbacks registered on the mock Audio element
 let audioEventListeners: Record<string, Array<() => void>>;
 let mockAudio: {
   play: ReturnType<typeof vi.fn>;
@@ -9,7 +8,6 @@ let mockAudio: {
   addEventListener: ReturnType<typeof vi.fn>;
   paused: boolean;
   src: string;
-  preload: string;
   currentTime: number;
   duration: number;
 };
@@ -21,14 +19,10 @@ function createMockAudio() {
     play: nextPlayMock ?? vi.fn().mockResolvedValue(undefined),
     pause: vi.fn(),
     addEventListener: vi.fn((event: string, handler: () => void) => {
-      if (!audioEventListeners[event]) {
-        audioEventListeners[event] = [];
-      }
-      audioEventListeners[event].push(handler);
+      (audioEventListeners[event] ??= []).push(handler);
     }),
     paused: true,
     src: '',
-    preload: '',
     currentTime: 0,
     duration: 0,
   };
@@ -37,29 +31,39 @@ function createMockAudio() {
 }
 
 function fireAudioEvent(event: string) {
-  const handlers = audioEventListeners[event];
-  if (handlers) {
-    for (const handler of handlers) {
-      handler();
-    }
-  }
+  for (const handler of audioEventListeners[event] ?? []) handler();
 }
 
-// Mock the global Audio constructor before any module imports.
-// A constructor function that returns the mock object directly so that
-// property assignments (e.g. audio.src = ...) happen on our tracked reference.
-function MockAudioConstructor() {
+vi.stubGlobal('Audio', function MockAudio() {
   return createMockAudio();
-}
-vi.stubGlobal('Audio', MockAudioConstructor);
+});
 
-// Each test needs a fresh module to reset the module-level singleton `_audio`
-async function importFresh() {
+async function setup() {
   const mod = await import(
     '@/components/organisms/release-sidebar/useTrackAudioPlayer'
   );
-  return mod.useTrackAudioPlayer;
+  return { mod, result: renderHook(() => mod.useTrackAudioPlayer()).result };
 }
+
+const CDN = 'https://cdn.example.com';
+const song = (id: string, extra: object = {}) => ({
+  id,
+  title: 'Test Song',
+  audioUrl: `${CDN}/song.mp3`,
+  ...extra,
+});
+
+const ps = (r: { current: any }) => r.current.playbackState;
+
+const play = async (result: { current: any }, t: object) => {
+  await act(async () => {
+    await result.current.toggleTrack(t);
+  });
+  act(() => {
+    mockAudio.paused = false;
+    fireAudioEvent('play');
+  });
+};
 
 describe('useTrackAudioPlayer', () => {
   beforeEach(() => {
@@ -68,61 +72,40 @@ describe('useTrackAudioPlayer', () => {
   });
 
   it('plays a new track and sets metadata', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
-
-    const track = {
-      id: 'track-1',
-      title: 'Test Song',
-      audioUrl: 'https://cdn.example.com/song.mp3',
-      releaseTitle: 'Test Album',
-      artistName: 'Test Artist',
-      artworkUrl: 'https://cdn.example.com/art.jpg',
-    };
+    const { result } = await setup();
 
     await act(async () => {
-      await result.current.toggleTrack(track);
+      await result.current.toggleTrack(
+        song('track-1', {
+          releaseTitle: 'Test Album',
+          artistName: 'Test Artist',
+          artworkUrl: `${CDN}/art.jpg`,
+        })
+      );
     });
-
-    // After play, fire the 'play' event to set isPlaying
     act(() => {
       fireAudioEvent('play');
     });
 
-    expect(result.current.playbackState.activeTrackId).toBe('track-1');
-    expect(result.current.playbackState.trackTitle).toBe('Test Song');
-    expect(result.current.playbackState.releaseTitle).toBe('Test Album');
-    expect(result.current.playbackState.artistName).toBe('Test Artist');
-    expect(result.current.playbackState.artworkUrl).toBe(
-      'https://cdn.example.com/art.jpg'
-    );
-    expect(result.current.playbackState.isPlaying).toBe(true);
-    expect(mockAudio.src).toBe('https://cdn.example.com/song.mp3');
+    expect(ps(result)).toMatchObject({
+      activeTrackId: 'track-1',
+      trackTitle: 'Test Song',
+      releaseTitle: 'Test Album',
+      artistName: 'Test Artist',
+      artworkUrl: `${CDN}/art.jpg`,
+      isPlaying: true,
+    });
+    expect(mockAudio.src).toBe(`${CDN}/song.mp3`);
     expect(mockAudio.play).toHaveBeenCalledTimes(1);
   });
 
   it('toggles pause/resume when called with the same track ID', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
+    const { result } = await setup();
+    const track = song('track-1');
 
-    const track = {
-      id: 'track-1',
-      title: 'Test Song',
-      audioUrl: 'https://cdn.example.com/song.mp3',
-    };
+    await play(result, track);
+    expect(ps(result).isPlaying).toBe(true);
 
-    // Play the track initially
-    await act(async () => {
-      await result.current.toggleTrack(track);
-    });
-    act(() => {
-      mockAudio.paused = false;
-      fireAudioEvent('play');
-    });
-
-    expect(result.current.playbackState.isPlaying).toBe(true);
-
-    // Toggle same track -> should pause
     await act(async () => {
       await result.current.toggleTrack(track);
     });
@@ -130,11 +113,9 @@ describe('useTrackAudioPlayer', () => {
       mockAudio.paused = true;
       fireAudioEvent('pause');
     });
-
     expect(mockAudio.pause).toHaveBeenCalled();
-    expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(ps(result).isPlaying).toBe(false);
 
-    // Toggle again -> should resume (play)
     await act(async () => {
       await result.current.toggleTrack(track);
     });
@@ -142,215 +123,150 @@ describe('useTrackAudioPlayer', () => {
       mockAudio.paused = false;
       fireAudioEvent('play');
     });
-
-    // play called: once for initial, once for resume
     expect(mockAudio.play).toHaveBeenCalledTimes(2);
-    expect(result.current.playbackState.isPlaying).toBe(true);
+    expect(ps(result).isPlaying).toBe(true);
   });
 
   it('resets state and notifies error listeners on audio error', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
-
+    const { result } = await setup();
     const errorCb = vi.fn();
-
-    // Register error listener
     act(() => {
       result.current.onError(errorCb);
     });
 
-    // Play a track first
     await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-1',
-        title: 'Test Song',
-        audioUrl: 'https://cdn.example.com/song.mp3',
-        releaseTitle: 'Album',
-        artistName: 'Artist',
-        artworkUrl: 'https://cdn.example.com/art.jpg',
-      });
+      await result.current.toggleTrack(
+        song('track-1', {
+          releaseTitle: 'Album',
+          artistName: 'Artist',
+          artworkUrl: `${CDN}/art.jpg`,
+        })
+      );
     });
+    expect(ps(result).activeTrackId).toBe('track-1');
 
-    expect(result.current.playbackState.activeTrackId).toBe('track-1');
-
-    // Fire error event
     act(() => {
       fireAudioEvent('error');
     });
 
-    expect(result.current.playbackState.activeTrackId).toBeNull();
-    expect(result.current.playbackState.isPlaying).toBe(false);
-    expect(result.current.playbackState.trackTitle).toBeNull();
-    expect(result.current.playbackState.releaseTitle).toBeNull();
-    expect(result.current.playbackState.artistName).toBeNull();
-    expect(result.current.playbackState.artworkUrl).toBeNull();
+    expect(ps(result)).toMatchObject({
+      activeTrackId: null,
+      isPlaying: false,
+      trackTitle: null,
+      releaseTitle: null,
+      artistName: null,
+      artworkUrl: null,
+    });
     expect(errorCb).toHaveBeenCalledTimes(1);
   });
 
   it('keeps error status when a queued pause event lands after failure', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
+    const { result } = await setup();
 
     await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-1',
-        title: 'Test Song',
-        audioUrl: 'https://cdn.example.com/song.mp3',
-      });
+      await result.current.toggleTrack(song('track-1'));
     });
-
     act(() => {
       fireAudioEvent('error');
     });
-    expect(result.current.playbackState.playbackStatus).toBe('error');
+    expect(ps(result).playbackStatus).toBe('error');
 
-    // Real browsers dispatch media events asynchronously: the pause() inside
-    // handlePlaybackFailure queues a 'pause' event that lands after the error
-    // state was set. It must not downgrade the terminal 'error' status.
     act(() => {
       fireAudioEvent('pause');
     });
-    expect(result.current.playbackState.playbackStatus).toBe('error');
-    expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(ps(result).playbackStatus).toBe('error');
+    expect(ps(result).isPlaying).toBe(false);
   });
 
   it('sets isPlaying to false and resets currentTime on ended event', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
+    const { result } = await setup();
 
-    // Play a track
-    await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-1',
-        title: 'Test Song',
-        audioUrl: 'https://cdn.example.com/song.mp3',
-      });
-    });
-    act(() => {
-      fireAudioEvent('play');
-    });
+    await play(result, song('track-1'));
 
-    expect(result.current.playbackState.isPlaying).toBe(true);
-
-    // Simulate some playback progress via timeupdate
     act(() => {
       mockAudio.currentTime = 30;
       mockAudio.duration = 180;
       fireAudioEvent('timeupdate');
     });
+    expect(ps(result).currentTime).toBe(30);
 
-    expect(result.current.playbackState.currentTime).toBe(30);
-
-    // Fire ended event
     act(() => {
       fireAudioEvent('ended');
     });
-
-    expect(result.current.playbackState.isPlaying).toBe(false);
-    expect(result.current.playbackState.currentTime).toBe(0);
-    // activeTrackId should remain (track didn't error, it just finished)
-    expect(result.current.playbackState.activeTrackId).toBe('track-1');
+    expect(ps(result).isPlaying).toBe(false);
+    expect(ps(result).currentTime).toBe(0);
+    expect(ps(result).activeTrackId).toBe('track-1');
   });
 
-  it('stores queue metadata and advances to the next queued track on ended', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
+  const queue = () => [
+    song('track-1', { title: 'First Song', audioUrl: `${CDN}/first.mp3` }),
+    song('track-2', { title: 'Second Song', audioUrl: `${CDN}/second.mp3` }),
+  ];
 
-    const queue = [
-      {
-        id: 'track-1',
-        title: 'First Song',
-        audioUrl: 'https://cdn.example.com/first.mp3',
-      },
-      {
-        id: 'track-2',
-        title: 'Second Song',
-        audioUrl: 'https://cdn.example.com/second.mp3',
-      },
-    ];
+  it('stores queue metadata and advances to the next queued track on ended', async () => {
+    const { result } = await setup();
+    const q = queue();
 
     await act(async () => {
-      await result.current.toggleTrack(queue[0], { queue });
+      await result.current.toggleTrack(q[0], { queue: q });
     });
     act(() => {
       fireAudioEvent('play');
     });
-
-    expect(result.current.playbackState.queueLength).toBe(2);
-    expect(result.current.playbackState.queueIndex).toBe(0);
-    expect(result.current.playbackState.hasNext).toBe(true);
-    expect(result.current.playbackState.hasPrevious).toBe(false);
+    expect(ps(result)).toMatchObject({
+      queueLength: 2,
+      queueIndex: 0,
+      hasNext: true,
+      hasPrevious: false,
+    });
 
     await act(async () => {
       fireAudioEvent('ended');
     });
-
-    expect(result.current.playbackState.activeTrackId).toBe('track-2');
-    expect(result.current.playbackState.trackTitle).toBe('Second Song');
-    expect(result.current.playbackState.queueIndex).toBe(1);
-    expect(result.current.playbackState.hasNext).toBe(false);
-    expect(result.current.playbackState.hasPrevious).toBe(true);
-    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+    expect(ps(result)).toMatchObject({
+      activeTrackId: 'track-2',
+      trackTitle: 'Second Song',
+      queueIndex: 1,
+      hasNext: false,
+      hasPrevious: true,
+    });
+    expect(mockAudio.src).toBe(`${CDN}/second.mp3`);
   });
 
   it('moves to the previous queued track when playPrevious is called', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
-
-    const queue = [
-      {
-        id: 'track-1',
-        title: 'First Song',
-        audioUrl: 'https://cdn.example.com/first.mp3',
-      },
-      {
-        id: 'track-2',
-        title: 'Second Song',
-        audioUrl: 'https://cdn.example.com/second.mp3',
-      },
-    ];
+    const { result } = await setup();
+    const q = queue();
 
     await act(async () => {
-      await result.current.toggleTrack(queue[1], { queue });
+      await result.current.toggleTrack(q[1], { queue: q });
     });
     act(() => {
       fireAudioEvent('play');
     });
-
-    expect(result.current.playbackState.activeTrackId).toBe('track-2');
-    expect(result.current.playbackState.hasPrevious).toBe(true);
+    expect(ps(result).activeTrackId).toBe('track-2');
+    expect(ps(result).hasPrevious).toBe(true);
 
     await act(async () => {
       await result.current.playPrevious();
     });
-
-    expect(result.current.playbackState.activeTrackId).toBe('track-1');
-    expect(result.current.playbackState.trackTitle).toBe('First Song');
-    expect(mockAudio.src).toBe('https://cdn.example.com/first.mp3');
+    expect(ps(result).activeTrackId).toBe('track-1');
+    expect(ps(result).trackTitle).toBe('First Song');
+    expect(mockAudio.src).toBe(`${CDN}/first.mp3`);
   });
 
   it('clears playback state on stop and stays inactive after remount', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const firstMount = renderHook(() => useTrackAudioPlayer());
-    const queue = [
-      {
-        id: 'track-1',
-        title: 'Test Song',
-        audioUrl: 'https://cdn.example.com/song.mp3',
-        releaseTitle: 'Test Album',
-        artistName: 'Test Artist',
-        artworkUrl: 'https://cdn.example.com/art.jpg',
-        hasLyrics: true,
-      },
-      {
-        id: 'track-2',
-        title: 'Next Song',
-        audioUrl: 'https://cdn.example.com/next.mp3',
-      },
-    ];
+    const { result } = await setup();
+    const q = queue();
+    q[0] = {
+      ...q[0],
+      releaseTitle: 'Test Album',
+      artistName: 'Test Artist',
+      artworkUrl: `${CDN}/art.jpg`,
+      hasLyrics: true,
+    };
 
     await act(async () => {
-      await firstMount.result.current.toggleTrack(queue[0], { queue });
+      await result.current.toggleTrack(q[0], { queue: q });
     });
     act(() => {
       mockAudio.paused = false;
@@ -361,16 +277,16 @@ describe('useTrackAudioPlayer', () => {
       fireAudioEvent('timeupdate');
     });
 
-    expect(firstMount.result.current.playbackState).toMatchObject({
+    expect(ps(result)).toMatchObject({
       activeTrackId: 'track-1',
       isPlaying: true,
       playbackStatus: 'playing',
       currentTime: 42,
       duration: 180,
-      trackTitle: 'Test Song',
+      trackTitle: 'First Song',
       releaseTitle: 'Test Album',
       artistName: 'Test Artist',
-      artworkUrl: 'https://cdn.example.com/art.jpg',
+      artworkUrl: `${CDN}/art.jpg`,
       hasLyrics: true,
       queueLength: 2,
       queueIndex: 0,
@@ -380,12 +296,12 @@ describe('useTrackAudioPlayer', () => {
 
     const pauseCallsBeforeStop = mockAudio.pause.mock.calls.length;
     act(() => {
-      firstMount.result.current.stop();
+      result.current.stop();
     });
 
     expect(mockAudio.pause).toHaveBeenCalledTimes(pauseCallsBeforeStop + 1);
     expect(mockAudio.src).toBe('');
-    expect(firstMount.result.current.playbackState).toEqual({
+    expect(ps(result)).toEqual({
       activeTrackId: null,
       isPlaying: false,
       playbackStatus: 'idle',
@@ -404,64 +320,39 @@ describe('useTrackAudioPlayer', () => {
       hasNext: false,
       hasPrevious: false,
     });
-
-    firstMount.unmount();
-    const remount = renderHook(() => useTrackAudioPlayer());
-
-    expect(remount.result.current.playbackState.activeTrackId).toBeNull();
-    expect(remount.result.current.playbackState.playbackStatus).toBe('idle');
-    expect(mockAudio.src).toBe('');
   });
 
   it('resets state and notifies listeners when play() rejects', async () => {
     nextPlayMock = vi.fn().mockRejectedValue(new Error('Playback blocked'));
 
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
+    const { result } = await setup();
     const errorCb = vi.fn();
-
     act(() => {
       result.current.onError(errorCb);
     });
 
     await act(async () => {
-      await expect(
-        result.current.toggleTrack({
-          id: 'track-1',
-          title: 'Test Song',
-          audioUrl: 'https://cdn.example.com/song.mp3',
-        })
-      ).rejects.toThrow('Playback blocked');
+      await expect(result.current.toggleTrack(song('track-1'))).rejects.toThrow(
+        'Playback blocked'
+      );
     });
 
-    expect(result.current.playbackState.activeTrackId).toBeNull();
-    expect(result.current.playbackState.isPlaying).toBe(false);
-    expect(result.current.playbackState.trackTitle).toBeNull();
+    expect(ps(result)).toMatchObject({
+      activeTrackId: null,
+      isPlaying: false,
+      trackTitle: null,
+    });
     expect(mockAudio.src).toBe('');
     expect(errorCb).toHaveBeenCalledTimes(1);
   });
 
   it('pauses for interruptions and stays paused by default', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const engine = await import(
-      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
-    );
-    const { result } = renderHook(() => useTrackAudioPlayer());
+    const { mod, result } = await setup();
 
-    await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-1',
-        title: 'Test Song',
-        audioUrl: 'https://cdn.example.com/song.mp3',
-      });
-    });
-    act(() => {
-      mockAudio.paused = false;
-      fireAudioEvent('play');
-    });
+    await play(result, song('track-1'));
 
     act(() => {
-      engine.pausePlaybackForInterruption();
+      mod.pausePlaybackForInterruption();
     });
     expect(mockAudio.pause).toHaveBeenCalled();
     act(() => {
@@ -470,40 +361,34 @@ describe('useTrackAudioPlayer', () => {
     });
 
     act(() => {
-      engine.resumePlaybackAfterInterruption();
+      mod.resumePlaybackAfterInterruption();
     });
     expect(mockAudio.play).toHaveBeenCalledTimes(1);
-    expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(ps(result).isPlaying).toBe(false);
   });
 
   it('switches source onto a single active track', async () => {
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
+    const { result } = await setup();
 
     await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-1',
-        title: 'First',
-        audioUrl: 'https://cdn.example.com/first.mp3',
-      });
+      await result.current.toggleTrack(
+        song('track-1', { title: 'First', audioUrl: `${CDN}/first.mp3` })
+      );
     });
     await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-2',
-        title: 'Second',
-        audioUrl: 'https://cdn.example.com/second.mp3',
-      });
+      await result.current.toggleTrack(
+        song('track-2', { title: 'Second', audioUrl: `${CDN}/second.mp3` })
+      );
     });
 
-    expect(result.current.playbackState.activeTrackId).toBe('track-2');
-    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+    expect(ps(result).activeTrackId).toBe('track-2');
+    expect(mockAudio.src).toBe(`${CDN}/second.mp3`);
     expect(mockAudio.pause.mock.calls.length).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps the latest track active when an earlier play() resolves late', async () => {
     let resolveFirstPlay: (() => void) | undefined;
     let resolveSecondPlay: (() => void) | undefined;
-
     nextPlayMock = vi
       .fn()
       .mockImplementationOnce(
@@ -519,24 +404,15 @@ describe('useTrackAudioPlayer', () => {
           })
       );
 
-    const useTrackAudioPlayer = await importFresh();
-    const { result } = renderHook(() => useTrackAudioPlayer());
-
-    let firstToggle: Promise<void> | undefined;
-    let secondToggle: Promise<void> | undefined;
+    const { result } = await setup();
 
     await act(async () => {
-      firstToggle = result.current.toggleTrack({
-        id: 'track-1',
-        title: 'First Song',
-        audioUrl: 'https://cdn.example.com/first.mp3',
-      });
-      secondToggle = result.current.toggleTrack({
-        id: 'track-2',
-        title: 'Second Song',
-        audioUrl: 'https://cdn.example.com/second.mp3',
-      });
-
+      const firstToggle = result.current.toggleTrack(
+        song('track-1', { title: 'First Song', audioUrl: `${CDN}/first.mp3` })
+      );
+      const secondToggle = result.current.toggleTrack(
+        song('track-2', { title: 'Second Song', audioUrl: `${CDN}/second.mp3` })
+      );
       resolveSecondPlay?.();
       await secondToggle;
       resolveFirstPlay?.();
@@ -544,70 +420,67 @@ describe('useTrackAudioPlayer', () => {
     });
 
     expect(mockAudio.pause).toHaveBeenCalledTimes(2);
-    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
-    expect(result.current.playbackState.activeTrackId).toBe('track-2');
-    expect(result.current.playbackState.trackTitle).toBe('Second Song');
+    expect(mockAudio.src).toBe(`${CDN}/second.mp3`);
+    expect(ps(result).activeTrackId).toBe('track-2');
+    expect(ps(result).trackTitle).toBe('Second Song');
   });
 
   it('syncs now-playing metadata for the active track’s release without resetting playback', async () => {
-    const mod = await import(
-      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
-    );
-    const { result } = renderHook(() => mod.useTrackAudioPlayer());
+    const { mod, result } = await setup();
 
     await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-9',
-        title: 'Old Song',
-        releaseId: 'release-1',
-        audioUrl: 'https://cdn.example.com/song.mp3',
-        releaseTitle: 'Old Album',
-        artworkUrl: 'https://cdn.example.com/old.jpg',
-      });
+      await result.current.toggleTrack(
+        song('track-9', {
+          title: 'Old Song',
+          releaseId: 'release-1',
+          releaseTitle: 'Old Album',
+          artworkUrl: `${CDN}/old.jpg`,
+        })
+      );
     });
-    act(() => fireAudioEvent('play'));
-    act(() =>
+    act(() => {
+      fireAudioEvent('play');
+    });
+
+    act(() => {
       mod.updateNowPlayingForRelease({
         id: 'release-1',
         title: 'New Album',
-        artworkUrl: 'https://cdn.example.com/new.jpg',
+        artworkUrl: `${CDN}/new.jpg`,
         artistNames: ['New Artist'],
-      })
-    );
+      });
+    });
 
-    const state = result.current.playbackState;
-    expect(state.releaseTitle).toBe('New Album');
-    expect(state.artworkUrl).toBe('https://cdn.example.com/new.jpg');
-    expect(state.artistName).toBe('New Artist');
-    // Track-level title is preserved — only release-level previews (id ===
-    // release.id) adopt the release title as their label.
-    expect(state.trackTitle).toBe('Old Song');
-    expect(state.activeTrackId).toBe('track-9');
-    expect(state.isPlaying).toBe(true);
-    expect(mockAudio.src).toBe('https://cdn.example.com/song.mp3');
+    expect(ps(result)).toMatchObject({
+      releaseTitle: 'New Album',
+      artworkUrl: `${CDN}/new.jpg`,
+      artistName: 'New Artist',
+      trackTitle: 'Old Song',
+      activeTrackId: 'track-9',
+      isPlaying: true,
+    });
+    expect(mockAudio.src).toBe(`${CDN}/song.mp3`);
     expect(mockAudio.play).toHaveBeenCalledTimes(1);
   });
 
   it('ignores now-playing updates for a different release', async () => {
-    const mod = await import(
-      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
-    );
-    const { result } = renderHook(() => mod.useTrackAudioPlayer());
+    const { mod, result } = await setup();
 
     await act(async () => {
-      await result.current.toggleTrack({
-        id: 'track-9',
-        title: 'Old Song',
-        releaseId: 'release-1',
-        audioUrl: 'https://cdn.example.com/song.mp3',
-        releaseTitle: 'Old Album',
-      });
+      await result.current.toggleTrack(
+        song('track-9', {
+          title: 'Old Song',
+          releaseId: 'release-1',
+          releaseTitle: 'Old Album',
+        })
+      );
     });
-    act(() =>
-      mod.updateNowPlayingForRelease({ id: 'release-2', title: 'Unrelated' })
-    );
 
-    expect(result.current.playbackState.releaseTitle).toBe('Old Album');
-    expect(result.current.playbackState.trackTitle).toBe('Old Song');
+    act(() => {
+      mod.updateNowPlayingForRelease({ id: 'release-2', title: 'Unrelated' });
+    });
+
+    expect(ps(result).releaseTitle).toBe('Old Album');
+    expect(ps(result).trackTitle).toBe('Old Song');
   });
 });

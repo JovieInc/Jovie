@@ -6,13 +6,6 @@ import { queryKeys } from '@/lib/queries/keys';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-const makeRelease = (overrides = {}) => ({
-  id: 'release-1',
-  profileId: 'profile-1',
-  totalTracks: 3,
-  ...overrides,
-});
-
 describe('prefetchReleaseDetailData', () => {
   let queryClient: QueryClient;
 
@@ -23,13 +16,20 @@ describe('prefetchReleaseDetailData', () => {
     });
   });
 
+  const release = (overrides = {}) => ({
+    id: 'release-1',
+    profileId: 'profile-1',
+    totalTracks: 3,
+    ...overrides,
+  });
+
   it('warms the release tracks query on intent', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve([{ id: 'track-1', title: 'Song One' }]),
     });
 
-    prefetchReleaseDetailData(queryClient, makeRelease());
+    prefetchReleaseDetailData(queryClient, release());
 
     await vi.waitFor(() => {
       expect(
@@ -42,11 +42,10 @@ describe('prefetchReleaseDetailData', () => {
     );
   });
 
-  it.each([{ totalTracks: 0 }, { profileId: '' }, { id: '' }])(
-    'does not prefetch for %o',
-    overrides => {
-      prefetchReleaseDetailData(queryClient, makeRelease(overrides));
-      expect(mockFetch).not.toHaveBeenCalled();
-    }
-  );
+  it('skips prefetch without tracks, profile id, or release id', () => {
+    prefetchReleaseDetailData(queryClient, release({ totalTracks: 0 }));
+    prefetchReleaseDetailData(queryClient, release({ profileId: '' }));
+    prefetchReleaseDetailData(queryClient, release({ id: '' }));
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });

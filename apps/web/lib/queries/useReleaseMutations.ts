@@ -23,12 +23,8 @@ import { updateNowPlayingForRelease } from '@/components/organisms/release-sideb
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from './keys';
 
-/**
- * Converge every cached view of a mutated release — the matrix row, the
- * detail query behind entity panels/drawers, the open track list, and the
- * now-playing bar's display metadata. Scoped to the affected release and
- * profile only; playback state and other profiles' caches are untouched.
- */
+/** Converge every cached view of a mutated release: matrix row, detail
+ * query, open track list, and now-playing metadata. Playback is untouched. */
 function applyReleaseUpdate(
   queryClient: QueryClient,
   profileId: string,
@@ -46,13 +42,29 @@ function applyReleaseUpdate(
     queryKeys.releases.detail(profileId, release.id),
     release
   );
-  // Track-level fields (lyrics, previews, providers) can change without a
-  // matrix shape change — invalidate so an open track list refetches just
-  // this release's key.
   void queryClient.invalidateQueries({
     queryKey: queryKeys.releases.tracks(release.id),
   });
   updateNowPlayingForRelease(release);
+}
+
+/** Invalidate every cached view of a release after an override mutation. */
+async function invalidateReleaseViews(
+  queryClient: QueryClient,
+  profileId: string,
+  releaseId: string
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.releases.matrix(profileId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.releases.detail(profileId, releaseId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.releases.tracks(releaseId),
+    }),
+  ]);
 }
 
 /** Drop all cached views of a deleted release. */
@@ -171,19 +183,11 @@ export function useSaveProviderOverrideMutation() {
 
     // Always refetch after error or success to ensure cache consistency
     onSettled: async (_data, _error, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.matrix(variables.profileId),
-      });
-      // Keep the detail view + open track list in sync with the matrix.
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.detail(
-          variables.profileId,
-          variables.releaseId
-        ),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.tracks(variables.releaseId),
-      });
+      await invalidateReleaseViews(
+        queryClient,
+        variables.profileId,
+        variables.releaseId
+      );
     },
   });
 }
@@ -241,18 +245,11 @@ export function useResetProviderOverrideMutation() {
     },
 
     onSettled: async (_data, _error, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.matrix(variables.profileId),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.detail(
-          variables.profileId,
-          variables.releaseId
-        ),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.tracks(variables.releaseId),
-      });
+      await invalidateReleaseViews(
+        queryClient,
+        variables.profileId,
+        variables.releaseId
+      );
     },
   });
 }
