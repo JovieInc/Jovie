@@ -9,11 +9,13 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     proofClaim,
     claimFooterHref,
     claimFooterLabel,
+    releaseCredits,
   }: {
     readonly catalogLoadFailed?: boolean;
     readonly proofClaim?: boolean;
     readonly claimFooterHref?: string | null;
     readonly claimFooterLabel?: string;
+    readonly releaseCredits?: readonly { readonly label: string }[];
   }) => (
     <div
       data-testid='mock-compact-template'
@@ -21,6 +23,7 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       data-proof-claim={proofClaim ? 'true' : 'false'}
       data-claim-footer-href={claimFooterHref ?? ''}
       data-claim-footer-label={claimFooterLabel ?? ''}
+      data-release-credits={(releaseCredits ?? []).map(g => g.label).join('|')}
     />
   ),
 }));
@@ -69,6 +72,38 @@ describe('StaticArtistPage', () => {
     expect(template).toHaveAttribute(
       'data-claim-footer-label',
       'Request access'
+    );
+  });
+
+  it('forwards release credits onto the compact template', () => {
+    render(
+      <StaticArtistPage
+        mode='profile'
+        artist={PROFILE_STORY_ARTIST}
+        socialLinks={[]}
+        contacts={[]}
+        subtitle='Artist profile'
+        showBackButton={false}
+        releaseCredits={[
+          {
+            role: 'producer',
+            label: 'Producer',
+            entries: [
+              {
+                artistId: 'artist-2',
+                name: 'Guest Producer',
+                handle: null,
+                role: 'producer',
+                position: 0,
+              },
+            ],
+          },
+        ]}
+      />
+    );
+    expect(screen.getByTestId('mock-compact-template')).toHaveAttribute(
+      'data-release-credits',
+      'Producer'
     );
   });
 });

@@ -313,11 +313,11 @@ Three input variables generate the entire palette:
 
 | Token | Value | Hex approx | Usage |
 |-------|-------|-----------|-------|
-| `--color-bg-base` | `#F8FAFD` | canvas | Page / canvas |
-| `--color-bg-surface-0` | `#F3F5F8` | shell | Sidebar / chrome |
-| `--color-bg-surface-1` | `#EAEDF1` | card | Cards / content |
-| `--color-bg-surface-2` | `#DFE3E8` | elevated | Hover / raised |
-| `--color-bg-surface-3` | `#D4D9E0` | floating | Pressed / overlays |
+| `--color-bg-base` | `#F3F4F6` | canvas | Page / canvas |
+| `--color-bg-surface-0` | `#F9FAFC` | shell | Sidebar / chrome |
+| `--color-bg-surface-1` | `#FFFFFF` | card | Cards / content |
+| `--color-bg-surface-2` | `#FFFFFF` | elevated | Hover / raised |
+| `--color-bg-surface-3` | `#FFFFFF` | floating | Pressed / overlays |
 | `--color-bg-primary` | `lch(98.94% 0.5 282)` | `#fcfcfd` | Primary content area |
 | `--color-bg-secondary` | `lch(95.94% 0.5 282)` | `#f3f3f5` | Secondary surfaces, sidebar |
 | Text primary | `lch(9.894% 0 282)` | `#0c0c0c` | Headings, primary text |
@@ -340,11 +340,11 @@ prior anchors without a second theme provider).
 
 | Role | Anchor | Product token(s) | Usage |
 |------|--------|------------------|-------|
-| Canvas | `#030407` | `--color-bg-base`, `--color-bg-page`, `--linear-bg-page` | App page |
-| Shell | `#06080D` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
-| Card | `#0F1420` | `--color-bg-surface-1`, `--app-shell-content-surface` | Cards / content |
-| Elevated | `#151B2A` | `--color-bg-surface-2` | Inputs, raised |
-| Floating | `#1B2436` | `--color-bg-surface-3` | Modals, tooltips |
+| Canvas | `#030406` | `--color-bg-base`, `--color-bg-page`, `--linear-bg-page` | App page |
+| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `7 8 10` | Sidebar / chrome |
+| Card | `#131417` | `--color-bg-surface-1`, `--app-shell-content-surface` | Cards / content |
+| Elevated | `#1A1B1E` | `--color-bg-surface-2` | Inputs, raised |
+| Floating | `#232427` | `--color-bg-surface-3` | Modals, tooltips |
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
 | Text secondary | `#D7DCE8` | `--color-text-secondary-token` | Labels |
 | Text muted | `#A8B0C3` | `--color-text-tertiary-token` | Meta |
@@ -765,7 +765,7 @@ keep them at semibold (~590) and do not drop medium surfaces to book/400.
 | Token | Light | Dark |
 |-------|-------|------|
 | Width | 244px | 244px |
-| Background RGB | `247 248 248` | `6 8 13` |
+| Background RGB | `247 248 248` | `7 8 10` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
@@ -877,7 +877,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 
 | Property | Value | Notes |
 |----------|-------|-------|
-| Background | `#0a0a0a` | Shipped status-screen black (e.g. `apps/web/public/offline.html`); intentionally distinct from the app canvas `--color-bg-base` (`#030407`) |
+| Background | `#0a0a0a` | Shipped status-screen black (e.g. `apps/web/public/offline.html`); intentionally distinct from the app canvas `--color-bg-base` (`#030406`) |
 | Text primary | `#ffffff` | |
 | Text secondary | `#969799` | Descriptions |
 | Text quaternary | `#62666d` | Error IDs |

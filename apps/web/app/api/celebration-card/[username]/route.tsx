@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { profileCardLayout } from '@/lib/profile/profile-card-layout';
 import { getProfileWithLinks } from '@/lib/services/profile';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 const SIZES = {
   feed: { width: 1080, height: 1080 },

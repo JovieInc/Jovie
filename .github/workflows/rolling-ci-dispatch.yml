@@ -640,6 +640,8 @@ jobs:
           include=$(jq -er '.coveragePlan.coverageInclude | .[]' "$RUNNER_TEMP/hosted-repair/test-plan.json")
           test -n "$include"
           export JOVIE_COVERAGE_INCLUDE="$include"
+          related_tests=$(jq -r '.coveragePlan.relatedTests // [] | .[]' "$RUNNER_TEMP/hosted-repair/test-plan.json")
+          export JOVIE_COVERAGE_RELATED_TESTS="$related_tests"
           BASE_SHA=$(jq -er '.baseSha' "$RUNNER_TEMP/hosted-repair/test-plan.json")
           timeout --kill-after=20s 17m \
             pnpm --filter @jovie/web test:coverage --changed "$BASE_SHA" --bail 1
@@ -817,6 +819,12 @@ jobs:
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/invariants/scanned-paths.mjs
+            scripts/invariants/done-sprint-invariants.mjs
+            scripts/invariants/ios-web-no-scroll-jank.mjs
+            scripts/invariants/latency-sensitive-execution-paths.mjs
+            scripts/invariants/latency-sensitive-execution-allowlist.json
+            scripts/invariants/registry.mjs
             scripts/design-conformance-paths.mjs
             scripts/run-affected-tests.mjs
             scripts/version-fanout-guard.mjs

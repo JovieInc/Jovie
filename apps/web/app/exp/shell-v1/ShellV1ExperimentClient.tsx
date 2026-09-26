@@ -211,6 +211,7 @@ import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 //      "keyboard shortcuts" sheet can ship later without hunting them down.
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
+import { releasePopoverStatus, releaseTrackCount } from './release-popover';
 import type { CanvasView } from './shell-v1-types';
 import { useShellHotkeys } from './useShellHotkeys';
 
@@ -892,10 +893,9 @@ function releaseToEntityPopover(r: Release): EntityPopoverData {
     artist: r.artist,
     releaseType: r.type,
     releaseDate: r.releaseDate,
-    totalTracks: r.type === 'Single' ? 1 : r.type === 'EP' ? 5 : 11,
+    totalTracks: releaseTrackCount(r.type),
     durationSec: r.durationSec,
-    status:
-      r.dsps.spotify === 'live' ? 'Live' : r.pitchReady ? 'Ready' : 'Draft',
+    status: releasePopoverStatus(r.dsps.spotify, r.pitchReady),
   };
 }
 
@@ -2769,7 +2769,6 @@ function ShellV1ExperimentContent() {
           <AudioBar
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
-            onCollapse={() => setBarCollapsed(true)}
             currentTime={currentTimeSec}
             duration={playingDurationSec}
             loopMode={loopMode}

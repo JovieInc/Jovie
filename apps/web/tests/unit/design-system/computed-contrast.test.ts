@@ -208,6 +208,10 @@ describe('computed contrast primitives', () => {
     const slashRgb = parseColor('rgb(255/0/0/0.5)');
     expect(slashRgb?.alpha).toBeCloseTo(0.5, 5);
     expect(slashRgb?.luminance).toBeCloseTo(0.2126, 3);
+    expect(parseColor('rgba(0, 0, 0, 0.9)')?.alpha).toBeCloseTo(0.9, 5);
+    expect(parseColor('lch(100% 0 0)')?.luminance).toBeCloseTo(1, 2);
+    expect(parseColor('oklch(0.5 0 0)')?.luminance).toBeCloseTo(0.125, 5);
+    expect(parseColor('oklch(0.5 0.2 180)')).toBeNull();
   });
 
   it('resolveValue supports fallbacks and rejects cycles', () => {

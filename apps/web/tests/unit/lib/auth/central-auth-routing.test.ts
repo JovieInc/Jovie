@@ -34,20 +34,22 @@ describe('central auth routing', () => {
     expect(isCentralAuthCallbackPath(APP_ROUTES.DASHBOARD)).toBe(false);
   });
 
-  it.each(
-    CENTRAL_AUTH_PASS_THROUGH_ROUTES
-  )('treats %s as a central auth pass-through route', route => {
-    expect(isCentralAuthPassThroughRoute(route)).toBe(true);
-  });
+  it.each(CENTRAL_AUTH_PASS_THROUGH_ROUTES)(
+    'treats %s as a central auth pass-through route',
+    route => {
+      expect(isCentralAuthPassThroughRoute(route)).toBe(true);
+    }
+  );
 
   it('does not treat sign-in routes as central auth pass-through routes', () => {
     expect(isCentralAuthPassThroughRoute(APP_ROUTES.SIGNIN)).toBe(false);
     expect(isCentralAuthPassThroughRoute(APP_ROUTES.SIGNUP)).toBe(false);
   });
 
-  it.each(
-    CENTRAL_AUTH_CALLBACK_ROUTES
-  )('treats %s as a central auth callback route', route => {
-    expect(isCentralAuthCallbackRoute(route)).toBe(true);
-  });
+  it.each(CENTRAL_AUTH_CALLBACK_ROUTES)(
+    'treats %s as a central auth callback route',
+    route => {
+      expect(isCentralAuthCallbackRoute(route)).toBe(true);
+    }
+  );
 });

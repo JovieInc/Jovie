@@ -52,9 +52,6 @@ const COLOR_UTILITY_PREFIXES = [
 
 // Shrink-only. Do not add entries; fix the class instead.
 const TEMPORARY_ALLOWLIST = [
-  // TODO(#18551): remove once the desktop-auth handoff PR swaps its tokens.
-  'app/(auth)/DesktopAuthRouteHandoff.tsx',
-  'app/desktop-auth/',
   // TODO: DropdownMenuItem rows restyle to a 44px touch target (min-h-11,
   // py-2, text-sm), which trips shadcn/no-restyle on any staged edit and has
   // no supported @jovie/ui size. Swap ring-offset-background ->
