@@ -397,7 +397,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
     const selector = remaining
       .split('id: storybook-browser\n')[1]
-      .split('      - name: Run ci-fast lanes')[0];
+      .split('      - name: Start ci-fast lanes')[0];
     const command = selector
       .split('run: |\n')[1]
       .replaceAll('${{ github.event_name }}', 'pull_request')
@@ -690,6 +690,47 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('overlaps the two typecheck lanes, each under its own singleflight lock', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-overlap-'));
+    const binDir = join(repo, 'bin');
+    try {
+      mkdirSync(binDir);
+      // Each call waits for the other to start; a serial runner exits 9.
+      writeFileSync(
+        join(binDir, 'pnpm'),
+        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 3 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
+      );
+      chmodSync(join(binDir, 'pnpm'), 0o755);
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'typecheck',
+            CI_FAST_LANES_OUT: join(repo, 'out.json'),
+            CI_FAST_ONLY_STRUCTURAL: 'false',
+            GITHUB_EVENT_NAME: 'workflow_dispatch',
+            TYPECHECK_SINGLEFLIGHT_DIR: '',
+            PATH: `${binDir}:${process.env.PATH}`,
+          },
+        }
+      );
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      const { lanes } = JSON.parse(
+        readFileSync(join(repo, 'out.json'), 'utf8')
+      );
+      expect(lanes.map(lane => [lane.id, lane.logExcerpt])).toEqual([
+        ['typecheck', 'dir='],
+        ['web-tests-typecheck', 'dir=.cache/typecheck-singleflight-tests'],
+      ]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     {
       name: 'a product-owned root script changes',
@@ -883,20 +924,20 @@ describe('ci-fast bounded parallel workflow', () => {
       /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
     );
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
-    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo');
+    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
     const configHash =
-      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json')";
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json')";
     expect(restore).toContain(
-      `key: jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
+      `key: jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
     );
     expect(restore).toContain(
-      `jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\n`
+      `jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\n`
     );
     expect(restore).toMatch(
-      /\n\s+jovie-web-tsbuildinfo-v1-\$\{\{ runner\.os \}\}-\s*$/
+      /\n\s+jovie-web-tsbuildinfo-v2-\$\{\{ runner\.os \}\}-\s*$/
     );
     expect(record).toContain(
-      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo') }}"
+      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo*') }}"
     );
 
     // Order: restore before the lanes, save after them.
@@ -912,7 +953,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(save).toContain(`uses: actions/cache/save@${cacheSha}`);
     expect(save).toContain("steps.lanes.outcome == 'success' &&");
     expect(save).toContain(
-      "hashFiles('apps/web/.cache/tsbuildinfo') != steps.web-tsbuildinfo-restored.outputs.hash"
+      "hashFiles('apps/web/.cache/tsbuildinfo*') != steps.web-tsbuildinfo-restored.outputs.hash"
     );
     expect(save).toContain(
       "((github.event_name == 'push' && github.ref == 'refs/heads/main') ||"
@@ -931,6 +972,38 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(save).toContain(
       'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}'
     );
+
+    // tsc-cache-warm.yml seeds main (merge_group can read main, not PRs):
+    // trusted triggers, no secrets, same path and fallbacks, save after tsc.
+    const warm = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/tsc-cache-warm.yml'),
+      'utf8'
+    );
+    const header = warm.slice(0, warm.indexOf('\njobs:'));
+    expect(header).toMatch(
+      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:\n {2}contents: read\n\n/m
+    );
+    expect(warm).toContain("github.ref == 'refs/heads/main' &&");
+    expect(warm).not.toMatch(/secrets\.|TURBO_TOKEN|continue-on-error/);
+    expect(warm).toContain('persist-credentials: false');
+    const keys = body =>
+      body.split('\n').filter(line => line.includes('jovie-web-tsbuildinfo'));
+    const [ciKey, ...ciFallbacks] = keys(restore).map(line => line.trim());
+    const [warmKey, ...warmFallbacks] = keys(warm).map(line => line.trim());
+    expect(warmFallbacks).toEqual(ciFallbacks);
+    expect(warmKey.replace(/h\$\{\{ steps\.hour\.outputs\.hour }}$/, '')).toBe(
+      ciKey.replace('${{ github.sha }}', '')
+    );
+    expect(
+      warm.match(/path: apps\/web\/\.cache\/tsbuildinfo\*\n/g)
+    ).toHaveLength(2);
+    const order = [
+      'Restore web tsc incremental state',
+      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n',
+      'uses: actions/cache/save@',
+      'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}',
+    ].map(marker => warm.indexOf(marker));
+    expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
@@ -1614,19 +1687,49 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('defers structural Playwright/Python until cheap remaining lanes pass', () => {
+  it('overlaps structural setup with cheap lanes; structural awaits them', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const cheapLanes = remaining.indexOf('- name: Run ci-fast lanes');
-    const playwright = remaining.indexOf('Setup Playwright (Chromium)');
-    const structuralLane = remaining.indexOf(
-      '- name: Run structural ci-fast lane'
+    const at = marker => remaining.indexOf(marker);
+    // A failing background lane run fails the await step, with its log.
+    const dir = mkdtempSync(join(tmpdir(), 'ci-fast-bg-'));
+    const env = {
+      ...process.env,
+      PATH: `${dir}:${process.env.PATH}`,
+      LANES_DIR: `${dir}/bg`,
+      GITHUB_STEP_SUMMARY: '/dev/null',
+    };
+    writeFileSync(`${dir}/node`, '#!/bin/sh\necho lane-log\nexit 3\n');
+    chmodSync(`${dir}/node`, 0o755);
+    const sh = name =>
+      spawnSync(
+        'bash',
+        [
+          '-eo',
+          'pipefail',
+          '-c',
+          remaining
+            .split(`name: ${name}`)[1]
+            .split('run: |\n')[1]
+            .split('\n      - ')[0],
+        ],
+        { env, encoding: 'utf8', timeout: 9000 }
+      );
+    expect(sh('Start ci-fast lanes').status).toBe(0);
+    const awaited = sh('Await ci-fast lanes');
+    rmSync(dir, { recursive: true, force: true });
+    expect([awaited.status, awaited.stdout]).toEqual([3, 'lane-log\n']);
+    expect(at('Setup Playwright (Chromium)')).toBeGreaterThan(
+      at('- name: Start ci-fast lanes')
     );
-    expect(cheapLanes).toBeGreaterThan(0);
-    expect(playwright).toBeGreaterThan(cheapLanes);
-    expect(structuralLane).toBeGreaterThan(playwright);
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Restore Symphony selector cache')
+    );
+    expect(at('- name: Run structural ci-fast lane')).toBeGreaterThan(
+      at('- name: Await ci-fast lanes')
+    );
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain(
@@ -2327,7 +2430,7 @@ describe('invariant-scanned PR structural selection', () => {
     );
     expect(decision).toContain(addition);
     expect(decision.indexOf(addition)).toBeLessThan(
-      decision.indexOf('if git diff --name-only')
+      decision.indexOf('|| git diff --name-only')
     );
 
     const ere = execFileSync(
@@ -2351,6 +2454,29 @@ describe('invariant-scanned PR structural selection', () => {
     ]) {
       expect(selects(path), path).toBe(false);
     }
+  });
+});
+
+describe('new scripts test PR structural selection', () => {
+  // #18714 added an unwired scripts test; only the merge queue ran the
+  // inventory guard, so the PR passed and the queue group was ejected.
+  it('selects structural when a PR adds or renames a scripts test', () => {
+    const decision = WORKFLOW.slice(
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
+    );
+    const line = decision
+      .split('\n')
+      .find(l => l.includes('NEW_SCRIPT_TESTS=$('));
+    expect(line).toContain('git diff --diff-filter=AR --name-only');
+    expect(decision).toContain('if [ -n "$NEW_SCRIPT_TESTS" ] ||');
+    const ere = line.match(/grep -E '([^']+)'/)[1];
+    const selects = path =>
+      spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
+    expect(selects('scripts/ops/firecrawl-crawl.test.mjs')).toBe(true);
+    expect(selects('scripts/symphony/lib/__tests__/typed.test.ts')).toBe(true);
+    expect(selects('scripts/ops/firecrawl-crawl.mjs')).toBe(false);
+    expect(selects('apps/web/tests/unit/a.test.ts')).toBe(false);
   });
 });
 
