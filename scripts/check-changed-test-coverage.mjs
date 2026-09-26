@@ -14,6 +14,19 @@ function readArgument(name) {
   return process.argv[index + 1];
 }
 
+function readArguments(name) {
+  const values = [];
+  process.argv.forEach((arg, index) => {
+    if (arg !== name) return;
+    const value = process.argv[index + 1];
+    if (!value || value.startsWith('--')) {
+      throw new Error(`Missing value for ${name} argument.`);
+    }
+    values.push(value);
+  });
+  return values;
+}
+
 try {
   const base = readArgument('--base');
   const head = readArgument('--head');
@@ -25,12 +38,14 @@ try {
     console.log(JSON.stringify({ ...plan, coverageInclude }));
     process.exitCode = 0;
   } else {
+    // Repeat --coverage once per `vitest --shard` report; the maps are merged.
+    const coveragePaths = readArguments('--coverage').map(path =>
+      resolve(path)
+    );
     const result = runChangedLineCoverageCheck({
       base,
       head,
-      coveragePath: process.argv.includes('--coverage')
-        ? resolve(readArgument('--coverage'))
-        : undefined,
+      ...(coveragePaths.length > 0 ? { coveragePaths } : {}),
     });
     console.log(formatChangedLineCoverage(result));
     if (!result.ok) process.exitCode = 1;

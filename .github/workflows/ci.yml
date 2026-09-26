@@ -4671,13 +4671,165 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  ci-exact-head-coverage-shard:
+    name: Exact-head Coverage shard ${{ matrix.shard }}/4
+    needs: [ci-path-changes]
+    # V8 coverage for the planned related tests is CPU-bound on one 4-vCPU
+    # runner (merge_group run 36260335136: 331 files, 313s step). Four
+    # `vitest --shard` runners each take a disjoint quarter of the same
+    # related selection; ci-exact-head-coverage merges their coverage maps
+    # and runs the unchanged changed-line ratchet. Local repro of that run:
+    # the four shards ran the identical 331 files / 2483 tests and merged to
+    # the identical statement hit counts as the unsharded run.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.ci-path-changes.outputs.has_web_coverage_changes == 'true' &&
+      (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Checkout exact coverage head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Fetch base-branch history
+        # Same blobless base fetch and diff-base resolution as
+        # ci-exact-head-coverage (see the comment there): the coverage plan
+        # reads the same exact diff.
+        id: coverage-base
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
+            COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"
+          else
+            COVERAGE_BASE="$MERGE_GROUP_BASE"
+          fi
+          [[ "$COVERAGE_BASE" =~ ^[0-9a-f]{40}$ ]]
+          GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
+          GIT_NO_LAZY_FETCH=1 git diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
+          echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify exact coverage head and diff base
+        env:
+          GIT_NO_LAZY_FETCH: '1'
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$COVERAGE_BASE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git cat-file -e "${COVERAGE_BASE}^{commit}"
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run exact-head coverage shard
+        id: coverage-shard
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}
+          COVERAGE_SHARD: ${{ matrix.shard }}/4
+          COVERAGE_REPORT: exact-head-coverage/coverage-final.${{ matrix.shard }}.json
+        # Do not put a double-dash separator before --changed. pnpm 9
+        # forwards that token and Vitest then treats --changed as a
+        # positional, which runs the full suite until the 18m job cap.
+        # --shard partitions the planned related selection by measured
+        # cost (DurationShardSequencer); an empty shard still writes the
+        # coverage.all zero report, so every applicable shard uploads one.
+        # Keep this note in YAML, not inside the shell script, so
+        # actionlint/shellcheck do not see quoted command substitution.
+        run: |
+          set -euo pipefail
+          coverage_group=''
+          stop_coverage() {
+            trap - EXIT INT TERM
+            if [[ -n "$coverage_group" ]] && kill -0 -- "-$coverage_group" 2>/dev/null; then
+              kill -TERM -- "-$coverage_group" 2>/dev/null || true
+              sleep 2
+              kill -KILL -- "-$coverage_group" 2>/dev/null || true
+            fi
+            wait "$coverage_group" 2>/dev/null || true
+          }
+          trap 'stop_coverage; exit 130' INT
+          trap 'stop_coverage; exit 143' TERM
+          trap stop_coverage EXIT
+          export EXPECTED_HEAD COVERAGE_BASE COVERAGE_SHARD COVERAGE_REPORT
+          setsid bash -c "
+            set -euo pipefail
+            plan_json=\$(node scripts/check-changed-test-coverage.mjs \
+              --base \"\$COVERAGE_BASE\" \
+              --head \"\$EXPECTED_HEAD\" \
+              --plan)
+            echo \"\$plan_json\"
+            if [[ \"\$(printf '%s' \"\$plan_json\" | jq -r '.applicable')\" != 'true' ]]; then
+              echo 'No coverable web product source; non-applicable exact-head coverage receipt.'
+              exit 0
+            fi
+            include=\$(printf '%s' \"\$plan_json\" | jq -r '.coverageInclude // [] | .[]')
+            if [[ -z \"\$include\" ]]; then
+              echo 'Applicable exact-head coverage plan produced no include paths.'
+              exit 1
+            fi
+            export JOVIE_COVERAGE_INCLUDE=\"\$include\"
+            related_tests=\$(printf '%s' \"\$plan_json\" | jq -r '.relatedTests // [] | .[]')
+            export JOVIE_COVERAGE_RELATED_TESTS=\"\$related_tests\"
+            timeout --kill-after=20s 17m \
+              pnpm --filter @jovie/web test:coverage --changed \"\$COVERAGE_BASE\" --bail 1 --shard \"\$COVERAGE_SHARD\"
+            mkdir -p exact-head-coverage
+            cp apps/web/coverage/coverage-final.json \"\$COVERAGE_REPORT\"
+            echo 'applicable=true' >> \"\$GITHUB_OUTPUT\"
+          " &
+          coverage_group=$!
+          wait "$coverage_group"
+          coverage_group=''
+          trap - EXIT INT TERM
+
+      - name: Upload exact-head coverage shard report
+        if: steps.coverage-shard.outputs.applicable == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: exact-head-coverage-${{ github.run_id }}-${{ matrix.shard }}
+          path: exact-head-coverage/coverage-final.${{ matrix.shard }}.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1
+
   ci-exact-head-coverage:
     name: Exact-head Coverage
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-exact-head-coverage-shard]
     # Coverage is promotion evidence, not a draft-publication prerequisite.
     # Run V8 coverage on the exact source head and exact synthetic merge-group
     # head. Docs-only heads keep an explicit green no-code receipt without
     # spending a runner on an empty coverage pass.
+    # The V8 run itself happens in ci-exact-head-coverage-shard; this job
+    # requires every shard to pass, merges their coverage maps, and runs the
+    # changed-line ratchet on the exact diff.
     # Job timeout must fail before GitHub merge-queue
     # check_response_timeout_minutes=60 after source-first ruleset cutover.
     if: >-
@@ -4692,6 +4844,17 @@ jobs:
       - name: Record non-applicable coverage receipt
         if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true' && needs.ci-path-changes.outputs.has_route_prep_coverage_changes != 'true'
         run: echo "No web runtime or coverage-substrate change; selected exact-head CI tests own the changed behavior."
+
+      - name: Require every exact-head coverage shard
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+        env:
+          SHARD_RESULT: ${{ needs.ci-exact-head-coverage-shard.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$SHARD_RESULT" != 'success' ]]; then
+            echo "::error::Exact-head coverage shards did not pass (result: $SHARD_RESULT)."
+            exit 1
+          fi
 
       - name: Checkout exact coverage head
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
@@ -4760,66 +4923,67 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git cat-file -e "${COVERAGE_BASE}^{commit}"
 
-      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Node for the changed-behavior ratchet
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
 
-      - name: Run exact-head coverage and changed-behavior ratchet
+      - name: Plan exact-head changed-behavior ratchet
+        id: coverage-plan
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
-          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
           EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}
-        # Do not put a double-dash separator before --changed. pnpm 9
-        # forwards that token and Vitest then treats --changed as a
-        # positional, which runs the full suite until the 18m job cap.
-        # Keep this note in YAML, not inside the shell script, so
-        # actionlint/shellcheck do not see quoted command substitution.
         run: |
           set -euo pipefail
-          coverage_group=''
-          stop_coverage() {
-            trap - EXIT INT TERM
-            if [[ -n "$coverage_group" ]] && kill -0 -- "-$coverage_group" 2>/dev/null; then
-              kill -TERM -- "-$coverage_group" 2>/dev/null || true
-              sleep 2
-              kill -KILL -- "-$coverage_group" 2>/dev/null || true
-            fi
-            wait "$coverage_group" 2>/dev/null || true
-          }
-          trap 'stop_coverage; exit 130' INT
-          trap 'stop_coverage; exit 143' TERM
-          trap stop_coverage EXIT
-          export EXPECTED_HEAD COVERAGE_BASE
-          setsid bash -c "
-            set -euo pipefail
-            plan_json=\$(node scripts/check-changed-test-coverage.mjs \
-              --base \"\$COVERAGE_BASE\" \
-              --head \"\$EXPECTED_HEAD\" \
-              --plan)
-            echo \"\$plan_json\"
-            if [[ \"\$(printf '%s' \"\$plan_json\" | jq -r '.applicable')\" != 'true' ]]; then
-              echo 'No coverable web product source; non-applicable exact-head coverage receipt.'
-              exit 0
-            fi
-            include=\$(printf '%s' \"\$plan_json\" | jq -r '.coverageInclude // [] | .[]')
-            if [[ -z \"\$include\" ]]; then
-              echo 'Applicable exact-head coverage plan produced no include paths.'
+          plan_json=$(node scripts/check-changed-test-coverage.mjs \
+            --base "$COVERAGE_BASE" \
+            --head "$EXPECTED_HEAD" \
+            --plan)
+          echo "$plan_json"
+          applicable=$(printf '%s' "$plan_json" | jq -r '.applicable')
+          if [[ "$applicable" != 'true' ]]; then
+            echo 'No coverable web product source; non-applicable exact-head coverage receipt.'
+          fi
+          echo "applicable=$applicable" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact-head coverage shard reports
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true' && steps.coverage-plan.outputs.applicable == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: exact-head-coverage-${{ github.run_id }}-*
+          path: ${{ runner.temp }}/exact-head-coverage
+          merge-multiple: true
+
+      - name: Run exact-head coverage and changed-behavior ratchet
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true' && steps.coverage-plan.outputs.applicable == 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}
+          COVERAGE_REPORTS: ${{ runner.temp }}/exact-head-coverage
+        # One report per shard (coverage-final.<n>.json, n = 1..4); a
+        # missing or extra report fails closed before the merged ratchet.
+        run: |
+          set -euo pipefail
+          coverage_args=()
+          for shard in 1 2 3 4; do
+            report="$COVERAGE_REPORTS/coverage-final.${shard}.json"
+            if [[ ! -f "$report" ]]; then
+              echo "::error::Missing exact-head coverage report for shard ${shard}/4."
               exit 1
             fi
-            export JOVIE_COVERAGE_INCLUDE=\"\$include\"
-            related_tests=\$(printf '%s' \"\$plan_json\" | jq -r '.relatedTests // [] | .[]')
-            export JOVIE_COVERAGE_RELATED_TESTS=\"\$related_tests\"
-            timeout --kill-after=20s 17m \
-              pnpm --filter @jovie/web test:coverage --changed \"\$COVERAGE_BASE\" --bail 1
-            node scripts/check-changed-test-coverage.mjs \
-              --base \"\$COVERAGE_BASE\" \
-              --head \"\$EXPECTED_HEAD\"
-          " &
-          coverage_group=$!
-          wait "$coverage_group"
-          coverage_group=''
-          trap - EXIT INT TERM
+            coverage_args+=(--coverage "$report")
+          done
+          report_count=$(find "$COVERAGE_REPORTS" -type f | wc -l)
+          if [[ "$report_count" -ne 4 ]]; then
+            echo "::error::Expected 4 exact-head coverage shard reports, found ${report_count}."
+            exit 1
+          fi
+          node scripts/check-changed-test-coverage.mjs \
+            --base "$COVERAGE_BASE" \
+            --head "$EXPECTED_HEAD" \
+            "${coverage_args[@]}"
 
       - name: Checkout exact route-prep coverage head
         if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
