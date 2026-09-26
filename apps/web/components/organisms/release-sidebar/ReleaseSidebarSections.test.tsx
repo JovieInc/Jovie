@@ -24,15 +24,19 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerMediaThumb: ({
     imageClassName,
     sizeClassName,
+    fallback,
   }: {
     readonly imageClassName?: string;
     readonly sizeClassName?: string;
+    readonly fallback?: React.ReactNode;
   }) => (
     <div
       data-testid='release-artwork-thumb'
       data-image-class={imageClassName}
       className={sizeClassName}
-    />
+    >
+      {fallback}
+    </div>
   ),
   DrawerSection: ({ children }: { readonly children?: React.ReactNode }) => (
     <section>{children}</section>
@@ -264,6 +268,27 @@ describe('ReleaseSidebarSections', () => {
     expect(artwork).toHaveAttribute('data-image-class', 'object-contain');
     expect(preview).toHaveClass('rounded-xs');
     expect(preview).not.toHaveClass('rounded-lg');
+  });
+
+  it('uses the banned-icon-safe AudioLines glyph for the missing-artwork fallback', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId('icon-AudioLines')).toBeTruthy();
+    expect(screen.queryByTestId('icon-Disc3')).toBeNull();
   });
 
   it('takes the provider glyph from the first letter or digit', () => {

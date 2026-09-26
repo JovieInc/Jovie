@@ -45,11 +45,11 @@ import {
   ChevronLeft,
   ChevronUp,
   Copy,
-  Disc3,
   ExternalLink,
   Flag,
   Heart,
   Inbox,
+  Layers,
   LayoutDashboard,
   Library as LibraryIcon,
   Link as LinkIcon,
@@ -411,7 +411,7 @@ const THREADS: Thread[] = [
 
 const ARTIST_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', active: true },
-  { icon: Disc3, label: 'Releases' },
+  { icon: Layers, label: 'Releases' },
   { icon: BarChart3, label: 'Insights' },
   { icon: Users, label: 'Audience' },
   { icon: Heart, label: 'Tipping' },
@@ -5126,7 +5126,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         <ShellDropdown.Item icon={ExternalLink} label='Open Release' />
         <ShellDropdown.Separator />
         <ShellDropdown.Sub>
-          <ShellDropdown.SubTrigger icon={Disc3} label='Move To Release…' />
+          <ShellDropdown.SubTrigger icon={Layers} label='Move To Release…' />
           <ShellDropdown.SubContent
             searchable
             searchPlaceholder='Filter releases…'
