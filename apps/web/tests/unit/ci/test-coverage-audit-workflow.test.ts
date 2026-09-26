@@ -71,13 +71,15 @@ describe('test coverage audit workflow', () => {
       resolve(repoRoot, '.github/workflows/ci.yml'),
       'utf8'
     );
+    // Exact-head V8 collection runs in the ci-exact-head-coverage-shard
+    // matrix, which ci-exact-head-coverage merges and ratchets.
     const unitJob = ciWorkflow.slice(
       ciWorkflow.indexOf('  ci-unit-tests:'),
-      ciWorkflow.indexOf('  ci-exact-head-coverage:')
+      ciWorkflow.indexOf('  ci-exact-head-coverage-shard:')
     );
     const coverageJob = ciWorkflow.slice(
-      ciWorkflow.indexOf('  ci-exact-head-coverage:'),
-      ciWorkflow.indexOf('  ci-a11y:')
+      ciWorkflow.indexOf('  ci-exact-head-coverage-shard:'),
+      ciWorkflow.indexOf('  ci-exact-head-coverage:')
     );
 
     expect(unitJob).not.toContain('test:coverage');

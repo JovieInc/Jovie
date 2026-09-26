@@ -1874,27 +1874,16 @@ def run_official_binary_once(
     closure_observe_only: bool,
     max_gate_sleep_seconds: int | None,
 ) -> int:
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        errors="replace",
-        bufsize=1,
-    )
+    process: subprocess.Popen[str] | None = None
     rate_limited = False
     stop_signal: int | None = None
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
-    assert process.stdout is not None
     previous_handlers = {}
 
-    def request_shutdown(signum: int, _frame: Any) -> None:
-        nonlocal stop_signal
-        if stop_signal is not None:
-            return
-        stop_signal = signum
+    def forward_shutdown(signum: int) -> None:
+        assert process is not None
         if process.poll() is None:
             try:
                 process.send_signal(signum)
@@ -1904,10 +1893,33 @@ def run_official_binary_once(
                 pass
         raise _ShutdownRequested()
 
+    def request_shutdown(signum: int, _frame: Any) -> None:
+        nonlocal stop_signal
+        if stop_signal is not None:
+            return
+        stop_signal = signum
+        if process is not None:
+            forward_shutdown(signum)
+        # Otherwise the child is still being spawned; it is forwarded below.
+
+    # Trap TERM/INT before the child exists: a signal that lands while the
+    # child is starting must be forwarded, not kill this supervisor by default
+    # and orphan the scheduler.
     try:
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            previous_handlers[signum] = signal.signal(signum, request_shutdown)
         try:
-            for signum in (signal.SIGTERM, signal.SIGINT):
-                previous_handlers[signum] = signal.signal(signum, request_shutdown)
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                errors="replace",
+                bufsize=1,
+            )
+            assert process.stdout is not None
+            if stop_signal is not None:
+                forward_shutdown(stop_signal)
             for line in process.stdout:
                 print(line, end="", flush=True)
                 classification = classify_linear_log_line(line)
@@ -1953,7 +1965,8 @@ def run_official_binary_once(
     finally:
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
-        process.stdout.close()
+        if process is not None and process.stdout is not None:
+            process.stdout.close()
 
 
 def run_official_binary(

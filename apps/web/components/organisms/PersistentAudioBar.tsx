@@ -204,6 +204,24 @@ export function PersistentAudioBar() {
   // space, no layout shift of main content (founder spec 2026-09-25 #5).
   const compactPlayerVisible = hasActiveTrack && !playerOpen;
 
+  // An active track with lyrics is the intent signal for the lyrics
+  // surface (lyrics button and the `l` shortcut both land there). Warm the
+  // route once per track so opening lyrics feels immediate; skipped while
+  // already on a lyrics route. Bounded to one prefetch per track id.
+  const prefetchedLyricsTrackRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !activeTrackId ||
+      !playbackState.hasLyrics ||
+      isLyricsRoutePath(pathname) ||
+      prefetchedLyricsTrackRef.current === activeTrackId
+    ) {
+      return;
+    }
+    prefetchedLyricsTrackRef.current = activeTrackId;
+    router.prefetch(buildLyricsRoute(activeTrackId));
+  }, [activeTrackId, pathname, playbackState.hasLyrics, router]);
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || isFormElement(event.target)) return;

@@ -155,9 +155,26 @@ describe('exact-head coverage diff base (ci.yml)', () => {
     expect(step('ci.yml', RESOLVE_STEP, JOB)).toContain('id: coverage-base');
     for (const name of [
       'Verify exact coverage head and diff base',
+      'Plan exact-head changed-behavior ratchet',
       'Run exact-head coverage and changed-behavior ratchet',
     ]) {
       expect(step('ci.yml', name, JOB), name).toContain(
+        'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
+      );
+    }
+    // The V8 shards resolve the same base and plan from the same diff.
+    const SHARD_JOB = 'ci-exact-head-coverage-shard';
+    expect(step('ci.yml', RESOLVE_STEP, SHARD_JOB)).toContain(
+      'id: coverage-base'
+    );
+    expect(stepRunScript('ci.yml', RESOLVE_STEP, SHARD_JOB)).toBe(
+      stepRunScript('ci.yml', RESOLVE_STEP, JOB)
+    );
+    for (const name of [
+      'Verify exact coverage head and diff base',
+      'Run exact-head coverage shard',
+    ]) {
+      expect(step('ci.yml', name, SHARD_JOB), name).toContain(
         'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
       );
     }

@@ -874,6 +874,18 @@ describe('Public Profile Page Logic', () => {
       );
     });
 
+    it('passes public-release presence into profile metadata (JOV-6611)', () => {
+      const metadataSource = PUBLIC_PROFILE_PAGE_SOURCE.slice(
+        PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+          'export async function generateMetadata'
+        )
+      );
+      expect(metadataSource).toContain('latestRelease');
+      expect(metadataSource).toContain(
+        'hasPublicRelease: latestRelease !== null'
+      );
+    });
+
     it('uses notFound() in generateMetadata for missing profiles', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'export async function generateMetadata'

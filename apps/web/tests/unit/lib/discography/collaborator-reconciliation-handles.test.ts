@@ -27,6 +27,7 @@ function selectBuilder() {
   const builder: Record<string, unknown> = {};
   builder.from = () => builder;
   builder.innerJoin = () => builder;
+  builder.leftJoin = () => builder;
   builder.where = () => builder;
   builder.orderBy = () => builder;
   builder.limit = () => nextSelectResult();

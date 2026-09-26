@@ -15,10 +15,11 @@ export function isProtectedCacheKey(key) {
 
 // Rolling build caches: keep only the newest entries per live ref. The
 // next-build-web family is the Build + Layout Turbopack cache that ci.yml
-// restores and next-build-cache-warm.yml writes from main.
+// restores and next-build-cache-warm.yml writes from main; tsbuildinfo is
+// the tsc state tsc-cache-warm.yml writes hourly.
 export function turboFamily(key) {
   const match = String(key ?? '').match(
-    /^((?:Linux|macOS|Windows)-(?:turbo|next-build-web))/
+    /^((?:Linux|macOS|Windows)-(?:turbo|next-build-web)|jovie-web-tsbuildinfo)/
   );
   return match ? match[1] : null;
 }

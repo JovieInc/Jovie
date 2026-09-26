@@ -119,6 +119,12 @@ function readIdentityInstructions(id: EveIdentityId): string {
   const candidates = [
     resolve(
       /* turbopackIgnore: true */ process.cwd(),
+      'runtime-data/apps/eve-pilot/identities',
+      id,
+      'instructions.md'
+    ),
+    resolve(
+      /* turbopackIgnore: true */ process.cwd(),
       '../eve-pilot/identities',
       id,
       'instructions.md'
