@@ -161,7 +161,7 @@ export async function runPlaceholderUnpublish(
 
 export async function runCli(
   argv: readonly string[],
-  env: { DATABASE_URL?: string } = process.env
+  env: Readonly<Record<string, string | undefined>> = process.env
 ): Promise<PlaceholderUnpublishPlan> {
   const options = parseArgs(argv);
   const databaseUrl = env.DATABASE_URL;
