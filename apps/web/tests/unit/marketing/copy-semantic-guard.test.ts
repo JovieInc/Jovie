@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   auditMarketingCopyPage,
+  auditMarketingCopyRendered,
   auditMarketingCopySemantics,
   createMarketingCopyReviewDigest,
   type MarketingCopyPageBrief,
   type MarketingCopyPageDraft,
+  type MarketingCopyRenderedSurface,
 } from '@/data/marketing';
 
 const brief: MarketingCopyPageBrief = {
@@ -115,6 +117,40 @@ describe('meaning-first marketing copy guard', () => {
     );
     expect(result.status).toBe('advisory');
     expect(result.blocking).toBe(false);
+  });
+
+  it('does not let a registry pass certify a route that renders different words', () => {
+    const passingDraft = draft('One profile for every fan');
+    expect(
+      auditMarketingCopySemantics(brief, passingDraft, {
+        enforcement: 'delta',
+      }).status
+    ).toBe('pass');
+    const rendered: MarketingCopyRenderedSurface = {
+      pageId: brief.pageId,
+      route: brief.route,
+      sourceVersion: '107b5408301a5f3304c875a6e453221ba3742b29',
+      sections: [
+        {
+          sectionId: 'hero',
+          lines: [
+            {
+              lineId: 'headline',
+              role: 'headline',
+              text: 'Different words entirely.',
+            },
+          ],
+        },
+      ],
+    };
+    expect(auditMarketingCopyRendered(brief, passingDraft, rendered)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'rendered-text-changed',
+          lineId: 'headline',
+        }),
+      ])
+    );
   });
 
   it('passes a complete outcome-bound page through the structural audit', () => {
