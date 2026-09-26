@@ -229,6 +229,16 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
+    const row = screen
+      .getByRole('link', { name: /Inbox —/ })
+      .closest('[data-sidebar-brand-row]');
+    expect(row).toContainElement(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    );
+    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+      'href',
+      '/app'
+    );
   });
 
   it('keeps pending Inbox work reachable without a sidebar notifications region', () => {

@@ -96,7 +96,10 @@ function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
-export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
+export function DashboardNav({
+  children: searchSurface,
+  headerOwnsInbox = false,
+}: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const runtimeUpdate = useRuntimeUpdate();
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
@@ -124,6 +127,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     [isElectron, isMobile]
   );
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
+
   const threadsVisible =
     !isDemo &&
     !isInSettings &&
@@ -422,46 +426,48 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
             >
               {searchSurface}
               <span aria-hidden='true' className='h-4 w-px bg-subtle' />
-              <Link
-                href={APP_ROUTES.DASHBOARD}
-                onClick={event => handleCommandClick(event, inboxNavItem)}
-                prefetch={!isDemo}
-                aria-label={
-                  hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
-                }
-                data-inbox-attention={
-                  hasRuntimeUpdate
-                    ? 'available'
-                    : (inboxNavigation?.state ?? 'unknown')
-                }
-                aria-current={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
-                    ? 'page'
-                    : undefined
-                }
-                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
-              >
-                <Bell
-                  className='size-(--app-shell-sidebar-icon-size)'
-                  aria-hidden='true'
-                />
-                {inboxNavigation?.state === 'available' &&
-                (inboxNavigation.pendingCount ?? 0) > 0 ? (
-                  <span
-                    role='status'
-                    aria-label={`${inboxNavigation.pendingCount} pending items`}
-                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-background'
-                  >
-                    {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
-                  </span>
-                ) : hasRuntimeUpdate ? (
-                  <span
+              {headerOwnsInbox ? null : (
+                <Link
+                  href={APP_ROUTES.DASHBOARD}
+                  onClick={event => handleCommandClick(event, inboxNavItem)}
+                  prefetch={!isDemo}
+                  aria-label={
+                    hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
+                  }
+                  data-inbox-attention={
+                    hasRuntimeUpdate
+                      ? 'available'
+                      : (inboxNavigation?.state ?? 'unknown')
+                  }
+                  aria-current={
+                    normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
+                      ? 'page'
+                      : undefined
+                  }
+                  className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
+                >
+                  <Bell
+                    className='size-(--app-shell-sidebar-icon-size)'
                     aria-hidden='true'
-                    data-inbox-runtime-update
-                    className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
                   />
-                ) : null}
-              </Link>
+                  {inboxNavigation?.state === 'available' &&
+                  (inboxNavigation.pendingCount ?? 0) > 0 ? (
+                    <span
+                      role='status'
+                      aria-label={`${inboxNavigation.pendingCount} pending items`}
+                      className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-background'
+                    >
+                      {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
+                    </span>
+                  ) : hasRuntimeUpdate ? (
+                    <span
+                      aria-hidden='true'
+                      data-inbox-runtime-update
+                      className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
+                    />
+                  ) : null}
+                </Link>
+              )}
               <Link
                 href={APP_ROUTES.CHAT}
                 onClick={event => handleCommandClick(event, chatNavItem)}

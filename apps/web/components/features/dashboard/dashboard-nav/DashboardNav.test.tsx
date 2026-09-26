@@ -28,6 +28,16 @@ describe('DashboardNav route warming', () => {
     resetDashboardNavTestMocks();
   });
 
+  it('leaves Inbox to the brand-row bell without removing other destinations', () => {
+    renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
+    expect(
+      screen.queryByRole('link', { name: 'Inbox' })
+    ).not.toBeInTheDocument();
+    for (const label of ['New Chat', 'Library', 'Contacts', 'Presence']) {
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+    }
+  });
+
   it('fully prefetches every canonical dynamic customer route', () => {
     renderDashboardNav({ renderFn: render });
 

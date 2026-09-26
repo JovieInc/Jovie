@@ -28,6 +28,8 @@ export interface NavItem {
 }
 
 export interface DashboardNavProps {
+  /** The brand-row bell owns Inbox discovery in the main customer shell. */
+  readonly headerOwnsInbox?: boolean;
   readonly collapsed?: boolean;
   /** Shell-owned surface placed after the New Chat primary action. */
   readonly children?: ReactNode;
