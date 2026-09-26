@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { isNavigationEligiblePath } from '@/data/marketing/featureAvailability';
 
 export interface MarketingNavLink {
   readonly href: string;
@@ -28,18 +29,28 @@ export const MARKETING_CLI_LINK: MarketingFooterLink = {
   label: 'CLI',
 };
 
-export const MARKETING_NAV_LINKS = [
+/**
+ * Header/footer destinations consume the shared feature-availability policy
+ * (JOV-6216): internal-only or unauthorized-proof routes never appear in
+ * navigation even if the route exists. External links bypass the check.
+ */
+const eligibleLinks = <T extends { href: string; external?: boolean }>(
+  links: readonly T[]
+): readonly T[] =>
+  links.filter(link => link.external || isNavigationEligiblePath(link.href));
+
+export const MARKETING_NAV_LINKS = eligibleLinks([
   { href: APP_ROUTES.ABOUT, label: 'About' },
   { href: APP_ROUTES.PRODUCT, label: 'For Artists' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
-] as const satisfies readonly MarketingNavLink[];
+] as const satisfies readonly MarketingNavLink[]);
 
 export const MARKETING_NAV_UTILITIES = [
   { href: APP_ROUTES.SIGNIN, label: 'Log in' },
   { href: APP_ROUTES.START, label: 'Find yourself' },
 ] as const satisfies readonly MarketingNavLink[];
 
-export const MARKETING_FOR_FLYOUT_LINKS = [
+export const MARKETING_FOR_FLYOUT_LINKS = eligibleLinks([
   {
     href: APP_ROUTES.ARTIST_PROFILES,
     label: 'Artists',
@@ -60,9 +71,9 @@ export const MARKETING_FOR_FLYOUT_LINKS = [
     label: 'Authors',
     description: 'A public page for the work, with a supported next step.',
   },
-] as const satisfies readonly MarketingNavFlyoutLink[];
+] as const satisfies readonly MarketingNavFlyoutLink[]);
 
-export const MARKETING_TOOLS_FLYOUT_LINKS = [
+export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
   {
     href: APP_ROUTES.SMART_LINKS,
     label: 'Music Smart Links',
@@ -88,9 +99,9 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = [
     label: 'CLI',
     description: 'Read public artist data from the command line.',
   },
-] as const satisfies readonly MarketingNavFlyoutLink[];
+] as const satisfies readonly MarketingNavFlyoutLink[]);
 
-export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
+const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
     links: [
@@ -153,6 +164,12 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     ],
   },
 ] as const;
+
+export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
+  RAW_MARKETING_FOOTER_COLUMNS.map(column => ({
+    ...column,
+    links: eligibleLinks(column.links),
+  }));
 
 export const MARKETING_LEGAL_LINKS: readonly MarketingFooterLink[] = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
