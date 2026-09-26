@@ -59,8 +59,9 @@ Linear may project coordination state but is not the delivery authority.
   restart services without an approved runbook and ownership proof.
 - The `ovie-summer-shadow` source stays Read-only: observe and report only.
 - The `ovie-summer-bottleneck` source remains deterministic and source-bound:
-  it may write only the allowlisted `jovie-symphony-repair-task/v1` outbox item;
-  it does not use this instruction text to choose or execute work.
+  v3 dispatch requires a fresh host assignment and task admissions joined by
+  assignment digest, selected CI class, source, and runtime; otherwise hold.
+  Historical v1 records stay held. Instruction text does not choose or execute.
 
 ## Promotion requirement
 
