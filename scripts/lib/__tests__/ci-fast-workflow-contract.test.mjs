@@ -2153,6 +2153,45 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   );
 });
 
+describe('invariant-scanned PR structural selection', () => {
+  // #18182 changed apps/desktop/src/main.ts (JOV-INV-031 scope) without any
+  // invariant run; PR structural selection must derive from the scan roots.
+  it('selects structural for every invariant-scanned path on source PRs', () => {
+    const addition =
+      'STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"';
+    const decision = WORKFLOW.slice(
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
+    );
+    expect(decision).toContain(addition);
+    expect(decision.indexOf(addition)).toBeLessThan(
+      decision.indexOf('if git diff --name-only')
+    );
+
+    const ere = execFileSync(
+      process.execPath,
+      [resolve(REPO_ROOT, 'scripts/invariants/scanned-paths.mjs'), '--ere'],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    ).trim();
+    const selects = path =>
+      spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
+    for (const path of [
+      'apps/desktop/src/main.ts',
+      'apps/web/lib/chat/knowledge/topics.ts',
+      'apps/web/app/[username]/page.tsx',
+      'scripts/invariants/latency-sensitive-execution-allowlist.json',
+    ]) {
+      expect(selects(path), path).toBe(true);
+    }
+    for (const path of [
+      'apps/desktop/src-other/main.ts',
+      'apps/web/tests/e2e/public-profile-smoke.spec.ts',
+    ]) {
+      expect(selects(path), path).toBe(false);
+    }
+  });
+});
+
 describe('CI diff selection on a divergent PR', () => {
   it('ignores main-only changes for PRs while preserving exact combined-head and push diffs', () => {
     const repository = mkdtempSync(join(tmpdir(), 'ci-pr-diff-'));

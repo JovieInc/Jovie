@@ -33,6 +33,7 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
+import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
 import {
   affectsJovieTypecheck,
   affectsWebTestTypecheck,
@@ -154,6 +155,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/summer-live-state.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
+  'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
@@ -1169,6 +1171,19 @@ export function runStructural(opts = {}) {
   }
 
   const selected = selectedProductLanes();
+  // invariants:check lives in operationsParts, but invariant-scanned sources
+  // such as apps/desktop/src/main.ts classify as mac/web only (#18182 reached
+  // main red that way). Unreadable or empty diffs fail closed.
+  const changed =
+    event === 'workflow_dispatch'
+      ? null
+      : (opts.changedFileList ?? listAllChangedFiles());
+  const invariantParts =
+    !selected.has('operations') &&
+    (selected.has('web') || selected.has('mac')) &&
+    (!changed?.length || changed.some(file => isInvariantScannedPath(file)))
+      ? ['pnpm invariants:check']
+      : [];
   const operationsParts = [
     ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
@@ -1278,6 +1293,7 @@ export function runStructural(opts = {}) {
           `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
         ]
       : []),
+    ...invariantParts,
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),

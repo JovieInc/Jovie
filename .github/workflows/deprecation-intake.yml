@@ -1,0 +1,59 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: No existing controller reads build logs for deprecation warnings; this only files deduped Linear intake for the devin lane and writes no code, branches, or deploys.
+# removal-trigger: Remove when Summer or the build pipeline emits deprecation findings into Linear intake natively.
+name: Deprecation Intake (Linear devin lane)
+
+# clock-class: skip-if-unchanged
+# Daily: read the latest successful main build log, file one deduped Linear
+# issue per distinct deprecation warning (Todo + label devin) so the
+# autonomous lane fixes deprecations without a human.
+
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deprecation-intake
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Fetch latest main build log
+        id: log
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "::error::No successful main CI run found."
+            exit 1
+          fi
+          : > build.log
+          for job in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | select(.name | test("^Build")) | .id'); do
+            gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job/logs" >> build.log
+          done
+          echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: File deduped deprecation issues
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node scripts/deprecation-intake.mjs build.log "${{ steps.log.outputs.url }}"
