@@ -382,7 +382,7 @@ const clusterInput = {
 
 test('task-cluster freezes a bounded label choice and rejects forged labels', async () => {
   const req = prepareJevRequest(clusterInput);
-  assert.throws(() => req.labels.push('late'));
+  assert.throws(() => /** @type {any} */ (req).labels.push('late'));
   const criteria = req.questions.alignment.criteria;
   for (const slug of [...clusterInput.labels, 'unclassified'])
     assert.ok(Object.hasOwn(criteria, slug));

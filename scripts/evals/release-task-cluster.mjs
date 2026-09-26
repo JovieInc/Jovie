@@ -194,8 +194,10 @@ async function evalExample(example, corpus, mode, cfg) {
   };
   const started = performance.now();
   const prepared = prepareTaskClusterDecision(input);
-  let decision = prepared.decision;
-  if (prepared.kind === 'request') {
+  let decision;
+  if (prepared.kind === 'decision') {
+    decision = prepared.decision;
+  } else {
     const request = prepareJevRequest(prepared.input);
     const options = {
       approval: {
@@ -341,6 +343,10 @@ export function dispositionFor(metrics, corpus, mode) {
   return ['retain', 'shadow quality below promotion bar'];
 }
 
+/**
+ * @param {ReturnType<typeof buildCorpus>} corpus
+ * @param {{split?: string, mode?: string, baseline?: Record<string, string|null>|null, config?: {apiKey?: string, authorityRef?: string, maxUsd?: number}}} [options]
+ */
 export async function runEval(
   corpus,
   { split = 'all', mode = 'stub', baseline = null, config } = {}

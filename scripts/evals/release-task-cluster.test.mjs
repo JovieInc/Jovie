@@ -49,10 +49,12 @@ const opts = (input, choice, extra = {}) => {
 };
 
 test('frozen allowlist, abstain-first decisions and evaluator-free short-circuits', async () => {
-  assert.throws(() => freezeClusterAllowlist(CLUSTERS).push({ slug: 'x' }));
+  assert.throws(() =>
+    /** @type {any} */ (freezeClusterAllowlist(CLUSTERS)).push({ slug: 'x' })
+  );
   assert.throws(() => freezeClusterAllowlist([{ slug: 'a' }, { slug: 'a' }]));
   const p = prepareTaskClusterDecision(base);
-  assert.throws(() => p.labels.push('late'));
+  assert.throws(() => /** @type {any} */ (p.labels).push('late'));
   const hit = await runTaskClusterDecision(
     base,
     opts(p.input, 'editorial-pitching')
@@ -75,11 +77,11 @@ test('frozen allowlist, abstain-first decisions and evaluator-free short-circuit
     );
   }
   assert.equal(calls, 0);
-  for (const [extra, reason] of [
+  for (const [extra, reason] of /** @type {[Record<string, unknown>, string][]} */ ([
     [{ transport: transport('unclassified') }, 'no-clear-fit'],
     [{ approval: null }, 'evaluator-not-admitted'],
     [{ transport: transport('made-up-slug') }, 'evaluator-invalid-response'],
-  ]) {
+  ])) {
     const d = await runTaskClusterDecision(base, {
       ...opts(p.input, 'lyrics'),
       ...extra,
@@ -90,7 +92,7 @@ test('frozen allowlist, abstain-first decisions and evaluator-free short-circuit
   const one = { ...base, clusters: [CLUSTERS[0]] };
   const d = await runTaskClusterDecision(one, {
     ...opts(prepareTaskClusterDecision(one).input, 'unclassified'),
-    transport: async r => (calls++, transport('unclassified')(r)),
+    transport: async () => (calls++, transport('unclassified')()),
   });
   assert.equal(calls, 1);
   assert.equal(d.decision, 'abstain');
