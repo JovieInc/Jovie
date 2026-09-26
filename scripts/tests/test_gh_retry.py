@@ -105,6 +105,9 @@ def _drain_command(
         f'FLEET_POLICY_MAIN_SHA={"a" * 40} '
         'DRAIN_PRODUCTION_CHECKPOINT_STATE=verified '
         f'MERGE_QUEUE_BACKEND={backend} '
+        # Fixture gh answers instantly: keep every bounded postcondition read
+        # but skip the production 2s eventual-consistency spacing between them.
+        'MERGE_QUEUE_POSTCONDITION_DELAY_MS=0 '
     )
     if extra_env:
         env_prefix += f"{extra_env} "
