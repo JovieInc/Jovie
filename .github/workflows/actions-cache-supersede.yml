@@ -22,7 +22,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: actions-cache-supersede
+  group: actions-cache-supersede-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
