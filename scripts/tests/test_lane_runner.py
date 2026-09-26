@@ -86,6 +86,13 @@ class GateTest(unittest.TestCase):
                                           self.change("apps/web/lib/a.test.ts")]), [])
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
 
+    def test_xcode_tests_directory_counts_as_test(self):
+        changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
+                   self.change("apps/ios/JovieTests/ChatRepositoryTests.swift")]
+        self.assertEqual(lane.gate_rules(changes), [])
+        self.assertEqual(lane.gate_rules([self.change("apps/ios/Jovie/Core/A.swift")]),
+                         ["code-change-without-test"])
+
     def test_secrets_lockfile_and_size_guards(self):
         self.assertIn("secret-like-file-changed", lane.gate_rules([self.change("apps/web/.env.local")]))
         self.assertIn("lockfile-without-manifest", lane.gate_rules([self.change("pnpm-lock.yaml")]))
