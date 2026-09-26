@@ -82,6 +82,21 @@ describe('AuthModalShell', () => {
     );
   });
 
+  it('paints the modal surface with the defined bg-base theme token', () => {
+    const { container } = render(
+      <AuthModalShell ariaLabel='Create your Jovie account'>
+        <div>Modal auth form</div>
+      </AuthModalShell>
+    );
+
+    const shell = container.querySelector('[data-auth-modal-shell]');
+    // bg-background has no --color-background token and emits no CSS, which
+    // left the modal without a page background.
+    expect(shell).toHaveClass('bg-base', 'sm:bg-base/96');
+    expect(shell).not.toHaveClass('bg-background');
+    expect(shell).not.toHaveClass('sm:bg-background/96');
+  });
+
   it('dismisses through router.back when the backdrop is clicked', () => {
     const { container } = render(
       <AuthModalShell ariaLabel='Create your Jovie account'>

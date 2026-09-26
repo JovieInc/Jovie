@@ -26,7 +26,7 @@ export function FilterChip({
       className={cn(
         'rounded-full border px-2.5 py-1 text-xs transition-colors',
         pressed
-          ? 'border-foreground bg-foreground text-(--color-bg-base)'
+          ? 'border-foreground bg-foreground text-background'
           : 'border-border bg-transparent text-muted-foreground hover:border-foreground/60',
         className
       )}

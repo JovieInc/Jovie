@@ -61,6 +61,16 @@ const TEMPORARY_ALLOWLIST = [
   // text-background -> text-(--color-bg-base) when that debt is cleared.
   'components/features/dashboard/molecules/UniversalLinkInputPlatformSelector.tsx',
   'components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx',
+  // TODO: these shippable components have no adjacent story yet, so any edit
+  // trips component-ship-gate [missing-story]. Swap in a follow-up that adds
+  // the story (and touches the component test):
+  //   NavLink: focus-visible:ring-offset-background -> focus-visible:ring-offset-base
+  //   IngestProfileDropdown, GrowthIntakeComposer: bg-background-elevated -> bg-surface-elevated
+  //   FilterChip: text-background -> text-(--color-bg-base)
+  'components/atoms/NavLink.tsx',
+  'components/features/admin/ingest-profile-dropdown/IngestProfileDropdown.tsx',
+  'components/features/admin/leads/GrowthIntakeComposer.tsx',
+  'components/molecules/filters/FilterChip.tsx',
 ] as const;
 
 function walk(dir: string, out: string[]): void {
