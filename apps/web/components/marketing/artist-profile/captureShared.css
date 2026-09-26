@@ -12,16 +12,15 @@
   );
 }
 
-.artist-profile-audience-pill {
+/* Shared compact-glass material — the `compact-glass` media recipe approved
+   in JOV-6246 (reference #23). The audience pill and the marketing compact
+   glass module share this single owner; do not fork the shell mix, washes,
+   hairlines, or blur. */
+.artist-profile-audience-pill,
+.compact-glass-module {
   position: relative;
   isolation: isolate;
-  display: flex;
-  min-height: 3rem;
-  max-width: min(21rem, calc(100vw - 4rem));
-  flex-shrink: 0;
-  align-items: center;
   overflow: hidden;
-  border-radius: 9999px;
   background:
     linear-gradient(
       180deg,
@@ -30,9 +29,6 @@
     ),
     color-mix(in oklab, var(--system-b-cinematic-black) 82%, transparent);
   color: color-mix(in oklab, var(--color-text-primary-token) 92%, transparent);
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.3;
   box-shadow:
     inset 0 1px 0
     color-mix(in oklab, var(--color-text-primary-token) 5%, transparent),
@@ -41,6 +37,121 @@
     0 10px 24px
     color-mix(in oklab, var(--system-b-cinematic-black) 18%, transparent);
   backdrop-filter: blur(14px);
+}
+
+.artist-profile-audience-pill {
+  display: flex;
+  min-height: 3rem;
+  max-width: min(21rem, calc(100vw - 4rem));
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* Compact glass module (JOV-6248): the shared material at module scale.
+   Geometry scales through existing tokens; fine edge highlight stays
+   asymmetric (upper-left transmission, near-black lower-right). */
+.compact-glass-module {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-3xl);
+  padding: var(--space-5);
+}
+
+.compact-glass-module::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    118deg,
+    color-mix(in oklab, var(--color-text-primary-token) 5%, transparent),
+    color-mix(in oklab, var(--color-text-primary-token) 1.5%, transparent) 34%,
+    transparent 58%
+  );
+}
+
+.compact-glass-module > * {
+  position: relative;
+  z-index: 1;
+}
+
+.compact-glass-module__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-text-primary-token) 60%, transparent);
+}
+
+.compact-glass-module__demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.compact-glass-module__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.compact-glass-module__button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
+  border-radius: 9999px;
+  padding: 0 var(--space-4);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 3.5%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 160ms ease-out;
+}
+
+.compact-glass-module__button:hover {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 6%,
+    transparent
+  );
+}
+
+.compact-glass-module__button:focus-visible {
+  outline: 2px solid
+    color-mix(in oklab, var(--color-text-primary-token) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.compact-glass-module__status {
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: color-mix(in oklab, var(--color-text-primary-token) 60%, transparent);
+}
+
+@supports not (
+    (backdrop-filter: blur(1px)) or
+    (-webkit-backdrop-filter: blur(1px))
+  ) {
+  .artist-profile-audience-pill,
+  .compact-glass-module {
+    background: var(--system-b-cinematic-black);
+  }
 }
 
 /* Per-pill accent (previously a `--pill-accent` inline style). Index order
