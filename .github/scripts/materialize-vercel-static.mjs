@@ -129,8 +129,8 @@ export function materializeStatic(root) {
 // files... Error: Unexpected error"), which blocked every staging deploy after
 // those includes landed (JOV-6576). Point each such key at the link's real
 // file: the function reads identical bytes at the same path, and the archive
-// holds a regular file. Directory links (pnpm's node_modules layer) predate
-// the regression and stay as traced.
+// holds a regular file. Directory links (pnpm's node_modules layer) stay as
+// traced, but files traced through one are re-pointed at their real path.
 export function dereferenceFunctionFileLinks(root) {
   root = realpathSync(root);
   const functions = resolve(root, '.vercel/output/functions');
@@ -166,7 +166,22 @@ export function dereferenceFunctionFileLinks(root) {
           if (error.code === 'ENOENT') continue; // Not a link; CLI reports it.
           throw error;
         }
-        if (!tracedStat.isSymbolicLink()) continue;
+        if (!tracedStat.isSymbolicLink()) {
+          // A regular file reached THROUGH a symlinked directory (pnpm's hoisted
+          // .pnpm/node_modules layer, e.g. import-in-the-middle since Sentry
+          // 10.75.3): the archive would hold the directory link and a file entry
+          // beneath it, and Vercel rejects that path at "Extracting deployment
+          // files" ("... is not a valid path"). Upload the real file instead.
+          if (tracedStat.isFile()) {
+            const real = realpathSync(traced);
+            if (real !== traced) {
+              inside(root, real);
+              map[key] = relative(root, real).split(sep).join('/');
+              changed += 1;
+            }
+          }
+          continue;
+        }
         let target;
         try {
           target = realpathSync(traced);
