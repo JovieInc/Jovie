@@ -22,8 +22,10 @@ export class OnboardingOwnershipError extends Error {
     this.name = 'OnboardingOwnershipError';
     this.code = code;
     this.errorCode = code;
-    this.status =
-      code === 'UNAUTHORIZED' ? 401 : code === 'FORBIDDEN' ? 403 : 404;
+    let status: 401 | 403 | 404 = 404;
+    if (code === 'UNAUTHORIZED') status = 401;
+    else if (code === 'FORBIDDEN') status = 403;
+    this.status = status;
   }
 }
 
