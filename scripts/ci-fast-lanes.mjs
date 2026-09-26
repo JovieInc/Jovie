@@ -2,11 +2,11 @@
 /**
  * Run the cheap CI cluster as labeled lanes.
  *
- * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
- * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
- * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
- * artifact; the aggregate `ci-fast` job also requires the dedicated profile
- * browser admission job.
+ * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
+ * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
+ * Each hosted job checks out and installs once, invokes one value from
+ * LANE_GROUPS, and publishes an isolated lane artifact; the aggregate
+ * `ci-fast` job also requires the dedicated profile browser admission job.
  *
  * Fail-fast: the first failed lane skips the expensive structural lane so
  * biome/typecheck red does not pay for structural Playwright. Cheap lanes
@@ -522,13 +522,16 @@ export const LANE_GROUPS = Object.freeze({
     'design-system-source-ratchet',
     'design-exception-registry',
     'design-governance-enforcement',
-    'design-conformance',
     'ios-fast',
-    'profile-admission',
     'billing-coverage',
     'copy-gate',
     'structural',
   ]),
+  // ci-fast (structural web) runs these in the background while its structural
+  // web commands run. They were the two slowest cheap lanes left in remaining
+  // (38s + 35s of a ~150s serial chain that outlasted remaining's structural
+  // lane, merge-group run 36270458408); web finished ~100s before remaining.
+  web: Object.freeze(['design-conformance', 'profile-admission']),
 });
 
 export const LANE_COMMANDS = Object.freeze(
@@ -2012,6 +2015,11 @@ function annotateFailure(lane, logExcerpt) {
   if (short) console.error(`::error::${short}`);
 }
 
+/** @param {number} ms */
+export function formatLaneDuration(ms) {
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
+}
+
 function writeSummary(results, groupId, timingTables = []) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return;
@@ -2019,11 +2027,13 @@ function writeSummary(results, groupId, timingTables = []) {
   const lines = [
     `### ci-fast lanes (${groupId || 'all'})`,
     '',
-    '| Lane | Status | Next local command |',
-    '| --- | --- | --- |',
+    '| Lane | Status | Duration | Next local command |',
+    '| --- | --- | --- | --- |',
   ];
   for (const r of results) {
-    lines.push(`| ${r.name} | **${r.status}** | \`${r.nextLocalCommand}\` |`);
+    lines.push(
+      `| ${r.name} | **${r.status}** | ${formatLaneDuration(r.durationMs)} | \`${r.nextLocalCommand}\` |`
+    );
   }
   lines.push('');
   const failed = results.filter(r => r.status === 'failure');
@@ -2112,7 +2122,10 @@ async function main() {
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
-        console.log(`[ci-fast] ${lane.id}: skipped`);
+        const durationMs = Math.max(0, Date.now() - laneStartedAt);
+        console.log(
+          `[ci-fast] ${lane.id}: skipped (${formatLaneDuration(durationMs)})`
+        );
         console.log(logExcerpt);
         results.push({
           id: lane.id,
@@ -2120,7 +2133,7 @@ async function main() {
           nextLocalCommand: lane.nextLocalCommand,
           status: 'skipped',
           logExcerpt,
-          durationMs: Math.max(0, Date.now() - laneStartedAt),
+          durationMs,
         });
         continue;
       }
@@ -2150,7 +2163,12 @@ async function main() {
         if (failFast) failedFast = true;
       }
 
-      console.log(`[ci-fast] ${lane.id}: ${status}`);
+      // Per-lane wall time: the job log is the only place the background
+      // lanes' timings surface without downloading the results artifact.
+      const durationMs = Math.max(0, Date.now() - laneStartedAt);
+      console.log(
+        `[ci-fast] ${lane.id}: ${status} (${formatLaneDuration(durationMs)})`
+      );
       if (lane.id === 'structural' && status === 'success') {
         // Keep exact suite/coverage receipts available in GitHub's job log.
         console.log(outcome.output);
@@ -2172,7 +2190,7 @@ async function main() {
         nextLocalCommand: lane.nextLocalCommand,
         status,
         logExcerpt,
-        durationMs: Math.max(0, Date.now() - laneStartedAt),
+        durationMs,
       });
     }
   } catch (error) {
