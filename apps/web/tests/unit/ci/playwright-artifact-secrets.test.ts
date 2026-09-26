@@ -47,13 +47,22 @@ const guardScriptName = 'guard-playwright-artifacts.mjs';
 const guardScript = join(githubRoot, 'scripts', guardScriptName);
 const generated: string[] = [];
 const configLoaders = Object.fromEntries(
-  Object.entries(
-    import.meta.glob<{ default: PlaywrightTestConfig }>(
-      '../../../playwright*.config*.ts'
-    )
-  ).map(([path, load]) => [path.split('/').at(-1), load])
+  Object.entries(import.meta.glob('../../../playwright*.config*.ts')).map(
+    ([path, load]) => [path.split('/').at(-1), load]
+  )
 );
 const expectedConfigs = Object.keys(configLoaders).sort();
+function isPlaywrightConfigModule(
+  value: unknown
+): value is { default: PlaywrightTestConfig } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'default' in value &&
+    typeof value.default === 'object' &&
+    value.default !== null
+  );
+}
 const localTrace = Object.fromEntries(
   'playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
@@ -480,10 +489,12 @@ async function configs(ci: boolean, producer = false, bypass = '') {
   vi.resetModules();
   return Object.fromEntries(
     await Promise.all(
-      expectedConfigs.map(async name => [
-        name,
-        (await configLoaders[name]()).default,
-      ])
+      expectedConfigs.map(async name => {
+        const loaded = await configLoaders[name]();
+        if (!isPlaywrightConfigModule(loaded))
+          throw new Error(`${name} must default-export a Playwright config`);
+        return [name, loaded.default] as const;
+      })
     )
   );
 }
@@ -498,7 +509,7 @@ async function port() {
   });
 }
 
-function chunk(type: string, data = Buffer.alloc(0)) {
+function chunk(type: string, data: Buffer<ArrayBufferLike> = Buffer.alloc(0)) {
   const output = Buffer.alloc(data.length + 12);
   output.writeUInt32BE(data.length);
   output.write(type, 4, 4, 'ascii');
@@ -536,8 +547,13 @@ function png(
   ]);
 }
 
-function baseEnv(workspace: string, runner: string, extra = {}) {
+function baseEnv(
+  workspace: string,
+  runner: string,
+  extra: Record<string, string | undefined> = {}
+): NodeJS.ProcessEnv {
   return {
+    NODE_ENV: process.env.NODE_ENV,
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     GITHUB_WORKSPACE: workspace,
@@ -551,7 +567,12 @@ function baseEnv(workspace: string, runner: string, extra = {}) {
   };
 }
 
-function runChild(workspace: string, runner: string, code: string, extra = {}) {
+function runChild(
+  workspace: string,
+  runner: string,
+  code: string,
+  extra: Record<string, string | undefined> = {}
+) {
   return spawnSync(
     process.execPath,
     [guardScript, '--run', '--', process.execPath, '-e', code],
@@ -2163,7 +2184,7 @@ ${fixtureCheckout}
       env: baseEnv(workspace, fixture(), {
         PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
         PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
-      }) as NodeJS.ProcessEnv,
+      }),
     });
     expect(diagnostic.status).toBe(1);
     expect(`${diagnostic.stdout}\n${diagnostic.stderr}`).toContain(
@@ -2180,7 +2201,7 @@ ${fixtureCheckout}
         env: baseEnv(workspace, fixture(), {
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
           PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
-        }) as NodeJS.ProcessEnv,
+        }),
       }
     );
     expect(sensitiveDiagnostic.status).toBe(1);
@@ -2202,7 +2223,7 @@ ${fixtureCheckout}
         env: baseEnv(workspace, fixture(), {
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
           PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
-        }) as NodeJS.ProcessEnv,
+        }),
       }
     );
     expect(outsideDiagnostic.status).toBe(1);

@@ -109,6 +109,52 @@ describe('ReleasePlanWizard', () => {
     expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
   });
 
+  it('uses Title Case for the dialog title and choice labels', () => {
+    render(<ReleasePlanWizard {...baseProps} />);
+    expect(
+      screen.getByRole('heading', { name: 'Plan For The Deep End' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('choice-single'));
+    fireEvent.click(screen.getByTestId('wizard-next'));
+    expect(screen.getByTestId('choice-indie_label')).toHaveTextContent(
+      'Indie Label'
+    );
+    expect(screen.getByTestId('choice-major_label')).toHaveTextContent(
+      'Major Label'
+    );
+  });
+
+  it('falls back to a Title Case title when the release is untitled', () => {
+    render(<ReleasePlanWizard {...baseProps} releaseTitle={null} />);
+    expect(
+      screen.getByRole('heading', { name: 'Plan For This Release' })
+    ).toBeInTheDocument();
+  });
+
+  it('marks the selected choice with the base-surface text token', () => {
+    render(<ReleasePlanWizard {...baseProps} />);
+    const choice = screen.getByTestId('choice-single');
+    expect(choice).toHaveAttribute('aria-pressed', 'false');
+    expect(choice.className).not.toContain('text-(--color-bg-base)');
+    fireEvent.click(choice);
+    expect(choice).toHaveAttribute('aria-pressed', 'true');
+    expect(choice.className).toContain('text-(--color-bg-base)');
+    expect(choice.className).not.toContain('text-background');
+  });
+
+  it('offers a Title Case dismiss action on the Pro gate', () => {
+    const onClose = vi.fn();
+    render(
+      <ReleasePlanWizard
+        {...baseProps}
+        canGenerateReleasePlans={false}
+        onClose={onClose}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('shows a loading state while the gate is resolving', () => {
     render(<ReleasePlanWizard {...baseProps} isGateLoading={true} />);
     expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled();

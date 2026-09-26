@@ -1595,21 +1595,68 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      - name: Fetch base-branch history
+      - name: Start base-branch history fetch
         # Diff bases need only HEAD's full ancestry plus origin/<base>:
         # pull_request origin/<base>...HEAD, merge_group base_sha, push
         # event.before, and guardrail merge-base with origin/<base>.
         # A full-depth checkout also fetched every branch and tag (~4k ref
         # lines of log noise before any work). --unshallow deepens HEAD fully.
+        # Guards in this job read historical blobs (git show <merge-base>:path,
+        # rename-detecting diffs), so the fetch stays full, not blobless. It
+        # runs in the background while dependencies install instead of
+        # serially before them; "Fetch base-branch history" below waits for
+        # it and fails closed before any history consumer runs.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          mkdir -p "$BASE_FETCH_DIR"
+          rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
+          (
+            set +e
+            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+            echo "$?" > "$BASE_FETCH_DIR/status.tmp"
+            mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
+          ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
+          echo "Base-branch history fetch started in the background (pid $!)."
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Fetch base-branch history
+        # Await the background fetch. Fails closed on a non-zero fetch exit,
+        # no exit status within the deadline, a still-shallow clone, or a
+        # missing origin/<base> ref.
+        shell: bash
+        timeout-minutes: 10
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+          BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 540); do
+            [[ -f "$BASE_FETCH_DIR/status" ]] && break
+            sleep 1
+          done
+          cat "$BASE_FETCH_DIR/fetch.log" 2>/dev/null || true
+          if [[ ! -f "$BASE_FETCH_DIR/status" ]]; then
+            echo "::error title=Base-branch fetch::background fetch did not finish within 540s"
+            exit 1
+          fi
+          fetch_status="$(cat "$BASE_FETCH_DIR/status")"
+          if [[ "$fetch_status" != '0' ]]; then
+            echo "::error title=Base-branch fetch::git fetch exited $fetch_status"
+            exit 1
+          fi
+          if [[ "$(git rev-parse --is-shallow-repository)" != 'false' ]]; then
+            echo "::error title=Base-branch fetch::checkout is still shallow"
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet "refs/remotes/origin/${BASE_BRANCH}^{commit}" > /dev/null; then
+            echo "::error title=Base-branch fetch::origin/${BASE_BRANCH} is missing"
+            exit 1
+          fi
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
@@ -1748,6 +1795,8 @@ jobs:
       # Hex/rebar and recompiles deps on every structural run. The exact-key
       # cache holds only outputs derived from the selector pin, OTP/Elixir
       # versions and platform; the selector re-verifies them before reuse.
+      # This job only restores. Queue-proven main pushes skip this job, so
+      # symphony-selector-cache-warm.yml writes the entry from trusted main.
       - name: Resolve Symphony selector cache key
         id: selector-cache-key
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
@@ -1775,35 +1824,6 @@ jobs:
           MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix
           HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex
         run: node scripts/ci-fast-lanes.mjs
-      - name: Check Symphony selector cache outputs
-        id: selector-cache-ready
-        if: ${{ success() && steps.structural.outputs.skip != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.selector-cache.outputs.cache-hit != 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          ready=true
-          for output in \
-            "$RUNNER_TEMP/symphony-selector-beam/otp/bin/erl" \
-            "$RUNNER_TEMP/symphony-selector-beam/bin/elixir" \
-            "$RUNNER_TEMP/symphony-selector-mix-home/mix" \
-            "$RUNNER_TEMP/symphony-selector-src/elixir/deps" \
-            "$RUNNER_TEMP/symphony-selector-src/elixir/_build/test"; do
-            [[ -e "$output" ]] || ready=false
-          done
-          echo "ready=$ready" >> "$GITHUB_OUTPUT"
-      # Only trusted main pushes write the cache. PR and merge-group runs
-      # restore main's entry and never spend their deadline on an upload.
-      - name: Save Symphony selector cache
-        if: ${{ success() && steps.selector-cache-ready.outputs.ready == 'true' }}
-        continue-on-error: true
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ runner.temp }}/symphony-selector-beam
-            ${{ runner.temp }}/symphony-selector-mix-home
-            ${{ runner.temp }}/symphony-selector-src/elixir/deps
-            ${{ runner.temp }}/symphony-selector-src/elixir/_build/test
-          key: ${{ steps.selector-cache.outputs.cache-primary-key }}
       - name: Run selected Storybook browser proof
         id: storybook-browser-test
         if: ${{ success() && steps.storybook-browser.outputs.run == 'true' }}

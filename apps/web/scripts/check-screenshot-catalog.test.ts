@@ -109,11 +109,11 @@ describe('checkScreenshotCatalog', () => {
 
     await expect(
       checkScreenshotCatalog({ paths, scenarios })
-    ).rejects.toMatchObject<ScreenshotCatalogIntegrityError>({
+    ).rejects.toMatchObject({
       violations: expect.arrayContaining([
         'homepage-desktop: public export symlink must target its canonical catalog image',
       ]),
-    });
+    } satisfies Pick<ScreenshotCatalogIntegrityError, 'violations'>);
   });
 
   it('rejects manifest drift, temporary files, and stale public exports', async () => {
@@ -132,14 +132,14 @@ describe('checkScreenshotCatalog', () => {
 
     await expect(
       checkScreenshotCatalog({ paths, scenarios: driftedScenarios })
-    ).rejects.toMatchObject<ScreenshotCatalogIntegrityError>({
+    ).rejects.toMatchObject({
       violations: expect.arrayContaining([
         'homepage-desktop: manifest title does not match the registry',
         'screenshot-catalog/current contains orphan or temporary file: homepage-desktop.next.png',
         'public/product-screenshots contains orphan or temporary file: stale.png',
         'homepage-desktop: public export does not match its canonical catalog image',
       ]),
-    });
+    } satisfies Pick<ScreenshotCatalogIntegrityError, 'violations'>);
   });
 
   it('rejects count, total-byte, and per-image budget overruns', async () => {
@@ -155,13 +155,13 @@ describe('checkScreenshotCatalog', () => {
           maxImageBytes: 1,
         },
       })
-    ).rejects.toMatchObject<ScreenshotCatalogIntegrityError>({
+    ).rejects.toMatchObject({
       violations: expect.arrayContaining([
         expect.stringContaining('over the 0-image budget'),
         expect.stringContaining('per-image budget'),
         expect.stringContaining('over the 0.00 MiB budget'),
       ]),
-    });
+    } satisfies Pick<ScreenshotCatalogIntegrityError, 'violations'>);
   });
 
   it('rejects an image over the production 3 MiB cap', async () => {
@@ -180,10 +180,10 @@ describe('checkScreenshotCatalog', () => {
 
     await expect(
       checkScreenshotCatalog({ paths, scenarios })
-    ).rejects.toMatchObject<ScreenshotCatalogIntegrityError>({
+    ).rejects.toMatchObject({
       violations: expect.arrayContaining([
         expect.stringContaining('over the 3.00 MiB per-image budget'),
       ]),
-    });
+    } satisfies Pick<ScreenshotCatalogIntegrityError, 'violations'>);
   });
 });

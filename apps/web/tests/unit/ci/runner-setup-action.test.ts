@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { delimiter, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
@@ -395,8 +395,21 @@ describe('baked runner prerequisite contract', () => {
       playwrightBrowsersPath: browsersPath,
     };
     writeFileSync(fixtureRequirementsPath, JSON.stringify(fixtureRequirements));
+    // Real `pnpm --version` costs ~600ms per verifier run. Marker cases prove
+    // marker logic, so they probe a pinned shim; one case keeps the host pnpm.
+    const pnpmShimDirectory = resolve(directory, 'pnpm-shim');
+    mkdirSync(pnpmShimDirectory);
+    const setPnpmShimVersion = (version: string) =>
+      writeFileSync(
+        resolve(pnpmShimDirectory, 'pnpm'),
+        `#!/bin/sh\necho ${version}\n`,
+        { mode: 0o755 }
+      );
+    setPnpmShimVersion(fixtureRequirements.pnpmVersion);
     return {
       browsersPath,
+      pnpmShimDirectory,
+      setPnpmShimVersion,
       installedTreeArchivePath,
       markerPath: resolve(directory, 'manifest.json'),
       requirementsPath: fixtureRequirementsPath,
@@ -406,12 +419,16 @@ describe('baked runner prerequisite contract', () => {
 
   function verifierEnvironment(
     fixture: ReturnType<typeof makeFixture>,
-    environment: NodeJS.ProcessEnv = process.env
+    environment: NodeJS.ProcessEnv = process.env,
+    { hostPnpm = false }: { readonly hostPnpm?: boolean } = {}
   ) {
     const { GITHUB_OUTPUT: _githubOutput, ...environmentWithoutGithubOutput } =
       environment;
     return {
       ...environmentWithoutGithubOutput,
+      PATH: hostPnpm
+        ? environment.PATH
+        : `${fixture.pnpmShimDirectory}${delimiter}${environment.PATH ?? ''}`,
       JOVIE_RUNNER_PREREQUISITES_MARKER: fixture.markerPath,
       JOVIE_RUNNER_REQUIREMENTS_PATH: fixture.requirementsPath,
       JOVIE_RUNNER_REPO_ROOT: repoRoot,
@@ -991,6 +1008,54 @@ describe('baked runner prerequisite contract', () => {
     expect(drifted.stderr).toContain('lockfileSha256');
     expect(drifted.stderr).toContain('got "stale"');
   }, 15_000);
+
+  it('binds the marker to the pnpm version reported by the host binary', () => {
+    const fixture = makeFixture();
+    const env = verifierEnvironment(fixture, process.env, { hostPnpm: true });
+    // Like nodeMajor/nodeMinimum in makeFixture, require the runtime under
+    // test: the verifier fails closed on pnpm drift (covered by the drift test
+    // below), and this case proves the marker records the host binary's own
+    // report on any host, not only one that happens to match the image pin.
+    const hostPnpmVersion = execFileSync('pnpm', ['--version'], {
+      encoding: 'utf8',
+      env,
+    }).trim();
+    writeFileSync(
+      fixture.requirementsPath,
+      JSON.stringify({ ...fixture.requirements, pnpmVersion: hostPnpmVersion })
+    );
+    execFileSync(
+      process.execPath,
+      [verifierPath, '--write-marker', fixture.markerPath],
+      { env }
+    );
+    const marker = JSON.parse(readFileSync(fixture.markerPath, 'utf8')) as {
+      readonly pnpmVersion: string;
+    };
+    expect(marker.pnpmVersion).toBe(hostPnpmVersion);
+  }, 15_000);
+
+  it('falls back on required pnpm version drift', () => {
+    const fixture = makeFixture();
+    const env = verifierEnvironment(fixture);
+    execFileSync(
+      process.execPath,
+      [verifierPath, '--write-marker', fixture.markerPath],
+      { env }
+    );
+
+    fixture.setPnpmShimVersion('0.0.0');
+    const pnpmDrift = spawnSync(
+      process.execPath,
+      [verifierPath, '--component', 'dependencies'],
+      { encoding: 'utf8', env }
+    );
+    expect(pnpmDrift.status).toBe(0);
+    expect(pnpmDrift.stdout).toContain('dependencies_warm=false');
+    expect(pnpmDrift.stderr).toContain(
+      `pnpm 0.0.0 does not match required ${requirements.pnpmVersion}`
+    );
+  });
 
   it('falls back on required runtime or Playwright version drift', () => {
     const fixture = makeFixture();
