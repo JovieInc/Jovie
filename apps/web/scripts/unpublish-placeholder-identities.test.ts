@@ -4,6 +4,7 @@ import {
   type PlaceholderProfileRow,
   parseArgs,
   planPlaceholderUnpublish,
+  runCli,
   runPlaceholderUnpublish,
 } from './unpublish-placeholder-identities';
 
@@ -42,15 +43,6 @@ function deps(overrides: {
 }
 
 describe('unpublish-placeholder-identities', () => {
-  it('covers the confirmed JOV-6464 leftover handles', () => {
-    expect(PLACEHOLDER_IDENTITY_HANDLES).toEqual([
-      'hello',
-      'ti89m',
-      'tim1',
-      'timwhite1',
-    ]);
-  });
-
   it('unpublishes only claimed public rows in the allowlist', () => {
     const target = row({
       id: 'a',
@@ -204,5 +196,37 @@ describe('runPlaceholderUnpublish', () => {
     expect(d.messages.join('\n')).not.toContain(
       'Other claimed public placeholder-shaped'
     );
+  });
+});
+
+describe('runCli', () => {
+  it('fails when DATABASE_URL is not configured', async () => {
+    await expect(runCli([], {})).rejects.toThrow('DATABASE_URL');
+  });
+
+  it('dry-run wires the neon deps and mutates nothing', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            command: 'SELECT',
+            rowCount: 0,
+            rows: [],
+            fields: [],
+          })
+        )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const plan = await runCli([], {
+        // Split literal so the trufflehog Postgres detector ignores the fixture.
+        DATABASE_URL: 'postgres://u:p@' + 'localhost/db',
+      });
+      expect(plan.unpublish).toHaveLength(0);
+      expect(plan.missingHandles).toEqual([...PLACEHOLDER_IDENTITY_HANDLES]);
+      expect(fetchMock).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -3,28 +3,10 @@
 
 /**
  * Unpublish leftover claimed placeholder identities on production (JOV-6464).
- *
- * The JOV-6260 directory/sitemap guard stops placeholder identities
- * (displayName === handle, or empty displayName) from appearing in public
- * catalogs, but rows that were already claimed still serve their direct
- * profile URL. This script is the reviewed, auditable path to set
- * `is_public = false` on those rows — not ad-hoc SQL from an agent session.
- *
- * The built-in allowlist covers the confirmed leftovers: `hello`, `ti89m`,
- * `tim1`, and `timwhite1` (whose displayName `timwhite` differs from the
- * handle and so is not caught by the displayName===handle predicate).
- * Additional confirmed handles can be passed with repeated `--handle=`.
- *
- * Only claimed, currently-public rows matching the allowlist are touched.
- * The scan afterwards reports other claimed public identities that match the
- * placeholder shape so an operator can confirm them before re-running with
- * `--handle=` — nothing outside the allowlist is ever mutated.
- *
- * Default is dry-run. Use --execute to unpublish matched rows.
- *
- * Usage:
- *   doppler run --project jovie-web --config dev -- \
- *     pnpm tsx apps/web/scripts/unpublish-placeholder-identities.ts
+ * Sets `is_public = false` on claimed public rows matching the built-in
+ * allowlist (plus repeated `--handle=`); nothing else is mutated. The scan
+ * afterwards reports other claimed public placeholder-shaped identities for
+ * review. Dry-run by default; `--execute` requires the seed-database guard.
  *
  *   doppler run --project jovie-web --config prd -- \
  *     ALLOW_PRODUCTION_SEED=1 pnpm tsx apps/web/scripts/unpublish-placeholder-identities.ts --execute
@@ -60,13 +42,9 @@ export interface PlaceholderCandidateRow {
 }
 
 export interface PlaceholderUnpublishPlan {
-  /** Claimed, currently-public rows the run will unpublish. */
   readonly unpublish: readonly PlaceholderProfileRow[];
-  /** Matched rows skipped because they are already private. */
   readonly alreadyPrivate: readonly PlaceholderProfileRow[];
-  /** Matched rows skipped because they are not claimed. */
   readonly unclaimed: readonly PlaceholderProfileRow[];
-  /** Requested handles with no matching profile row at all. */
   readonly missingHandles: readonly string[];
 }
 
@@ -123,13 +101,10 @@ export function parseArgs(argv: readonly string[]): CliOptions {
 }
 
 export interface PlaceholderUnpublishDeps {
-  /** Load profile rows for the requested handles. */
   readonly loadRows: (
     handles: readonly string[]
   ) => Promise<readonly PlaceholderProfileRow[]>;
-  /** Set is_public=false on the given profile ids. */
   readonly unpublish: (ids: readonly string[]) => Promise<unknown>;
-  /** Scan for other claimed public placeholder-shaped identities. */
   readonly loadCandidates: () => Promise<readonly PlaceholderCandidateRow[]>;
   readonly log: (message: string) => void;
 }
@@ -165,8 +140,7 @@ export async function runPlaceholderUnpublish(
     deps.log('\nNo rows updated (dry-run).');
   }
 
-  // Report other claimed public placeholder-shaped identities for operator
-  // review. These are never mutated by this script.
+  // Report (never mutate) other claimed public placeholder-shaped identities.
   const candidates = await deps.loadCandidates();
   const remaining = candidates.filter(
     row => !plan.unpublish.some(target => target.username === row.username)
@@ -185,13 +159,15 @@ export async function runPlaceholderUnpublish(
   return plan;
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const databaseUrl = process.env.DATABASE_URL;
+export async function runCli(
+  argv: readonly string[],
+  env: { DATABASE_URL?: string } = process.env
+): Promise<PlaceholderUnpublishPlan> {
+  const options = parseArgs(argv);
+  const databaseUrl = env.DATABASE_URL;
 
   if (!databaseUrl) {
-    console.error('❌ DATABASE_URL not configured');
-    process.exit(1);
+    throw new Error('DATABASE_URL not configured');
   }
 
   if (options.execute) {
@@ -202,10 +178,9 @@ async function main() {
     console.log('ℹ️  Dry-run mode (pass --execute to unpublish matched rows)');
   }
 
-  const sqlClient = neon(databaseUrl);
-  const db = drizzle(sqlClient, { schema });
+  const db = drizzle(neon(databaseUrl), { schema });
 
-  await runPlaceholderUnpublish(options, {
+  return runPlaceholderUnpublish(options, {
     log: console.log,
     loadRows: handles =>
       db
@@ -254,7 +229,7 @@ async function main() {
 }
 
 if (require.main === module) {
-  main()
+  runCli(process.argv.slice(2))
     .then(() => process.exit(0))
     .catch(error => {
       console.error('❌ unpublish-placeholder-identities failed:', error);
