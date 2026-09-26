@@ -2587,7 +2587,11 @@ jobs:
             ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
             ${{ runner.os }}-next-build-web-v1-
       - name: Build exact combined head
-        run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
+        # Only push saves the cache: skip the 13-36s persist elsewhere.
+        # Any value, even empty, sets read-only.
+        run: |
+          [ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1
+          pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
           # Merge-group code is PR-controlled. This deterministic mock key is
           # intentionally public and keeps the combined lane secret-free.
