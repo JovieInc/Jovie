@@ -8,10 +8,10 @@
  * - `control` = matched artist (similar catalog size / genre) with a profile
  *   but no automations. Assigned explicitly with match criteria.
  *
- * The baseline is an immutable 30-day pre-activation snapshot of the same
- * revenue signal used for rolling windows, so lift = signal(window) − baseline
- * compares like against like. All proxy terms are dollarized through
- * `revenue-lift-weights.ts` and labeled with the weights version.
+ * The baseline is an immutable 30-day pre-activation snapshot. `liftCents` is
+ * the blended signal difference (GMV, tips, and engagement proxies). Causal
+ * verified-money lift is computed separately in `creator-outcomes.ts` and
+ * never includes those proxies.
  */
 
 import 'server-only';
@@ -27,6 +27,12 @@ import {
   type ArtistRevenueCohortRow,
   artistRevenueCohorts,
 } from '@/lib/db/schema/revenue-cohorts';
+import {
+  assertVerifiedMoneyExcludesProxies,
+  type CreatorOutcomeMetricStatus,
+  outcomeWindowDays,
+  resolveCausalVerifiedMoneyLift,
+} from '@/lib/metrics/creator-outcomes';
 import {
   dollarizeRevenueLiftCents,
   REVENUE_LIFT_WEIGHTS_VERSION,
@@ -345,9 +351,17 @@ export interface ArtistCohortRevenueRow {
   readonly window: RevenueSignalWindow;
   readonly signal: ArtistRevenueSignal | null;
   readonly baselineRevenueSignalCents: number;
+  readonly baselineGmvCents: number;
+  readonly baselineTipsCents: number;
   readonly baselineWeightsVersion: string;
-  /** signal.revenueSignalCents − baselineRevenueSignalCents (null without a profile). */
+  /**
+   * Blended signal difference, including engagement proxies.
+   * Not verified money and not causal lift.
+   */
   readonly liftCents: number | null;
+  /** Settled GMV + tips versus the same baseline terms. Null unless measured. */
+  readonly causalVerifiedMoneyLiftCents: number | null;
+  readonly causalVerifiedMoneyLiftStatus: CreatorOutcomeMetricStatus;
 }
 
 /**
@@ -374,10 +388,28 @@ export async function listArtistCohortRevenueRows(input: {
     window: input.window,
   });
 
+  const windowDays = outcomeWindowDays(input.window.start, input.window.end);
+
   return rows.map(row => {
     const signal = row.creatorProfileId
       ? (signals.get(row.creatorProfileId) ?? null)
       : null;
+    if (signal) {
+      assertVerifiedMoneyExcludesProxies({
+        verifiedMoneyCents: signal.gmvCents + signal.tipsCents,
+        blendedSignalCents: signal.revenueSignalCents,
+        engagementProxyCents:
+          signal.revenueSignalCents - (signal.gmvCents + signal.tipsCents),
+      });
+    }
+    const causal = resolveCausalVerifiedMoneyLift({
+      currentGmvCents: signal?.gmvCents ?? null,
+      currentTipsCents: signal?.tipsCents ?? null,
+      baselineGmvCents: row.baselineGmvCents,
+      baselineTipsCents: row.baselineTipsCents,
+      windowDays,
+      baselineWindowDays: BASELINE_WINDOW_DAYS,
+    });
     return {
       userId: row.userId,
       creatorProfileId: row.creatorProfileId,
@@ -387,10 +419,14 @@ export async function listArtistCohortRevenueRows(input: {
       window: input.window,
       signal,
       baselineRevenueSignalCents: row.baselineRevenueSignalCents,
+      baselineGmvCents: row.baselineGmvCents,
+      baselineTipsCents: row.baselineTipsCents,
       baselineWeightsVersion: row.baselineWeightsVersion,
       liftCents: signal
         ? signal.revenueSignalCents - row.baselineRevenueSignalCents
         : null,
+      causalVerifiedMoneyLiftCents: causal.cents,
+      causalVerifiedMoneyLiftStatus: causal.status,
     };
   });
 }
