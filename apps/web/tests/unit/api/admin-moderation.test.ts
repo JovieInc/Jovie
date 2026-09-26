@@ -22,41 +22,31 @@ vi.mock('@/lib/error-tracking', () => ({
 
 import { GET, POST } from '@/app/api/admin/moderation/route';
 
-const admin = {
-  isAuthenticated: true,
-  isAdmin: true,
-  userId: 'admin-1',
-};
-
 const URL_ = 'http://localhost/api/admin/moderation';
 const get = (q = '') => new Request(`${URL_}${q}`);
-const postRequest = (body: unknown) =>
+const post = (body: unknown) =>
   new Request(URL_, { method: 'POST', body: JSON.stringify(body) });
 
-describe('GET /api/admin/moderation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    hoisted.getCurrentUserEntitlements.mockResolvedValue(admin);
-    hoisted.listAbuseReports.mockResolvedValue([{ id: 'r1' }]);
-  });
+const admin = { isAuthenticated: true, isAdmin: true, userId: 'admin-1' };
+const anon = { isAuthenticated: false };
+const nonAdmin = { isAuthenticated: true, isAdmin: false, userId: 'u1' };
 
-  it('returns 401 when unauthenticated', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
-      isAuthenticated: false,
-    });
-    const res = await GET(get());
-    expect(res.status).toBe(401);
-    expect(res.headers.get('Cache-Control')).toBe('no-store');
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  hoisted.getCurrentUserEntitlements.mockResolvedValue(admin);
+  hoisted.listAbuseReports.mockResolvedValue([{ id: 'r1' }]);
+  hoisted.applyModerationTakedown.mockResolvedValue({ ok: true });
+});
 
-  it('returns 403 for non-admin users', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
-      isAuthenticated: true,
-      isAdmin: false,
-      userId: 'u1',
-    });
+describe('GET', () => {
+  it('rejects anonymous and non-admin callers', async () => {
+    hoisted.getCurrentUserEntitlements.mockResolvedValueOnce(anon);
+    expect((await GET(get())).status).toBe(401);
+
+    hoisted.getCurrentUserEntitlements.mockResolvedValueOnce(nonAdmin);
     const res = await GET(get());
     expect(res.status).toBe(403);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(hoisted.listAbuseReports).not.toHaveBeenCalled();
   });
 
@@ -69,56 +59,32 @@ describe('GET /api/admin/moderation', () => {
 
   it('returns 500 when the queue read fails', async () => {
     hoisted.listAbuseReports.mockRejectedValue(new Error('db down'));
-    const res = await GET(get());
-    expect(res.status).toBe(500);
+    expect((await GET(get())).status).toBe(500);
     expect(hoisted.captureError).toHaveBeenCalled();
   });
 });
 
-describe('POST /api/admin/moderation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    hoisted.getCurrentUserEntitlements.mockResolvedValue(admin);
-    hoisted.applyModerationTakedown.mockResolvedValue({
-      ok: true,
-      profileId: 'prof-1',
-      wrappedLinksDisabled: 1,
-      reportsResolved: 1,
-    });
+describe('POST', () => {
+  it('rejects anonymous and non-admin callers', async () => {
+    hoisted.getCurrentUserEntitlements.mockResolvedValueOnce(anon);
+    expect((await POST(post({}))).status).toBe(401);
+
+    hoisted.getCurrentUserEntitlements.mockResolvedValueOnce(nonAdmin);
+    expect((await POST(post({}))).status).toBe(403);
   });
 
-  it('returns 401 when unauthenticated', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
-      isAuthenticated: false,
-    });
-    const res = await POST(postRequest({}));
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 403 for non-admin users', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
-      isAuthenticated: true,
-      isAdmin: false,
-      userId: 'u1',
-    });
-    const res = await POST(postRequest({}));
-    expect(res.status).toBe(403);
-  });
-
-  it('rejects invalid bodies', async () => {
-    const res = await POST(postRequest({ targetType: 'nope', target: 'x' }));
+  it('rejects invalid bodies and malformed JSON', async () => {
+    const res = await POST(post({ targetType: 'nope', target: 'x' }));
     expect(res.status).toBe(400);
+    expect(
+      (await POST(new Request(URL_, { method: 'POST', body: '{bad' }))).status
+    ).toBe(400);
     expect(hoisted.applyModerationTakedown).not.toHaveBeenCalled();
-  });
-
-  it('rejects malformed JSON', async () => {
-    const res = await POST(new Request(URL_, { method: 'POST', body: '{bad' }));
-    expect(res.status).toBe(400);
   });
 
   it('applies a takedown for a valid admin request', async () => {
     const res = await POST(
-      postRequest({
+      post({
         targetType: 'profile',
         target: 'badhandle',
         reportId: '11111111-1111-4111-8111-111111111111',
@@ -134,15 +100,12 @@ describe('POST /api/admin/moderation', () => {
       reportId: '11111111-1111-4111-8111-111111111111',
       reason: 'impersonation',
     });
-    const data = await res.json();
-    expect(data.ok).toBe(true);
+    expect((await res.json()).ok).toBe(true);
   });
 
   it('returns 500 when the takedown throws', async () => {
     hoisted.applyModerationTakedown.mockRejectedValue(new Error('db down'));
-    const res = await POST(
-      postRequest({ targetType: 'wrapped_link', target: 'abc123' })
-    );
+    const res = await POST(post({ targetType: 'wrapped_link', target: 'abc' }));
     expect(res.status).toBe(500);
     expect(hoisted.captureError).toHaveBeenCalled();
   });

@@ -97,6 +97,9 @@ export function SmartLinkArtistName({
   );
 }
 
+const FOOTER_LINK_CLASSES =
+  'inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90';
+
 export function SmartLinkPoweredByFooter({
   reportHref = `${APP_ROUTES.REPORT}?type=smart_link`,
 }: Readonly<{ reportHref?: string }>) {
@@ -105,15 +108,12 @@ export function SmartLinkPoweredByFooter({
       <div className='inline-flex items-center gap-2'>
         <Link
           href='/'
-          className='smart-link-powered-by inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
+          className={`smart-link-powered-by gap-1 ${FOOTER_LINK_CLASSES}`}
         >
           <span>Powered by</span>
           <span className='font-semibold'>Jovie</span>
         </Link>
-        <Link
-          href={reportHref}
-          className='inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground/70 dark:hover:text-foreground/90'
-        >
+        <Link href={reportHref} className={FOOTER_LINK_CLASSES}>
           <span aria-hidden='true'>{'· '}</span>Report
         </Link>
       </div>
