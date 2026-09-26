@@ -89,8 +89,57 @@ export function gemBridgeReceiptUrl(
   ) {
     return null;
   }
-  const prefix = base.pathname.replace(/\/+$/, '');
+  let prefix = base.pathname;
+  while (prefix.length > 1 && prefix.endsWith('/')) {
+    prefix = prefix.slice(0, -1);
+  }
+  if (prefix === '/') prefix = '';
   return `${base.origin}${prefix}/receipts/${key}`;
+}
+
+async function readJsonAuthority(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  url: string,
+  timeoutMs: number,
+  authority: string,
+  malformedMessage: string,
+  headers: Record<string, string> = {}
+): Promise<AuthorityRead> {
+  try {
+    const response = await io.fetch(url, {
+      method: 'GET',
+      headers: { accept: 'application/json', ...headers },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status === 401 || response.status === 403) {
+      return failedRead(
+        sourceId,
+        'unauthorized',
+        `${authority} returned ${response.status}`
+      );
+    }
+    if (!response.ok) {
+      return failedRead(
+        sourceId,
+        'unavailable',
+        `${authority} returned ${response.status}`,
+        { errorCode: `http-${response.status}` }
+      );
+    }
+    const payload: unknown = await response.json();
+    if (!isRecord(payload)) {
+      return failedRead(sourceId, 'error', malformedMessage, {
+        errorCode: 'malformed',
+      });
+    }
+    return okFileRead(sourceId, payload);
+  } catch (error) {
+    return disconnectedRead(
+      sourceId,
+      error instanceof Error ? error.message : `${authority} unreachable`
+    );
+  }
 }
 
 async function readBridgeReceipt(
@@ -106,46 +155,15 @@ async function readBridgeReceipt(
       { errorCode: 'not-configured' }
     );
   }
-  try {
-    const response = await io.fetch(url, {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${io.gemBridge?.token ?? ''}`,
-      },
-      signal: AbortSignal.timeout(GEM_BRIDGE_TIMEOUT_MS),
-    });
-    if (response.status === 401 || response.status === 403) {
-      return failedRead(
-        sourceId,
-        'unauthorized',
-        `Gem bridge returned ${response.status}`
-      );
-    }
-    if (!response.ok) {
-      return failedRead(
-        sourceId,
-        'unavailable',
-        `Gem bridge returned ${response.status}`,
-        { errorCode: `http-${response.status}` }
-      );
-    }
-    const payload: unknown = await response.json();
-    if (!isRecord(payload)) {
-      return failedRead(
-        sourceId,
-        'error',
-        'Gem bridge receipt was not an object',
-        { errorCode: 'malformed' }
-      );
-    }
-    return okFileRead(sourceId, payload);
-  } catch (error) {
-    return disconnectedRead(
-      sourceId,
-      error instanceof Error ? error.message : 'Gem bridge unreachable'
-    );
-  }
+  return readJsonAuthority(
+    io,
+    sourceId,
+    url,
+    GEM_BRIDGE_TIMEOUT_MS,
+    'Gem bridge',
+    'Gem bridge receipt was not an object',
+    { authorization: `Bearer ${io.gemBridge?.token ?? ''}` }
+  );
 }
 
 async function readFleetReceipt(io: LiveIo): Promise<AuthorityRead> {
@@ -317,43 +335,14 @@ async function readNamedUrl(
   url: string,
   timeoutMs: number
 ): Promise<AuthorityRead> {
-  try {
-    const response = await io.fetch(url, {
-      method: 'GET',
-      headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (response.status === 401 || response.status === 403) {
-      return failedRead(
-        sourceId,
-        'unauthorized',
-        `named authority returned ${response.status}`
-      );
-    }
-    if (!response.ok) {
-      return failedRead(
-        sourceId,
-        'unavailable',
-        `named authority returned ${response.status}`,
-        { errorCode: `http-${response.status}` }
-      );
-    }
-    const payload: unknown = await response.json();
-    if (!isRecord(payload)) {
-      return failedRead(
-        sourceId,
-        'error',
-        'named authority payload was not an object',
-        { errorCode: 'malformed' }
-      );
-    }
-    return okFileRead(sourceId, payload);
-  } catch (error) {
-    return disconnectedRead(
-      sourceId,
-      error instanceof Error ? error.message : 'named authority unreachable'
-    );
-  }
+  return readJsonAuthority(
+    io,
+    sourceId,
+    url,
+    timeoutMs,
+    'named authority',
+    'named authority payload was not an object'
+  );
 }
 
 async function githubFetch(

@@ -1020,6 +1020,12 @@ describe('bounded authenticated Gem transport', () => {
     expect(gemBridgeReceiptUrl(bridge, 'fleet-receipt')).toBe(
       'https://gem.example.internal/hud/receipts/fleet-receipt'
     );
+    expect(
+      gemBridgeReceiptUrl(
+        { ...bridge, url: 'https://gem.example.internal/hud///' },
+        'fleet-receipt'
+      )
+    ).toBe('https://gem.example.internal/hud/receipts/fleet-receipt');
     for (const bad of [
       { url: 'ftp://gem.example.internal', token: 'tok' },
       { url: 'https://user:pw@gem.example.internal', token: 'tok' },
