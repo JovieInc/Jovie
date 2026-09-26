@@ -31,8 +31,10 @@ if (typeof window !== 'undefined') {
     import('@testing-library/react'),
   ]);
 
-  // Extend expect with jest-dom matchers
-  expect.extend(matchers);
+  // Extend expect with jest-dom matchers. The dynamic import's namespace also
+  // carries the CommonJS `default` export, which is not a matcher.
+  const { default: _commonJsDefault, ...jestDomMatchers } = matchers;
+  expect.extend(jestDomMatchers);
 
   // Ensure the DOM is cleaned up between tests to avoid cross-test interference
   afterEach(() => {
