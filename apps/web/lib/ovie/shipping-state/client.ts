@@ -63,7 +63,7 @@ const operationalTaskFeedSchema = z.object({
   deltas: z.array(
     z.object({
       taskId: operationalTaskIdSchema,
-      kind: z.enum(['added', 'updated', 'removed']),
+      kind: z.enum(['added', 'updated', 'removed', 'recurred']),
       fromState: operationalTaskWorkflowStateSchema.nullable(),
       toState: operationalTaskWorkflowStateSchema.nullable(),
       sequence: z.number().int().nonnegative(),
@@ -101,6 +101,9 @@ const sourceObservationSchema = z.object({
     running: countMeasurementSchema,
     retrying: countMeasurementSchema,
     blocked: countMeasurementSchema,
+    terminalFailures: countMeasurementSchema
+      .optional()
+      .default(NOT_MEASURED_COUNT_VALUE),
     queued: countMeasurementSchema,
     openPullRequests: countMeasurementSchema
       .optional()
@@ -136,6 +139,9 @@ export const shippingCockpitProjectionSchema = z.object({
   }),
   retrying: countMeasurementSchema,
   terminalFailures: countMeasurementSchema,
+  recurrence: countMeasurementSchema
+    .optional()
+    .default(NOT_MEASURED_COUNT_VALUE),
   capacityAvailable: countMeasurementSchema,
   operationalTasks: operationalTaskFeedSchema,
   sources: z.object(sourceMapShape),

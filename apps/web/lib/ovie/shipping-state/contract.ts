@@ -131,7 +131,8 @@ export type OperationalTask = {
 
 export type OperationalTaskDelta = {
   readonly taskId: OperationalTask['id'];
-  readonly kind: 'added' | 'updated' | 'removed';
+  /** 'recurred' marks work re-entering an active state after a terminal one. */
+  readonly kind: 'added' | 'updated' | 'removed' | 'recurred';
   readonly fromState: OperationalTaskWorkflowState | null;
   readonly toState: OperationalTaskWorkflowState | null;
   readonly sequence: number;
@@ -278,6 +279,8 @@ export type SourceObservation = IdentityFields & {
     readonly running: CountMeasurement;
     readonly retrying: CountMeasurement;
     readonly blocked: CountMeasurement;
+    /** Terminal failures are never aliased to blocked: only explicit terminal evidence counts. */
+    readonly terminalFailures: CountMeasurement;
     readonly queued: CountMeasurement;
     readonly openPullRequests: CountMeasurement;
     readonly capacityAvailable: CountMeasurement;
@@ -308,6 +311,8 @@ export type ShippingStateProjection = IdentityFields & {
   readonly timeToShipSeconds: DurationMeasurement;
   readonly retrying: CountMeasurement;
   readonly terminalFailures: CountMeasurement;
+  /** Tasks observed re-entering an active state after a terminal one. */
+  readonly recurrence: CountMeasurement;
   readonly capacityAvailable: CountMeasurement;
   /** Shared cache-backed task projection consumed by Ovie and terminal adapters. */
   readonly operationalTasks: OperationalTaskFeed;
@@ -367,6 +372,7 @@ export function emptyCounts(): SourceObservation['counts'] {
     running: NOT_MEASURED_COUNT,
     retrying: NOT_MEASURED_COUNT,
     blocked: NOT_MEASURED_COUNT,
+    terminalFailures: NOT_MEASURED_COUNT,
     queued: NOT_MEASURED_COUNT,
     openPullRequests: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,

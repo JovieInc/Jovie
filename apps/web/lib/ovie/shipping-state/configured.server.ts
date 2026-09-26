@@ -18,14 +18,17 @@ const configuredReaders = createLiveShippingStateReaders(
     githubToken: env.HUD_GITHUB_TOKEN,
     githubOwner: env.HUD_GITHUB_OWNER,
     githubRepo: env.HUD_GITHUB_REPO,
+    gemBridgeUrl: env.HUD_GEM_BRIDGE_URL,
+    gemBridgeToken: env.HUD_GEM_BRIDGE_TOKEN,
   })
 );
 
 /**
  * Compose the installed authorities through the publisher's reader-keyed,
  * in-process coalescing. Do not mirror this high-cadence projection through
- * the shared production Redis quota; a durable Gem bridge needs its own
- * bounded producer cadence and fixed receipt key.
+ * the shared production Redis quota; the durable Gem bridge keeps its own
+ * bounded producer cadence and fixed receipt paths. Without HUD_GEM_BRIDGE_*
+ * configuration the Gem-hosted sources honestly report not-configured.
  */
 export function publishConfiguredShippingState(
   input: Pick<PublishShippingStateInput, 'clock'> = {}
