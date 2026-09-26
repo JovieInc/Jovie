@@ -235,6 +235,7 @@ apps/desktop/src/*
 .agents/skills/gstack/test/*
 !.agents/skills/gstack/package.json
 !.agents/skills/gstack/scripts/changelog-eval.ts
+!.agents/skills/gstack/scripts/daily-changelog-eval.ts
 !.agents/skills/gstack/scripts/resolvers/
 .agents/skills/gstack/scripts/resolvers/*
 !.agents/skills/gstack/scripts/resolvers/utility.ts
@@ -249,6 +250,7 @@ apps/desktop/src/*
 .agents/skills/gstack/design-review/references/*
 !.agents/skills/gstack/design-review/references/web-interface-gaps.md
 !.agents/skills/gstack/test/changelog-eval.test.ts
+!.agents/skills/gstack/test/daily-changelog-eval.test.ts
 !.agents/skills/gstack/test/gen-skill-docs.test.ts
 
 # Vitest junit output (generated; never commit — caused recurring PR conflicts)
