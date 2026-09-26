@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { ArtistNotificationsHero } from './ArtistNotificationsHero';
 import storyMeta, { Hero } from './ArtistNotificationsHero.stories';
 
@@ -11,7 +12,7 @@ describe('ArtistNotificationsHero', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Reach Every Fan. Automatically.',
+        name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
       })
     ).toHaveClass('line-clamp-2');
     expect(

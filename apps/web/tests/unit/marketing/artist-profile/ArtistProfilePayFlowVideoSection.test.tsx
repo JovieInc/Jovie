@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ArtistProfilePayFlowVideoSection } from '@/components/marketing/artist-profile/ArtistProfilePayFlowVideoSection';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const reducedMotionMock = vi.hoisted(() => ({ value: false }));
 
@@ -68,7 +69,9 @@ describe('ArtistProfilePayFlowVideoSection', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: ARTIST_PROFILE_COPY.monetization.headline,
+        name: segmentedAccessibleName(
+          ...ARTIST_PROFILE_COPY.monetization.headline.split(' ')
+        ),
       })
     ).toBeInTheDocument();
   });
@@ -122,7 +125,9 @@ describe('ArtistProfilePayFlowVideoSection', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: ARTIST_PROFILE_COPY.monetization.headline,
+        name: segmentedAccessibleName(
+          ...ARTIST_PROFILE_COPY.monetization.headline.split(' ')
+        ),
       })
     ).toBeInTheDocument();
   });

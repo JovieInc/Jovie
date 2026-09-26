@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { IngestProfileDropdown } from './IngestProfileDropdown';
 import type { UseIngestProfileReturn } from './types';
 
@@ -61,7 +62,9 @@ describe('IngestProfileDropdown', () => {
   it('renders Spotify results on the defined elevated surface token', () => {
     render(<IngestProfileDropdown />);
 
-    const result = screen.getByRole('button', { name: 'Phoebe Bridgers Use' });
+    const result = screen.getByRole('button', {
+      name: segmentedAccessibleName('Phoebe Bridgers', 'Use'),
+    });
     const resultsPanel = result.parentElement;
     expect(resultsPanel).toHaveClass('bg-surface-elevated');
     expect(resultsPanel).not.toHaveClass('bg-background-elevated');
@@ -80,7 +83,9 @@ describe('IngestProfileDropdown', () => {
       screen.getByText('No artists found. Try a different search.')
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Phoebe Bridgers Use' })
+      screen.queryByRole('button', {
+        name: segmentedAccessibleName('Phoebe Bridgers', 'Use'),
+      })
     ).not.toBeInTheDocument();
   });
 

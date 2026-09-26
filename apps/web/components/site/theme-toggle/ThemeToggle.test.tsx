@@ -61,8 +61,10 @@ describe('ThemeToggle', () => {
   it('uses the linear token treatment for icon appearance', () => {
     render(<ThemeToggle variant='linear' />);
 
-    expect(screen.getByRole('button', { name: /Toggle theme/ })).toHaveStyle(
-      'border: 1px solid var(--linear-border-subtle)'
-    );
+    // Assert the specified token: jsdom 30 resolves an undefined var() to the
+    // computed initial value, so toHaveStyle cannot see the token.
+    expect(
+      screen.getByRole('button', { name: /Toggle theme/ }).style.border
+    ).toBe('1px solid var(--linear-border-subtle)');
   });
 });
