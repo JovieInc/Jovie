@@ -5,8 +5,8 @@ name: Fleet Gate Refresh
 # revisit-trigger: Remove when Symphony emits this atomic receipt natively.
 
 # Event-driven one-writer refresh for the canonical Gem receipt (JOV-5467:
-# the sole automatic issue-admission writer). Work pickup is owned by upstream
-# OpenAI Symphony polling Linear directly; the assess job below only rereads
+# the sole automatic issue-admission writer). Work pickup is owned by
+# upstream OpenAI Symphony polling Linear directly; the assess job only rereads
 # the exact signed Linear event, applies the existing reconciler's Triage ->
 # Todo/Backlog disposition, and wakes the already-running Symphony picker. The
 # hourly schedule is a classify-only missed-event pass and cannot admit.
