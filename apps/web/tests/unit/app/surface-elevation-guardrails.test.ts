@@ -566,7 +566,6 @@ describe('surface elevation guardrails', () => {
     const creatorProfiles = readComponent(
       'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx'
     );
-
     expect(creatorProfiles).toContain('refetchSocialLinks, enrichment');
     expect(creatorProfiles).toContain('enrichment={enrichment}');
   });

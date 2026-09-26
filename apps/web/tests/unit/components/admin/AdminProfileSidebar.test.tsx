@@ -140,15 +140,10 @@ describe('AdminProfileSidebar', () => {
       />
     );
 
-    expect(
-      screen.getByTestId('admin-creator-enrichment-status')
-    ).toHaveTextContent('Identity enrichment: conflicted');
-    expect(
-      screen.getByTestId('admin-creator-enrichment-status')
-    ).toHaveTextContent('name mismatch');
-    expect(
-      screen.getByTestId('admin-creator-enrichment-status')
-    ).toHaveTextContent('Below share-ready evidence bar');
+    const note = screen.getByTestId('admin-creator-enrichment-status');
+    expect(note).toHaveTextContent('Identity enrichment: conflicted');
+    expect(note).toHaveTextContent('name mismatch');
+    expect(note).toHaveTextContent('Below share-ready evidence bar');
   });
 
   it('hides the enrichment note when nothing was checked', () => {

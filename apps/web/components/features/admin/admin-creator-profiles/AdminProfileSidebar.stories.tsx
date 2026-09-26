@@ -111,8 +111,3 @@ export const EnrichmentConflicted: Story = {
     onClose: () => {},
   },
 };
-
-/** Empty state when no creator profile is selected. */
-export const EmptyState: Story = {
-  args: { profile: null, contact: null, isOpen: true, onClose: () => {} },
-};
