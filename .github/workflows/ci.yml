@@ -4610,6 +4610,8 @@ jobs:
               exit 1
             fi
             export JOVIE_COVERAGE_INCLUDE=\"\$include\"
+            related_tests=\$(printf '%s' \"\$plan_json\" | jq -r '.relatedTests // [] | .[]')
+            export JOVIE_COVERAGE_RELATED_TESTS=\"\$related_tests\"
             timeout --kill-after=20s 17m \
               pnpm --filter @jovie/web test:coverage --changed \"\$COVERAGE_BASE\" --bail 1
             node scripts/check-changed-test-coverage.mjs \
