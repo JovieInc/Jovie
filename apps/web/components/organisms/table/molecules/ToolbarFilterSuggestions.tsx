@@ -24,7 +24,7 @@ export interface ToolbarFilterSuggestionsProps {
 }
 
 const SUGGESTION_PILL_CLASS = cn(
-  'inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-full border border-subtle bg-transparent px-2.5 text-2xs font-medium text-tertiary-token transition-colors duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token',
+  'inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-full border border-subtle bg-transparent px-3 text-2xs font-medium text-tertiary-token transition-colors duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none'
 );
 
