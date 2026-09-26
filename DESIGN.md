@@ -210,18 +210,27 @@ Read [the component patterns reference](docs/design-system/DETAILS.md#component-
 
 ### Sidebar (App Shell)
 
-Founder lock 2026-09-12, Pen `OqZTF`: 280px customer rail; combined search/inbox/
-new-chat bar; Library, Contacts, Presence (`canonicalSidebarNavigation`); 36px
-nav/history rows; Today/Earlier history; bottom-anchored account footer. Mobile
-keeps its composition. Homepage `t1x8T` remains locked.
+Founder lock 2026-09-12, Pen `OqZTF`: combined search/inbox/new-chat bar;
+Library, Contacts, Presence (`canonicalSidebarNavigation`); Today/Earlier
+history; bottom-anchored account footer. Mobile keeps its composition.
+Homepage `t1x8T` remains locked.
+
+Founder lock 2026-09-25 (Linear-scale density): 244px customer rail; 28px
+nav/history rows; 16px sidebar icons; 44px app header everywhere (single
+token, no separate "compact" variant); selected nav row is a neutral
+hover-level tint with primary-token text — no ion/blue background, no
+border; Today/Earlier day headers are sentence case, no letterspacing, 11px
+medium, quiet color; account footer is a single compact 32px row (20px
+avatar, name only — no workspace subtitle line).
 
 | Token | Light | Dark |
 |-------|-------|------|
-| Width | 280px | 280px |
+| Width | 244px | 244px |
 | Background RGB | `247 248 248` | `7 8 10` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
+| Accent active RGB | `236 238 241` | `168 176 195 / 0.1` |
 | Item foreground RGB | `88 90 96` | `214 218 226` |
 | Item icon RGB | `122 125 132` | `116 120 128` |
 | Muted RGB | `112 116 124` | `107 111 118` |

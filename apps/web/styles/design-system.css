@@ -96,16 +96,18 @@
 
   /* Shell V1 canonical app-shell tokens — app chrome should prefer these
      names when touching shared shell geometry. Values are centralized here
-     (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below. */
-  --app-shell-sidebar-width: 280px;
-  --app-shell-sidebar-icon-size: 0.9375rem;
+     (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below.
+     Founder lock 2026-09-25 (Linear-scale density): sidebar 244px, header
+     44px everywhere (single token — the former 36px "compact" variant is
+     retired), 28px nav/history rows, 16px sidebar icons. */
+  --app-shell-sidebar-width: 244px;
+  --app-shell-sidebar-icon-size: 1rem;
   --app-shell-sidebar-badge-font-size: 0.5rem;
   --app-shell-sidebar-history-font-size: 0.78125rem;
   --app-shell-sidebar-nav-grid: var(--app-shell-sidebar-icon-size)
     minmax(0, 1fr);
   --app-shell-sidebar-history-grid: minmax(0, 1fr) auto;
-  --app-shell-header-height: 40px;
-  --app-shell-header-height-compact: 36px;
+  --app-shell-header-height: 44px;
   --app-shell-header-padding-x: 12px;
   --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
   --app-shell-gap: 8px;
@@ -115,8 +117,9 @@
   --app-shell-border: rgba(0, 0, 0, 0.05);
   --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
   --app-shell-frame-seam: rgba(0, 0, 0, 0.045);
-  --app-shell-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045);
+  /* Founder lock 2026-09-25: main content panel is a flat, borderless
+     inset — no hairline ring, soft elevation only (see AppShellFrame). */
+  --app-shell-shadow: 0 14px 30px rgba(0, 0, 0, 0.045);
   --app-shell-sidebar-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035);
   --app-shell-card-shadow: none;
@@ -1514,8 +1517,9 @@ html[data-profile-initial-mode]
   --app-shell-border: rgba(168, 176, 195, 0.12);
   --app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
   --app-shell-frame-seam: rgba(168, 176, 195, 0.1);
-  --app-shell-shadow:
-    0 0 0 1px rgba(168, 176, 195, 0.06), 0 14px 36px rgba(0, 0, 0, 0.22);
+  /* Founder lock 2026-09-25: main content panel is a flat, borderless
+     inset — no hairline ring, soft elevation only (see AppShellFrame). */
+  --app-shell-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
   --app-shell-sidebar-shadow:
     0 0 0 1px rgba(168, 176, 195, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
   --app-shell-drawer-shadow:
@@ -1525,7 +1529,9 @@ html[data-profile-initial-mode]
   --app-shell-sidebar-foreground-rgb: 245 247 251;
   --app-shell-sidebar-border-rgb: 168 176 195 / 0.1;
   --app-shell-sidebar-accent-rgb: 168 176 195 / 0.06;
-  --app-shell-sidebar-accent-active-rgb: 17 175 255 / 0.1;
+  /* Founder lock 2026-09-25: selected nav row is a neutral hover-level
+     tint, not the ion accent — no blue background on the sidebar. */
+  --app-shell-sidebar-accent-active-rgb: 168 176 195 / 0.1;
   --app-shell-sidebar-item-foreground-rgb: 215 220 232;
   --app-shell-sidebar-item-icon-rgb: 125 135 157;
   --app-shell-sidebar-muted-rgb: 125 135 157;

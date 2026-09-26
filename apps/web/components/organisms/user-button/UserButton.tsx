@@ -514,7 +514,8 @@ export function UserButton({
         data-testid='user-button-loading'
         className={cn(
           'flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
-          calm && 'h-11'
+          // Founder lock 2026-09-25: single compact 32px row.
+          calm && 'h-8'
         )}
       >
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
@@ -562,14 +563,16 @@ export function UserButton({
         type='button'
         className={cn(
           'group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
-          calm && 'h-11 px-0.5 gap-(--space-2-5)'
+          // Founder lock 2026-09-25: single compact 32px row — 20px avatar,
+          // name only (no workspace subtitle line).
+          calm && 'h-8 px-0.5 gap-(--space-2-5)'
         )}
       >
         <Avatar
           src={userImageUrl}
           alt={displayName || 'User avatar'}
           name={displayName || userInitials}
-          size={calm ? 'sidebar' : 'xs'}
+          size={calm ? 'sm' : 'xs'}
           className='shrink-0'
         />
         <div
@@ -587,11 +590,6 @@ export function UserButton({
           >
             {displayName}
           </p>
-          {calm ? (
-            <p className='truncate text-(length:--text-3xs) text-sidebar-muted/50'>
-              Jovie workspace
-            </p>
-          ) : null}
         </div>
         <Icon
           name='ChevronRight'

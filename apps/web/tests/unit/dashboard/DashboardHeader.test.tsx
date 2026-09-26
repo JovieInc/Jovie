@@ -243,9 +243,9 @@ describe('DashboardHeader', () => {
     expect(
       container.querySelector('.sm\\:px-\\(--app-shell-header-padding-x\\)')
     ).not.toBeNull();
-    // Layout is unchanged — the desktop row keeps the compact header height.
+    // Layout is unchanged — the desktop row keeps the canonical header height.
     expect(
-      container.querySelector('.sm\\:h-\\(--app-shell-header-height-compact\\)')
+      container.querySelector('.sm\\:h-\\(--app-shell-header-height\\)')
     ).not.toBeNull();
   });
 });

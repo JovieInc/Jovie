@@ -444,8 +444,8 @@ describe('founder-locked calm sidebar history', () => {
     );
     const filter = screen.getByRole('button', { name: 'Filter Unread Chats' });
     expect(filter.querySelector('svg')).not.toBeNull();
-    expect(screen.getByText('TODAY')).toBeInTheDocument();
-    expect(screen.getByText('EARLIER')).toBeInTheDocument();
+    expect(screen.getByText('Today')).toBeInTheDocument();
+    expect(screen.getByText('Earlier')).toBeInTheDocument();
     expect(screen.getByText('2m')).toHaveAttribute(
       'datetime',
       current[0].updatedAt
