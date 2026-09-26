@@ -67,6 +67,14 @@ Gate evidence names are stable strings:
 - `gstack.land-and-deploy`
 - `sentry.canary`
 
+No skill is mandatory. GStack is a tool, not a gate: agents choose the skills
+and checks a change needs, and record only the gates that actually ran.
+`evaluateAgentRunGateEvidence` treats the gates an agent declares as the contract:
+at least one must pass with recorded evidence, and none the agent marked
+required (or that last failed) may be outstanding. Callers that need specific
+gates pass an explicit list. Scripts must never write a `passed` gate they did
+not observe.
+
 AgentOS may record GStack `qa`/`review`/`ship` artifacts on a PR for the operator board. Those comments are self-attested local CLI runs, not GitHub Actions run IDs, so agent-pipeline auto-approve must not consume them as provenance. Missing GStack comments are incomplete telemetry, not a merge-gate failure. Required merge evidence remains `github.ci` (`PR Ready`) plus the deterministic queue contract.
 
 ## PR Rollout
