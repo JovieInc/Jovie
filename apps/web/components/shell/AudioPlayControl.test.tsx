@@ -19,12 +19,29 @@ describe('AudioPlayButton', () => {
 
   it('blocks playback while the source is loading', () => {
     const onClick = vi.fn();
-    render(<AudioPlayButton isPlaying={false} isLoading onClick={onClick} />);
+    const { rerender } = render(
+      <AudioPlayButton isPlaying={false} isLoading onClick={onClick} />
+    );
 
     const button = screen.getByRole('button', { name: 'Loading track' });
     expect(button).toBeDisabled();
     fireEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
+
+    rerender(<AudioPlayButton isPlaying isLoading onClick={onClick} />);
+    expect(
+      screen.getByRole('button', { name: 'Loading track' })
+    ).toBeDisabled();
+  });
+
+  it('keeps an explicit label ahead of loading and playback state', () => {
+    const { rerender } = render(
+      <AudioPlayButton isPlaying isLoading label='Preview' onClick={vi.fn()} />
+    );
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
+
+    rerender(<AudioPlayButton isPlaying={false} label='' onClick={vi.fn()} />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', '');
   });
 
   it('reuses the canonical primary Button for compact player controls', () => {

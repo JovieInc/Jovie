@@ -312,7 +312,7 @@ export function EntityCarousel({
             data-layout={layout}
             data-carousel-active={currentIndex === 0 ? 'true' : 'false'}
             aria-roledescription='slide'
-            aria-label={`1 of ${slotCount}`}
+            aria-label={`Card 1 of ${slotCount}`}
             className={cardItemClassName}
           >
             {leading}
@@ -332,7 +332,7 @@ export function EntityCarousel({
               data-layout={layout}
               data-carousel-active={isActive ? 'true' : 'false'}
               aria-roledescription='slide'
-              aria-label={`${slotIndex + 1} of ${slotCount}`}
+              aria-label={`Card ${slotIndex + 1} of ${slotCount}`}
               className={cardItemClassName}
             >
               <EntityCard
@@ -363,7 +363,7 @@ export function EntityCarousel({
               currentIndex === slotCount - 1 ? 'true' : 'false'
             }
             aria-roledescription='slide'
-            aria-label={`${slotCount} of ${slotCount}`}
+            aria-label={`Card ${slotCount} of ${slotCount}`}
             className={cardItemClassName}
           >
             {trailing}
@@ -378,7 +378,7 @@ export function EntityCarousel({
         >
           <button
             type='button'
-            aria-label='Previous Item'
+            aria-label='Previous Card'
             disabled={currentIndex === 0}
             onClick={() => scrollToIndex(currentIndex - 1)}
             className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
@@ -386,7 +386,7 @@ export function EntityCarousel({
             <ChevronLeft className='h-4 w-4' aria-hidden='true' />
           </button>
           <nav
-            aria-label='Profile Items'
+            aria-label='Profile Cards'
             className='flex min-h-11 items-center justify-center gap-0.5'
           >
             {Array.from({ length: visibleDotCount }, (_, offset) => {
@@ -396,7 +396,7 @@ export function EntityCarousel({
                 <button
                   key={index}
                   type='button'
-                  aria-label={`Go to item ${index + 1}`}
+                  aria-label={`Go to card ${index + 1}`}
                   aria-current={isCurrent ? 'true' : undefined}
                   onClick={() => scrollToIndex(index)}
                   className='flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
@@ -414,7 +414,7 @@ export function EntityCarousel({
           </nav>
           <button
             type='button'
-            aria-label='Next Item'
+            aria-label='Next Card'
             disabled={currentIndex === slotCount - 1}
             onClick={() => scrollToIndex(currentIndex + 1)}
             className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
@@ -422,7 +422,8 @@ export function EntityCarousel({
             <ChevronRight className='h-4 w-4' aria-hidden='true' />
           </button>
           <span className='sr-only' aria-live='polite'>
-            Item {currentIndex + 1} of {slotCount}
+            Card {currentIndex + 1} of {slotCount} — profile cards include the
+            featured highlight and alerts, not releases only
           </span>
         </div>
       ) : null}
