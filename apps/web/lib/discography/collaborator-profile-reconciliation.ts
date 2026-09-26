@@ -30,10 +30,8 @@ import { buildSpotifyArtistUrl, getSpotifyArtistsBatch } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 import { PUBLIC_ARTIST_COLLABORATOR_ROLES } from './artist-credit-policy';
 import {
-  type ArtistIdentityEnrichment,
   applyArtistIdentityEnrichment,
   enrichArtistIdentity,
-  needsIdentityEnrichment,
 } from './artist-identity-enrichment';
 import { buildUnclaimedArtistHandle } from './artist-profile-routing';
 import {
@@ -78,7 +76,6 @@ interface LockedRegistryArtist {
 
 const MAX_CREDITED_ARTISTS_PER_RECONCILIATION = 24;
 const PROFILE_RECONCILIATION_CONFLICT_KEY = 'publicProfileReconciliation';
-const MAX_ISRCS_FOR_IDENTITY_MATCH = 8; // bounded ISRC sample (JOV-6529)
 
 function isMissingNextStaticGenerationStore(reason: unknown): boolean {
   return (
@@ -132,66 +129,41 @@ async function getCreditedArtistCandidates(
   };
 }
 
-// ISRCs of credited releases — shared-ISRC evidence for MB matching (JOV-6529).
-async function getArtistCreditIsrcs(artistId: string): Promise<string[]> {
-  const rows = await db
-    .selectDistinct({ isrc: discogRecordings.isrc })
-    .from(releaseArtists)
-    .innerJoin(
-      discogReleaseTracks,
-      eq(releaseArtists.releaseId, discogReleaseTracks.releaseId)
-    )
-    .innerJoin(
-      discogRecordings,
-      eq(discogReleaseTracks.recordingId, discogRecordings.id)
-    )
-    .where(
-      and(
-        eq(releaseArtists.artistId, artistId),
-        isNotNull(discogRecordings.isrc)
-      )
-    )
-    .limit(MAX_ISRCS_FOR_IDENTITY_MATCH);
-  return rows.flatMap(row => (row.isrc ? [row.isrc] : []));
-}
-
-// Enrichment pass for a provider-ID-backed candidate, outside the serializable
-// transaction; failures degrade to a `not_checked` record, never block ingest.
-async function enrichCandidateIdentity(
-  candidate: CreditedArtistCandidate
-): Promise<ArtistIdentityEnrichment | undefined> {
+// Identity enrichment for a provider-ID-backed candidate (JOV-6529), run
+// outside the serializable transaction; ISRCs of credited releases are the
+// shared-ISRC evidence. Failures degrade to `undefined`, never block ingest.
+async function enrichCandidateIdentity(candidate: CreditedArtistCandidate) {
   try {
-    const isrcs = await getArtistCreditIsrcs(candidate.artistId);
+    const rows = await db
+      .selectDistinct({ isrc: discogRecordings.isrc })
+      .from(releaseArtists)
+      .innerJoin(
+        discogReleaseTracks,
+        eq(releaseArtists.releaseId, discogReleaseTracks.releaseId)
+      )
+      .innerJoin(
+        discogRecordings,
+        eq(discogReleaseTracks.recordingId, discogRecordings.id)
+      )
+      .where(
+        and(
+          eq(releaseArtists.artistId, candidate.artistId),
+          isNotNull(discogRecordings.isrc)
+        )
+      )
+      .limit(8);
     return await enrichArtistIdentity({
       spotifyId: candidate.spotifyId,
       spotifyUrl: buildSpotifyArtistUrl(candidate.spotifyId),
-      isrcs,
+      isrcs: rows.flatMap(row => (row.isrc ? [row.isrc] : [])),
     });
   } catch (error) {
     logger.warn('Artist identity enrichment failed closed', {
       artistId: candidate.artistId,
-      spotifyId: candidate.spotifyId,
       error: error instanceof Error ? error.message : String(error),
     });
     return undefined;
   }
-}
-
-// Apply enrichment to a profile lacking a record. Insert-only — claimed and
-// user-locked fields are never overwritten.
-async function maybeApplyEnrichmentToProfile(
-  tx: DbOrTransaction,
-  profileId: string,
-  enrichment: ArtistIdentityEnrichment | undefined
-): Promise<void> {
-  if (!enrichment) return;
-  const [profile] = await tx
-    .select({ settings: creatorProfiles.settings })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
-    .limit(1);
-  if (!profile || !needsIdentityEnrichment(profile.settings)) return;
-  await applyArtistIdentityEnrichment(tx, profileId, enrichment);
 }
 
 async function bindOwnerRegistryArtist(
@@ -267,7 +239,7 @@ async function markArtistProfileConflict(
 async function reconcileCandidate(
   candidate: CreditedArtistCandidate,
   spotifyArtist: SpotifyArtistProfileData | undefined,
-  identityEnrichment?: ArtistIdentityEnrichment
+  identityEnrichment?: Awaited<ReturnType<typeof enrichArtistIdentity>>
 ): Promise<CandidateOutcome> {
   return withSystemIngestionSession(
     async tx => {
@@ -294,12 +266,6 @@ async function reconcileCandidate(
         return { status: 'conflicted' };
       }
       if (lockedArtist.creatorProfileId) {
-        // Idempotent backfill (JOV-6529): no claimed/locked field is touched.
-        await maybeApplyEnrichmentToProfile(
-          tx,
-          lockedArtist.creatorProfileId,
-          identityEnrichment
-        );
         return { status: 'reused' };
       }
 
@@ -333,11 +299,6 @@ async function reconcileCandidate(
               isNull(artists.creatorProfileId)
             )
           );
-        await maybeApplyEnrichmentToProfile(
-          tx,
-          exactProfile.id,
-          identityEnrichment
-        );
         return {
           status: 'reused',
           handle: exactProfile.usernameNormalized,
