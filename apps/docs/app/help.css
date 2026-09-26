@@ -1,0 +1,452 @@
+/**
+ * Jovie Help Center shell styles.
+ *
+ * Consumes the canonical generated design tokens (brand ink/cream, gray
+ * scale, radii) from apps/web — the single source of truth. Semantic
+ * `--help-*` aliases below are derived from those tokens via color-mix; no
+ * docs-local color literals are introduced.
+ */
+@import "../../web/styles/generated/design-tokens.css";
+
+:root {
+  /* Semantic aliases — light mode. All values resolve to canonical tokens. */
+  --help-field: var(--brand-ink);
+  --help-surface: var(--brand-cream);
+  --help-surface-raised: var(--gray1);
+  --help-text: var(--gray12);
+  --help-text-muted: var(--gray11);
+  --help-border: var(--gray4);
+  --help-border-strong: var(--gray6);
+  --help-accent-bg: var(--gray3);
+  --help-accent-bg-active: var(--gray4);
+  --help-window-border: color-mix(
+    in oklab,
+    var(--brand-cream) 16%,
+    transparent
+  );
+  --help-window-shadow:
+    0 0 0 1px color-mix(in oklab, var(--brand-ink) 6%, transparent),
+    0 24px 64px color-mix(in oklab, var(--brand-ink) 55%, transparent),
+    0 8px 24px color-mix(in oklab, var(--brand-ink) 35%, transparent);
+  --help-scrim: color-mix(in oklab, var(--brand-ink) 55%, transparent);
+  --help-focus-ring: var(--gray10);
+
+  /* Shell geometry (component-scoped, per the shared shell contract). */
+  --help-outer-margin: 32px;
+  --help-window-max: 1440px;
+  --help-window-radius: var(--radius-3xl);
+  --help-rail-width: 248px;
+  --help-topbar-height: 64px;
+  --help-content-max: 720px;
+  --help-search-width: 460px;
+}
+
+.dark {
+  --help-surface: color-mix(
+    in oklab,
+    var(--brand-ink) 92%,
+    var(--brand-cream) 8%
+  );
+  --help-surface-raised: color-mix(
+    in oklab,
+    var(--brand-ink) 86%,
+    var(--brand-cream) 14%
+  );
+  --help-text: var(--brand-cream);
+  --help-text-muted: color-mix(
+    in oklab,
+    var(--brand-cream) 62%,
+    var(--brand-ink)
+  );
+  --help-border: color-mix(in oklab, var(--brand-cream) 12%, transparent);
+  --help-border-strong: color-mix(
+    in oklab,
+    var(--brand-cream) 22%,
+    transparent
+  );
+  --help-accent-bg: color-mix(in oklab, var(--brand-cream) 7%, transparent);
+  --help-accent-bg-active: color-mix(
+    in oklab,
+    var(--brand-cream) 12%,
+    transparent
+  );
+  --help-window-border: color-mix(
+    in oklab,
+    var(--brand-cream) 10%,
+    transparent
+  );
+  --help-window-shadow:
+    0 0 0 1px color-mix(in oklab, var(--brand-cream) 4%, transparent),
+    0 24px 64px color-mix(in oklab, black 70%, transparent);
+  --help-scrim: color-mix(in oklab, black 65%, transparent);
+  --help-focus-ring: color-mix(in oklab, var(--brand-cream) 55%, transparent);
+}
+
+body {
+  font-family:
+    var(--font-inter), "Inter", "SF Pro Display", system-ui, sans-serif;
+}
+
+.help-field {
+  min-height: 100dvh;
+  background: var(--help-field);
+  display: flex;
+  padding: var(--help-outer-margin);
+}
+
+.help-window {
+  width: min(
+    var(--help-window-max),
+    calc(100vw - 2 * var(--help-outer-margin))
+  );
+  margin: auto;
+  min-height: calc(100dvh - 2 * var(--help-outer-margin));
+  display: flex;
+  flex-direction: column;
+  background: var(--help-surface);
+  color: var(--help-text);
+  border: 1px solid var(--help-window-border);
+  border-radius: var(--help-window-radius);
+  box-shadow: var(--help-window-shadow);
+  overflow: clip;
+}
+
+/* --- Skip link ------------------------------------------------------- */
+
+.help-skip {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 60;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--help-text);
+  color: var(--help-surface);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.help-skip:focus-visible {
+  transform: none;
+}
+
+/* --- Utility bar ------------------------------------------------------ */
+
+.help-topbar {
+  flex: none;
+  height: var(--help-topbar-height);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--help-border);
+  background: var(--help-surface);
+}
+
+.help-topbar-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.help-topbar-actions {
+  justify-content: flex-end;
+}
+
+.help-topbar-center {
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.help-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--help-text);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.help-brand-name {
+  font-weight: 650;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+}
+
+.help-brand-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--help-border-strong);
+}
+
+.help-brand-product {
+  font-size: 0.8125rem;
+  color: var(--help-text-muted);
+  font-weight: 550;
+}
+
+.help-topbar-link {
+  color: var(--help-text-muted);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.help-topbar-link:hover {
+  color: var(--help-text);
+  background: var(--help-accent-bg);
+}
+
+.help-topbar-cta {
+  color: var(--help-surface);
+  background: var(--help-text);
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+}
+
+.help-topbar-cta:hover {
+  color: var(--help-surface);
+  background: var(--help-text);
+  opacity: 0.88;
+}
+
+.help-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--help-text-muted);
+  cursor: pointer;
+}
+
+.help-icon-button:hover {
+  color: var(--help-text);
+  background: var(--help-accent-bg);
+}
+
+/* --- Search slot ------------------------------------------------------ */
+
+.help-search {
+  width: min(var(--help-search-width), 44vw);
+  min-width: 200px;
+}
+
+/* --- Body: rail + article --------------------------------------------- */
+
+.help-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.help-sidebar {
+  flex: none;
+  width: var(--help-rail-width);
+  border-right: 1px solid var(--help-border);
+  padding: 24px 12px 32px 20px;
+  overflow-y: auto;
+}
+
+.help-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.help-nav-nested {
+  margin: 2px 0 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--help-border);
+}
+
+.help-nav-link {
+  display: block;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--help-text-muted);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.help-nav-link:hover {
+  color: var(--help-text);
+  background: var(--help-accent-bg);
+}
+
+.help-nav-link[data-active] {
+  color: var(--help-text);
+  background: var(--help-accent-bg-active);
+  font-weight: 600;
+}
+
+.help-nav-group {
+  font-weight: 600;
+  color: var(--help-text);
+  margin-top: 10px;
+}
+
+.help-nav-item:first-child > .help-nav-group {
+  margin-top: 0;
+}
+
+.help-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.help-main-column {
+  max-width: var(--help-content-max);
+  margin: 0 auto;
+  padding: 48px 48px 96px;
+}
+
+/* --- Drawer ------------------------------------------------------------ */
+
+.help-drawer-trigger {
+  display: none;
+}
+
+.help-drawer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+}
+
+.help-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  background: var(--help-scrim);
+  cursor: default;
+}
+
+.help-drawer {
+  position: relative;
+  width: min(320px, 84vw);
+  height: 100%;
+  background: var(--help-surface);
+  border-right: 1px solid var(--help-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.help-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--help-border);
+  flex: none;
+}
+
+.help-drawer-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.help-drawer-nav {
+  padding: 12px 12px 24px;
+}
+
+/* --- Focus --------------------------------------------------------------- */
+
+.help-window :focus-visible,
+.help-skip:focus-visible {
+  outline: 2px solid var(--help-focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- Responsive ------------------------------------------------------------ */
+
+@media (max-width: 1023px) {
+  :root {
+    --help-outer-margin: 16px;
+  }
+
+  .help-sidebar {
+    display: none;
+  }
+
+  .help-drawer-trigger {
+    display: inline-flex;
+  }
+
+  .help-main-column {
+    padding: 36px 32px 80px;
+  }
+}
+
+@media (max-width: 767px) {
+  .help-topbar-link-optional {
+    display: none;
+  }
+
+  .help-main-column {
+    padding: 28px 20px 64px;
+  }
+}
+
+@media (max-width: 639px) {
+  .help-field {
+    padding: 0;
+  }
+
+  .help-window {
+    width: 100%;
+    min-height: 100dvh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .help-topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .help-topbar-center {
+    flex: 1;
+  }
+
+  .help-search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .help-brand-product {
+    display: none;
+  }
+
+  .help-brand-sep {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-window,
+  .help-window * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
