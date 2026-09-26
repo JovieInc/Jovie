@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AdminProfileSidebar } from '@/features/admin/admin-creator-profiles/AdminProfileSidebar';
+import { AdminProfileSidebar } from '@/components/features/admin/admin-creator-profiles/AdminProfileSidebar';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { AlgorithmHealthReport } from '@/lib/spotify/scoring';
 import type { Contact } from '@/types';
@@ -120,6 +120,46 @@ describe('AdminProfileSidebar', () => {
     expect(screen.getByTestId('admin-creator-profile-link')).toHaveTextContent(
       'jov.ie/alice'
     );
+  });
+
+  it('shows the identity enrichment status on the social tab', () => {
+    render(
+      <AdminProfileSidebar
+        profile={profile}
+        contact={contact}
+        enrichment={{
+          status: 'conflicted',
+          checkedAt: '2026-09-26T00:00:00Z',
+          sources: ['musicbrainz'],
+          fields: {},
+          conflicts: ['name mismatch'],
+          shareReady: false,
+        }}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+
+    const note = screen.getByTestId('admin-creator-enrichment-status');
+    expect(note).toHaveTextContent('Identity enrichment: conflicted');
+    expect(note).toHaveTextContent('name mismatch');
+    expect(note).toHaveTextContent('Below share-ready evidence bar');
+  });
+
+  it('hides the enrichment note when nothing was checked', () => {
+    render(
+      <AdminProfileSidebar
+        profile={profile}
+        contact={contact}
+        enrichment={null}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('admin-creator-enrichment-status')
+    ).not.toBeInTheDocument();
   });
 
   it('shows about tab content', async () => {

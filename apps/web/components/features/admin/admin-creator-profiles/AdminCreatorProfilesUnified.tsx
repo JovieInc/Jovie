@@ -216,7 +216,7 @@ export function AdminCreatorProfilesUnified({
     });
   }, []);
 
-  const { setDraftContact, effectiveContact, refetchSocialLinks } =
+  const { setDraftContact, effectiveContact, refetchSocialLinks, enrichment } =
     useContactHydration({
       profiles: filteredProfiles,
       selectedId,
@@ -449,6 +449,7 @@ export function AdminCreatorProfilesUnified({
       <AdminProfileSidebar
         profile={selectedProfile}
         contact={effectiveContact}
+        enrichment={enrichment}
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         onClose={handleSidebarClose}
         contextMenuItems={sidebarContextMenuItems}
@@ -458,6 +459,7 @@ export function AdminCreatorProfilesUnified({
       sidebarOpen,
       selectedProfile,
       effectiveContact,
+      enrichment,
       handleSidebarClose,
       sidebarContextMenuItems,
     ]

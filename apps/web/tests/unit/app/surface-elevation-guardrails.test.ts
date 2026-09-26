@@ -560,6 +560,16 @@ describe('surface elevation guardrails', () => {
     expect(releaseTable).toContain("name='Layers'");
   });
 
+  it('threads the identity-enrichment receipt into the admin profile sidebar', () => {
+    // JOV-6529: the unclaimed-artist enrichment receipt must reach the Social
+    // tab, not just the API hook.
+    const creatorProfiles = readComponent(
+      'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx'
+    );
+    expect(creatorProfiles).toContain('refetchSocialLinks, enrichment');
+    expect(creatorProfiles).toContain('enrichment={enrichment}');
+  });
+
   it('does not nest DrawerInlineNote inside a card (card-within-card)', () => {
     // DrawerInlineNote should use variant='flat', not variant='card'.
     // It is always rendered inside an existing card container.

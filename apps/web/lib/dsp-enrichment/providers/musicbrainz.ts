@@ -176,6 +176,48 @@ export async function getMusicBrainzArtist(
   }
 }
 
+/**
+ * Resolve MusicBrainz artist MBIDs attached to a URL entity.
+ *
+ * Used for exact provider-ID-backed identity resolution: the Spotify artist
+ * URL is an exact match key, so the returned MBIDs inherit provider-ID
+ * confidence rather than name-similarity confidence. More than one MBID
+ * claiming the same resource is an unresolved identity conflict — callers
+ * decide how to surface it; this helper never picks a winner by name.
+ */
+export async function findMusicBrainzArtistIdsByUrl(
+  resource: string
+): Promise<string[]> {
+  let urlEntity: {
+    id?: string;
+    relations?: Array<{
+      type?: string;
+      'target-type'?: string;
+      artist?: { id?: string };
+    }>;
+  } | null = null;
+
+  try {
+    urlEntity = await executeWithCircuitBreaker(async () => {
+      return musicBrainzRequest<typeof urlEntity>(
+        `/url?resource=${encodeURIComponent(resource)}&inc=artist-rels`
+      );
+    });
+  } catch (error) {
+    if (error instanceof MusicBrainzError && error.statusCode === 404) {
+      return [];
+    }
+    throw error;
+  }
+
+  const ids = new Set<string>();
+  for (const rel of urlEntity?.relations ?? []) {
+    const mbid = rel?.artist?.id;
+    if (mbid) ids.add(mbid);
+  }
+  return [...ids].sort();
+}
+
 export function isMusicBrainzAvailable(): boolean {
   return musicBrainzCircuitBreaker.getState() !== 'OPEN';
 }

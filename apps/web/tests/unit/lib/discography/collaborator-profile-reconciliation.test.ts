@@ -132,6 +132,18 @@ vi.mock('@/lib/utils/logger', () => ({
 vi.mock('@/lib/profile/public-release-eligibility', () => ({
   publicReleaseEligibilitySqlPredicate: vi.fn(() => 'public-release-only'),
 }));
+vi.mock('@/lib/discography/unclaimed-artist-enrichment', () => ({
+  discoverUnclaimedArtistIdentity: vi.fn(async () => null),
+  persistEnrichmentDestinations: vi.fn(async () => 0),
+  buildEnrichmentReceipt: vi.fn(() => ({
+    status: 'not_found',
+    checkedAt: 'now',
+    sources: [],
+    fields: {},
+    conflicts: [],
+    shareReady: false,
+  })),
+}));
 
 const {
   ensureUnclaimedArtistProfileForEntity,

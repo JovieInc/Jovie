@@ -143,7 +143,9 @@ export {
 } from './useAdminLeadsPrimitives';
 // Admin social links query
 export {
+  type AdminSocialEnrichment,
   type AdminSocialLink,
+  type AdminSocialLinksResult,
   type UseAdminSocialLinksQueryOptions,
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
