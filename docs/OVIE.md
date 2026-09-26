@@ -45,6 +45,15 @@ Scan-first need band: Needs Tim, survival (cash/MRR), customer bottleneck,
 delivery proof, operating chain. Velocity, activity, agent runs, design jury,
 walk capture, dispatch, and developer controls stay in disclosure.
 
+The packaged Mac mode (`OvieMacHud`, JOV-5322) carries one company activity
+feed under the three hero metrics — not a second screen. Rows project the
+Linear-ledger operational task feed (live via `/api/hud/shipping-state`),
+GitHub in-flight PRs / native merge queue, dogfood deploy receipts, and the
+curated public `/changelog` digest. Every row exposes its exact state
+(queued / in progress / merged / deployed / What's New / blocked) plus
+provenance links and freshness; merged never renders as deployed without a
+receipt, and missing sources never render as current.
+
 ## Presentation surfaces
 
 | Surface | Role |

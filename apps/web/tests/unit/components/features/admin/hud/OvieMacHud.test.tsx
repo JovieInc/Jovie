@@ -15,6 +15,10 @@ vi.mock('@/components/features/admin/hud/OperationalTasksPanel', () => ({
   OperationalTasksPanel: () => <div data-testid='operational-tasks-panel' />,
 }));
 
+vi.mock('@/components/features/admin/hud/OvieActivityFeed', () => ({
+  OvieActivityFeed: () => <div data-testid='ovie-activity-feed' />,
+}));
+
 vi.mock('@/components/features/admin/hud/SymphonyCodexAccountControl', () => ({
   SymphonyCodexAccountControl: () => (
     <div data-testid='ovie-codex-account-control'>Codex Accounts</div>
@@ -83,6 +87,11 @@ const BASE: OvieMacHudSnapshot = {
         mergeQueuePosition: null,
       },
     ],
+  },
+  activityFeed: {
+    availability: 'available',
+    truncated: false,
+    rows: [],
   },
   generatedAtIso: '2026-08-22T00:00:00.000Z',
 };

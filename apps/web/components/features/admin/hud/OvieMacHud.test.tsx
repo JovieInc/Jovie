@@ -23,6 +23,10 @@ vi.mock('./SymphonyCodexAccountControl', () => ({
   SymphonyCodexAccountControl: () => null,
 }));
 
+vi.mock('./OvieActivityFeed', () => ({
+  OvieActivityFeed: () => null,
+}));
+
 const snapshot: OvieMacHudSnapshot = {
   alive: {
     cashUsd: null,
@@ -54,6 +58,11 @@ const snapshot: OvieMacHudSnapshot = {
     items: [],
     truncated: false,
     errorMessage: null,
+  },
+  activityFeed: {
+    availability: 'available',
+    truncated: false,
+    rows: [],
   },
   generatedAtIso: '2026-09-16T00:00:00.000Z',
 };
