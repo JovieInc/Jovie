@@ -216,6 +216,9 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(compareJob).not.toContain('--update-snapshots');
     expect(compareJob).not.toContain('continue-on-error');
     expect(compareJob).not.toContain('neon-create-branch');
+    // Restore-only cache: read it, never persist or save it.
+    expect(compareJob).toContain("TURBO_ENGINE_READ_ONLY: '1'");
+    expect(compareJob).not.toContain('actions/cache/save@');
     expect(mergeReadyJob).toContain('ci-visual-snapshot-compare');
     expect(mergeReadyJob).toContain(
       'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
