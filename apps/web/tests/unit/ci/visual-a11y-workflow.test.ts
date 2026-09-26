@@ -255,13 +255,13 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(stepAt('Restore Next build cache (read-only)')).toBeLessThan(
       stepAt('Build homepage for rendered snapshot compare')
     );
-    expect(step('Resolve Next build cache day')).toContain(homepageGate);
+    expect(step('Resolve Next build cache hour')).toContain(homepageGate);
     expect(restore).toContain(homepageGate);
     expect(restore).toContain('uses: actions/cache/restore@');
     expect(restore).toContain('path: apps/web/.next/cache/turbopack');
     // Same key family Build + Layout writes from push-to-main only.
     expect(restore).toContain(
-      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}"
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
     );
     expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
 

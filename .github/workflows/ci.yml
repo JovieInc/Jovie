@@ -1365,16 +1365,16 @@ jobs:
       # only trusted push-to-main runs write; this job never saves it. The path
       # is compiler state only, and Turbopack revalidates every entry against
       # this job's own inputs and env, so the rendered output is unchanged.
-      - name: Resolve Next build cache day
-        id: next-build-cache-day
+      - name: Resolve Next build cache hour
+        id: next-build-cache-hour
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
-        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
       - name: Restore Next build cache (read-only)
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache/turbopack
-          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}
           restore-keys: |
             ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
             ${{ runner.os }}-next-build-web-v1-
@@ -2569,20 +2569,20 @@ jobs:
       # cold ~3 min compile. Merge-group and dispatch runs only restore the
       # newest trusted main entry. The writer is next-build-cache-warm.yml,
       # which runs on every push to main (and manual dispatch on main) and
-      # builds at most once per UTC day per dependency hash; keep its key
+      # builds at most once per UTC hour per dependency hash; keep its key
       # scheme identical to this restore. Queue-proven main pushes skip this
       # job, so the save steps below only fire on a direct-main fallback run.
       # The path is compiler state only (no fetch/image cache, no build
       # output), and Turbopack revalidates every entry against current inputs.
-      - name: Resolve Next build cache day
-        id: next-build-cache-day
-        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - name: Resolve Next build cache hour
+        id: next-build-cache-hour
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
       - name: Restore Next build cache (read-only)
         id: next-build-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache/turbopack
-          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}
           restore-keys: |
             ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
             ${{ runner.os }}-next-build-web-v1-
