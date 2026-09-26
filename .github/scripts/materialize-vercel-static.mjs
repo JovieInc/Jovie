@@ -132,6 +132,45 @@ export function materializeStatic(root) {
 // holds a regular file. Directory links (pnpm's node_modules layer) stay as
 // traced, but files traced through one are re-pointed at their real path, and a
 // link whose target uploads nothing is dropped.
+// A function gets a symlink at every key that is a directory link (pnpm's
+// hoisted node_modules/.pnpm/node_modules/import-in-the-middle) and a file at
+// every other key. A file key beneath a linked key would be written through
+// that link, and Vercel fails "Deploying outputs" ("task failed", ENOENT) on
+// the workflow flow function. Move such keys to their real path: the link
+// still resolves to the same bytes.
+function relocateKeysUnderLinkedKeys(root, map) {
+  const keys = new Set(Object.keys(map));
+  let moved = 0;
+  for (const key of [...keys]) {
+    let underLink = false;
+    for (
+      let at = key.lastIndexOf('/');
+      at > 0;
+      at = key.lastIndexOf('/', at - 1)
+    ) {
+      if (keys.has(key.slice(0, at))) {
+        underLink = true;
+        break;
+      }
+    }
+    if (!underLink) continue;
+    let real;
+    try {
+      real = realpathSync(resolve(root, key));
+    } catch (error) {
+      if (error.code === 'ENOENT') continue;
+      throw error;
+    }
+    inside(root, real);
+    const target = relative(root, real).split(sep).join('/');
+    if (target === key) continue;
+    if (!Object.hasOwn(map, target)) map[target] = map[key];
+    delete map[key];
+    moved += 1;
+  }
+  return moved;
+}
+
 export function dereferenceFunctionFileLinks(root) {
   root = realpathSync(root);
   const functions = resolve(root, '.vercel/output/functions');
@@ -207,6 +246,7 @@ export function dereferenceFunctionFileLinks(root) {
         map[key] = relative(root, target).split(sep).join('/');
         changed += 1;
       }
+      changed += relocateKeysUnderLinkedKeys(root, map);
       configs.push({ path, config, map, changed });
     }
   }

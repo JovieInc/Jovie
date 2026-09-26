@@ -459,3 +459,36 @@ test('drops directory links whose target uploads nothing, judged across all func
   assert.deepEqual(b(), { [debugFile]: debugFile });
   assert.equal(dereferenceFunctionFileLinks(f.root), 0);
 });
+
+test('moves file keys that sit beneath a linked directory key to their real path', t => {
+  const f = fixture(t);
+  const store =
+    'node_modules/.pnpm/import-in-the-middle@3.5.1/node_modules/import-in-the-middle';
+  f.put(`${store}/CHANGELOG.md`, 'log');
+  const hoisted = 'node_modules/.pnpm/node_modules/import-in-the-middle';
+  f.link(
+    hoisted,
+    '../import-in-the-middle@3.5.1/node_modules/import-in-the-middle'
+  );
+  const config = resolve(
+    f.root,
+    '.vercel/output/functions/flow.func/.vc-config.json'
+  );
+  mkdirSync(dirname(config), { recursive: true });
+  writeFileSync(
+    config,
+    JSON.stringify({
+      filePathMap: {
+        [hoisted]: hoisted,
+        [`${hoisted}/CHANGELOG.md`]: `${store}/CHANGELOG.md`,
+      },
+    })
+  );
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  // The link stays; the file lands at the real path the link resolves to.
+  assert.deepEqual(JSON.parse(readFileSync(config, 'utf8')).filePathMap, {
+    [hoisted]: hoisted,
+    [`${store}/CHANGELOG.md`]: `${store}/CHANGELOG.md`,
+  });
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
