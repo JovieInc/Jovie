@@ -64,11 +64,10 @@ test('contract: bounded input, frozen allowlist, abstain on every non-fit', asyn
     { slug: 'Bad' },
     null,
   ]);
-  assert.deepEqual(n.map(c => c.slug), [
-    'editorial-pitching',
-    'dj-promotion',
-    'radio-xm',
-  ]);
+  assert.deepEqual(
+    n.map(c => c.slug),
+    ['editorial-pitching', 'dj-promotion', 'radio-xm']
+  );
 
   const long = buildReleaseTaskInput({
     ...digests,
@@ -154,7 +153,10 @@ test('corpus fixture is valid, covers required cases, honestly below floor', asy
   assert.ok(ex.length >= 40 && ex.length < PREDECLARED_LIMITS.minExamples);
   assert.equal(ex[0].id, 'rt-0001');
   for (const tag of corpus.tags)
-    assert.ok(ex.some(e => e.tags.includes(tag)), `covers ${tag}`);
+    assert.ok(
+      ex.some(e => e.tags.includes(tag)),
+      `covers ${tag}`
+    );
   assert.ok(ex.some(e => e.clusters !== null));
   const r = await evaluateReleaseTaskCorpus(corpus, {
     classify: async ({ example }) => ({

@@ -50,7 +50,8 @@ export function normalizeClusters(clusters) {
     out.push(
       Object.freeze({
         slug,
-        displayName: typeof name === 'string' && name.trim() ? name.trim() : slug,
+        displayName:
+          typeof name === 'string' && name.trim() ? name.trim() : slug,
       })
     );
   }
