@@ -604,13 +604,14 @@ const nextConfig = {
       beforeFiles: [
         // Default /hud is a filesystem route outside /app/(shell). Intercept
         // it before that page so Ops inherits sidebar + app chrome. Isolated
-        // query modes stay on /hud: fullscreen, kiosk token, packaged Mac.
+        // query modes stay on /hud: fullscreen and kiosk token. The packaged
+        // Mac door (?ovie=mac) also gets the shell so the founder can reach
+        // Chat, Growth and revenue from Ops (JOV-6164).
         {
           source: '/hud',
           missing: [
             { type: 'query', key: 'fs', value: '1' },
             { type: 'query', key: 'kiosk' },
-            { type: 'query', key: 'ovie', value: 'mac' },
             { type: 'query', key: 'mode', value: 'kiosk' },
           ],
           destination: '/app/ov/hud',

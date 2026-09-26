@@ -1,4 +1,5 @@
 import { oauthProviderClient } from '@better-auth/oauth-provider/client';
+import { passkeyClient } from '@better-auth/passkey/client';
 import { emailOTPClient, oneTapClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 import { absolutePublicUrl } from '@/lib/env-public';
@@ -59,6 +60,8 @@ export const authClient = createAuthClient({
       : undefined,
   plugins: [
     emailOTPClient(),
+    // Admin step-up factor (JOV-4806).
+    passkeyClient(),
     // Carries the OAuth provider's signed authorization query through the
     // upstream Apple redirect so the callback can finish the LYB PKCE flow.
     oauthProviderClient(),

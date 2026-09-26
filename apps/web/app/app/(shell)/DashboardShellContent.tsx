@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
+import { AdminStepUpBannerWrapper } from '@/features/admin/AdminStepUpBannerWrapper';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBannerWrapper } from '@/features/admin/OperatorBannerWrapper';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
@@ -91,6 +92,7 @@ export async function DashboardShellContent({
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBannerWrapper isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
+      <AdminStepUpBannerWrapper isAdmin={dashboardData.isAdmin} />
       <DashboardDataProvider value={dashboardData}>
         <DashboardLoadTracker pathname={pathname} userId={userId} />
         <ProfileCompletionRedirect />

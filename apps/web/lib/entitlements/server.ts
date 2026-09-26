@@ -193,7 +193,7 @@ export async function getCurrentUserEntitlements(options?: {
     getUserBillingInfo(),
   ]);
   const adminStatus =
-    hasAdminRole && hasRecentAdminMfaReverification(authResult);
+    hasAdminRole && (await hasRecentAdminMfaReverification(authResult));
 
   if (!billing.success) {
     if (isMissingBillingRecord(billing.error)) {

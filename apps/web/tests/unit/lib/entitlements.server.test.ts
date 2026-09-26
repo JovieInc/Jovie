@@ -28,6 +28,13 @@ vi.mock('@/lib/stripe/config', () => ({
     id === 'legacy-price',
 }));
 
+// Step-up receipts live in ba_verifications; fixtures model a live receipt
+// with a truthy `has()` so the admin-role cases stay readable.
+vi.mock('@/lib/admin/mfa', () => ({
+  hasRecentAdminMfaReverification: async (auth: { has?: () => boolean }) =>
+    Boolean(auth?.has?.()),
+}));
+
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mockIsAdmin,
 }));
