@@ -335,6 +335,7 @@ describe('source PR path-output reachability contract', () => {
       'ci-integration-ready',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-build-public',
@@ -1218,6 +1219,10 @@ describe('deploy workflow Vercel env resolution', () => {
       'Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT'
     );
     expect(readinessJob).toContain('Ovie Build:$OVIE_BUILD_RESULT');
+    expect(readinessJob).toContain(
+      'Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT'
+    );
+    expect(readinessJob).toContain('Ovie Typecheck:$OVIE_TYPECHECK_RESULT');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
     expect(readinessJob).toContain('RUN_PROMPTFOO');

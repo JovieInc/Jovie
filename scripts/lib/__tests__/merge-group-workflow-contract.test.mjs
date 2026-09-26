@@ -460,6 +460,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -505,6 +506,7 @@ describe('merge_group workflow contract', () => {
     for (const jobId of [
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
     ]) {
       expect(getJobBlock(CI_WORKFLOW, jobId), jobId).toMatch(
@@ -537,6 +539,7 @@ describe('merge_group workflow contract', () => {
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
+    const typecheck = getJobBlock(CI_WORKFLOW, 'ci-typecheck-ovie');
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     const ovieTests = units.slice(
       units.indexOf(
@@ -558,20 +561,54 @@ describe('merge_group workflow contract', () => {
       build.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
     ).toHaveLength(2);
     expect(buildLayout).not.toContain('@jovie/ovie');
-    expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
-    // The build may skip Next's duplicate type pass only because the
-    // standalone typecheck runs first, fail-fast, in the same step.
     expect(ovieBuild).toContain('set -euo pipefail');
-    expect(
-      ovieBuild.indexOf('pnpm --filter @jovie/ovie typecheck')
-    ).toBeLessThan(
-      ovieBuild.indexOf(
-        'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
-      )
+    expect(ovieBuild).toContain(
+      'NEXT_IGNORE_TYPECHECK=1 TURBO_ENGINE_READ_ONLY=1 pnpm --filter @jovie/ovie build'
     );
     expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
-    expect(ovieBuild).not.toMatch(/typecheck[^\n]*\|\|/);
+    // The build may skip Next's duplicate type pass only because the
+    // standalone typecheck runs the full command, fail-closed, in a parallel
+    // job with the same trigger and absent-app guards.
+    expect(typecheck).toContain('name: Ovie Typecheck (combined)');
+    expect(typecheck.slice(0, typecheck.indexOf('    runs-on:'))).toBe(
+      build
+        .slice(0, build.indexOf('    runs-on:'))
+        .replace('ci-build-ovie:', 'ci-typecheck-ovie:')
+        .replace('Ovie Build (combined)', 'Ovie Typecheck (combined)')
+    );
+    expect(
+      typecheck.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
+    ).toHaveLength(2);
+    expect(typecheck).toContain('run: pnpm --filter @jovie/ovie typecheck');
+    expect(typecheck).not.toContain('continue-on-error');
+    expect(typecheck).not.toContain('NEXT_IGNORE_TYPECHECK');
+    expect(typecheck).not.toMatch(/typecheck[^\n]*\|\|/);
+    // Every job that consumes the build result must consume the typecheck
+    // result too, so skipping Next's type pass never weakens a gate.
+    const jobIds = [...CI_WORKFLOW.matchAll(/^  ([a-z0-9-]+):\n/gm)].map(
+      match => match[1]
+    );
+    const consumers = jobIds.filter(jobId => {
+      if (jobId === 'ci-build-ovie') return false;
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      return job
+        .slice(0, job.indexOf('    runs-on:'))
+        .includes('ci-build-ovie');
+    });
+    expect(consumers).toEqual([
+      'ci-cross-product-integration',
+      'ci-product-lane-receipt',
+      'ci-merge-group-ready',
+      'main-release-ready',
+    ]);
+    for (const jobId of consumers) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job.slice(0, job.indexOf('    runs-on:')), jobId).toContain(
+        'ci-typecheck-ovie'
+      );
+      expect(job, jobId).toContain('needs.ci-typecheck-ovie.result');
+    }
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
     expect(ovieBuild).toContain(
       'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
@@ -584,7 +621,7 @@ describe('merge_group workflow contract', () => {
     );
     // Both checks remain inside jobs already required by the merge-group
     // aggregate; neither allocates a heavy source-PR lane.
-    for (const job of [units, build]) {
+    for (const job of [units, build, typecheck]) {
       const header = job.slice(0, job.indexOf('    runs-on:'));
       expect(header).toContain(
         "needs.ci-path-changes.outputs.run_web == 'true'"
@@ -614,6 +651,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-exact-head-coverage');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-build-ovie');
+    expect(aggregate).toContain('ci-typecheck-ovie');
     expect(aggregate).toContain('ci-storybook-surfaces');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');
@@ -639,6 +677,12 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain(
       'OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"'
+    );
+    expect(aggregate).toContain(
+      'OVIE_TYPECHECK_RESULT="${{ needs.ci-typecheck-ovie.result }}"'
+    );
+    expect(aggregate).toContain(
+      '"Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT"'
     );
     expect(aggregate).toContain(
       'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
@@ -712,6 +756,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -1398,20 +1443,32 @@ describe('merge_group workflow contract', () => {
       .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
-    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped
-unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped
-unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped
-unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success
-healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success
-selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped
-selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success
-selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success
-selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success
-selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped
-deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped`;
+    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped|skipped
+unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped|skipped
+unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped|skipped
+unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success|skipped
+healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success|success
+selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped|skipped
+selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success|success
+selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success|success
+selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success|success
+selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped|success
+unselected Web rejects Ovie typecheck execution|false|skipped|skipped|false|skipped|1|skipped|skipped|success
+selected Web rejects failed Ovie typecheck|true|success|success|false|skipped|1|success|success|failure
+deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped|skipped`;
     for (const testCase of cases.split('\n')) {
-      const [name, web, unit, build, runIos, iosResult, status, ovie, story] =
-        testCase.split('|');
+      const [
+        name,
+        web,
+        unit,
+        build,
+        runIos,
+        iosResult,
+        status,
+        ovie,
+        story,
+        ovieTypecheck,
+      ] = testCase.split('|');
       const result = spawnSync(
         'bash',
         [
@@ -1425,6 +1482,7 @@ RUN_IOS="$4"
 IOS_RESULT="$5"
 OVIE_BUILD_RESULT="$6"
 STORYBOOK_SURFACES_RESULT="$7"
+OVIE_TYPECHECK_RESULT="$8"
 RUN_MACOS=false
 MACOS_RESULT=skipped
 RUN_CROSS_PRODUCT=false
@@ -1438,6 +1496,7 @@ ${selectedGateScript}`,
           iosResult,
           ovie,
           story,
+          ovieTypecheck,
         ],
         { encoding: 'utf8' }
       );
@@ -2470,6 +2529,7 @@ ${selectedGateScript}`,
       'ci-fast',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',

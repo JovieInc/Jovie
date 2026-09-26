@@ -537,6 +537,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Build + Layout (combined)',
   'CI / Ovie Build (combined)',
   'Ovie Build (combined)',
+  'CI / Ovie Typecheck (combined)',
+  'Ovie Typecheck (combined)',
   'CI / Storybook Surface Matrix (combined)',
   'Storybook Surface Matrix (combined)',
   'CI / iOS Fast Unit + Coverage (combined)',
