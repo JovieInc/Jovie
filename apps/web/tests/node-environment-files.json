@@ -49,7 +49,6 @@
   "components/molecules/inspector/dsp-find-url.test.ts",
   "components/molecules/inspector/dsp-quiet-scope.test.ts",
   "components/molecules/inspector/inspector-tab-keyboard.test.ts",
-  "components/shell/audio-bar-dismissal.test.ts",
   "components/shell/getVersionUpdateTitle.test.ts",
   "components/shell/header-search-results.test.ts",
   "constants/platforms/utils.fuzz.test.ts",

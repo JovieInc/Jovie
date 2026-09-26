@@ -39,7 +39,7 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "2524497e7f69a6fc2fe20bee4b1735bc3797d5c375d38ced0bb34c2090ac1142"
+    "bodySha256": "8cdf90065aa656e2fb153fba6a00f7ce13cf171bb98df324748de2e7fe4ae8e4"
   },
   {
     "file": ".claude/rules/hermes-air.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "5ca2f740799c7c440033c4d2465ddcb16c7d72f61ec27a669996269edd209401"
+    "bodySha256": "fd485bc83b0443bf9e686122b5935dea4c7d3ecc56276739d7d08f61a87bb422"
   },
   {
     "file": ".claude/rules/security.md",

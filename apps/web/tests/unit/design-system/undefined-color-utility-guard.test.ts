@@ -52,25 +52,12 @@ const COLOR_UTILITY_PREFIXES = [
 
 // Shrink-only. Do not add entries; fix the class instead.
 const TEMPORARY_ALLOWLIST = [
-  // TODO(#18551): remove once the desktop-auth handoff PR swaps its tokens.
-  'app/(auth)/DesktopAuthRouteHandoff.tsx',
-  'app/desktop-auth/',
   // TODO: these files carry unrelated pre-existing ESLint debt
   // (canonical-ui-label-casing, shadcn/no-restyle) that blocks any staged
   // edit. Swap ring-offset-background -> ring-offset-base and
   // text-background -> text-(--color-bg-base) when that debt is cleared.
   'components/features/dashboard/molecules/UniversalLinkInputPlatformSelector.tsx',
   'components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx',
-  // TODO: these shippable components have no adjacent story yet, so any edit
-  // trips component-ship-gate [missing-story]. Swap in a follow-up that adds
-  // the story (and touches the component test):
-  //   NavLink: focus-visible:ring-offset-background -> focus-visible:ring-offset-base
-  //   IngestProfileDropdown, GrowthIntakeComposer: bg-background-elevated -> bg-surface-elevated
-  //   FilterChip: text-background -> text-(--color-bg-base)
-  'components/atoms/NavLink.tsx',
-  'components/features/admin/ingest-profile-dropdown/IngestProfileDropdown.tsx',
-  'components/features/admin/leads/GrowthIntakeComposer.tsx',
-  'components/molecules/filters/FilterChip.tsx',
   // TODO: these are in-scope screens without a screen-certification
   // registration, so any edit trips screen-registration-gate (JOV-INV-018).
   // Swap bg-background -> bg-base in the follow-up that registers them.

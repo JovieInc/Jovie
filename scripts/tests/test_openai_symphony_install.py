@@ -109,7 +109,12 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("Issue pickup is owned by upstream OpenAI Symphony", webhook)
 
     def test_triage_event_only_wakes_existing_intake(self) -> None:
-        workflow = (ROOT / ".github/workflows/linear-triage-assessment.yml").read_text()
+        # JOV-5467: the Linear dispatch assessment moved into the single
+        # admission writer; the competing workflow file must stay retired.
+        self.assertFalse(
+            (ROOT / ".github/workflows/linear-triage-assessment.yml").exists()
+        )
+        workflow = (ROOT / ".github/workflows/fleet-gate-refresh.yml").read_text()
         self.assertIn("types: [linear_triage_assess]", workflow)
         self.assertIn("triage-event-assess.mjs", workflow)
         self.assertIn("summer-bottleneck-signing.env", workflow)

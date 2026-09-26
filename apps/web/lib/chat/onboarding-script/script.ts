@@ -62,7 +62,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'get_artist',
     'v4',
-    'Search Spotify for the act — pick a row so enrichment can attach.'
+    'Search Spotify for the act, then pick a row so enrichment can attach.'
   ),
 
   // Before ownership verified: "this artist", not "you". Followers cite enrichment source.
@@ -80,7 +80,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'confirm_artist_no_data',
     'v3',
-    'Locked the match. Spotify enrichment is slow — we can keep moving without the counts. Next: lock a handle.'
+    'Locked the match. Spotify enrichment is slow. We can keep moving without the counts. Next: lock a handle.'
   ),
 
   line(
@@ -98,7 +98,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'instant_access',
     'v3',
-    'You clear the bar. Checkout is about a minute — free tier is available if you want to start there.'
+    'You clear the bar. Checkout takes about a minute. The free tier is available if you want to start there.'
   ),
 
   line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),
@@ -106,7 +106,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'done',
     'v3',
-    'Next step is the card above — take it when ready. Nothing else needed from this chat.'
+    'Next step is the card above. Take it when ready. Nothing else needed from this chat.'
   ),
 
   line(
