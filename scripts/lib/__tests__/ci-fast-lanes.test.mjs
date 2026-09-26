@@ -760,6 +760,12 @@ describe('structural command pool', () => {
     expect(head).toContain('pnpm invariants:check');
     expect(head).toContain('run-governor-bounded-codex-selector.sh');
     expect(head).toContain('python3 -m pytest ');
+    // Both complementary pytest shards are long poles.
+    expect(
+      parallel
+        .slice(0, 4)
+        .filter(command => command.includes('python3 -m pytest '))
+    ).toHaveLength(2);
     const serial = await startOrder(1);
     expect(serial[0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
     expect([...serial].sort()).toEqual([...parallel].sort());
@@ -917,6 +923,16 @@ describe('structural command pool', () => {
         'COVERAGE_FILE="/t/a.coverage" python3 -m coverage run x.py && python3 -m pytest y.py'
       )
     ).toEqual(['pycoverage:/t/a.coverage', 'pytest-cache']);
+    // coverage.py driving pytest still writes the shared cache.
+    expect(
+      structuralLocks(
+        'COVERAGE_FILE="/t/l.coverage" python3 -m coverage run --branch -m pytest z.py -q'
+      )
+    ).toEqual(['pycoverage:/t/l.coverage', 'pytest-cache']);
+    // A cache-less pytest invocation holds no shared pytest state.
+    expect(
+      structuralLocks('python3 -m pytest -p no:cacheprovider -k "a" y.py')
+    ).toEqual([]);
     expect(structuralLocks('node --test a.test.mjs')).toEqual([]);
     expect(structuralLocks('pnpm no-such-script-alias')).toEqual([]);
   });
