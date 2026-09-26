@@ -367,16 +367,18 @@ class TestPerformanceProfiler {
   }
 
   private readAndRemoveFile(outputFile: string): string {
+    let content: string;
     try {
-      const content = readFileSync(
-        join(this.dependencies.cwd, outputFile),
-        'utf8'
-      );
-      unlinkSync(join(this.dependencies.cwd, outputFile));
-      return content;
-    } catch {
-      return '';
+      content = readFileSync(join(this.dependencies.cwd, outputFile), 'utf8');
+    } catch (error: unknown) {
+      // A run that produced no file reports as empty output; anything else
+      // (permissions, I/O) is a real failure and must not look like "no data".
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+      throw error;
     }
+    // Cleanup failures must not discard output that was read successfully.
+    this.removeStaleFile(outputFile);
+    return content;
   }
 
   private parseTestOutput(
