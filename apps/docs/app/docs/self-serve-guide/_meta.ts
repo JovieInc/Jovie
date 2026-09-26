@@ -6,4 +6,5 @@ export default {
   'set-up-tipping': 'Set Up Tipping',
   'set-up-ad-pixels': 'Set Up Ad Pixels',
   'connect-bandsintown': 'Connect Bandsintown',
+  'add-a-release-manually': 'Add a release manually',
 };
