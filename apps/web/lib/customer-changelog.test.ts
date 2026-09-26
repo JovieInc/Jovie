@@ -17,6 +17,7 @@ function release(
   return {
     version,
     date,
+    kind: 'release',
     summary: '',
     sections: {
       featured: [],

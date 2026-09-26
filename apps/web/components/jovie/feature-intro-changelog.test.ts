@@ -12,6 +12,7 @@ function release(
   return {
     version,
     date: '2026-08-16',
+    kind: 'release',
     summary: '',
     sections: {
       featured: [],

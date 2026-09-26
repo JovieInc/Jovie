@@ -1,12 +1,19 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { changelogInlineText } from '@/lib/changelog-parser';
+import {
+  type ChangelogRelease,
+  changelogInlineText,
+  changelogReleaseAnchor,
+  changelogReleaseLabel,
+} from '@/lib/changelog-parser';
 import { getChangelogReleases } from '@/lib/changelog-source';
 
 // Fully static
 export const revalidate = false;
 
-export function atomEntryId(version: string): string {
-  return `${BASE_URL}/changelog#v${version}`;
+export function atomEntryId(
+  release: Pick<ChangelogRelease, 'kind' | 'version'>
+): string {
+  return `${BASE_URL}/changelog#${changelogReleaseAnchor(release)}`;
 }
 
 function escapeXml(s: string): string {
@@ -44,8 +51,8 @@ export async function GET() {
 
       return `
     <entry>
-      <title>${escapeXml(APP_NAME)} v${escapeXml(release.version)}</title>
-      <id>${escapeXml(atomEntryId(release.version))}</id>
+      <title>${escapeXml(APP_NAME)} ${escapeXml(changelogReleaseLabel(release))}</title>
+      <id>${escapeXml(atomEntryId(release))}</id>
       <link href="${escapeXml(BASE_URL)}/changelog/${escapeXml(release.version)}" rel="alternate"/>
       <updated>${updated}</updated>
       <content type="html">${escapeXml(contentHtml)}</content>

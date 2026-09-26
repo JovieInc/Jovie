@@ -19,7 +19,10 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { changelogInlineText } from '@/lib/changelog-parser';
+import {
+  changelogInlineText,
+  changelogReleaseLabel,
+} from '@/lib/changelog-parser';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import '../changelog-editorial.css';
 
@@ -43,15 +46,16 @@ export async function generateMetadata({
   if (!release) return {};
 
   const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
+  const label = changelogReleaseLabel(release);
   const description = release.summary
     ? changelogInlineText(release.summary)
-    : `Features, improvements, and fixes in ${APP_NAME} v${version}.`;
+    : `Features, improvements, and fixes in ${APP_NAME} ${label}.`;
   return {
-    title: `${APP_NAME} v${version}`,
+    title: `${APP_NAME} ${label}`,
     description,
     alternates: { canonical },
     openGraph: {
-      title: `${APP_NAME} v${version}`,
+      title: `${APP_NAME} ${label}`,
       description,
       type: 'article',
       url: canonical,
@@ -150,15 +154,16 @@ export default async function ChangelogReleasePage({
                 <ChevronRight className='size-3 text-quaternary-token' />
               </li>
               <li aria-current='page' className='text-accent'>
-                {/* ui-casing-allow: semantic version path segment */}/v
-                {release.version}
+                {/* ui-casing-allow: semantic version path segment */}/
+                {changelogReleaseLabel(release)}
               </li>
             </ol>
           </nav>
 
           <div className='mt-8 flex flex-wrap items-center gap-5'>
             <h1 className='changelog-version-identity line-clamp-2 font-mono text-primary-token'>
-              {/* ui-casing-allow: semantic version string */}v{release.version}
+              {/* ui-casing-allow: semantic version string */}
+              {changelogReleaseLabel(release)}
             </h1>
             <div className='flex flex-col items-start gap-2'>
               {isLatest && (
@@ -254,8 +259,8 @@ export default async function ChangelogReleasePage({
                   href={`/changelog/${encodeURIComponent(olderRelease.version)}`}
                   className='mt-2 inline-block font-mono text-sm font-medium text-accent underline-offset-4 transition-colors duration-subtle hover:underline'
                 >
-                  {/* ui-casing-allow: semantic version string */}v
-                  {olderRelease.version}
+                  {/* ui-casing-allow: semantic version string */}
+                  {changelogReleaseLabel(olderRelease)}
                 </Link>
                 {olderRelease.date && (
                   <p className='mt-2 text-xs text-quaternary-token'>
@@ -281,8 +286,8 @@ export default async function ChangelogReleasePage({
                   href={`/changelog/${encodeURIComponent(newerRelease.version)}`}
                   className='mt-2 inline-block font-mono text-sm font-medium text-accent underline-offset-4 transition-colors duration-subtle hover:underline'
                 >
-                  {/* ui-casing-allow: semantic version string */}v
-                  {newerRelease.version}
+                  {/* ui-casing-allow: semantic version string */}
+                  {changelogReleaseLabel(newerRelease)}
                 </Link>
                 {newerRelease.date && (
                   <p className='mt-2 text-xs text-quaternary-token'>

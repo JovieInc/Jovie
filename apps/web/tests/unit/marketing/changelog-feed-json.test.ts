@@ -14,6 +14,7 @@ describe('changelog JSON Feed', () => {
     getChangelogReleases.mockResolvedValue([
       {
         version: '26.8.0',
+        kind: 'release',
         date: '2026-08-14',
         summary: 'A concise release summary.',
         sections: {
@@ -60,6 +61,8 @@ describe('changelog JSON Feed', () => {
     const { atomEntryId } = await import(
       '../../../app/(marketing)/changelog/feed.xml/route'
     );
-    expect(atomEntryId('26.8.0')).toBe('https://jov.ie/changelog#v26.8.0');
+    expect(atomEntryId({ version: '26.8.0', kind: 'release' })).toBe(
+      'https://jov.ie/changelog#v26.8.0'
+    );
   });
 });

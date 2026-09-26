@@ -1,5 +1,8 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { changelogInlineText } from '@/lib/changelog-parser';
+import {
+  changelogInlineText,
+  changelogReleaseLabel,
+} from '@/lib/changelog-parser';
 import { getChangelogReleases } from '@/lib/changelog-source';
 
 export const revalidate = false;
@@ -31,7 +34,7 @@ export async function GET() {
     items: releases.slice(0, 20).map(release => ({
       id: `${BASE_URL}/changelog/${encodeURIComponent(release.version)}`,
       url: `${BASE_URL}/changelog/${encodeURIComponent(release.version)}`,
-      title: `${APP_NAME} v${release.version}`,
+      title: `${APP_NAME} ${changelogReleaseLabel(release)}`,
       summary: release.summary
         ? changelogInlineText(release.summary)
         : undefined,

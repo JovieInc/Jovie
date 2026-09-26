@@ -18,6 +18,7 @@
 import { isInternalEntry } from './changelog-filter-rules.mjs';
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
 const FEATURED_SECTION_HEADING_RE =
   /^### (Featured|Added|Changed|Fixed|Removed)$/;
@@ -64,14 +65,22 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
       if (version.toLowerCase() === 'unreleased') {
         currentBlock = 'unreleased';
       } else {
+        // Date-keyed headings are daily digests (JOV-5762): stable date
+        // permalinks, no fake `v` prefix, invisible to CalVer version-check.
+        const daily =
+          DATE_KEY_RE.test(version) &&
+          !Number.isNaN(Date.parse(`${version}T00:00:00Z`)) &&
+          new Date(`${version}T00:00:00Z`).toISOString().slice(0, 10) ===
+            version;
         currentBlock = releases.length;
         releases.push({
           version,
-          date: date || '',
+          date: daily ? version : date || '',
           raw: '',
           summary: '',
           sections: {},
           internalSections: {},
+          kind: daily ? 'daily' : 'release',
         });
       }
       continue;

@@ -374,3 +374,26 @@ describe('getLatestRelease', () => {
     expect(release).toBeNull();
   });
 });
+
+describe('daily digest headings (JOV-5762)', () => {
+  it('parses a date-keyed heading as kind "daily" with a date permalink key', () => {
+    const md = `## [2026-09-26]\n\n### Added\n- Search your name on the homepage.\n\n## [26.9.5] - 2026-09-14\n\n### Fixed\n- Profile fix\n`;
+    const result = parseChangelog(md);
+    expect(result.releases[0]).toMatchObject({
+      version: '2026-09-26',
+      date: '2026-09-26',
+      kind: 'daily',
+    });
+    expect(result.releases[1].kind).toBe('release');
+  });
+
+  it('version-check CalVer regex never binds a daily digest heading', () => {
+    // Mirror of scripts/version-check.mjs: only CalVer `## [YY.M.P] - date`
+    // headings count as releases, so a digest can never mutate VERSION/tags.
+    const CALVER_HEADING_RE =
+      /^## \[(\d{2}\.(?:1[0-2]|[1-9])\.\d+)\] - (\d{4}-\d{2}-\d{2})$/gm;
+    const md = `## [2026-09-26]\n\n### Added\n- A digest entry.\n\n## [26.9.5] - 2026-09-14\n`;
+    const matches = [...md.matchAll(CALVER_HEADING_RE)].map(m => m[1]);
+    expect(matches).toEqual(['26.9.5']);
+  });
+});
