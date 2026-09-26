@@ -72,8 +72,6 @@ export const KNOWN_RED_ORPHANS = Object.freeze({
     'red on main: composition inventory expects 4 entries, finds 6.',
   'scripts/lib/__tests__/pr-preparation-canary.test.mjs':
     'red on main: canonical queue-hold list no longer contains every expected hold.',
-  'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs':
-    'red on main: CLAUDE.md no longer carries the draft-first publication sentence.',
   'scripts/lib/__tests__/scripts-hermes-path-death.test.mjs':
     'red on main: 8 live package-path citations to the removed hermes path remain.',
   'scripts/lib/__tests__/typecheck-singleflight.test.mjs':
