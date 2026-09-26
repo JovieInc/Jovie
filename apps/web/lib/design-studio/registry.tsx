@@ -1,5 +1,6 @@
 import {
-  Disc3,
+  AudioLines,
+  Layers,
   Library,
   MessageSquare,
   Mic2,
@@ -69,7 +70,7 @@ const COMMAND_ROWS = [
     meta: 'Track · Deep End',
   },
   {
-    icon: Disc3,
+    icon: Layers,
     title: 'Deep End',
     meta: 'Release · Scheduled Apr 30',
   },
@@ -217,7 +218,7 @@ function MusicAiCommandPreview() {
           {[
             ['Chat', MessageSquare],
             ['Library', Library],
-            ['Releases', Disc3],
+            ['Releases', Layers],
             ['Lyrics', Mic2],
           ].map(([label, Icon]) => (
             <div
@@ -345,7 +346,7 @@ function TrackViewPreview() {
       <div className='flex flex-col justify-between p-4'>
         <div>
           <div className='mb-4 flex items-center gap-2 text-[12px] text-white/45'>
-            <Disc3 className='h-3.5 w-3.5' />
+            <AudioLines className='h-3.5 w-3.5' />
             <span>Track View</span>
           </div>
           <div className='space-y-2'>

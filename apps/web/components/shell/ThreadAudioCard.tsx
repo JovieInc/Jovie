@@ -1,6 +1,6 @@
 'use client';
 
-import { Disc3, Play } from 'lucide-react';
+import { AudioLines, Play } from 'lucide-react';
 
 export interface ThreadAudioCardProps {
   readonly title: string;
@@ -27,7 +27,10 @@ export function ThreadAudioCard({
   return (
     <div className='system-b-thread-media-card system-b-thread-audio-card'>
       <div className='system-b-thread-audio-artwork'>
-        <Disc3 className='h-4 w-4 text-tertiary-token' strokeWidth={2.25} />
+        <AudioLines
+          className='h-4 w-4 text-tertiary-token'
+          strokeWidth={2.25}
+        />
       </div>
       <div className='system-b-thread-audio-copy'>
         <p className='system-b-thread-audio-title'>{title}</p>

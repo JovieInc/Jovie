@@ -3,11 +3,12 @@
 import { Button } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
 import {
+  AudioLines,
   Calendar,
   CheckSquare,
   Copy,
-  Disc3,
   ExternalLink,
+  Layers,
   Link as LinkIcon,
   Music2,
   UserRound,
@@ -141,7 +142,7 @@ function ChatRailContextIcon({
   kind,
 }: Readonly<{ kind: ChatRailContextKind }>) {
   if (kind === 'profile') return <UserRound className='h-3.5 w-3.5' />;
-  if (kind === 'release') return <Disc3 className='h-3.5 w-3.5' />;
+  if (kind === 'release') return <Layers className='h-3.5 w-3.5' />;
   if (kind === 'event' || kind === 'tour-date') {
     return <Calendar className='h-3.5 w-3.5' />;
   }
@@ -633,7 +634,7 @@ function ChatReleaseEntityPanel({
                     sizes='40px'
                   />
                 ) : (
-                  <Disc3 className='h-4 w-4' />
+                  <AudioLines className='h-4 w-4' />
                 )}
               </div>
             }

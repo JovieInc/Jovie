@@ -325,11 +325,11 @@
 .system-b-marketing.dark,
 :root.dark .system-b-marketing,
 [data-theme="linear"].dark {
-  /* Text — Jovie Noir Ion (JOV-4635) */
+  /* Text — Jovie Noir Ion (JOV-4635). Cinematic depth ramp (Tim, 2026-09-25). */
   --linear-text-primary: #f5f7fb;
-  --linear-text-secondary: #d7dce8;
-  --linear-text-tertiary: #a8b0c3;
-  --linear-text-quaternary: #7d879d;
+  --linear-text-secondary: #a0a5af;
+  --linear-text-tertiary: #8f95a0;
+  --linear-text-quaternary: #7d8593;
   --linear-text-inverse: #020307;
   /* Backgrounds — Noir Ion stepped surfaces */
   --linear-bg-page: #07080a;

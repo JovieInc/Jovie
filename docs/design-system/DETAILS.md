@@ -311,6 +311,13 @@ Three input variables generate the entire palette:
 
 ### App Colors — Light Mode (System B)
 
+Text secondary/tertiary/quaternary follow the **cinematic depth** ramp
+(founder-locked, Tim, 2026-09-25): one big step down from primary, then a
+compressed ordered tail. Each light value is ≥4.5:1 against white; secondary
+and tertiary are also gated at 4.5:1 against `--color-bg-base`/`surface-1` by
+`contrast-pairs.config.json` (dark values follow the same ramp via the
+Noir Ion anchors below).
+
 | Token | Value | Hex approx | Usage |
 |-------|-------|-----------|-------|
 | `--color-bg-base` | `#F3F4F6` | canvas | Page / canvas |
@@ -321,9 +328,9 @@ Three input variables generate the entire palette:
 | `--color-bg-primary` | `lch(98.94% 0.5 282)` | `#fcfcfd` | Primary content area |
 | `--color-bg-secondary` | `lch(95.94% 0.5 282)` | `#f3f3f5` | Secondary surfaces, sidebar |
 | Text primary | `lch(9.894% 0 282)` | `#0c0c0c` | Headings, primary text |
-| Text secondary | `lch(19.788% 1.25 282)` | `#2e2f31` | Body text, labels |
-| Text tertiary | `lch(39.576% 1.25 282)` | `#5a5b5d` | Descriptions, meta |
-| Text quaternary | `lch(65.3% 1.25 282)` | `#9a9b9d` | Placeholders |
+| Text secondary | `#5A606A` | `#5a606a` | Body text, labels |
+| Text tertiary | `#666C76` | `#666c76` | Descriptions, meta |
+| Text quaternary | `#737982` | `#737982` | Placeholders |
 | Border subtle | `oklch(0% 0 0 / 6%)` | — | Dividers |
 | Border default | `oklch(0% 0 0 / 10%)` | — | Borders |
 | Border strong | `oklch(0% 0 0 / 18%)` | — | Emphasis |
@@ -346,9 +353,9 @@ prior anchors without a second theme provider).
 | Elevated | `#1A1B1E` | `--color-bg-surface-2` | Inputs, raised |
 | Floating | `#232427` | `--color-bg-surface-3` | Modals, tooltips |
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
-| Text secondary | `#D7DCE8` | `--color-text-secondary-token` | Labels |
-| Text muted | `#A8B0C3` | `--color-text-tertiary-token` | Meta |
-| Text tertiary | `#7D879D` | `--color-text-quaternary-token` | Placeholders |
+| Text secondary | `#A0A5AF` | `--color-text-secondary-token` | Labels |
+| Text muted | `#8F95A0` | `--color-text-tertiary-token` | Meta |
+| Text tertiary | `#7D8593` | `--color-text-quaternary-token` | Placeholders |
 | Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
 | Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
 | Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |

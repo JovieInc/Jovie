@@ -291,7 +291,7 @@ export function ReleaseEntityHeader({
                   sizes={`${RELEASE_HEADER_ARTWORK_SIZE_PX}px`}
                   fallback={
                     <Icon
-                      name='Disc3'
+                      name='AudioLines'
                       className='h-6 w-6 text-tertiary-token'
                       aria-hidden='true'
                     />
