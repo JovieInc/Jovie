@@ -81,11 +81,11 @@ The kernel does not hardcode models. `scripts/pr-review/models.mjs` asks
 
 - `review` for discovery, costed on a full-diff job.
 - `review-verify` for verification, costed on a short call, with a quality floor
-  of 75 (`routing_policy.min_quality`), because verification decides what gets
+  of 65 on the DeepSWE v1.1 scale (`routing_policy.min_quality`), because verification decides what gets
   posted.
 
 It then takes the pair with the lowest combined expected cost per success. The
-verifier must be a different family from the discoverer and at least as strong.
+verifier must be a different family from the discoverer.
 
 **Expected cost per success** (router, all callers):
 
@@ -100,11 +100,18 @@ verifier must be a different family from the discoverer and at least as strong.
    observed outcomes and the registry `quality` prior. Observed token and minute
    averages replace the job estimates once there are 5 samples (`min_samples`).
 
-With no outcomes recorded yet, the pick is DeepSeek V4 Flash for discovery and
-GLM 5.3 for verification. DeepSeek V4.1 Flash is ranked, but at its peak
-$0.30/$1.20 price and a provisional quality equal to V4 Flash it costs about twice
-as much per success. Recorded replay outcomes, or a quality update, can change
-that. Its Gateway model id is unverified until the first live run.
+**Priors.** `scripts/symphony/config/model-research/2026-09-25-review-benchmarks.json`
+sets `quality_by_capability` for review from DeepSWE v1.1 pass@1 under
+mini-swe-agent: V4.1 Flash 74.2, GLM 5.3 66.9, GLM 5.3 Flash 63.4, V4 Flash 54.4.
+It also sets flat Vercel AI Gateway prices, with sources for each. No public
+code-review benchmark covers these models, and real-PR review scores run far below
+synthetic ones, so replay outcomes are meant to replace these priors.
+
+**Failure cost.** `review` and `review-verify` are one-shot, so their expected
+cost is attempt cost + (1 − p) × `failure_cost_usd` ($5). Code tasks keep
+attempt cost ÷ p. With the priors, discovery goes to
+`deepseek/deepseek-v4.1-flash` and verification to `zai/glm-5.3`.
+V4 Flash is cheaper per token but loses on its miss rate.
 
 Outcomes: `node scripts/pr-review/replay.mjs <seed.json> --record-outcomes`
 writes one outcome per case to the router state with `model-router.py
@@ -116,11 +123,11 @@ router state is not shared with hosted runners yet.
 only one the router ranked. Per-PR budget is $0.50
 (`DEFAULT_RUN_LIMITS.budgetUsd`).
 
-Not modeled yet:
-- time-of-day pricing, such as DeepSeek off-peak rates;
-- free external agents without a headless, credentialed channel, such as Devin
-  SWE2. When one exists, add it as a registry entry with a `promo` price of 0
-  until its end date.
+Devin SWE-2 is a subscription entry (`devin-swe-2`) in the Symphony agent route
+chains, free until 2026-10-10 through its `promo`. Its probe is
+`devin auth status`, so a host that isn't logged in is skipped. The hosted review
+job never uses it. DeepSeek's direct off-peak pricing isn't modeled, because
+review routes go through the flat-priced Gateway.
 
 ## Enabling the shadow run
 

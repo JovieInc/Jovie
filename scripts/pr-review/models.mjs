@@ -55,9 +55,9 @@ function pinnedRow(rows, env, key) {
 
 /**
  * Choose the discovery/verification pair with the lowest combined expected
- * cost per success. The verifier must be a different family and at least as
- * strong as the discoverer; the router already applies the verification
- * quality floor. Env overrides must name models the router ranked.
+ * cost per success. The verifier must be a different family; the router has
+ * already refused verifiers below the review-verify quality floor. Env
+ * overrides must name models the router ranked.
  */
 export function selectRoutes(rankings, env = {}) {
   const pinnedDiscovery = pinnedRow(
@@ -81,7 +81,6 @@ export function selectRoutes(rankings, env = {}) {
   for (const discovery of discoveries) {
     for (const verification of verifiers) {
       if (verification.family === discovery.family) continue;
-      if (verification.quality < discovery.quality) continue;
       const cost =
         discovery.expected_cost_per_success_usd +
         verification.expected_cost_per_success_usd;
@@ -90,7 +89,7 @@ export function selectRoutes(rankings, env = {}) {
   }
   if (!best) {
     throw new Error(
-      'no different-family review pair with verifier quality >= discoverer'
+      'no different-family review pair above the verification floor'
     );
   }
   const { discovery, verification } = best;

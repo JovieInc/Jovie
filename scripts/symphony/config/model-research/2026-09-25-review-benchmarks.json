@@ -1,0 +1,51 @@
+{
+  "schema": "model-research/v1",
+  "observed_at": "2026-09-25T23:00:00Z",
+  "source": "vercel-ai-gateway-model-pages+deepswe-v1.1-mini-swe-agent-reported-scores",
+  "notes": "Gateway prices are flat per 1M tokens (no peak window). quality_by_capability for review and review-verify uses DeepSWE v1.1 pass@1 under mini-swe-agent, the only agentic coding benchmark all four models report under one harness. No public code-review benchmark covers these models; replay outcomes replace these priors as they accumulate.",
+  "updates": [
+    {
+      "id": "deepseek-v4-flash",
+      "list_price_in": 0.06,
+      "list_price_out": 0.18,
+      "quality_by_capability": { "review": 54.4, "review-verify": 54.4 },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/deepseek-v4-flash",
+        "https://regolo.ai/deepseek-v4-1-flash-vs-v4-flash-which-open-weight-model-should-your-company-run/"
+      ]
+    },
+    {
+      "id": "gateway-deepseek-v4.1-flash",
+      "list_price_in": 0.075,
+      "list_price_out": 0.3,
+      "quality_by_capability": { "review": 74.2, "review-verify": 74.2 },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/deepseek-v4.1-flash",
+        "https://www.digitalapplied.com/blog/deepseek-v4-1-flash-pro-routing-prices-early-tests",
+        "https://flowtivity.ai/blog/deepseek-v4-1-flash-benchmarks/"
+      ]
+    },
+    {
+      "id": "gateway-glm-5.3",
+      "list_price_in": 0.5625,
+      "list_price_out": 1.8326,
+      "quality_by_capability": { "review": 66.9, "review-verify": 66.9 },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/glm-5.3",
+        "https://www.mindstudio.ai/blog/glm-5-3-coding-benchmarks",
+        "https://www.together.ai/blog/glm-5-3-vs-glm-5-3-flash-on-deepswe-cost-coding-and-routing"
+      ]
+    },
+    {
+      "id": "gateway-glm-5.3-flash",
+      "list_price_in": 0.07,
+      "list_price_out": 0.25,
+      "quality_by_capability": { "review": 63.4, "review-verify": 63.4 },
+      "sources": [
+        "https://vercel.com/ai-gateway/models/glm-5.3-flash",
+        "https://www.datacamp.com/blog/glm-5-3-flash",
+        "https://www.together.ai/blog/glm-5-3-vs-glm-5-3-flash-on-deepswe-cost-coding-and-routing"
+      ]
+    }
+  ]
+}

@@ -33,6 +33,8 @@ ALLOWED_UPDATE_FIELDS = (
     "promo",
     "effective_price_multiplier",
     "price_basis",
+    "quality_by_capability",
+    "sources",
 )
 SNAPSHOT_SCHEMA = "model-research/v1"
 
@@ -79,6 +81,13 @@ def apply_snapshot(registry, snapshot, now=None):
                 if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
                     rejected.append({"id": mid, "reason": f"invalid_{field}"})
                     break
+            if field == "sources" and (
+                not isinstance(value, list)
+                or not value
+                or not all(isinstance(item, str) and item.startswith("https://") for item in value)
+            ):
+                rejected.append({"id": mid, "reason": "invalid_sources"})
+                break
             if field == "notes" and not isinstance(value, str):
                 rejected.append({"id": mid, "reason": "invalid_notes"})
                 break

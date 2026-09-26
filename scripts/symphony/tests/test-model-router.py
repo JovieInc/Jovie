@@ -702,9 +702,12 @@ class RegistryTests(unittest.TestCase):
         ]
         self.assertEqual(prices, sorted(prices))
         deepseek_flash = next(m for m in cfg["models"] if m["id"] == "deepseek-v4-flash")
-        self.assertLess(
-            by_id["hyperagent-glm-5.3-flash"]["list_price_in"],
-            deepseek_flash["list_price_in"],
+        # Gateway V4 Flash is now priced from the Gateway model page ($0.06 in),
+        # below HyperAgent GLM Flash; HyperAgent still leads by route_priority,
+        # so its overflow must at least not be lower quality.
+        self.assertGreaterEqual(
+            by_id["hyperagent-glm-5.3-flash"]["quality"],
+            deepseek_flash["quality"],
         )
         self.assertEqual(
             by_id["hyperagent-astra"]["quality"],
@@ -918,24 +921,26 @@ class EffectiveCostTests(unittest.TestCase):
             cheap["id"]: {"review": {"attempts": 40, "successes": 2, "tokens_in": 40 * 60000, "tokens_out": 40 * 20000}},
             strong["id"]: {"review": {"attempts": 40, "successes": 38, "tokens_in": 40 * 30000, "tokens_out": 40 * 8000}},
         }}
-        cheap_rank = MODULE.score_candidate(cfg, cheap, st, "review", 1000)[2]
-        strong_rank = MODULE.score_candidate(cfg, strong, st, "review", 1000)[2]
+        st["outcomes"][cheap["id"]]["code"] = st["outcomes"][cheap["id"]].pop("review")
+        st["outcomes"][strong["id"]]["code"] = st["outcomes"][strong["id"]].pop("review")
+        cheap_rank = MODULE.score_candidate(cfg, cheap, st, "code", 1000)[2]
+        strong_rank = MODULE.score_candidate(cfg, strong, st, "code", 1000)[2]
         self.assertLess(strong_rank, cheap_rank)
-        self.assertLess(MODULE.score_candidate(cfg, cheap, {}, "review", 1000)[2], MODULE.score_candidate(cfg, strong, {}, "review", 1000)[2])
+        self.assertLess(MODULE.score_candidate(cfg, cheap, {}, "code", 1000)[2], MODULE.score_candidate(cfg, strong, {}, "code", 1000)[2])
 
     def test_beta_prior_holds_until_samples_then_observations_dominate(self):
         cfg = self.cfg()
         model = self.model(cfg, "gateway-glm-5.3")
-        prior = MODULE.expected_cost_per_success(cfg, model, {}, "review", 1000)
+        prior = MODULE.expected_cost_per_success(cfg, model, {}, "code", 1000)
         self.assertAlmostEqual(prior["p_success"], 0.82)
-        few = {"outcomes": {model["id"]: {"review": {"attempts": 2, "successes": 0, "tokens_in": 10, "tokens_out": 10}}}}
-        early = MODULE.expected_cost_per_success(cfg, model, few, "review", 1000)
+        few = {"outcomes": {model["id"]: {"code": {"attempts": 2, "successes": 0, "tokens_in": 10, "tokens_out": 10}}}}
+        early = MODULE.expected_cost_per_success(cfg, model, few, "code", 1000)
         self.assertAlmostEqual(early["p_success"], (0 + 2 * 0.82) / 4)
         self.assertEqual(early["attempt_token_cost"], prior["attempt_token_cost"])
-        many = {"outcomes": {model["id"]: {"review": {"attempts": 10, "successes": 10, "tokens_in": 10 * 1000, "tokens_out": 0, "minutes": 50}}}}
+        many = {"outcomes": {model["id"]: {"code": {"attempts": 10, "successes": 10, "tokens_in": 10 * 1000, "tokens_out": 0, "minutes": 50}}}}
         cfg["routing_policy"]["minute_value_usd"] = 1
-        late = MODULE.expected_cost_per_success(cfg, model, many, "review", 1000)
-        self.assertAlmostEqual(late["attempt_token_cost"], 1000 * 0.3 / 1_000_000)
+        late = MODULE.expected_cost_per_success(cfg, model, many, "code", 1000)
+        self.assertAlmostEqual(late["attempt_token_cost"], 1000 * model["list_price_in"] / 1_000_000)
         self.assertGreater(late["expected_cost_per_success"], 5 / late["p_success"] - 1e-9)
 
     def test_active_promo_is_used_and_expired_promo_is_ignored(self):
@@ -977,12 +982,64 @@ class EffectiveCostTests(unittest.TestCase):
         self.assertIsNone(MODULE._timestamp("not-a-date"))
         self.assertIsNone(MODULE._timestamp(None))
 
+    def test_capability_quality_overrides_global_quality(self):
+        model = {"quality": 82, "quality_by_capability": {"review": 66.9}}
+        self.assertEqual(MODULE.capability_quality(model, "review"), 66.9)
+        self.assertEqual(MODULE.capability_quality(model, "code"), 82)
+        self.assertEqual(MODULE.capability_quality({}, "code"), 0)
+        for bad in ({}, {"review": 101}, {"review": True}, "high"):
+            with self.subTest(bad=bad):
+                cfg = self.cfg()
+                cfg["models"][0]["quality_by_capability"] = bad
+                with self.assertRaisesRegex(ValueError, "quality_by_capability"):
+                    MODULE.validate_registry(cfg)
+
+    def test_one_shot_failure_cost_is_added_not_divided(self):
+        cfg = self.cfg()
+        model = self.model(cfg, "gateway-deepseek-v4.1-flash")
+        review = MODULE.expected_cost_per_success(cfg, model, {}, "review", 1000)
+        p = review["p_success"]
+        self.assertAlmostEqual(p, 0.742)
+        self.assertAlmostEqual(
+            review["expected_cost_per_success"],
+            review["attempt_token_cost"] + (1 - p) * cfg["routing_policy"]["failure_cost_usd"]["review"],
+        )
+        code = MODULE.expected_cost_per_success(cfg, model, {}, "code", 1000)
+        self.assertAlmostEqual(code["expected_cost_per_success"], code["attempt_token_cost"] / code["p_success"])
+
+    def test_review_priors_pick_the_stronger_cheap_model(self):
+        ranked = MODULE.rank("review", provider="vercel-ai-gateway", st={})["ranked"]
+        self.assertEqual(ranked[0]["id"], "gateway-deepseek-v4.1-flash")
+        self.assertEqual(ranked[-1]["id"], "deepseek-v4-flash")
+
+    def test_devin_swe_2_is_free_until_promo_end_and_fails_closed_without_login(self):
+        cfg = self.cfg()
+        devin = self.model(cfg, "devin-swe-2")
+        self.assertEqual(devin["channel"], "subscription")
+        self.assertEqual(devin["probe_argv"], ["{executable}", "auth", "status"])
+        before = MODULE._timestamp("2026-10-01T00:00:00Z")
+        after = MODULE._timestamp("2026-10-11T00:00:00Z")
+        self.assertEqual(MODULE.effective_prices(devin, before)[2], "promo")
+        self.assertEqual(MODULE.effective_prices(devin, after)[2], "list")
+        for chain in cfg["route_chains"].values():
+            self.assertIn("devin-swe-2", chain)
+        self.assertIsNotNone(MODULE.executor(devin, require_cwd=True))
+        with tempfile.TemporaryDirectory() as root:
+            fake = pathlib.Path(root) / "devin"
+            fake.write_text("#!/bin/sh\necho 'Not logged in'\nexit 1\n")
+            fake.chmod(0o755)
+            with mock.patch.dict(os.environ, {"GEM_DEVIN_EXECUTABLE": str(fake)}):
+                self.assertEqual(MODULE.probe(devin), (False, "auth_or_runtime_failed"))
+            fake.write_text("#!/bin/sh\necho 'Logged in as tim'\nexit 0\n")
+            with mock.patch.dict(os.environ, {"GEM_DEVIN_EXECUTABLE": str(fake)}):
+                self.assertEqual(MODULE.probe(devin), (True, "ready"))
+
     def test_rank_and_record_outcome_round_trip_through_state(self):
         with tempfile.TemporaryDirectory() as root:
             env = {"GEM_MODEL_ROUTER_STATE": str(pathlib.Path(root) / "state.json")}
             with mock.patch.dict(os.environ, env):
                 ranked = MODULE.rank("review-verify", provider="vercel-ai-gateway")
-                self.assertEqual([row["id"] for row in ranked["ranked"]], ["gateway-glm-5.3"])
+                self.assertEqual([row["id"] for row in ranked["ranked"]], ["gateway-deepseek-v4.1-flash", "gateway-glm-5.3"])
                 self.assertIn({"id": "gateway-glm-5.3-flash", "reason": "below_quality_floor"}, ranked["refused"])
                 st = MODULE.state()
                 for _ in range(6):
@@ -991,7 +1048,7 @@ class EffectiveCostTests(unittest.TestCase):
                 self.assertEqual((entry["attempts"], entry["successes"]), (6, 0))
                 after = MODULE.rank("review", provider="vercel-ai-gateway")
                 self.assertNotEqual(after["ranked"][0]["id"], "gateway-glm-5.3-flash")
-                filtered = MODULE.rank("review", provider="vercel-ai-gateway", channel="api", min_quality=70, exclude_families=("deepseek",))
+                filtered = MODULE.rank("review", provider="vercel-ai-gateway", channel="api", min_quality=65, exclude_families=("deepseek",))
                 self.assertEqual([row["id"] for row in filtered["ranked"]], ["gateway-glm-5.3"])
                 reasons = {row["reason"] for row in filtered["refused"]}
                 self.assertTrue({"excluded_family", "below_min_quality"} <= reasons)
