@@ -593,7 +593,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 " signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
                 f" pathlib.Path({str(draining)!r}).touch()\n"
                 f" while not pathlib.Path({str(release)!r}).exists(): time.sleep(0.01)\n"
-                " data = ('x' * 262144 + '\\nshutdown-drained\\n').encode()\n"
+                " data = b'x' * 262144 + b'\\nshutdown-drained\\n'\n"
                 " while data: data = data[os.write(1, data):]\n"
                 " raise SystemExit(75)\n"
                 "signal.signal(signal.SIGTERM, stop)\n"
