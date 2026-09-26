@@ -195,6 +195,16 @@ export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
 export { TableHeaderRow } from './molecules/TableHeaderRow';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
+export type {
+  ToolbarFilterSuggestion,
+  ToolbarFilterSuggestionsProps,
+} from './molecules/ToolbarFilterSuggestions';
+export { ToolbarFilterSuggestions } from './molecules/ToolbarFilterSuggestions';
+export type {
+  ViewModeSliderOption,
+  ViewModeSliderProps,
+} from './molecules/ViewModeSlider';
+export { ViewModeSlider } from './molecules/ViewModeSlider';
 
 // =============================================================================
 // Organisms
