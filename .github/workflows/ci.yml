@@ -1576,6 +1576,9 @@ jobs:
         # event.before, and guardrail merge-base with origin/<base>.
         # A full-depth checkout also fetched every branch and tag (~4k ref
         # lines of log noise before any work). --unshallow deepens HEAD fully.
+        # A refspec-scoped --unshallow can leave the depth-1 checkout ref
+        # (pull/<n>/merge) shallow and sever ancestry checks, so also deepen
+        # the checked-out commit whenever the repo is still shallow.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1584,6 +1587,9 @@ jobs:
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "$(git rev-parse HEAD)"
+          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
@@ -1874,6 +1880,9 @@ jobs:
         # event.before, and guardrail merge-base with origin/<base>.
         # A full-depth checkout also fetched every branch and tag (~4k ref
         # lines of log noise before any work). --unshallow deepens HEAD fully.
+        # A refspec-scoped --unshallow can leave the depth-1 checkout ref
+        # (pull/<n>/merge) shallow and sever ancestry checks, so also deepen
+        # the checked-out commit whenever the repo is still shallow.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1882,6 +1891,9 @@ jobs:
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "$(git rev-parse HEAD)"
+          fi
       - name: Select public-profile browser admission
         id: profile-browser
         shell: bash
@@ -4545,6 +4557,9 @@ jobs:
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "$(git rev-parse HEAD)"
+          fi
           GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
           GIT_NO_LAZY_FETCH=1 git diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
