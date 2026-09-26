@@ -422,6 +422,35 @@ class FixRedTest(unittest.TestCase):
         self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
 
+    def test_merge_conflicts_count_as_stuck_even_with_green_checks(self):
+        dirty = {**self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}]),
+                 "mergeStateStatus": "DIRTY"}
+        self.assertEqual(lane.red_pr([dirty], {})["number"], 5)
+        prompt = lane.render_fix_prompt(dirty, "")
+        self.assertIn("conflicts with main", prompt)
+        self.assertIn("renumber yours", prompt)
+
+    def test_a_pushed_fix_re_arms_auto_merge_for_ready_prs(self):
+        real, real_excerpt = lane.sh, lane.failure_excerpt
+        lane.failure_excerpt = lambda pr: ""
+        calls = []
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            calls.append(args)
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {**self.pr(), "isDraft": False})
+            finally:
+                lane.sh, lane.failure_excerpt = real, real_excerpt
+        self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+
     def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=(
