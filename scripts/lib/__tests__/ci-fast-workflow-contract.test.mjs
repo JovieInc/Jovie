@@ -2430,7 +2430,7 @@ describe('invariant-scanned PR structural selection', () => {
     );
     expect(decision).toContain(addition);
     expect(decision.indexOf(addition)).toBeLessThan(
-      decision.indexOf('if git diff --name-only')
+      decision.indexOf('|| git diff --name-only')
     );
 
     const ere = execFileSync(
@@ -2454,6 +2454,29 @@ describe('invariant-scanned PR structural selection', () => {
     ]) {
       expect(selects(path), path).toBe(false);
     }
+  });
+});
+
+describe('new scripts test PR structural selection', () => {
+  // #18714 added an unwired scripts test; only the merge queue ran the
+  // inventory guard, so the PR passed and the queue group was ejected.
+  it('selects structural when a PR adds or renames a scripts test', () => {
+    const decision = WORKFLOW.slice(
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
+    );
+    const line = decision
+      .split('\n')
+      .find(l => l.includes('NEW_SCRIPT_TESTS=$('));
+    expect(line).toContain('git diff --diff-filter=AR --name-only');
+    expect(decision).toContain('if [ -n "$NEW_SCRIPT_TESTS" ] ||');
+    const ere = line.match(/grep -E '([^']+)'/)[1];
+    const selects = path =>
+      spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
+    expect(selects('scripts/ops/firecrawl-crawl.test.mjs')).toBe(true);
+    expect(selects('scripts/symphony/lib/__tests__/typed.test.ts')).toBe(true);
+    expect(selects('scripts/ops/firecrawl-crawl.mjs')).toBe(false);
+    expect(selects('apps/web/tests/unit/a.test.ts')).toBe(false);
   });
 });
 
