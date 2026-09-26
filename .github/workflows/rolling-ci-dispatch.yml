@@ -817,6 +817,12 @@ jobs:
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/invariants/scanned-paths.mjs
+            scripts/invariants/done-sprint-invariants.mjs
+            scripts/invariants/ios-web-no-scroll-jank.mjs
+            scripts/invariants/latency-sensitive-execution-paths.mjs
+            scripts/invariants/latency-sensitive-execution-allowlist.json
+            scripts/invariants/registry.mjs
             scripts/design-conformance-paths.mjs
             scripts/run-affected-tests.mjs
             scripts/version-fanout-guard.mjs

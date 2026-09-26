@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
   buildDesktopUpdateMenuItem,
+  buildManualUpdateCheckFeedback,
   desktopBundlePathFromExecutable,
   hasNightlyUpdateFlag,
   NIGHTLY_UPDATE_FLAG,
@@ -138,6 +139,21 @@ test('closed nightly launches install immediately; visible windows wait', () => 
       hasVisibleWindow: false,
     })
   ).toBe(false);
+});
+
+test('a manual check that finds nothing still yields a visible up-to-date message (JOV-6342)', () => {
+  expect(buildManualUpdateCheckFeedback('not-available')).toEqual({
+    type: 'info',
+    title: "You're Up To Date",
+    message: 'Jovie is on the latest version.',
+  });
+});
+
+test('a manual check that errors yields a visible retry message (JOV-6342)', () => {
+  const feedback = buildManualUpdateCheckFeedback('error');
+  expect(feedback.type).toBe('error');
+  expect(feedback.title.length).toBeGreaterThan(0);
+  expect(feedback.message.length).toBeGreaterThan(0);
 });
 
 test('nightly LaunchAgent plist opens the packaged app hidden with the in-tree flag', () => {

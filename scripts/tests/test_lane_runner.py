@@ -402,6 +402,21 @@ class DispatchTest(unittest.TestCase):
             self.assertFalse(old.exists())
         self.assertEqual(spawned, ["a", "a"])
 
+    def test_shallow_clones_are_unshallowed_before_gating(self):
+        calls = []
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            calls.append(args)
+            out = "true\n" if args[:2] == ["git", "rev-parse"] else ""
+            return SimpleNamespace(returncode=0, stderr="", stdout=out)
+        real = lane.sh
+        lane.sh = fake
+        try:
+            lane.ensure_full_history(lane.Host(repo=Path("/tmp")))
+        finally:
+            lane.sh = real
+        self.assertIn(["git", "fetch", "-q", "--unshallow", "origin"], calls)
+
     def test_health_check_matches_output_and_survives_missing_binaries(self):
         ok = [sys.executable, "-c", "print('Logged in (via Devin).')"]
         self.assertTrue(lane.provider_healthy({"health": ok, "healthy": "Logged in"}))

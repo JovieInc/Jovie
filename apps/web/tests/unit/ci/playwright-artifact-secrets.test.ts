@@ -794,6 +794,9 @@ describe('Playwright artifact secret boundary', () => {
     `,
         ],
         {
+          // The step runs from the repository root in CI; it invokes
+          // repo-relative scripts (scripts/invariants/scanned-paths.mjs).
+          cwd: repoRoot,
           encoding: 'utf8',
           env: {
             ...process.env,

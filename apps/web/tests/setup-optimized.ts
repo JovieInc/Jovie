@@ -4,12 +4,16 @@
  * Ultra-minimal setup file that only loads essential matchers and browser globals.
  * All mocks are lazy-loaded by individual tests as needed.
  * Reduces setup time significantly by deferring all heavy initialization.
+ *
+ * DOM testing pieces (jest-dom matchers, React Testing Library cleanup) load
+ * only when a DOM exists. Files listed in tests/node-environment-files.json run
+ * in Vitest's `node` environment, never render, and never use jest-dom
+ * matchers (tests/unit/ci/node-environment-files.test.ts enforces both), so
+ * they skip that import cost. Every other global below applies to both.
  */
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as matchers from '@testing-library/jest-dom/matchers';
-import { cleanup } from '@testing-library/react';
 import { afterEach, expect, vi } from 'vitest';
 
 const appRoot = path.resolve(
@@ -21,8 +25,20 @@ if (process.cwd() !== appRoot) {
   process.chdir(appRoot);
 }
 
-// Extend expect with jest-dom matchers (lightweight, always needed)
-expect.extend(matchers);
+if (typeof window !== 'undefined') {
+  const [matchers, { cleanup }] = await Promise.all([
+    import('@testing-library/jest-dom/matchers'),
+    import('@testing-library/react'),
+  ]);
+
+  // Extend expect with jest-dom matchers
+  expect.extend(matchers);
+
+  // Ensure the DOM is cleaned up between tests to avoid cross-test interference
+  afterEach(() => {
+    cleanup();
+  });
+}
 
 // Baseline env vars for fast/unit tests (see `tests/setup.ts` for details).
 process.env.VITEST ??= 'true';
@@ -223,11 +239,6 @@ vi.mock('@clerk/nextjs', () => ({
   SignedOut: ({ children }: { children: unknown }) => children,
   ClerkProvider: ({ children }: { children: unknown }) => children,
 }));
-
-// Ensure the DOM is cleaned up between tests to avoid cross-test interference
-afterEach(() => {
-  cleanup();
-});
 
 // Suppress noisy runtime warnings that depend on optional integrations in tests.
 global.console = {
