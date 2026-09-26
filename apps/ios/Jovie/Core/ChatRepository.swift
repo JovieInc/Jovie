@@ -221,6 +221,7 @@ final class ChatRepository {
   private func performSend(text: String, generation: Int) async {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
+    let localCreatedAt = ISO8601DateFormatter().string(from: Date())
     timeline.append(
       MobileChatTimelineItem(
         id: "user:\(clientTurnId)",
@@ -229,7 +230,8 @@ final class ChatRepository {
         status: .completed,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: localCreatedAt
       )
     )
     timeline.append(
@@ -240,7 +242,8 @@ final class ChatRepository {
         status: .queued,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: localCreatedAt
       )
     )
 
@@ -323,6 +326,7 @@ final class ChatRepository {
 
     let clientMessageId = "\(idempotencyKey):msg"
     timeline.removeAll { $0.clientTurnId == idempotencyKey }
+    let localCreatedAt = ISO8601DateFormatter().string(from: Date())
     timeline.append(
       MobileChatTimelineItem(
         id: "user:\(idempotencyKey)",
@@ -331,7 +335,8 @@ final class ChatRepository {
         status: .completed,
         clientTurnId: idempotencyKey,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: localCreatedAt
       )
     )
     timeline.append(
@@ -342,7 +347,8 @@ final class ChatRepository {
         status: .sending,
         clientTurnId: idempotencyKey,
         requiresWebHandoff: false,
-        handoffURL: nil
+        handoffURL: nil,
+        createdAt: localCreatedAt
       )
     )
 
@@ -699,7 +705,8 @@ final class ChatRepository {
       clientTurnId: message.clientMessageId,
       requiresWebHandoff: message.requiresWebHandoff,
       handoffURL: handoffURL,
-      turnId: message.turnId
+      turnId: message.turnId,
+      createdAt: message.createdAt
     )
   }
 
@@ -728,7 +735,7 @@ final class ChatRepository {
         default: return "completed"
         }
       }(),
-      createdAt: ISO8601DateFormatter().string(from: Date()),
+      createdAt: item.createdAt ?? ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )
   }
