@@ -253,6 +253,39 @@ describe('HeaderSearchSurface', () => {
     ]);
   });
 
+  it('uses the banned-icon-safe Layers glyph for a release with no known provider', () => {
+    render(
+      <HeaderSearchSurface
+        adapter={createAdapter()}
+        catalog={{
+          conversations: [],
+          profiles: [],
+          releases: [
+            {
+              id: 'release-unknown-provider',
+              title: 'Unmastered Draft',
+              artistNames: ['Midnight Artist'],
+              smartLinkPath: '/midnight-artist/unmastered-draft',
+            },
+          ],
+        }}
+        isOpen
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search Jovie' }), {
+      target: { value: 'unmastered' },
+    });
+
+    const icon = screen
+      .getByRole('option', { name: /Unmastered Draft/ })
+      .querySelector('[data-header-search-result-icon] svg');
+    expect(icon).toHaveClass('lucide-layers');
+    expect(icon).not.toHaveClass('lucide-disc-3');
+  });
+
   it('keeps the active result identity stable as slower groups arrive and falls back only when it disappears', () => {
     const onClose = vi.fn();
     const props = {
