@@ -290,9 +290,12 @@ test('dereferences file-symlink trace targets that break Vercel tgz extraction',
     '../../../node_modules/.pnpm/next@16/node_modules/next'
   );
   f.put('CHANGELOG.md', '# log');
+  const nextPackage =
+    'node_modules/.pnpm/next@16/node_modules/next/package.json';
   const admin = withFunctionConfig(f, 'admin/screenshots', {
     [exportLink]: exportLink,
     'apps/web/node_modules/next': 'apps/web/node_modules/next',
+    [nextPackage]: nextPackage,
     'CHANGELOG.md': 'CHANGELOG.md',
   });
   // Next writes aliases such as page.rsc.func as links to the real function.
@@ -306,6 +309,7 @@ test('dereferences file-symlink trace targets that break Vercel tgz extraction',
     [exportLink]:
       'apps/web/screenshot-catalog/current/public-profile-desktop.png',
     'apps/web/node_modules/next': 'apps/web/node_modules/next',
+    [nextPackage]: nextPackage,
     'CHANGELOG.md': 'CHANGELOG.md',
   });
   // The source export link is untouched; only the upload map changes.
@@ -417,5 +421,41 @@ test('re-points files traced through a hoisted pnpm directory link at their real
   // Same destination key, real source file; the directory link itself is untouched.
   assert.equal(map[hoisted], `${store}/index.js`);
   assert.equal(map['apps/web/node_modules/next'], 'apps/web/node_modules/next');
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
+
+test('drops directory links whose target uploads nothing, judged across all functions', t => {
+  const f = fixture(t);
+  f.put(
+    'node_modules/.pnpm/supports-color@5.5.0/node_modules/supports-color/index.js',
+    'x'
+  );
+  f.link(
+    'node_modules/.pnpm/node_modules/supports-color',
+    '../supports-color@5.5.0/node_modules/supports-color'
+  );
+  f.put('node_modules/.pnpm/debug@4/node_modules/debug/index.js', 'x');
+  f.link(
+    'node_modules/.pnpm/node_modules/debug',
+    '../debug@4/node_modules/debug'
+  );
+  const write = (name, filePathMap) => {
+    const path = resolve(
+      f.root,
+      `.vercel/output/functions/${name}.func/.vc-config.json`
+    );
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify({ filePathMap }));
+    return () => JSON.parse(readFileSync(path, 'utf8')).filePathMap;
+  };
+  const colorLink = 'node_modules/.pnpm/node_modules/supports-color';
+  const debugLink = 'node_modules/.pnpm/node_modules/debug';
+  const debugFile = 'node_modules/.pnpm/debug@4/node_modules/debug/index.js';
+  // `a` maps both links; only `b` traces a file inside debug's target.
+  const a = write('a', { [colorLink]: colorLink, [debugLink]: debugLink });
+  const b = write('b', { [debugFile]: debugFile });
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  assert.deepEqual(a(), { [debugLink]: debugLink });
+  assert.deepEqual(b(), { [debugFile]: debugFile });
   assert.equal(dereferenceFunctionFileLinks(f.root), 0);
 });
