@@ -128,5 +128,7 @@ export function classifiedRetryDelay(
     QUERY_RETRY_BASE_DELAY_MS * 2 ** attemptIndex,
     QUERY_RETRY_MAX_DELAY_MS
   );
-  return backoff + Math.random() * QUERY_RETRY_JITTER_MS;
+  const draw = new Uint32Array(1);
+  crypto.getRandomValues(draw);
+  return backoff + (draw[0] / 2 ** 32) * QUERY_RETRY_JITTER_MS;
 }
