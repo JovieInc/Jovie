@@ -256,7 +256,11 @@ class ProviderAndLockTest(unittest.TestCase):
 
 class FakeLinear:
     def __init__(self, issues):
-        self.issues, self.moves, self.comments = issues, [], []
+        self.issues, self.moves, self.comments, self.triaged = issues, [], [], []
+
+    def create_triage(self, title, description):
+        self.triaged.append(title)
+        return "triage-id"
 
     def lane_issues(self, label):
         return self.issues
@@ -374,11 +378,14 @@ class RunIssueTest(unittest.TestCase):
 class WorkerTest(unittest.TestCase):
     def setUp(self):
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-                      lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues)
+                      lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
+                      lane.fix_candidates, lane.escalate_exhausted)
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs: None
         lane.lane_prs = lambda name: []
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
+        lane.fix_candidates = lambda name: []
+        lane.escalate_exhausted = lambda host, prs, linear: None
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
         self.linear = FakeLinear([issue("JOV-3")])
@@ -389,7 +396,8 @@ class WorkerTest(unittest.TestCase):
 
     def tearDown(self):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-         lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues) = self.saved
+         lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
+         lane.fix_candidates, lane.escalate_exhausted) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -700,6 +708,42 @@ class FixRedTest(unittest.TestCase):
                 self.assertEqual(lane.claim_adoptable_pr(host2, "devin", [draft])["number"], 5, "retried once the claim is gone")
         finally:
             lane.sh = real
+
+    def test_changes_requested_counts_as_red_and_every_repo_pr_is_a_candidate(self):
+        human = {**self.pr(number=42), "headRefName": "tim/jov-1-manual", "isDraft": False,
+                 "reviewDecision": "CHANGES_REQUESTED", "statusCheckRollup": [{"conclusion": "SUCCESS"}]}
+        self.assertEqual(lane.red_pr([human], {})["number"], 42)
+        clean = {**human, "reviewDecision": "APPROVED"}
+        self.assertIsNone(lane.red_pr([clean], {}))
+        real = lane.sh
+        lane.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([
+            {**human, "isCrossRepository": False}, {**human, "number": 43, "isCrossRepository": True}]))
+        try:
+            self.assertEqual([pr["number"] for pr in lane.repo_prs()], [42], "fork PRs cannot be pushed to")
+        finally:
+            lane.sh = real
+
+    def test_exhausted_heads_escalate_once_to_triage(self):
+        stuck = {**self.pr(number=7), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
+        attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}
+        self.assertEqual([pr["number"] for pr in lane.exhausted_prs([stuck], attempts)], [7])
+        self.assertEqual(lane.exhausted_prs([{**stuck, "headRefOid": "h2"}], attempts), [], "a new head is not exhausted")
+        self.assertEqual(lane.exhausted_prs([stuck], {"7": {**attempts["7"], "escalated": True}}), [])
+        real = lane.sh
+        posted = []
+        lane.sh = lambda args, **k: posted.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
+        linear = FakeLinear([])
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            try:
+                lane.escalate_exhausted(host, [stuck], linear)
+                lane.escalate_exhausted(host, [stuck], linear)
+            finally:
+                lane.sh = real
+            self.assertEqual(linear.triaged, ["Fix loop exhausted: PR #7 stuck one"], "escalated exactly once")
+            self.assertEqual(len([p for p in posted if p[:3] == ["gh", "pr", "comment"]]), 1)
+            self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
 
     def test_claim_records_attempt_before_work(self):
         real = lane.sh
