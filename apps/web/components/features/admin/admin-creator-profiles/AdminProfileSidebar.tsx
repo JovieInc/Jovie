@@ -20,9 +20,19 @@ import {
   type CategoryOption,
   ProfileLinkList,
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
-import type { AdminCreatorProfileRow } from '@/lib/admin/types';
+import type {
+  AdminCreatorProfileRow,
+  IdentityEnrichmentStatus,
+} from '@/lib/admin/types';
 import type { Contact } from '@/types';
 import { AlgorithmHealthPanel } from './AlgorithmHealthPanel';
+
+const ENRICHMENT_STATUS_LABELS: Record<IdentityEnrichmentStatus, string> = {
+  not_checked: 'Identity enrichment: not checked',
+  not_found: 'Identity enrichment: checked — no artist-controlled links found',
+  conflicted: 'Identity enrichment: conflicted sources',
+  verified: 'Identity enrichment: verified',
+};
 
 const PROFILE_TAB_OPTIONS = [
   { value: 'social' as const, label: 'Social' },
@@ -199,6 +209,21 @@ export function AdminProfileSidebar({
             contact={contact}
             isActive={selectedCategory === 'algorithm'}
           />
+        ) : null}
+        {selectedCategory === 'social' ? (
+          <p
+            className='text-xs text-tertiary-token'
+            data-testid='admin-creator-enrichment-status'
+          >
+            {
+              ENRICHMENT_STATUS_LABELS[
+                profile.identityEnrichment?.status ?? 'not_checked'
+              ]
+            }
+            {profile.identityEnrichment?.conflicts?.length
+              ? ` — ${profile.identityEnrichment.conflicts.length} unresolved`
+              : ''}
+          </p>
         ) : null}
         {selectedCategory !== 'about' && selectedCategory !== 'algorithm' ? (
           <ProfileLinkList

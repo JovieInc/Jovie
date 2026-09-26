@@ -17,6 +17,7 @@ type ConfidenceSignal =
   | 'tiktok_profile_link'
   | 'twitter_profile_link'
   | 'musicfetch_artist_lookup'
+  | 'musicbrainz_url_rel'
   | 'onboarding_enrichment';
 
 const SIGNAL_WEIGHTS: Record<ConfidenceSignal, number> = {
@@ -40,6 +41,9 @@ const SIGNAL_WEIGHTS: Record<ConfidenceSignal, number> = {
   // MusicFetch authoritative enrichment — links from verified Spotify artist lookup
   // are high-confidence and should be immediately active in the drawer
   musicfetch_artist_lookup: 0.8,
+  // MusicBrainz url-rels attached to an exact provider-resolved MBID are
+  // artist-curated destinations (official homepage, social networks).
+  musicbrainz_url_rel: 0.75,
   // onboarding_enrichment: links from the onboarding Spotify step (same verified Spotify source)
   onboarding_enrichment: 0.8,
 };

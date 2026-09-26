@@ -72,7 +72,7 @@ File count, checkout/history size, dependency/build complexity, and organization
 | --- | ---: |
 | Single changed file / binary | 10 MiB / 10 MiB |
 | Changed payload / binaries | 60 MiB / 120 files and 60 MiB |
-| Tracked regular / binary payload | 180 MiB / 96 MiB |
+| Tracked regular / binary payload | 181 MiB / 96 MiB |
 | Canonical visual baselines | 100 files / 12 MiB |
 | Forbidden tracked outputs | Zero new violations |
 
