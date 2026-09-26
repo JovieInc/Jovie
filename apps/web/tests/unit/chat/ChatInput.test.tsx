@@ -176,6 +176,46 @@ describe('ChatInput', () => {
     isSubmitting: false,
   };
 
+  it('emits exactly one onChange per keystroke (JOV-5325)', async () => {
+    const user = userEvent.setup();
+    const calls: string[] = [];
+
+    function Harness() {
+      const [value, setValue] = useState('');
+      return (
+        <ChatInput
+          value={value}
+          onChange={next => {
+            calls.push(next);
+            setValue(next);
+          }}
+          onSubmit={vi.fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<Harness />));
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+
+    await user.type(textarea, 'Hey');
+
+    expect(calls).toEqual(['H', 'He', 'Hey']);
+  });
+
+  it('sets the textarea height inline so line growth snaps with the keystroke (JOV-5325)', () => {
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    }) as HTMLTextAreaElement;
+
+    expect(textarea.style.height).toBe('24px');
+  });
+
   it('keeps the textarea focused when clicking send', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
