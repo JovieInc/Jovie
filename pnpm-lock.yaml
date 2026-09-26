@@ -271,7 +271,7 @@ importers:
         version: 1.4.0
       workflow:
         specifier: 4.8.9
-        version: 4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)
     devDependencies:
       '@types/node':
         specifier: ^26.6.2
@@ -438,7 +438,7 @@ importers:
         version: 1.2.16(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@sentry/nextjs':
         specifier: ^10.75.3
-        version: 10.75.3(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
+        version: 10.75.3(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
       '@statsig/statsig-node-core':
         specifier: ^0.23.0
         version: 0.23.0(encoding@0.1.13)
@@ -526,6 +526,9 @@ importers:
       heic2any:
         specifier: ^0.0.4
         version: 0.0.4
+      import-in-the-middle:
+        specifier: 3.5.1
+        version: 3.5.1
       isomorphic-dompurify:
         specifier: 4.3.0
         version: 4.3.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -589,6 +592,9 @@ importers:
       remark-html:
         specifier: ^16.0.1
         version: 16.0.1
+      require-in-the-middle:
+        specifier: 8.0.1
+        version: 8.0.1
       resend:
         specifier: ^6.28.1
         version: 6.28.1(@react-email/render@1.1.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
@@ -624,7 +630,7 @@ importers:
         version: 6.2.2
       workflow:
         specifier: 4.8.9
-        version: 4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       ws:
         specifier: 8.21.3
         version: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -661,7 +667,7 @@ importers:
         version: 10.6.0(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))
       '@storybook/addon-docs':
         specifier: 10.5.10
-        version: 10.5.10(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
+        version: 10.5.10(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
       '@storybook/addon-vitest':
         specifier: 10.6.0
         version: 10.6.0(@vitest/browser-playwright@5.0.1)(@vitest/browser@5.0.1)(@vitest/runner@4.1.10)(react@19.2.8)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vitest@5.0.1)
@@ -21530,7 +21536,7 @@ snapshots:
       - encoding
       - supports-color
 
-  '@sentry/bundler-plugins@10.75.3(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
+  '@sentry/bundler-plugins@10.75.3(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
     dependencies:
       '@babel/core': 7.29.6
       '@sentry/cli': 2.58.6(encoding@0.1.13)
@@ -21541,7 +21547,7 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       rollup: 4.63.5
-      webpack: 5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
+      webpack: 5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -21612,7 +21618,7 @@ snapshots:
       '@sentry/utils': 7.120.4
       localforage: 1.10.0
 
-  '@sentry/nextjs@10.75.3(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
+  '@sentry/nextjs@10.75.3(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(encoding@0.1.13)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.63.5)
@@ -21625,7 +21631,7 @@ snapshots:
       '@sentry/react': 10.75.3(react@19.2.8)
       '@sentry/server-utils': 10.75.3
       '@sentry/vercel-edge': 10.75.3
-      '@sentry/webpack-plugin': 5.4.0(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
+      '@sentry/webpack-plugin': 5.4.0(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
       next: 16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       rollup: 4.63.5
       stacktrace-parser: 0.1.11
@@ -21716,10 +21722,10 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@sentry/core': 10.75.3
 
-  '@sentry/webpack-plugin@5.4.0(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
+  '@sentry/webpack-plugin@5.4.0(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
     dependencies:
-      '@sentry/bundler-plugins': 10.75.3(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
-      webpack: 5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
+      '@sentry/bundler-plugins': 10.75.3(encoding@0.1.13)(rollup@4.63.5)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
+      webpack: 5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
     transitivePeerDependencies:
       - encoding
       - rollup
@@ -21996,10 +22002,10 @@ snapshots:
       axe-core: 4.13.0
       storybook: 10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6)
 
-  '@storybook/addon-docs@10.5.10(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
+  '@storybook/addon-docs@10.5.10(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
     dependencies:
       '@mdx-js/react': 3.1.1(@types/react@19.2.18)(react@19.2.8)
-      '@storybook/csf-plugin': 10.5.10(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
+      '@storybook/csf-plugin': 10.5.10(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
       '@storybook/icons': 2.1.0(react@19.2.8)
       '@storybook/react-dom-shim': 10.5.10(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))
       react: 19.2.8
@@ -22034,7 +22040,7 @@ snapshots:
       ts-dedent: 2.3.0
       vite: 8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
 
-  '@storybook/csf-plugin@10.5.10(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
+  '@storybook/csf-plugin@10.5.10(esbuild@0.28.2)(rollup@4.63.5)(storybook@10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6))(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))':
     dependencies:
       storybook: 10.6.0(@types/react@19.2.18)(bufferutil@4.1.0)(prettier@3.8.1)(react@19.2.8)(utf-8-validate@6.0.6)
       unplugin: 2.3.11
@@ -22042,7 +22048,7 @@ snapshots:
       esbuild: 0.28.2
       rollup: 4.63.5
       vite: 8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
-      webpack: 5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
+      webpack: 5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
 
   '@storybook/global@5.0.0': {}
 
@@ -24147,7 +24153,7 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/nest@4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/nest@4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)':
     dependencies:
       '@nestjs/common': 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -24178,7 +24184,7 @@ snapshots:
       - supports-color
       - ws
 
-  '@workflow/next@4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@workflow/next@4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))':
     dependencies:
       '@swc/core': 1.15.3(@swc/helpers@0.5.23)
       '@workflow/builders': 4.1.14(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -33672,15 +33678,15 @@ snapshots:
       ansi-escapes: 7.3.0
       supports-hyperlinks: 4.5.0
 
-  terser-webpack-plugin@5.6.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)):
+  terser-webpack-plugin@5.6.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.5.0
       terser: 5.51.2
-      webpack: 5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
+      webpack: 5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)
     optionalDependencies:
-      '@swc/core': 1.16.2(@swc/helpers@0.5.23)
+      '@swc/core': 1.15.3(@swc/helpers@0.5.23)
       esbuild: 0.28.2
       postcss: 8.5.23
 
@@ -34557,7 +34563,7 @@ snapshots:
 
   webpack-virtual-modules@0.6.2: {}
 
-  webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23):
+  webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23):
     dependencies:
       '@types/eslint-scope': 3.7.7
       '@types/estree': 1.0.9
@@ -34581,7 +34587,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.5.0
       tapable: 2.3.3
-      terser-webpack-plugin: 5.6.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)(webpack@5.105.0(@swc/core@1.16.2(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
+      terser-webpack-plugin: 5.6.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23)(webpack@5.105.0(@swc/core@1.15.3(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.23))
       watchpack: 2.5.2
       webpack-sources: 3.5.3
     transitivePeerDependencies:
@@ -34726,14 +34732,14 @@ snapshots:
   worker-f@0.1.20:
     optional: true
 
-  workflow@4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  workflow@4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
     dependencies:
       '@workflow/astro': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/cli': 4.3.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/errors': 4.2.1
       '@workflow/nest': 4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/next': 4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/next': 4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/nitro': 4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/nuxt': 4.0.25(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(magicast@0.5.5)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -34755,14 +34761,14 @@ snapshots:
       - typescript
       - ws
 
-  workflow@4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)):
+  workflow@4.8.9(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(magicast@0.5.5)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(typescript@6.0.3):
     dependencies:
       '@workflow/astro': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/cli': 4.3.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/core': 4.8.9(@opentelemetry/api@1.9.1)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/errors': 4.2.1
-      '@workflow/nest': 4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@workflow/next': 4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.6(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@workflow/nest': 4.0.25(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19(@nestjs/common@11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.9.1)(@swc/cli@0.8.1(@swc/core@1.16.2(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.16.2(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)
+      '@workflow/next': 4.1.13(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.2)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
       '@workflow/nitro': 4.1.15(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/nuxt': 4.0.25(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(magicast@0.5.5)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@workflow/rollup': 4.0.24(@opentelemetry/api@1.9.1)(@swc/helpers@0.5.23)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
