@@ -210,6 +210,7 @@
   "lib/onboarding/social-link-parse.test.ts",
   "lib/onboarding/start-entry-handoff.test.ts",
   "lib/ovie/acceptance.test.ts",
+  "lib/ovie/approvals.test.ts",
   "lib/ovie/lyb-mrr.server.test.ts",
   "lib/ovie/lyb-mrr.test.ts",
   "lib/ovie/mcp/postgres-backend.test.ts",
