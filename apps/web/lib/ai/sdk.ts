@@ -135,6 +135,18 @@ function getGatewayProvider(): GatewayModelSelector {
   return cachedGateway;
 }
 
-/** Env-gated Vercel AI Gateway selector (optionally routed through Helicone proxy). */
-export const gateway: GatewayModelSelector = ((...args) =>
+/**
+ * Env-gated Vercel AI Gateway selector (optionally routed through Helicone proxy).
+ *
+ * `gateway(id)` selects a language model. `gateway.image(id)` selects an image
+ * model on the same provider instance, so image calls use the same API key or
+ * Vercel OIDC fallback and the same optional Helicone base URL.
+ */
+const gatewaySelector = ((...args: Parameters<GatewayModelSelector>) =>
   getGatewayProvider()(...args)) as GatewayModelSelector;
+
+gatewaySelector.image = ((
+  modelId: Parameters<GatewayModelSelector['image']>[0]
+) => getGatewayProvider().image(modelId)) as GatewayModelSelector['image'];
+
+export const gateway: GatewayModelSelector = gatewaySelector;

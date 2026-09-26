@@ -157,6 +157,8 @@ export function opaqueInternalProfileRedirectPath(
   decision: Extract<OpaqueInternalProfileDecision, { action: 'redirect' }>,
   suffix = ''
 ): string {
-  const tail = suffix.startsWith('/') ? suffix : suffix ? `/${suffix}` : '';
+  let tail = '';
+  if (suffix.startsWith('/')) tail = suffix;
+  else if (suffix) tail = `/${suffix}`;
   return `${publicProfilePathForHandle(decision.handle)}${tail}`;
 }

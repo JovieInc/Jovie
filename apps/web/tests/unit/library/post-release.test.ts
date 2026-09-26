@@ -86,6 +86,12 @@ describe('post-release Library invariants', () => {
     expect(move(repair, 'prepare_update')).toEqual(ok('resolved'));
     expect(
       move(
+        { ...repair, actionMode: 'filter_only', status: 'open' },
+        'prepare_update'
+      )
+    ).toEqual({ ok: true, status: 'open', collisionDisposition: null });
+    expect(
+      move(
         { ...repair, actionMode: 'draft_request', draftRequest: '   ' },
         'prepare_update'
       )

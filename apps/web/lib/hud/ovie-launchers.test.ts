@@ -12,6 +12,7 @@ import {
   rankLaunchers,
   resolveLauncherDestination,
   stripSecrets,
+  whyForControl,
 } from './ovie-launchers';
 
 const READY = Object.fromEntries(
@@ -164,5 +165,55 @@ describe('ovie-launchers inventory', () => {
     );
     expect(matches.map(row => row.id)).toEqual(['symphony']);
     expect(matches[0]?.destinationDisplay).toMatch(/^ssh /);
+  });
+
+  it('explains ready, missing, and failed launcher preflight', () => {
+    const definition = item('github-prs');
+    const destination = {
+      display: 'prs',
+      configured: true,
+      source: 'env',
+    };
+
+    expect(
+      whyForControl({
+        definition,
+        status: 'ready',
+        destination,
+        timActionCount: 0,
+      })
+    ).toContain('Destination preflight succeeded.');
+    expect(
+      whyForControl({
+        definition,
+        status: 'not_configured',
+        destination,
+        timActionCount: 0,
+      })
+    ).toContain('No configured destination yet.');
+    expect(
+      whyForControl({
+        definition,
+        status: 'error',
+        destination,
+        timActionCount: 2,
+      })
+    ).toContain('Preflight did not reach the destination.');
+    expect(
+      whyForControl({
+        definition,
+        status: 'error',
+        destination,
+        timActionCount: 2,
+      })
+    ).toContain('2 open Tim-action');
+    expect(
+      whyForControl({
+        definition: item('gbrain'),
+        status: 'error',
+        destination,
+        timActionCount: 2,
+      })
+    ).not.toContain('Tim-action');
   });
 });

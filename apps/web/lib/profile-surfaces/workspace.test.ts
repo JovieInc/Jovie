@@ -248,6 +248,34 @@ describe('connections workspace helpers', () => {
     expect(
       summarizeProfileWorkspaceRows([surface()], false).monitoringLabel
     ).toBe('Unavailable');
+    expect(
+      summarizeProfileWorkspaceRows(
+        [surface({ monitoringState: 'paused' })],
+        false
+      ).monitoringLabel
+    ).toBe('Unavailable');
+  });
+
+  it('reports paused, limited, and idle monitoring without an active surface', () => {
+    expect(
+      summarizeProfileWorkspaceRows([
+        surface({ id: 'paused', monitoringState: 'paused', rank: null }),
+      ]).monitoringLabel
+    ).toBe('Paused');
+    expect(
+      summarizeProfileWorkspaceRows([
+        surface({ id: 'locked', monitoringState: 'locked', rank: null }),
+      ]).monitoringLabel
+    ).toBe('Limited');
+    expect(
+      summarizeProfileWorkspaceRows([
+        surface({
+          id: 'idle',
+          monitoringState: 'unavailable',
+          rank: null,
+        }),
+      ]).monitoringLabel
+    ).toBe('Unavailable');
   });
 
   it('treats stale observations as attention, not a zero score', () => {
