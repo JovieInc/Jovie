@@ -1,6 +1,6 @@
 # Backlog hygiene receipt — 2026-09-26 (JOV-5555)
 
-Machine-readable post-pass inventory: `audits/backlog-hygiene-inventory-2026-09-26.csv` (columns: identifier, state, createdAt, updatedAt, priority, assignee — one row per active issue).
+Machine-readable post-pass inventory: `audits/backlog-hygiene-inventory-2026-09-26.csv` (columns: identifier, state, createdAt, updatedAt, priority, assignee — one row per active issue; timestamps truncated to date precision to stay under the repo combined-tree byte budget).
 
 ## Before / after
 
