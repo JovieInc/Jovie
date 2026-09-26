@@ -106,7 +106,7 @@ describe('GET /api/workflow-captures/[id]/media', () => {
     );
   });
 
-  it('preserves byte-range semantics when the client seeks the recording', async () => {
+  it('preserves byte-range semantics when a viewer seeks the recording', async () => {
     const ownerId = 'c67f31fc-4b61-43de-b690-b9d8045de8e0';
     mocks.resolvePrincipal.mockResolvedValue({
       authenticated: true,
