@@ -794,7 +794,7 @@ describe('Playwright artifact secret boundary', () => {
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
       const command = step
-        .split('        run: |\n')[1]
+        .split(/ {8}run: (?:&[\w-]+ )?\|\n/)[1]
         .replaceAll('${{ github.event_name }}', 'pull_request')
         .replaceAll('${{ github.base_ref }}', 'main');
       const directory = fixture();
@@ -833,7 +833,7 @@ describe('Playwright artifact secret boundary', () => {
       expect(invoked[0]).toBe(
         `-c http.https://github.com/.extraheader=AUTHORIZATION: basic ${Buffer.from('x-access-token:fixture-token').toString('base64')} fetch origin main --no-tags`
       );
-      expect(invoked).toHaveLength(fetchExit === 0 ? 2 : 1);
+      expect(invoked).toHaveLength(fetchExit === 0 ? 3 : 1);
       expect(`${result.stdout}\n${result.stderr}`).not.toContain(
         'fixture-token'
       );
