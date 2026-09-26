@@ -3,6 +3,8 @@ import 'server-only';
 import { existsSync, readFileSync } from 'node:fs';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
+import { getChangelogReleases } from '@/lib/changelog-source';
+import { projectCustomerChangelog } from '@/lib/customer-changelog';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { serverFetch } from '@/lib/http/server-fetch';
@@ -11,7 +13,9 @@ import {
   composeOvieMacHudSnapshot,
   emptyOvieMacHudInFlightPullRequests,
   monthlyToWeeklyUsd,
+  OVIE_MAC_HUD_PUBLIC_DIGEST_LIMIT,
   type OvieMacHudInFlightPullRequests,
+  type OvieMacHudPublicDigest,
   type OvieMacHudSnapshot,
   weeklyGrowthFromPeriodRate,
   windowToWeeklyUsd,
@@ -207,17 +211,47 @@ export async function getOvieMacHudInFlightPullRequests(): Promise<OvieMacHudInF
   }
 }
 
+/**
+ * Curated public "What's New" rows for the activity feed (JOV-5322). These
+ * come from the customer changelog projection, never from raw PR titles.
+ */
+async function readPublicDigest(): Promise<OvieMacHudPublicDigest> {
+  try {
+    const releases = await getChangelogReleases();
+    const items = projectCustomerChangelog(releases)
+      .slice(0, OVIE_MAC_HUD_PUBLIC_DIGEST_LIMIT)
+      .map(entry => ({
+        title: entry.title,
+        slug: entry.slug,
+        date: entry.date,
+        technicalVersion: entry.technicalVersion,
+      }));
+    return { availability: 'available', items };
+  } catch (error) {
+    await captureError('Ovie Mac HUD public digest failed', error, {
+      context: 'ovie_mac_hud_public_digest',
+    });
+    return { availability: 'unavailable', items: [] };
+  }
+}
+
 export async function getOvieMacHudSnapshot(
   nowMs: number = Date.now()
 ): Promise<OvieMacHudSnapshot> {
   const generatedAtIso = new Date(nowMs).toISOString();
-  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr] =
-    await Promise.all([
-      getAdminStripeOverviewMetrics(),
-      getAdminMercuryMetrics(),
-      getOvieMacHudInFlightPullRequests(),
-      getLybDailyMrr(new Date(nowMs)),
-    ]);
+  const [
+    stripeMetrics,
+    mercuryMetrics,
+    inFlightPullRequests,
+    lybMrr,
+    publicDigest,
+  ] = await Promise.all([
+    getAdminStripeOverviewMetrics(),
+    getAdminMercuryMetrics(),
+    getOvieMacHudInFlightPullRequests(),
+    getLybDailyMrr(new Date(nowMs)),
+    readPublicDigest(),
+  ]);
   const shipping = readShippingEntries();
   const financialAvailable =
     stripeMetrics.isAvailable &&
@@ -257,6 +291,7 @@ export async function getOvieMacHudSnapshot(
     shippingEntries: shipping.entries,
     shippingAvailable: shipping.available,
     inFlightPullRequests,
+    publicDigest,
     lybMrr,
     generatedAtIso,
     nowMs,
