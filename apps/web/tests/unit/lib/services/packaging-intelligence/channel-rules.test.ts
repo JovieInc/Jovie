@@ -295,4 +295,33 @@ describe('resolvePackagingPriors', () => {
     expect(resolved.source).toBe('observed');
     expect(resolved.faceEffect).toBe('helps'); // positive lift → helps
   });
+
+  it('maps a neutral lift to neutral face, neutral text, and medium titles', () => {
+    const neutral = {
+      liftDirection: 'neutral' as const,
+      liftPercent: 0,
+      confidence: CONFIDENCE_THRESHOLD,
+      sampleSize: MIN_SAMPLE_SIZE,
+      provenance: [],
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    };
+    const rules: ChannelPackagingRules = {
+      channelId: 'channel-abc',
+      topic: null,
+      dimensions: {
+        face: neutral,
+        text: neutral,
+        titleLength: neutral,
+      },
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    };
+
+    const resolved = resolvePackagingPriors(rules, getNichePriors('gaming'));
+
+    expect(resolved.faceEffect).toBe('neutral');
+    expect(resolved.textEffect).toBe('neutral');
+    expect(resolved.titleLengthBias).toBe('medium');
+    expect(resolved.source).toBe('observed');
+  });
 });

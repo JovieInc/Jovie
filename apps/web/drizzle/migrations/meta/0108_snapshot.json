@@ -1,5 +1,5 @@
 {
-  "id": "ec601b0b-c8f0-4b6e-836d-25a2de07a23d",
+  "id": "03954820-7a36-4f54-9b0d-2dd2292b1532",
   "prevId": "69d86396-ae51-472e-85d9-90ebf42a1f0a",
   "version": "7",
   "dialect": "postgresql",
@@ -7069,6 +7069,260 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.coding_agent_runs": {
+      "name": "coding_agent_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "source": {
+          "name": "source",
+          "type": "coding_agent_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_run_id": {
+          "name": "source_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_url": {
+          "name": "session_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_name": {
+          "name": "agent_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_name": {
+          "name": "model_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_usd": {
+          "name": "cost_usd",
+          "type": "numeric(10, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_source": {
+          "name": "cost_source",
+          "type": "coding_agent_cost_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "input_tokens": {
+          "name": "input_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "output_tokens": {
+          "name": "output_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cached_tokens": {
+          "name": "cached_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tools_used": {
+          "name": "tools_used",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "prompt_digest": {
+          "name": "prompt_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "diff_stats": {
+          "name": "diff_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_url": {
+          "name": "pr_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_number": {
+          "name": "pr_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ci_result": {
+          "name": "ci_result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merge_timestamp": {
+          "name": "merge_timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outcome_label": {
+          "name": "outcome_label",
+          "type": "coding_agent_outcome",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "revert_link": {
+          "name": "revert_link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "post_land_incidents": {
+          "name": "post_land_incidents",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "linear_issue_id": {
+          "name": "linear_issue_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ingested_at": {
+          "name": "ingested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "coding_agent_runs_source_run_idx": {
+          "name": "coding_agent_runs_source_run_idx",
+          "columns": [
+            {
+              "expression": "source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "coding_agent_runs_outcome_merge_idx": {
+          "name": "coding_agent_runs_outcome_merge_idx",
+          "columns": [
+            {
+              "expression": "outcome_label",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "merge_timestamp",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "coding_agent_runs_model_idx": {
+          "name": "coding_agent_runs_model_idx",
+          "columns": [
+            {
+              "expression": "source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "model_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.connector_accounts": {
       "name": "connector_accounts",
       "schema": "",
@@ -10294,28 +10548,6 @@
           ],
           "isUnique": false,
           "where": "is_public = true AND is_featured = true AND marketing_opt_out = false",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_creator_profiles_public_discovery": {
-          "name": "idx_creator_profiles_public_discovery",
-          "columns": [
-            {
-              "expression": "coalesce(\"display_name\", '')",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "is_public = true AND is_claimed = true",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -36384,6 +36616,36 @@
         "bounced",
         "failed",
         "unsubscribed"
+      ]
+    },
+    "public.coding_agent_cost_source": {
+      "name": "coding_agent_cost_source",
+      "schema": "public",
+      "values": [
+        "actual",
+        "estimated"
+      ]
+    },
+    "public.coding_agent_outcome": {
+      "name": "coding_agent_outcome",
+      "schema": "public",
+      "values": [
+        "open",
+        "landed",
+        "reverted",
+        "failed",
+        "abandoned"
+      ]
+    },
+    "public.coding_agent_source": {
+      "name": "coding_agent_source",
+      "schema": "public",
+      "values": [
+        "hyperagent",
+        "devin",
+        "cursor",
+        "grokbot",
+        "manual"
       ]
     },
     "public.connector_provider": {

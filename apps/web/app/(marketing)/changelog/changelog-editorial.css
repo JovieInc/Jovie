@@ -237,6 +237,17 @@
 }
 
 /* ---------------------------------------------------------- */
+/* Category filter toolbar (secondary to outcome titles)       */
+/* ---------------------------------------------------------- */
+
+.changelog-filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+/* ---------------------------------------------------------- */
 /* Archive jump navigation (Q3JwYT)                            */
 /* ---------------------------------------------------------- */
 

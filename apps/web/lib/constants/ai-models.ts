@@ -60,3 +60,13 @@ export const PACKAGING_INTELLIGENCE_MODEL =
 
 /** Vision-capable model used for the golden-journey design-taste sweep */
 export const DESIGN_TASTE_SWEEP_MODEL = 'anthropic/claude-haiku-4-5-20251001';
+
+/**
+ * Album-art background model for AI SDK `generateImage` via the Gateway.
+ *
+ * Same Grok Imagine model the feature already used. Gateway catalog price on
+ * 2026-09-25: $0.02 per image. A generation requests three images.
+ * Swap this constant to change the model. Keep it on a cheap image tier —
+ * OpenAI image models and other expensive Gateway tiers are out of policy.
+ */
+export const ALBUM_ART_GATEWAY_IMAGE_MODEL = 'spacexai/grok-imagine-image';

@@ -1,13 +1,15 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, asc, count, sql as drizzleSql, eq, exists } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { filterPublicDiscoveryIdentities } from './public-profile-indexing-policy';
+import { publicReleaseEligibilitySqlPredicate } from './public-release-eligibility';
 
 /**
  * Maximum profiles rendered per /artists page (JOV-6451). The query reads at
@@ -31,6 +33,7 @@ export interface ArtistsDirectoryCatalogRow
   readonly isPublic?: boolean | null;
   readonly ownerEmail?: string | null;
   readonly handle?: string | null;
+  readonly hasPublicRelease?: boolean | null;
 }
 
 export type ArtistsDirectoryCatalogResult =
@@ -122,6 +125,17 @@ async function queryArtistsDirectoryCatalog(
         bio: creatorProfiles.bio,
         isPublic: creatorProfiles.isPublic,
         ownerEmail: users.email,
+        hasPublicRelease: drizzleSql<boolean>`${exists(
+          db
+            .select({ one: drizzleSql`1` })
+            .from(discogReleases)
+            .where(
+              and(
+                eq(discogReleases.creatorProfileId, creatorProfiles.id),
+                publicReleaseEligibilitySqlPredicate()
+              )
+            )
+        )}`,
       })
       .from(creatorProfiles)
       .leftJoin(users, eq(users.id, creatorProfiles.userId))

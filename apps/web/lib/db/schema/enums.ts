@@ -856,3 +856,34 @@ export const libraryAssetVisibilityEnum = pgEnum('library_asset_visibility', [
   'public',
   'private',
 ]);
+
+// ---------------------------------------------------------------------------
+// Coding Agent Run Ingestion Enums (JOV-6508)
+// ---------------------------------------------------------------------------
+
+/** External coding-agent provider that produced the run. */
+export const codingAgentSourceEnum = pgEnum('coding_agent_source', [
+  'hyperagent',
+  'devin',
+  'cursor',
+  'grokbot',
+  'manual',
+]);
+
+/** Whether `cost_usd` is billed truth from the provider or a backfill estimate. */
+export const codingAgentCostSourceEnum = pgEnum('coding_agent_cost_source', [
+  'actual',
+  'estimated',
+]);
+
+/**
+ * Outcome label for the run's linked PR. Rows stay `open` until the 7-day
+ * post-merge window closes — never label landed prematurely.
+ */
+export const codingAgentOutcomeEnum = pgEnum('coding_agent_outcome', [
+  'open',
+  'landed',
+  'reverted',
+  'failed',
+  'abandoned',
+]);

@@ -12,7 +12,11 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
+import {
+  ensureBaseHistory,
+  runMergeGroupStorybookCertification,
+  SHALLOW_DEEPEN_DEPTHS,
+} from '../../component-merge-group-storybook-cert.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -529,6 +533,18 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).not.toContain('@jovie/ovie');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
+    // The build may skip Next's duplicate type pass only because the
+    // standalone typecheck runs first, fail-fast, in the same step.
+    expect(ovieBuild).toContain('set -euo pipefail');
+    expect(
+      ovieBuild.indexOf('pnpm --filter @jovie/ovie typecheck')
+    ).toBeLessThan(
+      ovieBuild.indexOf(
+        'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
+      )
+    );
+    expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
+    expect(ovieBuild).not.toMatch(/typecheck[^\n]*\|\|/);
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
     expect(ovieBuild).toContain(
       'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
@@ -829,9 +845,14 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain('persist-credentials: false');
       expect(job, jobId).not.toContain('filter: blob:none');
       const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
-      expect(fetchScript, jobId).toContain(
-        'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
-      );
+      // Exact-head Coverage reads history only through the ratchet diff, so
+      // it skips historical blobs (pinned separately below). Jobs whose
+      // guards read historical blobs keep the full unshallow.
+      const expectedFetch =
+        jobId === 'ci-exact-head-coverage'
+          ? 'fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+          : 'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"';
+      expect(fetchScript, jobId).toContain(expectedFetch);
       expect(job, jobId).toContain(
         "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
       );
@@ -842,6 +863,73 @@ describe('merge_group workflow contract', () => {
         job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
       );
     }
+  });
+
+  it('prefetches exactly the ratchet diff blobs for blobless exact-head coverage', () => {
+    const job = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
+    const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+    const ratchetSource = readFileSync(
+      join(REPO_ROOT, 'scripts/lib/changed-test-coverage.mjs'),
+      'utf8'
+    );
+    // The ratchet's diff arguments; the prefetch must replay the same diff so
+    // every blob it reads is local before persist-credentials: false steps.
+    for (const arg of [
+      "'diff'",
+      "'--unified=0'",
+      "'--diff-filter=ACMR'",
+      "'--no-renames'",
+      '`${base}...${head}`',
+      "'apps/web'",
+    ]) {
+      expect(ratchetSource).toContain(arg);
+    }
+    const ratchetDiff =
+      'diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null';
+    const lines = fetchScript.split('\n');
+    const fetchLine = lines.findIndex(line =>
+      line.includes('fetch --no-tags --unshallow --filter=blob:none')
+    );
+    const baseLine = lines.findIndex(
+      line =>
+        line ===
+        'GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"'
+    );
+    const prefetchLine = lines.findIndex(
+      line =>
+        line.startsWith(
+          'git -c "http.https://github.com/.extraheader=$AUTH_HEADER" '
+        ) && line.endsWith(ratchetDiff)
+    );
+    const offlineLine = lines.findIndex(
+      line => line === `GIT_NO_LAZY_FETCH=1 git ${ratchetDiff}`
+    );
+    expect(fetchLine).toBeGreaterThanOrEqual(0);
+    expect(baseLine).toBeGreaterThan(fetchLine);
+    expect(prefetchLine).toBeGreaterThan(baseLine);
+    expect(offlineLine).toBeGreaterThan(prefetchLine);
+    expect(fetchScript).toContain('set -euo pipefail');
+    const fetchStep = job.slice(
+      job.indexOf('      - name: Fetch base-branch history'),
+      job.indexOf('      - name: Verify exact coverage head and diff base')
+    );
+    expect(fetchStep).toContain(
+      "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+    );
+    expect(fetchStep).toContain(
+      "COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+    );
+    // The base-commit check must not be satisfiable by a promisor fetch.
+    const verifyStep = job.slice(
+      job.indexOf('      - name: Verify exact coverage head and diff base'),
+      job.indexOf('      - uses: ./.github/actions/setup-node-pnpm')
+    );
+    expect(verifyStep).toContain("GIT_NO_LAZY_FETCH: '1'");
+    expect(verifyStep).toContain('git cat-file -e "${COVERAGE_BASE}^{commit}"');
+    // Credentials stay step-scoped: no checkout-level blob filter or persisted
+    // token that later test code could reuse.
+    expect(job).not.toContain('filter: blob:none');
+    expect(job).toContain('persist-credentials: false');
   });
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {
@@ -1303,6 +1391,62 @@ ${selectedGateScript}`,
     expect(buildLayout).not.toContain('actions/download-artifact');
   });
 
+  it('restores the Build+Layout Turbopack cache read-only and writes it only from trusted main', () => {
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const stepAt = name => buildLayout.indexOf(`      - name: ${name}\n`);
+    const step = name => {
+      const start = stepAt(name);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = buildLayout.indexOf('\n      - ', start + 1);
+      return buildLayout.slice(start, next === -1 ? undefined : next);
+    };
+    const restore = step('Restore Next build cache (read-only)');
+    const measure = step('Measure Next build cache (trusted main only)');
+    const save = step('Save Next build cache (trusted main only)');
+    const trustedMain =
+      "success() && github.event_name == 'push' && github.ref == 'refs/heads/main'";
+
+    // Restore runs on every event and happens before the build it warms.
+    expect(stepAt('Restore Next build cache (read-only)')).toBeLessThan(
+      stepAt('Build exact combined head')
+    );
+    expect(restore).toContain('uses: actions/cache/restore@');
+    expect(restore).not.toMatch(/^\s+if:/m);
+    expect(restore).toContain('path: apps/web/.next/cache/turbopack');
+    expect(restore).toContain(
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}"
+    );
+    expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
+
+    // Only compiler state is cached: never fetch/image caches or build output.
+    expect(buildLayout).not.toMatch(/path: apps\/web\/\.next\/cache\s*$/m);
+    expect(buildLayout).not.toContain('uses: actions/cache@');
+
+    // Writes happen after the layout guard, only from trusted main pushes,
+    // only on a primary-key miss, and only below the size bound.
+    expect(stepAt('Run deterministic layout behavior guard')).toBeLessThan(
+      stepAt('Save Next build cache (trusted main only)')
+    );
+    expect(measure).toContain(`if: \${{ ${trustedMain} &&`);
+    expect(measure).toContain(
+      "steps.next-build-cache.outputs.cache-hit != 'true'"
+    );
+    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
+    expect(measure).toContain('must not be a symlink');
+    expect(save).toContain(`if: \${{ ${trustedMain} &&`);
+    expect(save).toContain(
+      "steps.next-build-cache-size.outputs.eligible == 'true'"
+    );
+    expect(save).toContain('uses: actions/cache/save@');
+    expect(save).toContain('path: apps/web/.next/cache/turbopack');
+    expect(save).toContain(
+      'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
+    );
+    expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
+    expect(buildLayout).not.toContain('pull_request_target');
+    expect(buildLayout).not.toContain('secrets.');
+  });
+
   it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {
     const workflowHeader = IOS_CI_WORKFLOW.slice(
       0,
@@ -1378,7 +1522,10 @@ ${selectedGateScript}`,
     expect(buildLayout).toContain(
       'MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}'
     );
-    expect(buildLayout).toContain('fetch-depth: 0');
+    // Exact-head checkout only: the certification helper deepens HEAD's own
+    // ancestry to the diff base instead of fetching every branch.
+    expect(buildLayout).toContain('fetch-depth: 1');
+    expect(buildLayout).not.toContain('fetch-depth: 0');
     expect(buildLayout).not.toContain('fetch-depth: 2');
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     expect(pathChanges).toContain(
@@ -1410,6 +1557,10 @@ ${selectedGateScript}`,
 
     expect(result.skipped).toBe(false);
     expect(calls).toEqual([
+      {
+        command: 'git',
+        args: ['rev-parse', '--is-shallow-repository'],
+      },
       {
         command: 'git',
         args: ['cat-file', '-e', `${'a'.repeat(40)}^{commit}`],
@@ -1464,7 +1615,7 @@ ${selectedGateScript}`,
       runMergeGroupStorybookCertification({
         eventName: 'merge_group',
         baseSha: 'c'.repeat(40),
-        spawn: () => ({ status: call++ < 2 ? 0 : 1 }),
+        spawn: () => ({ status: call++ < 3 ? 0 : 1 }),
       })
     ).toThrow(/certification failed/);
   });
@@ -2660,5 +2811,343 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
         fetchLiveMain: false,
       })
     ).toThrow(/is not a valid tree/);
+  });
+});
+
+describe('Storybook Surface Matrix shallow diff-base history', () => {
+  const tempRoots = [];
+
+  afterEach(() => {
+    for (const root of tempRoots.splice(0)) {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  function git(cwd, args) {
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    return result.stdout.trim();
+  }
+
+  function commitFile(cwd, path, contents, message) {
+    const absolutePath = join(cwd, path);
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, contents);
+    git(cwd, ['add', path]);
+    git(cwd, ['commit', '-q', '-m', message]);
+    return git(cwd, ['rev-parse', 'HEAD']);
+  }
+
+  /**
+   * Origin main: root, 40 queue-sized commits, then a head that changes a
+   * component. A sibling branch carries commits that must never be fetched.
+   */
+  function createFixture() {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-storybook-shallow-base-'));
+    tempRoots.push(root);
+    const origin = join(root, 'origin.git');
+    const seed = join(root, 'seed');
+    const work = join(root, 'work');
+    git(root, ['init', '--bare', '-q', origin]);
+    // GitHub serves any reachable SHA; mirror that for the file:// remote.
+    git(origin, ['config', 'uploadpack.allowReachableSHA1InWant', 'true']);
+    git(root, ['init', '-q', '-b', 'main', seed]);
+    git(seed, ['config', 'user.name', 'Storybook Shallow Test']);
+    git(seed, ['config', 'user.email', 'storybook-shallow@example.invalid']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    git(seed, ['remote', 'add', 'origin', origin]);
+
+    const shas = [
+      commitFile(
+        seed,
+        'apps/web/components/Button.tsx',
+        'export const Button = 1;\n',
+        'root'
+      ),
+    ];
+    for (let index = 1; index <= 40; index++) {
+      shas.push(
+        commitFile(
+          seed,
+          `queue/entry-${index}.txt`,
+          `${index}\n`,
+          `queue ${index}`
+        )
+      );
+    }
+    git(seed, ['switch', '-q', '-c', 'sibling', shas[20]]);
+    const sibling = commitFile(
+      seed,
+      'sibling/only.txt',
+      'sibling\n',
+      'sibling-only commit'
+    );
+    git(seed, ['push', '-q', 'origin', 'sibling']);
+    git(seed, ['switch', '-q', 'main']);
+    const head = commitFile(
+      seed,
+      'apps/web/components/Button.tsx',
+      'export const Button = 2;\n',
+      'combined head changes a component'
+    );
+    git(seed, ['push', '-q', 'origin', 'main']);
+    git(root, [
+      'clone',
+      '-q',
+      '--depth=1',
+      '--no-tags',
+      '--branch',
+      'main',
+      `file://${origin}`,
+      work,
+    ]);
+    expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('true');
+    expect(git(work, ['rev-parse', 'HEAD'])).toBe(head);
+    return { work, shas, sibling, head };
+  }
+
+  function realGit(fetches) {
+    return (command, args, options = {}) => {
+      if (command !== 'git') return { status: 0 };
+      if (args[0] === 'fetch') fetches.push(args);
+      // Keep fixture fetch progress out of the test reporter.
+      return spawnSync(command, args, {
+        ...options,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
+    };
+  }
+
+  function changedSince(work, base) {
+    // Exact command component-ship-gate uses for its diff.
+    return git(work, [
+      'diff',
+      '--diff-filter=ACMR',
+      '--name-only',
+      `${base}...HEAD`,
+    ])
+      .split('\n')
+      .filter(Boolean)
+      .sort();
+  }
+
+  it('deepens only HEAD ancestry until a near queue base is reachable', () => {
+    const { work, shas, sibling, head } = createFixture();
+    const base = shas[38];
+    const fetches = [];
+
+    const result = ensureBaseHistory({
+      baseSha: base,
+      repoRoot: work,
+      spawn: realGit(fetches),
+    });
+
+    expect(result).toEqual({
+      deepened: true,
+      fetches: [
+        [
+          'fetch',
+          '--no-tags',
+          '--no-recurse-submodules',
+          `--depth=${SHALLOW_DEEPEN_DEPTHS[0]}`,
+          'origin',
+          head,
+        ],
+      ],
+    });
+    expect(fetches).toHaveLength(1);
+    git(work, ['merge-base', '--is-ancestor', base, 'HEAD']);
+    expect(git(work, ['merge-base', base, 'HEAD'])).toBe(base);
+    expect(changedSince(work, base)).toEqual([
+      'apps/web/components/Button.tsx',
+      'queue/entry-39.txt',
+      'queue/entry-40.txt',
+    ]);
+    // Other branches are never fetched.
+    expect(
+      spawnSync('git', ['cat-file', '-e', `${sibling}^{commit}`], {
+        cwd: work,
+      }).status
+    ).not.toBe(0);
+    expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('true');
+  });
+
+  it('keeps deepening for an older coalesced-head base and diffs exactly', () => {
+    const { work, shas, head } = createFixture();
+    const base = shas[5];
+    const fetches = [];
+
+    const result = ensureBaseHistory({
+      baseSha: base,
+      repoRoot: work,
+      spawn: realGit(fetches),
+    });
+
+    expect(result.deepened).toBe(true);
+    expect(fetches.map(args => args[3])).toEqual(
+      SHALLOW_DEEPEN_DEPTHS.map(depth => `--depth=${depth}`)
+    );
+    expect(fetches.every(args => args.at(-1) === head)).toBe(true);
+    expect(git(work, ['merge-base', base, 'HEAD'])).toBe(base);
+    expect(changedSince(work, base)).toEqual(
+      [
+        'apps/web/components/Button.tsx',
+        ...Array.from(
+          { length: 35 },
+          (_, index) => `queue/entry-${index + 6}.txt`
+        ),
+      ].sort()
+    );
+  });
+
+  it('runs the merge-group certification against the exact base from a depth-1 checkout', () => {
+    const { work, shas } = createFixture();
+    const base = shas[40];
+    const fetches = [];
+    const gateCalls = [];
+    const spawn = (command, args, options) => {
+      if (command === 'pnpm') {
+        gateCalls.push(args);
+        return { status: 0 };
+      }
+      return realGit(fetches)(command, args, options);
+    };
+
+    const result = runMergeGroupStorybookCertification({
+      eventName: 'merge_group',
+      baseSha: base,
+      repoRoot: work,
+      storybookUrl: 'http://localhost:6006',
+      spawn,
+    });
+
+    expect(result.skipped).toBe(false);
+    expect(fetches).toHaveLength(1);
+    expect(gateCalls).toEqual([
+      [
+        'component-ship-gate',
+        `--diff-base=${base}`,
+        '--skip-quality',
+        '--skip-ratchet',
+        '--skip-rendered-cert',
+        '--skip-live-storybook',
+        '--storybook-url=http://localhost:6006',
+      ],
+    ]);
+    expect(changedSince(work, base)).toEqual([
+      'apps/web/components/Button.tsx',
+    ]);
+  });
+
+  it('fails closed after a full unshallow when the base is not an ancestor of HEAD', () => {
+    const { work, sibling } = createFixture();
+    const fetches = [];
+    const gateCalls = [];
+    const spawn = (command, args, options) => {
+      if (command === 'pnpm') {
+        gateCalls.push(args);
+        return { status: 0 };
+      }
+      return realGit(fetches)(command, args, options);
+    };
+
+    expect(() =>
+      runMergeGroupStorybookCertification({
+        eventName: 'merge_group',
+        baseSha: sibling,
+        repoRoot: work,
+        spawn,
+      })
+    ).toThrow(/base is unavailable/);
+    // The 42-commit fixture is complete after the bounded 256 fetch, so no
+    // redundant --unshallow is attempted.
+    expect(fetches.map(args => args[3])).toEqual(
+      SHALLOW_DEEPEN_DEPTHS.map(depth => `--depth=${depth}`)
+    );
+    expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('false');
+    expect(gateCalls).toEqual([]);
+  });
+
+  it('falls back to a full unshallow of HEAD when bounded depths miss the base', () => {
+    const { work, shas } = createFixture();
+    const fetches = [];
+
+    expect(
+      ensureBaseHistory({
+        baseSha: shas[1],
+        repoRoot: work,
+        spawn: realGit(fetches),
+        depths: [2, 4],
+      })
+    ).toMatchObject({ deepened: true });
+    expect(fetches.map(args => args[3])).toEqual([
+      '--depth=2',
+      '--depth=4',
+      '--unshallow',
+    ]);
+    expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('false');
+    git(work, ['merge-base', '--is-ancestor', shas[1], 'HEAD']);
+
+    // A non-ancestor stays unreachable even after the full unshallow.
+    const other = createFixture();
+    const otherFetches = [];
+    ensureBaseHistory({
+      baseSha: other.sibling,
+      repoRoot: other.work,
+      spawn: realGit(otherFetches),
+      depths: [2],
+    });
+    expect(otherFetches.map(args => args[3])).toEqual([
+      '--depth=2',
+      '--unshallow',
+    ]);
+    expect(
+      spawnSync('git', ['merge-base', '--is-ancestor', other.sibling, 'HEAD'], {
+        cwd: other.work,
+      }).status
+    ).not.toBe(0);
+  });
+
+  it('never fetches for a full-history checkout and fails closed on a failed fetch', () => {
+    const { work, shas } = createFixture();
+    git(work, ['fetch', '-q', '--unshallow', 'origin', 'main']);
+    const fetches = [];
+    expect(
+      ensureBaseHistory({
+        baseSha: shas[1],
+        repoRoot: work,
+        spawn: realGit(fetches),
+      })
+    ).toEqual({ deepened: false, fetches: [] });
+    expect(fetches).toEqual([]);
+
+    const shallow = createFixture();
+    expect(() =>
+      ensureBaseHistory({
+        baseSha: shallow.shas[1],
+        repoRoot: shallow.work,
+        remote: 'missing-remote',
+        spawn: realGit([]),
+      })
+    ).toThrow(/could not fetch history \(--depth=16\)/);
+  });
+});
+
+describe('merge-group Playwright artifact guard', () => {
+  it('lets every guarded layout and Storybook Playwright step keep error-context.md', () => {
+    // A test that fails once and passes on retry leaves error-context.md; the
+    // guard must scan it (redacted) instead of failing the passed step.
+    const guardedSteps = CI_WORKFLOW.split(/\n {6}- name: /u).filter(step =>
+      /^(Run deterministic layout behavior guard|Run surface elevation matrix \(Storybook\))/u.test(
+        step
+      )
+    );
+    // Combined-head layout + Storybook, and the manual layout guard job.
+    expect(guardedSteps).toHaveLength(3);
+    for (const step of guardedSteps) {
+      expect(step).toContain('guard-playwright-artifacts.mjs" --run --');
+      expect(step).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/u);
+    }
   });
 });

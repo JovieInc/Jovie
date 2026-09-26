@@ -116,6 +116,30 @@ describe('dedupeLinks (property)', () => {
     );
   });
 
+  it('strips every trailing slash and keeps a non-slash ending', () => {
+    const links = [
+      {
+        id: 'slashed',
+        platform: 'instagram',
+        url: 'https://instagram.com/tim///',
+      },
+      {
+        id: 'bare',
+        platform: 'instagram',
+        url: 'https://instagram.com/tim',
+      },
+      {
+        id: 'other',
+        platform: 'instagram',
+        url: 'https://instagram.com/tim2',
+      },
+    ];
+    expect(dedupeLinks(links).map(link => link.id)).toEqual([
+      'slashed',
+      'other',
+    ]);
+  });
+
   it('preserves distinct query strings — ?id=1 and ?id=2 stay separate', () => {
     // Regression for CodeRabbit JOV-2149: the prior dedupe key dropped
     // u.search, so Facebook profile URLs like profile.php?id=1 and ?id=2

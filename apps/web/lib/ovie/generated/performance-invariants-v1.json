@@ -27,7 +27,7 @@
     "apps/web/.lighthouserc.dashboard.pr.json": "sha256:3ca4e7ea268479b1fced0154550c9a1d95d4542e7e60747c4f2e6b09eec81238",
     "apps/web/.lighthouserc.chat.pr.json": "sha256:835168d9b34b51989efc3cd101d2cb1abf2850b4ca3e2bdc4c481c4c91747bbd",
     "apps/web/.lighthouserc.onboarding.pr.json": "sha256:917a41679fc0ef0e3a5420866dcf69c3f664f874503064351749f51e3ddd11cf",
-    "apps/web/.lighthouserc.admin.pr.json": "sha256:15fb013f3a6179d2b73c66d903e8e5783acf8bca99495e58ca5f8e7e15402e2e",
+    "apps/web/.lighthouserc.admin.pr.json": "sha256:2a7005e95160aac1fd25246e167ab5b50c304588bdd48b69cd2540b8eec5d17d",
     "apps/web/.lighthouserc.public-launch.json": "sha256:e90313e4d493b49363dc8fe32c3037037576029ca9c635a4b96cf9d166c9b63c",
     "apps/web/.lighthouserc.build.json": "sha256:5e7077deac09a048ee7620ea8fac550f3c34ad52563bb5e854a261e7ca92322b",
     "apps/web/scripts/performance-route-manifest.ts": "sha256:5bb1085090512dbb3290a0bc0b9186a823149614e35f10364763e7cbc85e5d60"
@@ -2385,19 +2385,14 @@
       "metric": "cls",
       "surface": "admin",
       "direction": "max",
-      "budget": 0.1,
-      "level": "error",
-      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "budget": 0.15,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
       "sources": [
         {
           "path": "docs/performance/route-budgets.json",
           "value": 0.15,
           "level": "declared"
-        },
-        {
-          "path": "apps/web/.lighthouserc.admin.pr.json",
-          "value": 0.1,
-          "level": "error"
         }
       ]
     },
@@ -2406,19 +2401,14 @@
       "metric": "fcp_ms",
       "surface": "admin",
       "direction": "max",
-      "budget": 2200,
-      "level": "error",
-      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "budget": 2500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
       "sources": [
         {
           "path": "docs/performance/route-budgets.json",
           "value": 2500,
           "level": "declared"
-        },
-        {
-          "path": "apps/web/.lighthouserc.admin.pr.json",
-          "value": 2200,
-          "level": "error"
         }
       ]
     },
@@ -2444,50 +2434,13 @@
       "surface": "admin",
       "direction": "max",
       "budget": 4000,
-      "level": "error",
-      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
       "sources": [
         {
           "path": "docs/performance/route-budgets.json",
           "value": 4000,
           "level": "declared"
-        },
-        {
-          "path": "apps/web/.lighthouserc.admin.pr.json",
-          "value": 4000,
-          "level": "error"
-        }
-      ]
-    },
-    {
-      "route": "/app/admin/*",
-      "metric": "performance_score",
-      "surface": "admin",
-      "direction": "min",
-      "budget": 0.6,
-      "level": "error",
-      "source": "apps/web/.lighthouserc.admin.pr.json",
-      "sources": [
-        {
-          "path": "apps/web/.lighthouserc.admin.pr.json",
-          "value": 0.6,
-          "level": "error"
-        }
-      ]
-    },
-    {
-      "route": "/app/admin/*",
-      "metric": "tbt_ms",
-      "surface": "admin",
-      "direction": "max",
-      "budget": 500,
-      "level": "error",
-      "source": "apps/web/.lighthouserc.admin.pr.json",
-      "sources": [
-        {
-          "path": "apps/web/.lighthouserc.admin.pr.json",
-          "value": 500,
-          "level": "error"
         }
       ]
     },
@@ -2504,6 +2457,86 @@
           "path": "docs/performance/route-budgets.json",
           "value": 5000,
           "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/ov/*",
+      "metric": "cls",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 0.1,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/ov/*",
+      "metric": "fcp_ms",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 2200,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 2200,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/ov/*",
+      "metric": "lcp_ms",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 4000,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 4000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/ov/*",
+      "metric": "performance_score",
+      "surface": "admin",
+      "direction": "min",
+      "budget": 0.6,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 0.6,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/ov/*",
+      "metric": "tbt_ms",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 500,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 500,
+          "level": "error"
         }
       ]
     },
@@ -3020,5 +3053,5 @@
       ]
     }
   ],
-  "fingerprint": "sha256:578e495a302eb2f8d44d36d992e38b49261ecac17be181ed5ef20e7d85a773ab"
+  "fingerprint": "sha256:4047201e4efc009c2a6f0c1ec623d58378f05612dd9332c1ef0f108897976022"
 }

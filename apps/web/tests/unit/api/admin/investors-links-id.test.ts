@@ -130,18 +130,18 @@ describe('PATCH /api/admin/investors/links/[id]', () => {
     );
   });
 
-  it.each([
-    'not-a-date',
-    123,
-  ])('rejects invalid expiresAt %j before touching the database', async expiresAt => {
-    const res = await PATCH(patchRequest({ expiresAt }), paramsFor('link-1'));
+  it.each(['not-a-date', 123])(
+    'rejects invalid expiresAt %j before touching the database',
+    async expiresAt => {
+      const res = await PATCH(patchRequest({ expiresAt }), paramsFor('link-1'));
 
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({
-      error: 'expiresAt must be a valid date',
-    });
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({
+        error: 'expiresAt must be a valid date',
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    }
+  );
 
   it('ignores a `token` field in the body — it is not in the update payload', async () => {
     await PATCH(

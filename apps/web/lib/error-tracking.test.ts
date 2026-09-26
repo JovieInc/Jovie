@@ -213,3 +213,54 @@ describe('captureError wrapped UpstashError (JOV-5220)', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 });
+
+describe('captureError Sentry fingerprint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getClient.mockReturnValue({});
+  });
+
+  it('uses a caller fingerprint when one is provided', async () => {
+    await captureError('RLS set_config failed', new Error('Failed query'), {
+      fingerprint: 'auth_rls_set_config_failed',
+    });
+
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Failed query' }),
+      expect.objectContaining({
+        fingerprint: ['auth_rls_set_config_failed'],
+      })
+    );
+  });
+
+  it('prefers an explicit fingerprint over quota text in the capture message', async () => {
+    await captureError('quota exceeded while writing the receipt', undefined, {
+      fingerprint: 'receipt-writer',
+    });
+
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ fingerprint: ['receipt-writer'] })
+    );
+  });
+
+  it('groups a quota message that still reaches Sentry as one incident', async () => {
+    await captureError('quota exceeded while writing the receipt', undefined);
+
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ fingerprint: ['redis-quota-exceeded'] })
+    );
+  });
+
+  it('leaves grouping to Sentry when the fingerprint is blank', async () => {
+    await captureError('profile save failed', new Error('db'), {
+      fingerprint: '',
+    });
+
+    const options = captureException.mock.calls[0]?.[1] as {
+      fingerprint?: string[];
+    };
+    expect(options.fingerprint).toBeUndefined();
+  });
+});
