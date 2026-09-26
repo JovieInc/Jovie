@@ -58,7 +58,11 @@ jobs:
     runs-on: ubuntu-latest
     # The trusted policy has a 45s aggregate API deadline. Keep this producer
     # terminal well before merge-group admission's 6-minute external-check deadline.
-    timeout-minutes: 1
+    # The job clock starts at runner assignment, before image provisioning: a
+    # 1-minute budget let a 69s provisioning stall mark a fully passing run
+    # CANCELLED, which admission (correctly) treats as a terminal failure
+    # (PR #18454, run 36271793816). Match Fork PR Gate's 3-minute budget.
+    timeout-minutes: 3
     steps:
       - name: Check out trusted queue policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
