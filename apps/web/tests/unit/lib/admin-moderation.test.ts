@@ -69,12 +69,14 @@ beforeEach(() => {
   }));
 });
 
+const ADMIN = 'admin-1';
+
 describe('applyModerationTakedown', () => {
   it('expires a wrapped link by shortId and resolves matching reports', async () => {
     hoisted.updateQueue.push([{ id: 'l1' }, { id: 'l2' }], [{ id: 'r1' }]);
 
     const result = await applyModerationTakedown({
-      adminUserId: 'admin-1',
+      adminUserId: ADMIN,
       targetType: 'wrapped_link',
       target: 'abc123',
     });
@@ -90,7 +92,7 @@ describe('applyModerationTakedown', () => {
     expect(hoisted.select).not.toHaveBeenCalled();
     expect(hoisted.insertValues).toHaveLength(1);
     expect(hoisted.insertValues[0]).toMatchObject({
-      adminUserId: 'admin-1',
+      adminUserId: ADMIN,
       action: 'moderation_takedown',
       metadata: expect.objectContaining({
         targetType: 'wrapped_link',
@@ -109,7 +111,7 @@ describe('applyModerationTakedown', () => {
     hoisted.updateQueue.push([{ id: 'l1' }], [{ id: 'r1' }]);
 
     const result = await applyModerationTakedown({
-      adminUserId: 'admin-1',
+      adminUserId: ADMIN,
       targetType: 'profile',
       target: '@BadHandle',
       reportId: '11111111-1111-4111-8111-111111111111',
@@ -137,7 +139,7 @@ describe('applyModerationTakedown', () => {
     hoisted.updateQueue.push([], []);
 
     const result = await applyModerationTakedown({
-      adminUserId: 'admin-1',
+      adminUserId: ADMIN,
       targetType: 'smart_link',
       target: 'release-slug--prof-9',
     });
@@ -149,7 +151,7 @@ describe('applyModerationTakedown', () => {
     hoisted.updateQueue.push([]);
 
     const result = await applyModerationTakedown({
-      adminUserId: 'admin-1',
+      adminUserId: ADMIN,
       targetType: 'page',
       target: '/some/page',
     });
