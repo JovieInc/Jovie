@@ -7,16 +7,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // commands delete apps/web/coverage while doc:freshness:check runs.
 const vanishing = vi.hoisted(() => ({ dir: null }));
 vi.mock('node:fs', async importOriginal => {
+  /** @type {typeof import('node:fs')} */
   const fs = await importOriginal();
   return {
     ...fs,
     readdirSync: (path, options) => {
       if (vanishing.dir && String(path) === vanishing.dir) {
-        const error = new Error(
-          `ENOENT: no such file or directory, scandir '${path}'`
+        throw Object.assign(
+          new Error(`ENOENT: no such file or directory, scandir '${path}'`),
+          { code: 'ENOENT' }
         );
-        error.code = 'ENOENT';
-        throw error;
       }
       return fs.readdirSync(path, options);
     },
