@@ -476,7 +476,6 @@ function AudioBarPreview() {
         onToggleWaveform={() => undefined}
         lyricsActive
         onOpenLyrics={() => undefined}
-        onCollapse={() => undefined}
         track={{
           id: 'deep-end',
           title: 'Deep End',

@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { writeAudioBarDismissed } from '@/components/shell/audio-bar-dismissal';
 
 export interface AudioTrackSource {
   readonly id: string;
@@ -14,6 +13,10 @@ export interface AudioTrackSource {
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
   readonly hasLyrics?: boolean;
+  /** Analyzed tempo, when known. Never fabricated — omit rather than guess. */
+  readonly bpm?: number | null;
+  /** Musical/Camelot key, when known. Never fabricated — omit rather than guess. */
+  readonly musicalKey?: string | null;
 }
 
 export interface ToggleTrackOptions {
@@ -37,6 +40,10 @@ interface PlaybackState {
   readonly artistName: string | null;
   readonly artworkUrl: string | null;
   readonly hasLyrics: boolean;
+  /** Analyzed tempo for the active track, when known. Null when absent — never fabricated. */
+  readonly bpm: number | null;
+  /** Musical/Camelot key for the active track, when known. Null when absent — never fabricated. */
+  readonly musicalKey: string | null;
   readonly queueLength: number;
   readonly queueIndex: number;
   readonly hasNext: boolean;
@@ -122,6 +129,8 @@ let state: PlaybackState = {
   artistName: null,
   artworkUrl: null,
   hasLyrics: false,
+  bpm: null,
+  musicalKey: null,
   queueLength: 0,
   queueIndex: -1,
   hasNext: false,
@@ -277,6 +286,8 @@ function handlePlaybackFailure(
     artistName: null,
     artworkUrl: null,
     hasLyrics: false,
+    bpm: null,
+    musicalKey: null,
     ...getQueueSnapshot(),
   });
   notifyPlaybackError(reason);
@@ -308,6 +319,8 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     artistName: track.artistName ?? null,
     artworkUrl: track.artworkUrl ?? null,
     hasLyrics: Boolean(track.hasLyrics),
+    bpm: track.bpm ?? null,
+    musicalKey: track.musicalKey ?? null,
     ...getQueueSnapshot(),
   });
 
@@ -501,9 +514,7 @@ export function useTrackAudioPlayer() {
       const audio = getAudio();
       if (!audio) return;
 
-      // Intentional play clears dictation/local-preview holds and reopens
-      // a user-dismissed shell audio bar.
-      writeAudioBarDismissed(false);
+      // Intentional play clears any dictation/local-preview interruption hold.
       if (_interruptionDepth > 0) {
         _interruptionDepth = 0;
         _wasPlayingBeforeInterruption = false;
@@ -572,6 +583,8 @@ export function useTrackAudioPlayer() {
       artistName: null,
       artworkUrl: null,
       hasLyrics: false,
+      bpm: null,
+      musicalKey: null,
       ...getQueueSnapshot(),
     });
   }, []);

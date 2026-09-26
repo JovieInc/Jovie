@@ -2769,7 +2769,6 @@ function ShellV1ExperimentContent() {
           <AudioBar
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
-            onCollapse={() => setBarCollapsed(true)}
             currentTime={currentTimeSec}
             duration={playingDurationSec}
             loopMode={loopMode}

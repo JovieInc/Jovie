@@ -5,11 +5,9 @@ import {
   AudioLines,
   AudioWaveform,
   Mic2,
-  Minimize2,
   Shuffle,
   SkipBack,
   SkipForward,
-  X,
 } from 'lucide-react';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
@@ -28,18 +26,24 @@ export interface AudioBarTrack {
   readonly id: string;
   readonly title: string;
   readonly artist: string;
-  /** When true, surfaces the Lyrics toggle. */
+  /** When true, surfaces the Karaoke (lyrics) toggle. */
   readonly hasLyrics?: boolean;
+  /** Analyzed tempo, when known. Never fabricated — omit rather than guess. */
+  readonly bpm?: number | null;
+  /** Musical/Camelot key, when known. Never fabricated — omit rather than guess. */
+  readonly musicalKey?: string | null;
 }
 
 /**
- * AudioBar — bottom-of-screen audio player chrome.
+ * AudioBar — flat, in-flow audio player chrome (no card fill/border/shadow).
  *
- * Two-row Spotify-style layout: waveform drawer (collapsible) above, transport
- * controls below. Right cluster offers Lyrics (when available), Waveform
- * toggle, and Minimize. Filled-waveform variant only — alternate variants
- * (hairlines / stereo / RMS / dense bars) lived in the dev picker and were
- * not extracted.
+ * Compact by default: artwork/title live in the caller's left column, this
+ * component renders transport (prev / play-pause / next) plus exactly two
+ * mode buttons — Karaoke (mic → lyrics) and Waveform. The waveform drawer
+ * (seek scrub + elapsed/duration + "BPM · key" facts, when known) only
+ * renders while `waveformOn` is true — never in compact. Filled-waveform
+ * variant only — alternate variants (hairlines / stereo / RMS / dense bars)
+ * lived in the dev picker and were not extracted.
  *
  * Pure presentational component — all state is owned by the caller. Wire
  * `useTrackAudioPlayer()` (or equivalent) into the props at the mount site.
@@ -47,13 +51,12 @@ export interface AudioBarTrack {
  * @example
  * ```tsx
  * const player = useTrackAudioPlayer();
- * const [waveformOn, setWaveformOn] = useState(false);
+ * const [waveformOn, setWaveformOn] = useState(false); // compact is default
  * const [loopMode, setLoopMode] = useState<LoopMode>('off');
  *
  * <AudioBar
  *   isPlaying={player.playbackState.isPlaying}
  *   onPlay={() => player.toggleTrack(currentTrack)}
- *   onCollapse={() => setBarCollapsed(true)}
  *   currentTime={player.playbackState.currentTime}
  *   duration={player.playbackState.duration}
  *   loopMode={loopMode}
@@ -75,8 +78,6 @@ export function AudioBar({
   onShuffle,
   onPrevious,
   onNext,
-  onCollapse,
-  onDismiss,
   currentTime,
   duration,
   cues,
@@ -96,8 +97,6 @@ export function AudioBar({
   readonly onShuffle?: () => void;
   readonly onPrevious?: () => void;
   readonly onNext?: () => void;
-  readonly onCollapse?: () => void;
-  readonly onDismiss?: () => void;
   readonly currentTime: number;
   readonly duration: number;
   readonly cues?: readonly ScrubCue[];
@@ -160,8 +159,14 @@ export function AudioBar({
     </div>
   );
 
+  // Karaoke (mic → lyrics) and Waveform are the only two mode buttons in the
+  // compact bar. Lyrics conditionally hides when the track has none — that
+  // still leaves at most these two, never a third.
   const rightCluster = (
-    <div className='flex items-center gap-1 justify-self-end'>
+    <div
+      data-testid='audio-bar-mode-buttons'
+      className='flex items-center gap-1 justify-self-end'
+    >
       {track.hasLyrics && onOpenLyrics && (
         <IconBtn
           label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
@@ -190,30 +195,21 @@ export function AudioBar({
           )}
         </IconBtn>
       )}
-      {onCollapse && (
-        <IconBtn
-          label='Minimize Player'
-          shortcut={SHORTCUTS.toggleBar}
-          onClick={onCollapse}
-          tooltipSide='top'
-          tone='ghost'
-          testId='audio-bar-minimize'
-        >
-          <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
-        </IconBtn>
-      )}
-      {onDismiss && (
-        <IconBtn
-          label='Dismiss Player'
-          onClick={onDismiss}
-          tooltipSide='top'
-          tone='ghost'
-        >
-          <X aria-hidden='true' className='size-3.5' strokeWidth={2.25} />
-        </IconBtn>
-      )}
     </div>
   );
+
+  // "BPM · key" facts — only ever built from real analyzed data. Absent
+  // fields are omitted rather than guessed, and the whole row disappears
+  // when nothing is known.
+  const trackFacts = [
+    typeof track.bpm === 'number' && Number.isFinite(track.bpm)
+      ? `${Math.round(track.bpm)} BPM`
+      : null,
+    track.musicalKey || null,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ');
+  const drawerHeight = trackFacts ? 56 : 40;
 
   return (
     <section
@@ -233,7 +229,7 @@ export function AudioBar({
           aria-hidden={!waveformOn}
           className='w-full overflow-hidden'
           style={{
-            maxHeight: waveformOn ? 40 : 0,
+            maxHeight: waveformOn ? drawerHeight : 0,
             opacity: waveformOn ? 1 : 0,
             transform: waveformOn ? 'translateY(0)' : 'translateY(6px)',
             transition: `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
@@ -249,6 +245,11 @@ export function AudioBar({
               loopSection={loopSection}
             />
           </div>
+          {waveformOn && trackFacts ? (
+            <div className='pb-1 text-center text-3xs tabular-nums text-quaternary-token'>
+              {trackFacts}
+            </div>
+          ) : null}
         </div>
         {transportButtons}
       </div>
