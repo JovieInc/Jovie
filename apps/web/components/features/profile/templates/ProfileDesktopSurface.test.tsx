@@ -610,6 +610,57 @@ describe('ProfileDesktopSurface', () => {
     ).toBeNull();
   });
 
+  it.each(['profile', 'tour'] as const)(
+    'uses the venue day in the desktop %s show row',
+    activeMode => {
+      const upcomingShow = {
+        id: 'show-1',
+        profileId: artist.id,
+        externalId: null,
+        provider: 'manual',
+        eventType: 'tour',
+        confirmationStatus: 'confirmed',
+        reviewedAt: '2026-01-01T00:00:00.000Z',
+        title: null,
+        venueName: 'The Echo',
+        city: 'Los Angeles',
+        region: 'CA',
+        country: 'US',
+        startDate: '2030-09-24T03:00:00Z',
+        startTime: null,
+        timezone: 'America/Chicago',
+        latitude: null,
+        longitude: null,
+        ticketUrl: 'https://tickets.example.com/show-1',
+        ticketStatus: 'available',
+        lastSyncedAt: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      } satisfies TourDateViewModel;
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          tourDates={[upcomingShow]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode={activeMode}
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+        />
+      );
+      expect(screen.getByText('Sep')).toBeVisible();
+      expect(screen.getByText('23')).toBeVisible();
+      expect(screen.queryByText('24')).toBeNull();
+    }
+  );
+
   it('offers View Shows only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
     const upcomingShow = {

@@ -35,6 +35,9 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      # base.sha can lag the base tip (not refreshed on synchronize). That only
+      # delays policy updates: it is still a trusted base commit, and the guard
+      # only reads PR labels through the API.
       - name: Checkout exact trusted base policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

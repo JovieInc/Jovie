@@ -23,9 +23,10 @@ describe('scripts test inventory guard', () => {
   it('runs every scripts/ test file from some CI entry point', async () => {
     const { unrun } = await inventoryScriptTests(REPO_ROOT);
     const orphans = unrun.filter(file => !Object.hasOwn(EXCEPTIONS, file));
+    // Name the orphans first: CI failure summaries truncate the diff.
     expect(
       orphans,
-      'Wire each file into a ci-fast lane (SCRIPT_CONTRACT_NODE_TESTS / SCRIPT_CONTRACT_VITEST_TESTS in scripts/ci-fast-lanes.mjs) or delete it if obsolete.'
+      `Unwired: ${orphans.join(', ')}. Wire each file into a ci-fast lane (SCRIPT_CONTRACT_NODE_TESTS / SCRIPT_CONTRACT_VITEST_TESTS in scripts/ci-fast-lanes.mjs) or delete it if obsolete.`
     ).toEqual([]);
   });
 
@@ -174,5 +175,17 @@ describe('command resolution', () => {
         command => command.source === 'run-affected-tests.mjs --control'
       )
     ).toBe(true);
+  });
+
+  it('follows pnpm scripts reached from control suite stages', async () => {
+    const commands = await collectCiCommands(REPO_ROOT, {
+      controlCommands: async () => ['pnpm run test:rolling-ci-fx:coverage'],
+    });
+    const fxCoverage = commands.find(
+      command => command.source === 'package.json#test:rolling-ci-fx:coverage'
+    );
+    expect(fxCoverage?.text).toContain(
+      'lib/__tests__/rolling-ci-fx-finish.test.mjs'
+    );
   });
 });
