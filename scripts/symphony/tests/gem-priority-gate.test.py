@@ -248,6 +248,23 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MODULE.UNKNOWN_MAIN_SHA)
 
+    def test_observe_main_without_source_gate_uses_combined_status(self):
+        # Per-repo lanes: no "Main Release Ready" job; the repo's own combined
+        # status gates main.
+        responses = {
+            "branches/main": {"commit": {"sha": MAIN_SHA}},
+            f"commits/{MAIN_SHA}/status": {"state": "success"},
+        }
+
+        def fake_gh(_repo: str, endpoint: str) -> dict[str, object]:
+            return responses[endpoint]
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=fake_gh):
+            observed = MODULE.observe_main("JovieInc/LogYourBody", source_gate=None)
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertIsNone(observed["sourceGate"])
+
 
 class ProductionHealthTests(unittest.TestCase):
     def test_default_uses_the_dedicated_deploy_health_contract(self):
@@ -256,8 +273,13 @@ class ProductionHealthTests(unittest.TestCase):
             mock.patch.object(sys, "argv", [str(GATE)]),
         ):
             args = MODULE.parse_args()
-
-        self.assertEqual(args.production_url, "https://jov.ie/api/health/deploy")
+        # Per-repo lanes: no repo inherits a jov.ie default; observe_signals
+        # resolves the deploy health URL only for Jovie.
+        self.assertIsNone(args.production_url)
+        with mock.patch.object(
+            sys, "argv", [str(GATE), "--repo", "JovieInc/gbrain"]
+        ):
+            self.assertIsNone(MODULE.parse_args().production_url)
 
     def test_default_queue_backpressure_threshold_is_fifteen(self):
         with mock.patch.object(sys, "argv", [str(GATE)]):
@@ -2078,6 +2100,22 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+        # JOV-5340: a bound-GREEN fleet admits isolated UI/docs promotion.
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertTrue(receipt["isolatedPromotionAdmission"]["allowed"])
+        self.assertFalse(
+            receipt["isolatedPromotionAdmission"]["deploymentsAllowed"]
+        )
+        # A not-configured production surface binds to main but never deploys.
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {
+            "status": "green",
+            "configured": False,
+            "deployedSha": MAIN_SHA,
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
     def test_lane_receipt_classifies_ci_separately_from_product_paths(self):
         now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
@@ -3105,6 +3143,12 @@ class DeploymentBindingTests(unittest.TestCase):
         signals["queue"]["laneCapacity"] = lane_capacity(14)
         one_landed = self.evaluate(signals)
         self.assertTrue(one_landed["workAdmission"]["newIssueLeaseAllowed"])
+        # JOV-5340: GREEN below target leases without laneCapacity or
+        # accepted capacity evidence.
+        del signals["queue"]["laneCapacity"]
+        signals["concurrencyEvidence"] = {"schema": "malformed"}
+        no_capacity = self.evaluate(signals)
+        self.assertTrue(no_capacity["workAdmission"]["newIssueLeaseAllowed"])
 
     def test_malformed_queue_does_not_freeze_a_bound_green_factory(self):
         signals = dict(GREEN_SIGNALS)

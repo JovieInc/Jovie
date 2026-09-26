@@ -1699,12 +1699,13 @@ describe('deterministic Symphony admission boundary', () => {
       fleetEvidence({ concurrencyEvidence: null }),
       { now }
     );
+    // JOV-5340: missing capacity closes mutation seats, not GREEN below-target
+    // issue leases.
+    assert.equal(gate.state, 'GREEN');
     assert.equal(gate.workAdmission.allowed, true);
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(gate.concurrency.gem.maxConcurrent, 0);
-    assert.ok(
-      !gate.workAdmission.activities.includes('isolated-implementation')
-    );
+    assert.equal(gate.isolatedPromotionAdmission.allowed, true);
   });
 
   it('does not multiply one provider profile by model name', () => {

@@ -174,6 +174,11 @@ def typed_reason(code: str, layer: str, severity: str, detail: str) -> dict[str,
     return {"code": code, "layer": layer, "severity": severity, "detail": detail}
 
 
+def is_jovie_repo(repo: object) -> bool:
+    """Jovie's release gate and jov.ie health URL apply only to Jovie repos."""
+    return str(repo or "").casefold() in {"jovieinc/jovie", "itstimwhite/jovie"}
+
+
 def already_admitted_cohort_semantics(promotion_mode: str) -> dict[str, Any]:
     if promotion_mode == "hold-intake":
         return {
@@ -367,7 +372,9 @@ def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any
     ]
 
 
-def observe_main(repo: str) -> dict[str, Any]:
+def observe_main(
+    repo: str, source_gate: str | None = "Main Release Ready"
+) -> dict[str, Any]:
     sha: object = UNKNOWN_MAIN_SHA
     try:
         branch = gh_json(repo, "branches/main")
@@ -375,6 +382,21 @@ def observe_main(repo: str) -> dict[str, Any]:
         if not sha:
             raise ValueError("main SHA missing")
         combined = gh_json(repo, f"commits/{sha}/status")
+        combined_state = str(combined.get("state") or "unknown")
+        if not source_gate:
+            # Non-Jovie lanes have no "Main Release Ready" job; their own
+            # combined commit status gates main.
+            status = {
+                "success": "green",
+                "failure": "red",
+                "error": "red",
+            }.get(combined_state, "unknown")
+            return {
+                "status": status,
+                "sha": sha,
+                "combinedStatus": combined_state,
+                "sourceGate": None,
+            }
         release_attempts: list[dict[str, Any]] = []
         for page in range(1, 11):
             checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100&page={page}")
@@ -387,7 +409,6 @@ def observe_main(repo: str) -> dict[str, Any]:
         if not _real_release_attempts(release_attempts):
             release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
         latest = select_main_release_ready(release_attempts)
-        combined_state = str(combined.get("state") or "unknown")
         conclusion = latest.get("conclusion")
         if latest.get("status") != "completed":
             status = "unknown"
@@ -1730,6 +1751,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and valid_commit_sha(main.get("sha"), exact=True)
         and production.get("status") == "green"
         and valid_commit_sha(production.get("deployedSha"))
+        and production.get("configured") is not False
     )
     evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
@@ -1786,15 +1808,18 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         lane_capacity_consistent
         and repository_capacity.get("ready") < repository_capacity.get("budget")
     )
-    isolated_promotion_allowed = (
-        state == "AMBER"
-        and review_allowed
-        and controller.get("status") == "green"
-        and main.get("status") == "green"
-        and production.get("status") == "red"
-        and integrity.get("status") in {"clear", "resolved"}
-        and queue_below_backpressure
-        and all(reason["code"] == "production-not-green" for reason in reasons)
+    # merge-speed-fast-ui-lanes-v1: bound-GREEN also admits isolated UI/docs.
+    isolated_promotion_allowed = review_allowed and (
+        state == "GREEN"
+        or (
+            state == "AMBER"
+            and controller.get("status") == "green"
+            and main.get("status") == "green"
+            and production.get("status") == "red"
+            and integrity.get("status") in {"clear", "resolved"}
+            and queue_below_backpressure
+            and all(reason["code"] == "production-not-green" for reason in reasons)
+        )
     )
     hold_intake_allowed = (
         state == "AMBER"
@@ -1843,10 +1868,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             {"controller-failure", "production-deployment-unbound"},
         )
     )
-    if isolated_promotion_allowed:
-        promotion_mode = "isolated-only"
-    elif state == "GREEN":
+    if state == "GREEN":
         promotion_mode = "normal"
+    elif isolated_promotion_allowed:
+        promotion_mode = "isolated-only"
     elif (
         state == "AMBER"
         and main.get("status") == "red"
@@ -1884,7 +1909,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # Capacity evidence governs mutation seats, not Linear-child intake.
         # Missing useful-turn proofs must not freeze Eve's v2 projection.
         # Queue backpressure (ready >= budget) still holds new leases.
-        new_implementation_allowed = queue_shape_valid and repository_capacity_available
+        # JOV-5340: GREEN leases key off greenReadyPrs < target, no fresh
+        # laneCapacity/capacity_fresh receipt required.
+        new_implementation_allowed = queue_below_backpressure and (
+            repository_capacity_available or state == "GREEN"
+        )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
             work_activities = [
@@ -2791,8 +2820,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--queue-target", type=int, default=15)
     parser.add_argument(
         "--production-url",
-        default=os.environ.get("JOVIE_PRODUCTION_HEALTH_URL")
-        or "https://jov.ie/api/health/deploy",
+        # Per-repo lanes: non-Jovie repos never inherit the jov.ie deployed
+        # SHA; without a URL they get a not-configured signal bound to main.
+        default=os.environ.get("JOVIE_PRODUCTION_HEALTH_URL") or None,
     )
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument(
@@ -2830,7 +2860,12 @@ def parse_args() -> argparse.Namespace:
 def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     integrity_path = args.integrity_receipt or args.state_dir.parent / "integrity.json"
     concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
-    main = observe_main(args.repo)
+    source_gate = (
+        getattr(args, "source_gate", None)
+        or os.environ.get("GEM_PRIORITY_GATE_SOURCE_GATE")
+        or ("Main Release Ready" if is_jovie_repo(args.repo) else None)
+    )
+    main = observe_main(args.repo, source_gate)
     concurrency = observe_concurrency(concurrency_path, now)
     measured_target = concurrency.get("target")
     # Lane budget follows live seats; without accepted evidence it falls to
@@ -2860,9 +2895,23 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         now,
         controller_observation=controller,
     )
+    production_url = getattr(args, "production_url", None) or (
+        "https://jov.ie/api/health/deploy" if is_jovie_repo(args.repo) else None
+    )
+    production = (
+        observe_production(production_url)
+        if production_url
+        # No configured production surface: green, bound to this repo's own
+        # main SHA; configured=False keeps deploymentAdmission closed.
+        else {
+            "status": "green",
+            "configured": False,
+            "deployedSha": main.get("sha"),
+        }
+    )
     return {
         "main": main,
-        "production": observe_production(args.production_url),
+        "production": production,
         "controller": controller,
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(

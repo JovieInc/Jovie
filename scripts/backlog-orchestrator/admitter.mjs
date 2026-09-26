@@ -678,22 +678,26 @@ export function evaluateFleetGate(
     queueRepositoryCapacity &&
       queueRepositoryCapacity.ready < queueRepositoryCapacity.budget
   );
+  // JOV-5340: GREEN leases key off greenReadyPrs < target; no fresh
+  // laneCapacity receipt required.
   const newMutationAllowed =
-    concurrency.newMutationAllowed &&
-    queueShapeValid &&
-    queueRepositoryCapacityAvailable;
-  const isolatedPromotionAllowed =
-    state === FLEET_GATE_STATE.AMBER &&
-    reviewAdmission.allowed &&
-    controllerFresh &&
-    controllerStatus === 'green' &&
-    mainStatus === 'green' &&
-    productionStatus === 'red' &&
-    ['clear', 'resolved'].includes(integrityStatus) &&
     queueBelowBackpressure &&
-    reasons.every(
-      reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
-    );
+    (queueRepositoryCapacityAvailable || state === FLEET_GATE_STATE.GREEN);
+  // merge-speed-fast-ui-lanes-v1: a bound-GREEN fleet also admits isolated
+  // UI/docs promotion on source-bound gates.
+  const isolatedPromotionAllowed =
+    (state === FLEET_GATE_STATE.GREEN && reviewAdmission.allowed) ||
+    (state === FLEET_GATE_STATE.AMBER &&
+      reviewAdmission.allowed &&
+      controllerFresh &&
+      controllerStatus === 'green' &&
+      mainStatus === 'green' &&
+      productionStatus === 'red' &&
+      ['clear', 'resolved'].includes(integrityStatus) &&
+      queueBelowBackpressure &&
+      reasons.every(
+        reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
+      ));
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? [...FLEET_AUTHORITY.RED]
@@ -745,19 +749,20 @@ export function evaluateFleetGate(
         FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
       ].includes(reason)
     );
-  const promotionMode = isolatedPromotionAllowed
-    ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
-    : state === FLEET_GATE_STATE.GREEN
+  const promotionMode =
+    state === FLEET_GATE_STATE.GREEN
       ? FLEET_PROMOTION_MODE.NORMAL
-      : state === FLEET_GATE_STATE.AMBER &&
-          mainStatus === 'red' &&
-          ['clear', 'resolved'].includes(integrityStatus)
-        ? FLEET_PROMOTION_MODE.DRAFT_ONLY
-        : holdIntakeAllowed
-          ? FLEET_PROMOTION_MODE.HOLD_INTAKE
-          : controllerRepairAllowed
-            ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
-            : FLEET_PROMOTION_MODE.BLOCKED;
+      : isolatedPromotionAllowed
+        ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
+        : state === FLEET_GATE_STATE.AMBER &&
+            mainStatus === 'red' &&
+            ['clear', 'resolved'].includes(integrityStatus)
+          ? FLEET_PROMOTION_MODE.DRAFT_ONLY
+          : holdIntakeAllowed
+            ? FLEET_PROMOTION_MODE.HOLD_INTAKE
+            : controllerRepairAllowed
+              ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
+              : FLEET_PROMOTION_MODE.BLOCKED;
   const cohort = alreadyAdmittedCohortSemantics(promotionMode);
   const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
     ? cohort
