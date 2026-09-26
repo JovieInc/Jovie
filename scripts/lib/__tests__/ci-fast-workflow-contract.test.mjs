@@ -397,7 +397,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
     const selector = remaining
       .split('id: storybook-browser\n')[1]
-      .split('      - name: Run ci-fast lanes')[0];
+      .split('      - name: Start ci-fast lanes')[0];
     const command = selector
       .split('run: |\n')[1]
       .replaceAll('${{ github.event_name }}', 'pull_request')
@@ -1687,19 +1687,49 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('defers structural Playwright/Python until cheap remaining lanes pass', () => {
+  it('overlaps structural setup with cheap lanes; structural awaits them', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const cheapLanes = remaining.indexOf('- name: Run ci-fast lanes');
-    const playwright = remaining.indexOf('Setup Playwright (Chromium)');
-    const structuralLane = remaining.indexOf(
-      '- name: Run structural ci-fast lane'
+    const at = marker => remaining.indexOf(marker);
+    // A failing background lane run fails the await step, with its log.
+    const dir = mkdtempSync(join(tmpdir(), 'ci-fast-bg-'));
+    const env = {
+      ...process.env,
+      PATH: `${dir}:${process.env.PATH}`,
+      LANES_DIR: `${dir}/bg`,
+      GITHUB_STEP_SUMMARY: '/dev/null',
+    };
+    writeFileSync(`${dir}/node`, '#!/bin/sh\necho lane-log\nexit 3\n');
+    chmodSync(`${dir}/node`, 0o755);
+    const sh = name =>
+      spawnSync(
+        'bash',
+        [
+          '-eo',
+          'pipefail',
+          '-c',
+          remaining
+            .split(`name: ${name}`)[1]
+            .split('run: |\n')[1]
+            .split('\n      - ')[0],
+        ],
+        { env, encoding: 'utf8', timeout: 9000 }
+      );
+    expect(sh('Start ci-fast lanes').status).toBe(0);
+    const awaited = sh('Await ci-fast lanes');
+    rmSync(dir, { recursive: true, force: true });
+    expect([awaited.status, awaited.stdout]).toEqual([3, 'lane-log\n']);
+    expect(at('Setup Playwright (Chromium)')).toBeGreaterThan(
+      at('- name: Start ci-fast lanes')
     );
-    expect(cheapLanes).toBeGreaterThan(0);
-    expect(playwright).toBeGreaterThan(cheapLanes);
-    expect(structuralLane).toBeGreaterThan(playwright);
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Restore Symphony selector cache')
+    );
+    expect(at('- name: Run structural ci-fast lane')).toBeGreaterThan(
+      at('- name: Await ci-fast lanes')
+    );
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain(
