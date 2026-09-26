@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/admin/AdminProfileSidebar.test.tsx
 import type { CommonDropdownItem } from '@jovie/ui';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -31,6 +32,28 @@ const PROFILE_TAB_OPTIONS = [
   { value: 'earnings' as const, label: 'Earn' },
   { value: 'about' as const, label: 'About' },
 ];
+
+/**
+ * Enrichment-state label for the Social pane (JOV-6529). Unclaimed profiles
+ * must never render a bare empty Social pane: the receipt distinguishes
+ * `not_checked`, `not_found`, `conflicted`, and `verified`.
+ */
+function identityEnrichmentLabel(
+  enrichment: AdminCreatorProfileRow['identityEnrichment']
+): string {
+  switch (enrichment?.status) {
+    case 'verified': {
+      const count = enrichment.verifiedPlatforms.length;
+      return `Identity verified: ${count} artist-controlled destination${count === 1 ? '' : 's'}${enrichment.shareReady ? ' — share-ready' : ''}`;
+    }
+    case 'not_found':
+      return 'Identity enrichment found no artist-controlled destinations';
+    case 'conflicted':
+      return `Identity enrichment conflicted on ${enrichment.conflicts.map(conflict => conflict.platform).join(', ') || 'sources'} — review needed`;
+    default:
+      return 'Identity enrichment not checked';
+  }
+}
 
 function mapContactLinksToPreviewLinks(contact: Contact): PreviewPanelLink[] {
   return contact.socialLinks.map(link => ({
@@ -180,7 +203,6 @@ export function AdminProfileSidebar({
             ariaLabel='Creator profile sidebar view'
           />
         }
-        contentClassName='pt-2'
       >
         {selectedCategory === 'about' ? (
           <ProfileAboutTab
@@ -199,6 +221,14 @@ export function AdminProfileSidebar({
             contact={contact}
             isActive={selectedCategory === 'algorithm'}
           />
+        ) : null}
+        {selectedCategory === 'social' && !profile.isClaimed ? (
+          <p
+            className='text-xs text-tertiary-token'
+            data-testid='identity-enrichment-status'
+          >
+            {identityEnrichmentLabel(profile.identityEnrichment)}
+          </p>
         ) : null}
         {selectedCategory !== 'about' && selectedCategory !== 'algorithm' ? (
           <ProfileLinkList

@@ -1,6 +1,7 @@
 'use client';
 
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import type { UnclaimedIdentityEnrichmentReceipt } from '@/lib/discography/unclaimed-artist-identity';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 import type { AdminLead } from './useAdminLeadsPrimitives';
@@ -73,6 +74,8 @@ export interface AdminCreatorProfileRow {
   hometown: string | null;
   activeSinceYear: number | null;
   lastIngestionError: string | null;
+  /** Identity-enrichment receipt for unclaimed profiles (JOV-6529). */
+  identityEnrichment?: UnclaimedIdentityEnrichmentReceipt | null;
   socialLinks?: Array<{
     id: string;
     platform: string;

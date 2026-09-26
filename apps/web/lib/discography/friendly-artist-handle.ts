@@ -39,6 +39,7 @@ export interface FriendlyArtistHandleCandidate {
   readonly source:
     | 'registry_artist_name'
     | 'provider_display_name'
+    | 'provider_identity_handle'
     | 'primary_name_token';
 }
 
@@ -87,6 +88,14 @@ export function normalizeArtistNameToHandleBase(name: string): string {
 export function composeFriendlyArtistHandleCandidates(input: {
   readonly registryName: string | null | undefined;
   readonly providerArtist: SpotifyArtistProfileData | undefined;
+  /**
+   * Handles discovered on verified artist-controlled destinations by the
+   * bounded identity-enrichment pass (JOV-6529). Every handle here came from
+   * an exact provider/entity match — never from display-name similarity.
+   * They rank below name-derived candidates and still must pass the
+   * canonical username contract.
+   */
+  readonly identityHandles?: readonly string[];
 }): ComposedFriendlyArtistHandles {
   const accepted: FriendlyArtistHandleCandidate[] = [];
   const rejected: RejectedFriendlyHandleCandidate[] = [];
@@ -137,6 +146,27 @@ export function composeFriendlyArtistHandleCandidates(input: {
     }
   }
 
+  // Identity-enrichment handles come last so seen-dedupe keeps the stronger
+  // registry/provider source attribution for identical normalized forms.
+  for (const handle of input.identityHandles ?? []) {
+    const base = normalizeArtistNameToHandleBase(handle);
+    if (!base || seen.has(base)) continue;
+    seen.add(base);
+    if (!validateUsernameCore(base).isValid) {
+      rejected.push({
+        handle: base,
+        source: 'provider_identity_handle',
+        reason: 'fails_username_contract',
+      });
+      continue;
+    }
+    accepted.push({
+      rank: 0,
+      handle: base,
+      source: 'provider_identity_handle',
+    });
+  }
+
   // Canonical registry name outranks provider display name; within one
   // source, the more specific (longer) joined form outranks single tokens —
   // `feddelegrand` above `fedde` (Tim's locked example).
@@ -152,6 +182,15 @@ export function composeFriendlyArtistHandleCandidates(input: {
 }
 
 function rankOf(candidate: FriendlyArtistHandleCandidate): number {
-  // Registry name outranks provider display name at equal specificity.
-  return candidate.source === 'registry_artist_name' ? 0 : 1;
+  // Registry name outranks provider display name at equal specificity;
+  // enrichment-discovered identity handles rank last so they only decide
+  // the handle when every name-derived candidate is taken.
+  switch (candidate.source) {
+    case 'registry_artist_name':
+      return 0;
+    case 'provider_display_name':
+      return 1;
+    default:
+      return 2;
+  }
 }
