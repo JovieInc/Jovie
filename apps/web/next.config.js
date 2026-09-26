@@ -675,6 +675,13 @@ const nextConfig = {
     // GitHub-hosted ubuntu-latest/24.04 runners are 4 vCPU / 16 GB RAM — cap
     // at 4 (was 2, which halved build parallelism; revert to 2 if OOM recurs).
     cpus: process.env.GITHUB_ACTIONS === 'true' ? 4 : undefined,
+    // CI-only: the merge-queue test builds (ci.yml Build + Layout, Visual
+    // Snapshot Compare, next-build-cache-warm.yml) never read the ~6k server
+    // .map files (~320 MB) Turbopack emits by default. Vercel and local builds
+    // never set this flag, so deployed builds keep their source maps.
+    ...(process.env.JOVIE_CI_SKIP_TURBOPACK_SOURCE_MAPS === '1'
+      ? { turbopackSourceMaps: false }
+      : {}),
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup

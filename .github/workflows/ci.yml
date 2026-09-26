@@ -1385,6 +1385,8 @@ jobs:
           # Still reads the restored cache but skips persisting it (13-55s of
           # cache write + compaction per run); this job never saves it.
           TURBO_ENGINE_READ_ONLY: '1'
+          # Same compiler options as the cache warmer; no step reads .map files.
+          JOVIE_CI_SKIP_TURBOPACK_SOURCE_MAPS: '1'
           DATABASE_URL: postgresql://localhost/noop
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
           CLERK_SECRET_KEY: sk_test_mock
@@ -2617,6 +2619,8 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          # Nothing here reads server source maps; Vercel builds keep them.
+          JOVIE_CI_SKIP_TURBOPACK_SOURCE_MAPS: '1'
       - name: Verify combined build output
         run: |
           set -euo pipefail

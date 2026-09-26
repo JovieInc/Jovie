@@ -267,6 +267,10 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
     );
     expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
+    // Same CI-only compiler option as the warmer that writes the cache.
+    expect(step('Build homepage for rendered snapshot compare')).toMatch(
+      /^ {10}JOVIE_CI_SKIP_TURBOPACK_SOURCE_MAPS: '1'$/m
+    );
 
     // PR-controlled code never writes the cache, and only compiler state is
     // restored: no fetch/image cache and no build output.

@@ -86,6 +86,8 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          # Must match the consumers' compiler options (see apps/web/next.config.js).
+          JOVIE_CI_SKIP_TURBOPACK_SOURCE_MAPS: '1'
       - name: Measure Next build cache (trusted main only)
         id: next-build-cache-size
         if: ${{ success() && steps.next-build-cache-lookup.outputs.cache-hit != 'true' }}

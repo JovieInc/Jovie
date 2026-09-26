@@ -1673,6 +1673,11 @@ ${selectedGateScript}`,
     const ciBuild = stepIn(buildLayout, 'Build exact combined head');
     expect(envLines(build).length).toBeGreaterThan(0);
     expect(envLines(build)).toEqual(envLines(ciBuild));
+    // Warmer and consumer compile with the same CI-only source-map option,
+    // or the restored compiler state would not match.
+    const skipMaps = /^ {10}JOVIE_CI_SKIP_TURBOPACK_SOURCE_MAPS: '1'$/m;
+    expect(build).toMatch(skipMaps);
+    expect(ciBuild).toMatch(skipMaps);
 
     // Size/symlink guard and a single trusted-main save of the primary key.
     const measure = stepIn(

@@ -47,7 +47,10 @@
         "SENTRY_*",
         "STATSIG_*",
         "FLAGS_*",
-        "EXPERIMENTATION_*"
+        "EXPERIMENTATION_*",
+        // CI-only: drops server source maps (apps/web/next.config.js). Hashed so
+        // a map-less build output can never replay into a build that expects maps.
+        "JOVIE_CI_SKIP_TURBOPACK_SOURCE_MAPS"
       ],
       // Runtime-only secrets and deployment-specific vars are passed through
       // without affecting the cache key. This allows ci-build and vercel build
