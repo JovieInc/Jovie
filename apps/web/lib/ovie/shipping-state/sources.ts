@@ -107,6 +107,36 @@ function countFromNumber(value: unknown): CountMeasurement {
     : NOT_MEASURED_COUNT;
 }
 
+/**
+ * Terminal failures are a distinct authority signal from blocked work. A
+ * blocked item only counts as terminal when it carries explicit terminal
+ * evidence (non-retryable launcher failure or exhausted retries); an explicit
+ * terminal list from the producer also counts directly. Blocked work without
+ * terminal classification measures zero rather than aliasing the blocked set.
+ */
+function isTerminalFailureItem(item: unknown): boolean {
+  if (!isRecord(item)) return false;
+  if (item.terminal === true || item.exhausted === true) return true;
+  if (item.retryable === false) return true;
+  const failure = isRecord(item.launcherFailure) ? item.launcherFailure : null;
+  return (
+    failure != null &&
+    (failure.retryable === false || failure.exhausted === true)
+  );
+}
+
+function terminalFailureCount(
+  payload: Readonly<Record<string, unknown>>
+): CountMeasurement {
+  for (const key of ['terminalFailures', 'terminal', 'failed'] as const) {
+    const list = payload[key];
+    if (Array.isArray(list)) return measuredCount(list.length);
+  }
+  const blocked = payload.blocked;
+  if (!Array.isArray(blocked)) return NOT_MEASURED_COUNT;
+  return measuredCount(blocked.filter(isTerminalFailureItem).length);
+}
+
 export function failedRead(
   sourceId: ShippingSourceId,
   status: AuthorityReadStatus,
@@ -148,6 +178,7 @@ export function interpretCounts(
       running: countFromList(payload.running, 'running' in payload),
       retrying: countFromList(payload.retrying, 'retrying' in payload),
       blocked: countFromList(payload.blocked, 'blocked' in payload),
+      terminalFailures: terminalFailureCount(payload),
       queued: NOT_MEASURED_COUNT,
       openPullRequests: NOT_MEASURED_COUNT,
       capacityAvailable: NOT_MEASURED_COUNT,

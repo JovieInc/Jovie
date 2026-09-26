@@ -31,6 +31,7 @@ import {
   createLiveShippingStateReaders,
   isAllowlistedAuthorityPath,
   NAMED_AUTHORITY_PATHS,
+  normalizeGemBridgeUrl,
   readMergeQueue,
   readWorkflow,
   resolveNamedAuthorityPath,
@@ -976,6 +977,177 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(after.capacityAvailable.value).not.toBe(9);
     expect(after.observationTimestamp).toBe(live.observationTimestamp);
   });
+
+  it('keeps terminal failures distinct from blocked work', async () => {
+    const classified = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [
+            {
+              issue_identifier: 'JOV-1',
+              launcherFailure: { retryable: false },
+            },
+            { issue_identifier: 'JOV-2' },
+          ],
+        }),
+      })
+    );
+    expect(classified.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 1,
+    });
+    expect(classified.sources['symphony-runtime'].counts.blocked).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
+    });
+
+    resetShippingStatePublisher();
+    const explicit = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [],
+          terminalFailures: [{ issue_identifier: 'JOV-9' }],
+        }),
+      })
+    );
+    expect(explicit.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 1,
+    });
+    expect(explicit.sources['symphony-runtime'].counts.blocked).toEqual({
+      state: 'measured-zero',
+      value: 0,
+    });
+
+    resetShippingStatePublisher();
+    const none = await publish(baseline());
+    expect(none.terminalFailures).toEqual({
+      state: 'measured-zero',
+      value: 0,
+    });
+  });
+
+  it('measures ship time only for a matched work and build identity', async () => {
+    const matched = await publish(
+      baseline({
+        'fleet-receipt': ok(
+          'fleet-receipt',
+          { state: 'GREEN', signals: { main: { sha: SHA } } },
+          {
+            sourceTimestamp: '2026-08-21T23:00:00.000Z',
+            correlation: { sha: SHA },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA, buildId: 'b1' },
+          {
+            sourceTimestamp: '2026-08-21T23:03:20.000Z',
+            correlation: { sha: SHA, buildId: 'b1' },
+          }
+        ),
+      }),
+      clockAt('2026-08-21T23:04:00.000Z')
+    );
+    expect(matched.timeToShipSeconds).toEqual({
+      state: 'measured-nonzero',
+      value: 200,
+    });
+
+    resetShippingStatePublisher();
+    const mismatched = await publish(
+      baseline({
+        'fleet-receipt': ok(
+          'fleet-receipt',
+          { state: 'GREEN', signals: { main: { sha: SHA } } },
+          { correlation: { sha: SHA } }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA_B, buildId: 'b2' },
+          { correlation: { sha: SHA_B, buildId: 'b2' } }
+        ),
+        'production-controller': ok(
+          'production-controller',
+          { conclusion: 'success' },
+          { correlation: { sha: SHA_B } }
+        ),
+      })
+    );
+    expect(mismatched.timeToShipSeconds).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+
+    resetShippingStatePublisher();
+    const missing = await publish(
+      baseline({
+        'fleet-receipt': ok('fleet-receipt', {
+          state: 'GREEN',
+          signals: { main: { sha: SHA } },
+        }),
+      })
+    );
+    expect(missing.timeToShipSeconds.state).toBe('not-measured');
+  });
+
+  it('marks tasks re-entering active work after a terminal state as recurred', async () => {
+    const first = await publish(
+      baseline({
+        'symphony-runtime': ok(
+          'symphony-runtime',
+          {
+            running: [],
+            retrying: [],
+            blocked: [
+              {
+                issue_identifier: 'JOV-7',
+                launcherFailure: { retryable: false },
+              },
+            ],
+          },
+          { sequence: 1, eventId: 'symphony-runtime:1:blocked' }
+        ),
+      })
+    );
+    expect(first.recurrence).toEqual({ state: 'measured-zero', value: 0 });
+
+    const second = await publish(
+      baseline({
+        'symphony-runtime': ok(
+          'symphony-runtime',
+          {
+            running: [{ issue_identifier: 'JOV-7' }],
+            retrying: [],
+            blocked: [],
+          },
+          {
+            sequence: 2,
+            eventId: 'symphony-runtime:2:running',
+            sourceRevision: SHA_B,
+          }
+        ),
+      })
+    );
+
+    expect(second.operationalTasks.deltas).toEqual([
+      {
+        taskId: 'linear:JOV-7',
+        kind: 'recurred',
+        fromState: 'blocked',
+        toState: 'running',
+        sequence: 2,
+      },
+    ]);
+    expect(second.recurrence).toEqual({
+      state: 'measured-nonzero',
+      value: 1,
+    });
+  });
 });
 
 describe('live symphony-task reader', () => {
@@ -997,6 +1169,132 @@ describe('live symphony-task reader', () => {
     const projection = await publish({ 'symphony-task': read });
     expect(projection.sources['symphony-task'].state).toBe('unavailable');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reads the task receipt over the bounded authenticated Gem bridge', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            schema: 'symphony-workspace-revision/v1',
+            observedAt: T0,
+            running: [{ issue_identifier: 'JOV-5248' }],
+            retrying: [],
+            blocked: [],
+          }),
+          { status: 200 }
+        )
+    );
+    const readers = createLiveShippingStateReaders({
+      readFile: vi.fn(),
+      fetch: fetchMock,
+      gemBridgeUrl: 'https://gem.example.ts.net',
+      gemBridgeToken: 'bridge-token',
+    });
+
+    const read = await readers['symphony-task']();
+
+    expect(read).toMatchObject({ sourceId: 'symphony-task', status: 'ok' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://gem.example.ts.net/api/v1/task-receipt',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: 'Bearer bridge-token',
+        }),
+      })
+    );
+    const projection = await publish(
+      baseline({ 'symphony-task': read }),
+      clockAt(T0)
+    );
+    expect(projection.sources['symphony-task'].state).toBe('fresh');
+    expect(projection.sources['symphony-task'].entities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityId: 'linear:JOV-5248',
+          operationalTask: expect.objectContaining({
+            workflowState: 'running',
+          }),
+        }),
+      ])
+    );
+  });
+
+  it.each([
+    ['non-loopback http', 'http://gem.example.ts.net'],
+    ['userinfo', 'https://<user>:<pass>@gem.example.ts.net'],
+    ['query string', 'https://gem.example.ts.net/?path=/etc/passwd'],
+    ['non-http scheme', 'file:///etc/passwd'],
+  ])(
+    'refuses the bridge transport for an unsafe base url: %s',
+    async (_label, baseUrl) => {
+      expect(normalizeGemBridgeUrl(baseUrl)).toBeNull();
+      const fetchMock = vi.fn();
+      const readers = createLiveShippingStateReaders({
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        gemBridgeUrl: baseUrl,
+        gemBridgeToken: 'bridge-token',
+      });
+
+      const read = await readers['symphony-task']();
+
+      expect(read).toMatchObject({
+        status: 'unavailable',
+        errorCode: 'not-configured',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reports unauthorized when the bridge rejects the token', async () => {
+    const readers = createLiveShippingStateReaders({
+      readFile: vi.fn(),
+      fetch: vi.fn(async () => new Response('{}', { status: 403 })),
+      gemBridgeUrl: 'https://gem.example.ts.net',
+      gemBridgeToken: 'bridge-token',
+    });
+
+    const read = await readers['symphony-task']();
+
+    expect(read).toMatchObject({
+      sourceId: 'symphony-task',
+      status: 'unauthorized',
+    });
+  });
+
+  it('reads the fleet receipt over the bridge without touching the filesystem', async () => {
+    const readFile = vi.fn();
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            schema: 'jovie-fleet-gate/v1',
+            observedAt: T0,
+            signals: { main: { sha: SHA } },
+          }),
+          { status: 200 }
+        )
+    );
+    const readers = createLiveShippingStateReaders({
+      readFile,
+      fetch: fetchMock,
+      gemBridgeUrl: 'https://gem.example.ts.net',
+      gemBridgeToken: 'bridge-token',
+    });
+
+    const read = await readers['fleet-receipt']();
+
+    expect(read).toMatchObject({ status: 'ok', sourceTimestamp: T0 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://gem.example.ts.net/api/v1/fleet-receipt',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: 'Bearer bridge-token',
+        }),
+      })
+    );
+    expect(readFile).not.toHaveBeenCalled();
   });
 });
 

@@ -58,8 +58,14 @@ walk capture, dispatch, and developer controls stay in disclosure.
 Read-only projection `ovie.shipping-state.v1` at `GET /api/hud/shipping-state`.
 It composes Symphony runtime/task state, lease-guard capacity, native
 `mergeQueueEntry`, exact-SHA CI, Production Controller, live build-info, and
-the typed fleet receipt. JOV-5249 consumes freshness UX. Shutdown retains the
-expired last-known marker. No Mac-journal fallback, merged-PR-as-shipped, or
+the typed fleet receipt. Gem-hosted sources read through the bounded
+authenticated bridge (`HUD_GEM_BRIDGE_URL`/`HUD_GEM_BRIDGE_TOKEN`, fixed
+receipt paths only) when configured; without it they report not-configured
+rather than fabricating state. Terminal failures are measured only from
+explicit terminal evidence — never aliased to blocked — and time-to-ship is
+measured only when the fleet-gate and live-build/verified timestamps share
+one exact sha. JOV-5249 consumes freshness UX. Shutdown retains the expired
+last-known marker. No Mac-journal fallback, merged-PR-as-shipped, or
 dispatch/retry/cancel/restart surface.
 
 The Summer Kanban projection (`SummerKanbanCard` in

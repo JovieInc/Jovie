@@ -40,6 +40,13 @@ export type LiveIo = {
   readonly githubToken?: string;
   readonly githubOwner?: string;
   readonly githubRepo?: string;
+  /**
+   * Bounded authenticated transport to the normalized Gem bridge. When set,
+   * Gem-hosted authorities are read over fixed bridge paths with a bearer
+   * token instead of relying on same-host loopback or filesystem reads.
+   */
+  readonly gemBridgeUrl?: string;
+  readonly gemBridgeToken?: string;
 };
 
 const githubBackoffUntilByIo = new WeakMap<LiveIo, number>();
@@ -189,30 +196,64 @@ async function readNamedJson(
   }
 }
 
-async function readNamedUrl(
+/** Fixed bridge receipt paths; the bridge never accepts caller-chosen paths. */
+export const GEM_BRIDGE_RECEIPT_PATHS = {
+  'symphony-runtime': '/api/v1/state',
+  'symphony-task': '/api/v1/task-receipt',
+  'fleet-receipt': '/api/v1/fleet-receipt',
+} as const;
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+/**
+ * The bridge base must be an https origin or a loopback http origin with no
+ * userinfo, query, or fragment. Anything else is rejected before use so the
+ * bearer token can never be sent to an arbitrary endpoint.
+ */
+export function normalizeGemBridgeUrl(value: string | undefined): {
+  readonly ok: true;
+  readonly baseUrl: string;
+} | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || url.search || url.hash) return null;
+    const https = url.protocol === 'https:';
+    const loopbackHttp =
+      url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname);
+    if (!https && !loopbackHttp) return null;
+    return { ok: true, baseUrl: url.origin };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchJsonRead(
   io: LiveIo,
   sourceId: ShippingSourceId,
   url: string,
-  timeoutMs: number
+  timeoutMs: number,
+  label: string,
+  headers: Record<string, string>
 ): Promise<AuthorityRead> {
   try {
     const response = await io.fetch(url, {
       method: 'GET',
-      headers: { accept: 'application/json' },
+      headers: { accept: 'application/json', ...headers },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.status === 401 || response.status === 403) {
       return failedRead(
         sourceId,
         'unauthorized',
-        `named authority returned ${response.status}`
+        `${label} returned ${response.status}`
       );
     }
     if (!response.ok) {
       return failedRead(
         sourceId,
         'unavailable',
-        `named authority returned ${response.status}`,
+        `${label} returned ${response.status}`,
         { errorCode: `http-${response.status}` }
       );
     }
@@ -221,17 +262,69 @@ async function readNamedUrl(
       return failedRead(
         sourceId,
         'error',
-        'named authority payload was not an object',
-        { errorCode: 'malformed' }
+        `${label} payload was not an object`,
+        {
+          errorCode: 'malformed',
+        }
       );
     }
     return okFileRead(sourceId, payload);
   } catch (error) {
     return disconnectedRead(
       sourceId,
-      error instanceof Error ? error.message : 'named authority unreachable'
+      error instanceof Error ? error.message : `${label} unreachable`
     );
   }
+}
+
+async function readBridgeReceipt(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  path: string,
+  timeoutMs: number
+): Promise<AuthorityRead> {
+  const base = normalizeGemBridgeUrl(io.gemBridgeUrl);
+  if (!base || !io.gemBridgeToken) {
+    return failedRead(
+      sourceId,
+      'unavailable',
+      'Gem bridge transport is not configured',
+      { errorCode: 'not-configured' }
+    );
+  }
+  return fetchJsonRead(
+    io,
+    sourceId,
+    `${base.baseUrl}${path}`,
+    timeoutMs,
+    'Gem bridge',
+    { authorization: `Bearer ${io.gemBridgeToken}` }
+  );
+}
+
+/** Canonical fleet receipt: bridge when configured, else the allowlisted file. */
+async function readFleetReceipt(io: LiveIo): Promise<AuthorityRead> {
+  if (normalizeGemBridgeUrl(io.gemBridgeUrl) && io.gemBridgeToken) {
+    return readBridgeReceipt(
+      io,
+      'fleet-receipt',
+      GEM_BRIDGE_RECEIPT_PATHS['fleet-receipt'],
+      2500
+    );
+  }
+  const file =
+    (await readNamedJson(io, 'fleet-receipt')) ??
+    disconnectedRead('fleet-receipt', 'fleet receipt missing');
+  return file;
+}
+
+async function readNamedUrl(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  url: string,
+  timeoutMs: number
+): Promise<AuthorityRead> {
+  return fetchJsonRead(io, sourceId, url, timeoutMs, 'named authority', {});
 }
 
 async function githubFetch(
@@ -667,12 +760,21 @@ export function createLiveShippingStateReaders(
 ): NamedAuthorityReaders {
   return {
     'symphony-runtime': async () => {
-      const live = await readNamedUrl(
-        io,
-        'symphony-runtime',
-        NAMED_AUTHORITY_URLS['symphony-runtime'],
-        750
-      );
+      const bridged = normalizeGemBridgeUrl(io.gemBridgeUrl);
+      const live =
+        bridged && io.gemBridgeToken
+          ? await readBridgeReceipt(
+              io,
+              'symphony-runtime',
+              GEM_BRIDGE_RECEIPT_PATHS['symphony-runtime'],
+              750
+            )
+          : await readNamedUrl(
+              io,
+              'symphony-runtime',
+              NAMED_AUTHORITY_URLS['symphony-runtime'],
+              750
+            );
       if (live.status !== 'ok') return live;
       if (
         !live.payload ||
@@ -691,15 +793,30 @@ export function createLiveShippingStateReaders(
       return { ...live, schema: 'symphony-runtime-state/v1' };
     },
     'symphony-task': async () => {
-      return failedRead(
+      const read = await readBridgeReceipt(
+        io,
         'symphony-task',
-        'unavailable',
-        'Official Symphony task receipt is not configured',
-        { errorCode: 'not-configured' }
+        GEM_BRIDGE_RECEIPT_PATHS['symphony-task'],
+        750
       );
+      if (read.status !== 'ok') return read;
+      if (
+        !read.payload ||
+        !Array.isArray(read.payload.running) ||
+        !Array.isArray(read.payload.retrying) ||
+        !Array.isArray(read.payload.blocked)
+      ) {
+        return failedRead(
+          'symphony-task',
+          'unavailable',
+          'Official Symphony task receipt was malformed',
+          { errorCode: 'malformed' }
+        );
+      }
+      return read;
     },
     'lease-guard-capacity': async () => {
-      const fleet = await readNamedJson(io, 'fleet-receipt');
+      const fleet = await readFleetReceipt(io);
       const signals =
         fleet?.status === 'ok' &&
         fleet.payload &&
@@ -755,9 +872,7 @@ export function createLiveShippingStateReaders(
         2500
       ),
     'fleet-receipt': async () => {
-      const fleet =
-        (await readNamedJson(io, 'fleet-receipt')) ??
-        disconnectedRead('fleet-receipt', 'fleet receipt missing');
+      const fleet = await readFleetReceipt(io);
       if (fleet.status === 'ok' && fleet.sourceTimestamp == null) {
         return failedRead(
           'fleet-receipt',
@@ -778,5 +893,7 @@ export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
     githubToken: overrides.githubToken,
     githubOwner: overrides.githubOwner,
     githubRepo: overrides.githubRepo,
+    gemBridgeUrl: overrides.gemBridgeUrl,
+    gemBridgeToken: overrides.gemBridgeToken,
   };
 }

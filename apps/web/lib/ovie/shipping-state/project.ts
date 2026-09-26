@@ -4,6 +4,7 @@ import {
   isExactSha,
   M1_SOURCE_TO_PROJECTION_BUDGET_MS,
   measuredBoolean,
+  measuredCount,
   measuredDuration,
   NOT_MEASURED_BOOLEAN,
   NOT_MEASURED_COUNT,
@@ -162,16 +163,43 @@ function pickCount(
   return NOT_MEASURED_COUNT;
 }
 
+/**
+ * Time-to-ship is only measurable when both ends observe the same exact build
+ * identity. The fleet gate timestamp starts the clock for a merged main sha;
+ * the matching live build-info (or production-verified) timestamp ends it.
+ * Subtracting timestamps across different work or build identities would
+ * fabricate a duration, so any mismatch stays not-measured.
+ */
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const start =
-    sources['github-native-merge-queue'].sourceTimestamp ??
-    sources['fleet-receipt'].sourceTimestamp;
-  const end =
-    sources['live-build-info'].sourceTimestamp ??
-    sources['production-controller'].sourceTimestamp;
-  if (start == null || end == null) return NOT_MEASURED_DURATION;
+  const receipt = sources['fleet-receipt'];
+  const build = sources['live-build-info'];
+  const controller = sources['production-controller'];
+  const endSource = SUCCESS_STATES.has(build.state) ? build : controller;
+  if (
+    !SUCCESS_STATES.has(receipt.state) ||
+    !SUCCESS_STATES.has(endSource.state)
+  ) {
+    return NOT_MEASURED_DURATION;
+  }
+  const startSha = isExactSha(receipt.correlation.sha)
+    ? receipt.correlation.sha
+    : null;
+  const endSha = isExactSha(endSource.correlation.sha)
+    ? endSource.correlation.sha
+    : null;
+  const start = receipt.sourceTimestamp;
+  const end = endSource.sourceTimestamp;
+  if (
+    start == null ||
+    end == null ||
+    startSha == null ||
+    endSha == null ||
+    startSha !== endSha
+  ) {
+    return NOT_MEASURED_DURATION;
+  }
   const startMs = Date.parse(start);
   const endMs = Date.parse(end);
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
@@ -234,9 +262,16 @@ function taskDeltas(
       prior.retryAt !== task.retryAt ||
       prior.sourceRevision !== task.sourceRevision
     ) {
+      const recurred =
+        (prior.workflowState === 'blocked' &&
+          (task.workflowState === 'running' ||
+            task.workflowState === 'retrying')) ||
+        (prior.attempt != null &&
+          task.attempt != null &&
+          task.attempt < prior.attempt);
       deltas.push({
         taskId: task.id,
-        kind: 'updated',
+        kind: recurred ? 'recurred' : 'updated',
         fromState: prior.workflowState,
         toState: task.workflowState,
         sequence,
@@ -329,6 +364,15 @@ export function projectShippingState(input: {
   );
   const revision = revisionFingerprint(input.sources);
   const eventId = projectionIdFor(input.sequence, revision);
+  const operationalTasks = projectOperationalTasks(input);
+  const recurrence =
+    operationalTasks.syncState === 'fresh' ||
+    operationalTasks.syncState === 'stale'
+      ? measuredCount(
+          operationalTasks.deltas.filter(delta => delta.kind === 'recurred')
+            .length
+        )
+      : NOT_MEASURED_COUNT;
   return {
     producerId: SHIPPING_STATE_PRODUCER_ID,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
@@ -367,9 +411,10 @@ export function projectShippingState(input: {
     meanings: projectMeanings(input.sources),
     timeToShipSeconds: timeToShip(input.sources),
     retrying: pickCount(input.sources, 'retrying'),
-    terminalFailures: pickCount(input.sources, 'blocked'),
+    terminalFailures: pickCount(input.sources, 'terminalFailures'),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
-    operationalTasks: projectOperationalTasks(input),
+    recurrence,
+    operationalTasks,
   };
 }
 
@@ -555,6 +600,7 @@ export function unknownProjection(input: {
     timeToShipSeconds: NOT_MEASURED_DURATION,
     retrying: NOT_MEASURED_COUNT,
     terminalFailures: NOT_MEASURED_COUNT,
+    recurrence: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,
     operationalTasks: {
       canonicalSource: 'linear',
