@@ -528,6 +528,14 @@ const nextConfig = {
         destination: '/artist-notifications',
         permanent: true,
       },
+      // /artist-profile (singular) has been a content-level alias of
+      // /artist-profiles since 2026-08-08 (same component, canonical tag,
+      // manifest `aliasOf`). Enforce it as a real redirect (JOV-6264).
+      {
+        source: '/artist-profile',
+        destination: '/artist-profiles',
+        permanent: true,
+      },
       // Legacy launch-campaign links now use the canonical, indexed pricing
       // page. Next.js preserves the original query string, including UTM
       // attribution, when a redirect destination does not supply one.
