@@ -149,28 +149,27 @@ describe('completeMobileProfile', () => {
     expect(mocks.invalidateProfileCache).toHaveBeenCalledWith('tim');
   });
 
-  it.each([
-    'banned',
-    'suspended',
-    'waitlist_pending',
-  ])('blocks %s users', async userStatus => {
-    const tx = makeTx([
-      [{ activeProfileId: null, id: 'app-user-1', userStatus }],
-    ]);
-    mocks.withDbSessionTx.mockImplementation(async callback => callback(tx));
+  it.each(['banned', 'suspended', 'waitlist_pending'])(
+    'blocks %s users',
+    async userStatus => {
+      const tx = makeTx([
+        [{ activeProfileId: null, id: 'app-user-1', userStatus }],
+      ]);
+      mocks.withDbSessionTx.mockImplementation(async callback => callback(tx));
 
-    const { completeMobileProfile } = await import(
-      '@/lib/mobile/complete-profile'
-    );
-    await expect(
-      completeMobileProfile({
-        displayName: 'Tim White',
-        userId: 'app-user-1',
-        username: 'tim',
-      })
-    ).rejects.toMatchObject({ code: 'forbidden' });
-    expect(mocks.markWaitlistSignedUpInTx).not.toHaveBeenCalled();
-  });
+      const { completeMobileProfile } = await import(
+        '@/lib/mobile/complete-profile'
+      );
+      await expect(
+        completeMobileProfile({
+          displayName: 'Tim White',
+          userId: 'app-user-1',
+          username: 'tim',
+        })
+      ).rejects.toMatchObject({ code: 'forbidden' });
+      expect(mocks.markWaitlistSignedUpInTx).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects a handle owned by another profile', async () => {
     const tx = makeTx([

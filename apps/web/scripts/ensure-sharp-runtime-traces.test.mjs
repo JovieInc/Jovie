@@ -390,26 +390,29 @@ describe('repairSharpRuntimeTraces', () => {
     ['platform', '@img/sharp-darwin-arm64'],
     ['architecture', '@img/sharp-linux-arm64'],
     ['Linux libc', '@img/sharp-linuxmusl-x64'],
-  ])('fails closed when the present native addon has the wrong %s', (_label, packageName) => {
-    const root = mkdtempSync(path.join(tmpdir(), 'jovie-sharp-trace-'));
-    temporaryRoots.push(root);
-    const traceRoot = path.join(root, '.next', 'server');
-    const libraryPath = path.join(root, 'libvips-cpp.so.8.18.3');
-    writeFileSync(libraryPath, 'fixture');
-    const nativeAddonPath = createSharpNativeAddon(root, packageName);
-    writeTrace(traceRoot, 'app/api/chat/route.js.nft.json', [
-      '../../../../node_modules/sharp-76070f79591ce98c',
-      toTraceRelativePath(traceRoot, nativeAddonPath),
-    ]);
+  ])(
+    'fails closed when the present native addon has the wrong %s',
+    (_label, packageName) => {
+      const root = mkdtempSync(path.join(tmpdir(), 'jovie-sharp-trace-'));
+      temporaryRoots.push(root);
+      const traceRoot = path.join(root, '.next', 'server');
+      const libraryPath = path.join(root, 'libvips-cpp.so.8.18.3');
+      writeFileSync(libraryPath, 'fixture');
+      const nativeAddonPath = createSharpNativeAddon(root, packageName);
+      writeTrace(traceRoot, 'app/api/chat/route.js.nft.json', [
+        '../../../../node_modules/sharp-76070f79591ce98c',
+        toTraceRelativePath(traceRoot, nativeAddonPath),
+      ]);
 
-    expect(() =>
-      repairSharpRuntimeTraces({
-        traceRoot,
-        sharedLibraries: [libraryPath],
-        ...glibcX64,
-      })
-    ).toThrow('must belong to @img/sharp-linux-x64');
-  });
+      expect(() =>
+        repairSharpRuntimeTraces({
+          traceRoot,
+          sharedLibraries: [libraryPath],
+          ...glibcX64,
+        })
+      ).toThrow('must belong to @img/sharp-linux-x64');
+    }
+  );
 
   it('fails closed when no Sharp-backed traces exist', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'jovie-sharp-trace-'));
@@ -484,20 +487,23 @@ describe('repairSharpRuntimeTraces', () => {
       '@img/sharp-libvips-linuxmusl-x64',
       '@img/sharp-libvips-linux-x64',
     ],
-  ])('finds the exact on-disk libvips package for Linux %s through production resolution', (_libc, runtime, expectedPackageName, wrongPackageName) => {
-    const root = mkdtempSync(path.join(tmpdir(), 'jovie-sharp-runtime-'));
-    temporaryRoots.push(root);
-    const libraries = createSharpRuntimeResolutionFixture(root);
-    const expectedLibraryPath = realpathSync(libraries[expectedPackageName]);
-    const wrongLibraryPath = realpathSync(libraries[wrongPackageName]);
+  ])(
+    'finds the exact on-disk libvips package for Linux %s through production resolution',
+    (_libc, runtime, expectedPackageName, wrongPackageName) => {
+      const root = mkdtempSync(path.join(tmpdir(), 'jovie-sharp-runtime-'));
+      temporaryRoots.push(root);
+      const libraries = createSharpRuntimeResolutionFixture(root);
+      const expectedLibraryPath = realpathSync(libraries[expectedPackageName]);
+      const wrongLibraryPath = realpathSync(libraries[wrongPackageName]);
 
-    expect(getSharpLibvipsPackageName(runtime)).toBe(expectedPackageName);
-    expect(existsSync(expectedLibraryPath)).toBe(true);
-    expect(findSharpSharedLibraries({ packageRoot: root, ...runtime })).toEqual(
-      [expectedLibraryPath]
-    );
-    expect(expectedLibraryPath).not.toBe(wrongLibraryPath);
-  });
+      expect(getSharpLibvipsPackageName(runtime)).toBe(expectedPackageName);
+      expect(existsSync(expectedLibraryPath)).toBe(true);
+      expect(
+        findSharpSharedLibraries({ packageRoot: root, ...runtime })
+      ).toEqual([expectedLibraryPath]);
+      expect(expectedLibraryPath).not.toBe(wrongLibraryPath);
+    }
+  );
 
   it('selects exactly one glibc or musl runtime package', () => {
     expect(getSharpNativePackageName(glibcX64)).toBe('@img/sharp-linux-x64');

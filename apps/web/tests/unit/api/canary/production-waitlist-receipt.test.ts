@@ -261,19 +261,22 @@ describe('GET /api/canary/waitlist/receipt', () => {
       ],
       ['analytics_receipt'],
     ],
-  ] as const)('returns conflict for %s evidence', async (_label, table, result, expectedMissing) => {
-    const rows = new Map(COMPLETE_ROWS);
-    rows.set(table, [...result]);
-    installDbRows(rows);
+  ] as const)(
+    'returns conflict for %s evidence',
+    async (_label, table, result, expectedMissing) => {
+      const rows = new Map(COMPLETE_ROWS);
+      rows.set(table, [...result]);
+      installDbRows(rows);
 
-    const response = await GET(request(`?run_id=123-1&entry_id=${ENTRY_ID}`));
+      const response = await GET(request(`?run_id=123-1&entry_id=${ENTRY_ID}`));
 
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({
-      status: 'incomplete',
-      missing: expect.arrayContaining([...expectedMissing]),
-    });
-  });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        status: 'incomplete',
+        missing: expect.arrayContaining([...expectedMissing]),
+      });
+    }
+  );
 
   it('rejects malformed entry ids before any database read', async () => {
     const response = await GET(request('?run_id=123-1&entry_id=unsafe'));

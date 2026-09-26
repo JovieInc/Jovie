@@ -17,13 +17,16 @@ describe('ThemeIcons', () => {
     ['SmallSystemIcon', SmallSystemIcon, 'h-3.5 w-3.5'],
     ['SmallSunIcon', SmallSunIcon, 'h-3.5 w-3.5'],
     ['SmallMoonIcon', SmallMoonIcon, 'h-3.5 w-3.5'],
-  ] as const)('%s is decorative and keeps its optical size', (_name, Icon, size) => {
-    const { container } = render(<Icon />);
-    const icon = container.querySelector('svg');
+  ] as const)(
+    '%s is decorative and keeps its optical size',
+    (_name, Icon, size) => {
+      const { container } = render(<Icon />);
+      const icon = container.querySelector('svg');
 
-    expect(icon).toHaveAttribute('aria-hidden', 'true');
-    expect(icon).toHaveClass(size);
-  });
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+      expect(icon).toHaveClass(size);
+    }
+  );
 
   it('allows an owning control to provide an instance class without changing semantics', () => {
     const { container } = render(<SunIcon className='text-primary-token' />);
