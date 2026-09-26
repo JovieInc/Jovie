@@ -200,14 +200,20 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('runs the latency invariant suite outside the V8-coverage node --test batch', () => {
-    // Coverage instrumentation made this in-process scanner ~6x slower
-    // (18s -> 118s locally) while contributing nothing to the batch's
-    // --test-coverage-include files. It must still run exactly once.
+  it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
+    // Coverage instrumentation made these in-process scanners several times
+    // slower (latency: 18s -> 118s locally) while contributing nothing to the
+    // batch's --test-coverage-include files. Each must still run exactly once.
     const segments = PACKAGE_JSON.scripts['invariants:check'].split(' && ');
     const latency = 'scripts/invariants/latency-sensitive-execution.test.mjs';
-    const running = segments.filter(segment => segment.includes(latency));
-    expect(running).toEqual([`node --test ${latency}`]);
+    const screenCertification =
+      'scripts/invariants/screen-certification.test.mjs';
+    for (const suite of [latency, screenCertification]) {
+      const running = segments.filter(segment => segment.includes(suite));
+      expect(running).toEqual([
+        `node --test ${screenCertification} ${latency}`,
+      ]);
+    }
     const coverageBatch = segments.find(segment =>
       segment.includes(
         '--test-coverage-include=scripts/backlog-orchestrator/reconcile.mjs'
@@ -215,6 +221,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(coverageBatch).toBeDefined();
     expect(coverageBatch).not.toContain(latency);
+    expect(coverageBatch).not.toContain(screenCertification);
   });
 
   it('runs desktop release regressions with measured coverage for mac changes', () => {
