@@ -14,7 +14,7 @@ describe('ProfileQuickActions', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Tour' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Events' })).toHaveAttribute(
       'aria-current',
       'page'
     );
