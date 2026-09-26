@@ -833,7 +833,16 @@ describe('Playwright artifact secret boundary', () => {
       expect(invoked[0]).toBe(
         `-c http.https://github.com/.extraheader=AUTHORIZATION: basic ${Buffer.from('x-access-token:fixture-token').toString('base64')} fetch origin main --no-tags`
       );
-      expect(invoked).toHaveLength(fetchExit === 0 ? 3 : 1);
+      // After the authenticated fetch: the new-scripts-test diff and the
+      // selector diff, both without the auth header.
+      expect(invoked.slice(1)).toEqual(
+        fetchExit === 0
+          ? [
+              'diff --diff-filter=AR --name-only origin/main HEAD',
+              'diff --name-only origin/main HEAD',
+            ]
+          : []
+      );
       expect(`${result.stdout}\n${result.stderr}`).not.toContain(
         'fixture-token'
       );
