@@ -5,51 +5,51 @@
   "$description": "Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors (--noir-ion-*) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.",
   "color": {
     "surface.canvas": {
-      "$value": "#030407",
+      "$value": "#030406",
       "$type": "color"
     },
     "surface.shell": {
-      "$value": "#06080d",
+      "$value": "#07080a",
       "$type": "color"
     },
     "surface.panel": {
-      "$value": "#0f1420",
+      "$value": "#131417",
       "$type": "color"
     },
     "surface.card": {
-      "$value": "#0f1420",
+      "$value": "#131417",
       "$type": "color"
     },
     "surface.elevated": {
-      "$value": "#151b2a",
+      "$value": "#1a1b1e",
       "$type": "color"
     },
     "surface.floating": {
-      "$value": "#1b2436",
+      "$value": "#232427",
       "$type": "color"
     },
     "surface.bgBase": {
-      "$value": "#030407",
+      "$value": "#030406",
       "$type": "color"
     },
     "surface.bgPage": {
-      "$value": "#030407",
+      "$value": "#030406",
       "$type": "color"
     },
     "surface.surface0": {
-      "$value": "#06080d",
+      "$value": "#07080a",
       "$type": "color"
     },
     "surface.surface1": {
-      "$value": "#0f1420",
+      "$value": "#131417",
       "$type": "color"
     },
     "surface.surface2": {
-      "$value": "#151b2a",
+      "$value": "#1a1b1e",
       "$type": "color"
     },
     "surface.surface3": {
-      "$value": "#1b2436",
+      "$value": "#232427",
       "$type": "color"
     },
     "text.primary": {

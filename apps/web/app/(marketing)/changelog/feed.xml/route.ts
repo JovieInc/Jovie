@@ -1,19 +1,26 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   type ChangelogRelease,
-  changelogInlineText,
   changelogReleaseAnchor,
-  changelogReleaseLabel,
 } from '@/lib/changelog-parser';
-import { getChangelogReleases } from '@/lib/changelog-source';
+import { getChangelogSnapshot } from '@/lib/changelog-source';
+import {
+  formatCustomerChangelogTertiary,
+  projectCustomerChangelog,
+} from '@/lib/customer-changelog';
 
 // Fully static
 export const revalidate = false;
 
 export function atomEntryId(
-  release: Pick<ChangelogRelease, 'kind' | 'version'>
+  version: string,
+  kind: ChangelogRelease['kind'] = 'release'
 ): string {
-  return `${BASE_URL}/changelog#${changelogReleaseAnchor(release)}`;
+  return `${BASE_URL}/changelog#${changelogReleaseAnchor({ version, kind })}`;
+}
+
+function versionPageUrl(version: string): string {
+  return `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
 }
 
 function escapeXml(s: string): string {
@@ -26,36 +33,29 @@ function escapeXml(s: string): string {
 }
 
 export async function GET() {
-  const releases = await getChangelogReleases();
+  const snapshot = await getChangelogSnapshot();
+  const entries = projectCustomerChangelog(snapshot.releases).slice(0, 20);
 
-  const atomEntries = releases
-    .slice(0, 20)
-    .map(release => {
-      const updated = release.date
-        ? `${release.date}T00:00:00Z`
+  const atomEntries = entries
+    .map(entry => {
+      const updated = entry.date
+        ? `${entry.date}T00:00:00Z`
         : new Date().toISOString();
-      const summaryHtml = release.summary
-        ? `<p>${escapeXml(changelogInlineText(release.summary))}</p>`
-        : '';
-      const allEntries = [
-        ...release.sections.featured,
-        ...release.sections.added,
-        ...release.sections.changed,
-        ...release.sections.fixed,
-        ...release.sections.removed,
-      ];
-      const listHtml = allEntries
-        .map(c => `<li>${escapeXml(changelogInlineText(c))}</li>`)
-        .join('');
-      const contentHtml = summaryHtml + `<ul>${listHtml}</ul>`;
+      const tertiary = formatCustomerChangelogTertiary(
+        entry.date,
+        entry.technicalVersion,
+        entry.technicalKind
+      );
+      const contentHtml = `<p>${escapeXml(entry.summary)}</p>`;
 
       return `
     <entry>
-      <title>${escapeXml(APP_NAME)} ${escapeXml(changelogReleaseLabel(release))}</title>
-      <id>${escapeXml(atomEntryId(release))}</id>
-      <link href="${escapeXml(BASE_URL)}/changelog/${escapeXml(release.version)}" rel="alternate"/>
+      <title>${escapeXml(entry.title)}</title>
+      <id>${escapeXml(atomEntryId(entry.technicalVersion, entry.technicalKind))}#${escapeXml(entry.slug)}</id>
+      <link href="${escapeXml(versionPageUrl(entry.technicalVersion))}" rel="alternate"/>
       <updated>${updated}</updated>
-      <content type="html">${escapeXml(contentHtml)}</content>
+      <summary>${escapeXml(tertiary)}</summary>
+      <content type="html">${contentHtml}</content>
     </entry>`;
     })
     .join('\n');

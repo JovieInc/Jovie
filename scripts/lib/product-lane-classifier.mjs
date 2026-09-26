@@ -45,6 +45,13 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^packages\/jev-evaluation\//,
   ],
   [
+    // @jovie/copy: canonical copy rules consumed by apps/web (canon/VOICE.md).
+    'shared-copy',
+    'shared-contract',
+    ['web'],
+    /^packages\/copy\//,
+  ],
+  [
     'shared-agent-transport',
     'shared-contract',
     ['web'],
