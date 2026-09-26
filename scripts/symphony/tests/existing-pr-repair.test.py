@@ -1401,7 +1401,7 @@ class RepairTests(unittest.TestCase):
             child = ("import os,pathlib,signal,time; c=os.fork(); "
                      f"p=pathlib.Path({str(descendant_path)!r}); t=p.with_suffix('.tmp'); "
                      "(signal.signal(signal.SIGTERM,signal.SIG_IGN),t.write_text(str(os.getpid())),os.replace(t,p),"
-                     "os.close(1),os.close(2),time.sleep(10)) if c==0 else ([time.sleep(0.01) for _ in iter(p.exists,True)],os._exit(0))")
+                     "os.close(1),os.close(2),time.sleep(10)) if c==0 else ([time.sleep(0.01) for _ in iter(lambda:p.exists() or os.waitpid(c,os.WNOHANG)[0]!=0,True)],os._exit(0))")
             result = repair._run_bounded([sys.executable, "-c", child],
                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                          text=True, timeout=2)
@@ -1427,7 +1427,7 @@ class RepairTests(unittest.TestCase):
             stopped_path = Path(directory) / "service-stopped"
             child = ("import os,pathlib,time; c=os.fork(); "
                      f"p=pathlib.Path({str(descendant_path)!r}); t=p.with_suffix('.tmp'); "
-                     "(t.write_text(str(os.getpid())),os.replace(t,p),time.sleep(10)) if c==0 else ([time.sleep(0.01) for _ in iter(p.exists,True)],os._exit(7))")
+                     "(t.write_text(str(os.getpid())),os.replace(t,p),time.sleep(10)) if c==0 else ([time.sleep(0.01) for _ in iter(lambda:p.exists() or os.waitpid(c,os.WNOHANG)[0]!=0,True)],os._exit(7))")
 
             def stop_service():
                 stopped_path.write_text("stopped", encoding="utf-8")
