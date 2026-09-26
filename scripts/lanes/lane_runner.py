@@ -375,7 +375,35 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
         return {**result, "verdict": "held"}
     sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
     queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
+    if queued.returncode != 0:
+        # Verified heads are never re-gated, so a failed enqueue (e.g. a GraphQL rate limit)
+        # would strand a green PR; each worker pass retries it via requeue_verified.
+        update_json(host.state / "requeue.json", lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
+
+
+def update_json(path: Path, change) -> None:
+    data = json.loads(path.read_text()) if path.exists() else {}
+    change(data)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data))
+
+
+def requeue_verified(host: Host, prs: list[dict]) -> None:
+    """Retry enqueueing gate-verified PRs whose enqueue failed; drop them once queued or moved."""
+    path = host.state / "requeue.json"
+    if not path.exists():
+        return
+    heads = {str(pr["number"]): pr["headRefOid"] for pr in prs}
+    def retry(requeue: dict) -> None:
+        for number, head in list(requeue.items()):
+            if heads.get(number) != head:
+                del requeue[number]  # merged, closed, or a new head that the gate owns again
+                continue
+            sh(["gh", "pr", "ready", number, "--repo", REPO_SLUG])
+            if sh(["gh", "pr", "merge", number, "--repo", REPO_SLUG, "--auto"]).returncode == 0:
+                del requeue[number]
+    update_json(path, retry)
 
 
 # ---------------------------------------------------------------- fix red first
@@ -581,6 +609,7 @@ def worker(host: Host, name: str) -> int:
     try:
         # Finish before starting: red PRs, then ungated drafts, then new issues.
         prs = lane_prs(name)
+        requeue_verified(host, prs)
         red = claim_red_pr(host, name, prs)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
