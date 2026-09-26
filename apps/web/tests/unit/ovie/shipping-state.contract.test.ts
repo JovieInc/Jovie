@@ -30,6 +30,7 @@ import {
 import {
   createLiveShippingStateReaders,
   isAllowlistedAuthorityPath,
+  type LiveIo,
   NAMED_AUTHORITY_PATHS,
   readMergeQueue,
   readWorkflow,
@@ -1628,7 +1629,7 @@ describe('live GitHub shipping reader', () => {
 
 describe('Gem authority transport (JOV-5248 reopened repair)', () => {
   function gemIo(
-    fetchMock: ReturnType<typeof vi.fn>,
+    fetchMock: ReturnType<typeof vi.fn<LiveIo['fetch']>>,
     extra: Partial<Parameters<typeof createLiveShippingStateReaders>[0]> = {}
   ) {
     return {
@@ -1643,7 +1644,7 @@ describe('Gem authority transport (JOV-5248 reopened repair)', () => {
   }
 
   it('reads Gem-resident authorities through the authenticated bridge', async () => {
-    const fetchMock = vi.fn(
+    const fetchMock = vi.fn<LiveIo['fetch']>(
       async () =>
         new Response(
           JSON.stringify({
@@ -1673,7 +1674,9 @@ describe('Gem authority transport (JOV-5248 reopened repair)', () => {
   });
 
   it('reports bridge auth failure as unauthorized without local fallback', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 401 }));
+    const fetchMock = vi.fn<LiveIo['fetch']>(
+      async () => new Response('{}', { status: 401 })
+    );
     const readFile = vi.fn(async () => {
       throw Object.assign(new Error('missing'), { code: 'ENOENT' });
     });
@@ -1690,7 +1693,7 @@ describe('Gem authority transport (JOV-5248 reopened repair)', () => {
   });
 
   it('reports an unreachable bridge as disconnected', async () => {
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn<LiveIo['fetch']>(async () => {
       throw new Error('offline');
     });
     const readers = createLiveShippingStateReaders(gemIo(fetchMock));
@@ -1698,7 +1701,7 @@ describe('Gem authority transport (JOV-5248 reopened repair)', () => {
   });
 
   it('reads the symphony task receipt through the bridge', async () => {
-    const fetchMock = vi.fn(
+    const fetchMock = vi.fn<LiveIo['fetch']>(
       async () =>
         new Response(
           JSON.stringify({
@@ -1725,7 +1728,7 @@ describe('Gem authority transport (JOV-5248 reopened repair)', () => {
   });
 
   it('reads lease-guard capacity from the bridge payload', async () => {
-    const fetchMock = vi.fn(
+    const fetchMock = vi.fn<LiveIo['fetch']>(
       async () =>
         new Response(
           JSON.stringify({
