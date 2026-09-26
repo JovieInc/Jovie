@@ -71,6 +71,9 @@ export function partitionByDuration(keys, count, durations, reserved = {}) {
 }
 
 export default class DurationShardSequencer extends BaseSequencer {
+  /** @type {ReturnType<typeof loadDurations> | undefined} */
+  _durations = undefined;
+
   get durations() {
     this._durations ??= loadDurations();
     return this._durations;
