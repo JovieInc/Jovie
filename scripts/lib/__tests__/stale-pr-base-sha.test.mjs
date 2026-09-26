@@ -37,7 +37,9 @@ function step(file, name, job) {
 
 /** @param {string} file @param {string} name @param {string} [job] */
 function stepRunScript(file, name, job) {
-  const body = step(file, name, job).match(/\n {8}run: \|\n((?: {10}.*\n?)+)/u)?.[1];
+  const body = step(file, name, job).match(
+    /\n {8}run: \|\n((?: {10}.*\n?)+)/u
+  )?.[1];
   if (!body) throw new Error(`${file}: step "${name}" has no run block`);
   return body.replace(/^ {10}/gmu, '');
 }
@@ -216,7 +218,8 @@ describe('PR visual review routing base (pr-visual-review.yml)', () => {
   function resolveScript() {
     const script = stepRunScript(FILE, ROUTE_STEP);
     const cut = script.indexOf('export BASE_SHA\n');
-    if (cut === -1) throw new Error(`${FILE}: Route step no longer exports BASE_SHA`);
+    if (cut === -1)
+      throw new Error(`${FILE}: Route step no longer exports BASE_SHA`);
     return `${script.slice(0, cut)}echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"\n`;
   }
 

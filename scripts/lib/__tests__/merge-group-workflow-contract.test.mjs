@@ -920,7 +920,9 @@ describe('merge_group workflow contract', () => {
       'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
     );
     expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
-    expect(fetchScript).toContain('echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"');
+    expect(fetchScript).toContain(
+      'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
+    );
     // The base-commit check must not be satisfiable by a promisor fetch.
     const verifyStep = job.slice(
       job.indexOf('      - name: Verify exact coverage head and diff base'),
