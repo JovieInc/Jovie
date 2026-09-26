@@ -58,6 +58,11 @@ const hoisted = vi.hoisted(() => {
   return {
     captureWarning: vi.fn(),
     dbSelect,
+    enrichUnclaimedArtistProfileIdentity: vi.fn(async () => 'not_checked'),
+    lookupUnclaimedArtistIdentity: vi.fn(async () => ({
+      attempted: false,
+      artistData: null,
+    })),
     dbSelectResults,
     getSpotifyArtistsBatch: vi.fn(),
     insertedValues,
@@ -131,6 +136,24 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 vi.mock('@/lib/profile/public-release-eligibility', () => ({
   publicReleaseEligibilitySqlPredicate: vi.fn(() => 'public-release-only'),
+}));
+vi.mock('@/lib/discography/unclaimed-artist-enrichment', () => ({
+  buildInitialUnclaimedEnrichmentReceipt: vi.fn(
+    ({ providerArtistId, observedAt }: Record<string, unknown>) => ({
+      status: 'not_checked',
+      observedAt,
+      sources: [],
+      provider: 'spotify',
+      providerArtistId,
+      verifiedPlatforms: [],
+      conflicts: [],
+      linksFound: 0,
+      shareReady: false,
+    })
+  ),
+  enrichUnclaimedArtistProfileIdentity:
+    hoisted.enrichUnclaimedArtistProfileIdentity,
+  lookupUnclaimedArtistIdentity: hoisted.lookupUnclaimedArtistIdentity,
 }));
 
 const {
@@ -535,6 +558,79 @@ describe('credited artist profile reconciliation', () => {
         retry: 'next_spotify_import_or_backfill',
         source: 'spotify_release_credit',
       })
+    );
+  });
+
+  it('runs the bounded identity-enrichment pass and seeds a not_checked receipt', async () => {
+    queueOwnerAndCandidates();
+    hoisted.txSelectResults.push(
+      [
+        {
+          ...candidate,
+          creatorProfileId: null,
+          id: candidate.artistId,
+        },
+      ],
+      [],
+      []
+    );
+    hoisted.txReturningResults.push(
+      [
+        {
+          id: 'created-profile',
+          usernameNormalized: 'austinleeds',
+        },
+      ],
+      [{ id: candidate.artistId }]
+    );
+
+    const result = await reconcileCreditedArtistProfiles(
+      'owner-profile',
+      'spotify-owner'
+    );
+
+    expect(result.created).toBe(1);
+    expect(hoisted.lookupUnclaimedArtistIdentity).toHaveBeenCalledWith(
+      'https://open.spotify.com/artist/spotify-austin'
+    );
+    expect(hoisted.enrichUnclaimedArtistProfileIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'created-profile',
+        spotifyId: 'spotify-austin',
+        spotifyUrl: 'https://open.spotify.com/artist/spotify-austin',
+      })
+    );
+    expect(hoisted.insertedValues[0]?.settings).toMatchObject({
+      unclaimedArtistIdentityEnrichment: expect.objectContaining({
+        status: 'not_checked',
+        provider: 'spotify',
+        providerArtistId: 'spotify-austin',
+        shareReady: false,
+      }),
+    });
+  });
+
+  it('backfills identity enrichment idempotently for reused profiles', async () => {
+    queueOwnerAndCandidates();
+    hoisted.txSelectResults.push(
+      [
+        {
+          ...candidate,
+          creatorProfileId: null,
+          id: candidate.artistId,
+        },
+      ],
+      [{ id: 'existing-profile', usernameNormalized: 'austinleeds' }]
+    );
+
+    const result = await reconcileCreditedArtistProfiles(
+      'owner-profile',
+      'spotify-owner'
+    );
+
+    expect(result).toMatchObject({ created: 0, reused: 1 });
+    expect(hoisted.enrichUnclaimedArtistProfileIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'existing-profile' })
     );
   });
 });

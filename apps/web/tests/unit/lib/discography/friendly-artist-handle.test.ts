@@ -102,6 +102,43 @@ describe('composeFriendlyArtistHandleCandidates', () => {
     ]);
   });
 
+  it('ranks enrichment identity handles below name-derived candidates', () => {
+    const result = composeFriendlyArtistHandleCandidates({
+      registryName: 'Fedde Le Grand',
+      providerArtist: { id: 'sp-1', name: 'Fedde Le Grand' },
+      identityHandles: ['feddelegrand', 'djfedde'],
+    });
+
+    // The exact entity-matched handle joins the candidate list but never
+    // outranks canonical name evidence.
+    expect(result.accepted[0]?.handle).toBe('feddelegrand');
+    expect(result.accepted[0]?.source).toBe('registry_artist_name');
+    const identityCandidate = result.accepted.find(c => c.handle === 'djfedde');
+    expect(identityCandidate?.source).toBe('provider_identity_handle');
+    expect(identityCandidate?.rank).toBeGreaterThan(
+      result.accepted[0]?.rank ?? 0
+    );
+  });
+
+  it('still validates identity handles against the username contract', () => {
+    const result = composeFriendlyArtistHandleCandidates({
+      registryName: '坂本龍一',
+      providerArtist: undefined,
+      identityHandles: ['top', 'ryuichi.sakamoto'],
+    });
+
+    expect(result.accepted.map(c => c.handle)).toEqual(['ryuichisakamoto']);
+    expect(result.rejected).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          handle: 'top',
+          source: 'provider_identity_handle',
+          reason: 'fails_username_contract',
+        }),
+      ])
+    );
+  });
+
   it('produces identical output for identical inputs (pure/deterministic)', () => {
     const input = {
       registryName: 'Fedde Le Grand',

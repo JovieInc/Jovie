@@ -379,4 +379,71 @@ describe('AdminProfileSidebar', () => {
       })
     );
   });
+
+  it('distinguishes enrichment states in the social pane for unclaimed profiles', () => {
+    const unclaimedProfile: AdminCreatorProfileRow = {
+      ...profile,
+      isClaimed: false,
+      identityEnrichment: {
+        status: 'conflicted',
+        observedAt: '2026-09-26T00:00:00.000Z',
+        sources: ['musicfetch'],
+        provider: 'spotify',
+        providerArtistId: 'sp-1',
+        verifiedPlatforms: ['spotify'],
+        conflicts: [
+          {
+            platform: 'instagram',
+            urls: ['https://instagram.com/a', 'https://instagram.com/b'],
+            resolvedUrl: null,
+          },
+        ],
+        linksFound: 2,
+        shareReady: false,
+      },
+    };
+
+    renderWithQueryClient(
+      <AdminProfileSidebar
+        profile={unclaimedProfile}
+        contact={contact}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.getByTestId('identity-enrichment-status')).toHaveTextContent(
+      'conflicted'
+    );
+  });
+
+  it('reports not_checked for unclaimed profiles without a receipt', () => {
+    renderWithQueryClient(
+      <AdminProfileSidebar
+        profile={{ ...profile, isClaimed: false, identityEnrichment: null }}
+        contact={contact}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.getByTestId('identity-enrichment-status')).toHaveTextContent(
+      'not checked'
+    );
+  });
+
+  it('hides the enrichment status line for claimed profiles', () => {
+    renderWithQueryClient(
+      <AdminProfileSidebar
+        profile={profile}
+        contact={contact}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('identity-enrichment-status')
+    ).not.toBeInTheDocument();
+  });
 });

@@ -34,6 +34,17 @@ import {
   type SpotifyArtistProfileData,
 } from './collaborator-profile-plan';
 import { composeFriendlyArtistHandleCandidates } from './friendly-artist-handle';
+import {
+  buildInitialUnclaimedEnrichmentReceipt,
+  enrichUnclaimedArtistProfileIdentity,
+  lookupUnclaimedArtistIdentity,
+  type UnclaimedArtistIdentityLookup,
+} from './unclaimed-artist-enrichment';
+import {
+  evaluateUnclaimedArtistIdentity,
+  observationsFromMusicFetchArtist,
+  UNCLAIMED_IDENTITY_ENRICHMENT_KEY,
+} from './unclaimed-artist-identity';
 
 export interface CollaboratorProfileReconciliationResult {
   readonly candidates: number;
@@ -52,6 +63,8 @@ export interface UnclaimedArtistProfileEnsureResult {
 interface CandidateOutcome {
   readonly status: 'created' | 'reused' | 'conflicted';
   readonly handle?: string;
+  /** Bound profile when the artist now has one (created or reused). */
+  readonly profileId?: string;
 }
 
 interface CandidateReconciliationState {
@@ -195,7 +208,8 @@ async function markArtistProfileConflict(
 
 async function reconcileCandidate(
   candidate: CreditedArtistCandidate,
-  spotifyArtist: SpotifyArtistProfileData | undefined
+  spotifyArtist: SpotifyArtistProfileData | undefined,
+  identityLookup?: UnclaimedArtistIdentityLookup
 ): Promise<CandidateOutcome> {
   return withSystemIngestionSession(
     async tx => {
@@ -222,7 +236,10 @@ async function reconcileCandidate(
         return { status: 'conflicted' };
       }
       if (lockedArtist.creatorProfileId) {
-        return { status: 'reused' };
+        return {
+          status: 'reused',
+          profileId: lockedArtist.creatorProfileId,
+        };
       }
 
       const exactProfiles = await tx
@@ -258,8 +275,24 @@ async function reconcileCandidate(
         return {
           status: 'reused',
           handle: exactProfile.usernameNormalized,
+          profileId: exactProfile.id,
         };
       }
+
+      const spotifyUrl = buildSpotifyArtistUrl(candidate.spotifyId);
+
+      // JOV-6529: evaluate the prefetched identity-source evidence. The
+      // evaluation is pure — no I/O inside this serializable transaction —
+      // and only exact provider/entity matches feed it.
+      const identityEvaluation = identityLookup?.artistData
+        ? evaluateUnclaimedArtistIdentity(
+            observationsFromMusicFetchArtist(
+              identityLookup.artistData,
+              spotifyUrl,
+              new Date().toISOString()
+            )
+          )
+        : undefined;
 
       // JOV-6528: compose friendly candidates from the identity signals the
       // exact-ID match already validated, then take the first one that is
@@ -271,6 +304,7 @@ async function reconcileCandidate(
       const composed = composeFriendlyArtistHandleCandidates({
         registryName: lockedArtist.name,
         providerArtist: spotifyArtist,
+        identityHandles: identityEvaluation?.handleEvidence,
       });
 
       let handle: string | null = null;
@@ -310,7 +344,6 @@ async function reconcileCandidate(
       const avatarUrl =
         spotifyArtist?.images?.find(image => image.url.trim())?.url ??
         lockedArtist.imageUrl;
-      const spotifyUrl = buildSpotifyArtistUrl(candidate.spotifyId);
       const now = new Date();
 
       const [createdProfile] = await tx
@@ -339,6 +372,13 @@ async function reconcileCandidate(
               artistRegistryId: candidate.artistId,
               providerArtistId: candidate.spotifyId,
             }),
+            // Share-readiness receipt starts at not_checked; the bounded
+            // enrichment pass rewrites it after commit (JOV-6529).
+            [UNCLAIMED_IDENTITY_ENRICHMENT_KEY]:
+              buildInitialUnclaimedEnrichmentReceipt({
+                providerArtistId: candidate.spotifyId,
+                observedAt: now.toISOString(),
+              }),
           },
           theme: {},
           createdAt: now,
@@ -397,7 +437,11 @@ async function reconcileCandidate(
         throw new Error('Artist profile binding lost its identity lock');
       }
 
-      return { status: 'created', handle: createdProfile.usernameNormalized };
+      return {
+        status: 'created',
+        handle: createdProfile.usernameNormalized,
+        profileId: createdProfile.id,
+      };
     },
     { isolationLevel: 'serializable' }
   );
@@ -445,7 +489,11 @@ export async function ensureUnclaimedArtistProfileForEntity(
     return { status: 'unavailable', handle: null };
   }
 
-  const [spotifyArtist] = await getSpotifyArtistsBatch([candidate.spotifyId]);
+  const candidateSpotifyUrl = buildSpotifyArtistUrl(candidate.spotifyId);
+  const [spotifyArtist, identityLookup] = await Promise.all([
+    getSpotifyArtistsBatch([candidate.spotifyId]).then(rows => rows[0]),
+    lookupUnclaimedArtistIdentity(candidateSpotifyUrl),
+  ]);
   let outcome: CandidateOutcome;
   try {
     outcome = await reconcileCandidate(
@@ -455,7 +503,8 @@ export async function ensureUnclaimedArtistProfileForEntity(
         spotifyId: candidate.spotifyId,
         imageUrl: candidate.imageUrl,
       },
-      spotifyArtist
+      spotifyArtist,
+      identityLookup
     );
   } catch (error) {
     await captureWarning(
@@ -468,6 +517,30 @@ export async function ensureUnclaimedArtistProfileForEntity(
 
   if (outcome.status === 'conflicted') {
     return { status: 'conflicted', handle: outcome.handle ?? null };
+  }
+
+  // Bounded identity enrichment (JOV-6529). Best-effort: a failure must not
+  // turn a committed exact-ID binding into a conflict — the receipt stays
+  // `not_checked` and the pass retries on the next hit.
+  if (outcome.profileId) {
+    try {
+      await enrichUnclaimedArtistProfileIdentity({
+        profileId: outcome.profileId,
+        spotifyId: candidate.spotifyId,
+        spotifyUrl: candidateSpotifyUrl,
+        lookup: identityLookup,
+      });
+    } catch (error) {
+      await captureWarning(
+        'Unclaimed artist identity enrichment failed',
+        error,
+        {
+          source: 'public_artist_entity_route',
+          artistId,
+          profileId: outcome.profileId,
+        }
+      );
+    }
   }
 
   const [resolved] = await db
@@ -528,11 +601,46 @@ async function reconcileCandidatePlan(
   for (const { candidate, spotifyArtist } of plan) {
     if (!spotifyArtist) state.metadataUnavailable += 1;
 
+    const spotifyUrl = buildSpotifyArtistUrl(candidate.spotifyId);
+    // Prefetch the identity-source lookup outside any transaction so the
+    // serializable profile write never performs network I/O (JOV-6529).
+    const identityLookup = await lookupUnclaimedArtistIdentity(spotifyUrl);
+
     try {
-      recordCandidateOutcome(
-        state,
-        await reconcileCandidate(candidate, spotifyArtist)
+      const outcome = await reconcileCandidate(
+        candidate,
+        spotifyArtist,
+        identityLookup
       );
+      recordCandidateOutcome(state, outcome);
+
+      // Enrichment runs post-commit for both created and reused profiles,
+      // which is also the idempotent backfill path for profiles minted
+      // before the stage existed. It never touches claimed profiles.
+      if (
+        outcome.profileId &&
+        (outcome.status === 'created' || outcome.status === 'reused')
+      ) {
+        try {
+          await enrichUnclaimedArtistProfileIdentity({
+            profileId: outcome.profileId,
+            spotifyId: candidate.spotifyId,
+            spotifyUrl,
+            lookup: identityLookup,
+          });
+        } catch (error) {
+          await captureWarning(
+            'Unclaimed artist identity enrichment failed',
+            error,
+            {
+              source: 'spotify_release_credit',
+              creatorProfileId,
+              artistId: candidate.artistId,
+              profileId: outcome.profileId,
+            }
+          );
+        }
+      }
     } catch (error) {
       state.conflicted += 1;
       await captureWarning(
