@@ -212,30 +212,16 @@ Read [the component patterns reference](docs/design-system/DETAILS.md#component-
 
 Founder lock 2026-09-12, Pen `OqZTF`: combined search/inbox/new-chat bar;
 Library, Contacts, Presence (`canonicalSidebarNavigation`); Today/Earlier
-history; bottom-anchored account footer. Mobile keeps its composition.
-Homepage `t1x8T` remains locked.
-
-Founder lock 2026-09-25 (Linear-scale density): 244px customer rail; 28px
-nav/history rows; 16px sidebar icons; 44px app header everywhere (single
-token, no separate "compact" variant); selected nav row is a neutral
-hover-level tint with primary-token text — no ion/blue background, no
-border; Today/Earlier day headers are sentence case, no letterspacing, 11px
-medium, quiet color; account footer is a single compact 32px row (20px
-avatar, name only — no workspace subtitle line).
+history; footer. Mobile keeps composition. Homepage `t1x8T` locked. Founder
+lock 2026-09-25 brought it to Linear-scale density (28px rows, neutral
+non-ion selected state). Read
+[the sidebar reference](docs/design-system/DETAILS.md#sidebar-app-shell)
+for full tokens and sizing when changing this area.
 
 | Token | Light | Dark |
 |-------|-------|------|
 | Width | 244px | 244px |
 | Background RGB | `247 248 248` | `7 8 10` |
-| Foreground RGB | `18 18 20` | `227 228 229` |
-| Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
-| Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
-| Accent active RGB | `236 238 241` | `168 176 195 / 0.1` |
-| Item foreground RGB | `88 90 96` | `214 218 226` |
-| Item icon RGB | `122 125 132` | `116 120 128` |
-| Muted RGB | `112 116 124` | `107 111 118` |
-| Nav font | 12px / weight 500 | — |
-| Item font | 13px / weight 450 | — |
 
 
 ## Full-Screen Status Screens

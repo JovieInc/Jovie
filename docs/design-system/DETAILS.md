@@ -776,11 +776,20 @@ keep them at semibold (~590) and do not drop medium surfaces to book/400.
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
+| Accent active RGB | `236 238 241` | `168 176 195 / 0.1` |
 | Item foreground RGB | `88 90 96` | `214 218 226` |
 | Item icon RGB | `122 125 132` | `116 120 128` |
 | Muted RGB | `112 116 124` | `107 111 118` |
 | Nav font | 12px / weight 500 | — |
 | Item font | 13px / weight 450 | — |
+
+Linear-scale density (founder lock 2026-09-25): 28px nav/history rows, 16px
+sidebar icons, 44px app header everywhere (single token, no separate
+"compact" variant). Selected nav row uses the neutral Accent active tint
+above with primary-token text — no ion/blue background, no border.
+Today/Earlier day headers are sentence case, no letterspacing, 11px medium,
+quiet color. Account footer is a single compact 32px row: 20px avatar, name
+only, no workspace subtitle line.
 
 ### App Shell Frame
 
