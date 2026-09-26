@@ -165,19 +165,43 @@ function pickCount(
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const start =
-    sources['github-native-merge-queue'].sourceTimestamp ??
-    sources['fleet-receipt'].sourceTimestamp;
-  const end =
-    sources['live-build-info'].sourceTimestamp ??
-    sources['production-controller'].sourceTimestamp;
-  if (start == null || end == null) return NOT_MEASURED_DURATION;
-  const startMs = Date.parse(start);
-  const endMs = Date.parse(end);
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
-    return NOT_MEASURED_DURATION;
+  // Ship time is only truthful when both endpoints observe the same build:
+  // subtracting a queue entry timestamp for one SHA from a live-build
+  // timestamp for another fabricates a duration. Missing or mismatched
+  // identity stays not-measured.
+  const starts = [
+    sources['github-native-merge-queue'],
+    sources['fleet-receipt'],
+  ].filter(
+    source =>
+      SUCCESS_STATES.has(source.state) &&
+      source.sourceTimestamp != null &&
+      isExactSha(source.correlation.sha)
+  );
+  const ends = [
+    sources['live-build-info'],
+    sources['production-controller'],
+  ].filter(
+    source =>
+      SUCCESS_STATES.has(source.state) &&
+      source.sourceTimestamp != null &&
+      isExactSha(source.correlation.sha)
+  );
+  for (const end of ends) {
+    const endMs = Date.parse(end.sourceTimestamp ?? '');
+    for (const start of starts) {
+      if (start.correlation.sha !== end.correlation.sha) continue;
+      const startMs = Date.parse(start.sourceTimestamp ?? '');
+      if (
+        Number.isFinite(startMs) &&
+        Number.isFinite(endMs) &&
+        endMs >= startMs
+      ) {
+        return measuredDuration(Math.round((endMs - startMs) / 1000));
+      }
+    }
   }
-  return measuredDuration(Math.round((endMs - startMs) / 1000));
+  return NOT_MEASURED_DURATION;
 }
 
 function revisionFingerprint(
@@ -367,7 +391,7 @@ export function projectShippingState(input: {
     meanings: projectMeanings(input.sources),
     timeToShipSeconds: timeToShip(input.sources),
     retrying: pickCount(input.sources, 'retrying'),
-    terminalFailures: pickCount(input.sources, 'blocked'),
+    terminalFailures: pickCount(input.sources, 'terminalFailures'),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
     operationalTasks: projectOperationalTasks(input),
   };

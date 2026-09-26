@@ -278,6 +278,12 @@ export type SourceObservation = IdentityFields & {
     readonly running: CountMeasurement;
     readonly retrying: CountMeasurement;
     readonly blocked: CountMeasurement;
+    /**
+     * Terminal (dead-lettered) failures. Distinct from `blocked`: blocked work
+     * is still live and may recover; terminal failures ended without success.
+     * Never aliases another list — absent evidence stays `not-measured`.
+     */
+    readonly terminalFailures: CountMeasurement;
     readonly queued: CountMeasurement;
     readonly openPullRequests: CountMeasurement;
     readonly capacityAvailable: CountMeasurement;
@@ -367,6 +373,7 @@ export function emptyCounts(): SourceObservation['counts'] {
     running: NOT_MEASURED_COUNT,
     retrying: NOT_MEASURED_COUNT,
     blocked: NOT_MEASURED_COUNT,
+    terminalFailures: NOT_MEASURED_COUNT,
     queued: NOT_MEASURED_COUNT,
     openPullRequests: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,

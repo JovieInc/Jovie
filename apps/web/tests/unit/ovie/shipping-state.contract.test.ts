@@ -29,6 +29,8 @@ import {
 } from '@/lib/ovie/shipping-state';
 import {
   createLiveShippingStateReaders,
+  GEM_BRIDGE_RECEIPT_KEYS,
+  gemBridgeReceiptUrl,
   isAllowlistedAuthorityPath,
   NAMED_AUTHORITY_PATHS,
   readMergeQueue,
@@ -38,6 +40,7 @@ import {
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const SHA_C = 'cccccccccccccccccccccccccccccccccccccccc';
 const T0 = '2026-08-22T00:00:00.000Z';
 
 function clockAt(iso: string): ShippingClock {
@@ -997,6 +1000,304 @@ describe('live symphony-task reader', () => {
     const projection = await publish({ 'symphony-task': read });
     expect(projection.sources['symphony-task'].state).toBe('unavailable');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('bounded authenticated Gem transport', () => {
+  const bridge = { url: 'https://gem.example.internal/hud', token: 'tok' };
+
+  it('addresses only fixed receipt keys on the configured bridge', () => {
+    for (const sourceId of SHIPPING_SOURCE_IDS) {
+      const url = gemBridgeReceiptUrl(bridge, sourceId);
+      if (sourceId in GEM_BRIDGE_RECEIPT_KEYS) {
+        expect(url).toBe(
+          `https://gem.example.internal/hud/receipts/${sourceId}`
+        );
+      } else {
+        expect(url).toBeNull();
+      }
+    }
+    expect(gemBridgeReceiptUrl(bridge, 'fleet-receipt')).toBe(
+      'https://gem.example.internal/hud/receipts/fleet-receipt'
+    );
+    expect(
+      gemBridgeReceiptUrl(
+        { ...bridge, url: 'https://gem.example.internal/hud///' },
+        'fleet-receipt'
+      )
+    ).toBe('https://gem.example.internal/hud/receipts/fleet-receipt');
+    for (const bad of [
+      { url: 'ftp://gem.example.internal', token: 'tok' },
+      { url: 'https://user:pw@gem.example.internal', token: 'tok' },
+      { url: 'https://gem.example.internal/?cmd=retry', token: 'tok' },
+      { url: 'https://gem.example.internal/#frag', token: 'tok' },
+      { url: 'not-a-url', token: 'tok' },
+      { url: 'https://gem.example.internal', token: '' },
+    ]) {
+      expect(gemBridgeReceiptUrl(bad, 'fleet-receipt')).toBeNull();
+    }
+  });
+
+  it('reads the symphony task receipt over the bridge with bearer auth', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            schema: 'symphony-workspace-revision/v1',
+            generated_at: T0,
+            running: [],
+            retrying: [{ issue_identifier: 'JOV-5248', attempt: 3 }],
+            blocked: [],
+          }),
+          { status: 200 }
+        )
+    );
+    const readers = createLiveShippingStateReaders({
+      readFile: vi.fn(),
+      fetch: fetchMock,
+      gemBridge: bridge,
+    });
+
+    const read = await readers['symphony-task']();
+
+    expect(read).toMatchObject({ status: 'ok', sourceTimestamp: T0 });
+    const call = fetchMock.mock.calls[0];
+    expect(String(call?.[0])).toBe(
+      'https://gem.example.internal/hud/receipts/symphony-task'
+    );
+    expect((call?.[1]?.headers as Record<string, string>).authorization).toBe(
+      'Bearer tok'
+    );
+  });
+
+  it('reads symphony runtime and the fleet receipt over the bridge', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/receipts/symphony-runtime')) {
+        return new Response(
+          JSON.stringify({
+            generated_at: T0,
+            running: [],
+            retrying: [],
+            blocked: [],
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          schema: 'jovie-fleet-gate/v1',
+          observedAt: T0,
+          signals: { main: { sha: SHA } },
+        }),
+        { status: 200 }
+      );
+    });
+    const readers = createLiveShippingStateReaders({
+      readFile: vi.fn(),
+      fetch: fetchMock,
+      gemBridge: bridge,
+    });
+
+    const runtime = await readers['symphony-runtime']();
+    const fleet = await readers['fleet-receipt']();
+
+    expect(runtime).toMatchObject({ status: 'ok', sourceTimestamp: T0 });
+    expect(fleet).toMatchObject({ status: 'ok', sourceTimestamp: T0 });
+    expect(fetchMock.mock.calls.map(call => String(call[0]))).toEqual([
+      'https://gem.example.internal/hud/receipts/symphony-runtime',
+      'https://gem.example.internal/hud/receipts/fleet-receipt',
+    ]);
+  });
+
+  it.each([
+    ['unauthorized', 401, 'unauthorized'],
+    ['forbidden', 403, 'unauthorized'],
+    ['http failure', 502, 'unavailable'],
+  ])(
+    'maps bridge %s to an explicit observation state',
+    async (_label, status, expected) => {
+      const readers = createLiveShippingStateReaders({
+        readFile: vi.fn(),
+        fetch: vi.fn(async () => new Response('{}', { status })),
+        gemBridge: bridge,
+      });
+
+      expect(await readers['fleet-receipt']()).toMatchObject({
+        status: expected,
+      });
+    }
+  );
+
+  it('reports disconnect and malformed bridge receipts without fabricating', async () => {
+    const offline = createLiveShippingStateReaders({
+      readFile: vi.fn(),
+      fetch: vi.fn(async () => {
+        throw new Error('connection refused');
+      }),
+      gemBridge: bridge,
+    });
+    expect(await offline['fleet-receipt']()).toMatchObject({
+      status: 'disconnected',
+    });
+
+    const malformed = createLiveShippingStateReaders({
+      readFile: vi.fn(),
+      fetch: vi.fn(async () => new Response('[]', { status: 200 })),
+      gemBridge: bridge,
+    });
+    expect(await malformed['fleet-receipt']()).toMatchObject({
+      status: 'error',
+      errorCode: 'malformed',
+    });
+  });
+});
+
+describe('terminal failures are not aliased to blocked', () => {
+  it('measures a terminal failure list separately from blocked work', async () => {
+    const projection = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [{ issue_identifier: 'JOV-1' }],
+          failed: [
+            { issue_identifier: 'JOV-2' },
+            { issue_identifier: 'JOV-3' },
+          ],
+        }),
+      })
+    );
+
+    expect(projection.sources['symphony-runtime'].counts.blocked).toEqual({
+      state: 'measured-nonzero',
+      value: 1,
+    });
+    expect(
+      projection.sources['symphony-runtime'].counts.terminalFailures
+    ).toEqual({ state: 'measured-nonzero', value: 2 });
+    expect(projection.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
+    });
+  });
+
+  it('stays not-measured when no terminal list is reported', async () => {
+    const projection = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [{ issue_identifier: 'JOV-1' }],
+        }),
+      })
+    );
+
+    expect(projection.terminalFailures).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+
+  it('measures zero only when a terminal list is actually empty', async () => {
+    const projection = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [],
+          blocked: [],
+          deadLetters: [],
+        }),
+      })
+    );
+
+    expect(projection.terminalFailures).toEqual({
+      state: 'measured-zero',
+      value: 0,
+    });
+  });
+});
+
+describe('ship time requires matched build identity', () => {
+  const at = (iso: string, extra: Partial<AuthorityRead> = {}) => ({
+    sourceTimestamp: iso,
+    ...extra,
+  });
+
+  it('measures ship time only across the same exact SHA', async () => {
+    const projection = await publish(
+      baseline({
+        'fleet-receipt': ok(
+          'fleet-receipt',
+          { state: 'GREEN' },
+          at(T0, { correlation: { sha: SHA } })
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA },
+          at('2026-08-22T00:02:00.000Z', {
+            correlation: { sha: SHA, buildId: 'b1' },
+            measuredMeanings: { exactLiveBuild: true },
+          })
+        ),
+      })
+    );
+
+    expect(projection.timeToShipSeconds).toEqual({
+      state: 'measured-nonzero',
+      value: 120,
+    });
+  });
+
+  it('does not subtract timestamps for different builds', async () => {
+    const projection = await publish(
+      baseline({
+        'fleet-receipt': ok(
+          'fleet-receipt',
+          { state: 'GREEN' },
+          at(T0, { correlation: { sha: SHA } })
+        ),
+        'production-controller': ok(
+          'production-controller',
+          { conclusion: 'success' },
+          at('2026-08-22T00:03:00.000Z', {
+            correlation: { sha: SHA_C, deploymentId: '3' },
+            measuredMeanings: { productionVerified: true },
+          })
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA_B },
+          at('2026-08-22T00:02:00.000Z', {
+            correlation: { sha: SHA_B, buildId: 'b2' },
+          })
+        ),
+      })
+    );
+
+    expect(projection.timeToShipSeconds).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+
+  it('does not invent ship time when either build identity is unknown', async () => {
+    const projection = await publish(
+      baseline({
+        'fleet-receipt': ok('fleet-receipt', { state: 'GREEN' }, at(T0)),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA },
+          at('2026-08-22T00:02:00.000Z', {
+            correlation: { sha: SHA },
+          })
+        ),
+      })
+    );
+
+    expect(projection.timeToShipSeconds).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
   });
 });
 
