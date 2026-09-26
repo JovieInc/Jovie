@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/components/admin/AdminProfileSidebar.test.tsx
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
