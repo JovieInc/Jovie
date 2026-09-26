@@ -142,6 +142,13 @@ def _validate_economics(mid, model):
             value = promo.get(price)
             if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
                 raise ValueError(f"{mid}: promo.{price} must be >= 0")
+    by_capability = model.get("quality_by_capability")
+    if by_capability is not None:
+        if not isinstance(by_capability, dict) or not by_capability or any(
+            not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 100
+            for value in by_capability.values()
+        ):
+            raise ValueError(f"{mid}: quality_by_capability values must be 0-100")
     if "effective_price_multiplier" in model:
         value = model["effective_price_multiplier"]
         if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 1:
@@ -402,6 +409,13 @@ def effective_prices(model, now):
     return price_in, price_out, basis
 
 
+def capability_quality(model, capability):
+    """Benchmark-backed quality for this capability, else the global quality."""
+    by_capability = model.get("quality_by_capability") or {}
+    value = by_capability.get(capability)
+    return float(value if isinstance(value, (int, float)) else model.get("quality") or 0)
+
+
 def _outcome(st, model_id, capability):
     return ((st.get("outcomes") or {}).get(model_id) or {}).get(capability) or {}
 
@@ -418,7 +432,7 @@ def expected_cost_per_success(cfg, model, st, capability, now):
     min_samples = int(policy.get("min_samples") or 5)
     prior_weight = float(policy.get("prior_weight") or 2)
     minute_value = float(policy.get("minute_value_usd") or 0)
-    prior_p = min(0.99, max(0.01, float(model.get("quality") or 0) / 100.0))
+    prior_p = min(0.99, max(0.01, capability_quality(model, capability) / 100.0))
     observed = _outcome(st, model["id"], capability)
     attempts = max(0, int(observed.get("attempts") or 0))
     successes = min(attempts, max(0, int(observed.get("successes") or 0)))
@@ -439,8 +453,16 @@ def expected_cost_per_success(cfg, model, st, capability, now):
         basis = "subscription-included"
     token_cost = (tokens_in * price_in + tokens_out * price_out) / 1_000_000.0
     attempt_cost = token_cost + minutes * minute_value
+    failure_cost = (policy.get("failure_cost_usd") or {}).get(capability)
+    if isinstance(failure_cost, (int, float)) and failure_cost >= 0:
+        # One-shot work (a review is not retried): pay once, plus the
+        # downstream cost of a miss or a false result.
+        expected = attempt_cost + (1 - p_success) * failure_cost
+    else:
+        # Retry-until-done work (code tasks): expected attempts = 1 / p.
+        expected = attempt_cost / p_success
     return {
-        "expected_cost_per_success": attempt_cost / p_success,
+        "expected_cost_per_success": expected,
         "attempt_token_cost": token_cost,
         "p_success": p_success,
         "samples": attempts,
@@ -469,7 +491,7 @@ def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
         "price_basis": economics["price_basis"],
     }
     floor = (policy.get("min_quality") or {}).get(capability)
-    if isinstance(floor, (int, float)) and quality < floor:
+    if isinstance(floor, (int, float)) and capability_quality(model, capability) < floor:
         return False, "below_quality_floor", None, extra
 
     if channel in {"subscription", "local"}:
@@ -617,7 +639,7 @@ def rank(capability, path=None, provider=None, channel=None, min_quality=None,
         reason = None
         if model.get("family") in exclude_families:
             reason = "excluded_family"
-        elif min_quality is not None and float(model.get("quality") or 0) < min_quality:
+        elif min_quality is not None and capability_quality(model, capability) < min_quality:
             reason = "below_min_quality"
         elif pool_exhausted(st, model.get("pool"), now):
             reason = "pool_exhausted"
@@ -635,7 +657,7 @@ def rank(capability, path=None, provider=None, channel=None, min_quality=None,
             "model": model["model"],
             "provider": model["provider"],
             "family": model.get("family"),
-            "quality": model.get("quality"),
+            "quality": capability_quality(model, capability),
             "list_price_in": model["list_price_in"],
             "list_price_out": model["list_price_out"],
             **extra,

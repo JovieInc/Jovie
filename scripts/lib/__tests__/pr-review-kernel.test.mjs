@@ -466,10 +466,29 @@ describe('models', () => {
     ).rejects.toThrow(/rank output invalid/);
   });
 
-  it('gets a floored, different-family pair from the real registry', async () => {
-    const { routing } = selectRoutes(await fetchRankings());
-    expect(routing.discovery.family).not.toBe(routing.verification.family);
-    expect(routing.verification.pSuccess).toBeGreaterThanOrEqual(0.75);
+  it('picks V4.1 Flash to discover and GLM 5.3 to verify from the real registry priors', async () => {
+    // Locks the benchmark-prior outcome (DeepSWE v1.1 + Gateway prices +
+    // $5 failure cost). Replay outcomes are expected to move it later.
+    const { routes, routing } = selectRoutes(await fetchRankings());
+    expect(routes).toEqual({
+      discovery: 'deepseek/deepseek-v4.1-flash',
+      verification: 'zai/glm-5.3',
+    });
+    expect(routing.verification.pSuccess).toBeGreaterThanOrEqual(0.65);
+  });
+
+  it('lets a weaker verifier check a stronger discoverer of another family', () => {
+    const { routes } = selectRoutes({
+      discovery: {
+        ranked: [
+          rankRow('d-41', 'deepseek/deepseek-v4.1-flash', 'deepseek', 74, 1.3),
+        ],
+      },
+      verification: {
+        ranked: [rankRow('g-full', 'zai/glm-5.3', 'glm', 67, 1.66)],
+      },
+    });
+    expect(routes.verification).toBe('zai/glm-5.3');
   });
 
   it('refuses to build a transport without a key', () => {

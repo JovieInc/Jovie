@@ -12,7 +12,7 @@ import types
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/test-model-router.py"
 TARGETS = {
-    "model-router.py": {"route_priority", "score_candidate", "update_state", "save_state", "mark_pool_exhausted", "record_pool_use", "record_api_spend", "_timestamp", "_validate_economics", "effective_prices", "expected_cost_per_success", "record_outcome", "rank", "mark_model_exhausted"},
+    "model-router.py": {"route_priority", "score_candidate", "update_state", "save_state", "mark_pool_exhausted", "record_pool_use", "record_api_spend", "_timestamp", "_validate_economics", "effective_prices", "expected_cost_per_success", "record_outcome", "rank", "mark_model_exhausted", "capability_quality"},
 }
 
 
