@@ -23,12 +23,15 @@ describe('NavBadge', () => {
   it.each([
     ['pro', 'Pro'],
     ['new', 'New'],
-  ] as const)('renders the %s label from the canonical variant', (variant, label) => {
-    render(<NavBadge variant={variant} />);
+  ] as const)(
+    'renders the %s label from the canonical variant',
+    (variant, label) => {
+      render(<NavBadge variant={variant} />);
 
-    const badge = screen.getByText(label);
-    expect(badge).toBeVisible();
-    expect(badge).toHaveAttribute('data-nav-badge', variant);
-    expect(badge).toHaveClass('h-4');
-  });
+      const badge = screen.getByText(label);
+      expect(badge).toBeVisible();
+      expect(badge).toHaveAttribute('data-nav-badge', variant);
+      expect(badge).toHaveClass('h-4');
+    }
+  );
 });

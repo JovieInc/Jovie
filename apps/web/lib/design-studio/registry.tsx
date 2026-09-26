@@ -108,7 +108,7 @@ function StudioFrame({
   return (
     <div
       className={cn(
-        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-background text-white dark:text-white shadow-2xl',
+        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-base text-white dark:text-white shadow-2xl',
         className
       )}
     >
@@ -146,7 +146,7 @@ function PublicProfileIphonePreview() {
   ] as const;
 
   return (
-    <StudioFrame className='bg-background p-4'>
+    <StudioFrame className='bg-base p-4'>
       <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
         {states.map(state => (
           <div key={state.id} className='min-w-0'>
@@ -175,7 +175,7 @@ function PublicProfileIphonePreview() {
 
 function PublicProfileMerchFixturePreview() {
   return (
-    <StudioFrame className='flex items-center justify-center bg-background p-6'>
+    <StudioFrame className='flex items-center justify-center bg-base p-6'>
       <div className='w-full max-w-[390px] rounded-[28px] border border-white/10 bg-black dark:bg-black p-4'>
         <div className='relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.035]'>
           <div className='grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-3 p-3'>

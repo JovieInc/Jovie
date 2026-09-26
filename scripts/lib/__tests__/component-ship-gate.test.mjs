@@ -886,9 +886,12 @@ describe('coverage-via executable evidence', () => {
         "test.todo('renders', () => render(<ViaPanel />));",
       ],
     ],
-  ])('rejects a render inside %s as inert @coverage-via evidence', (_case, testSource) => {
-    expectInvalidCoverageVia(testSource.join('\n'));
-  });
+  ])(
+    'rejects a render inside %s as inert @coverage-via evidence',
+    (_case, testSource) => {
+      expectInvalidCoverageVia(testSource.join('\n'));
+    }
+  );
 
   it('rejects a helper call from an unrelated shadowed scope', () => {
     expectInvalidCoverageVia(

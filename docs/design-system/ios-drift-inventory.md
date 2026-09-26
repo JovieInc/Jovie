@@ -15,7 +15,7 @@ only. No device, simulator, or Pen runtime proof in this slice.
 | Rank | Family | Severity | Status | Why it ranks here |
 | --- | --- | --- | --- | --- |
 | 1 | Settings | High | **Lowered in this PR** | Founder-named system surface. Was a custom `ScrollView` of solid `surface0` wells, all-caps section titles, a private press style, force-unwrapped URLs, and an unused Liquid Glass atom. |
-| 2 | Token hex vs Noir Ion | High | Open | `JovieColor` still hard-codes pre-Noir-Ion dark values (`0x06070A` canvas, `#FFFFFF` text) while web System B dark is `#030407` / `#F5F7FB`. Semantic names match; values do not. |
+| 2 | Token hex vs Noir Ion | High | Open | `JovieColor` still hard-codes pre-Noir-Ion dark values (`0x06070A` canvas, `#FFFFFF` text) while web System B dark is `#030406` / `#F5F7FB`. Semantic names match; values do not. |
 | 3 | Motion comment vs code | Medium | Open | `DrawerRowRevealModifier` and `StatTileRevealModifier` comments say opacity-only and still apply offset. Reduce Motion already zeros the offset. |
 | 4 | Press scale token | Medium | Open | iOS `JovieMotion.pressScale` is `0.96`. Web `--scale-press` is `0.98`. `docs/design-system/state-matrix.md` still documents `active:scale-[0.96]`. One owner needed. |
 | 5 | System-surface glass adoption | Medium | Open after Settings | `jovieSurface` / `glassEffect` now has a Settings consumer. Dashboard, audience, library, and onboarding grouped cards still use solid fills. Do not spray glass onto Chat/Calendar. |
