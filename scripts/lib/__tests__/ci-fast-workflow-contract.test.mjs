@@ -75,7 +75,7 @@ describe('ci-fast bounded parallel workflow', () => {
     { ci: 'true', available: true, suiteExit: 37, expected: 37 },
   ])('executes structural Python dependency policy %j', scenario => {
     const command = CI_FAST_SOURCE.match(
-      /'(if python3 -c "import coverage, pytest"[^'\n]+)'/
+      /'(if python3 -c "import coverage, pytest, xdist"[^'\n]+)'/
     )?.[1];
     expect(command).toBeTruthy();
     if (!command) throw new Error('missing structural Python command');
@@ -115,7 +115,7 @@ describe('ci-fast bounded parallel workflow', () => {
           .find(call => call.startsWith('-m pytest '));
         expect(pytestInvocation).toBe(
           [
-            '-m pytest --durations=20',
+            '-m pytest -n 3 --durations=20',
             'scripts/tests/test_gh_retry.py',
             'scripts/tests/test_vercel_prebuilt_deploy.py',
             'scripts/tests/test_brand_scrub.py',
@@ -126,9 +126,11 @@ describe('ci-fast bounded parallel workflow', () => {
           ].join(' ')
         );
       } else {
-        expect(invoked.trim()).toBe('-c import coverage, pytest');
+        expect(invoked.trim()).toBe('-c import coverage, pytest, xdist');
         if (scenario.ci === 'true') {
-          expect(result.stderr).toContain('::error::pytest/coverage missing');
+          expect(result.stderr).toContain(
+            '::error::pytest/coverage/xdist missing'
+          );
         } else {
           expect(result.stdout).toContain('skip local structural regressions');
         }
@@ -136,6 +138,33 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('installs the pytest-xdist the structural suite parallelizes with from hashed pins', () => {
+    const requirementsIn = readFileSync(
+      join(REPO_ROOT, '.github/requirements/pytest.in'),
+      'utf8'
+    );
+    const requirementsTxt = readFileSync(
+      join(REPO_ROOT, '.github/requirements/pytest.txt'),
+      'utf8'
+    );
+    const version = /^pytest-xdist==(\S+)$/mu.exec(requirementsIn)?.[1];
+    expect(version).toBeTruthy();
+    // xdist and its execnet dependency must be hash-pinned: the structural
+    // step installs with --require-hashes and `-n 3` fails without xdist.
+    for (const pkg of [`pytest-xdist==${version}`, 'execnet==']) {
+      const start = requirementsTxt.indexOf(`\n${pkg}`);
+      expect(start, `${pkg} missing from pytest.txt`).toBeGreaterThan(-1);
+      expect(requirementsTxt.slice(start + 1).split('\n')[1]).toMatch(
+        /^\s+--hash=sha256:[0-9a-f]{64}/u
+      );
+    }
+    expect(
+      jobBlock('ci-fast-remaining', 'ci-profile-admission-browser')
+    ).toContain(
+      'python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt'
+    );
   });
 
   it('runs desktop release regressions with measured coverage for mac changes', () => {
