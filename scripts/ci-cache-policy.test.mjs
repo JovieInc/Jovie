@@ -53,9 +53,12 @@ test('hosted repair restores the exact candidate dependency store', () => {
   assert.match(workflow, /cache-dependency-path: candidate\/pnpm-lock\.yaml/);
 });
 
+// pr-visual-review.yml is deliberately absent: its capture job runs
+// PR-controlled code, and its trust-boundary contract
+// (apps/web/tests/unit/ci/pr-visual-review-workflow.test.ts) forbids any
+// actions/cache step there.
 test('Chromium download steps restore a Playwright cache first', () => {
   for (const file of [
-    '.github/workflows/pr-visual-review.yml',
     '.github/workflows/screenshots.yml',
     '.github/workflows/visual-a11y.yml',
   ]) {
