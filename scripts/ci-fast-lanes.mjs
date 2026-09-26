@@ -35,12 +35,14 @@ import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import {
   affectsJovieTypecheck,
+  affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 
+export { affectsWebTestTypecheck };
+
 export const WEB_TESTS_TYPECHECK_COMMAND =
   'pnpm --filter=@jovie/web run typecheck:tests';
-const WEB_TESTS_TYPECHECK_BASELINE = 'apps/web/typecheck-tests-baseline.json';
 
 export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
   '--test',
@@ -866,21 +868,11 @@ function runTypecheck() {
   return shell('pnpm turbo typecheck --affected --force');
 }
 
-/**
- * apps/web/tsconfig.test.json also compiles JS helpers (allowJs) such as
- * .github/scripts/*.mjs, and its ratchet reads the committed baseline.
- */
-export function affectsWebTestTypecheck(file) {
-  const normalized = String(file || '').trim();
-  if (affectsJovieTypecheck(normalized)) return true;
-  if (normalized === WEB_TESTS_TYPECHECK_BASELINE) return true;
-  return /\.(?:js|jsx|mjs|cjs)$/i.test(normalized);
-}
-
 function runWebTestsTypecheck() {
   // The shrink-only apps/web test graph (tests/, scripts/, allowJs helpers)
-  // rotted while nothing in CI ran it. Library type changes break test types,
-  // so it follows the product typecheck selection plus JS/baseline inputs.
+  // rotted while nothing in CI ran it. Source-PR preselection
+  // (run_jovie_typecheck) already counts its JS and baseline inputs via
+  // affectsWebTestTypecheck, so a 'false' receipt means none changed.
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (
     event === 'pull_request' &&
