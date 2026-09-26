@@ -214,6 +214,7 @@ describe('ShellReleaseRow audio affordance', () => {
       artistName: 'Bahamas',
       artworkUrl: 'https://x.invalid/a.jpg',
       hasLyrics: true,
+      releaseId: 'r1',
     });
     expect(onSelect).not.toHaveBeenCalled();
   });
