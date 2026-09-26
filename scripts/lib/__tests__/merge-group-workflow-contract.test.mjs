@@ -1783,6 +1783,20 @@ ${selectedGateScript}`,
     expect(envLines(build).length).toBeGreaterThan(0);
     expect(envLines(build)).toEqual(envLines(ciBuild));
 
+    // The homepage visual compare restores the same entry, so it builds with
+    // the same NEXT_* env and task hash. NEXT_DISABLE_TOOLBAR is the one extra:
+    // turbo does not hash it and the homepage baselines render without the
+    // cookie banner it disables. No DATABASE_URL/VERCEL_ENV pass-through.
+    const visualBuild = stepIn(
+      getJobBlock(CI_WORKFLOW, 'ci-visual-snapshot-compare'),
+      'Build homepage for rendered snapshot compare'
+    );
+    expect(envLines(visualBuild)).toEqual([
+      ...envLines(build),
+      "          NEXT_DISABLE_TOOLBAR: '1'",
+    ]);
+    expect(visualBuild).not.toMatch(/^ {10}(DATABASE_URL|VERCEL_ENV):/m);
+
     // Size/symlink guard and a single trusted-main save of the primary key.
     const measure = stepIn(
       warm,
