@@ -12,14 +12,16 @@ import {
   buildProjectCreationTestCommand,
   buildSelectedTestCommands,
   buildVerificationEnv,
+  CONTROL_TEST_CONCURRENCY,
+  controlCoverageReportsDirectory,
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 
 describe('structural control stage execution', () => {
-  it('runs registry, project, control coverage, Dependabot coverage, CLI coverage, and web sequentially', async () => {
+  it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(8);
+    expect(stages).toHaveLength(17);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -56,12 +58,57 @@ describe('structural control stage execution', () => {
         '--coverage.thresholds.lines=95',
         '--coverage.thresholds.branches=90',
         '--coverage.thresholds.functions=95',
+        controlCoverageReportsDirectory('dependabot-update-policy'),
       ],
     ]);
     expect(stages[6][1]).toContain(
       '--coverage.include=pr-conflict-handler.mjs'
     );
     expect(stages[7][1]).toContain('@jovie/web');
+    expect(stages[8]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/production-continuity.mjs',
+        '--test-coverage-lines=95',
+        '--test-coverage-branches=90',
+        '--test-coverage-functions=90',
+        '.github/scripts/production-continuity.test.mjs',
+      ],
+    ]);
+    expect(stages[11]).toEqual([
+      'node',
+      ['--test', '.github/scripts/production-continuity-workflow.test.mjs'],
+    ]);
+    expect(stages[13]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/vercel-output-manifest.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=85',
+        '--test-coverage-functions=90',
+        '.github/scripts/vercel-output-manifest.test.mjs',
+      ],
+    ]);
+    expect(stages[14]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/production-input-provenance.mjs',
+        '--test-coverage-lines=85',
+        '--test-coverage-branches=75',
+        '--test-coverage-functions=90',
+        '.github/scripts/production-input-provenance.test.mjs',
+      ],
+    ]);
+    expect(stages[16]).toEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
     const visited = [];
     expect(
       await runControlTestCommands(async (command, args) => {
@@ -72,20 +119,111 @@ describe('structural control stage execution', () => {
     expect(visited).toEqual(stages);
   });
 
-  it('propagates each failed stage and never starts its successor', async () => {
-    for (const failedStage of buildControlTestCommands().map(
-      (_, index) => index
-    )) {
+  it('propagates each failed stage and starts nothing after the failure', async () => {
+    const stages = buildControlTestCommands();
+    for (const failedStage of stages.map((_, index) => index)) {
       const visited = [];
       const status = await runControlTestCommands(async (command, args) => {
+        const index = visited.length;
         visited.push([command, args]);
-        return visited.length - 1 === failedStage ? 7 : 0;
+        await new Promise(resolveTick => setTimeout(resolveTick, 0));
+        return index === failedStage ? 7 : 0;
       });
       expect(status).toBe(7);
-      expect(visited).toEqual(
-        buildControlTestCommands().slice(0, failedStage + 1)
+      // Only a stage already in flight alongside the failed one may have
+      // started; nothing is dispatched once the failure is observed.
+      expect(visited.length).toBeGreaterThanOrEqual(failedStage + 1);
+      expect(visited.length).toBeLessThanOrEqual(
+        Math.min(stages.length, failedStage + CONTROL_TEST_CONCURRENCY)
       );
+      expect(visited).toEqual(stages.slice(0, visited.length));
     }
+  });
+
+  it('bounds concurrent control stages and overlaps independent work', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const status = await runControlTestCommands(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise(resolveTick => setTimeout(resolveTick, 1));
+      inFlight -= 1;
+      return 0;
+    });
+    expect(status).toBe(0);
+    expect(CONTROL_TEST_CONCURRENCY).toBe(3);
+    expect(peak).toBe(CONTROL_TEST_CONCURRENCY);
+    peak = 0;
+    expect(
+      await runControlTestCommands(async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise(resolveTick => setTimeout(resolveTick, 1));
+        inFlight -= 1;
+        return 0;
+      }, 1)
+    ).toBe(0);
+    expect(peak).toBe(1);
+  });
+
+  it('gives every concurrent Vitest coverage stage its own reports directory', () => {
+    const stages = /** @type {Array<[string, string[]]>} */ (
+      buildControlTestCommands()
+    );
+    const vitestCoverageStages = stages.filter(
+      ([command, args]) =>
+        command === 'pnpm' &&
+        args.includes('vitest') &&
+        args.some(argument => argument.startsWith('--coverage'))
+    );
+    expect(vitestCoverageStages).toHaveLength(4);
+    const directories = vitestCoverageStages.map(([, args]) => {
+      const flags = args.filter(argument =>
+        argument.startsWith('--coverage.reportsDirectory=')
+      );
+      expect(flags).toHaveLength(1);
+      return flags[0].slice('--coverage.reportsDirectory='.length);
+    });
+    expect(new Set(directories).size).toBe(directories.length);
+    for (const directory of directories) {
+      expect(directory).toMatch(/jovie-control-coverage/);
+    }
+    // The FX stage keeps its own dedicated directory in package.json.
+    expect(buildControlTestCommands().at(-1)).toEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
+  });
+
+  it('flushes buffered stage output whole after the command exits', async () => {
+    const diagnostics = [];
+    const writes = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = chunk => {
+      writes.push(String(chunk));
+      return true;
+    };
+    let status;
+    try {
+      status = await runCommandStatus(
+        process.execPath,
+        [
+          '-e',
+          'console.log("first"); console.error("second"); process.exit(3)',
+        ],
+        {
+          bufferOutput: true,
+          logger: message => diagnostics.push(message),
+        }
+      );
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    expect(status).toBe(3);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('first');
+    expect(writes[0]).toContain('second');
+    expect(diagnostics.at(-1)).toContain('status=3');
   });
 });
 

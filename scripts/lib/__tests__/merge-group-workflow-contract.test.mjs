@@ -87,6 +87,10 @@ const CLAUDE_REVIEW_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/claude-review.yml'),
   'utf8'
 );
+const NEXT_BUILD_CACHE_WARM_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/next-build-cache-warm.yml'),
+  'utf8'
+);
 const MEMBER_POLICY = readFileSync(
   resolve(REPO_ROOT, 'scripts/lib/merge-group-member-policy.mjs'),
   'utf8'
@@ -136,7 +140,10 @@ function getStepRunScript(jobBlock, stepName) {
     stepStart,
     stepEnd === -1 ? lines.length : stepEnd
   );
-  const runStart = stepLines.findIndex(line => line === '        run: |');
+  // `run: &anchor |` shares the script with ci-fast (structural python).
+  const runStart = stepLines.findIndex(line =>
+    /^ {8}run: (?:&[\w-]+ )?\|$/.test(line)
+  );
   expect(runStart, `Missing run block: ${stepName}`).toBeGreaterThanOrEqual(0);
   return stepLines
     .slice(runStart + 1)
@@ -182,12 +189,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_PYTHON_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -214,13 +221,22 @@ function workflowDeclaresReadyForReviewType(source) {
   return false;
 }
 
+const BLOBLESS_BASE_FETCH_JOBS = new Set([
+  'ci-exact-head-coverage',
+  'ci-profile-admission-browser',
+]);
+
+// Jobs whose full base fetch runs in the background during dependency
+// install; "Fetch base-branch history" then awaits it before any consumer.
+const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
+
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(3);
+    ).toHaveLength(4);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -414,7 +430,7 @@ describe('merge_group workflow contract', () => {
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-admission');
-      expect(job, jobId).toMatch(/if: >-\s+!cancelled\(\) &&/);
+      expect(job, jobId).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
       expect(job, jobId).not.toContain('always()');
       expect(job, jobId).toContain("github.event_name != 'merge_group'");
       expect(job, jobId).toContain(
@@ -478,7 +494,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(3);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(4);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
@@ -507,6 +523,16 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('runs unsharded quarantine retries in exactly one unit shard', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const step = units.slice(
+      units.indexOf('- name: Run quarantined unit tests (retries)'),
+      units.indexOf('- name: Run Ovie route')
+    );
+    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/10'\n/);
+    expect(step).not.toContain('--shard');
+  });
+
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
@@ -533,6 +559,18 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).not.toContain('@jovie/ovie');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
+    // The build may skip Next's duplicate type pass only because the
+    // standalone typecheck runs first, fail-fast, in the same step.
+    expect(ovieBuild).toContain('set -euo pipefail');
+    expect(
+      ovieBuild.indexOf('pnpm --filter @jovie/ovie typecheck')
+    ).toBeLessThan(
+      ovieBuild.indexOf(
+        'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
+      )
+    );
+    expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
+    expect(ovieBuild).not.toMatch(/typecheck[^\n]*\|\|/);
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
     expect(ovieBuild).toContain(
       'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
@@ -796,6 +834,15 @@ describe('merge_group workflow contract', () => {
     expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
     expect(coverage).toContain("github.event_name == 'merge_group'");
     expect(coverage).toContain('github.event.merge_group.head_sha');
+    // The event PR base SHA goes stale on synchronize; the PR diff base is the
+    // merge base with the fetched base tip, the queue keeps its exact base.
+    expect(coverage).not.toContain('github.event.pull_request.base.sha');
+    expect(coverage).toContain(
+      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+    );
+    expect(coverage).toContain(
+      'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
+    );
     expect(coverage).toContain('.applicable');
     expect(coverage).toContain(
       'pnpm --filter @jovie/web test:coverage --changed'
@@ -832,14 +879,19 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain('fetch-depth: 1');
       expect(job, jobId).toContain('persist-credentials: false');
       expect(job, jobId).not.toContain('filter: blob:none');
-      const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
-      // Exact-head Coverage reads history only through the ratchet diff, so
-      // it skips historical blobs (pinned separately below). Jobs whose
-      // guards read historical blobs keep the full unshallow.
-      const expectedFetch =
-        jobId === 'ci-exact-head-coverage'
-          ? 'fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
-          : 'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"';
+      const fetchScript = getStepRunScript(
+        job,
+        BACKGROUND_BASE_FETCH_JOBS.has(jobId)
+          ? 'Start base-branch history fetch'
+          : 'Fetch base-branch history'
+      );
+      // These jobs read history only through a tree diff (the profile-browser
+      // selector's --name-only --no-renames diff, and Exact-head Coverage's
+      // ratchet diff), so they skip historical blobs (each pinned separately
+      // below). Jobs whose guards read historical blobs keep the full unshallow.
+      const expectedFetch = BLOBLESS_BASE_FETCH_JOBS.has(jobId)
+        ? 'fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'
+        : 'fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"';
       expect(fetchScript, jobId).toContain(expectedFetch);
       expect(job, jobId).toContain(
         "BASE_BRANCH: ${{ github.base_ref || 'main' }}"
@@ -851,6 +903,71 @@ describe('merge_group workflow contract', () => {
         job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
       );
     }
+  });
+
+  it('overlaps the full ci-fast (remaining) base fetch with dependency install and fails closed', () => {
+    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const start = getStepRunScript(job, 'Start base-branch history fetch');
+    const wait = getStepRunScript(job, 'Fetch base-branch history');
+    const startAt = job.indexOf('- name: Start base-branch history fetch');
+    const setupAt = job.indexOf('- uses: ./.github/actions/setup-node-pnpm');
+    const waitAt = job.indexOf('- name: Fetch base-branch history');
+    const firstConsumer = job.search(
+      /pnpm ci:incident-contract:validate|git diff|ci-fast-lanes\.mjs/
+    );
+    // start -> dependency install -> await -> every history consumer.
+    expect(startAt).toBeGreaterThan(-1);
+    expect(setupAt).toBeGreaterThan(startAt);
+    expect(waitAt).toBeGreaterThan(setupAt);
+    expect(firstConsumer).toBeGreaterThan(waitAt);
+    // Guards here read historical blobs, so the fetch must stay full.
+    expect(start).not.toContain('--filter=blob:none');
+    expect(start).toContain('set -euo pipefail');
+    // The exit status is published atomically only after git fetch returns.
+    expect(start).toMatch(
+      /echo "\$\?" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
+    );
+    expect(start).toContain('< /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &');
+    // The awaiting step holds no token and fails closed on every failure mode.
+    const waitStep = job.slice(waitAt, firstConsumer);
+    expect(waitStep).not.toContain('GH_TOKEN');
+    expect(waitStep).toContain('timeout-minutes: 10');
+    expect(wait).toContain('set -euo pipefail');
+    expect(wait).toContain('did not finish within 540s');
+    expect(wait).toMatch(
+      /if \[\[ "\$fetch_status" != '0' \]\]; then[^]*?exit 1/
+    );
+    expect(wait).toMatch(
+      /git rev-parse --is-shallow-repository\)" != 'false' \]\]; then[^]*?exit 1/
+    );
+    expect(wait).toMatch(
+      /git rev-parse --verify --quiet "refs\/remotes\/origin\/\$\{BASE_BRANCH\}\^\{commit\}"[^]*?exit 1/
+    );
+  });
+
+  it('keeps the blobless profile-browser selector a blob-free tree diff', () => {
+    const job = getJobBlock(CI_WORKFLOW, 'ci-profile-admission-browser');
+    const selectStep = job.slice(
+      job.indexOf('      - name: Select public-profile browser admission'),
+      job.indexOf('      - uses: ./.github/actions/setup-node-pnpm')
+    );
+    expect(selectStep).toContain('id: profile-browser');
+    // Lazy promisor fetches are disabled, so a blob read would fail closed
+    // instead of silently downloading history.
+    expect(selectStep).toContain("GIT_NO_LAZY_FETCH: '1'");
+    const diffs = selectStep.match(/git diff [^\n]*/g) ?? [];
+    expect(diffs).toHaveLength(1);
+    // Rename detection is the only blob reader for --name-only; --no-renames
+    // keeps the diff to commits and trees the blobless fetch provides.
+    expect(diffs[0]).toContain(
+      'git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD --'
+    );
+    expect(selectStep).not.toMatch(/git (?:blame|show|log -p|cat-file -p)/);
+    expect(selectStep).not.toMatch(/git diff [^\n]*(?:--stat|-p\b|--patch)/);
+    // Credentials stay step-scoped: no checkout-level blob filter or
+    // persisted token that later test code could reuse.
+    expect(job).not.toContain('filter: blob:none');
+    expect(job).toContain('persist-credentials: false');
   });
 
   it('prefetches exactly the ratchet diff blobs for blobless exact-head coverage', () => {
@@ -904,8 +1021,15 @@ describe('merge_group workflow contract', () => {
     expect(fetchStep).toContain(
       "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
     );
+    // The prefetch diffs from the resolved base (PR merge base with the base
+    // tip, or the exact merge-group base), which later steps then consume.
+    expect(fetchStep).toContain('id: coverage-base');
     expect(fetchStep).toContain(
-      "COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+    );
+    expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
+    expect(fetchScript).toContain(
+      'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
     );
     // The base-commit check must not be satisfiable by a promisor fetch.
     const verifyStep = job.slice(
@@ -1433,6 +1557,125 @@ ${selectedGateScript}`,
     expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
     expect(buildLayout).not.toContain('pull_request_target');
     expect(buildLayout).not.toContain('secrets.');
+  });
+
+  it('writes the Build+Layout Turbopack cache only from a trusted-main warmer with the identical key', () => {
+    const warm = NEXT_BUILD_CACHE_WARM_WORKFLOW;
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const stepIn = (block, name) => {
+      const start = block.indexOf(`      - name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = block.indexOf('\n      - ', start + 1);
+      return block.slice(start, next === -1 ? undefined : next);
+    };
+    const stepAt = name => warm.indexOf(`      - name: ${name}\n`);
+    const keyLines = step =>
+      step
+        .split('\n')
+        .filter(line => line.includes('-next-build-web-v1-'))
+        .map(line => line.trim());
+
+    // Triggers: only push to main and manual dispatch. No PR, fork,
+    // merge-group or workflow_run code can reach the save step.
+    const header = warm.slice(0, warm.indexOf('\njobs:'));
+    expect(header).toMatch(
+      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:/m
+    );
+    for (const trigger of [
+      'pull_request',
+      'pull_request_target',
+      'merge_group',
+      'workflow_run',
+      'schedule',
+    ]) {
+      expect(header).not.toMatch(new RegExp(`^\\s+${trigger}:`, 'm'));
+    }
+    expect(header).toMatch(/^permissions:\n {2}contents: read\n\n/m);
+    expect(header).toContain('group: next-build-cache-warm-${{ github.ref }}');
+    expect(warm).not.toContain('secrets.');
+    expect(warm).not.toContain('TURBO_TOKEN');
+    expect(warm).toContain('persist-credentials: false');
+    expect(warm).toContain('runs-on: ubuntu-latest');
+
+    const job = getJobBlock(warm, 'warm');
+    expect(job).toContain("github.ref == 'refs/heads/main' &&");
+    expect(job).toContain(
+      "(github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
+    );
+
+    // Key scheme is byte-identical to the Build + Layout restore.
+    const ciRestore = stepIn(
+      buildLayout,
+      'Restore Next build cache (read-only)'
+    );
+    const lookup = stepIn(warm, "Look up today's Next build cache");
+    expect(keyLines(ciRestore)).toHaveLength(3);
+    expect(keyLines(lookup)).toEqual(keyLines(ciRestore).slice(0, 1));
+
+    // The warmer always compiles cold. Building on top of a restored older
+    // entry grew the cache past the 3 GiB save bound (3.51-3.54 GB vs 2.37 GB
+    // cold), so the warmer rebuilt on every main push and never saved.
+    expect(warm.match(/actions\/cache\/restore@/g)).toHaveLength(1);
+    expect(warm).not.toContain('restore-keys:');
+    const dayRun = step =>
+      step.split('\n').find(line => line.trim().startsWith('run:'));
+    expect(dayRun(stepIn(warm, 'Resolve Next build cache day'))).toBe(
+      dayRun(stepIn(buildLayout, 'Resolve Next build cache day'))
+    );
+    expect(lookup).toContain('path: apps/web/.next/cache/turbopack');
+
+    // Lookup-only early exit: nothing heavy runs on an exact-key hit.
+    expect(lookup).toContain('lookup-only: true');
+    expect(lookup).not.toMatch(/^\s+if:/m);
+    const miss = "steps.next-build-cache-lookup.outputs.cache-hit != 'true'";
+    const setupAt = warm.indexOf('- uses: ./.github/actions/setup-node-pnpm');
+    expect(stepAt("Look up today's Next build cache")).toBeLessThan(setupAt);
+    expect(
+      warm.slice(setupAt, warm.indexOf('\n      - ', setupAt + 1))
+    ).toContain(miss);
+    for (const name of [
+      'Build web for cache',
+      'Measure Next build cache (trusted main only)',
+    ]) {
+      expect(stepIn(warm, name), name).toContain(miss);
+    }
+
+    // Same web build and public mock env as the combined head build.
+    const build = stepIn(warm, 'Build web for cache');
+    expect(build).toContain('run: pnpm turbo build --filter=@jovie/web\n');
+    const envLines = step =>
+      step.split('\n').filter(line => /^ {10}NEXT_[A-Z_]+:/.test(line));
+    const ciBuild = stepIn(buildLayout, 'Build exact combined head');
+    expect(envLines(build).length).toBeGreaterThan(0);
+    expect(envLines(build)).toEqual(envLines(ciBuild));
+
+    // Size/symlink guard and a single trusted-main save of the primary key.
+    const measure = stepIn(
+      warm,
+      'Measure Next build cache (trusted main only)'
+    );
+    const save = stepIn(warm, 'Save Next build cache (trusted main only)');
+    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
+    expect(measure).toContain('must not be a symlink');
+    expect(stepAt('Build web for cache')).toBeLessThan(
+      stepAt('Save Next build cache (trusted main only)')
+    );
+    expect(save).toContain(
+      "if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && steps.next-build-cache-size.outputs.eligible == 'true' }}"
+    );
+    expect(save).toContain('path: apps/web/.next/cache/turbopack');
+    expect(save).toContain(
+      'key: ${{ steps.next-build-cache-lookup.outputs.cache-primary-key }}'
+    );
+    expect(warm.match(/actions\/cache\/save@/g)).toHaveLength(1);
+    expect(warm).not.toContain('uses: actions/cache@');
+
+    // Every pinned action SHA is one ci.yml already uses.
+    const pins = source =>
+      new Set(source.match(/uses: actions\/[\w/-]+@[0-9a-f]{40}/g));
+    const ciPins = pins(CI_WORKFLOW);
+    expect(pins(warm).size).toBeGreaterThan(0);
+    for (const pin of pins(warm)) expect(ciPins.has(pin), pin).toBe(true);
   });
 
   it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {
@@ -2120,8 +2363,14 @@ ${selectedGateScript}`,
     expect(sourceSizeGuard).toContain('persist-credentials: false');
     expect(sourceSizeGuard).toContain('fetch-depth: 0');
     expect(sourceSizeGuard).toContain('id: pr-merge-base');
+    // The event base SHA goes stale on long-lived PRs; judge the PR against
+    // the fetched base branch tip instead (#18131 failed on a 3-day-old base).
+    expect(sourceSizeGuard).not.toContain('github.event.pull_request.base.sha');
     expect(sourceSizeGuard).toContain(
-      'PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}'
+      'PR_BASE_REF: ${{ github.event.pull_request.base.ref }}'
+    );
+    expect(sourceSizeGuard).toContain(
+      'PR_BASE_SHA: ${{ steps.pr-merge-base.outputs.base_tip }}'
     );
     expect(sourceSizeGuard).toContain(
       'PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}'
@@ -2459,7 +2708,7 @@ describe('PR Size Guard merge-base comparison', () => {
     const mergeBaseOutput = join(root, 'merge-base-output');
     const env = {
       ...process.env,
-      PR_BASE_SHA: eventBase,
+      PR_BASE_REF: 'main',
       PR_HEAD_SHA: head,
       GITHUB_OUTPUT: mergeBaseOutput,
     };
@@ -2473,7 +2722,9 @@ describe('PR Size Guard merge-base comparison', () => {
       }
     );
     expect(resolved.status, resolved.stderr || resolved.stdout).toBe(0);
-    expect(readFileSync(mergeBaseOutput, 'utf8')).toBe(`sha=${ancestor}\n`);
+    expect(readFileSync(mergeBaseOutput, 'utf8')).toBe(
+      `base_tip=${eventBase}\nsha=${ancestor}\n`
+    );
 
     const shallowWork = join(root, 'shallow-work');
     git(root, [
@@ -2545,7 +2796,8 @@ describe('PR Size Guard merge-base comparison', () => {
     expect(readFileSync(screenshotOutput, 'utf8')).toBe('');
 
     for (const badEnv of [
-      { PR_BASE_SHA: 'invalid' },
+      { PR_BASE_REF: 'main;true' },
+      { PR_BASE_REF: 'no-such-base' },
       { PR_HEAD_SHA: ancestor },
     ]) {
       writeFileSync(mergeBaseOutput, '');
@@ -2802,12 +3054,21 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 });
 
-describe('Storybook Surface Matrix shallow diff-base history', () => {
+// Each case builds a 40+ commit fixture repo with real git subprocesses;
+// the default 5s timeout flaked under load and ejected merge-queue groups.
+describe('Storybook Surface Matrix shallow diff-base history', {
+  timeout: 30_000,
+}, () => {
   const tempRoots = [];
 
   afterEach(() => {
     for (const root of tempRoots.splice(0)) {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   });
 
@@ -2889,6 +3150,11 @@ describe('Storybook Surface Matrix shallow diff-base history', () => {
       `file://${origin}`,
       work,
     ]);
+    // Each `git fetch` otherwise spawns a detached `git maintenance run
+    // --auto` that can still be writing .git/objects when afterEach removes
+    // the fixture (ENOTEMPTY in merge-group Structural Contract).
+    git(work, ['config', 'maintenance.auto', 'false']);
+    git(work, ['config', 'gc.auto', '0']);
     expect(git(work, ['rev-parse', '--is-shallow-repository'])).toBe('true');
     expect(git(work, ['rev-parse', 'HEAD'])).toBe(head);
     return { work, shas, sibling, head };

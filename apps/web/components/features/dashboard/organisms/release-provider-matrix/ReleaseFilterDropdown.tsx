@@ -41,8 +41,8 @@ const RELEASE_TYPE_OPTIONS: {
   label: string;
   iconName: string;
 }[] = [
-  { id: 'album', label: 'Album', iconName: 'Disc3' },
-  { id: 'ep', label: 'EP', iconName: 'Disc' },
+  { id: 'album', label: 'Album', iconName: 'Layers' },
+  { id: 'ep', label: 'EP', iconName: 'Layers2' },
   { id: 'single', label: 'Single', iconName: 'Music' },
   { id: 'compilation', label: 'Compilation', iconName: 'ListMusic' },
   { id: 'live', label: 'Live', iconName: 'Radio' },
@@ -240,7 +240,7 @@ export function ReleaseFilterDropdown({
   const FILTER_CATEGORIES = useMemo(
     () =>
       [
-        { id: 'releaseType', label: 'Release Type', iconName: 'Disc3' },
+        { id: 'releaseType', label: 'Release Type', iconName: 'Layers' },
         { id: 'popularity', label: 'Popularity', iconName: 'Signal' },
         { id: 'label', label: 'Label', iconName: 'Building2' },
       ] as const,
@@ -349,7 +349,7 @@ export function ReleaseFilterDropdown({
                 {/* Release Type Submenu */}
                 <FilterSubmenu
                   label='Release Type'
-                  iconName='Disc3'
+                  iconName='Layers'
                   options={RELEASE_TYPE_OPTIONS}
                   selectedIds={filters.releaseTypes}
                   onToggle={handleTypeToggle}
@@ -463,7 +463,7 @@ export function ReleaseFilterDropdown({
         <ActiveFilterPill
           groupLabel='Release Type'
           values={activeTypeLabels}
-          icon={<Icon name='Disc3' className='h-3.5 w-3.5' />}
+          icon={<Icon name='Layers' className='h-3.5 w-3.5' />}
           onClear={handleClearTypes}
         />
       )}

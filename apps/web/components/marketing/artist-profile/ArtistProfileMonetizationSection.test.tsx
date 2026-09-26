@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 
 const MONETIZATION_CARDS = [
@@ -29,7 +30,7 @@ describe('ArtistProfileMonetizationSection source contract', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Get paid. Again and again.',
+        name: segmentedAccessibleName('Get paid.', 'Again and again.'),
       })
     ).toHaveClass('line-clamp-2');
     expect(

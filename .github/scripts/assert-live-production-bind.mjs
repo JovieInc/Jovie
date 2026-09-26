@@ -133,6 +133,15 @@ function loadFixture(path) {
   };
 }
 
+/**
+ * @param {{
+ *   fetchImpl?: typeof fetch,
+ *   liveSha?: string | null,
+ *   mainSha?: string | null,
+ *   timeoutMs?: number,
+ *   url?: string,
+ * }} [options]
+ */
 export async function assertLiveProductionBind({
   fetchImpl = fetch,
   liveSha = null,

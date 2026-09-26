@@ -368,21 +368,6 @@ def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
     assert "ci-harness/manifest.json" not in workflow
 
 
-def test_slop_gate_is_post_merge_informational() -> None:
-    """Copy smell stays off PR Ready; taste is post-ship."""
-    workflow = (WORKFLOWS / "slop-gate.yml").read_text(encoding="utf-8")
-    trigger_block = workflow.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert "schedule:" in trigger_block
-    assert "workflow_dispatch:" in trigger_block
-    assert "pull_request" not in trigger_block
-    assert "ci-harness/manifest.json" in workflow
-    assert "continue-on-error: true" in workflow
-    assert "HEAD~1" not in workflow
-    assert "--before='7 days ago'" in workflow
-
-
 def test_agent_pipeline_retires_dead_qc_wires() -> None:
     """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
     workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
@@ -442,7 +427,6 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
         "actionlint.yml",
         "brand-scrub.yml",
         "ci.yml",
-        "slop-gate.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert install_command in workflow, workflow_name
@@ -1698,6 +1682,59 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
             scheduled_fixed.append(workflow_path.name)
 
     assert scheduled_fixed == ["runner-heartbeat.yml"]
+
+
+ADMISSION_MUTATION_PATTERNS = (
+    re.compile(r"triage-event-assess\.mjs"),
+    re.compile(r"backlog-orchestrator\.mjs[\"'\s]+(gate-next|admit-next|approve-plan|approve-research|reconcile|remediate)(?![^\n]*--dry-run)"),
+    re.compile(r"run-backlog\.sh\s+(gate-next|admit-next)"),
+)
+
+
+def test_one_workflow_owns_automatic_issue_admission() -> None:
+    """JOV-5467: a single workflow under one concurrency group may mutate
+    Linear issue admission; Linear dispatch and capacity events share it."""
+    writers: set[str] = set()
+    dispatch_listeners: set[str] = set()
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        if any(pattern.search(text) for pattern in ADMISSION_MUTATION_PATTERNS):
+            writers.add(path.name)
+        if "linear_triage_assess" in text:
+            dispatch_listeners.add(path.name)
+
+    assert writers == {"fleet-gate-refresh.yml"}
+    assert dispatch_listeners == {"fleet-gate-refresh.yml"}
+    assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
+
+    workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+    # One file-level concurrency group serializes every admission event.
+    assert workflow.count("concurrency:") == 1
+    assert "group: fleet-gate-event-refresh" in workflow
+    assert workflow.index("concurrency:") < workflow.index("jobs:")
+
+
+def test_symphony_wake_requires_verified_admitted_receipt() -> None:
+    """The assess job writes the exact-issue receipt before any Symphony wake,
+    and the wake is conditioned on the reconciler's mutated Todo transition."""
+    block = _job_block("fleet-gate-refresh.yml", "assess")
+    assert "github.event_name == 'repository_dispatch'" in block
+    receipt_write = block.index('> "$RECEIPT_FILE"')
+    wake_gate = block.index(".wakeSymphony == true")
+    wake_call = block.index("http://127.0.0.1:4041/api/v1/refresh")
+    assert receipt_write < wake_gate < wake_call
+    assert "requiresImmediateInvestigation == true" in block
+
+
+def test_retired_admission_commands_stay_disabled() -> None:
+    """gate-next/admit-next/approve-plan fail closed at the shared CLI."""
+    cli = (REPO_ROOT / "scripts/backlog-orchestrator/backlog-orchestrator.mjs").read_text(
+        encoding="utf-8"
+    )
+    for command in ("admit-next", "gate-next", "approve-plan"):
+        assert f"'{command}'" in cli
+    assert "owns Linear pickup and dispatch" in cli
+    assert "process.exit(78)" in cli
 
 
 def test_fleet_controllers_share_one_evaluate_action() -> None:

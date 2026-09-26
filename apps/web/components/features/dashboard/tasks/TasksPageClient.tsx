@@ -13,8 +13,8 @@ import {
 import {
   ArrowLeft,
   ChevronDown,
-  Disc3,
   FileText,
+  Layers,
   Plus,
   Sparkles,
   Trash2,
@@ -531,7 +531,7 @@ function TaskMetaMenuNumber({
         {task.releaseId ? (
           <ToolbarMenuChoiceItem
             active={false}
-            leadingVisual={<Disc3 className='h-4 w-4' />}
+            leadingVisual={<Layers className='h-4 w-4' />}
             label='Open Release'
             onSelect={() => onOpenRelease(task)}
           />
@@ -842,7 +842,7 @@ function TaskDocumentPanel({
                   onClick={() => onOpenRelease(task)}
                   className='inline-flex min-w-0 items-center gap-1 text-secondary-token transition-colors hover:text-primary-token'
                 >
-                  <Disc3 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                  <Layers className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
                   <span className='truncate font-semibold'>
                     {task.releaseTitle}
                   </span>
@@ -1172,7 +1172,7 @@ function MobileTaskListItem({
         </span>
         {task.releaseTitle ? (
           <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-3xs text-tertiary-token'>
-            <Disc3 className='h-3 w-3 shrink-0' />
+            <Layers className='h-3 w-3 shrink-0' />
             <span className='min-w-0 truncate'>{task.releaseTitle}</span>
           </span>
         ) : null}
@@ -1278,7 +1278,7 @@ function useTaskActions({
         },
         visuals: {
           openTask: <FileText className='h-4 w-4' />,
-          openRelease: <Disc3 className='h-4 w-4' />,
+          openRelease: <Layers className='h-4 w-4' />,
           generatePitch: <Sparkles className='h-4 w-4' />,
           deleteTask: <Trash2 className='h-4 w-4' />,
           status: status => {

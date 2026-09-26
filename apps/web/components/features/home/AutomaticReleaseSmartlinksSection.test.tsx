@@ -23,7 +23,7 @@ describe('AutomaticReleaseSmartlinksSection', () => {
     render(<AutomaticReleaseSmartlinksSection />);
 
     expect(
-      screen.getByRole('heading', { name: /New Release\?\s+Already Live\./i })
+      screen.getByRole('heading', { name: /New Release\?\s*Already Live\./i })
     ).toHaveClass('line-clamp-2');
     expect(screen.getByText('Zero manual work')).toBeInTheDocument();
     expect(screen.getByText('The Deep End')).toBeInTheDocument();

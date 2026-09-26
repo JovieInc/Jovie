@@ -16,17 +16,18 @@
 import {
   ArrowDownToLine,
   ArrowUpDown,
+  AudioLines,
   ChevronDown,
   ChevronRight,
   Circle,
   CircleDashed,
   Clock,
   Copy,
-  Disc3,
   Eye,
   Film,
   Grid3x3,
   Image as ImageIcon,
+  Layers,
   LayoutList,
   Mic2,
   MoreHorizontal,
@@ -126,11 +127,11 @@ const TYPE_LABELS: Record<AssetType, string> = {
 const TYPE_ICONS: Record<AssetType, typeof ImageIcon> = {
   cover: ImageIcon,
   reel: Film,
-  visualizer: Disc3,
+  visualizer: AudioLines,
   lyric_clip: Mic2,
   alt_crop: ImageIcon,
   remix_art: ImageIcon,
-  master: Disc3,
+  master: AudioLines,
 };
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -1880,7 +1881,7 @@ function ReleaseMoment({ asset }: { asset: Asset }) {
         className='h-7 w-7 rounded-md grid place-items-center'
         style={{ background: `${release?.color}22`, color: release?.color }}
       >
-        <Disc3 className='h-3.5 w-3.5' strokeWidth={2.25} />
+        <Layers className='h-3.5 w-3.5' strokeWidth={2.25} />
       </span>
       <div className='flex-1 min-w-0'>
         <p

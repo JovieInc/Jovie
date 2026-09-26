@@ -13,7 +13,8 @@ vi.mock('../../../components/providers/ToastProvider', () => ({
 }));
 
 it('provides the real UI tooltip context to Storybook stories', async () => {
-  const decorate = preview.decorators?.[0];
+  const decorators = preview.decorators;
+  const decorate = Array.isArray(decorators) ? decorators[0] : decorators;
   expect(decorate).toBeTypeOf('function');
   if (!decorate) return;
 

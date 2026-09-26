@@ -26,17 +26,25 @@
  *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
  *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
+ *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
+import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
 import {
   affectsJovieTypecheck,
+  affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+
+export { affectsWebTestTypecheck };
+
+export const WEB_TESTS_TYPECHECK_COMMAND =
+  'pnpm --filter=@jovie/web run typecheck:tests';
 
 export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
   '--test',
@@ -63,6 +71,16 @@ export const BILLING_PROVENANCE_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
+/** Customer-facing copy surfaces gated by @jovie/copy (policy: canon/VOICE.md). */
+export const COPY_GATE_PATHS = Object.freeze([
+  'apps/web/content/**',
+  'apps/web/data/*Copy.ts',
+  'apps/web/lib/email/templates/**',
+  'apps/web/lib/chat/onboarding-script/**',
+]);
+export const COPY_GATE_COMMAND =
+  'pnpm copy:check --diff-base origin/main $(git diff --name-only origin/main...HEAD)';
+
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -77,13 +95,27 @@ export const DESKTOP_RELEASE_COVERAGE_COMMAND =
 // production-marker-state coverage gate (operations structural command), and
 // every unit test in the quarantine ledger (Unit Tests reruns those with
 // retries under continue-on-error).
+const PLAYWRIGHT_RECEIPT_CI_TEST =
+  'tests/unit/ci/playwright-artifact-secrets.test.ts';
 const WEB_CI_CONTRACT_ALWAYS_EXCLUDED = Object.freeze([
-  'tests/unit/ci/playwright-artifact-secrets.test.ts',
+  PLAYWRIGHT_RECEIPT_CI_TEST,
   'tests/unit/ci/production-marker-state.test.ts',
 ]);
 // Run by name in the web structural parts so it executes even while it sits in
 // the quarantine ledger.
 const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';
+// Web Unit Tests run the Playwright receipt only for web merge groups/pushes
+// (never PRs), so #18718 broke it unseen. Run it here when they will not.
+const PLAYWRIGHT_RECEIPT_INPUTS =
+  /^(\.github\/|scripts\/lib\/playwright-png\.mjs$|apps\/web\/(playwright[^/]*\.config[^/]*\.ts|tests\/unit\/ci\/playwright-artifact-secrets\.test\.ts)$)/u;
+export function selectPlaywrightReceipt(event, selected, changed) {
+  if (event === 'pull_request') {
+    return (
+      !changed?.length || changed.some(f => PLAYWRIGHT_RECEIPT_INPUTS.test(f))
+    );
+  }
+  return event !== 'workflow_dispatch' && !selected.has('web');
+}
 export function webCiContractTestsCommand(
   ledgerPath = resolve(process.cwd(), 'apps/web/tests/quarantine.json'),
   runElsewhere = []
@@ -118,7 +150,7 @@ export function webCiContractTestsCommand(
     .sort()
     .map(path => ` --exclude=${path}`)
     .join('');
-  return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci${excludes}`;
+  return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
@@ -129,12 +161,76 @@ const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
  * is not run by any CI entry point; add new node:test files to the first list
  * and new scripts-root Vitest files to the second (or to a narrower command).
  */
+/**
+ * Hosted structural Python regressions share one dependency policy: CI must
+ * have pytest + coverage.py (installed from .github/requirements/pytest.txt);
+ * a local checkout without them skips with a notice.
+ * @param {string} body
+ */
+const structuralPythonRegression = body =>
+  `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then ${body}; elif [ "\${CI:-}" = "true" ]; then echo "::error::pytest/coverage/xdist missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage/xdist not installed — skip local structural regressions"; fi`;
+
+/** Files of the structural pytest suite (one collection, sharded below). */
+export const STRUCTURAL_PYTEST_FILES = Object.freeze([
+  'scripts/tests/test_gh_retry.py',
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+  'scripts/tests/test_brand_scrub.py',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+  'scripts/tests/test_runner_routing.py',
+]);
+
+/**
+ * The structural pytest suite (420 tests, 132s of one hosted run) was the
+ * lane's longest single command, so the bounded pool could not shorten it.
+ * Two shards over the identical file list select `-k EXPR` and
+ * `-k "not (EXPR)"`: every collected test matches exactly one of them, so the
+ * pair runs precisely the original suite. EXPR names the heaviest
+ * test_gh_retry.py classes (~half the measured suite time); a rename that
+ * empties the first shard fails it (pytest exit 5) instead of dropping tests.
+ * Each shard owns its basetemp and skips the shared repo-root .pytest_cache.
+ */
+export const STRUCTURAL_PYTEST_SHARD_EXPRESSION =
+  'TestDrainPrQueueWiring or TestNativeAdmissionReceiptReconciliation';
+
+/** @param {string} shard @param {string} expression */
+// The suite spawns thousands of short-lived jq/gh/node processes, so it is
+// CPU-bound on process startup: pytest-xdist spreads each shard over two
+// workers. Two, not auto: both shards run concurrently on the 4 vCPU
+// structural python job; more workers measured slower (JovieInc/Jovie#18657).
+const structuralPytestShard = (shard, expression) =>
+  `python3 -m pytest -n 2 --durations=20 -v -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-structural-pytest-${shard}" -k "${expression}" ${STRUCTURAL_PYTEST_FILES.join(' ')}`;
+
+export const STRUCTURAL_PYTEST_SHARD_COMMANDS = Object.freeze([
+  structuralPytestShard('a', STRUCTURAL_PYTEST_SHARD_EXPRESSION),
+  structuralPytestShard('b', `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`),
+]);
+const STRUCTURAL_PYTEST_PARTS = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(
+  structuralPythonRegression
+);
+
+/**
+ * Structural Python regressions, split so the pool can overlap them. Each
+ * command keeps its original `&&` dependencies (coverage run → report).
+ */
+export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
+  structuralPythonRegression(
+    [
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85',
+    ].join(' && ')
+  ),
+  ...STRUCTURAL_PYTEST_PARTS,
+]);
+
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  '.claude/hooks/post-task-validate.test.mjs',
   'scripts/agent-context/check.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-disposition.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-receipt.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/backlog-hygiene.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
   'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
   'scripts/backlog-orchestrator/__tests__/intake-readiness.test.mjs',
@@ -143,13 +239,18 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/runtime-state.test.mjs',
   'scripts/backlog-orchestrator/__tests__/shipping-observability.test.mjs',
   'scripts/backlog-orchestrator/__tests__/summer-live-state.test.mjs',
+  'scripts/ci-cache-policy.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
+  'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
+  'scripts/evals/release-task-cluster.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
+  'scripts/invariants/writing-surfaces.test.mjs',
+  'scripts/ios-ci-cache-contract.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
   'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
   'scripts/lib/observability-fingerprint.test.mjs',
@@ -205,6 +306,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pipeline-scoreboard.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
+  'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-label-override.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
@@ -215,12 +317,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-learning.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
   'scripts/lib/__tests__/rolling-ci-remediation-concurrency.test.mjs',
   'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/ship-ledger.test.mjs',
   'scripts/lib/__tests__/spawn-resource.test.mjs',
+  'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
   'scripts/lib/__tests__/story-coverage-ratchet.test.mjs',
   'scripts/lib/__tests__/taste-classifier.test.mjs',
   'scripts/lib/__tests__/taste-label-guard.test.mjs',
@@ -284,6 +388,12 @@ const LANES = [
     run: runTypecheck,
   },
   {
+    id: 'web-tests-typecheck',
+    name: 'Web Tests Typecheck (shrink-only baseline)',
+    nextLocalCommand: WEB_TESTS_TYPECHECK_COMMAND,
+    run: runWebTestsTypecheck,
+  },
+  {
     id: 'scripts-typecheck',
     name: 'Scripts Typecheck (shrink-only baseline)',
     nextLocalCommand: 'pnpm run typecheck:scripts',
@@ -340,6 +450,12 @@ const LANES = [
     run: runBillingCoverage,
   },
   {
+    id: 'copy-gate',
+    name: 'Copy gate (changed customer-facing lines)',
+    nextLocalCommand: COPY_GATE_COMMAND,
+    run: runCopyGate,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -366,7 +482,7 @@ const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
  * selector to retain the historical all-lanes behavior.
  */
 export const LANE_GROUPS = Object.freeze({
-  typecheck: Object.freeze(['typecheck']),
+  typecheck: Object.freeze(['typecheck', 'web-tests-typecheck']),
   remaining: Object.freeze([
     'biome',
     'eslint-server-boundaries',
@@ -380,6 +496,7 @@ export const LANE_GROUPS = Object.freeze({
     'ios-fast',
     'profile-admission',
     'billing-coverage',
+    'copy-gate',
     'structural',
   ]),
 });
@@ -577,6 +694,36 @@ export function runBillingCoverage() {
   return { code: 0, output: combined };
 }
 
+/**
+ * Delta copy gate: only lines this change adds are judged, so legacy copy debt
+ * stays advisory while new slop, harm, legal, or ToS violations cannot land.
+ * An unreadable diff fails closed.
+ */
+export function runCopyGate() {
+  const files = changedFiles(COPY_GATE_PATHS);
+  if (files === null) {
+    return {
+      code: 1,
+      output: 'Copy gate: changed-file diff unreadable; failing closed\n',
+    };
+  }
+  if (files.length === 0) {
+    return {
+      code: 0,
+      output: 'Copy gate skipped (no customer-facing copy changed)\n',
+      skipped: true,
+    };
+  }
+  const base = process.env.GITHUB_BASE_REF || 'main';
+  const diffBase =
+    shell(`git rev-parse --verify origin/${base}`).code === 0
+      ? `origin/${base}`
+      : process.env.TURBO_SCM_BASE || 'HEAD^1';
+  return shell(
+    `pnpm exec tsx packages/copy/cli.ts check --diff-base ${diffBase} ${files.map(file => `'${file}'`).join(' ')}`
+  );
+}
+
 export function listAllChangedFiles(cwd = REPO_ROOT) {
   return changedFiles([], cwd);
 }
@@ -604,6 +751,8 @@ const GIT_FETCH_NOISE_LINE =
 // the word boundary still skips summary noise such as `errors: 0`.
 const DIAGNOSTIC_LINE =
   /\b(?:ERROR|\w*Error|error|FAIL|FAILED|failed|expected)\b/u;
+// Passing TAP tests whose names merely contain `failed`/`error` are not causes.
+const TAP_PASS_LINE = /^(?:ok \d+ - |# Subtest: )/u;
 const ANSI_ESCAPE = new RegExp(
   `${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`,
   'gu'
@@ -617,18 +766,162 @@ export function stripGitFetchNoise(text) {
     .join('\n');
 }
 
+function boundedLine(raw, width = 200) {
+  const line = String(raw ?? '')
+    .replace(ANSI_ESCAPE, '')
+    .trim();
+  return line.length > width ? `${line.slice(0, width - 1)}…` : line;
+}
+
 /** Last few bounded, de-duplicated lines that look like a failure cause. */
 export function extractDiagnosticLines(text, { max = 5, width = 200 } = {}) {
   const lines = [];
   for (const raw of stripGitFetchNoise(text).split('\n')) {
-    const line = raw.replace(ANSI_ESCAPE, '').trim();
-    if (!line || !DIAGNOSTIC_LINE.test(line)) continue;
-    lines.push(line.length > width ? `${line.slice(0, width - 1)}…` : line);
+    const line = boundedLine(raw, width);
+    if (!line || !DIAGNOSTIC_LINE.test(line) || TAP_PASS_LINE.test(line)) {
+      continue;
+    }
+    lines.push(line);
   }
   // Keep the LAST occurrence of a repeated line so a root cause that repeats
   // at the end of the log is not dropped by the tail slice.
   const newestFirst = [...new Set(lines.reverse())];
   return newestFirst.slice(0, max).reverse();
+}
+
+const NODE_SUBTEST_LINE = /^(\s*)# Subtest: (.+)$/u;
+const NODE_NOT_OK_LINE = /^(\s*)not ok \d+ - (.+?)(?: # (?:SKIP|TODO)\b.*)?$/u;
+const NODE_DETAIL_LINE = /^(\s*)(failureType|error|expected|actual): ?(.*)$/u;
+const YAML_BLOCK_SCALAR = /^[|>][+-]?$/u;
+const VITEST_FAIL_LINE =
+  /^FAIL\s+(?:\|[^|]+\|\s+)?\S+\.(?:test|spec)\.[cm]?[jt]sx?\b/u;
+const VITEST_ERROR_LINE = /^(?:[A-Z]\w*)?Error\b[^:]*:/u;
+const PYTEST_NODE = String.raw`(scripts\/[\w./-]+\.py)::([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)`;
+const PYTEST_SUMMARY_LINE = new RegExp(
+  String.raw`^(FAILED|ERROR) ${PYTEST_NODE}(?=\[| - |$)`,
+  'u'
+);
+// `pytest -v` progress lines still name the test when the run is killed
+// before its short test summary prints.
+const PYTEST_PROGRESS_LINE = new RegExp(
+  String.raw`^${PYTEST_NODE}(?:\[[^\]\n]*\])? (FAILED|ERROR)\b`,
+  'u'
+);
+const PYTEST_IDENTITY_LINE = /^(?:FAILED|ERROR) scripts\/[\w./-]+\.py::/u;
+/** Header lines that name a failing test; the annotation keeps them in order. */
+const TEST_IDENTITY_LINE = new RegExp(
+  `${PYTEST_IDENTITY_LINE.source}|^not ok - |${VITEST_FAIL_LINE.source}`,
+  'u'
+);
+
+/** node:test TAP YAML fields for the `not ok` block starting at `start`. */
+function nodeFailureDetails(lines, start, indent) {
+  const details = {};
+  const fieldIndent = indent + 2;
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index].replace(ANSI_ESCAPE, '');
+    const leading = line.length - line.trimStart().length;
+    if (line.trim() && leading < fieldIndent) break;
+    if (line.trim() === '...' && leading === fieldIndent) break;
+    const field = NODE_DETAIL_LINE.exec(line);
+    if (!field || field[1].length !== fieldIndent || field[2] in details) {
+      continue;
+    }
+    let value = field[3].trim();
+    if (YAML_BLOCK_SCALAR.test(value)) {
+      value =
+        lines
+          .slice(index + 1)
+          .map(next => next.replace(ANSI_ESCAPE, '').trim())
+          .find(Boolean) ?? '';
+    }
+    details[field[2]] = value;
+  }
+  return details;
+}
+
+/** `not ok` leaves with their `# Subtest:` ancestry and assertion fields. */
+function nodeTestFailures(lines, max, width) {
+  const failures = [];
+  /** @type {{ indent: number, name: string }[]} */
+  const ancestry = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (failures.length === max) break;
+    const line = lines[index].replace(ANSI_ESCAPE, '');
+    const subtest = NODE_SUBTEST_LINE.exec(line);
+    if (subtest) {
+      const indent = subtest[1].length;
+      while (ancestry.length > 0 && ancestry.at(-1).indent >= indent) {
+        ancestry.pop();
+      }
+      ancestry.push({ indent, name: subtest[2].trim() });
+      continue;
+    }
+    const notOk = NODE_NOT_OK_LINE.exec(line);
+    if (!notOk) continue;
+    const indent = notOk[1].length;
+    const details = nodeFailureDetails(lines, index + 1, indent);
+    // A suite fails when a child fails; the child already names the cause.
+    if (details.failureType === "'subtestsFailed'") continue;
+    const path = [
+      ...ancestry.filter(entry => entry.indent < indent).map(e => e.name),
+      notOk[2].trim(),
+    ];
+    failures.push([
+      boundedLine(`not ok - ${path.join(' > ')}`, width),
+      ...['error', 'expected', 'actual'].flatMap(key =>
+        details[key] ? [boundedLine(`${key}: ${details[key]}`, width)] : []
+      ),
+    ]);
+  }
+  return failures;
+}
+
+/** Vitest `FAIL file > suite > test` lines with their first error line. */
+function vitestFailures(lines, max, width) {
+  const failures = [];
+  const seen = new Set();
+  for (let index = 0; index < lines.length; index += 1) {
+    if (failures.length === max) break;
+    const line = boundedLine(lines[index], width);
+    if (!VITEST_FAIL_LINE.test(line) || seen.has(line)) continue;
+    seen.add(line);
+    const failure = [line];
+    for (const next of lines.slice(index + 1, index + 9)) {
+      const candidate = boundedLine(next, width);
+      if (VITEST_FAIL_LINE.test(candidate)) break;
+      if (VITEST_ERROR_LINE.test(candidate)) {
+        failure.push(candidate);
+        break;
+      }
+    }
+    failures.push(failure);
+  }
+  return failures;
+}
+
+/**
+ * Failing node:test / Vitest test identities plus their assertion message,
+ * in output order. A bounded tail excerpt otherwise drops the test name
+ * behind coverage tables and passing-test noise.
+ */
+export function extractFailureIdentities(text, { max = 3, width = 200 } = {}) {
+  const lines = stripGitFetchNoise(text).split('\n');
+  const failures = nodeTestFailures(lines, max, width);
+  failures.push(...vitestFailures(lines, max - failures.length, width));
+  return failures.flat();
+}
+
+/** Keep leading lines (the first always) while their total stays in `max`. */
+function capLines(lines, max) {
+  const kept = [];
+  let used = 0;
+  for (const line of lines) {
+    if (kept.length > 0 && used + line.length + 1 > max) break;
+    kept.push(line);
+    used += line.length + 1;
+  }
+  return kept;
 }
 
 /** Escape a workflow-command message per GitHub Actions rules. */
@@ -660,33 +953,41 @@ function excerpt(text, max = 1200) {
   return `…${trimmed.slice(-max)}`;
 }
 
+/** Header body budget so the excerpt tail keeps some raw context. */
+const HEADER_BODY_MAX = 800;
+
 /**
- * Failure excerpt for a lane: diagnostic lines first, then the output tail.
- * The structural lane already builds its own header in runStructural.
+ * Failure excerpt for a lane: failing test identities, then diagnostic lines,
+ * then the output tail. Structural builds its own header in runStructural.
  */
 export function laneFailureExcerpt(laneId, output) {
   const text = output || '';
   if (laneId === 'structural' && text.startsWith('Structural command ')) {
     return excerpt(text);
   }
-  const diagnostics = extractDiagnosticLines(text);
-  if (diagnostics.length === 0) return excerpt(text);
-  const header = ['Diagnostics:', ...diagnostics].join('\n');
+  const identities = extractFailureIdentities(text);
+  const named = new Set(identities);
+  const diagnostics = extractDiagnosticLines(text).filter(
+    line => !named.has(line)
+  );
+  if (identities.length + diagnostics.length === 0) return excerpt(text);
+  const header = [
+    'Diagnostics:',
+    ...capLines([...identities, ...diagnostics], HEADER_BODY_MAX),
+  ].join('\n');
   return `${header}\n\n${excerpt(text, 1200 - header.length - 3)}`;
 }
-
-const PYTEST_IDENTITY_LINE = /^FAILED scripts\/[\w./-]+\.py::/u;
 
 /**
  * Join a header's lead line with as many body lines as fit in `max` chars.
  * Diagnostic lines are chosen from the END so earlier errors cannot crowd out
- * the final root-cause line; registered pytest identities keep their order
- * so the first failing test stays the lead identity.
+ * the final root-cause line; a header that leads with a test identity keeps
+ * its order so the first failing test stays the lead identity.
  */
 function budgetHeader(header, max = 400) {
   const [lead, ...rest] = header.split('\n');
   const separator = ' | ';
-  const fromEnd = !rest.every(line => PYTEST_IDENTITY_LINE.test(line));
+  const fromEnd = !TEST_IDENTITY_LINE.test(rest[0] ?? '');
   const ordered = fromEnd ? [...rest].reverse() : rest;
   const kept = [];
   let used = lead.length;
@@ -714,8 +1015,8 @@ export function failureAnnotationMessage(lane, logExcerpt) {
   return escapeAnnotationMessage(short);
 }
 
-/** Keep only registered pytest identities; assertion bodies are not diagnostic labels. */
-function structuralFailureExcerpt(command, output, index, count, code) {
+/** Registered pytest `FAILED`/`ERROR` identities, first three in output order. */
+function registeredPytestIdentities(command, output) {
   const pytestArgs = /\bpython3 -m pytest\s+([^;&]+)/u.exec(command)?.[1] || '';
   const targets = new Set(
     pytestArgs
@@ -724,30 +1025,61 @@ function structuralFailureExcerpt(command, output, index, count, code) {
   );
   const identities = new Set();
   for (const line of output.split('\n')) {
-    const match =
-      /^FAILED (scripts\/[\w./-]+\.py)::([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)(?=\[| - |$)/u.exec(
-        line
-      );
-    if (!match || !targets.has(match[1])) continue;
-    const identity = `FAILED ${match[1]}::${match[2]}`;
+    const summary = PYTEST_SUMMARY_LINE.exec(line);
+    const progress = summary ? null : PYTEST_PROGRESS_LINE.exec(line);
+    const match = summary
+      ? { outcome: summary[1], file: summary[2], node: summary[3] }
+      : progress && {
+          outcome: progress[3],
+          file: progress[1],
+          node: progress[2],
+        };
+    if (!match || !targets.has(match.file)) continue;
+    const identity = `${match.outcome} ${match.file}::${match.node}`;
     if (identity.length > 200) continue;
     identities.add(identity);
     if (identities.size === 3) break;
   }
-  // Registered pytest identities win; otherwise surface the likeliest cause
-  // (e.g. a coverage-threshold ERROR) instead of only the exit code.
-  const diagnostics = identities.size > 0 ? [] : extractDiagnosticLines(output);
+  return [...identities];
+}
+
+/**
+ * Keep only registered pytest identities (assertion bodies are not diagnostic
+ * labels); otherwise node:test / Vitest identities, then generic diagnostics.
+ */
+function structuralFailureExcerpt(command, output, index, count, code) {
+  const pytest = registeredPytestIdentities(command, output);
+  const tests = pytest.length > 0 ? pytest : extractFailureIdentities(output);
+  // Test identities win; otherwise surface the likeliest cause (e.g. a
+  // coverage-threshold ERROR) instead of only the exit code.
+  const body = tests.length > 0 ? tests : extractDiagnosticLines(output);
   const header = [
     `Structural command ${index + 1}/${count} failed (exit ${code}). Command: ${commandLabel(command)}`,
-    ...identities,
-    ...diagnostics,
+    ...capLines(body, HEADER_BODY_MAX),
   ].join('\n');
   return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
 }
 
+/**
+ * Files whose change can alter Biome's verdict on untouched files (config or
+ * the pinned Biome version). Linting only the changed files would let a
+ * formatter bump leave drift in every file the bump PR didn't touch (#18071).
+ */
+export const BIOME_TOOLCHAIN_FILES = Object.freeze([
+  'biome.json',
+  'biome.jsonc',
+  'package.json',
+  'pnpm-lock.yaml',
+]);
+
+export function biomeNeedsFullTree(changed) {
+  return changed.some(file => BIOME_TOOLCHAIN_FILES.includes(file));
+}
+
 function runBiome() {
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch') {
+  const toolchain = changedFiles([...BIOME_TOOLCHAIN_FILES]);
+  if (event !== 'workflow_dispatch' && !biomeNeedsFullTree(toolchain ?? [])) {
     const files = changedFiles([
       '*.ts',
       '*.tsx',
@@ -834,7 +1166,47 @@ function runTypecheck() {
       };
     }
   }
-  return shell('pnpm turbo typecheck --affected --force');
+  return shellAsync('pnpm turbo typecheck --affected --force');
+}
+
+function runWebTestsTypecheck() {
+  // The shrink-only apps/web test graph (tests/, scripts/, allowJs helpers)
+  // rotted while nothing in CI ran it. Source-PR preselection
+  // (run_jovie_typecheck) already counts its JS and baseline inputs via
+  // affectsWebTestTypecheck, so a 'false' receipt means none changed.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (
+    event === 'pull_request' &&
+    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
+  ) {
+    return {
+      code: 0,
+      output:
+        'No TypeScript graph files changed (ci-path-changes preselection)\n',
+      skipped: true,
+    };
+  }
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Web tests typecheck skipped (no product files changed)\n',
+      skipped: true,
+    };
+  }
+  if (event === 'pull_request') {
+    const files = listAllChangedFiles();
+    if (files && !files.some(file => affectsWebTestTypecheck(file))) {
+      return {
+        code: 0,
+        output: 'No web test typecheck inputs changed\n',
+        skipped: true,
+      };
+    }
+  }
+  // Own lock so it overlaps app tsc instead of queueing behind it.
+  return shellAsync(
+    `TYPECHECK_SINGLEFLIGHT_DIR=.cache/typecheck-singleflight-tests ${WEB_TESTS_TYPECHECK_COMMAND}`
+  );
 }
 
 function runScriptsTypecheck() {
@@ -874,10 +1246,11 @@ function runGuardrails() {
     ...(selected.has('operations')
       ? [
           'node scripts/design-authority-guard.mjs',
+          'node --test scripts/dev-loop-latency.test.mjs',
           // Exercise retention executables and subprocess coverage before other guards.
           'node --test --test-timeout=45000 --experimental-test-coverage --test-coverage-include="scripts/*retention.mjs" --test-coverage-lines=75 --test-coverage-functions=70 --test-coverage-branches=75 scripts/local-runtime-retention.test.mjs scripts/generated-artifact-retention.test.mjs scripts/cleanup-safety.test.mjs scripts/setup-cache-cleanup.test.mjs',
           'pnpm design:logo-assets:check',
-          'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs',
+          'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs scripts/dev-loop-contract.test.mjs',
         ]
       : []),
     ...(selected.has('web')
@@ -1066,9 +1439,257 @@ function runProfileAdmission() {
   return shell(LANE_COMMANDS['profile-admission']);
 }
 
-/** @param {{changedFileList?: readonly string[], execute?: (command: string) => {code: number, output: string}}} [opts] */
-export function runStructural(opts = {}) {
-  const execute = opts.execute ?? shell;
+/** Async twin of shell() so structural commands can overlap. */
+function shellAsync(command) {
+  return new Promise(resolveResult => {
+    const stdout = [];
+    const stderr = [];
+    const child = spawn(command, {
+      shell: true,
+      cwd: REPO_ROOT,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout.on('data', chunk => stdout.push(chunk));
+    child.stderr.on('data', chunk => stderr.push(chunk));
+    child.on('error', error =>
+      resolveResult({ code: 1, output: String(error) })
+    );
+    child.on('close', code =>
+      resolveResult({
+        code: code ?? 1,
+        output: `${Buffer.concat(stdout)}${Buffer.concat(stderr)}`,
+      })
+    );
+  });
+}
+
+/** Sized for GitHub ubuntu-latest (4 vCPU / 16 GB); CI web Vitest is 1 fork. */
+export const STRUCTURAL_DEFAULT_CONCURRENCY = 3;
+
+export function structuralConcurrency(value) {
+  const parsed = Number(String(value ?? '').trim());
+  return Number.isInteger(parsed) && parsed > 0
+    ? parsed
+    : STRUCTURAL_DEFAULT_CONCURRENCY;
+}
+
+/**
+ * Measured long poles (2026-09-25 local 4 vCPU: 224s, 170s, 126s of a 913s
+ * serial sum). Starting them first keeps the tail from waiting on one late
+ * command. A stale entry only loses the head start; output order is unchanged.
+ */
+const STRUCTURAL_LONG_POLES = Object.freeze([
+  'python3 -m pytest ',
+  'pnpm invariants:check',
+]);
+
+const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
+/** Entry points whose child commands are invisible in package.json text. */
+const OPAQUE_ENTRY_LOCKS = Object.freeze([
+  // Runs scripts Vitest suites with the default scripts/coverage directory.
+  ['scripts/run-affected-tests.mjs --control', 'coverage:scripts'],
+]);
+
+function packageScripts(dir) {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, dir, 'package.json'), 'utf8')
+    );
+    return pkg.scripts ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Expand `pnpm [--filter X] [run] <script>` aliases into [dir, segment] pairs. */
+function expandSegments(command, dir = '.', depth = 0) {
+  const segments = [];
+  for (const raw of command.split(/&&|\|\||;/u)) {
+    const segment = raw.trim();
+    const alias =
+      /^pnpm(?:\s+--filter(?:=|\s+)(\S+))?(?:\s+run)?\s+([\w:-]+)$/u.exec(
+        segment
+      );
+    const aliasDir = alias?.[1] ? PACKAGE_DIRS[alias[1]] : dir;
+    const body = alias && aliasDir && packageScripts(aliasDir)[alias[2]];
+    if (body && depth < 5) {
+      segments.push(...expandSegments(body, aliasDir, depth + 1));
+    } else {
+      segments.push([dir, segment]);
+    }
+  }
+  return segments;
+}
+
+function vitestRoot(dir, segment) {
+  if (/--filter(?:=|\s+)@jovie\/web\b|--dir\s+apps\/web\b/u.test(segment)) {
+    return 'apps/web';
+  }
+  if (/--root\s+scripts\b|--config\s+scripts\/vitest/u.test(segment)) {
+    return 'scripts';
+  }
+  return dir;
+}
+
+/**
+ * Shared writable state a structural command touches; commands sharing a lock
+ * never overlap. Vitest cleans and rewrites its coverage reportsDirectory
+ * (default `<root>/coverage`; relative dirs nest inside it), coverage.py data
+ * is keyed by COVERAGE_FILE, and pytest owns the repo-root `.pytest_cache`
+ * (unless `-p no:cacheprovider` turns the cache off for that invocation).
+ */
+export function structuralLocks(command) {
+  const locks = new Set();
+  for (const [dir, segment] of expandSegments(command)) {
+    for (const [entry, lock] of OPAQUE_ENTRY_LOCKS) {
+      if (segment.includes(entry)) locks.add(lock);
+    }
+    if (/\bvitest\b/u.test(segment) && /--coverage\b/u.test(segment)) {
+      const reports = /--coverage\.reportsDirectory=("[^"]+"|\S+)/u
+        .exec(segment)?.[1]
+        ?.replaceAll('"', '');
+      locks.add(
+        reports && /^(?:\/|\$\{RUNNER_TEMP)/u.test(reports)
+          ? `coverage:${reports}`
+          : `coverage:${vitestRoot(dir, segment)}`
+      );
+    }
+    for (const match of segment.matchAll(/COVERAGE_FILE=("[^"]+"|\S+)/gu)) {
+      locks.add(`pycoverage:${match[1].replaceAll('"', '')}`);
+    }
+    // `python3 -m pytest` and `coverage run -m pytest` both write the shared
+    // cache unless the cache plugin is disabled for that invocation.
+    if (
+      /(?:^|\s)-m pytest\b/u.test(segment) &&
+      !/(?:^|\s)-p no:cacheprovider\b/u.test(segment)
+    ) {
+      locks.add('pytest-cache');
+    }
+  }
+  return [...locks].sort();
+}
+
+/**
+ * Run commands with bounded concurrency. Commands sharing a lock run one at a
+ * time in list order. After the first failure no new command starts, but
+ * in-flight commands finish. A synchronous executor completes before the next
+ * command is considered, so it behaves exactly like the old serial loop.
+ * `first` lists indexes (long poles) to start ahead of list order; they never
+ * jump an earlier command that shares one of their locks.
+ * @param {readonly string[]} commands
+ * @param {{execute: (command: string) => ExecResult | Promise<ExecResult>, concurrency: number, locks?: readonly (readonly string[])[], first?: readonly number[], now?: () => number}} opts
+ * @returns {Promise<(ExecResult & {durationMs: number} | undefined)[]>}
+ * @typedef {{code: number, output: string}} ExecResult
+ */
+export function runCommandPool(commands, opts) {
+  const { execute, concurrency } = opts;
+  const locks = opts.locks ?? commands.map(() => []);
+  const now = opts.now ?? Date.now;
+  const results = new Array(commands.length);
+  const first = new Set(opts.first ?? []);
+  const pending = commands
+    .map((_, index) => index)
+    .sort((a, b) => Number(first.has(b)) - Number(first.has(a)) || a - b);
+  const blocked = index =>
+    locks[index].some(lock => held.has(lock)) ||
+    pending.some(
+      other => other < index && locks[other].some(l => locks[index].includes(l))
+    );
+  const held = new Set();
+  let running = 0;
+  let failed = false;
+  let pumping = false;
+  let repump = false;
+
+  return new Promise(resolveAll => {
+    const finish = (index, startedAt, result) => {
+      running -= 1;
+      for (const lock of locks[index]) held.delete(lock);
+      const code = Number.isInteger(result?.code) ? result.code : 1;
+      results[index] = {
+        code,
+        output: String(result?.output ?? ''),
+        durationMs: Math.max(0, now() - startedAt),
+      };
+      if (code !== 0) failed = true;
+      pump();
+    };
+    const start = index => {
+      running += 1;
+      for (const lock of locks[index]) held.add(lock);
+      const startedAt = now();
+      const onError = error =>
+        finish(index, startedAt, {
+          code: 1,
+          output:
+            error instanceof Error
+              ? error.stack || error.message
+              : String(error),
+        });
+      let result;
+      try {
+        result = execute(commands[index]);
+      } catch (error) {
+        onError(error);
+        return;
+      }
+      if (result instanceof Promise) {
+        result.then(value => finish(index, startedAt, value), onError);
+      } else {
+        finish(index, startedAt, result);
+      }
+    };
+    const pump = () => {
+      if (pumping) {
+        repump = true;
+        return;
+      }
+      pumping = true;
+      do {
+        repump = false;
+        while (!failed && running < concurrency) {
+          const slot = pending.findIndex(index => !blocked(index));
+          if (slot === -1) break;
+          start(pending.splice(slot, 1)[0]);
+        }
+      } while (repump);
+      pumping = false;
+      if (running === 0 && (failed || pending.length === 0)) {
+        resolveAll(results);
+      }
+    };
+    pump();
+  });
+}
+
+/** Markdown table of structural command wall times, slowest first. */
+export function formatStructuralTimings(timings, wallMs) {
+  if (!timings?.length) return '';
+  const total = timings.reduce((sum, t) => sum + t.durationMs, 0);
+  const seconds = ms => `${(ms / 1000).toFixed(1)}s`;
+  const rows = [...timings]
+    .sort((a, b) => b.durationMs - a.durationMs || a.index - b.index)
+    .map(t => {
+      const label = commandLabel(t.command, 100)
+        .replaceAll('|', '\\|')
+        .replaceAll('`', "'");
+      const result = t.code === 0 ? 'pass' : `exit ${t.code}`;
+      return `| ${t.index + 1} | ${seconds(t.durationMs)} | ${result} | \`${label}\` |`;
+    });
+  const wall = Number.isFinite(wallMs) ? `wall ${seconds(wallMs)}, ` : '';
+  return [
+    `#### Structural command timings (${wall}sum ${seconds(total)}, ${timings.length} commands)`,
+    '',
+    '| # | Time | Result | Command |',
+    '| --- | --- | --- | --- |',
+    ...rows,
+  ].join('\n');
+}
+
+/** @param {{changedFileList?: readonly string[], concurrency?: number, execute?: (command: string) => ExecResult | Promise<ExecResult>}} [opts] */
+export async function runStructural(opts = {}) {
+  const execute = opts.execute ?? shellAsync;
   if (process.env.CI_FAST_SKIP_STRUCTURAL === 'true') {
     return {
       code: 0,
@@ -1094,6 +1715,19 @@ export function runStructural(opts = {}) {
   }
 
   const selected = selectedProductLanes();
+  // invariants:check lives in operationsParts, but invariant-scanned sources
+  // such as apps/desktop/src/main.ts classify as mac/web only (#18182 reached
+  // main red that way). Unreadable or empty diffs fail closed.
+  const changed =
+    event === 'workflow_dispatch'
+      ? null
+      : (opts.changedFileList ?? listAllChangedFiles());
+  const invariantParts =
+    !selected.has('operations') &&
+    (selected.has('web') || selected.has('mac')) &&
+    (!changed?.length || changed.some(file => isInvariantScannedPath(file)))
+      ? ['pnpm invariants:check']
+      : [];
   const operationsParts = [
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
@@ -1107,7 +1741,8 @@ export function runStructural(opts = {}) {
     SCRIPT_CONTRACT_VITEST_COMMAND,
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
+    // merge-group-workflow-contract runs in ci:control:test's Vitest run.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -1122,14 +1757,12 @@ export function runStructural(opts = {}) {
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
     'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
-    // The Gem contract is embedded in the broader Symphony controller suite.
-    "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-gate.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/shipping-lead-gate.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    'if python3 -c "import coverage, pytest" 2>/dev/null; then python3 -m pytest --durations=20 scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py -v && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py -q && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
-    // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
+    ...STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+    // actionlint runs as a dedicated workflow step before this script (.github/scripts/run-actionlint.sh).
   ];
   const webParts = [
     // JOV-6104: measured marketing contracts must run for registry-only edits.
@@ -1163,7 +1796,7 @@ export function runStructural(opts = {}) {
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
-  const parts = [
+  const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
           webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
@@ -1176,13 +1809,27 @@ export function runStructural(opts = {}) {
           // quarantine ledger (#18339 landed a red deploy contract that way).
           // Targeting Vitest directly also fails closed when the file cannot
           // be resolved or contains no tests.
-          `pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
+          `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}`,
+          ...(selectPlaywrightReceipt(event, selected, changed)
+            ? [
+                `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${PLAYWRIGHT_RECEIPT_CI_TEST}`,
+              ]
+            : []),
         ]
       : []),
+    ...invariantParts,
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
   ];
+  // ci-fast (structural python) runs `only` the pytest shards; remaining skips.
+  // Consume the split mode so nested contract suites (which rebuild this
+  // list) don't inherit it and see a filtered pool.
+  const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
+  delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+  const parts = allParts.filter(
+    part => mode !== (STRUCTURAL_PYTEST_PARTS.includes(part) ? 'skip' : 'only')
+  );
   if (parts.length === 0) {
     return {
       code: 0,
@@ -1191,24 +1838,48 @@ export function runStructural(opts = {}) {
     };
   }
 
-  let combined = '';
-  for (const [index, cmd] of parts.entries()) {
-    const result = execute(cmd);
-    combined += result.output;
-    if (result.code !== 0) {
-      return {
-        code: result.code,
-        output: structuralFailureExcerpt(
-          cmd,
-          result.output,
-          index,
-          parts.length,
-          result.code
-        ),
-      };
-    }
+  const concurrency =
+    opts.concurrency ??
+    structuralConcurrency(process.env.CI_FAST_STRUCTURAL_CONCURRENCY);
+  const startedAt = Date.now();
+  const results = await runCommandPool(parts, {
+    execute,
+    concurrency,
+    locks: parts.map(structuralLocks),
+    // Serial runs gain nothing from reordering; keep strict list order there.
+    first:
+      concurrency > 1
+        ? parts.flatMap((command, index) =>
+            STRUCTURAL_LONG_POLES.some(pole => command.includes(pole))
+              ? [index]
+              : []
+          )
+        : [],
+  });
+  const wallMs = Date.now() - startedAt;
+  const timings = results.flatMap((result, index) =>
+    result ? [{ index, command: parts[index], ...result }] : []
+  );
+  // First failure in list order, not completion order.
+  const failedIndex = results.findIndex(result => result && result.code !== 0);
+  if (failedIndex !== -1) {
+    const { code, output } = results[failedIndex];
+    return {
+      code,
+      output: structuralFailureExcerpt(
+        parts[failedIndex],
+        output,
+        failedIndex,
+        parts.length,
+        code
+      ),
+      timings,
+      wallMs,
+    };
   }
-  return { code: 0, output: combined };
+  // Deterministic list order regardless of completion order.
+  const combined = results.map(result => result.output).join('');
+  return { code: 0, output: combined, timings, wallMs };
 }
 
 function annotateFailure(lane, logExcerpt) {
@@ -1222,7 +1893,7 @@ function annotateFailure(lane, logExcerpt) {
   if (short) console.error(`::error::${short}`);
 }
 
-function writeSummary(results, groupId) {
+function writeSummary(results, groupId, timingTables = []) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return;
 
@@ -1248,6 +1919,7 @@ function writeSummary(results, groupId) {
       lines.push('```');
     }
   }
+  for (const table of timingTables) lines.push('', table);
   lines.push('');
   appendFileSync(summaryPath, `${lines.join('\n')}\n`);
 }
@@ -1288,10 +1960,12 @@ function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
 
-function main() {
+async function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
   const results = [];
+  /** @type {string[]} */
+  const timingTables = [];
   /** @type {string | undefined} */
   let setupError;
   const failFast = failFastEnabled();
@@ -1302,10 +1976,20 @@ function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
+    // Overlap the independent tsc lanes (~5.6 GB each); results keep order.
+    const started = new Map();
+    for (const lane of selectedLanes.filter(l =>
+      LANE_GROUPS.typecheck.includes(l.id)
+    )) {
+      const run = Promise.resolve().then(() => lane.run());
+      run.catch(() => {});
+      started.set(lane.id, [Date.now(), run]);
+    }
+
     let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
-      const laneStartedAt = Date.now();
+      const [laneStartedAt, run] = started.get(lane.id) ?? [Date.now()];
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
@@ -1324,7 +2008,7 @@ function main() {
 
       let outcome;
       try {
-        outcome = lane.run();
+        outcome = await (run ?? lane.run());
       } catch (error) {
         const message =
           error instanceof Error ? error.stack || error.message : String(error);
@@ -1354,6 +2038,14 @@ function main() {
       } else if (logExcerpt && status !== 'success') {
         console.log(logExcerpt);
       }
+      const timingTable = formatStructuralTimings(
+        outcome.timings,
+        outcome.wallMs
+      );
+      if (timingTable) {
+        console.log(`\n${timingTable}`);
+        timingTables.push(timingTable);
+      }
 
       results.push({
         id: lane.id,
@@ -1370,7 +2062,7 @@ function main() {
     console.error(`[ci-fast] setup failed: ${setupError}`);
   }
 
-  writeSummary(results, laneGroup);
+  writeSummary(results, laneGroup, timingTables);
   writeLaneResults(results, laneGroup, setupError);
 
   if (setupError) {
@@ -1392,5 +2084,5 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
 ) {
-  main();
+  await main();
 }

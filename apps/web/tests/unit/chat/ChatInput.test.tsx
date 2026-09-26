@@ -17,6 +17,7 @@ import {
 } from '@/components/features/chat/Composer';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import * as largeTextPaste from '@/lib/chat/large-text-paste';
+import { serializedDeclaration } from '@/tests/utils/css-declaration';
 import { fastRender } from '@/tests/utils/fast-render';
 
 function withProviders(ui: ReactNode) {
@@ -175,6 +176,46 @@ describe('ChatInput', () => {
     isLoading: false,
     isSubmitting: false,
   };
+
+  it('emits exactly one onChange per keystroke (JOV-5325)', async () => {
+    const user = userEvent.setup();
+    const calls: string[] = [];
+
+    function Harness() {
+      const [value, setValue] = useState('');
+      return (
+        <ChatInput
+          value={value}
+          onChange={next => {
+            calls.push(next);
+            setValue(next);
+          }}
+          onSubmit={vi.fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<Harness />));
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+
+    await user.type(textarea, 'Hey');
+
+    expect(calls).toEqual(['H', 'He', 'Hey']);
+  });
+
+  it('sets the textarea height inline so line growth snaps with the keystroke (JOV-5325)', () => {
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    }) as HTMLTextAreaElement;
+
+    expect(textarea.style.height).toBe('24px');
+  });
 
   it('keeps the textarea focused when clicking send', async () => {
     const user = userEvent.setup();
@@ -410,7 +451,9 @@ describe('ChatInput', () => {
 
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.getAttribute('data-variant')).toBe('hero');
-    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 45rem)');
+    expect(surface.style.maxWidth).toBe(
+      serializedDeclaration('max-width', 'min(calc(100vw - 32px), 45rem)')
+    );
     expect(surface.style.borderRadius).toBe('9999px');
 
     expect(screen.getByTestId('chat-composer-input-row').className).toContain(

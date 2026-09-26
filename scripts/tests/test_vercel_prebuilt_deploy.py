@@ -12,6 +12,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
+# GNU timeout accepts fractional budgets. The fake CLI prints its URL within
+# milliseconds and ignores TERM, so these still exercise TERM -> KILL (exit 137)
+# without spending whole seconds of wall clock per timed-out attempt.
+FAST_TIMEOUT_SECONDS = "0.5"
+FAST_KILL_GRACE_SECONDS = "0.2"
 PRODUCTION_PROMOTION_SCRIPT = (
     REPO_ROOT / ".github/scripts/promote-production-deployment.sh"
 )
@@ -109,9 +114,9 @@ echo "https://jovie-timeout-test.vercel.app"
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
         }
     )
@@ -171,9 +176,9 @@ echo "https://jovie-source-fallback.vercel.app"
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
             "VERCEL_GIT_COMMIT_SHA": "0123456789abcdef",
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
             "VERCEL_ENV_LOG": str(tmp_path / "vercel-env"),
@@ -362,9 +367,9 @@ sleep 5
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
-            "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "1",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
+            "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
         }
     )
 
@@ -1734,3 +1739,71 @@ def test_every_prebuilt_build_dereferences_function_trace_links() -> None:
         build = workflow.rindex("./node_modules/.bin/vercel build", 0, deploy)
         materialize = workflow.index(invocation, build)
         assert build < materialize < deploy, workflow_path.name
+
+
+def _write_manifest_probe_vercel(bin_dir: Path, prebuilt_exit: int) -> None:
+    fake_vercel = bin_dir / "vercel"
+    fake_vercel.write_text(
+        f"""#!/usr/bin/env bash
+if [[ " $* " == *" --prebuilt "* ]]; then
+  echo "Extracted 7021 deployment files"
+  echo "https://jovie-manifest-probe.vercel.app"
+  exit {prebuilt_exit}
+fi
+echo "https://jovie-source-probe.vercel.app"
+"""
+    )
+    fake_vercel.chmod(0o755)
+
+
+def test_tgz_attempt_records_output_manifest_and_extracted_count(tmp_path: Path) -> None:
+    """Every tgz attempt leaves a names/sizes/modes manifest of the upload so
+    an "Extracting deployment files" failure can be diffed against a success."""
+
+    env = _prebuilt_fixture(tmp_path)
+    manifest_file = tmp_path / "manifest.json"
+    env["VERCEL_OUTPUT_MANIFEST_FILE"] = str(manifest_file)
+    (tmp_path / ".vercel/output/static").mkdir(parents=True)
+    (tmp_path / ".vercel/output/static/secret.txt").write_text("sk_live_manifest_probe")
+    _write_manifest_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+
+    result = _run_deploy(tmp_path, env)
+
+    combined = result.stdout + result.stderr
+    assert result.returncode == 0, combined
+    assert "Vercel remote build: Extracted 7021 deployment files" in result.stdout
+    assert "vercel-output-manifest| output: entries=" in result.stdout
+    assert "sk_live_manifest_probe" not in combined
+    assert "test-token" not in combined
+    manifest = json.loads(manifest_file.read_text())
+    assert manifest["schema"] == "jovie-vercel-output-manifest/v1"
+    assert manifest["filePathMap"]["uniqueTargets"] == 1
+    assert manifest["filePathMap"]["totals"]["files"] == 1
+    assert "Vercel output manifest:" not in result.stderr
+
+
+def test_failed_tgz_attempt_prints_compact_manifest_summary(tmp_path: Path) -> None:
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    env["VERCEL_OUTPUT_MANIFEST_FILE"] = str(tmp_path / "manifest.json")
+    _write_manifest_probe_vercel(tmp_path / "bin", prebuilt_exit=1)
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    summaries = [line for line in result.stderr.splitlines()
+                 if line.startswith("Vercel output manifest: ")]
+    assert len(summaries) == 1, result.stdout + result.stderr
+    assert re.search(r"entries=\d+ files=\d+ dirs=\d+ symlinks=0 ", summaries[0])
+    assert "tracedUnique=1 tracedFiles=1" in summaries[0]
+
+
+def test_manifest_failure_never_changes_deploy_outcome(tmp_path: Path) -> None:
+    env = _prebuilt_fixture(tmp_path)
+    env["VERCEL_OUTPUT_MANIFEST_FILE"] = str(tmp_path / "missing-dir" / "manifest.json")
+    _write_manifest_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Vercel output manifest unavailable" in result.stderr
+    assert "Deploy succeeded on attempt 1 with tgz upload" in result.stdout

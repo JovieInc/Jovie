@@ -2,19 +2,39 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ACQUISITION_CERTIFICATION_COMMAND,
+  BIOME_TOOLCHAIN_FILES,
+  biomeNeedsFullTree,
+  CERTIFICATION_KERNEL_COMMAND,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
   extractDiagnosticLines,
+  extractFailureIdentities,
   failureAnnotationMessage,
+  formatStructuralTimings,
   LANE_COMMANDS,
   laneFailureExcerpt,
+  MARKETING_CERTIFICATION_COMMAND,
+  runCommandPool,
   runDesignConformance,
   runStructural,
+  STRUCTURAL_DEFAULT_CONCURRENCY,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   stripGitFetchNoise,
+  structuralConcurrency,
+  structuralLocks,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+import {
+  ALLOWLIST_PATH as LATENCY_ALLOWLIST_PATH,
+  RUNTIME_ROOTS as LATENCY_RUNTIME_ROOTS,
+} from '../../invariants/latency-sensitive-execution-paths.mjs';
+import {
+  INVARIANT_SCANNED_PATHS,
+  isInvariantScannedPath,
+} from '../../invariants/scanned-paths.mjs';
 import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
 const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
@@ -63,10 +83,19 @@ describe('CI control selector', () => {
       expect(result.status, result.stderr).toBe(0);
       const scriptCommand = readFileSync(capture, 'utf8')
         .split('\n')
-        .find(command => command.startsWith('exec vitest --root scripts '));
+        // The control pool runs commands concurrently, so match the suite, not the order.
+        .find(
+          command =>
+            command.startsWith('exec vitest --root scripts ') &&
+            command.includes('--coverage.include=merge-queue-backend.mjs')
+        );
       expect(scriptCommand).toBeDefined();
       expect(scriptCommand.split(' ')).toContain(
         'lib/__tests__/ci-fast-lanes.test.mjs'
+      );
+      // The structural lane relies on this run instead of repeating it.
+      expect(scriptCommand.split(' ')).toContain(
+        'lib/__tests__/merge-group-workflow-contract.test.mjs'
       );
       expect(scriptCommand).toContain('--coverage');
     } finally {
@@ -145,7 +174,11 @@ describe('runStructural screenshot contract discovery', () => {
   const originalSkipStructural = process.env.CI_FAST_SKIP_STRUCTURAL;
   const originalScmBase = process.env.TURBO_SCM_BASE;
 
+  // These cases pin serial list order; pool ordering is covered separately.
+  beforeEach(() => vi.stubEnv('CI_FAST_STRUCTURAL_CONCURRENCY', '1'));
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     for (const [name, value] of [
       ['GITHUB_EVENT_NAME', originalEventName],
       ['CI_PRODUCT_LANES', originalProductLanes],
@@ -158,15 +191,17 @@ describe('runStructural screenshot contract discovery', () => {
     vi.clearAllMocks();
   });
 
-  it('never runs a tests/unit/ci file in two structural commands', () => {
+  it('never runs a tests/unit/ci file in two structural commands', async () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'web,operations';
     process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
     const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
-    runStructural({ execute });
+    await runStructural({ execute });
     const commands = execute.mock.calls.map(([command]) => String(command));
     const directoryRuns = commands.filter(command =>
-      /vitest\.config\.mts tests\/unit\/ci( |$)/.test(command)
+      // Any web Vitest config: a second directory run under another config
+      // would still execute every contract twice.
+      /vitest\.config(\.[\w-]+)?\.mts tests\/unit\/ci( |$)/.test(command)
     );
     expect(directoryRuns).toHaveLength(1);
     const explicitCiFiles = commands
@@ -189,7 +224,7 @@ describe('runStructural screenshot contract discovery', () => {
     ['ios', false],
   ])(
     'runs the screenshot contract once for selected lanes %s',
-    (lanes, expected) => {
+    async (lanes, expected) => {
       process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
       process.env.CI_PRODUCT_LANES = lanes;
       process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
@@ -197,7 +232,7 @@ describe('runStructural screenshot contract discovery', () => {
         .fn()
         .mockReturnValue({ code: 0, output: 'executed\n' });
 
-      const result = runStructural({ execute });
+      const result = await runStructural({ execute });
       const screenshotCalls = execute.mock.calls.filter(
         ([command]) => command === WEB_CI_CONTRACT_TESTS_COMMAND
       );
@@ -223,7 +258,7 @@ describe('runStructural screenshot contract discovery', () => {
     ['ios', 0],
   ])(
     'runs the quarantined deploy contract by name once for lanes %s',
-    (lanes, expected) => {
+    async (lanes, expected) => {
       // #18339 landed a red deploy contract through an operations-only diff:
       // the directory run excludes quarantined files and the by-name run was
       // web-only.
@@ -233,21 +268,26 @@ describe('runStructural screenshot contract discovery', () => {
       const execute = vi
         .fn()
         .mockReturnValue({ code: 0, output: 'executed\n' });
-      runStructural({ execute });
+      await runStructural({ execute });
       const byName = execute.mock.calls.filter(([command]) =>
         String(command).endsWith('tests/unit/ci/deploy-workflow.test.ts')
       );
       expect(byName).toHaveLength(expected);
+      for (const [command] of byName) {
+        expect(command).toBe(
+          'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/deploy-workflow.test.ts'
+        );
+      }
     }
   );
 
-  it('runs on a pull request changing the PR Size Guard workflow', () => {
+  it('runs on a pull request changing the PR Size Guard workflow', async () => {
     process.env.GITHUB_EVENT_NAME = 'pull_request';
     process.env.CI_PRODUCT_LANES = 'operations';
     process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
     const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
 
-    const result = runStructural({
+    const result = await runStructural({
       changedFileList: ['.github/workflows/pr-size-guard.yml'],
       execute,
     });
@@ -268,7 +308,7 @@ describe('runStructural screenshot contract discovery', () => {
     'config/node-runtime-policy.json',
   ])(
     'runs every apps/web/tests/unit/ci contract when only %s changes in a merge group',
-    path => {
+    async path => {
       const receipt = classifyProductLanes([path]);
       expect(receipt.selectedLanes).toEqual(['operations']);
       process.env.GITHUB_EVENT_NAME = 'merge_group';
@@ -278,7 +318,7 @@ describe('runStructural screenshot contract discovery', () => {
         .fn()
         .mockReturnValue({ code: 0, output: 'executed\n' });
 
-      const result = runStructural({ changedFileList: [path], execute });
+      const result = await runStructural({ changedFileList: [path], execute });
 
       expect(result.code).toBe(0);
       expect(result.skipped).toBeUndefined();
@@ -286,7 +326,30 @@ describe('runStructural screenshot contract discovery', () => {
     }
   );
 
-  it('stops before later structural commands when the screenshot contract fails', () => {
+  // #18718: web merge groups keep the receipt in Unit Tests only.
+  it.each([
+    ['pull_request', 'operations', '.github/workflows/ci.yml', 1],
+    ['pull_request', 'web', 'apps/web/app/page.tsx', 0],
+    ['merge_group', 'operations', '.github/workflows/ci.yml', 1],
+    ['merge_group', 'web,operations', '.github/workflows/ci.yml', 0],
+  ])(
+    'runs the Playwright receipt on %s (%s) for %s: %i',
+    async (event, lanes, path, expected) => {
+      process.env.GITHUB_EVENT_NAME = event;
+      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ changedFileList: [path], execute });
+      const receipt = execute.mock.calls.filter(([command]) =>
+        command.endsWith(
+          'ci-contracts.mts tests/unit/ci/playwright-artifact-secrets.test.ts'
+        )
+      );
+      expect(receipt).toHaveLength(expected);
+    }
+  );
+
+  it('stops before later structural commands when the screenshot contract fails', async () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'operations';
     process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
@@ -294,7 +357,7 @@ describe('runStructural screenshot contract discovery', () => {
       .fn()
       .mockReturnValue({ code: 17, output: 'fixture drift\n' });
 
-    expect(runStructural({ execute })).toMatchObject({
+    expect(await runStructural({ execute })).toMatchObject({
       code: 17,
       output: expect.stringMatching(
         /failed \(exit 17\)\. Command: [^\n]+\n\nfixture drift/u
@@ -305,7 +368,7 @@ describe('runStructural screenshot contract discovery', () => {
     );
   });
 
-  it('stops when runner coverage falls below its hosted floor', () => {
+  it('stops when runner coverage falls below its hosted floor', async () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'operations';
     process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
@@ -314,7 +377,7 @@ describe('runStructural screenshot contract discovery', () => {
       .mockReturnValueOnce({ code: 0, output: 'screenshot pass\n' })
       .mockReturnValueOnce({ code: 19, output: 'coverage floor failed\n' });
 
-    expect(runStructural({ execute })).toMatchObject({
+    expect(await runStructural({ execute })).toMatchObject({
       code: 19,
       output: expect.stringMatching(
         /failed \(exit 19\)\. Command: [^\n]+\ncoverage floor failed\n\ncoverage floor failed$/u
@@ -326,20 +389,36 @@ describe('runStructural screenshot contract discovery', () => {
     ]);
   });
 
-  it('uses the default executor on the structural skip path', () => {
-    process.env.CI_FAST_SKIP_STRUCTURAL = 'true';
-
-    expect(runStructural()).toMatchObject({ code: 0, skipped: true });
+  it('splits the structural pytest shards between two hosted jobs', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    const run = async mode => {
+      vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', mode);
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ execute });
+      return execute.mock.calls.map(([command]) => command);
+    };
+    const [all, only] = [await run(''), await run('only')];
+    expect(only).toEqual(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1));
+    expect([...only, ...(await run('skip'))].sort()).toEqual(all.sort());
+    // Consumed, so nested lane suites see the unsplit pool.
+    expect(process.env.CI_FAST_STRUCTURAL_PYTEST).toBeUndefined();
   });
 
-  it('keeps empty checkout diffs fail closed to structural execution', () => {
+  it('uses the default executor on the structural skip path', async () => {
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'true';
+
+    expect(await runStructural()).toMatchObject({ code: 0, skipped: true });
+  });
+
+  it('keeps empty checkout diffs fail closed to structural execution', async () => {
     process.env.GITHUB_EVENT_NAME = 'push';
     process.env.TURBO_SCM_BASE = 'HEAD';
     process.env.CI_PRODUCT_LANES = 'operations';
     process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
     const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
 
-    expect(runStructural({ execute })).toMatchObject({ code: 0 });
+    expect(await runStructural({ execute })).toMatchObject({ code: 0 });
     expect(execute.mock.calls[0][0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
     expect(execute.mock.calls[1][0]).toBe(STRUCTURAL_RUNNER_COVERAGE_COMMAND);
   });
@@ -356,26 +435,32 @@ describe('Summer bridge structural coverage selection', () => {
       'web,operations',
       'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts',
     ],
-  ])('enforces coverage once for %s changes to %s', (lanes, changedFile) => {
-    vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
-    vi.stubEnv('CI_PRODUCT_LANES', lanes);
-    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    const execute = vi.fn((_command = '') => ({
-      code: 0,
-      output: 'passed\n',
-    }));
+  ])(
+    'enforces coverage once for %s changes to %s',
+    async (lanes, changedFile) => {
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      vi.stubEnv('CI_PRODUCT_LANES', lanes);
+      vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+      const execute = vi.fn((_command = '') => ({
+        code: 0,
+        output: 'passed\n',
+      }));
 
-    const result = runStructural({ changedFileList: [changedFile], execute });
+      const result = await runStructural({
+        changedFileList: [changedFile],
+        execute,
+      });
 
-    expect(result.code).toBe(0);
-    expect(
-      execute.mock.calls.filter(
-        ([command]) => command === SUMMER_BRIDGE_COVERAGE_COMMAND
-      )
-    ).toHaveLength(1);
-  });
+      expect(result.code).toBe(0);
+      expect(
+        execute.mock.calls.filter(
+          ([command]) => command === SUMMER_BRIDGE_COVERAGE_COMMAND
+        )
+      ).toHaveLength(1);
+    }
+  );
 
-  it('stops the web lane when the route coverage floor fails', () => {
+  it('stops the web lane when the route coverage floor fails', async () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
     vi.stubEnv('CI_PRODUCT_LANES', 'web');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
@@ -386,7 +471,7 @@ describe('Summer bridge structural coverage selection', () => {
     );
 
     expect(
-      runStructural({
+      await runStructural({
         changedFileList: [
           'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts',
         ],
@@ -397,6 +482,106 @@ describe('Summer bridge structural coverage selection', () => {
       output: expect.stringContaining('route coverage floor failed'),
     });
     expect(execute.mock.calls.at(-1)[0]).toBe(SUMMER_BRIDGE_COVERAGE_COMMAND);
+  });
+});
+
+// #18182 added a second readFileSync to apps/desktop/src/main.ts. It classified
+// as mac,web, the structural lane ran without the operations-only
+// invariants:check, the merge group passed, and main went red on JOV-INV-031.
+describe('invariant-scanned structural selection', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  const INVARIANTS = 'pnpm invariants:check';
+  const invariantRuns = execute =>
+    execute.mock.calls.filter(([command]) => command === INVARIANTS).length;
+  const runFor = async (event, files, lanes) => {
+    vi.stubEnv('GITHUB_EVENT_NAME', event);
+    vi.stubEnv('CI_PRODUCT_LANES', lanes.join(','));
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+    const result = await runStructural({ changedFileList: files, execute });
+    return { execute, result };
+  };
+
+  it.each([
+    ['pull_request', 'apps/desktop/src/main.ts'],
+    ['merge_group', 'apps/desktop/src/main.ts'],
+    ['pull_request', 'apps/web/lib/chat/knowledge/topics.ts'],
+    ['merge_group', 'apps/web/lib/chat/knowledge/topics.ts'],
+  ])(
+    'runs invariants:check on %s when only %s changes',
+    async (event, path) => {
+      const lanes = classifyProductLanes([path]).selectedLanes;
+      expect(lanes).not.toContain('operations');
+      const { execute, result } = await runFor(event, [path], lanes);
+      expect(result.code).toBe(0);
+      expect(result.skipped).toBeUndefined();
+      expect(invariantRuns(execute)).toBe(1);
+    }
+  );
+
+  it('fails the lane when the invariant ratchet fails on a mac-only change', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'merge_group');
+    vi.stubEnv('CI_PRODUCT_LANES', 'mac');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const execute = vi.fn(command =>
+      command === INVARIANTS
+        ? { code: 1, output: 'readFileSync count 2 exceeds allowlist 1\n' }
+        : { code: 0, output: 'ok\n' }
+    );
+    expect(
+      await runStructural({
+        changedFileList: ['apps/desktop/src/main.ts'],
+        execute,
+      })
+    ).toMatchObject({
+      code: 1,
+      output: expect.stringContaining('exceeds allowlist 1'),
+    });
+  });
+
+  it('runs invariants:check once when operations already carries it', async () => {
+    const { execute } = await runFor(
+      'merge_group',
+      ['apps/desktop/src/main.ts', 'scripts/invariants/validate.mjs'],
+      ['mac', 'operations']
+    );
+    expect(invariantRuns(execute)).toBe(1);
+  });
+
+  it('keeps invariants:check off web changes outside every scanned path', async () => {
+    const path = 'apps/web/tests/e2e/public-profile-smoke.spec.ts';
+    expect(isInvariantScannedPath(path)).toBe(false);
+    const { execute } = await runFor(
+      'pull_request',
+      [path],
+      classifyProductLanes([path]).selectedLanes
+    );
+    expect(invariantRuns(execute)).toBe(0);
+  });
+
+  it('covers every latency root and allowlisted file', () => {
+    const allowlist = JSON.parse(
+      readFileSync(join(REPO_ROOT, LATENCY_ALLOWLIST_PATH), 'utf8')
+    );
+    for (const path of [
+      ...Object.keys(allowlist.entries),
+      ...LATENCY_RUNTIME_ROOTS,
+      LATENCY_ALLOWLIST_PATH,
+    ]) {
+      expect(isInvariantScannedPath(path), path).toBe(true);
+    }
+  });
+
+  it('classifies every scanned path into a lane that reaches structural', () => {
+    for (const root of INVARIANT_SCANNED_PATHS) {
+      const file = /\.[a-z]+$/u.test(root) ? root : `${root}/index.ts`;
+      const lanes = classifyProductLanes([file]).selectedLanes;
+      expect(
+        lanes.some(lane => ['operations', 'web', 'mac'].includes(lane)),
+        `${file} -> ${lanes.join(',')}`
+      ).toBe(true);
+    }
   });
 });
 
@@ -416,9 +601,11 @@ describe('structural failure diagnostics', () => {
     '1 failed, 402 passed\n',
   ].join('\n');
 
+  // Serial list order keeps "command 1/N" deterministic for these cases.
+  beforeEach(() => vi.stubEnv('CI_FAST_STRUCTURAL_CONCURRENCY', '1'));
   afterEach(() => vi.unstubAllEnvs());
 
-  it('retains bounded registered identities from only the failed command', () => {
+  it('retains bounded registered identities from only the failed command', async () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations,web');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
@@ -428,7 +615,7 @@ describe('structural failure diagnostics', () => {
         ? noisyFailure
         : `FAILED ${failureNode}_successful_command\n`,
     }));
-    const result = runStructural({ execute });
+    const result = await runStructural({ execute });
     expect(result.code).toBe(23);
     expect(execute.mock.calls.at(-1)[0]).toContain('python3 -m pytest ');
     expect(
@@ -452,7 +639,7 @@ describe('structural failure diagnostics', () => {
     expect(result.output).toContain('1 failed, 402 passed');
   });
 
-  it('reports command and exit without inventing an identity for unknown output', () => {
+  it('reports command and exit without inventing an identity for unknown output', async () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
@@ -460,7 +647,7 @@ describe('structural failure diagnostics', () => {
       code: 31,
       output: 'unknown failure\n',
     }));
-    const result = runStructural({ execute });
+    const result = await runStructural({ execute });
     expect(result.code).toBe(31);
     expect(execute).toHaveBeenCalledTimes(1);
     expect(result.output).toMatch(
@@ -474,7 +661,7 @@ describe('structural failure diagnostics', () => {
     );
   });
 
-  it('surfaces the coverage ERROR line and drops git fetch noise when no identity exists', () => {
+  it('surfaces the coverage ERROR line and drops git fetch noise when no identity exists', async () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
@@ -491,7 +678,7 @@ describe('structural failure diagnostics', () => {
       ),
     ].join('\n');
     const execute = vi.fn(() => ({ code: 1, output }));
-    const result = runStructural({ execute });
+    const result = await runStructural({ execute });
     expect(result.code).toBe(1);
     const [header, body] = result.output.split('\n\n');
     expect(header.split('\n')).toEqual([
@@ -576,7 +763,8 @@ exit 0
         expect(result.status, result.stderr).toBe(1);
         const report = JSON.parse(readFileSync(output, 'utf8'));
         expect(report.setupError).toBeNull();
-        expect(report.lanes).toHaveLength(1);
+        // The typecheck group also runs the web tests ratchet after typecheck.
+        expect(report.lanes).toHaveLength(scenario === 'other-lane' ? 2 : 1);
         expect(report.lanes[0].status).toBe('failure');
         const diagnostic = report.lanes[0].logExcerpt;
         expect(diagnostic.length).toBeLessThanOrEqual(1200);
@@ -615,6 +803,332 @@ exit 0
   );
 });
 
+/** Executor whose commands finish only when the test settles them. */
+function deferredExecutor() {
+  const calls = [];
+  const execute = vi.fn(
+    command =>
+      new Promise(resolveCall => {
+        calls.push({ command, settle: resolveCall });
+      })
+  );
+  const settle = (command, code = 0, output = `${command}\n`) =>
+    calls.find(call => call.command === command).settle({ code, output });
+  return { calls, execute, settle };
+}
+
+const flush = () => new Promise(resolveFlush => setImmediate(resolveFlush));
+
+describe('structural command pool', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('caps in-flight commands at the configured concurrency', async () => {
+    const { calls, execute, settle } = deferredExecutor();
+    const commands = Array.from({ length: 8 }, (_, index) => `c${index}`);
+    const done = runCommandPool(commands, { execute, concurrency: 3 });
+    let maxInFlight = 0;
+    for (const [settled, command] of commands.entries()) {
+      await flush();
+      maxInFlight = Math.max(maxInFlight, calls.length - settled);
+      expect(calls.length - settled).toBeLessThanOrEqual(3);
+      settle(command);
+    }
+    const results = await done;
+    expect(maxInFlight).toBe(3);
+    expect(execute.mock.calls.map(([command]) => command)).toEqual(commands);
+    expect(results.every(result => result.code === 0)).toBe(true);
+  });
+
+  it('never overlaps commands that share a lock and keeps their list order', async () => {
+    const { calls, execute, settle } = deferredExecutor();
+    const done = runCommandPool(['a1', 'b1', 'a2', 'c1', 'a3'], {
+      execute,
+      concurrency: 3,
+      locks: [['a'], ['b'], ['a'], [], ['a']],
+    });
+    await flush();
+    expect(calls.map(call => call.command)).toEqual(['a1', 'b1', 'c1']);
+    settle('b1');
+    await flush();
+    // A free slot must not admit a2 while a1 still holds lock "a".
+    expect(calls.map(call => call.command)).toEqual(['a1', 'b1', 'c1']);
+    settle('a1');
+    await flush();
+    expect(calls.map(call => call.command)).toContain('a2');
+    expect(calls.map(call => call.command)).not.toContain('a3');
+    settle('a2');
+    await flush();
+    settle('c1');
+    settle('a3');
+    expect((await done).map(result => result.code)).toEqual([0, 0, 0, 0, 0]);
+    expect(
+      calls.map(call => call.command).filter(c => c.startsWith('a'))
+    ).toEqual(['a1', 'a2', 'a3']);
+  });
+
+  it('starts long poles first without jumping an earlier same-lock command', async () => {
+    const started = [];
+    const results = await runCommandPool(
+      ['a', 'x1', 'pole', 'x2', 'lockedPole'],
+      {
+        concurrency: 1,
+        locks: [['L'], [], [], [], ['L']],
+        first: [2, 4],
+        execute: command => {
+          started.push(command);
+          return { code: 0, output: `${command}\n` };
+        },
+      }
+    );
+    // lockedPole waits for the earlier "a" that shares lock L.
+    expect(started).toEqual(['pole', 'a', 'lockedPole', 'x1', 'x2']);
+    expect(results.map(result => result.output)).toEqual([
+      'a\n',
+      'x1\n',
+      'pole\n',
+      'x2\n',
+      'lockedPole\n',
+    ]);
+  });
+
+  it('starts long-pole structural commands ahead of list order only when parallel', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const startOrder = async concurrency => {
+      const started = [];
+      await runStructural({
+        concurrency,
+        execute: command => {
+          started.push(command);
+          return { code: 0, output: '' };
+        },
+      });
+      return started;
+    };
+    const parallel = await startOrder(3);
+    const head = parallel.slice(0, 3).join('\n');
+    expect(head).toContain('pnpm invariants:check');
+    expect(head).toContain('python3 -m pytest ');
+    // Both complementary pytest shards are long poles.
+    expect(
+      parallel
+        .slice(0, 4)
+        .filter(command => command.includes('python3 -m pytest '))
+    ).toHaveLength(2);
+    const serial = await startOrder(1);
+    expect(serial[0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
+    expect([...serial].sort()).toEqual([...parallel].sort());
+  });
+
+  it('starts nothing new after a failure but lets in-flight commands finish', async () => {
+    const { calls, execute, settle } = deferredExecutor();
+    const done = runCommandPool(['c0', 'c1', 'c2', 'c3'], {
+      execute,
+      concurrency: 2,
+    });
+    await flush();
+    settle('c0', 9, 'boom\n');
+    await flush();
+    expect(calls.map(call => call.command)).toEqual(['c0', 'c1']);
+    settle('c1', 0, 'late pass\n');
+    const results = await done;
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(results[0]).toMatchObject({ code: 9, output: 'boom\n' });
+    expect(results[1]).toMatchObject({ code: 0, output: 'late pass\n' });
+    expect(results.slice(2)).toEqual([undefined, undefined]);
+  });
+
+  it('turns thrown and rejected executions into failures', async () => {
+    const execute = command => {
+      if (command === 'throw') throw new Error('sync explode');
+      return Promise.reject('async explode');
+    };
+    const [thrown, never] = await runCommandPool(['throw', 'reject'], {
+      concurrency: 2,
+      execute,
+    });
+    expect(thrown.code).toBe(1);
+    expect(thrown.output).toContain('sync explode');
+    // A synchronous failure is known before the next slot is filled.
+    expect(never).toBeUndefined();
+    const [rejected] = await runCommandPool(['reject'], {
+      concurrency: 2,
+      execute,
+    });
+    expect(rejected).toMatchObject({ code: 1, output: 'async explode' });
+  });
+
+  it('emits combined output in list order and reports the first failure by list order', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    // A synchronous executor runs serially, so it records the list order.
+    const order = [];
+    await runStructural({
+      concurrency: 1,
+      execute: command => {
+        order.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    // Later commands finish first; output must not follow completion order.
+    const delayed = failing => command => {
+      const index = order.indexOf(command);
+      return new Promise(resolveCall =>
+        setTimeout(
+          () =>
+            resolveCall({
+              code: failing.includes(index) ? 40 + index : 0,
+              output: `out-${index}\n`,
+            }),
+          Math.max(0, 4 - index) * 5
+        )
+      );
+    };
+
+    const pass = await runStructural({ execute: delayed([]), concurrency: 3 });
+    expect(pass.code).toBe(0);
+    expect(pass.output).toBe(
+      order.map((_, index) => `out-${index}\n`).join('')
+    );
+    expect(pass.timings).toHaveLength(order.length);
+
+    // Command 3 (index 2) fails first in time; command 2 (index 1) fails later.
+    const fail = await runStructural({
+      execute: delayed([1, 2]),
+      concurrency: 3,
+    });
+    expect(fail.code).toBe(41);
+    expect(fail.output).toMatch(
+      /^Structural command 2\/\d+ failed \(exit 41\)\. Command: pnpm exec vitest --root scripts/u
+    );
+    expect(fail.output).toContain('out-1');
+    expect(fail.output).not.toContain('out-2');
+  });
+
+  it('never runs real structural commands that share writable state together', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const active = new Map();
+    const started = [];
+    let maxActive = 0;
+    const execute = command =>
+      new Promise(resolveCall => {
+        const locks = structuralLocks(command);
+        for (const other of active.values()) {
+          expect(other.filter(lock => locks.includes(lock))).toEqual([]);
+        }
+        active.set(command, locks);
+        started.push(command);
+        maxActive = Math.max(maxActive, active.size);
+        setTimeout(() => {
+          active.delete(command);
+          resolveCall({ code: 0, output: '' });
+        }, 1);
+      });
+    const result = await runStructural({ execute });
+    expect(result.code).toBe(0);
+    expect(maxActive).toBe(STRUCTURAL_DEFAULT_CONCURRENCY);
+    const webCoverage = started.filter(command =>
+      structuralLocks(command).includes('coverage:apps/web')
+    );
+    expect(webCoverage).toEqual(
+      expect.arrayContaining([
+        MARKETING_CERTIFICATION_COMMAND,
+        CERTIFICATION_KERNEL_COMMAND,
+        ACQUISITION_CERTIFICATION_COMMAND,
+      ])
+    );
+    expect(webCoverage.indexOf(MARKETING_CERTIFICATION_COMMAND)).toBeLessThan(
+      webCoverage.indexOf(ACQUISITION_CERTIFICATION_COMMAND)
+    );
+  });
+
+  it('derives locks for coverage dirs, package aliases, coverage.py, and pytest', () => {
+    // Relative reportsDirectory nests inside the cleaned default directory.
+    expect(structuralLocks(ACQUISITION_CERTIFICATION_COMMAND)).toEqual([
+      'coverage:apps/web',
+    ]);
+    expect(
+      structuralLocks(
+        'pnpm exec vitest --root scripts run a.test.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/x"'
+      )
+    ).toEqual(['coverage:${RUNNER_TEMP:-/tmp}/x']);
+    expect(
+      structuralLocks(
+        'pnpm exec vitest --root scripts run a.test.mjs --coverage'
+      )
+    ).toEqual(['coverage:scripts']);
+    // Package aliases expand; control tests hide default scripts coverage.
+    expect(structuralLocks('pnpm ci:control:test')).toContain(
+      'coverage:scripts'
+    );
+    expect(structuralLocks('pnpm --filter=@jovie/web run lint:seo')).toEqual(
+      []
+    );
+    expect(
+      structuralLocks(
+        'COVERAGE_FILE="/t/a.coverage" python3 -m coverage run x.py && python3 -m pytest y.py'
+      )
+    ).toEqual(['pycoverage:/t/a.coverage', 'pytest-cache']);
+    // coverage.py driving pytest still writes the shared cache.
+    expect(
+      structuralLocks(
+        'COVERAGE_FILE="/t/l.coverage" python3 -m coverage run --branch -m pytest z.py -q'
+      )
+    ).toEqual(['pycoverage:/t/l.coverage', 'pytest-cache']);
+    // A cache-less pytest invocation holds no shared pytest state.
+    expect(
+      structuralLocks('python3 -m pytest -p no:cacheprovider -k "a" y.py')
+    ).toEqual([]);
+    expect(structuralLocks('node --test a.test.mjs')).toEqual([]);
+    expect(structuralLocks('pnpm no-such-script-alias')).toEqual([]);
+  });
+
+  it('parses the concurrency override and falls back to the default', () => {
+    expect(structuralConcurrency(undefined)).toBe(3);
+    expect(structuralConcurrency('5')).toBe(5);
+    expect(structuralConcurrency(' 1 ')).toBe(1);
+    for (const invalid of ['0', '-2', '2.5', 'many', '']) {
+      expect(structuralConcurrency(invalid)).toBe(
+        STRUCTURAL_DEFAULT_CONCURRENCY
+      );
+    }
+  });
+
+  it('formats a slowest-first timing table with escaped commands', () => {
+    const table = formatStructuralTimings(
+      [
+        { index: 0, command: 'fast | cmd', code: 0, durationMs: 1000 },
+        { index: 1, command: 'slow `cmd`', code: 3, durationMs: 9000 },
+      ],
+      9500
+    );
+    const rows = table.split('\n').filter(line => line.startsWith('| '));
+    expect(table).toContain('wall 9.5s, sum 10.0s, 2 commands');
+    expect(rows[2]).toBe("| 2 | 9.0s | exit 3 | `slow 'cmd'` |");
+    expect(rows[3]).toBe('| 1 | 1.0s | pass | `fast \\| cmd` |');
+    expect(formatStructuralTimings(undefined)).toBe('');
+  });
+});
+
+describe('biomeNeedsFullTree', () => {
+  it('lints the whole tree when Biome config or version can change', () => {
+    for (const file of BIOME_TOOLCHAIN_FILES) {
+      expect(biomeNeedsFullTree(['apps/web/a.ts', file])).toBe(true);
+    }
+  });
+
+  it('keeps ordinary PRs on changed-files lint', () => {
+    expect(biomeNeedsFullTree([])).toBe(false);
+    expect(
+      biomeNeedsFullTree(['apps/web/package.json', 'apps/web/lib/utils.ts'])
+    ).toBe(false);
+  });
+});
+
 describe('webCiContractTestsCommand', () => {
   it('honors the quarantine ledger and keeps browser-heavy receipts out', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ci-contract-ledger-'));
@@ -640,7 +1154,7 @@ describe('webCiContractTestsCommand', () => {
       expect(command).not.toContain('webhook-handler');
       expect(command).not.toContain('not-a-unit');
       expect(webCiContractTestsCommand(join(dir, 'missing.json'))).toBe(
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -798,5 +1312,163 @@ describe('failure annotation helpers', () => {
     expect(failureAnnotationMessage({ id: 'structural' }, excerpt)).toBe(
       'Structural command 2/9 failed (exit 1). Command: pnpm x | ERROR: 50%25'
     );
+  });
+});
+
+/**
+ * Real runner output, captured locally with Node 22.23.2 / pytest 9.0.3 /
+ * Vitest 5 by running the exact structural commands with an injected failure
+ * (paths normalised to the hosted runner, long pytest lines trimmed). Hosted
+ * runs 36126382616 (node:test) and 35918510808 (pytest) only kept the tail
+ * excerpt, which lost the failing test names behind coverage tables and
+ * passing-test noise such as `ok 8 - ... rejects failed ... streams`.
+ */
+describe('failing test identities in lane excerpts', () => {
+  const fixture = name =>
+    readFileSync(
+      join(import.meta.dirname, 'fixtures', 'ci-fast-excerpts', name),
+      'utf8'
+    );
+  const NODE_FAILURE = fixture('node-test-structural-failure.tap.txt');
+  const PYTEST_FAILURE = fixture('pytest-structural-failure.txt');
+  const VITEST_FAILURE = fixture('vitest-structural-failure.txt');
+  const NODE_FIRST =
+    'not ok - verifies the new signed contract without inheriting repair authority';
+  const NODE_NESTED =
+    'not ok - Summer outbox record authority > accepts the current signed wire record';
+  const PYTEST_NODE =
+    'scripts/tests/test_agent_workflow_hygiene.py::test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready';
+  const VITEST_FAIL =
+    'FAIL  |workspace-scripts| lib/__tests__/design-exception-registry.test.mjs > design exception-registry contract (JOV-5447) > fails closed for every required rejection';
+
+  beforeEach(() => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations,web');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_CONCURRENCY', '1');
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  /** Fail only the structural command containing `marker`. */
+  async function structuralFailure(marker, output) {
+    const result = await runStructural({
+      execute: command =>
+        command.includes(marker)
+          ? { code: 1, output }
+          : { code: 0, output: 'passed\n' },
+    });
+    expect(result.code).toBe(1);
+    expect(result.output.length).toBeLessThanOrEqual(1200);
+    const annotation = failureAnnotationMessage(
+      { id: 'structural' },
+      laneFailureExcerpt('structural', result.output)
+    );
+    expect(annotation.length).toBeLessThanOrEqual(400);
+    return {
+      header: result.output.split('\n\n')[0].split('\n'),
+      annotation,
+    };
+  }
+
+  it('names node:test failures with Subtest ancestry and assertion fields', async () => {
+    const { header, annotation } = await structuralFailure(
+      'gate-next-hold.test.mjs',
+      NODE_FAILURE
+    );
+    expect(header.slice(1)).toEqual([
+      NODE_FIRST,
+      "error: 'shipping-lead-task-invalid'",
+      NODE_NESTED,
+      'error: Expected values to be strictly equal:',
+      `expected: '${'a'.repeat(64)}-drift'`,
+      `actual: '${'a'.repeat(64)}'`,
+    ]);
+    expect(annotation).toContain(
+      `| ${NODE_FIRST} | error: 'shipping-lead-task-invalid' | ${NODE_NESTED}`
+    );
+    // Passing tests whose names contain "failed" are noise, not causes.
+    expect(annotation).not.toContain('ok 8 - bounds controller');
+    expect(annotation).not.toContain('1 subtest failed');
+  });
+
+  it('names the Vitest FAIL identity and its AssertionError', async () => {
+    const { header, annotation } = await structuralFailure(
+      'lib/__tests__/design-exception-registry.test.mjs',
+      VITEST_FAILURE
+    );
+    expect(header.slice(1)).toEqual([
+      VITEST_FAIL,
+      "AssertionError: expected [ 'biome', …(12) ] to include 'design-exception-registry-drift'",
+    ]);
+    expect(annotation).toContain(`| ${VITEST_FAIL} | AssertionError:`);
+  });
+
+  it('keeps the registered pytest identity from the summary or progress line', async () => {
+    const full = await structuralFailure('python3 -m pytest ', PYTEST_FAILURE);
+    expect(full.header.slice(1)).toEqual([`FAILED ${PYTEST_NODE}`]);
+    expect(full.annotation).toContain(`FAILED ${PYTEST_NODE}`);
+
+    // A run killed before its short test summary still names the test.
+    const killed = PYTEST_FAILURE.split('=== FAILURES ===')[0];
+    const progress = await structuralFailure('python3 -m pytest ', killed);
+    expect(progress.header.slice(1)).toEqual([`FAILED ${PYTEST_NODE}`]);
+
+    const setupError = await structuralFailure(
+      'python3 -m pytest ',
+      `ERROR ${PYTEST_NODE} - fixture 'x' not found\n1 error in 0.1s\n`
+    );
+    expect(setupError.header.slice(1)).toEqual([`ERROR ${PYTEST_NODE}`]);
+  });
+
+  it('leads non-structural lane excerpts with test identities', () => {
+    const excerpt = laneFailureExcerpt('unit', NODE_FAILURE);
+    expect(excerpt.length).toBeLessThanOrEqual(1200);
+    expect(excerpt.startsWith(`Diagnostics:\n${NODE_FIRST}\n`)).toBe(true);
+    expect(excerpt).not.toContain('ok 8 - bounds controller');
+    const annotation = failureAnnotationMessage({ id: 'unit' }, excerpt);
+    expect(annotation.startsWith(`Diagnostics: | ${NODE_FIRST} | `)).toBe(true);
+    expect(annotation).toContain(NODE_NESTED);
+
+    const vitest = laneFailureExcerpt('unit', VITEST_FAILURE);
+    expect(vitest.split('\n').slice(1, 3)).toEqual([
+      VITEST_FAIL,
+      expect.stringMatching(/^AssertionError: /u),
+    ]);
+  });
+
+  it('bounds identities and skips suites that only report a failing child', () => {
+    const suite = [
+      '# Subtest: outer',
+      '    # Subtest: inner',
+      '    not ok 1 - inner',
+      '      ---',
+      "      failureType: 'testCodeFailure'",
+      '      error: |-',
+      '        boom',
+      '      ...',
+      '    1..1',
+      'not ok 1 - outer',
+      '  ---',
+      "  failureType: 'subtestsFailed'",
+      "  error: '1 subtest failed'",
+      '  ...',
+      ...Array.from({ length: 5 }, (_, index) => [
+        `# Subtest: case ${index} ${'x'.repeat(300)}`,
+        `not ok ${index + 2} - case ${index} ${'x'.repeat(300)}`,
+        '  ---',
+        `  error: 'bad ${index}'`,
+        '  ...',
+      ]).flat(),
+    ].join('\n');
+    const lines = extractFailureIdentities(suite);
+    expect(lines.slice(0, 2)).toEqual([
+      'not ok - outer > inner',
+      'error: boom',
+    ]);
+    expect(lines).not.toContain("error: '1 subtest failed'");
+    expect(lines.filter(line => line.startsWith('not ok - '))).toHaveLength(3);
+    expect(lines.every(line => line.length <= 200)).toBe(true);
+    expect(extractFailureIdentities('all good\n')).toEqual([]);
+    expect(extractFailureIdentities(undefined)).toEqual([]);
   });
 });

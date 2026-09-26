@@ -62,7 +62,7 @@ export function SmartLinkArtwork({
           ) : (
             <div className='flex h-full w-full items-center justify-center'>
               <Icon
-                name='Disc3'
+                name='AudioLines'
                 className='h-16 w-16 text-white/20'
                 aria-hidden='true'
               />

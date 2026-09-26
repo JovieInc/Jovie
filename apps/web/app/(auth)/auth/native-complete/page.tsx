@@ -192,7 +192,7 @@ function NativeCompleteContent() {
   }, [router, searchParams]);
 
   return (
-    <main className='grid min-h-dvh place-items-center bg-background px-6 text-white dark:text-white [color-scheme:dark]'>
+    <main className='grid min-h-dvh place-items-center bg-base px-6 text-white dark:text-white [color-scheme:dark]'>
       <section className='w-full max-w-sm px-6 py-7 text-center'>
         <h1 className='text-xl font-semibold leading-7'>
           {state === 'error'

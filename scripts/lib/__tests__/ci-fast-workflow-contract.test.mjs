@@ -14,10 +14,12 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  affectsWebTestTypecheck,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_PATHS,
   CERTIFICATION_KERNEL_COMMAND,
+  COPY_GATE_COMMAND,
   changedFiles,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   FAN_SEND_SAFETY_COVERAGE_COMMAND,
@@ -26,10 +28,16 @@ import {
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  STRUCTURAL_PYTEST_FILES,
+  STRUCTURAL_PYTEST_SHARD_COMMANDS,
+  STRUCTURAL_PYTEST_SHARD_EXPRESSION,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   selectBillingCoverageCommands,
   selectLanes,
+  structuralLocks,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
+import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -67,17 +75,17 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
-  it.each([
-    { ci: 'true', available: false, suiteExit: 0, expected: 1 },
-    { ci: '', available: false, suiteExit: 0, expected: 0 },
-    { ci: 'true', available: true, suiteExit: 0, expected: 0 },
-    { ci: 'true', available: true, suiteExit: 37, expected: 37 },
-  ])('executes structural Python dependency policy %j', scenario => {
-    const command = CI_FAST_SOURCE.match(
-      /'(if python3 -c "import coverage, pytest"[^'\n]+)'/
-    )?.[1];
-    expect(command).toBeTruthy();
-    if (!command) throw new Error('missing structural Python command');
+  it.each(
+    STRUCTURAL_PYTHON_REGRESSION_COMMANDS.flatMap((command, index) =>
+      [
+        { ci: 'true', available: false, suiteExit: 0, expected: 1 },
+        { ci: '', available: false, suiteExit: 0, expected: 0 },
+        { ci: 'true', available: true, suiteExit: 0, expected: 0 },
+        { ci: 'true', available: true, suiteExit: 37, expected: 37 },
+      ].map(scenario => ({ ...scenario, index, command }))
+    )
+  )('executes structural Python dependency policy %j', scenario => {
+    const { command } = scenario;
     const root = mkdtempSync(join(tmpdir(), 'structural-python-policy-'));
     const calls = join(root, 'calls');
     try {
@@ -103,28 +111,45 @@ describe('ci-fast bounded parallel workflow', () => {
           POLICY_CALLS: calls,
           POLICY_IMPORT_EXIT: scenario.available ? '0' : '1',
           POLICY_SUITE_EXIT: String(scenario.suiteExit),
+          RUNNER_TEMP: tmpdir(),
         },
       });
-      expect(result.status, result.stderr).toBe(scenario.expected);
       const invoked = readFileSync(calls, 'utf8');
-      if (scenario.available) {
-        const pytestInvocation = invoked
-          .split('\n')
-          .find(call => call.startsWith('-m pytest '));
+      const pytestInvocation = invoked
+        .split('\n')
+        .find(call => call.startsWith('-m pytest '));
+      if (scenario.index === 0) {
+        // The coverage-gated command has no bare `-m pytest` step, so the
+        // stubbed suite exit never applies to it.
+        expect(result.status, result.stderr).toBe(
+          scenario.expected === 37 ? 0 : scenario.expected
+        );
+      } else {
+        expect(result.status, result.stderr).toBe(scenario.expected);
+      }
+      if (scenario.available && scenario.index === 0) {
+        expect(invoked).toContain('-m coverage run --branch');
+        expect(pytestInvocation).toBeUndefined();
+      } else if (scenario.available) {
+        const shard = scenario.index === 1 ? 'a' : 'b';
+        const expression =
+          scenario.index === 1
+            ? STRUCTURAL_PYTEST_SHARD_EXPRESSION
+            : `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`;
         expect(pytestInvocation).toBe(
           [
-            '-m pytest --durations=20',
-            'scripts/tests/test_gh_retry.py',
-            'scripts/tests/test_vercel_prebuilt_deploy.py',
-            'scripts/tests/test_brand_scrub.py',
-            'scripts/tests/test_agent_workflow_hygiene.py',
-            'scripts/tests/test_runner_routing.py -v',
+            '-m pytest -n 2 --durations=20 -v -p no:cacheprovider',
+            `--basetemp=${tmpdir()}/jovie-structural-pytest-${shard}`,
+            `-k ${expression}`,
+            ...STRUCTURAL_PYTEST_FILES,
           ].join(' ')
         );
       } else {
-        expect(invoked.trim()).toBe('-c import coverage, pytest');
+        expect(invoked.trim()).toBe('-c import coverage, pytest, xdist');
         if (scenario.ci === 'true') {
-          expect(result.stderr).toContain('::error::pytest/coverage missing');
+          expect(result.stderr).toContain(
+            '::error::pytest/coverage/xdist missing'
+          );
         } else {
           expect(result.stdout).toContain('skip local structural regressions');
         }
@@ -132,6 +157,100 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('installs the pytest-xdist the structural suite parallelizes with from hashed pins', () => {
+    const requirementsIn = readFileSync(
+      join(REPO_ROOT, '.github/requirements/pytest.in'),
+      'utf8'
+    );
+    const requirementsTxt = readFileSync(
+      join(REPO_ROOT, '.github/requirements/pytest.txt'),
+      'utf8'
+    );
+    const version = /^pytest-xdist==(\S+)$/mu.exec(requirementsIn)?.[1];
+    expect(version).toBeTruthy();
+    // xdist and its execnet dependency must be hash-pinned: the structural
+    // step installs with --require-hashes and `-n 2` fails without xdist.
+    for (const pkg of [`pytest-xdist==${version}`, 'execnet==']) {
+      const start = requirementsTxt.indexOf(`\n${pkg}`);
+      expect(start, `${pkg} missing from pytest.txt`).toBeGreaterThan(-1);
+      expect(requirementsTxt.slice(start + 1).split('\n')[1]).toMatch(
+        /^\s+--hash=sha256:[0-9a-f]{64}/u
+      );
+    }
+    expect(
+      jobBlock('ci-fast-remaining', 'ci-profile-admission-browser')
+    ).toContain(
+      'python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt'
+    );
+  });
+
+  it('partitions the structural pytest suite into exactly complementary shards', () => {
+    // The original single invocation ran these files once; the shards must
+    // select the identical files with complementary -k expressions so every
+    // collected test runs in exactly one shard (never zero, never twice).
+    expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/tests/test_gh_retry.py',
+      'scripts/tests/test_vercel_prebuilt_deploy.py',
+      'scripts/tests/test_brand_scrub.py',
+      'scripts/tests/test_agent_workflow_hygiene.py',
+      'scripts/tests/test_runner_routing.py',
+    ]);
+    const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
+      const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
+      return { command, keyword, files: files?.split(' ') };
+    });
+    expect(shards).toHaveLength(2);
+    expect(shards[0].keyword).toBe(STRUCTURAL_PYTEST_SHARD_EXPRESSION);
+    expect(shards[1].keyword).toBe(
+      `not (${STRUCTURAL_PYTEST_SHARD_EXPRESSION})`
+    );
+    for (const shard of shards) {
+      expect(shard.files).toEqual([...STRUCTURAL_PYTEST_FILES]);
+      expect(shard.command).toContain('--durations=20 -v');
+      // Each shard fans out over two xdist workers (both shards overlap).
+      expect(shard.command).toContain('-m pytest -n 2 ');
+      // Shards overlap in the pool: no shared .pytest_cache or basetemp.
+      expect(shard.command).toContain('-p no:cacheprovider');
+      expect(structuralLocks(shard.command)).toEqual([]);
+    }
+    expect(
+      new Set(
+        shards.map(shard => /--basetemp="([^"]+)"/u.exec(shard.command)?.[1])
+      ).size
+    ).toBe(2);
+    // Both shards run in the operations structural lane, wrapped in the same
+    // hosted dependency policy as the other structural Python regressions.
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1)).toEqual(
+      STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command =>
+        expect.stringContaining(`then ${command}; elif`)
+      )
+    );
+  });
+
+  it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
+    // Coverage instrumentation made these in-process scanners several times
+    // slower (latency: 18s -> 118s locally) while contributing nothing to the
+    // batch's --test-coverage-include files. Each must still run exactly once.
+    const segments = PACKAGE_JSON.scripts['invariants:check'].split(' && ');
+    const latency = 'scripts/invariants/latency-sensitive-execution.test.mjs';
+    const screenCertification =
+      'scripts/invariants/screen-certification.test.mjs';
+    for (const suite of [latency, screenCertification]) {
+      const running = segments.filter(segment => segment.includes(suite));
+      expect(running).toEqual([
+        `node --test ${screenCertification} ${latency}`,
+      ]);
+    }
+    const coverageBatch = segments.find(segment =>
+      segment.includes(
+        '--test-coverage-include=scripts/backlog-orchestrator/reconcile.mjs'
+      )
+    );
+    expect(coverageBatch).toBeDefined();
+    expect(coverageBatch).not.toContain(latency);
+    expect(coverageBatch).not.toContain(screenCertification);
   });
 
   it('runs desktop release regressions with measured coverage for mac changes', () => {
@@ -212,7 +331,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
     const selector = remaining
       .split('id: storybook-browser\n')[1]
-      .split('      - name: Run ci-fast lanes')[0];
+      .split('      - name: Start ci-fast lanes')[0];
     const command = selector
       .split('run: |\n')[1]
       .replaceAll('${{ github.event_name }}', 'pull_request')
@@ -388,6 +507,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...laneIds].sort()).toEqual([
       'billing-coverage',
       'biome',
+      'copy-gate',
       'design-conformance',
       'design-exception-registry',
       'design-governance-enforcement',
@@ -400,6 +520,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts',
       'structural',
       'typecheck',
+      'web-tests-typecheck',
     ]);
     expect(validateLaneGroups(LANE_GROUPS)).toBe(true);
     expect(() =>
@@ -420,6 +541,25 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'files.some(file => affectsJovieTypecheck(file))'
     );
+  });
+
+  it('gates the web test typecheck ratchet on its compiled inputs', () => {
+    for (const file of [
+      'apps/web/tests/unit/chat/turns.test.ts',
+      'apps/web/lib/rate-limit/types.ts',
+      'apps/web/tsconfig.test.json',
+      'apps/web/typecheck-tests-baseline.json',
+      '.github/scripts/guard-playwright-artifacts.mjs',
+    ]) {
+      expect(affectsWebTestTypecheck(file), file).toBe(true);
+    }
+    for (const file of ['docs/PR_FLOW.md', 'apps/web/app/globals.css']) {
+      expect(affectsWebTestTypecheck(file), file).toBe(false);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      'files.some(file => affectsWebTestTypecheck(file))'
+    );
+    expect(LANE_GROUPS.typecheck).toContain('web-tests-typecheck');
   });
 
   it('preselects source-PR typecheck before dependency hydration', () => {
@@ -471,10 +611,55 @@ describe('ci-fast bounded parallel workflow', () => {
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       expect(payload.lanes).toEqual([
         expect.objectContaining({ id: 'typecheck', status: 'skipped' }),
+        expect.objectContaining({
+          id: 'web-tests-typecheck',
+          status: 'skipped',
+        }),
       ]);
-      expect(payload.lanes[0].logExcerpt).toContain(
-        'ci-path-changes preselection'
+      for (const lane of payload.lanes) {
+        expect(lane.logExcerpt).toContain('ci-path-changes preselection');
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('overlaps the two typecheck lanes, each under its own singleflight lock', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-overlap-'));
+    const binDir = join(repo, 'bin');
+    try {
+      mkdirSync(binDir);
+      // Each call waits for the other to start; a serial runner exits 9.
+      writeFileSync(
+        join(binDir, 'pnpm'),
+        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 3 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
       );
+      chmodSync(join(binDir, 'pnpm'), 0o755);
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'typecheck',
+            CI_FAST_LANES_OUT: join(repo, 'out.json'),
+            CI_FAST_ONLY_STRUCTURAL: 'false',
+            GITHUB_EVENT_NAME: 'workflow_dispatch',
+            TYPECHECK_SINGLEFLIGHT_DIR: '',
+            PATH: `${binDir}:${process.env.PATH}`,
+          },
+        }
+      );
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      const { lanes } = JSON.parse(
+        readFileSync(join(repo, 'out.json'), 'utf8')
+      );
+      expect(lanes.map(lane => [lane.id, lane.logExcerpt])).toEqual([
+        ['typecheck', 'dir='],
+        ['web-tests-typecheck', 'dir=.cache/typecheck-singleflight-tests'],
+      ]);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -620,8 +805,14 @@ describe('ci-fast bounded parallel workflow', () => {
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       expect(payload.lanes).toEqual([
         expect.objectContaining({ id: 'typecheck', status: 'failure' }),
+        expect.objectContaining({
+          id: 'web-tests-typecheck',
+          status: 'failure',
+        }),
       ]);
-      expect(payload.lanes[0].logExcerpt).toMatch(/pnpm.*not found/i);
+      for (const lane of payload.lanes) {
+        expect(lane.logExcerpt).toMatch(/pnpm.*not found/i);
+      }
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -667,20 +858,20 @@ describe('ci-fast bounded parallel workflow', () => {
       /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
     );
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
-    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo');
+    expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
     const configHash =
-      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json')";
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json')";
     expect(restore).toContain(
-      `key: jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
+      `key: jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
     );
     expect(restore).toContain(
-      `jovie-web-tsbuildinfo-v1-\${{ runner.os }}-\${{ ${configHash} }}-\n`
+      `jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\n`
     );
     expect(restore).toMatch(
-      /\n\s+jovie-web-tsbuildinfo-v1-\$\{\{ runner\.os \}\}-\s*$/
+      /\n\s+jovie-web-tsbuildinfo-v2-\$\{\{ runner\.os \}\}-\s*$/
     );
     expect(record).toContain(
-      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo') }}"
+      "hash=${{ hashFiles('apps/web/.cache/tsbuildinfo*') }}"
     );
 
     // Order: restore before the lanes, save after them.
@@ -696,7 +887,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(save).toContain(`uses: actions/cache/save@${cacheSha}`);
     expect(save).toContain("steps.lanes.outcome == 'success' &&");
     expect(save).toContain(
-      "hashFiles('apps/web/.cache/tsbuildinfo') != steps.web-tsbuildinfo-restored.outputs.hash"
+      "hashFiles('apps/web/.cache/tsbuildinfo*') != steps.web-tsbuildinfo-restored.outputs.hash"
     );
     expect(save).toContain(
       "((github.event_name == 'push' && github.ref == 'refs/heads/main') ||"
@@ -715,6 +906,38 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(save).toContain(
       'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}'
     );
+
+    // tsc-cache-warm.yml seeds main (merge_group can read main, not PRs):
+    // trusted triggers, no secrets, same path and fallbacks, save after tsc.
+    const warm = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/tsc-cache-warm.yml'),
+      'utf8'
+    );
+    const header = warm.slice(0, warm.indexOf('\njobs:'));
+    expect(header).toMatch(
+      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:\n {2}contents: read\n\n/m
+    );
+    expect(warm).toContain("github.ref == 'refs/heads/main' &&");
+    expect(warm).not.toMatch(/secrets\.|TURBO_TOKEN|continue-on-error/);
+    expect(warm).toContain('persist-credentials: false');
+    const keys = body =>
+      body.split('\n').filter(line => line.includes('jovie-web-tsbuildinfo'));
+    const [ciKey, ...ciFallbacks] = keys(restore).map(line => line.trim());
+    const [warmKey, ...warmFallbacks] = keys(warm).map(line => line.trim());
+    expect(warmFallbacks).toEqual(ciFallbacks);
+    expect(warmKey.replace(/h\$\{\{ steps\.hour\.outputs\.hour }}$/, '')).toBe(
+      ciKey.replace('${{ github.sha }}', '')
+    );
+    expect(
+      warm.match(/path: apps\/web\/\.cache\/tsbuildinfo\*\n/g)
+    ).toHaveLength(2);
+    const order = [
+      'Restore web tsc incremental state',
+      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n',
+      'uses: actions/cache/save@',
+      'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}',
+    ].map(marker => warm.indexOf(marker));
+    expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
@@ -766,7 +989,7 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(block).toMatch(
         /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
       );
-      expect(block).toMatch(/if: >-\s+!cancelled\(\) &&/);
+      expect(block).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
       expect(block).not.toContain('always()');
       expect(block).toMatch(/needs\.ci-path-changes\.result == 'success'/);
       expect(block).toMatch(/github\.event_name != 'merge_group'/);
@@ -788,6 +1011,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'eslint-server-boundaries',
       'shadcn-lint-contracts',
       'typecheck',
+      'web-tests-typecheck',
       'scripts-typecheck',
       'guardrails',
       'design-system-source-ratchet',
@@ -797,10 +1021,12 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'profile-admission',
       'billing-coverage',
+      'copy-gate',
       'structural',
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
       'typecheck',
+      'web-tests-typecheck',
     ]);
     expect(selectLanes('remaining').map(lane => lane.id)).toEqual(
       LANE_GROUPS.remaining
@@ -818,6 +1044,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts':
         'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
+      'web-tests-typecheck': 'pnpm --filter=@jovie/web run typecheck:tests',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
@@ -828,6 +1055,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
+      'copy-gate': COPY_GATE_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -853,7 +1081,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Install actionlint')
+      remaining.indexOf('- name: Run actionlint (structural)')
     );
 
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
@@ -946,7 +1174,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Install actionlint')
+      remaining.indexOf('- name: Run actionlint (structural)')
     );
 
     for (const requiredPath of [
@@ -1046,8 +1274,17 @@ describe('ci-fast bounded parallel workflow', () => {
     const preflight = jobBlock('ci-lockfile-preflight', 'ci-path-changes');
     expect(preflight).toContain('name: Lockfile Specifier Preflight');
     expect(preflight).toContain(
-      'run: pnpm exec node scripts/lockfile-specifier-preflight.mjs'
+      'run: node scripts/lockfile-specifier-preflight.mjs'
     );
+    expect(preflight).toContain(
+      'run: node scripts/verify-workflow-references.mjs'
+    );
+    // Dependency-free preflight: plain setup-node from .nvmrc, no pnpm install.
+    expect(preflight).toMatch(
+      /uses: actions\/setup-node@[0-9a-f]{40} # v\d+[\s\S]*node-version-file: '\.nvmrc'/
+    );
+    expect(preflight).not.toContain('setup-node-pnpm');
+    expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
         /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
@@ -1056,21 +1293,14 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
-    const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
-
-    expect(controlTest).toContain(
-      'scripts/symphony/tests/control-bundle-manifest.test.mjs'
+    expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
+      'node scripts/run-affected-tests.mjs --control'
     );
-    expect(controlTest).toContain(
-      '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs'
-    );
-    expect(controlTest).toContain('--test-coverage-lines=90');
-    expect(controlTest).toContain('--test-coverage-branches=75');
-    expect(controlTest).toContain('--test-coverage-functions=90');
-    expect(controlTest).toContain(
-      '&& node scripts/run-affected-tests.mjs --control'
-    );
-    expect(controlTest).toContain('&& pnpm run test:rolling-ci-fx:coverage');
+    const controlStages = buildControlTestCommands();
+    expect(controlStages).toContainEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
     const fxCoverage = PACKAGE_JSON.scripts['test:rolling-ci-fx:coverage'];
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx.test.mjs');
     expect(fxCoverage).toContain('lib/__tests__/rolling-ci-fx-finish.test.mjs');
@@ -1212,19 +1442,49 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('defers structural Playwright/Python until cheap remaining lanes pass', () => {
+  it('overlaps structural setup with cheap lanes; structural awaits them', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const cheapLanes = remaining.indexOf('- name: Run ci-fast lanes');
-    const playwright = remaining.indexOf('Setup Playwright (Chromium)');
-    const structuralLane = remaining.indexOf(
-      '- name: Run structural ci-fast lane'
+    const at = marker => remaining.indexOf(marker);
+    // A failing background lane run fails the await step, with its log.
+    const dir = mkdtempSync(join(tmpdir(), 'ci-fast-bg-'));
+    const env = {
+      ...process.env,
+      PATH: `${dir}:${process.env.PATH}`,
+      LANES_DIR: `${dir}/bg`,
+      GITHUB_STEP_SUMMARY: '/dev/null',
+    };
+    writeFileSync(`${dir}/node`, '#!/bin/sh\necho lane-log\nexit 3\n');
+    chmodSync(`${dir}/node`, 0o755);
+    const sh = name =>
+      spawnSync(
+        'bash',
+        [
+          '-eo',
+          'pipefail',
+          '-c',
+          remaining
+            .split(`name: ${name}`)[1]
+            .split('run: |\n')[1]
+            .split('\n      - ')[0],
+        ],
+        { env, encoding: 'utf8', timeout: 9000 }
+      );
+    expect(sh('Start ci-fast lanes').status).toBe(0);
+    const awaited = sh('Await ci-fast lanes');
+    rmSync(dir, { recursive: true, force: true });
+    expect([awaited.status, awaited.stdout]).toEqual([3, 'lane-log\n']);
+    expect(at('Setup Playwright (Chromium)')).toBeGreaterThan(
+      at('- name: Start ci-fast lanes')
     );
-    expect(cheapLanes).toBeGreaterThan(0);
-    expect(playwright).toBeGreaterThan(cheapLanes);
-    expect(structuralLane).toBeGreaterThan(playwright);
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Restore Symphony selector cache')
+    );
+    expect(at('- name: Run structural ci-fast lane')).toBeGreaterThan(
+      at('- name: Await ci-fast lanes')
+    );
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain(
@@ -1319,6 +1579,46 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('runs actionlint from checksum-pinned binaries instead of a Docker action', () => {
+    // A Docker action's image is built at job start even when its step is
+    // skipped (~30s on the merge-queue critical path). The script pins the
+    // exact toolchain the image shipped and must fail closed on any drift.
+    const script = readFileSync(
+      resolve(REPO_ROOT, '.github/scripts/run-actionlint.sh'),
+      'utf8'
+    );
+    const workflowsDir = resolve(REPO_ROOT, '.github/workflows');
+    for (const file of readdirSync(workflowsDir)) {
+      if (!/\.ya?ml$/.test(file)) continue;
+      expect(
+        readFileSync(join(workflowsDir, file), 'utf8'),
+        `${file} must not use the Docker actionlint action`
+      ).not.toMatch(/uses:\s*rhysd\/actionlint/);
+    }
+    expect(
+      readFileSync(resolve(workflowsDir, 'actionlint.yml'), 'utf8')
+    ).toContain('run: bash .github/scripts/run-actionlint.sh');
+
+    expect(script).toMatch(/^set -euo pipefail$/m);
+    expect(script).toContain("readonly ACTIONLINT_VERSION='1.7.12'");
+    expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
+    expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
+    for (const name of [
+      'ACTIONLINT_SHA256',
+      'SHELLCHECK_TARBALL_SHA256',
+      'SHELLCHECK_BINARY_SHA256',
+      'PYFLAKES_WHEEL_SHA256',
+    ]) {
+      expect(script).toMatch(
+        new RegExp(`^readonly ${name}='[0-9a-f]{64}'$`, 'm')
+      );
+    }
+    expect(script.match(/sha256sum --check --status/g)?.length).toBe(2);
+    expect(script).toContain('--fail');
+    expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
+    expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
+  });
+
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {
     const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
     const remaining = jobBlock(
@@ -1328,16 +1628,18 @@ describe('ci-fast bounded parallel workflow', () => {
     const aggregate = jobBlock('ci-fast', 'ci-promptfoo-evals');
 
     expect(typecheck).not.toMatch(
-      /rhysd\/actionlint|actions\/setup-python|python -m pip install/
+      /run-actionlint\.sh|rhysd\/actionlint|actions\/setup-python|python -m pip install/
     );
-    expect(remaining).toMatch(/rhysd\/actionlint/);
+    expect(remaining).toMatch(
+      /- name: Run actionlint \(structural\)\n\s+if: \$\{\{ success\(\) && steps\.structural\.outputs\.skip != 'true' \}\}\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n/
+    );
     expect(remaining).toMatch(/actions\/setup-python/);
     expect(remaining).toMatch(/python -m pip install/);
     expect(typecheck).not.toContain('ci-fast-remaining');
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -1356,10 +1658,23 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \]\]/
     );
     expect(aggregate).not.toContain('GROUP_RESULT');
     expect(aggregate).toMatch(/exit 1/);
+  });
+
+  it('runs the structural pytest shards in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const python = jobBlock('ci-fast-structural-python', 'ci-knip');
+    const aliases = python.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(10);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
+    expect(python).toContain('CI_FAST_STRUCTURAL_PYTEST: only');
   });
 
   it('runs a bounded public-profile admission subset on source and merge-group heads', () => {
@@ -1659,7 +1974,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Install actionlint')
+      remaining.indexOf('- name: Run actionlint (structural)')
     );
     const controlPattern = remaining.match(
       /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
@@ -1822,6 +2137,87 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
   expect(CI_FAST_SOURCE).toContain(
     '--coverage.include=lib/ovie/summer-admissions.ts'
   );
+});
+
+it('runs web CI contracts on PRs changing the files they read (#18718)', () => {
+  const pattern = [
+    ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
+  ]
+    .map(match => match[1])
+    .join('');
+  const selects = path =>
+    spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status === 0;
+  for (const path of [
+    '.github/workflows/ci.yml',
+    '.github/actions/setup-playwright/action.yml',
+    'scripts/lib/playwright-png.mjs',
+    'apps/web/playwright.config.ts',
+  ]) {
+    expect(selects(path), path).toBe(true);
+  }
+  expect(selects('README.md')).toBe(false);
+});
+
+describe('invariant-scanned PR structural selection', () => {
+  // #18182 changed apps/desktop/src/main.ts (JOV-INV-031 scope) without any
+  // invariant run; PR structural selection must derive from the scan roots.
+  it('selects structural for every invariant-scanned path on source PRs', () => {
+    const addition =
+      'STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"';
+    const decision = WORKFLOW.slice(
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
+    );
+    expect(decision).toContain(addition);
+    expect(decision.indexOf(addition)).toBeLessThan(
+      decision.indexOf('|| git diff --name-only')
+    );
+
+    const ere = execFileSync(
+      process.execPath,
+      [resolve(REPO_ROOT, 'scripts/invariants/scanned-paths.mjs'), '--ere'],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    ).trim();
+    const selects = path =>
+      spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
+    for (const path of [
+      'apps/desktop/src/main.ts',
+      'apps/web/lib/chat/knowledge/topics.ts',
+      'apps/web/app/[username]/page.tsx',
+      'scripts/invariants/latency-sensitive-execution-allowlist.json',
+    ]) {
+      expect(selects(path), path).toBe(true);
+    }
+    for (const path of [
+      'apps/desktop/src-other/main.ts',
+      'apps/web/tests/e2e/public-profile-smoke.spec.ts',
+    ]) {
+      expect(selects(path), path).toBe(false);
+    }
+  });
+});
+
+describe('new scripts test PR structural selection', () => {
+  // #18714 added an unwired scripts test; only the merge queue ran the
+  // inventory guard, so the PR passed and the queue group was ejected.
+  it('selects structural when a PR adds or renames a scripts test', () => {
+    const decision = WORKFLOW.slice(
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
+    );
+    const line = decision
+      .split('\n')
+      .find(l => l.includes('NEW_SCRIPT_TESTS=$('));
+    expect(line).toContain('git diff --diff-filter=AR --name-only');
+    expect(decision).toContain('if [ -n "$NEW_SCRIPT_TESTS" ] ||');
+    const ere = line.match(/grep -E '([^']+)'/)[1];
+    const selects = path =>
+      spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
+    expect(selects('scripts/ops/firecrawl-crawl.test.mjs')).toBe(true);
+    expect(selects('scripts/symphony/lib/__tests__/typed.test.ts')).toBe(true);
+    expect(selects('scripts/ops/firecrawl-crawl.mjs')).toBe(false);
+    expect(selects('apps/web/tests/unit/a.test.ts')).toBe(false);
+  });
 });
 
 describe('CI diff selection on a divergent PR', () => {

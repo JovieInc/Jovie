@@ -1,0 +1,544 @@
+{
+  "schema": "jovie.writing-surfaces/v1",
+  "issue": "JOV-6475",
+  "parentEpic": "JOV-3720",
+  "version": "2026-09-26.1",
+  "sourceInspectedAt": "2026-09-26",
+  "sourceSha": "172eb361a7",
+  "notes": [
+    "Extends the existing capability/policy inventory pattern (JOV-5917: encode capabilities and policies, register instances, generic adapters) with writing coverage. This is a registry plus validator, not a new service.",
+    "Advisory transport is the artifact-bound Jev Gateway integration from JOV-6465 (scripts/invariants/jev-gateway.mjs, modality 'text'). No alternative HTTP adapter is created.",
+    "Whole-message generation that streams to a reader before any review is recorded as 'post-generation-advisory' review, never as gated.",
+    "The weekly advisory Slop Gate is retired: @jovie/copy owns copy rules (canon/VOICE.md) and the deterministic copy-gate ci-fast lane blocks new violations on changed customer-facing lines. This registry adds no recurring automation and no fleet dispatch.",
+    "Coverage reports a denominator and a reviewed version. There is no blanket 'everywhere' claim."
+  ],
+  "coverage": {
+    "denominator": 10,
+    "reviewedVersion": "2026-09-26.1",
+    "claim": "10 named delivery surfaces inventoried; per-surface review mode recorded, uncovered paths keep explicit owner-routed rollout slices under JOV-3720."
+  },
+  "reviewModes": ["gated", "advisory", "manual", "uncovered"],
+  "reviewPoints": [
+    "pre-send",
+    "pre-publish",
+    "pre-render",
+    "post-generation-advisory",
+    "none"
+  ],
+  "checkKinds": [
+    "truth",
+    "usefulness",
+    "repetition",
+    "puffery",
+    "instructionLeakage",
+    "voice"
+  ],
+  "preservationAllowlist": [
+    "deliberate-fragments",
+    "domain-terms",
+    "quotations",
+    "non-english",
+    "justified-uncertainty"
+  ],
+  "surfaces": [
+    {
+      "id": "marketing-pricing",
+      "producer": "Marketing generation pipeline and hand-edited copy briefs (apps/web/data/marketing/copy.ts, generation.ts truth→narrative→copy→adversarial-review→taste-admission stages)",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer (execution); Founder (taste authority)",
+      "audience": "Prospects and visitors on jov.ie marketing and pricing pages",
+      "purpose": "State the smallest true promise that moves the funnel bottleneck",
+      "evidenceSources": [
+        "apps/web/data/marketing/copy.ts",
+        "apps/web/data/marketing/generation.ts",
+        "apps/web/data/marketing/routeManifest.ts",
+        "docs/marketing/LANGUAGE.md",
+        "canon/VOICE.md",
+        "canon/MARKETING.md"
+      ],
+      "deliveryAdapter": "static-render:apps/web marketing routeManifest",
+      "policyVersion": "MARKETING_COPY_SPEC_VERSION 1.1.0; canon/VOICE.md 2026-07-17",
+      "reviewMode": "gated",
+      "reviewPoint": "pre-publish",
+      "proofLink": "apps/web/tests/unit/marketing/copy-semantic-guard.test.ts",
+      "checks": {
+        "truth": {
+          "enforcement": "enforced",
+          "source": "semantic guard + meaning-first briefs require claim evidence"
+        },
+        "usefulness": {
+          "enforcement": "advisory",
+          "source": "adversarial-review stage, audience rubric"
+        },
+        "repetition": {
+          "enforcement": "advisory",
+          "source": "narrative rubric rejects redundant sections"
+        },
+        "puffery": {
+          "enforcement": "enforced",
+          "source": "@jovie/copy legal/slop rules"
+        },
+        "instructionLeakage": {
+          "enforcement": "enforced",
+          "source": "@jovie/copy leak rules"
+        },
+        "voice": {
+          "enforcement": "enforced",
+          "source": "@jovie/copy jovie-marketing register"
+        }
+      },
+      "preserves": ["deliberate-fragments", "domain-terms", "quotations"],
+      "bypassCandidates": [],
+      "pilot": null,
+      "rollout": null
+    },
+    {
+      "id": "product-ui-errors-onboarding",
+      "producer": "Component copy authors plus the deterministic onboarding response bank (apps/web/lib/chat/onboarding-script/script.ts)",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer",
+      "audience": "Signed-in and onboarding product users",
+      "purpose": "Help the user complete the current job; errors explain the next step",
+      "evidenceSources": [
+        "apps/web/lib/chat/onboarding-script/script.ts",
+        "apps/web/lib/chat/voice-lint.ts",
+        "apps/web/tests/unit/lib/chat/voice-lint.test.ts",
+        "canon/VOICE.md",
+        "docs/marketing/LANGUAGE.md"
+      ],
+      "deliveryAdapter": "react-ui:apps/web components + onboarding-script engine",
+      "policyVersion": "canon/VOICE.md 2026-07-17; onboarding copy contract JOV-3806",
+      "reviewMode": "advisory",
+      "reviewPoint": "pre-render",
+      "proofLink": "apps/web/tests/unit/lib/chat/voice-lint.test.ts",
+      "checks": {
+        "truth": {
+          "enforcement": "advisory",
+          "source": "scripted bank audited inline; general UI strings rely on code review"
+        },
+        "usefulness": {
+          "enforcement": "advisory",
+          "source": "scripted bank contract requires action per turn"
+        },
+        "repetition": { "enforcement": "none", "source": "no automated check" },
+        "puffery": {
+          "enforcement": "enforced",
+          "source": "lintVoice on scripted onboarding lines"
+        },
+        "instructionLeakage": {
+          "enforcement": "enforced",
+          "source": "@jovie/copy leak rules via lintVoice"
+        },
+        "voice": {
+          "enforcement": "enforced",
+          "source": "lintVoice on scripted onboarding lines only; general strings manual"
+        }
+      },
+      "preserves": ["deliberate-fragments", "domain-terms"],
+      "bypassCandidates": [],
+      "pilot": null,
+      "rollout": null
+    },
+    {
+      "id": "chat-persona",
+      "producer": "Authenticated/onboarding/mobile chat turns (apps/web/lib/chat/run.ts executeChatTurn; prompts in apps/web/lib/chat/prompts/)",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer",
+      "audience": "Artists and prospects talking to Jovie",
+      "purpose": "Answer in the Jovie persona and advance the user's task",
+      "evidenceSources": [
+        "apps/web/lib/chat/run.ts",
+        "apps/web/lib/chat/prompts/registry.ts",
+        "apps/web/lib/chat/voice-lint.ts",
+        "apps/web/tests/unit/lib/chat/prompt-voice.test.ts",
+        "apps/web/app/api/chat/route.ts"
+      ],
+      "deliveryAdapter": "sse:/api/chat; ndjson:/api/mobile/v1/chat/turns",
+      "policyVersion": "canon/VOICE.md 2026-07-17; prompt-voice test pins",
+      "reviewMode": "advisory",
+      "reviewPoint": "post-generation-advisory",
+      "proofLink": "apps/web/tests/unit/lib/chat/prompt-voice.test.ts",
+      "checks": {
+        "truth": {
+          "enforcement": "advisory",
+          "source": "prompt-voice pins; claims not evidence-bound at runtime"
+        },
+        "usefulness": {
+          "enforcement": "advisory",
+          "source": "chat eval harness"
+        },
+        "repetition": { "enforcement": "advisory", "source": "eval scorers" },
+        "puffery": {
+          "enforcement": "advisory",
+          "source": "lintVoice available; not wired as a send gate on streamed text"
+        },
+        "instructionLeakage": {
+          "enforcement": "enforced",
+          "source": "leak guard in apps/web/lib/eval/leak-guard.ts plus copy leak rules"
+        },
+        "voice": {
+          "enforcement": "advisory",
+          "source": "prompt-voice tests lint prompts, not each streamed reply"
+        }
+      },
+      "preserves": [
+        "deliberate-fragments",
+        "domain-terms",
+        "quotations",
+        "non-english",
+        "justified-uncertainty"
+      ],
+      "bypassCandidates": [
+        "Direct streamText/generateText imports outside executeChatTurn (e.g. apps/web/lib/hud/humanize-pr-title.ts) can ship text without persona review",
+        "apps/web/lib/ai/sdk.ts callers that render model text directly"
+      ],
+      "pilot": {
+        "kind": "product-response",
+        "scope": "bounded Jovie persona reply on the onboarding-mode chat path",
+        "via": "JOV-3720"
+      },
+      "rollout": null
+    },
+    {
+      "id": "email-notifications-support-social",
+      "producer": "Notification service and Resend provider (apps/web/lib/notifications/, apps/web/lib/email/send.ts), support/help-center docs, connector reply drafts (apps/web/lib/connectors/social-replies/contract.ts)",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer",
+      "audience": "Customers receiving lifecycle email/SMS, readers of help content, social audiences",
+      "purpose": "Deliver the notification or reply the recipient needs, in the right register",
+      "evidenceSources": [
+        "apps/web/lib/notifications/sender-policy.ts",
+        "apps/web/lib/email/send.ts",
+        "apps/web/lib/connectors/social-replies/contract.ts",
+        "docs/help-center/ARTICLE_METADATA.md",
+        "canon/VOICE.md"
+      ],
+      "deliveryAdapter": "resend-email; sms; connector-send social replies; docs.jov.ie articles",
+      "policyVersion": "canon/VOICE.md 2026-07-17; sender policy founder|system classes",
+      "reviewMode": "advisory",
+      "reviewPoint": "pre-send",
+      "proofLink": "apps/web/tests/lib/notifications/sender-policy.test.ts",
+      "checks": {
+        "truth": {
+          "enforcement": "manual",
+          "source": "sender policy separates founder/system identity; no claim lint on templates"
+        },
+        "usefulness": { "enforcement": "none", "source": "no automated check" },
+        "repetition": {
+          "enforcement": "enforced",
+          "source": "social reply contract rejects duplicate draftedText after normalization"
+        },
+        "puffery": {
+          "enforcement": "enforced",
+          "source": "@jovie/copy customer-voice floor on social replies; email templates not linted"
+        },
+        "instructionLeakage": {
+          "enforcement": "enforced",
+          "source": "@jovie/copy leak rules on social replies"
+        },
+        "voice": {
+          "enforcement": "advisory",
+          "source": "customer-voice floor enforced on social replies; email/support copy manual"
+        }
+      },
+      "preserves": ["domain-terms", "quotations", "non-english"],
+      "bypassCandidates": [
+        "Connector sends that skip socialReplyBatchRequestSchema validation",
+        "Direct Resend provider calls that author body text outside reviewed templates (apps/web/lib/notifications/providers/resend.ts)"
+      ],
+      "pilot": null,
+      "rollout": null
+    },
+    {
+      "id": "agent-ops-reports",
+      "producer": "Summer/Symphony/Ovie operational reports and commissioning receipts (apps/eve-pilot identities, scripts/summer-commissioning, scripts/symphony)",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer",
+      "audience": "Founder and operators reading agent output",
+      "purpose": "Report what happened, why it matters, the exact need, and the receipt",
+      "evidenceSources": [
+        "apps/eve-pilot/identities/summer/instructions.md",
+        "apps/eve-pilot/identities/jovie/instructions.md",
+        "scripts/summer-commissioning/registry.json",
+        "canon/FLEET.md",
+        "canon/VOICE.md"
+      ],
+      "deliveryAdapter": "ovie-desktop; linear-issue; ops-report artifacts",
+      "policyVersion": "canon/VOICE.md action-only agent communication; FLEET admission policy",
+      "reviewMode": "advisory",
+      "reviewPoint": "post-generation-advisory",
+      "proofLink": "scripts/summer-commissioning/canonical-registry.test.mjs",
+      "checks": {
+        "truth": {
+          "enforcement": "enforced",
+          "source": "commissioning registry binds claims to evidence tiers"
+        },
+        "usefulness": {
+          "enforcement": "advisory",
+          "source": "action-only communication canon"
+        },
+        "repetition": {
+          "enforcement": "advisory",
+          "source": "no routine success updates rule"
+        },
+        "puffery": {
+          "enforcement": "advisory",
+          "source": "voice canon; not linted per report"
+        },
+        "instructionLeakage": {
+          "enforcement": "advisory",
+          "source": "prompt/data boundary in identity packs"
+        },
+        "voice": {
+          "enforcement": "advisory",
+          "source": "agent-communication canon"
+        }
+      },
+      "preserves": ["domain-terms", "quotations", "justified-uncertainty"],
+      "bypassCandidates": [],
+      "pilot": {
+        "kind": "ops-report",
+        "scope": "one bounded Summer/Symphony ops report routed through the advisory Jev text review",
+        "via": "JOV-3720"
+      },
+      "rollout": null
+    },
+    {
+      "id": "engineering-prose",
+      "producer": "Humans and agents writing PRs, issues, release notes, and runbooks (docs/PR_FLOW.md, docs/playbooks/, RELEASE_CHECKLIST.md)",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer",
+      "audience": "Engineers, reviewers, and operators",
+      "purpose": "State change, verification, and rollback precisely",
+      "evidenceSources": [
+        "docs/PR_FLOW.md",
+        "docs/playbooks/release-day-announcement.playbook.md",
+        "RELEASE_CHECKLIST.md",
+        "docs/DOCUMENTATION.md"
+      ],
+      "deliveryAdapter": "github-pr; linear-issue; markdown-docs",
+      "policyVersion": "docs/PR_FLOW.md current; docs/DOCUMENTATION.md parity policy",
+      "reviewMode": "manual",
+      "reviewPoint": "pre-publish",
+      "proofLink": "docs/PR_FLOW.md",
+      "checks": {
+        "truth": {
+          "enforcement": "manual",
+          "source": "PR flow requires exact checks and receipts"
+        },
+        "usefulness": { "enforcement": "manual", "source": "review" },
+        "repetition": { "enforcement": "none", "source": "no automated check" },
+        "puffery": { "enforcement": "none", "source": "no automated check" },
+        "instructionLeakage": {
+          "enforcement": "enforced",
+          "source": "leak guards on agent-authored PR text"
+        },
+        "voice": {
+          "enforcement": "advisory",
+          "source": "writing-guidelines vendor check available"
+        }
+      },
+      "preserves": [
+        "domain-terms",
+        "deliberate-fragments",
+        "justified-uncertainty"
+      ],
+      "bypassCandidates": [],
+      "pilot": null,
+      "rollout": null
+    },
+    {
+      "id": "skills-prompts-templates",
+      "producer": "Agent skills, prompts, and templates authored in .agents/skills/*.tmpl, .claude/skills/, prompts/, and identity instruction packs",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer",
+      "audience": "Agents and operators executing skills",
+      "purpose": "Give the executing agent a bounded task-local contract",
+      "evidenceSources": [
+        ".claude/rules/gstack.md",
+        ".claude/skills/copywriting/SKILL.md",
+        "packages/copy/rules.ts",
+        "apps/eve-pilot/identities/summer/instructions.md",
+        "canon/VOICE.md"
+      ],
+      "deliveryAdapter": "skill-frontmatter; system-prompt; .tmpl-generated SKILL.md",
+      "policyVersion": ".claude/rules/gstack.md skill hygiene; canon/VOICE.md",
+      "reviewMode": "manual",
+      "reviewPoint": "pre-publish",
+      "proofLink": ".claude/rules/gstack.md",
+      "checks": {
+        "truth": {
+          "enforcement": "manual",
+          "source": "skill hygiene requires bounded scope and evidence"
+        },
+        "usefulness": {
+          "enforcement": "manual",
+          "source": "leaf-skill task-local rule"
+        },
+        "repetition": {
+          "enforcement": "enforced",
+          "source": "shared text must live in root template/rules, not forked into skills"
+        },
+        "puffery": { "enforcement": "none", "source": "no automated check" },
+        "instructionLeakage": {
+          "enforcement": "manual",
+          "source": "secret/data boundary policy"
+        },
+        "voice": {
+          "enforcement": "advisory",
+          "source": "generic voice rules live in root template; do not copy word lists"
+        }
+      },
+      "preserves": ["domain-terms"],
+      "bypassCandidates": [],
+      "pilot": null,
+      "rollout": null
+    },
+    {
+      "id": "gbrain-capture",
+      "producer": "Summer operational GBrain write path (apps/web/lib/ovie/operational-memory.ts) and gbrain search/recall",
+      "repository": "JovieInc/Jovie",
+      "owner": "Summer",
+      "audience": "Future agents and operators querying company memory",
+      "purpose": "Persist durable findings with provenance",
+      "evidenceSources": [
+        "apps/web/lib/ovie/operational-memory.ts",
+        "apps/web/lib/ovie/identity.ts",
+        "apps/web/lib/ovie/isolation.ts"
+      ],
+      "deliveryAdapter": "gbrain-page append via operational-gbrain-write capability",
+      "policyVersion": "operational-memory contract: evidence-backed append, supersedes on correction",
+      "reviewMode": "advisory",
+      "reviewPoint": "pre-send",
+      "proofLink": "apps/web/lib/ovie/operational-memory.ts",
+      "checks": {
+        "truth": {
+          "enforcement": "enforced",
+          "source": "append requires evidence; proposals distinguished from observed facts; source and date retained"
+        },
+        "usefulness": {
+          "enforcement": "advisory",
+          "source": "operational-memory contract"
+        },
+        "repetition": {
+          "enforcement": "advisory",
+          "source": "corrections use supersedes rather than duplication"
+        },
+        "puffery": { "enforcement": "none", "source": "no automated check" },
+        "instructionLeakage": {
+          "enforcement": "enforced",
+          "source": "isolation boundary separates company-scoped from personal-agent state"
+        },
+        "voice": {
+          "enforcement": "none",
+          "source": "internal memory, voice floor only"
+        }
+      },
+      "preserves": [
+        "domain-terms",
+        "quotations",
+        "justified-uncertainty",
+        "non-english"
+      ],
+      "bypassCandidates": [],
+      "pilot": null,
+      "rollout": null
+    },
+    {
+      "id": "support-help-center",
+      "producer": "Help-center articles and support macros (docs/help-center/, apps/docs)",
+      "repository": "JovieInc/Jovie",
+      "owner": "unassigned",
+      "audience": "Customers self-serving support answers",
+      "purpose": "Answer the support question with current product truth",
+      "evidenceSources": [
+        "docs/help-center/ARTICLE_METADATA.md",
+        "docs/help-center/MIGRATION_MAP.md"
+      ],
+      "deliveryAdapter": "docs.jov.ie article render",
+      "policyVersion": "docs/DOCUMENTATION.md parity policy",
+      "reviewMode": "uncovered",
+      "reviewPoint": "none",
+      "proofLink": "docs/help-center/ARTICLE_METADATA.md",
+      "checks": {
+        "truth": {
+          "enforcement": "manual",
+          "source": "article metadata review"
+        },
+        "usefulness": { "enforcement": "none", "source": "no automated check" },
+        "repetition": { "enforcement": "none", "source": "no automated check" },
+        "puffery": { "enforcement": "none", "source": "no automated check" },
+        "instructionLeakage": {
+          "enforcement": "none",
+          "source": "no automated check"
+        },
+        "voice": { "enforcement": "none", "source": "no automated check" }
+      },
+      "preserves": ["domain-terms", "quotations", "non-english"],
+      "bypassCandidates": [],
+      "pilot": null,
+      "rollout": {
+        "routeTo": "Summer",
+        "via": "JOV-3720",
+        "slice": "wire help-center prose to the writing contract and name an accountable owner"
+      }
+    },
+    {
+      "id": "native-other-products",
+      "producer": "iOS/macOS/desktop/extension strings and misc product text (apps/ios, apps/macos, apps/desktop, apps/extension)",
+      "repository": "JovieInc/Jovie",
+      "owner": "unassigned",
+      "audience": "Native app users",
+      "purpose": "Keep native UI text truthful and consistent with shared vocabulary",
+      "evidenceSources": [
+        "apps/ios/Jovie/Core/MobileChatClient.swift",
+        "docs/design-system/native-ui-convergence-registry.md"
+      ],
+      "deliveryAdapter": "bundled native UI strings",
+      "policyVersion": "canon/VOICE.md 2026-07-17; docs/marketing/LANGUAGE.md shared vocabulary",
+      "reviewMode": "uncovered",
+      "reviewPoint": "none",
+      "proofLink": "docs/design-system/native-ui-convergence-registry.md",
+      "checks": {
+        "truth": { "enforcement": "manual", "source": "code review" },
+        "usefulness": { "enforcement": "none", "source": "no automated check" },
+        "repetition": { "enforcement": "none", "source": "no automated check" },
+        "puffery": { "enforcement": "none", "source": "no automated check" },
+        "instructionLeakage": {
+          "enforcement": "none",
+          "source": "no automated check"
+        },
+        "voice": { "enforcement": "none", "source": "no automated check" }
+      },
+      "preserves": ["domain-terms", "non-english"],
+      "bypassCandidates": [],
+      "pilot": null,
+      "rollout": {
+        "routeTo": "Summer",
+        "via": "JOV-3720",
+        "slice": "inventory native string surfaces and assign per-app owners before gating"
+      }
+    }
+  ],
+  "contractInput": {
+    "fields": [
+      "exactCandidate",
+      "intendedJob",
+      "allowedClaims",
+      "evidence",
+      "approvedVoiceExamples"
+    ],
+    "contextSeparation": "operator context and consumer context are recorded separately and never merged"
+  },
+  "reviewTransport": {
+    "adapter": "scripts/invariants/jev-gateway.mjs",
+    "issue": "JOV-6465",
+    "mode": "advisory",
+    "modality": "text"
+  },
+  "antiGoals": [
+    "No authorship classification",
+    "No detector-evasion as a success criterion",
+    "No new recurring automation or fleet dispatch from this issue"
+  ]
+}

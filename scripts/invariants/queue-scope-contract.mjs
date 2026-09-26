@@ -103,24 +103,8 @@ const EXPECTATIONS = [
       'STACK_REPAIR_ACTION',
     ],
   },
-  {
-    path: 'scripts/symphony/symphony-lease-guard',
-    includes: [
-      'REPOSITORY = re.compile',
-      'def _repository_for_identifier',
-      'return f"{repo}:{identifier}"',
-      '"issueTombstoneScope": "repository-identifier"',
-    ],
-  },
-  {
-    path: 'scripts/symphony/symphony-concurrency-controller.py',
-    includes: [
-      'def resource_scope(args: argparse.Namespace)',
-      '"kind": "gem-host-provider-accounts-workflow"',
-      '"resourceScope": scope',
-      'value.get("resourceScope") != scope',
-    ],
-  },
+  // symphony-lease-guard and symphony-concurrency-controller.py moved to
+  // JovieInc/symphony-control, which carries their scope expectations.
 ];
 
 function textFor(path, repoRoot, files) {

@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { UserAvatar } from '@jovie/ui';
-import { Disc3, Plus } from 'lucide-react';
+import { Layers, Plus } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { type ContextMenuItemType } from '@/components/organisms/table';
@@ -436,7 +436,7 @@ const TaskBoardCard = memo(function TaskBoardCard({
               className='inline-flex max-w-full items-center gap-1 text-3xs text-tertiary-token'
               title={task.releaseTitle}
             >
-              <Disc3 className='h-3 w-3 shrink-0' />
+              <Layers className='h-3 w-3 shrink-0' />
               <span className='truncate'>{task.releaseTitle}</span>
             </span>
           ) : null}

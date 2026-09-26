@@ -13,6 +13,7 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **careful**: .agents/skills/gstack/careful/SKILL.md
 - **codex**: .agents/skills/gstack/codex/SKILL.md
 - **connect-chrome**: .agents/skills/gstack/connect-chrome/SKILL.md
+- **copywriting**: .claude/skills/copywriting/SKILL.md
 - **cso**: .agents/skills/gstack/cso/SKILL.md
 - **design-canonical**: .claude/skills/design-canonical/SKILL.md | .agents/skills/gstack/design-canonical/SKILL.md
 - **design-consultation**: .agents/skills/gstack/design-consultation/SKILL.md

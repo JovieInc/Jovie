@@ -65,6 +65,11 @@ describe('DashboardNav route warming', () => {
     expect(
       pending.getByRole('status', { name: '3 pending items' })
     ).toHaveTextContent('3');
+    // text-background emits no CSS (no --color-background token); the badge
+    // count must use the base-color token on its accent fill.
+    expect(
+      pending.getByRole('status', { name: '3 pending items' })
+    ).toHaveClass('bg-accent', 'text-(--color-bg-base)');
     pending.unmount();
 
     const updateOnly = renderDashboardNav({

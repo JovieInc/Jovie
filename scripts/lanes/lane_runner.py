@@ -376,13 +376,16 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
 # ---------------------------------------------------------------- fix red first
 
 def red_pr(prs: list[dict], attempts: dict) -> dict | None:
-    """A lane PR whose checks have settled red at a head we have not tried twice."""
+    """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
+    merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
     for pr in sorted(prs, key=lambda item: item["number"]):
         checks = pr.get("statusCheckRollup") or []
-        if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
-            continue
-        if not any(check.get("conclusion") in RED for check in checks):
-            continue
+        conflicted = pr.get("mergeStateStatus") == "DIRTY"
+        if not conflicted:
+            if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
+                continue
+            if not any(check.get("conclusion") in RED for check in checks):
+                continue
         record = attempts.get(str(pr["number"]), {})
         if record.get("sha") == pr["headRefOid"] or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
             continue
@@ -405,12 +408,21 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
 
 
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
+    if pr.get("mergeStateStatus") == "DIRTY":
+        problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
+                   "conflict keeping both sides' intent. If both sides added a migration with the same",
+                   "number, renumber yours after main's and regenerate its snapshot/journal entry.",
+                   "Run the related checks after resolving.", ""]
+    else:
+        problem = []
     return "\n".join([
         f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
         "",
-        f"You are on its branch `{pr['headRefName']}`. Required CI failed with:",
+        f"You are on its branch `{pr['headRefName']}`.",
         "",
-        excerpt or "(no excerpt; run the failing checks named on the PR)",
+        *problem,
+        "Failing required checks:" if excerpt else "",
+        excerpt or "(no failing check excerpt)",
         "",
         "## Contract",
         "- Fix the root cause on this branch; push to the same branch. Do not open a new PR.",
@@ -442,8 +454,12 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                                    timeout=host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
+            pushed = bool(after) and after != pr["headRefOid"]
             receipt.update(agentExit=agent.returncode, headAfter=after,
-                           verdict="fix-pushed" if after and after != pr["headRefOid"] else "fix-no-change")
+                           verdict="fix-pushed" if pushed else "fix-no-change")
+            if pushed and not pr.get("isDraft"):
+                # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
+                sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
         except subprocess.TimeoutExpired:
             receipt.update(verdict="failed", reasons=["timeout"])
         except Exception as error:
@@ -489,7 +505,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
 
 def lane_prs(name: str) -> list[dict]:
     listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{name}/",
-                 "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup"])
+                 "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus"])
     # Only PRs this lane opened (its dated run branches), never other agents' `devin/...` work.
     own = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     return [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
@@ -602,7 +618,15 @@ def reexec(host: Host, name: str) -> int:
     return 0
 
 
+def ensure_full_history(host: Host) -> None:
+    """Repo gates check git ancestry (e.g. story provenance); a shallow clone fails them for
+    every PR. Clones made with --reference to a shallow mirror inherit that, so repair it."""
+    if sh(["git", "rev-parse", "--is-shallow-repository"], cwd=host.repo).stdout.strip() == "true":
+        sh(["git", "fetch", "-q", "--unshallow", "origin"], cwd=host.repo, timeout=1800)
+
+
 def dispatch(host: Host) -> int:
+    ensure_full_history(host)
     prune_worktrees(host)
     for name, spec in load_providers().items():
         if not spec.get("enabled", True) or cooling(host, name) or not provider_healthy(spec):

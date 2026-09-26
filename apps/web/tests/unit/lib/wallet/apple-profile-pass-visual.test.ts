@@ -178,8 +178,8 @@ describe('Apple Wallet profile pass visual contract', () => {
     });
     expect(definition).not.toHaveProperty('logoText');
     expect(JSON.stringify(definition.generic)).not.toContain('JOVIE');
-    expect(contrastRatio('#F5F4F0', '#06080D')).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio('#8D8D93', '#06080D')).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio('#F5F4F0', '#07080A')).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio('#8D8D93', '#07080A')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('preserves the tracked QR destination and readable public profile URL', () => {

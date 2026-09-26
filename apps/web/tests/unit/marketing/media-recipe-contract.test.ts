@@ -104,7 +104,7 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     expect(homeCss).toContain('opacity: 0.42');
     expect(homeCss).toContain('var(--color-accent-blue-subtle)');
     expect(tokens).toMatch(/--geist-cyan-solid:\s*#22c1fc/i);
-    expect(tokens).toMatch(/--noir-ion-shell:\s*#06080d/i);
+    expect(tokens).toMatch(/--noir-ion-shell:\s*#07080a/i);
     expect(tokens).toMatch(
       /--color-accent-blue-subtle:\s*rgba\(17,\s*175,\s*255,\s*0\.12\)/
     );

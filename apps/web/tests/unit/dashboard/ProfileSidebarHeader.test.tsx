@@ -62,11 +62,14 @@ describe('ProfileSidebarHeader QR download', () => {
 
   it('downloads QR as blob without opening a new tab', async () => {
     const user = userEvent.setup({ delay: null });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(new Blob(['qr'], { type: 'image/png' }), { status: 200 })
-      );
+    // jsdom 30's Blob has no stream(), so undici's Response cannot read it;
+    // raw bytes plus the content-type header model the same response.
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(new TextEncoder().encode('qr'), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      })
+    );
 
     vi.stubGlobal('fetch', fetchMock);
 
