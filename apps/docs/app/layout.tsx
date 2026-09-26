@@ -53,7 +53,7 @@ export default async function RootLayout({
             />
           }
           pageMap={pageMap}
-          docsRepositoryBase='https://github.com/ArtistFirst/Jovie/tree/main/apps/docs'
+          docsRepositoryBase='https://github.com/JovieInc/Jovie/tree/main/apps/docs'
           editLink='Edit this page on GitHub'
           footer={
             <Footer>Copyright {new Date().getFullYear()} Jovie Inc.</Footer>
