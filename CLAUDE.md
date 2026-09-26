@@ -47,6 +47,7 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 | Security, billing, entitlements | [.claude/rules/security.md](.claude/rules/security.md) |
 | UI/design | [DESIGN.md](DESIGN.md), [.claude/rules/ui.md](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
+| Writing surfaces / copy review | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
 | Tests/coverage | [.claude/rules/testing.md](.claude/rules/testing.md) |
 | PR, CI, merge, deploy | [docs/PR_FLOW.md](docs/PR_FLOW.md), [.claude/rules/release.md](.claude/rules/release.md) |
 | iOS / macOS | [.claude/rules/ios.md](.claude/rules/ios.md) / [.claude/rules/macos.md](.claude/rules/macos.md) |
