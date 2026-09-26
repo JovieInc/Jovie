@@ -86,7 +86,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 ### Semantic Colors
 
 - `--color-accent`: #11afff
-- `--color-bg-active`: var(--noir-ion-elevated)
+- `--color-bg-active`: rgba(0, 0, 0, 0.06)
 - `--color-bg-base`: var(--noir-ion-canvas)
 - `--color-bg-button`: var(--noir-ion-elevated)
 - `--color-bg-elevated`: var(--noir-ion-elevated)
