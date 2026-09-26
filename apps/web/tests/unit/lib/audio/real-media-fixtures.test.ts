@@ -25,19 +25,20 @@ describe('real audio media fixtures', () => {
     ).toBe(AUDIO_FORMAT_IDS.length);
   });
 
-  it.each(
-    REAL_AUDIO_FIXTURES
-  )('pins the generated $formatId bytes and canonical MIME', fixture => {
-    const bytes = readFixture(fixture.fileName);
-    const digest = createHash('sha256').update(bytes).digest('hex');
-    const registryFormat = AUDIO_FORMAT_REGISTRY.find(
-      format => format.id === fixture.formatId
-    );
+  it.each(REAL_AUDIO_FIXTURES)(
+    'pins the generated $formatId bytes and canonical MIME',
+    fixture => {
+      const bytes = readFixture(fixture.fileName);
+      const digest = createHash('sha256').update(bytes).digest('hex');
+      const registryFormat = AUDIO_FORMAT_REGISTRY.find(
+        format => format.id === fixture.formatId
+      );
 
-    expect(bytes.byteLength).toBeGreaterThan(0);
-    expect(digest).toBe(fixture.sha256);
-    expect(registryFormat?.canonicalMimeType).toBe(fixture.mimeType);
-  });
+      expect(bytes.byteLength).toBeGreaterThan(0);
+      expect(digest).toBe(fixture.sha256);
+      expect(registryFormat?.canonicalMimeType).toBe(fixture.mimeType);
+    }
+  );
 
   it('records AIFF as accepted but not directly Chromium-decodable', () => {
     const aiff = REAL_AUDIO_FIXTURES.find(
@@ -55,13 +56,14 @@ describe('real audio media fixtures', () => {
     );
   });
 
-  it.each(
-    MALFORMED_AUDIO_FIXTURES
-  )('pins the malformed $formatId bytes without treating them as empty', fixture => {
-    const bytes = readFixture(fixture.fileName);
-    const digest = createHash('sha256').update(bytes).digest('hex');
+  it.each(MALFORMED_AUDIO_FIXTURES)(
+    'pins the malformed $formatId bytes without treating them as empty',
+    fixture => {
+      const bytes = readFixture(fixture.fileName);
+      const digest = createHash('sha256').update(bytes).digest('hex');
 
-    expect(bytes.byteLength).toBe(32);
-    expect(digest).toBe(fixture.sha256);
-  });
+      expect(bytes.byteLength).toBe(32);
+      expect(digest).toBe(fixture.sha256);
+    }
+  );
 });

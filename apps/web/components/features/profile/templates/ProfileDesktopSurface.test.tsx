@@ -746,6 +746,73 @@ describe('ProfileDesktopSurface', () => {
     expect(within(releaseLink).queryByRole('button')).not.toBeInTheDocument();
   });
 
+  // JOV-6452: while the desktop surface is server-rendered but clip-hidden on
+  // mobile, portaled overlays must stay closed so they cannot flash open.
+  it('keeps portaled overlays closed while overlays are disabled', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen
+        drawerView='menu'
+        activeMode='subscribe'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+        overlaysEnabled={false}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-open',
+      'false'
+    );
+    expect(
+      screen.queryByTestId('mock-desktop-alerts-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens portaled overlays once overlays are enabled', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen
+        drawerView='menu'
+        activeMode='subscribe'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-open',
+      'true'
+    );
+    expect(screen.getByTestId('mock-desktop-alerts-cta')).toBeInTheDocument();
+  });
+
   it('does not render artist-generic Listen beside an imported catalog', () => {
     render(
       <ProfileDesktopSurface

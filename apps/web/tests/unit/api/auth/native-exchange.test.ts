@@ -292,30 +292,30 @@ describe('native auth exchange route (Better Auth)', () => {
   it.each([
     { failure: 'unavailable', unavailable: true },
     { failure: 'degraded', degraded: true },
-  ])('completes the iOS exchange when Redis is $failure', async ({
-    unavailable,
-    degraded,
-  }) => {
-    setupSuccessfulExchange();
-    setupIosSessionCreation();
-    mockGeneralLimiterLimit.mockResolvedValue({
-      success: false,
-      unavailable,
-      degraded,
-      reason: 'redis_unavailable',
-      reset: new Date(Date.now() + 60_000),
-      remaining: 0,
-      limit: 10,
-    });
+  ])(
+    'completes the iOS exchange when Redis is $failure',
+    async ({ unavailable, degraded }) => {
+      setupSuccessfulExchange();
+      setupIosSessionCreation();
+      mockGeneralLimiterLimit.mockResolvedValue({
+        success: false,
+        unavailable,
+        degraded,
+        reason: 'redis_unavailable',
+        reset: new Date(Date.now() + 60_000),
+        remaining: 0,
+        limit: 10,
+      });
 
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest('ios'));
-    const data = await response.json();
+      const { POST } = await import('@/app/api/auth/native/exchange/route');
+      const response = await POST(createExchangeRequest('ios'));
+      const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data.sessionToken).toBe('session_token_abc');
-    expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalled();
-  });
+      expect(response.status).toBe(200);
+      expect(data.sessionToken).toBe('session_token_abc');
+      expect(mockConsumeStoredNativeExchangeCode).toHaveBeenCalled();
+    }
+  );
 
   it('returns 400 for invalid request shape (missing code)', async () => {
     const request = new NextRequest('https://jov.ie/api/auth/native/exchange', {
