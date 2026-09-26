@@ -62,7 +62,7 @@ runs:
     # .npmrc and Node pin match restores, and `pnpm install --frozen-lockfile`
     # below still verifies the tree against pnpm-lock.yaml. Self-hosted
     # runners never restore or save Actions caches (see setup-node below).
-    # Bump v1 when the install command or its environment changes.
+    # Bump v2 when the install command or its environment changes.
     - name: Restore installed node_modules (GitHub-hosted)
       id: node-modules-cache
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true'
@@ -73,7 +73,7 @@ runs:
           apps/*/node_modules
           packages/*/node_modules
           workers/*/node_modules
-        key: pnpm-node-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}
+        key: pnpm-node-modules-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}
 
     # setup-node's pnpm cache is GitHub-hosted only. Every self-hosted runner,
     # fixed or ephemeral, skips Actions cache restore/save. Fixed runners reuse
@@ -110,6 +110,27 @@ runs:
         else
           pnpm install --frozen-lockfile
         fi
+
+    # Both packages pick binaries by process.platform, so a Linux tree never
+    # loads these darwin/win32 copies: ~340 MB raw, ~125 MB of the archive.
+    - name: Drop unloadable binaries before save
+      if: >-
+        runner.os == 'Linux' &&
+        steps.node-modules-cache.outcome == 'success' &&
+        steps.node-modules-cache.outputs.cache-hit != 'true' &&
+        (github.event_name == 'push' ||
+        (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository))
+      shell: bash
+      run: |
+        cd node_modules/.pnpm
+        rm -rf onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v*/{darwin,win32} \
+          app-builder-bin@*/node_modules/app-builder-bin/{mac,win}
+        # pnpm 9 installs musl builds too (lockfile has no libc). Glibc loaders
+        # never pick them: ~630 MB raw. Keep package.json so a frozen install
+        # still treats them as linked instead of refetching them on every hit.
+        find . -maxdepth 1 \( -name '*-musl@*' -o -name '*linuxmusl-*@*' \) \
+          -exec find {}/node_modules -type f ! -name package.json -delete \;
 
     # Save right after install, before any job step can write build or test
     # output under node_modules. Only same-repository push and pull_request
