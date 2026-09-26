@@ -1,3 +1,4 @@
+import type { CustomerChangelogEntry } from '@/lib/customer-changelog';
 import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
 
 export const YC_EXCEPTIONAL_GROWTH = 0.1;
@@ -81,11 +82,32 @@ export type OvieMacHudInFlightPullRequests = {
   errorMessage: string | null;
 };
 
+export type OvieMacHudReceiptedShip = {
+  linearIssue: string;
+  symphonyRef: string;
+  mergeQueueRef: string;
+  prodSha: string;
+  receiptAt: string;
+};
+
+/**
+ * Server-halves of the JOV-5322 company activity feed: verified ship receipts
+ * and the curated public digest. Runtime-hot rows arrive client-side through
+ * the shipping-state projection; a merged PR never becomes deployed without a
+ * receipt row here.
+ */
+export type OvieMacHudCompanyActivity = {
+  shippedReceipts: readonly OvieMacHudReceiptedShip[];
+  receiptsAvailable: boolean;
+  publicDigest: readonly CustomerChangelogEntry[];
+};
+
 export type OvieMacHudSnapshot = {
   alive: OvieMacHudAliveMetric;
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  companyActivity: OvieMacHudCompanyActivity;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
@@ -508,13 +530,9 @@ function textField(
   return null;
 }
 
-export function parseReceiptedShip(value: unknown): {
-  linearIssue: string;
-  symphonyRef: string;
-  mergeQueueRef: string;
-  prodSha: string;
-  receiptAt: string;
-} | null {
+export function parseReceiptedShip(
+  value: unknown
+): OvieMacHudReceiptedShip | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
   const linearIssue = textField(record, [
@@ -574,21 +592,32 @@ export function composeOvieMacHudSnapshot(input: {
   shippingEntries: readonly unknown[];
   shippingAvailable?: boolean;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
+  publicDigest?: readonly CustomerChangelogEntry[];
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
   nowMs?: number;
 }): OvieMacHudSnapshot {
+  const receiptsAvailable = input.shippingAvailable ?? true;
   return {
     alive: computeDefaultAlive(input.alive),
     growth: computeWowGrowth(input.growth),
     shipping: countReceiptedShipsThisWeek(
       input.shippingEntries,
       input.nowMs ?? Date.parse(input.generatedAtIso),
-      input.shippingAvailable ?? true
+      receiptsAvailable
     ),
     inFlightPullRequests:
       input.inFlightPullRequests ??
       emptyOvieMacHudInFlightPullRequests('not_configured'),
+    companyActivity: {
+      shippedReceipts: receiptsAvailable
+        ? input.shippingEntries
+            .map(parseReceiptedShip)
+            .filter((ship): ship is OvieMacHudReceiptedShip => ship !== null)
+        : [],
+      receiptsAvailable,
+      publicDigest: input.publicDigest ?? [],
+    },
     ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };

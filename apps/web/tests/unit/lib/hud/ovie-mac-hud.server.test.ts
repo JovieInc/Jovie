@@ -51,6 +51,14 @@ vi.mock('@/lib/ovie/lyb-mrr.server', () => ({
   getLybDailyMrr: vi.fn(),
 }));
 
+vi.mock('@/lib/changelog-source', () => ({
+  getChangelogSnapshot: vi.fn(async () => ({
+    releases: [],
+    sourceReleases: [],
+    unpublishedReleases: [],
+  })),
+}));
+
 function stripeAvailable() {
   return {
     mrrUsd: 5200,
