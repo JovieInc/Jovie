@@ -150,7 +150,16 @@ CONTROL_PLANE_PREFIXES = (
     "scripts/backlog-orchestrator/",
     "scripts/symphony/",
 )
+# Per-repo lanes (JOV-5340): only Jovie ships through the jov.ie deploy-health
+# contract and the "Main Release Ready" source gate. Sibling repos must not
+# inherit Jovie's production SHA or a source check their CI does not run.
+JOVIE_REPOSITORY_NAMES = frozenset({"jovieinc/jovie", "itstimwhite/jovie"})
+JOVIE_PRODUCTION_HEALTH_URL = "https://jov.ie/api/health/deploy"
 UTC = timezone.utc
+
+
+def is_jovie_repository(repo: object) -> bool:
+    return str(repo or "").casefold() in JOVIE_REPOSITORY_NAMES
 
 
 def utc_now() -> datetime:
@@ -385,7 +394,27 @@ def observe_main(repo: str) -> dict[str, Any]:
             if len(page_runs) < 100:
                 break
         if not _real_release_attempts(release_attempts):
-            release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
+            if is_jovie_repository(repo):
+                release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
+            elif not release_attempts:
+                # Sibling lanes do not run Jovie's "Main Release Ready" job;
+                # bind main health to the repo's own combined commit status
+                # instead of freezing on a source check that cannot exist.
+                combined_state = str(combined.get("state") or "unknown")
+                return {
+                    "status": "green"
+                    if combined_state == "success"
+                    else "red"
+                    if combined_state in {"failure", "error"}
+                    else "unknown",
+                    "sha": sha,
+                    "combinedStatus": combined_state,
+                    "sourceGate": {
+                        "name": "combined-commit-status",
+                        "status": "completed",
+                        "conclusion": combined_state,
+                    },
+                }
         latest = select_main_release_ready(release_attempts)
         combined_state = str(combined.get("state") or "unknown")
         conclusion = latest.get("conclusion")
@@ -606,6 +635,22 @@ def observe_production(url: str) -> dict[str, Any]:
         # stale production deploy can never pass as current-main proof.
         observed.update(observe_build_info(url.rsplit("/", 1)[0] + "/build-info"))
     return observed
+
+
+def repository_bound_production(main: dict[str, Any]) -> dict[str, Any]:
+    """Production signal for lanes without a separate deployed service.
+
+    Sibling repos (LYB/Symphony/gbrain) have no jov.ie deploy to observe.
+    Their production identity is the repository main head itself, so the
+    deployed SHA binds to the observed main SHA and never to Jovie's.
+    """
+    sha = main.get("sha")
+    bound = valid_commit_sha(sha, exact=True)
+    return {
+        "status": "green" if bound else "unknown",
+        "deployedSha": sha if bound else None,
+        "source": "repository-main-no-production-lane",
+    }
 
 
 def deployment_bound(main_sha: object, deployed_sha: object) -> bool:
@@ -1061,7 +1106,7 @@ def build_independent_review_receipt(main: dict[str, Any], now: datetime) -> dic
         "scope": INDEPENDENT_REVIEW_SCOPE,
         "observedAt": isoformat(now),
         "evidence": {
-            "check": "Main Release Ready",
+            "check": gate.get("name") or "Main Release Ready",
             "status": gate.get("status"),
             "conclusion": gate.get("conclusion"),
             "completedAt": gate.get("completedAt"),
@@ -1782,19 +1827,33 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and repository_capacity.get("ready") == green_ready_prs
         and repository_capacity.get("budget") == queue_target
     )
-    repository_capacity_available = bool(
-        lane_capacity_consistent
-        and repository_capacity.get("ready") < repository_capacity.get("budget")
-    )
+
+    # The isolated UI/docs lane (source-bound mocks, exact head) is a cheap
+    # promotion path. It runs while AMBER with production red, and it stays
+    # open on a bound GREEN factory below queue backpressure — a healthy
+    # fleet must not strand isolated UI/docs PRs behind the full suite.
     isolated_promotion_allowed = (
-        state == "AMBER"
-        and review_allowed
+        review_allowed
         and controller.get("status") == "green"
         and main.get("status") == "green"
-        and production.get("status") == "red"
         and integrity.get("status") in {"clear", "resolved"}
         and queue_below_backpressure
-        and all(reason["code"] == "production-not-green" for reason in reasons)
+        and (
+            (
+                state == "GREEN"
+                and production.get("status") == "green"
+                and deployment_bound(
+                    main.get("sha"), production.get("deployedSha")
+                )
+            )
+            or (
+                state == "AMBER"
+                and production.get("status") == "red"
+                and all(
+                    reason["code"] == "production-not-green" for reason in reasons
+                )
+            )
+        )
     )
     hold_intake_allowed = (
         state == "AMBER"
@@ -1843,10 +1902,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             {"controller-failure", "production-deployment-unbound"},
         )
     )
-    if isolated_promotion_allowed:
-        promotion_mode = "isolated-only"
-    elif state == "GREEN":
+    if state == "GREEN":
+        # The isolated lane is additive on GREEN; full promotion stays normal.
         promotion_mode = "normal"
+    elif isolated_promotion_allowed:
+        promotion_mode = "isolated-only"
     elif (
         state == "AMBER"
         and main.get("status") == "red"
@@ -1883,8 +1943,16 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     else:
         # Capacity evidence governs mutation seats, not Linear-child intake.
         # Missing useful-turn proofs must not freeze Eve's v2 projection.
-        # Queue backpressure (ready >= budget) still holds new leases.
-        new_implementation_allowed = queue_shape_valid and repository_capacity_available
+        # Queue backpressure (ready >= budget) still holds new leases, keyed
+        # off greenReadyPrs — not eligiblePrs and not capacity_fresh. A
+        # lane-capacity receipt only vetoes when present and contradictory;
+        # an absent or stale receipt must not freeze a green lane below
+        # target (JOV-5340).
+        new_implementation_allowed = (
+            queue_shape_valid
+            and queue_below_backpressure
+            and (not lane_capacity_valid or lane_capacity_consistent)
+        )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
             work_activities = [
@@ -2789,11 +2857,7 @@ def parse_args() -> argparse.Namespace:
         or "JovieInc/Jovie",
     )
     parser.add_argument("--queue-target", type=int, default=15)
-    parser.add_argument(
-        "--production-url",
-        default=os.environ.get("JOVIE_PRODUCTION_HEALTH_URL")
-        or "https://jov.ie/api/health/deploy",
-    )
+    parser.add_argument("--production-url", default=None)
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument(
         "--lease-guard-bin",
@@ -2824,7 +2888,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--concurrency-evidence", type=Path)
     parser.add_argument("--independent-review-receipt", type=Path)
     parser.add_argument("--model-registry", type=Path)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.production_url:
+        # Sibling lanes have no jov.ie deploy; without an explicit override
+        # they bind production to their own main head (JOV-5340).
+        args.production_url = os.environ.get("JOVIE_PRODUCTION_HEALTH_URL") or (
+            JOVIE_PRODUCTION_HEALTH_URL if is_jovie_repository(args.repo) else None
+        )
+    return args
 
 
 def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
@@ -2862,7 +2933,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     )
     return {
         "main": main,
-        "production": observe_production(args.production_url),
+        "production": observe_production(args.production_url)
+        if isinstance(args.production_url, str) and args.production_url
+        else repository_bound_production(main),
         "controller": controller,
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(
