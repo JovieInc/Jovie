@@ -548,4 +548,129 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.activeTrackId).toBe('track-2');
     expect(result.current.playbackState.trackTitle).toBe('Second Song');
   });
+
+  it('converges now-playing metadata when the playing release is mutated', async () => {
+    const mod = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const useTrackAudioPlayer = mod.useTrackAudioPlayer;
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'release-1',
+        title: 'Old Title',
+        audioUrl: 'https://cdn.example.com/preview.mp3',
+        releaseId: 'release-1',
+        releaseTitle: 'Old Title',
+        artworkUrl: 'https://cdn.example.com/old.jpg',
+        hasLyrics: false,
+      });
+    });
+    act(() => {
+      fireAudioEvent('play');
+    });
+    expect(result.current.playbackState.isPlaying).toBe(true);
+
+    act(() => {
+      mod.syncPlayingReleaseMetadata({
+        id: 'release-1',
+        title: 'New Title',
+        artworkUrl: 'https://cdn.example.com/new.jpg',
+        hasLyrics: true,
+      });
+    });
+
+    expect(result.current.playbackState.trackTitle).toBe('New Title');
+    expect(result.current.playbackState.releaseTitle).toBe('New Title');
+    expect(result.current.playbackState.artworkUrl).toBe(
+      'https://cdn.example.com/new.jpg'
+    );
+    expect(result.current.playbackState.hasLyrics).toBe(true);
+    // Metadata converges without interrupting the active source.
+    expect(result.current.playbackState.isPlaying).toBe(true);
+    expect(mockAudio.src).toBe('https://cdn.example.com/preview.mp3');
+    expect(mockAudio.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('converges release metadata on a playing track that belongs to the release', async () => {
+    const mod = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const useTrackAudioPlayer = mod.useTrackAudioPlayer;
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    const queue = [
+      {
+        id: 'track-1',
+        title: 'First Song',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+        releaseId: 'release-1',
+        releaseTitle: 'Old Album',
+        artworkUrl: 'https://cdn.example.com/old.jpg',
+      },
+      {
+        id: 'track-2',
+        title: 'Second Song',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+        releaseId: 'release-2',
+        releaseTitle: 'Other Album',
+        artworkUrl: 'https://cdn.example.com/other.jpg',
+      },
+    ];
+
+    await act(async () => {
+      await result.current.toggleTrack(queue[0], { queue });
+    });
+    act(() => {
+      fireAudioEvent('play');
+    });
+
+    act(() => {
+      mod.syncPlayingReleaseMetadata({
+        id: 'release-1',
+        title: 'New Album',
+        artworkUrl: 'https://cdn.example.com/new.jpg',
+      });
+    });
+
+    // Track identity is preserved; only release-scoped metadata converges.
+    expect(result.current.playbackState.activeTrackId).toBe('track-1');
+    expect(result.current.playbackState.trackTitle).toBe('First Song');
+    expect(result.current.playbackState.releaseTitle).toBe('New Album');
+    expect(result.current.playbackState.artworkUrl).toBe(
+      'https://cdn.example.com/new.jpg'
+    );
+    expect(result.current.playbackState.isPlaying).toBe(true);
+    expect(mockAudio.src).toBe('https://cdn.example.com/first.mp3');
+  });
+
+  it('ignores mutations for releases that are not playing', async () => {
+    const mod = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const useTrackAudioPlayer = mod.useTrackAudioPlayer;
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First Song',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+        releaseId: 'release-1',
+        releaseTitle: 'Current Album',
+      });
+    });
+
+    const before = result.current.playbackState;
+    act(() => {
+      mod.syncPlayingReleaseMetadata({
+        id: 'release-9',
+        title: 'Unrelated',
+        artworkUrl: 'https://cdn.example.com/unrelated.jpg',
+      });
+    });
+
+    expect(result.current.playbackState).toEqual(before);
+  });
 });

@@ -15,8 +15,26 @@ import {
   saveReleaseStatus,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
+import { syncPlayingReleaseMetadata } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from './keys';
+
+/**
+ * Push a mutated release into the shell player's now-playing snapshot so the
+ * audio bar, MediaSession metadata, and queued sources converge with the
+ * matrix cache — no reload or playback reset (JOV-6544).
+ */
+function syncNowPlayingRelease(release: ReleaseViewModel): void {
+  syncPlayingReleaseMetadata({
+    id: release.id,
+    title: release.title,
+    artworkUrl: release.artworkUrl,
+    hasLyrics:
+      typeof release.lyrics === 'string'
+        ? Boolean(release.lyrics.trim())
+        : undefined,
+  });
+}
 
 /**
  * Optimistically update a release's provider URL in the cache.
@@ -222,6 +240,7 @@ export function useRefreshReleaseMutation(profileId: string) {
             current.map(r => (r.id === result.release.id ? result.release : r))
           );
         }
+        syncNowPlayingRelease(result.release);
       }
     },
   });
@@ -247,6 +266,7 @@ export function useRescanIsrcLinksMutation(profileId: string) {
             current.map(r => (r.id === result.release.id ? result.release : r))
           );
         }
+        syncNowPlayingRelease(result.release);
       }
     },
   });
@@ -316,6 +336,7 @@ function useReleaseMutation<T>(
           current.map(r => (r.id === updated.id ? updated : r))
         );
       }
+      syncNowPlayingRelease(updated);
     },
   });
 }
@@ -355,6 +376,7 @@ export function useFormatReleaseLyricsMutation(profileId: string) {
           current.map(r => (r.id === release.id ? release : r))
         );
       }
+      syncNowPlayingRelease(release);
     },
   });
 }

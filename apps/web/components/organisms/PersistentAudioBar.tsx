@@ -198,6 +198,15 @@ export function PersistentAudioBar() {
     router,
   ]);
 
+  // Intent prefetch (JOV-6544): warm the lyrics route's RSC payload on
+  // hover/focus of the Lyrics toggle so click navigation is immediate.
+  // Bounded — one route, only while a track with lyrics is active; the
+  // router dedupes repeat prefetches.
+  const handlePrefetchLyrics = useCallback(() => {
+    if (!playbackState.activeTrackId || !playbackState.hasLyrics) return;
+    router.prefetch(buildLyricsRoute(playbackState.activeTrackId));
+  }, [playbackState.activeTrackId, playbackState.hasLyrics, router]);
+
   const activeTrackId = playbackState.activeTrackId;
   const hasActiveTrack = Boolean(activeTrackId);
   // Idle (nothing loaded): the player is absent entirely — zero reserved
@@ -478,6 +487,9 @@ export function PersistentAudioBar() {
               lyricsActive={pathname === lyricsPath}
               onOpenLyrics={
                 playbackState.hasLyrics ? handleOpenLyrics : undefined
+              }
+              onPrefetchLyrics={
+                playbackState.hasLyrics ? handlePrefetchLyrics : undefined
               }
               track={shellTrack}
               className='min-w-0 px-0 py-0'

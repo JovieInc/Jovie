@@ -38,6 +38,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         id: release.id,
         title: release.title,
         audioUrl: release.previewUrl,
+        releaseId: release.id,
         releaseTitle: release.title,
         artistName: primaryArtist,
         artworkUrl: release.artworkUrl,

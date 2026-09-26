@@ -43,6 +43,22 @@ describe('AudioBar', () => {
     expect(screen.getByLabelText(/^Lyrics/)).toBeInTheDocument();
   });
 
+  it('fires onPrefetchLyrics on hover and keyboard focus of the lyrics toggle', () => {
+    const onPrefetchLyrics = vi.fn();
+    render(
+      <AudioBar
+        {...baseProps}
+        track={{ ...baseTrack, hasLyrics: true }}
+        onOpenLyrics={() => {}}
+        onPrefetchLyrics={onPrefetchLyrics}
+      />
+    );
+    const lyricsButton = screen.getByLabelText(/^Lyrics/);
+    fireEvent.mouseEnter(lyricsButton);
+    fireEvent.focus(lyricsButton);
+    expect(onPrefetchLyrics).toHaveBeenCalledTimes(2);
+  });
+
   it('labels the lyrics button as a close action when active', () => {
     render(
       <AudioBar

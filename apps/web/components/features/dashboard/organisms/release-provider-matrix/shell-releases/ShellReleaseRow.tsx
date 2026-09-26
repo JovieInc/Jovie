@@ -105,6 +105,7 @@ function useArtworkPlayback(release: ReleaseViewModel) {
         title: release.title,
         audioUrl: previewUrl,
         isrc: release.primaryIsrc ?? null,
+        releaseId: release.id,
         releaseTitle: release.title,
         artistName: primaryArtist,
         artworkUrl: release.artworkUrl,
