@@ -57,6 +57,15 @@ function fixture() {
     },
   };
 }
+// Both bounds come from one clock read: reading Date.now() twice lets a
+// millisecond tick widen the window past the 600s contract limit, which turns
+// an "expired" fixture into an invalid one.
+function expiredFixture(now = Date.now()) {
+  const task = fixture();
+  task.createdAt = new Date(now - 700_000).toISOString();
+  task.expiresAt = new Date(now - 100_000).toISOString();
+  return task;
+}
 function signRecord(domain, body, privateKey, keyId) {
   const unsigned = { ...body, signatureKeyId: keyId };
   return {
@@ -244,9 +253,7 @@ test('holds owner/budget waits without turning them into terminal outcomes', asy
   assert.equal(c.state().active.phase, 'discovered');
 });
 test('never admits an expired task or releases its slot without terminal proof', async () => {
-  const task = fixture();
-  task.createdAt = new Date(Date.now() - 700_000).toISOString();
-  task.expiresAt = new Date(Date.now() - 100_000).toISOString();
+  const task = expiredFixture();
   const c = cycle(outbox(task));
   assert.equal(
     (await runCycle(c.deps)).reason,
@@ -256,9 +263,7 @@ test('never admits an expired task or releases its slot without terminal proof',
   assert.equal(c.state().active.phase, 'discovered');
 });
 test('clears expired work only after canonical terminal evidence is delivered', async () => {
-  const task = fixture();
-  task.createdAt = new Date(Date.now() - 700_000).toISOString();
-  task.expiresAt = new Date(Date.now() - 100_000).toISOString();
+  const task = expiredFixture();
   const c = cycle(outbox(task));
   c.deps.shippingLeadAdmitter.rejectExpired = async observed => {
     assert.equal(observed.taskKey, task.taskKey);
@@ -267,6 +272,21 @@ test('clears expired work only after canonical terminal evidence is delivered', 
   assert.equal((await runCycle(c.deps)).status, 'execution-recorded');
   assert.deepEqual(c.counts(), { executions: 0, deliveries: 1 });
   assert.equal(c.state().active, null);
+});
+test('keeps the expired fixture valid when the clock ticks between reads', async t => {
+  let tick = Date.parse('2026-09-25T12:00:00.000Z');
+  t.mock.method(Date, 'now', () => tick++);
+  const task = expiredFixture();
+  assert.equal(
+    Date.parse(task.expiresAt) - Date.parse(task.createdAt),
+    600_000
+  );
+  assert.equal(validateShippingTask(task), task);
+  const c = cycle(outbox(task));
+  assert.equal(
+    (await runCycle(c.deps)).reason,
+    'expired-shipping-lead-terminal-proof-unavailable'
+  );
 });
 test('delivers only signed terminal evidence and clears the exact journal', async () => {
   const c = cycle();
