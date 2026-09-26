@@ -52,8 +52,6 @@ export const RUNNER_ONLY_EXCEPTIONS = Object.freeze({});
 export const KNOWN_RED_ORPHANS = Object.freeze({
   'scripts/backlog-orchestrator/__tests__/symphony-launcher.test.mjs':
     'red on main: 7 of 11 launcher subprocess cases exit non-zero (24s file).',
-  'scripts/ci-cache-policy.test.mjs':
-    'red on main: only the desktop-release.yml pnpm-store and Electron-download caches from #16891 remain unrestored; that file is owned by #18430 until it lands.',
   'scripts/generate-llms-design-manifest.test.mjs':
     'red on main: "--check detects drift" reports no drift.',
   'scripts/repo-hygiene-guard.test.mjs':
