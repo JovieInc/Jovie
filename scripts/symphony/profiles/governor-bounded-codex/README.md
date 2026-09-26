@@ -26,17 +26,21 @@ stay `Todo`, `In Progress`, `Rework`, and `Merging`.
 `excluded_labels` keeps `no-symphony` and adds the existing deploy, permissions,
 billing, and spend labels: `vercel`, `infra`, `area:infra`, `infrastructure`,
 `blocked:auth`, `auth`, `area:auth`, `billing`, `blocked:payments`, `stripe`, and
-`cost-monitoring`. Linear has no pull-number label, and the scheduler has no
-identifier denylist. JOV-5914, JOV-6519, and GitHub PRs #17453 and #17156 stay
-outside intake only while those issues lack `agent-ready`. Adding `agent-ready`
-without an excluded label selects them. Legacy human-review
-labels are not exclusions. The one-retry ceiling, hooks, workspace, sandbox, and
-service port stay as they are.
+`cost-monitoring`. It also excludes `hold`, `protected`, and `human-only`.
+`protected-items.json` denies JOV-5914, JOV-6519, pull requests #17453, #17156,
+#18299, and #17511, the listed branches, and any `zz-upstream*` label.
+`after_create` runs `symphony-protected-intake-check` before clone, before
+`before_run` lease checks, and before routing. A missing or unparseable list,
+or unresolved pull/branch linkage, refuses intake. The scheduler still has no
+native identifier denylist. Legacy human-review labels are not exclusions.
+The one-retry ceiling, sandbox, and service port stay as they are. Host install
+of this workflow is held until the exact SHA is approved.
 
 Drop-ins stay the five reviewed `governor-bounded` units. Attestation compares
 those installed files with `scripts/symphony/profiles/governor-bounded/systemd`
 at the selected revision. No separate drop-in pin is required.
 
 The agent prompt no longer says native Codex execution is disabled. The tracker
-and intake paragraph are the team-wide `agent-ready` filter above. Hooks, sandbox,
-port, retry ceiling, and the rest of the worker instructions match `governor-bounded`.
+and intake paragraph are the team-wide `agent-ready` filter above. `after_create`
+runs the protected-item check before the managed workspace wrapper. Sandbox,
+port, and retry ceiling match `governor-bounded`.
