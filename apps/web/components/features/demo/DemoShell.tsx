@@ -4,7 +4,7 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
-  CircleDot,
+  CircleCheck,
   Compass,
   Eye,
   Folder,
@@ -273,7 +273,7 @@ export function DemoShell({
                             isActive={activeTab === 'current'}
                             onClick={() => onTabChange('current')}
                           >
-                            <CircleDot className='size-3.5' />
+                            <CircleCheck className='size-3.5' />
                             <span>Current</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -377,7 +377,6 @@ export function DemoShell({
                     icon={<Plus className='size-3.5' aria-hidden='true' />}
                     iconOnly
                     tooltipLabel='New Release'
-                    className='h-8 w-8'
                   />
                 ) : null}
               </DashboardHeaderActionGroup>

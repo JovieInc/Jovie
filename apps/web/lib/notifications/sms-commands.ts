@@ -88,7 +88,7 @@ export function parseInboundCommand(
 
   // Acceptance path 1: explicit "JOIN <code>" prefix wins over any bare
   // code so the carrier can disambiguate.
-  const joinMatch = upper.match(JOIN_CODE_PATTERN);
+  const joinMatch = JOIN_CODE_PATTERN.exec(upper);
   if (joinMatch?.[1]) {
     return { kind: 'join', code: joinMatch[1] };
   }
@@ -97,7 +97,7 @@ export function parseInboundCommand(
   // one digit. The digit requirement rejects ordinary letters-only words
   // like "UPDATE" or "PLEASE" while still accepting the codes the
   // generator emits (it guarantees ≥1 digit).
-  const bareMatch = upper.match(BARE_CODE_PATTERN);
+  const bareMatch = BARE_CODE_PATTERN.exec(upper);
   if (bareMatch?.[1] && HAS_DIGIT_PATTERN.test(bareMatch[1])) {
     return { kind: 'join', code: bareMatch[1] };
   }

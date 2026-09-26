@@ -32,7 +32,7 @@ export async function GET(
 
   const profile = await getProfileByUsername(username);
 
-  if (!profile || !profile.isPublic) {
+  if (!profile?.isPublic) {
     return new NextResponse('Not found', { status: 404 });
   }
   if (!isPublicProfileIndexable(profile.username, profile.displayName)) {

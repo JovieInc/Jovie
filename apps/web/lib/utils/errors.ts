@@ -102,14 +102,14 @@ export function unwrapCapturedContext(
   context?: Record<string, unknown>
 ): Record<string, unknown> | undefined {
   if (isContextOnlyCaptureBag(error)) {
-    const merged = { ...error, ...(context ?? {}) };
+    const merged = { ...error, ...context };
     return Object.keys(merged).length > 0 ? merged : undefined;
   }
   if (!isPlainObject(error) || !('error' in error)) {
     return context;
   }
   const { error: _nested, ...rest } = error;
-  const merged = { ...rest, ...(context ?? {}) };
+  const merged = { ...rest, ...context };
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 

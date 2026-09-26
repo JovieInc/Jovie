@@ -398,9 +398,7 @@ describe('CommandPalette', () => {
   it('toggles closed when Cmd+K is pressed again', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    expect(
-      screen.queryByLabelText('Command Palette Search')
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Command Palette Search')).toBeInTheDocument();
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     expect(
       screen.queryByLabelText('Command Palette Search')

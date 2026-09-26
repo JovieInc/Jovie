@@ -68,20 +68,18 @@ describe('production lane range', () => {
     ).toThrow('production base evidence is not admissible');
   });
 
-  it.each([
-    'pending',
-    'manual',
-    'recovery_available',
-    '',
-  ])('rejects %s production marker state as a release base', markerState => {
-    expect(() =>
-      classifyProductionBaseEvidence({
-        markerState,
-        deployedSha: sha('a'),
-        currentSha: sha('b'),
-      })
-    ).toThrow('production base evidence is not admissible');
-  });
+  it.each(['pending', 'manual', 'recovery_available', ''])(
+    'rejects %s production marker state as a release base',
+    markerState => {
+      expect(() =>
+        classifyProductionBaseEvidence({
+          markerState,
+          deployedSha: sha('a'),
+          currentSha: sha('b'),
+        })
+      ).toThrow('production base evidence is not admissible');
+    }
+  );
 
   it('keeps a preceding web lane live when a rapid operations merge becomes current', () => {
     const deployedSha = sha('a');

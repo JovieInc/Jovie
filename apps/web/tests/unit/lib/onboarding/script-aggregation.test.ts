@@ -13,7 +13,7 @@ import {
 } from '@/lib/onboarding/script-aggregation';
 
 const CLEAN_TEXT =
-  'Putting you on the early list — real spots open weekly and you keep your place.';
+  'Putting you on the early list. Real spots open weekly and you keep your place.';
 
 function toolCall(action: string, extra: Record<string, unknown> = {}) {
   return { toolName: 'x', output: { action, ...extra } };

@@ -13,8 +13,13 @@ export function isProtectedCacheKey(key) {
   return PROTECTED_KEY.test(String(key ?? ''));
 }
 
+// Rolling build caches: keep only the newest entries per live ref. The
+// next-build-web family is the Build + Layout Turbopack cache that ci.yml
+// restores and next-build-cache-warm.yml writes from main.
 export function turboFamily(key) {
-  const match = String(key ?? '').match(/^((?:Linux|macOS|Windows)-turbo)/);
+  const match = String(key ?? '').match(
+    /^((?:Linux|macOS|Windows)-(?:turbo|next-build-web))/
+  );
   return match ? match[1] : null;
 }
 

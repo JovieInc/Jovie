@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/dashboard/TaskListRow.test.tsx
 import { UserAvatar } from '@jovie/ui';
-import { Disc3, Sparkles, Tag } from 'lucide-react';
+import { Layers, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
 import { TaskProjectionListRow } from '@/components/organisms/table';
 import { DueChip } from '@/components/shell/DueChip';
@@ -169,12 +169,15 @@ export const TaskListRow = memo(function TaskListRow({
     task.status,
     task.agentStatus
   );
+  let rowOpacity: 'quiet' | 'muted' | 'full' = 'full';
+  if (isCancelled) rowOpacity = 'quiet';
+  else if (isDone) rowOpacity = 'muted';
 
   return (
     <TaskProjectionListRow
       testId={`task-list-row-${task.id}`}
       isSelected={isSelected}
-      opacity={isCancelled ? 'quiet' : isDone ? 'muted' : 'full'}
+      opacity={rowOpacity}
       leading={<TaskStageGlyph task={task} />}
       title={hideTitle ? undefined : task.title}
       titleAfter={agentWorking ? <TaskAgentWorkingGlyph /> : null}
@@ -225,7 +228,7 @@ export const TaskListRow = memo(function TaskListRow({
               className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base focus-visible:text-primary-token'
               title={task.releaseTitle}
             >
-              <Disc3 className='h-3 w-3 shrink-0 text-tertiary-token' />
+              <Layers className='h-3 w-3 shrink-0 text-tertiary-token' />
               <span className='min-w-0 truncate'>{task.releaseTitle}</span>
             </button>
           ) : null}

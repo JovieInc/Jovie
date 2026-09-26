@@ -241,15 +241,17 @@ export function validateOklchPalette(
   if (lightSurfaces.length === 4 && !isMonotonicLightness(lightSurfaces)) {
     add('elevation-light', 'light surface-0..3 L must be monotonic');
   }
-  if (lightSurfaces.length === 4 && lightSurfaces[3].l >= lightSurfaces[0].l) {
-    add('elevation-light', 'light surface-3 must recede (darker) vs surface-0');
+  // ZiaWI re-lock 2026-09-25: in light, raised = lighter (gray chrome, white
+  // working surfaces separated by border and shadow).
+  if (lightSurfaces.length === 4 && lightSurfaces[3].l < lightSurfaces[0].l) {
+    add('elevation-light', 'light surface-3 must not be darker than surface-0');
   }
   if (
     parsed.canvas?.light &&
     parsed['surface-0']?.light &&
-    parsed.canvas.light.l <= parsed['surface-0'].light.l
+    parsed.canvas.light.l >= parsed['surface-0'].light.l
   ) {
-    add('elevation-light', 'light canvas must be lighter than surface-0');
+    add('elevation-light', 'light canvas must be darker than surface-0');
   }
   if (
     parsed.canvas?.dark &&

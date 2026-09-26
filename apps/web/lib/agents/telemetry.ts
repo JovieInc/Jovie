@@ -109,7 +109,7 @@ export async function recordSkillRunEvent(
         successMetricOutcome: input.successMetricOutcome ?? null,
         error: input.error ?? null,
         metadata: {
-          ...(input.metadata ?? {}),
+          ...input.metadata,
           ...(input.cohort ? { cohort: input.cohort } : {}),
           ...(input.lifecycle ? { lifecycle: input.lifecycle } : {}),
         },
@@ -129,7 +129,7 @@ export async function recordSkillRunEvent(
           successMetricOutcome: input.successMetricOutcome ?? null,
           error: input.error ?? null,
           metadata: {
-            ...(input.metadata ?? {}),
+            ...input.metadata,
             ...(input.cohort ? { cohort: input.cohort } : {}),
             ...(input.lifecycle ? { lifecycle: input.lifecycle } : {}),
           },

@@ -17,8 +17,33 @@ describe('inspector tab keyboard', () => {
       nextInspectorTabValue(LIBRARY_INSPECTOR_TABS, 'details', 'End')
     ).toBe('rights');
     expect(
+      nextInspectorTabValue(
+        [
+          { value: 'details', label: 'Details' },
+          { value: 'rights', label: 'Rights' },
+        ],
+        'details',
+        'End'
+      )
+    ).toBe('rights');
+    expect(
       nextInspectorTabValue(LIBRARY_INSPECTOR_TABS, 'details', 'Enter')
     ).toBeNull();
+  });
+
+  it('starts from the first enabled tab when the current value is absent', () => {
+    const options = [
+      { value: 'details', label: 'Details' },
+      { value: 'assets', label: 'Assets' },
+      { value: 'links', label: 'Links' },
+    ] as const;
+
+    expect(nextInspectorTabValue(options, 'missing', 'ArrowRight')).toBe(
+      'assets'
+    );
+    expect(nextInspectorTabValue(options, 'missing', 'ArrowLeft')).toBe(
+      'links'
+    );
   });
 
   it('skips disabled tabs', () => {

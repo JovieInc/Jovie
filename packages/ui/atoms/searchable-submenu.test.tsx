@@ -310,6 +310,28 @@ describe('SearchableList', () => {
       expect(secondItem).toHaveAttribute('data-highlighted', 'true');
     });
 
+    it('stays on the first option when every option is disabled', () => {
+      const items: SearchableSubmenuItem[] = [
+        { id: '1', label: 'Closed', disabled: true },
+        { id: '2', label: 'Also closed', disabled: true },
+      ];
+      const { container } = render(
+        <SearchableList items={items} onSelect={vi.fn()} />
+      );
+
+      fireEvent.keyDown(screen.getByPlaceholderText('Search...'), {
+        key: 'ArrowDown',
+      });
+
+      expect(getItemButton(container, 'Closed')).toHaveAttribute(
+        'data-highlighted',
+        'true'
+      );
+      expect(getItemButton(container, 'Also closed')).not.toHaveAttribute(
+        'data-highlighted'
+      );
+    });
+
     it('skips disabled options during keyboard navigation', () => {
       const items: SearchableSubmenuItem[] = [
         { id: '1', label: 'First' },

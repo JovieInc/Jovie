@@ -20,6 +20,52 @@ export const PUBLIC_REQUALIFICATION_CONTRACT =
 export const PUBLIC_REQUALIFICATION_SCOPE =
   'premade-profile-certification-v1' as const;
 export const PUBLIC_REQUALIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Bump when derived public fit inputs change so old receipts stay immutable. */
+export const PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION =
+  'public-fit-inputs/v2' as const;
+
+/**
+ * Public DSP signals mirror the existing fit-scoring service's supported
+ * artist identifiers. Linktree links are untrusted input, so only these
+ * canonical platform IDs contribute to the distinct-platform count.
+ */
+const PUBLIC_DSP_PLATFORM_IDS = [
+  'spotify',
+  'apple_music',
+  'soundcloud',
+  'deezer',
+  'tidal',
+  'youtube_music',
+] as const;
+const PUBLIC_DSP_PLATFORM_SET = new Set(PUBLIC_DSP_PLATFORM_IDS);
+type PublicDspPlatformId = (typeof PUBLIC_DSP_PLATFORM_IDS)[number];
+
+export interface PublicDspSignals {
+  dspPlatformCount: number;
+  hasAppleMusicId: boolean;
+  hasSoundCloudId: boolean;
+}
+
+export function getPublicDspSignals(
+  links: readonly unknown[]
+): PublicDspSignals {
+  const observed = new Set<string>();
+  for (const link of links) {
+    if (!link || typeof link !== 'object') continue;
+    const platformId = (link as { platformId?: unknown }).platformId;
+    if (
+      typeof platformId === 'string' &&
+      PUBLIC_DSP_PLATFORM_SET.has(platformId as PublicDspPlatformId)
+    ) {
+      observed.add(platformId);
+    }
+  }
+  return {
+    dspPlatformCount: observed.size,
+    hasAppleMusicId: observed.has('apple_music'),
+    hasSoundCloudId: observed.has('soundcloud'),
+  };
+}
 
 export function publicRequalificationEventType(sourceRevision: string): string {
   const revision = sourceRevision.startsWith('sha256:')
@@ -136,6 +182,7 @@ export interface PublicCandidateRun {
   attemptEventType: string;
   previousAttemptRunId: string | null;
   requestedScope: typeof PUBLIC_REQUALIFICATION_SCOPE;
+  fitInputVersion?: string;
   environment: 'dev';
   observedAt: string;
   expiresAt: string;
@@ -157,6 +204,7 @@ export interface PublicRequalificationResult {
   dedupeKey: string;
   attemptEventType: string;
   previousAttemptRunId: string | null;
+  fitInputVersion: string | null;
   sourceRevision: string;
   sourceDigest: string;
   decisionDigest: string;
@@ -290,12 +338,14 @@ export function buildPublicRun(input: {
   previousAttemptRunId: string | null;
 }): PublicCandidateRun {
   const publicObservation = buildSourceObservation(input);
+  const dspSignals = getPublicDspSignals(input.qualification.allLinks);
   const sourceDigest = sha256({
     source: 'linktree',
     observed: publicObservation.qualification,
   });
   const sourceRevision = sha256({
     contract: PUBLIC_REQUALIFICATION_CONTRACT,
+    fitInputVersion: PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
     fitScoreVersion: FIT_SCORE_VERSION,
     requestedScope: PUBLIC_REQUALIFICATION_SCOPE,
     candidateKey: input.candidateKey,
@@ -316,6 +366,9 @@ export function buildPublicRun(input: {
     genres: input.spotify.spotifyGenres,
     latestReleaseDate: input.spotify.latestReleaseDate,
     hasContactEmail: false,
+    hasAppleMusicId: dspSignals.hasAppleMusicId,
+    hasSoundCloudId: dspSignals.hasSoundCloudId,
+    dspPlatformCount: dspSignals.dspPlatformCount,
     hasTrackingPixels: input.qualification.hasTrackingPixels,
   });
   const evidence = machineCertifyPremadeProfile({
@@ -353,6 +406,7 @@ export function buildPublicRun(input: {
       sourceRevision,
       runId,
       fitScoreVersion: FIT_SCORE_VERSION,
+      fitInputVersion: PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
     },
   };
   const machineCertification: AcquisitionMachineCertification = {
@@ -383,6 +437,7 @@ export function buildPublicRun(input: {
     attemptEventType,
     previousAttemptRunId: input.previousAttemptRunId,
     requestedScope: PUBLIC_REQUALIFICATION_SCOPE,
+    fitInputVersion: PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
     environment: 'dev',
     observedAt: input.observedAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
@@ -409,6 +464,7 @@ export function resultFromRun(run: PublicCandidateRun, deduplicated: boolean) {
     decisionDigest: run.decisionDigest,
     attemptEventType: run.attemptEventType,
     previousAttemptRunId: run.previousAttemptRunId,
+    fitInputVersion: run.fitInputVersion ?? null,
     environment: run.environment,
     observedAt: run.observedAt,
     expiresAt: run.expiresAt,

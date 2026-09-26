@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 import { BASE_URL } from '@/constants/app';
 import { getProfileWithLinks } from '@/lib/services/profile';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const revalidate = 900; // 15 min — matches previous Cache-Control max-age
 
 export const alt = 'Jovie artist profile';
@@ -29,7 +29,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.startsWith('image/')) return null;
 
-    // Limit to 2MB to avoid memory pressure in edge runtime
+    // Limit to 2MB to avoid memory pressure during OG render
     const contentLength = response.headers.get('content-length');
     if (contentLength && Number.parseInt(contentLength, 10) > 2 * 1024 * 1024) {
       return null;
@@ -39,7 +39,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
     if (arrayBuffer.byteLength > 2 * 1024 * 1024) return null;
     const bytes = new Uint8Array(arrayBuffer);
     // Convert to binary string in chunks to avoid call stack limits
-    // and O(n²) string concatenation in edge runtime
+    // and O(n²) string concatenation during image generation
     const CHUNK = 8192;
     const chunks: string[] = [];
     for (let i = 0; i < bytes.length; i += CHUNK) {
@@ -65,6 +65,7 @@ function gradientCard(headline: string, subtitle: string) {
         fontFamily: 'Inter, sans-serif',
       }}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'
@@ -134,6 +135,7 @@ function heroImage(
         fontFamily: 'Inter, sans-serif',
       }}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={photoDataUrl}
         alt={`${name} profile`}
@@ -158,6 +160,7 @@ function heroImage(
       />
 
       {/* Jovie logo */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'
@@ -245,7 +248,7 @@ export default async function Image({
 
   try {
     // 3-second timeout ensures the fallback image renders reliably
-    // even if the DB is slow (edge runtime has a 25s budget, but we want fast OG)
+    // even if the DB is slow (OG responses should stay fast)
     profileResult = await Promise.race([
       getProfileWithLinks(normalizedUsername),
       new Promise<never>((_, reject) =>

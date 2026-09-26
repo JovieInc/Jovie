@@ -110,6 +110,47 @@ describe('generateThumbnailRedo', () => {
     );
   });
 
+  it('stores webp and other image types with their own extensions', async () => {
+    const style = 'a'.repeat(16);
+    runRetouchModelMock.mockResolvedValueOnce({
+      image: Buffer.from('webp-bytes'),
+      mediaType: 'image/webp',
+      model: 'google/gemini-2.5-flash-image',
+      tokenUsage: { totalTokens: 100 },
+    });
+    putMock.mockResolvedValueOnce({ url: 'https://blob.example/redo.webp' });
+
+    await generateThumbnailRedo({
+      videoId: 'video-1',
+      beforeUrl: 'https://i.ytimg.com/vi/video-1/maxresdefault.jpg',
+    });
+
+    expect(putMock).toHaveBeenCalledWith(
+      `youtube-thumbnails/redo/video-1/${style}.webp`,
+      expect.any(Buffer),
+      expect.objectContaining({ addRandomSuffix: false })
+    );
+
+    runRetouchModelMock.mockResolvedValueOnce({
+      image: Buffer.from('jpeg-bytes'),
+      mediaType: 'image/jpeg',
+      model: 'google/gemini-2.5-flash-image',
+      tokenUsage: { totalTokens: 100 },
+    });
+    putMock.mockResolvedValueOnce({ url: 'https://blob.example/redo.jpg' });
+
+    await generateThumbnailRedo({
+      videoId: 'video-1',
+      beforeUrl: 'https://i.ytimg.com/vi/video-1/maxresdefault.jpg',
+    });
+
+    expect(putMock).toHaveBeenLastCalledWith(
+      `youtube-thumbnails/redo/video-1/${style}.jpg`,
+      expect.any(Buffer),
+      expect.objectContaining({ addRandomSuffix: false })
+    );
+  });
+
   it('maps gateway misconfiguration to provider_unavailable', async () => {
     runRetouchModelMock.mockRejectedValue(
       new RetouchGatewayUnconfiguredError()

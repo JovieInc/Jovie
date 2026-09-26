@@ -60,11 +60,11 @@ describe('NewLandingPage', () => {
   it('renders the staged homepage v2 content with canonical public nav', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute(
       'href',
-      '/artists'
+      '/about'
     );
-    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'For Artists' })).toHaveAttribute(
       'href',
       '/product'
     );

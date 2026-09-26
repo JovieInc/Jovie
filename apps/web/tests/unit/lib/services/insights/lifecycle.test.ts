@@ -67,6 +67,23 @@ describe('insight lifecycle deduplication', () => {
     expect(result).toHaveLength(1);
   });
 
+  it('does not treat a blank city token as a location key', () => {
+    const result = dedupeVisibleInsights([
+      {
+        ...baseInsight,
+        dataSnapshot: { city: '   ' },
+        title: 'Blank city card',
+      },
+      {
+        ...baseInsight,
+        dataSnapshot: { city: 'Austin' },
+        title: 'Blank city card',
+      },
+    ]);
+
+    expect(result).toHaveLength(2);
+  });
+
   it('uses normalized copy fallback when there is no structured source key', () => {
     const result = dedupeVisibleInsights([
       {

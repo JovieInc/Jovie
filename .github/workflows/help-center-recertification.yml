@@ -32,6 +32,17 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # A merge-queue batch lands several commits in one push, so the push's
+      # `before` commit can sit deeper than the depth-2 checkout.
+      - name: Fetch the pre-push base revision
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          fi
+
       - name: Open deterministic documentation-review issues
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
