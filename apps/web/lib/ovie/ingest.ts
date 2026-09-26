@@ -58,63 +58,91 @@ export type OvieReceipt = {
   readonly routingState?: OvieRoutingState;
 };
 
-const PERSONAL = [
-  'liv',
-  'remind me',
-  'apartment',
-  'mailbox',
-  't@timwhite',
-  'personal',
-  'shopping',
-  'catalina',
-  'travel',
-] as const;
+/**
+ * Signal match semantics (JOV-6419):
+ * - `substr`: raw substring. Reserved for multi-word phrases, addresses,
+ *   domains, and paths that carry their own context.
+ * - `word`: standalone token; both sides must be non-word boundaries.
+ *   Used for names and short signals that collide inside other words
+ *   (e.g. `liv` inside `deliver`, `live`, `olive`).
+ * - `wordStart`: left-boundary token; suffixes like plurals still match
+ *   (`bug` matches `bugs`, not `debug`).
+ */
+type Signal = {
+  readonly k: string;
+  readonly m: 'substr' | 'word' | 'wordStart';
+};
 
-const TASTE = [
-  'taste',
-  'swipe',
-  'hero',
-  'too salesy',
-  'visual approval',
-  'does this look',
-] as const;
+const sub = (k: string): Signal => ({ k, m: 'substr' });
+const word = (k: string): Signal => ({ k, m: 'word' });
+const wordStart = (k: string): Signal => ({ k, m: 'wordStart' });
 
-const ENGINEERING = [
-  'bug',
-  'broken',
-  '500',
-  'crash',
-  'ci ',
-  ' ci',
-  'pr ',
-  'signup',
-  '/start',
-  'traceback',
-  'typeerror',
-  'jovie bug',
-] as const;
+const PERSONAL: readonly Signal[] = [
+  word('liv'),
+  sub('remind me'),
+  wordStart('apartment'),
+  wordStart('mailbox'),
+  sub('t@timwhite'),
+  wordStart('personal'),
+  wordStart('shopping'),
+  wordStart('catalina'),
+  wordStart('travel'),
+];
 
-const FLASH = [
-  'tweet',
-  'post this',
-  'x.com',
-  'do this now',
-  'send this',
-  'slack',
-] as const;
+const TASTE: readonly Signal[] = [
+  wordStart('taste'),
+  wordStart('swipe'),
+  word('hero'),
+  sub('too salesy'),
+  sub('visual approval'),
+  sub('does this look'),
+];
 
-const HEAVY = [
-  'research',
-  'eval',
-  'skill lock',
-  'dogfood',
-  'deep dive',
-  'write evals',
-  'growth ideas',
-] as const;
+const ENGINEERING: readonly Signal[] = [
+  wordStart('bug'),
+  wordStart('broken'),
+  word('500'),
+  wordStart('crash'),
+  word('ci'),
+  word('pr'),
+  wordStart('signup'),
+  sub('/start'),
+  sub('traceback'),
+  sub('typeerror'),
+  sub('jovie bug'),
+];
 
-function includesAny(text: string, keys: readonly string[]): boolean {
-  return keys.some(key => text.includes(key));
+const FLASH: readonly Signal[] = [
+  wordStart('tweet'),
+  sub('post this'),
+  sub('x.com'),
+  sub('do this now'),
+  sub('send this'),
+  wordStart('slack'),
+];
+
+const HEAVY: readonly Signal[] = [
+  wordStart('research'),
+  wordStart('eval'),
+  sub('skill lock'),
+  wordStart('dogfood'),
+  sub('deep dive'),
+  sub('write evals'),
+  sub('growth ideas'),
+];
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function signalMatches(text: string, signal: Signal): boolean {
+  if (signal.m === 'substr') return text.includes(signal.k);
+  const suffix = signal.m === 'word' ? '\\b' : '';
+  return new RegExp(`\\b${escapeRegExp(signal.k)}${suffix}`).test(text);
+}
+
+function includesAny(text: string, keys: readonly Signal[]): boolean {
+  return keys.some(key => signalMatches(text, key));
 }
 
 export function classifyOvieItem(text: string): OvieLane {
