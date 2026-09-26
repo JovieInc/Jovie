@@ -1901,7 +1901,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -1920,7 +1920,10 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \]\]/
+    );
+    expect(aggregate).toMatch(
+      /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
     );
     expect(aggregate).not.toContain('GROUP_RESULT');
     expect(aggregate).toMatch(/exit 1/);
@@ -1931,12 +1934,38 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const python = jobBlock('ci-fast-structural-python', 'ci-knip');
+    const python = jobBlock(
+      'ci-fast-structural-python',
+      'ci-fast-structural-web'
+    );
     const aliases = python.match(/(?<= \*)[\w-]+/g);
     expect(aliases).toHaveLength(10);
     for (const name of aliases) expect(remaining).toContain(`&${name}`);
     expect(remaining).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
     expect(python).toContain('CI_FAST_STRUCTURAL_PYTEST: only');
+    expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
+  });
+
+  it('runs the structural web commands in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    expect(web).toMatch(
+      /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
+    );
+    const aliases = web.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(8);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_WEB: skip');
+    expect(web).toContain('CI_FAST_STRUCTURAL_WEB: only');
+    expect(web).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
+    // tests/unit/ci runs a real Chromium Playwright capture.
+    expect(web).toContain('uses: ./.github/actions/setup-playwright');
+    expect(web.indexOf('setup-playwright')).toBeLessThan(
+      web.indexOf('run: node scripts/ci-fast-lanes.mjs')
+    );
   });
 
   it('runs a bounded public-profile admission subset on source and merge-group heads', () => {

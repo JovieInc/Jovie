@@ -225,6 +225,15 @@ const STRUCTURAL_PYTHON_JOB_PARTS = new Set([
 ]);
 
 /**
+ * Prefixes of the @jovie/web Vitest runs that ci-fast (structural web) takes
+ * from remaining's pool alongside the web product lane (runStructural).
+ */
+export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
+  'pnpm --filter @jovie/web exec ',
+  'pnpm --dir apps/web exec ',
+]);
+
+/**
  * Structural Python regressions, split so the pool can overlap them. Each
  * command keeps its original `&&` dependencies (coverage run → report).
  */
@@ -1904,16 +1913,29 @@ export async function runStructural(opts = {}) {
     ...(selected.has('mac') ? macParts : []),
   ];
   // ci-fast (structural python) runs `only` its parts; remaining skips them.
-  // Consume the split mode so nested contract suites (which rebuild this
-  // list) don't inherit it and see a filtered pool.
+  // ci-fast (structural web) does the same for the web product lane plus
+  // every @jovie/web Vitest run (~200s of remaining's ~445s CPU-bound sum);
+  // those share apps/web coverage locks, so they stay together in one job.
+  // Consume the split modes so nested contract suites (which rebuild this
+  // list) don't inherit them and see a filtered pool.
   const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
   delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+  const webMode = process.env.CI_FAST_STRUCTURAL_WEB;
+  delete process.env.CI_FAST_STRUCTURAL_WEB;
   // Same for the fail-fast status file: the runner's own contract suite runs
   // runStructural and must not abort on this job's cheap-lane status.
   const abortStatusFile = process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
   delete process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
+  const webJobParts = new Set([
+    ...webParts,
+    ...allParts.filter(part =>
+      STRUCTURAL_WEB_JOB_PREFIXES.some(prefix => part.startsWith(prefix))
+    ),
+  ]);
   const parts = allParts.filter(
-    part => mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only')
+    part =>
+      mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only') &&
+      webMode !== (webJobParts.has(part) ? 'skip' : 'only')
   );
   if (parts.length === 0) {
     return {

@@ -1591,6 +1591,7 @@ jobs:
       )
     env:
       CI_FAST_STRUCTURAL_PYTEST: skip
+      CI_FAST_STRUCTURAL_WEB: skip
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
       SHELLCHECK_OPTS: >-
@@ -1844,8 +1845,8 @@ jobs:
           key: symphony-selector-v1-${{ runner.os }}-${{ steps.selector-cache-key.outputs.platform }}-otp-${{ steps.selector-cache-key.outputs.otp }}-elixir-${{ steps.selector-cache-key.outputs.elixir }}-${{ steps.selector-cache-key.outputs.pin }}-${{ hashFiles('scripts/symphony/tests/run-governor-bounded-codex-selector.sh') }}
       # Runs while the background cheap lanes finish instead of after them
       # (~55-105s of idle await in merge groups). Fail-fast is kept: a non-zero
-      # cheap-lane status stops new structural commands (the python job has
-      # no such file, so it never aborts). "Await ci-fast lanes" runs after
+      # cheap-lane status stops new structural commands (the python and web
+      # jobs have no such file, so they never abort). "Await ci-fast lanes" runs after
       # this step even when it fails, so both results still gate the job.
       - name: Run structural ci-fast lane
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
@@ -2085,6 +2086,7 @@ jobs:
         ci-fast-remaining,
         ci-profile-admission-browser,
         ci-fast-structural-python,
+        ci-fast-structural-web,
       ]
     if: >-
       always() &&
@@ -2105,13 +2107,14 @@ jobs:
           REMAINING_RESULT: ${{ needs.ci-fast-remaining.result }}
           PROFILE_BROWSER_RESULT: ${{ needs.ci-profile-admission-browser.result }}
           STRUCTURAL_PYTHON_RESULT: ${{ needs.ci-fast-structural-python.result }}
+          STRUCTURAL_WEB_RESULT: ${{ needs.ci-fast-structural-web.result }}
         run: |
           set -euo pipefail
-          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" ]]; then
-            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT"
+          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" ]]; then
+            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT"
             exit 1
           fi
-          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT"
+          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT"
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
@@ -2225,6 +2228,43 @@ jobs:
       - *structural-python
       - *structural-pytest
       - name: Run structural pytest shards
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        env: *structural-run-env
+        run: node scripts/ci-fast-lanes.mjs
+
+  ci-fast-structural-web:
+    name: ci-fast (structural web)
+    # Web product lane + every @jovie/web Vitest run (~200s of the ~445s
+    # CPU-bound structural sum) off remaining's pool. Chromium serves the
+    # tests/unit/ci Playwright contracts; no Python/Elixir command runs here.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: *ci-fast-gate
+    env:
+      CI_FAST_STRUCTURAL_WEB: only
+    steps:
+      - *shallow-checkout
+      - name: Start base-branch history fetch
+        shell: bash
+        env: *base-fetch-start-env
+        run: *base-fetch-start
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Fetch base-branch history
+        shell: bash
+        timeout-minutes: 10
+        env: *base-fetch-await-env
+        run: *base-fetch-await
+      - name: Decide structural lane
+        id: structural
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: *structural-decision
+      - name: Setup Playwright (Chromium)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        uses: ./.github/actions/setup-playwright
+      - name: Run structural web commands
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: *structural-run-env
         run: node scripts/ci-fast-lanes.mjs

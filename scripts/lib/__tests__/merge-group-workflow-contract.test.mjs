@@ -189,12 +189,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_PYTHON_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -234,9 +234,9 @@ describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(4);
+    ).toHaveLength(5);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -494,7 +494,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(4);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(5);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
