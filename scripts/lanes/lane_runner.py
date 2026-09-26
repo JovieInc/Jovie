@@ -531,7 +531,7 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
 def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
         gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
@@ -629,9 +629,24 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     return receipt
 
 
+def best_per_issue(prs: list[dict]) -> list[dict]:
+    """One PR per issue, retroactively: when the old runner left several open PRs for one
+    issue, the lanes spend effort only on the one furthest along (ready over draft, clean over
+    conflicted, then newest). The others stay open for a human to close; nothing is deleted."""
+    by_issue: dict[str, list[dict]] = {}
+    rest = []
+    for pr in prs:
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        (by_issue.setdefault(found.group("issue"), []) if found else rest).append(pr)
+    keep = list(rest)
+    for group in by_issue.values():
+        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
+    return sorted(keep, key=lambda pr: pr["number"])
+
+
 def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     """A lane draft whose head the gate has never seen, e.g. a remote agent that finished late."""
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         if pr.get("isDraft") and verified.get(str(pr["number"])) != pr["headRefOid"]:
             return pr
     return None

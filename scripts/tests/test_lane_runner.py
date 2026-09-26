@@ -466,6 +466,21 @@ class DispatchTest(unittest.TestCase):
             self.assertEqual((tick["unhealthy"], tick["spawned"], tick["error"]), (["b"], ["a", "a"], None))
         self.assertEqual(spawned, ["a", "a"])
 
+    def test_only_the_best_pr_per_issue_gets_lane_effort(self):
+        prs = [
+            {"number": 1, "headRefName": "devin/jov-7-20260926t0900", "isDraft": True, "mergeStateStatus": "CLEAN", "headRefOid": "a"},
+            {"number": 2, "headRefName": "devin/jov-7-20260926t1000", "isDraft": False, "mergeStateStatus": "DIRTY", "headRefOid": "b"},
+            {"number": 3, "headRefName": "codex/jov-7-20260926t1100", "isDraft": True, "mergeStateStatus": "CLEAN", "headRefOid": "c"},
+            {"number": 4, "headRefName": "devin/jov-8-20260926t1100", "isDraft": True, "mergeStateStatus": "CLEAN", "headRefOid": "d"},
+        ]
+        self.assertEqual([pr["number"] for pr in lane.best_per_issue(prs)], [2, 4], "ready outranks drafts even when conflicted")
+        drafts = [prs[0], prs[2], prs[3]]
+        self.assertEqual([pr["number"] for pr in lane.best_per_issue(drafts)], [3, 4], "newest draft wins")
+        # the adopt loop never spends a gate on the losing duplicates
+        self.assertEqual(lane.unverified_pr(drafts, {})["number"], 3)
+        self.assertEqual(lane.unverified_pr(drafts, {"3": "c"})["number"], 4)
+        self.assertIsNone(lane.unverified_pr(drafts, {"3": "c", "4": "d"}))
+
     def test_a_crashing_tick_leaves_its_error_for_the_doctor(self):
         saved = (lane.ensure_full_history, lane.doctor.run)
         lane.ensure_full_history = lambda host: (_ for _ in ()).throw(RuntimeError("git exploded"))
