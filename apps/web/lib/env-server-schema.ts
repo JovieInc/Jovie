@@ -233,6 +233,8 @@ export const ServerEnvSchema = z.object({
   HUD_GITHUB_OWNER: z.string().optional(),
   HUD_GITHUB_REPO: z.string().optional(),
   HUD_GITHUB_WORKFLOW: z.string().optional(),
+  HUD_GEM_BRIDGE_URL: z.string().url().optional(),
+  HUD_GEM_BRIDGE_TOKEN: z.string().optional(),
   GBRAIN_API_URL: z.string().optional(),
   GBRAIN_API_KEY: z.string().optional(),
 
@@ -562,6 +564,8 @@ export const ENV_KEYS = [
   'HUD_GITHUB_OWNER',
   'HUD_GITHUB_REPO',
   'HUD_GITHUB_WORKFLOW',
+  'HUD_GEM_BRIDGE_URL',
+  'HUD_GEM_BRIDGE_TOKEN',
   'GBRAIN_API_URL',
   'GBRAIN_API_KEY',
   'REVALIDATE_SECRET',

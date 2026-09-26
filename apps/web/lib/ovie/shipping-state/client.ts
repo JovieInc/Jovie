@@ -101,6 +101,9 @@ const sourceObservationSchema = z.object({
     running: countMeasurementSchema,
     retrying: countMeasurementSchema,
     blocked: countMeasurementSchema,
+    terminalFailures: countMeasurementSchema
+      .optional()
+      .default(NOT_MEASURED_COUNT_VALUE),
     queued: countMeasurementSchema,
     openPullRequests: countMeasurementSchema
       .optional()

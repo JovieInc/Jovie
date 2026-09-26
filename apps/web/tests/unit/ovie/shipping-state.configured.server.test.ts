@@ -13,6 +13,8 @@ vi.mock('@/lib/env-server', () => ({
     HUD_GITHUB_TOKEN: 'test-token',
     HUD_GITHUB_OWNER: 'JovieInc',
     HUD_GITHUB_REPO: 'Jovie',
+    HUD_GEM_BRIDGE_URL: 'https://gem.example.internal',
+    HUD_GEM_BRIDGE_TOKEN: 'bridge-token',
   },
 }));
 
@@ -51,6 +53,10 @@ describe('configured shipping-state publisher', () => {
       githubToken: 'test-token',
       githubOwner: 'JovieInc',
       githubRepo: 'Jovie',
+      gemBridge: {
+        url: 'https://gem.example.internal',
+        token: 'bridge-token',
+      },
     });
     expect(hoisted.createReaders).toHaveBeenCalledTimes(1);
     expect(hoisted.publish).toHaveBeenNthCalledWith(1, {

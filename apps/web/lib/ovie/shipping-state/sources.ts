@@ -144,10 +144,18 @@ export function interpretCounts(
 ): SourceObservation['counts'] {
   if (status !== 'ok' || payload == null) return emptyCounts();
   if (sourceId === 'symphony-runtime' || sourceId === 'symphony-task') {
+    const terminalList =
+      ['terminalFailures', 'deadLetters', 'dead_lettered', 'failed'].find(
+        key => key in payload
+      ) ?? null;
     return {
       running: countFromList(payload.running, 'running' in payload),
       retrying: countFromList(payload.retrying, 'retrying' in payload),
       blocked: countFromList(payload.blocked, 'blocked' in payload),
+      terminalFailures:
+        terminalList != null
+          ? countFromList(payload[terminalList], true)
+          : NOT_MEASURED_COUNT,
       queued: NOT_MEASURED_COUNT,
       openPullRequests: NOT_MEASURED_COUNT,
       capacityAvailable: NOT_MEASURED_COUNT,

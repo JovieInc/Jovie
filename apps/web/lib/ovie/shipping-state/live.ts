@@ -40,7 +40,129 @@ export type LiveIo = {
   readonly githubToken?: string;
   readonly githubOwner?: string;
   readonly githubRepo?: string;
+  /**
+   * Optional authenticated bridge to the Gem execution host. When present,
+   * Gem-resident authorities are read over this transport instead of from
+   * loopback/local files that only exist on Gem itself.
+   */
+  readonly gemBridge?: GemBridge;
 };
+
+export type GemBridge = {
+  readonly url: string;
+  readonly token: string;
+};
+
+/**
+ * Fixed receipt keys the Gem bridge may serve. Each maps to exactly one
+ * `GET {bridge}/receipts/{key}` — the transport can never address an
+ * arbitrary path, log, or command surface.
+ */
+export const GEM_BRIDGE_RECEIPT_KEYS = {
+  'symphony-runtime': 'symphony-runtime',
+  'symphony-task': 'symphony-task',
+  'fleet-receipt': 'fleet-receipt',
+} as const satisfies Partial<Record<ShippingSourceId, string>>;
+
+const GEM_BRIDGE_TIMEOUT_MS = 2_500;
+
+export function gemBridgeReceiptUrl(
+  bridge: GemBridge,
+  sourceId: ShippingSourceId
+): string | null {
+  const key = (
+    GEM_BRIDGE_RECEIPT_KEYS as Partial<Record<ShippingSourceId, string>>
+  )[sourceId];
+  if (key == null || bridge.token.length === 0) return null;
+  let base: URL;
+  try {
+    base = new URL(bridge.url);
+  } catch {
+    return null;
+  }
+  if (
+    (base.protocol !== 'https:' && base.protocol !== 'http:') ||
+    base.username !== '' ||
+    base.password !== '' ||
+    base.search !== '' ||
+    base.hash !== ''
+  ) {
+    return null;
+  }
+  const prefix = base.pathname.replace(/\/+$/, '');
+  return `${base.origin}${prefix}/receipts/${key}`;
+}
+
+async function readBridgeReceipt(
+  io: LiveIo,
+  sourceId: ShippingSourceId
+): Promise<AuthorityRead> {
+  const url = io.gemBridge ? gemBridgeReceiptUrl(io.gemBridge, sourceId) : null;
+  if (url == null) {
+    return failedRead(
+      sourceId,
+      'unavailable',
+      'Gem bridge receipt is not configured',
+      { errorCode: 'not-configured' }
+    );
+  }
+  try {
+    const response = await io.fetch(url, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${io.gemBridge?.token ?? ''}`,
+      },
+      signal: AbortSignal.timeout(GEM_BRIDGE_TIMEOUT_MS),
+    });
+    if (response.status === 401 || response.status === 403) {
+      return failedRead(
+        sourceId,
+        'unauthorized',
+        `Gem bridge returned ${response.status}`
+      );
+    }
+    if (!response.ok) {
+      return failedRead(
+        sourceId,
+        'unavailable',
+        `Gem bridge returned ${response.status}`,
+        { errorCode: `http-${response.status}` }
+      );
+    }
+    const payload: unknown = await response.json();
+    if (!isRecord(payload)) {
+      return failedRead(
+        sourceId,
+        'error',
+        'Gem bridge receipt was not an object',
+        { errorCode: 'malformed' }
+      );
+    }
+    return okFileRead(sourceId, payload);
+  } catch (error) {
+    return disconnectedRead(
+      sourceId,
+      error instanceof Error ? error.message : 'Gem bridge unreachable'
+    );
+  }
+}
+
+async function readFleetReceipt(io: LiveIo): Promise<AuthorityRead> {
+  const fleet = io.gemBridge
+    ? await readBridgeReceipt(io, 'fleet-receipt')
+    : ((await readNamedJson(io, 'fleet-receipt')) ??
+      disconnectedRead('fleet-receipt', 'fleet receipt missing'));
+  if (fleet.status === 'ok' && fleet.sourceTimestamp == null) {
+    return failedRead(
+      'fleet-receipt',
+      'unavailable',
+      'Canonical fleet receipt timestamp was malformed',
+      { errorCode: 'malformed' }
+    );
+  }
+  return fleet;
+}
 
 const githubBackoffUntilByIo = new WeakMap<LiveIo, number>();
 
@@ -667,12 +789,14 @@ export function createLiveShippingStateReaders(
 ): NamedAuthorityReaders {
   return {
     'symphony-runtime': async () => {
-      const live = await readNamedUrl(
-        io,
-        'symphony-runtime',
-        NAMED_AUTHORITY_URLS['symphony-runtime'],
-        750
-      );
+      const live = io.gemBridge
+        ? await readBridgeReceipt(io, 'symphony-runtime')
+        : await readNamedUrl(
+            io,
+            'symphony-runtime',
+            NAMED_AUTHORITY_URLS['symphony-runtime'],
+            750
+          );
       if (live.status !== 'ok') return live;
       if (
         !live.payload ||
@@ -691,6 +815,7 @@ export function createLiveShippingStateReaders(
       return { ...live, schema: 'symphony-runtime-state/v1' };
     },
     'symphony-task': async () => {
+      if (io.gemBridge) return readBridgeReceipt(io, 'symphony-task');
       return failedRead(
         'symphony-task',
         'unavailable',
@@ -699,7 +824,7 @@ export function createLiveShippingStateReaders(
       );
     },
     'lease-guard-capacity': async () => {
-      const fleet = await readNamedJson(io, 'fleet-receipt');
+      const fleet = await readFleetReceipt(io);
       const signals =
         fleet?.status === 'ok' &&
         fleet.payload &&
@@ -754,20 +879,7 @@ export function createLiveShippingStateReaders(
         NAMED_AUTHORITY_URLS['live-build-info'],
         2500
       ),
-    'fleet-receipt': async () => {
-      const fleet =
-        (await readNamedJson(io, 'fleet-receipt')) ??
-        disconnectedRead('fleet-receipt', 'fleet receipt missing');
-      if (fleet.status === 'ok' && fleet.sourceTimestamp == null) {
-        return failedRead(
-          'fleet-receipt',
-          'unavailable',
-          'Canonical fleet receipt timestamp was malformed',
-          { errorCode: 'malformed' }
-        );
-      }
-      return fleet;
-    },
+    'fleet-receipt': () => readFleetReceipt(io),
   };
 }
 
@@ -778,5 +890,6 @@ export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
     githubToken: overrides.githubToken,
     githubOwner: overrides.githubOwner,
     githubRepo: overrides.githubRepo,
+    gemBridge: overrides.gemBridge,
   };
 }
