@@ -1382,6 +1382,9 @@ jobs:
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
         run: pnpm turbo build --filter=@jovie/web
         env:
+          # Still reads the restored cache but skips persisting it (13-55s of
+          # cache write + compaction per run); this job never saves it.
+          TURBO_ENGINE_READ_ONLY: '1'
           DATABASE_URL: postgresql://localhost/noop
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
           CLERK_SECRET_KEY: sk_test_mock
@@ -2187,7 +2190,7 @@ jobs:
 
   ci-fast-structural-python:
     name: ci-fast (structural python)
-    # Structural pytest shards off remaining's CPU-bound pool (aliased steps).
+    # Pytest shards + invariants/control suites off remaining's CPU-bound pool.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 20
