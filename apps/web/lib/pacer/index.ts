@@ -25,9 +25,6 @@ export {
   withPacerErrorHandling,
 } from './errors';
 export type {
-  AutoSaveAttemptMeta,
-  UseAsyncSearchOptions,
-  UseAsyncSearchReturn,
   UseAsyncValidationOptions,
   UseAsyncValidationReturn,
   UseAutoSaveOptions,
@@ -43,7 +40,6 @@ export type {
 // Export application-specific hooks
 export {
   PACER_TIMING,
-  useAsyncSearch,
   useAsyncValidation,
   useAutoSave,
   useDebouncedInput,

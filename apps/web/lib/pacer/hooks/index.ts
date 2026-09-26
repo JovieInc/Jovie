@@ -9,12 +9,6 @@
 
 // Timing constants
 export { PACER_TIMING } from './timing';
-// Search hook
-export type {
-  UseAsyncSearchOptions,
-  UseAsyncSearchReturn,
-} from './useAsyncSearch';
-export { useAsyncSearch } from './useAsyncSearch';
 // Validation hook
 export type {
   UseAsyncValidationOptions,
@@ -22,11 +16,7 @@ export type {
 } from './useAsyncValidation';
 export { useAsyncValidation } from './useAsyncValidation';
 // Auto-save hook
-export type {
-  AutoSaveAttemptMeta,
-  UseAutoSaveOptions,
-  UseAutoSaveReturn,
-} from './useAutoSave';
+export type { UseAutoSaveOptions, UseAutoSaveReturn } from './useAutoSave';
 export { useAutoSave } from './useAutoSave';
 // Debounced Input hook
 export type {
