@@ -26,6 +26,7 @@ import {
   commandsForSurface,
   featuredSkillCommands,
 } from '@/lib/commands/registry';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const pushMock = vi.fn();
 const prefetchMock = vi.fn();
@@ -268,7 +269,11 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
 
     expect(
       screen.getByRole('option', {
-        name: 'Connections Manage account integrations and authorized services. ⌘1',
+        name: segmentedAccessibleName(
+          'Connections',
+          'Manage account integrations and authorized services.',
+          '⌘1'
+        ),
       })
     ).toHaveAttribute('aria-selected', 'true');
 
@@ -284,7 +289,11 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
 
     const selected = screen.getByRole('option', {
-      name: 'Connections Manage account integrations and authorized services. ⌘1',
+      name: segmentedAccessibleName(
+        'Connections',
+        'Manage account integrations and authorized services.',
+        '⌘1'
+      ),
     });
     expect(selected).toHaveClass('system-b-table-row-shell');
     expect(selected).toHaveClass('min-h-11');
@@ -302,7 +311,11 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
 
     const release = screen.getByRole('option', {
-      name: `Midnight Run Single · Jan 1 ${CMD_LABEL}1`,
+      name: segmentedAccessibleName(
+        'Midnight Run',
+        'Single · Jan 1',
+        `${CMD_LABEL}1`
+      ),
     });
     expect(release.querySelector('[data-testid="img"]')).toHaveAttribute(
       'data-src',
@@ -584,7 +597,11 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     fireEvent.change(input, { target: { value: 'active workspace' } });
 
     const action = screen.getByRole('option', {
-      name: 'Switch workspace Change the active workspace. ⌘1',
+      name: segmentedAccessibleName(
+        'Switch workspace',
+        'Change the active workspace.',
+        '⌘1'
+      ),
     });
     expect(action).toHaveAttribute('aria-selected', 'true');
     expect(input).toHaveAttribute('aria-activedescendant', action.id);
@@ -690,7 +707,11 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     fireEvent.change(input, { target: { value: 'flac' } });
 
     const audio = screen.getByRole('option', {
-      name: `${CHAT_COMPOSER_UPLOAD_AUDIO_LABEL} ${CHAT_COMPOSER_UPLOAD_AUDIO_HINT} ${CMD_LABEL}1`,
+      name: segmentedAccessibleName(
+        CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
+        CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+        `${CMD_LABEL}1`
+      ),
     });
     expect(audio).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('option', { name: /Attach Files/ })).toBeNull();

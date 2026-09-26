@@ -541,30 +541,26 @@ describe('repository-owned GBrain runtime assets', () => {
     expect(result.stderr).toContain(message);
   });
 
-  it.each([
-    true,
-    false,
-    null,
-    1.5,
-    {},
-    [],
-  ])('rejects invalid request id %j before forwarding', async id => {
-    let requests = 0;
-    const port = await listen((_request, response) => {
-      requests += 1;
-      response.writeHead(500).end();
-    });
-    const result = await runProxy({
-      port,
-      payload: { jsonrpc: '2.0', id, method: id === true ? 7 : 'tools/list' },
-    });
+  it.each([true, false, null, 1.5, {}, []])(
+    'rejects invalid request id %j before forwarding',
+    async id => {
+      let requests = 0;
+      const port = await listen((_request, response) => {
+        requests += 1;
+        response.writeHead(500).end();
+      });
+      const result = await runProxy({
+        port,
+        payload: { jsonrpc: '2.0', id, method: id === true ? 7 : 'tools/list' },
+      });
 
-    expect(requests).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      id: null,
-      error: { code: -32000, message: 'invalid JSON-RPC request id' },
-    });
-  });
+      expect(requests).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        id: null,
+        error: { code: -32000, message: 'invalid JSON-RPC request id' },
+      });
+    }
+  );
 
   it('refuses token files readable by group or others', async () => {
     const result = await runProxy({
@@ -581,19 +577,22 @@ describe('repository-owned GBrain runtime assets', () => {
   it.each([
     ['missing', false, 'test-only-token', 'startup validation failed'],
     ['empty', true, '', 'token file is empty'],
-  ])('fails closed for a %s token file', async (_name, createToken, token, message) => {
-    const dir = await mkdtemp(join(tmpdir(), 'gbrain-proxy-token-'));
-    const result = await runProxy({
-      tokenFile: join(dir, 'token'),
-      createToken,
-      token,
-      rawInput: '',
-    });
+  ])(
+    'fails closed for a %s token file',
+    async (_name, createToken, token, message) => {
+      const dir = await mkdtemp(join(tmpdir(), 'gbrain-proxy-token-'));
+      const result = await runProxy({
+        tokenFile: join(dir, 'token'),
+        createToken,
+        token,
+        rawInput: '',
+      });
 
-    expect(result.code).toBe(1);
-    expect(result.stdout).toBe('');
-    expect(result.stderr).toContain(message);
-  });
+      expect(result.code).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain(message);
+    }
+  );
 
   it('rejects multiline bearer material without reflecting it', async () => {
     const secretMarker = 'active-token-marker';
@@ -686,66 +685,68 @@ describe('repository-owned GBrain runtime assets', () => {
     expect(result.stdout).toBe('');
   }, 10_000);
 
-  it.each([
-    'application/json',
-    'text/event-stream',
-  ])('rejects an oversized %s daemon response', async contentType => {
-    const port = await listen((_request, response) => {
-      response.writeHead(200, { 'content-type': contentType });
-      const oversized = 'x'.repeat(8 * 1024 * 1024 + 1);
-      response.end(
-        contentType === 'text/event-stream'
-          ? `data: ${oversized}\n\n`
-          : oversized
-      );
-    });
-    const result = await runProxy({
-      port,
-      payload: {
-        jsonrpc: '2.0',
-        id: 20,
-        method: 'tools/call',
-        params: { name: 'query', arguments: { question: 'test' } },
-      },
-    });
-
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      id: 20,
-      error: { code: -32000 },
-    });
-    expect(result.stderr).not.toContain('Traceback');
-  }, 15_000);
-
-  it.each([
-    'text/event-stream',
-    'application/json',
-  ])('interrupts a silent %s read at the absolute request deadline', async contentType => {
-    const port = await listen((_request, response) => {
-      response.writeHead(200, { 'content-type': contentType });
-      const interval = setInterval(() => {
-        response.write(
-          contentType === 'text/event-stream' ? ': late\n\n' : ' '
+  it.each(['application/json', 'text/event-stream'])(
+    'rejects an oversized %s daemon response',
+    async contentType => {
+      const port = await listen((_request, response) => {
+        response.writeHead(200, { 'content-type': contentType });
+        const oversized = 'x'.repeat(8 * 1024 * 1024 + 1);
+        response.end(
+          contentType === 'text/event-stream'
+            ? `data: ${oversized}\n\n`
+            : oversized
         );
-      }, 750);
-      response.on('close', () => clearInterval(interval));
-    });
-    const started = performance.now();
-    const result = await runProxy({
-      port,
-      payload: { jsonrpc: '2.0', id: 23, method: 'tools/list' },
-      extraEnv: { GBRAIN_MCP_REQUEST_DEADLINE_SECONDS: '1' },
-    });
+      });
+      const result = await runProxy({
+        port,
+        payload: {
+          jsonrpc: '2.0',
+          id: 20,
+          method: 'tools/call',
+          params: { name: 'query', arguments: { question: 'test' } },
+        },
+      });
 
-    expect(performance.now() - started).toBeLessThan(2500);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      id: 23,
-      error: {
-        code: -32000,
-        message: 'shared gbrain HTTP exceeded total deadline',
-      },
-    });
-  }, 5000);
+      expect(result.code).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        id: 20,
+        error: { code: -32000 },
+      });
+      expect(result.stderr).not.toContain('Traceback');
+    },
+    15_000
+  );
+
+  it.each(['text/event-stream', 'application/json'])(
+    'interrupts a silent %s read at the absolute request deadline',
+    async contentType => {
+      const port = await listen((_request, response) => {
+        response.writeHead(200, { 'content-type': contentType });
+        const interval = setInterval(() => {
+          response.write(
+            contentType === 'text/event-stream' ? ': late\n\n' : ' '
+          );
+        }, 750);
+        response.on('close', () => clearInterval(interval));
+      });
+      const started = performance.now();
+      const result = await runProxy({
+        port,
+        payload: { jsonrpc: '2.0', id: 23, method: 'tools/list' },
+        extraEnv: { GBRAIN_MCP_REQUEST_DEADLINE_SECONDS: '1' },
+      });
+
+      expect(performance.now() - started).toBeLessThan(2500);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        id: 23,
+        error: {
+          code: -32000,
+          message: 'shared gbrain HTTP exceeded total deadline',
+        },
+      });
+    },
+    5000
+  );
 
   it('interrupts a slow HTTP header at the absolute request deadline', async () => {
     const server = createTcpServer(socket => {

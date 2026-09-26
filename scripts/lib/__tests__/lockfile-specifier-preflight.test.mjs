@@ -96,6 +96,37 @@ describe('lockfile importer specifier preflight', () => {
     );
   });
 
+  it('treats a root pnpm override as the effective jsdom specifier', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-lockfile-preflight-'));
+    tempRoots.push(root);
+    writeFileSync(
+      join(root, 'pnpm-workspace.yaml'),
+      "packages:\n  - 'apps/*'\n"
+    );
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ pnpm: { overrides: { jsdom: '26.1.0' } } })
+    );
+    mkdirPackage(root, 'apps/web', {
+      devDependencies: { jsdom: '30.1.0' },
+    });
+    const drifted = `lockfileVersion: '9.0'\n\nimporters:\n  .:\n  apps/web:\n    devDependencies:\n      jsdom:\n        specifier: 30.1.0\n`;
+    expect(compareWorkspaceSpecifiers({ root, lockfile: drifted })).toEqual([
+      {
+        packagePath: 'apps/web',
+        key: 'devDependencies:jsdom',
+        expected: '26.1.0',
+        actual: '30.1.0',
+      },
+    ]);
+
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ pnpm: { overrides: { jsdom: '30.1.0' } } })
+    );
+    expect(compareWorkspaceSpecifiers({ root, lockfile: drifted })).toEqual([]);
+  });
+
   it('honors negated workspace package paths like !apps/eve-pilot', () => {
     const root = mkdtempSync(join(tmpdir(), 'jovie-lockfile-preflight-'));
     tempRoots.push(root);

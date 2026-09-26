@@ -53,6 +53,20 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('selects the web contract lane for canonical copy rule changes', () => {
+    const receipt = classifyProductLanes([
+      'packages/copy/rules.ts',
+      'packages/copy/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'shared-copy')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['packages/copywriter/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('selects the web contract lane for release communications extraction', () => {
     const receipt = classifyProductLanes([
       'packages/release-communications/index.ts',

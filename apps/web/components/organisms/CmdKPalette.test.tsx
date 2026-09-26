@@ -7,6 +7,7 @@ import {
   CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
 } from '@/components/jovie/chat-composer-copy';
 import type { PickerActionItem } from '@/components/jovie/components/picker-rows';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { CmdKPalette } from './CmdKPalette';
 
 const pushMock = vi.fn();
@@ -146,12 +147,20 @@ describe('CmdKPalette', () => {
 
     expect(
       screen.getByRole('option', {
-        name: 'Calendar Plan release dates and campaign moments. ⌘1',
+        name: segmentedAccessibleName(
+          'Calendar',
+          'Plan release dates and campaign moments.',
+          '⌘1'
+        ),
       })
     ).toHaveAttribute('aria-selected', 'true');
     expect(
       screen.getByRole('option', {
-        name: 'Calendar Plan release dates and campaign moments. ⌘1',
+        name: segmentedAccessibleName(
+          'Calendar',
+          'Plan release dates and campaign moments.',
+          '⌘1'
+        ),
       })
     ).toHaveClass('system-b-table-row-shell');
 
@@ -192,7 +201,11 @@ describe('CmdKPalette', () => {
       name: 'Command Palette Search',
     });
     const profile = screen.getByRole('option', {
-      name: 'Profile Open your profile in the chat workspace. ⌘1',
+      name: segmentedAccessibleName(
+        'Profile',
+        'Open your profile in the chat workspace.',
+        '⌘1'
+      ),
     });
 
     expect(profile).toHaveAttribute('aria-selected', 'true');
@@ -202,7 +215,11 @@ describe('CmdKPalette', () => {
 
     expect(
       screen.getByRole('option', {
-        name: 'Presence Monitor artist profiles, public pages, and search visibility. ⌘2',
+        name: segmentedAccessibleName(
+          'Presence',
+          'Monitor artist profiles, public pages, and search visibility.',
+          '⌘2'
+        ),
       })
     ).toHaveAttribute('aria-selected', 'true');
   });
@@ -297,7 +314,11 @@ describe('CmdKPalette', () => {
     fireEvent.change(input, { target: { value: 'flac' } });
 
     const audio = screen.getByRole('option', {
-      name: `${CHAT_COMPOSER_UPLOAD_AUDIO_LABEL} ${CHAT_COMPOSER_UPLOAD_AUDIO_HINT} ⌘1`,
+      name: segmentedAccessibleName(
+        CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
+        CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+        '⌘1'
+      ),
     });
     expect(audio).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('option', { name: /Attach Files/ })).toBeNull();

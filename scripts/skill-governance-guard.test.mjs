@@ -15,6 +15,7 @@ import {
   collectAdapterSkillMarkdown,
   computeSkillFolderHash,
   evaluateSkillGovernance,
+  touchesGovernedPath,
 } from './skill-governance-guard.mjs';
 
 function sha256(content) {
@@ -164,6 +165,22 @@ function createFixture() {
   );
   return root;
 }
+
+test('staged gate only runs for changes it can observe', () => {
+  assert.equal(touchesGovernedPath(['apps/web/lib/utils.ts']), false);
+  assert.equal(touchesGovernedPath([]), false);
+  for (const path of [
+    '.claude/skills/find-skills/SKILL.md',
+    '.agents/skills/gstack/SKILL.md',
+    '.claude/rules/gstack.md',
+    'skills-lock.json',
+    'docs/agent-context/vercel-agent-skills-coverage.md',
+    'docs/vendor/vercel-labs/pins.json',
+    'scripts/skill-governance-guard.mjs',
+  ]) {
+    assert.equal(touchesGovernedPath(['README.md', path]), true, path);
+  }
+});
 
 test('the current repository satisfies skill governance', () => {
   assert.deepEqual(evaluateSkillGovernance(), []);

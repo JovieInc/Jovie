@@ -342,9 +342,11 @@ describe('live Storybook component certification', () => {
     browser = await chromium.launch({ headless: true });
   }, BROWSER_LAUNCH_TIMEOUT_MS);
 
+  // Closing Chromium is process teardown on the same loaded runner, so it
+  // gets the launch budget rather than Vitest's 10s default hook timeout.
   afterAll(async () => {
     await browser?.close();
-  });
+  }, BROWSER_LAUNCH_TIMEOUT_MS);
 
   it('qualifies exact Node 22 and rejects other majors', () => {
     expect(qualifyNode22('22.23.2').ok).toBe(true);
@@ -1081,6 +1083,49 @@ describe('live Storybook lifecycle', () => {
       expect(await waitUntilProcessGone(ready.helperPid, 10_000)).toBe(true);
       expect(existsSync(ready.tempRoot)).toBe(false);
       expect(existsSync(ready.leasePath)).toBe(false);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'defers watchdog lease writes until its identity handoff',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('hang', 30_000);
+      const readLease = () => JSON.parse(readFileSync(ready.leasePath, 'utf8'));
+      await waitFor(() => readLease().browserGroups.length > 0);
+      const { watchdogPid } = readLease();
+      killProcessGroup({ pid: watchdogPid }, 'SIGKILL');
+      expect(await waitUntilProcessGone(watchdogPid, 10_000)).toBe(true);
+      const unclaimed = { ...readLease(), browserGroups: [] };
+      for (const key of ['Pid', 'Pgid', 'StartedAt', 'CommandHash']) {
+        unclaimed[`watchdog${key}`] = null;
+      }
+      writeFileSync(ready.leasePath, JSON.stringify(unclaimed));
+      const watchdog = spawn(
+        process.execPath,
+        [
+          new URL(LIFECYCLE_MODULE_URL).pathname,
+          '--storybook-vitest-watchdog',
+          ready.leasePath,
+        ],
+        { detached: true, stdio: 'ignore' }
+      );
+      ownedPids.push(watchdog.pid);
+      // Past one poll: a stale write would have landed.
+      await new Promise(resolve => setTimeout(resolve, 2_500));
+      expect(readLease().browserGroups).toEqual([]);
+      unclaimed.watchdogPid = unclaimed.watchdogPgid = watchdog.pid;
+      unclaimed.watchdogStartedAt = 'handoff';
+      unclaimed.watchdogCommandHash = '0'.repeat(64);
+      writeFileSync(ready.leasePath, JSON.stringify(unclaimed));
+      await waitFor(() => readLease().browserGroups.length > 0);
+      expect(readLease().watchdogPid).toBe(watchdog.pid);
+      killProcessGroup(watchdog, 'SIGKILL');
+      child.kill('SIGKILL');
+      await waitForExit(child);
+      await reapStaleStorybookVitestLeases({
+        leaseDir: dirname(ready.leasePath),
+      });
     },
     LIFECYCLE_TEST_TIMEOUT_MS
   );

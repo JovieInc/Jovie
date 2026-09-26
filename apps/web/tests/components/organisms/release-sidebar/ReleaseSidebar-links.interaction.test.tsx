@@ -9,11 +9,13 @@ const mockUsePlanGate = vi.fn(() => ({
 const mockFetchReleaseCreditsAction = vi.fn();
 const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
+const mockRouterPrefetch = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockRouterPush,
     refresh: mockRouterRefresh,
+    prefetch: mockRouterPrefetch,
   }),
 }));
 
@@ -115,28 +117,37 @@ vi.mock('@/components/molecules/drawer', () => ({
         {footer}
       </div>
     ),
-  EntityHeaderCard: ({
+  EntityHeader: ({
+    thumbnail,
     title,
-    subtitle,
-    meta,
+    details,
+    statusGlyph,
     actions,
-    image,
-    stableLayout,
+    'data-testid': testId,
   }: {
+    thumbnail?: React.ReactNode;
     title: string;
-    subtitle?: React.ReactNode;
-    meta?: React.ReactNode;
+    details?: React.ReactNode;
+    statusGlyph?: React.ReactNode;
     actions?: React.ReactNode;
-    image?: React.ReactNode;
-    stableLayout?: boolean;
+    'data-testid'?: string;
   }) => (
-    <div data-testid='entity-header-card' data-stable-layout={stableLayout}>
-      {image}
-      <h2 className='text-sm line-clamp-1 min-h-6'>{title}</h2>
-      {subtitle}
-      <div data-testid='entity-header-meta-slot'>{meta}</div>
+    <div data-testid={testId ?? 'entity-header'}>
+      {thumbnail}
+      <h2 className='truncate text-sm font-semibold'>{title}</h2>
+      <div data-testid='entity-header-details-row'>
+        {details}
+        {statusGlyph}
+      </div>
       {actions}
     </div>
+  ),
+  EntityHeaderStatusGlyph: ({ label }: { label?: string }) => (
+    <span
+      data-testid='entity-header-status-glyph'
+      role='img'
+      aria-label={label}
+    />
   ),
   DrawerInlineNote: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
@@ -514,6 +525,11 @@ const mockRelease = {
   canvasStatus: 'not_set' as const,
 };
 
+const mockReleaseWithStatus = {
+  ...mockRelease,
+  status: 'released' as const,
+};
+
 const defaultProps = {
   mode: 'admin' as const,
   isOpen: true,
@@ -598,6 +614,41 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 
+  it('prefetches the release tasks route once when the drawer opens', () => {
+    const { rerender } = render(
+      <ReleaseSidebar release={mockReleaseWithStatus} {...defaultProps} />
+    );
+
+    expect(mockRouterPrefetch).toHaveBeenCalledTimes(1);
+    expect(mockRouterPrefetch).toHaveBeenCalledWith(
+      '/app/releases/release_1/tasks'
+    );
+
+    // Re-rendering the same release must not re-prefetch.
+    rerender(
+      <ReleaseSidebar release={mockReleaseWithStatus} {...defaultProps} />
+    );
+    expect(mockRouterPrefetch).toHaveBeenCalledTimes(1);
+
+    // Switching releases is a new intent — prefetch the new route once.
+    rerender(
+      <ReleaseSidebar
+        release={{ ...mockReleaseWithStatus, id: 'release_2' }}
+        {...defaultProps}
+      />
+    );
+    expect(mockRouterPrefetch).toHaveBeenCalledTimes(2);
+    expect(mockRouterPrefetch).toHaveBeenLastCalledWith(
+      '/app/releases/release_2/tasks'
+    );
+  });
+
+  it('does not prefetch the tasks route when no release is selected', () => {
+    render(<ReleaseSidebar release={null} {...defaultProps} />);
+
+    expect(mockRouterPrefetch).not.toHaveBeenCalled();
+  });
+
   it('uses app router navigation for the full release tasks page', async () => {
     const user = userEvent.setup();
 
@@ -633,10 +684,7 @@ describe('ReleaseSidebar inspector cards', () => {
 
     const header = screen.getByTestId('release-header-card');
     expect(header).not.toHaveAttribute('data-surface-variant');
-    expect(within(header).getByTestId('entity-header-card')).toHaveAttribute(
-      'data-stable-layout',
-      'true'
-    );
+    expect(within(header).getByTestId('entity-header')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(
@@ -650,8 +698,8 @@ describe('ReleaseSidebar inspector cards', () => {
     const header = screen.getByTestId('release-header-card');
     expect(
       within(header).getByRole('heading', { name: mockRelease.title })
-    ).toHaveClass('text-sm', 'line-clamp-1', 'min-h-6');
-    expect(screen.getByTestId('entity-header-meta-slot')).toBeInTheDocument();
+    ).toHaveClass('text-sm', 'truncate', 'font-semibold');
+    expect(screen.getByTestId('release-header-meta-strip')).toBeInTheDocument();
   });
 
   it('keeps static artwork fit and hover radius on the 40px contract', () => {

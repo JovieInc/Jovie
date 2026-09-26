@@ -1,7 +1,28 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Lets a test make one directory vanish mid-walk, the way parallel CI
+// commands delete apps/web/coverage while doc:freshness:check runs.
+const vanishing = vi.hoisted(() => ({ dir: null }));
+vi.mock('node:fs', async importOriginal => {
+  /** @type {typeof import('node:fs')} */
+  const fs = await importOriginal();
+  return {
+    ...fs,
+    readdirSync: (path, options) => {
+      if (vanishing.dir && String(path) === vanishing.dir) {
+        throw Object.assign(
+          new Error(`ENOENT: no such file or directory, scandir '${path}'`),
+          { code: 'ENOENT' }
+        );
+      }
+      return fs.readdirSync(path, options);
+    },
+  };
+});
+
 import {
   applyGardeningFixes,
   countAgentsMapLines,
@@ -28,6 +49,7 @@ function makeRepo(structure) {
 }
 
 afterEach(() => {
+  vanishing.dir = null;
   tempDirs.length = 0;
 });
 
@@ -137,5 +159,22 @@ describe('doc-freshness registry', () => {
     });
     const files = expandDocScopes(['.claude/rules/*.md'], repoRoot);
     expect(files).toEqual(['.claude/rules/a.md', '.claude/rules/b.md']);
+  });
+
+  it('skips a directory deleted by a parallel command mid-walk', () => {
+    const repoRoot = makeRepo({
+      '.claude/rules/a.md': '# a\n',
+      'apps/web/coverage/lcov-report/index.html': '<html></html>\n',
+    });
+    vanishing.dir = join(repoRoot, 'apps/web/coverage');
+    const files = expandDocScopes(['.claude/rules/*.md'], repoRoot);
+    expect(files).toEqual(['.claude/rules/a.md']);
+  });
+
+  it('still fails on directory read errors other than ENOENT', () => {
+    const repoRoot = makeRepo({ '.claude/rules/a.md': '# a\n' });
+    expect(() =>
+      expandDocScopes(['*.md'], join(repoRoot, '.claude/rules/a.md'))
+    ).toThrow(/ENOTDIR/);
   });
 });

@@ -705,6 +705,7 @@ import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
 } from '@/contexts/HeaderActionsContext';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const { TasksPageClient } = await import(
   '@/components/features/dashboard/tasks/TasksPageClient'
@@ -818,6 +819,20 @@ describe('TasksPageClient', () => {
     );
   });
 
+  it('drops the retired Disc3 release glyph (banned icon guard, Tim, 2026-09-25)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('Disc3');
+    expect(source).toContain('Layers,');
+    expect(source).toContain('<Layers className=');
+  });
+
   it('routes table API imports through the v9 compat adapter', () => {
     const source = readFileSync(
       resolve(
@@ -891,14 +906,24 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Me 2' })
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Me', '2'),
+      })
     ).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'All 3' })).toBeInTheDocument();
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
+      screen.getByRole('tab', { name: segmentedAccessibleName('All', '3') })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     expect(
       screen.getByTestId('mock-board-card-task-jovie')
@@ -944,14 +969,20 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Me 2' })
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Me', '2'),
+      })
     ).toHaveAttribute('aria-selected', 'true');
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-2',
       'task-1',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
       | {
@@ -960,7 +991,9 @@ describe('TasksPageClient', () => {
       | undefined;
 
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
     ).toHaveAttribute('aria-selected', 'true');
     expect(tableProps?.data?.map(task => task.id)).toEqual(['task-jovie']);
   });
@@ -1007,7 +1040,11 @@ describe('TasksPageClient', () => {
     });
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(screen.getByText('Select a task')).toBeInTheDocument();
@@ -1026,18 +1063,28 @@ describe('TasksPageClient', () => {
       'task-1',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Me 2' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Me', '2'),
+      })
+    );
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-2',
       'task-1',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
     ]);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
+    fireEvent.click(
+      screen.getByRole('tab', { name: segmentedAccessibleName('All', '3') })
+    );
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
       'task-2',
@@ -1929,18 +1976,26 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
+    fireEvent.click(
+      screen.getByRole('tab', { name: segmentedAccessibleName('All', '3') })
+    );
 
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(3);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open 2' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: segmentedAccessibleName('Open', '2') })
+    );
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(2);
     expect(screen.getByText(mockTaskTwo.title)).toBeInTheDocument();
     expect(screen.getByText(mockJovieTask.title)).toBeInTheDocument();
     expect(screen.queryByText(mockTask.title)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: segmentedAccessibleName('Closed', '1'),
+      })
+    );
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(1);
     expect(screen.getByText(mockTask.title)).toBeInTheDocument();
   });
@@ -1951,7 +2006,11 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(1);
     expect(screen.getByText(mockJovieTask.title)).toBeInTheDocument();

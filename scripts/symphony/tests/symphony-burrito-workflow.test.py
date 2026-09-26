@@ -91,6 +91,19 @@ def _closure_run_args(tmp):
     ]
 
 
+def _publish_child_pid(ready):
+    """Child-script lines that publish its pid by rename.
+
+    write_text() creates the file before writing it, so a parent polling
+    exists() could read "" and fail int() under load. os.replace is atomic.
+    """
+    staged = str(ready) + ".tmp"
+    return (
+        f"pathlib.Path({staged!r}).write_text(str(os.getpid()))\n"
+        f"os.replace({staged!r}, {str(ready)!r})\n"
+    )
+
+
 def _runtime_command(args, *, established_clock=False):
     directory = os.environ.get("SYMPHONY_RUNTIME_COVERAGE_DIR")
     if not directory and not established_clock:
@@ -109,6 +122,9 @@ def _runtime_command(args, *, established_clock=False):
         return [sys.executable, "-c", launcher, *args]
     launcher += (
         "tracer = trace.Trace(count=True, trace=False)\n"
+        # Only helper lines are merged into the report; skip the rest.
+        "count_lines = tracer.globaltrace\n"
+        f"tracer.globaltrace = lambda frame, why, arg: count_lines(frame, why, arg) if frame.f_code.co_filename == {str(HELPER_PATH)!r} else None\n"
         "try:\n"
         f" tracer.runfunc(runpy.run_path, {str(HELPER_PATH)!r}, run_name='__main__')\n"
         "finally:\n"
@@ -524,7 +540,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                         " raise SystemExit(0)\n"
                         "signal.signal(signal.SIGTERM, stop)\n"
                         "signal.signal(signal.SIGINT, stop)\n"
-                        f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid()))\n"
+                        + _publish_child_pid(ready) +
                         "while True: time.sleep(1)\n"
                     )
                     with log.open("w") as output:
@@ -560,6 +576,49 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                                 pass
                             process.wait(timeout=5)
 
+    def test_shutdown_during_child_spawn_is_forwarded_not_fatal(self):
+        # A TERM that lands while the scheduler is still being spawned used to
+        # hit the default disposition (-15, orphaned child) because handlers
+        # were installed only after Popen returned.
+        helper = _load_helper()
+        real_popen = subprocess.Popen
+        spawned = []
+        unforwarded = []
+
+        def popen_after_term(*args, **kwargs):
+            signal.raise_signal(signal.SIGTERM)
+            process = real_popen(*args, **kwargs)
+            spawned.append(process)
+            return process
+
+        def record_unforwarded(signum, _frame):
+            unforwarded.append(signum)
+
+        # Catch a TERM the runtime failed to trap instead of killing the suite.
+        outer = signal.signal(signal.SIGTERM, record_unforwarded)
+        try:
+            with tempfile.TemporaryDirectory() as tmp, \
+                    mock.patch.object(helper.subprocess, "Popen", popen_after_term), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                returncode = helper.run_official_binary_once(
+                    [sys.executable, "-c", "import time; time.sleep(5)"],
+                    gate_file=pathlib.Path(tmp) / "rate.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=pathlib.Path(tmp) / "fleet-gate.json",
+                        hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                        dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                    ),
+                    closure_observe_only=True,
+                    max_gate_sleep_seconds=None,
+                )
+            restored = signal.getsignal(signal.SIGTERM)
+        finally:
+            signal.signal(signal.SIGTERM, outer)
+        self.assertEqual(unforwarded, [])
+        self.assertEqual(returncode, 128 + signal.SIGTERM)
+        self.assertEqual(spawned[0].returncode, -signal.SIGTERM)
+        self.assertIs(restored, record_unforwarded)
+
     def test_shutdown_interrupts_rate_limit_sleep_without_relaunch(self):
         self._assert_shutdown_interrupts_gate("rate_limit")
 
@@ -582,6 +641,10 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     f"pathlib.Path({str(gate)!r}).write_text({json.dumps(_fleet_gate_payload(status='red', intake=False))!r})\n"
                     "print('scheduler-tick', flush=True)\n"
                 )
+            # The runtime SIGSTOPs the child during the hold and SIGCONTs it on
+            # shutdown, so SIGTERM can land while the announcement print is still
+            # inside sys.stdout's BufferedWriter. Drain with raw os.write so the
+            # handler never re-enters that writer ("reentrant call" RuntimeError).
             child = (
                 "import os, pathlib, signal, sys, time\n"
                 "def stop(sig, frame):\n"
@@ -589,10 +652,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 " signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
                 f" pathlib.Path({str(draining)!r}).touch()\n"
                 f" while not pathlib.Path({str(release)!r}).exists(): time.sleep(0.01)\n"
-                " print('x' * 262144 + '\\nshutdown-drained', flush=True)\n"
+                " data = ('x' * 262144 + '\\nshutdown-drained\\n').encode()\n"
+                " while data: data = data[os.write(1, data):]\n"
                 " raise SystemExit(75)\n"
                 "signal.signal(signal.SIGTERM, stop)\n"
-                f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid()))\n"
+                + _publish_child_pid(ready)
                 + announcement +
                 "while True: time.sleep(1)\n"
             )

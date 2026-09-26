@@ -567,9 +567,10 @@ async function checkRateLimit(
  * discarding the cookie would route every request back through the
  * first-touch path and escape the IP, ASN, and session limits entirely
  * (cookie-reset bypass, PR #18095 review). The session bucket is fresh on a
- * first touch, so a denial there can only mean a failed backend — checkRateLimit
- * already converts that into a fail-closed-but-advisory result shape, and the
- * handler treats it as 503 RATE_LIMIT_UNAVAILABLE rather than a fake 429.
+ * first touch, so a denial there can only mean a failed backend; that case
+ * degrades to the first-touch decision (JOV-6579) so a limiter outage never
+ * hard-fails message #1. Established sessions keep failing closed with 503
+ * RATE_LIMIT_UNAVAILABLE rather than a fake 429.
  */
 export async function checkAnonymousChatRateLimit(
   input: AnonymousChatLimitInput
@@ -584,11 +585,20 @@ export async function checkAnonymousChatRateLimit(
 
     // Charge the brand-new session's lifetime bucket so cookie rotation
     // cannot reset the conversation counter.
-    return checkRateLimit(
+    const sessionResult = await checkRateLimit(
       anonymousOnboardingChatSessionLimiter,
       `session:${input.sessionId}`,
       'You have hit the conversation limit for this session. Sign up to keep going.'
     );
+    // JOV-6579: a fresh session bucket cannot be exhausted, so `unavailable`
+    // here means the limiter backend is down, not that the visitor is over a
+    // limit. Message #1 already cleared Turnstile and the first-touch pool,
+    // so a limiter-infra outage degrades to that decision instead of
+    // hard-failing the golden path. Real exhaustion stays denied.
+    if (!sessionResult.success && sessionResult.unavailable === true) {
+      return { ...firstTouchResult, degraded: true };
+    }
+    return sessionResult;
   }
 
   const ipResult = await checkRateLimit(

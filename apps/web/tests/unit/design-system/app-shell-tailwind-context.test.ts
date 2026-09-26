@@ -111,7 +111,9 @@ describe('app-shell Tailwind context boundary (JOV-2269)', () => {
       { from: join(WEB_ROOT, 'app', 'globals.css') }
     );
     const selectors: string[] = [];
-    postcss.parse(css.css).walkRules(rule => selectors.push(rule.selector));
+    postcss.parse(css.css).walkRules(rule => {
+      selectors.push(rule.selector);
+    });
 
     expect(selectors).toContain('.max-w-\\[10ch\\]');
     expect(selectors).toContain('.break-words');

@@ -54,22 +54,45 @@ runs:
       with:
         dest: ${{ runner.temp }}/setup-pnpm
 
+    # GitHub-hosted only: restore the installed tree itself. In run
+    # 36175640539 each Unit Tests shard spent 12-24s extracting the 1.3 GB
+    # pnpm store and another 13-18s in `pnpm fetch` linking 3,083 packages
+    # into node_modules/.pnpm. An exact node_modules hit replaces both with
+    # one extract. No restore-keys: only an exact lockfile, workspace, patch,
+    # .npmrc and Node pin match restores, and `pnpm install --frozen-lockfile`
+    # below still verifies the tree against pnpm-lock.yaml. Self-hosted
+    # runners never restore or save Actions caches (see setup-node below).
+    # Bump v2 when the install command or its environment changes.
+    - name: Restore installed node_modules (GitHub-hosted)
+      id: node-modules-cache
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+          workers/*/node_modules
+        key: pnpm-node-modules-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}
+
     # setup-node's pnpm cache is GitHub-hosted only. Every self-hosted runner,
     # fixed or ephemeral, skips Actions cache restore/save. Fixed runners reuse
     # their persistent local pnpm store; ephemeral runners warm a fresh store
     # below. Do not add a separate actions/cache step here: run 29220980115
     # uploaded a 1.335 GB store at 1-1.5 MB/s until the 20-minute canary timed
-    # out after all tests had passed.
+    # out after all tests had passed. An exact node_modules hit needs no
+    # store, so the store restore is skipped then too. merge_group skips it:
+    # its post-job save cost ~16s/job and no later run can read it.
     - name: Setup Node.js with pnpm cache
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version-file: '.nvmrc'
-        cache: ${{ runner.environment == 'github-hosted' && inputs.package_cache == 'true' && 'pnpm' || '' }}
+        cache: ${{ runner.environment == 'github-hosted' && inputs.package_cache == 'true' && github.event_name != 'merge_group' && steps.node-modules-cache.outputs.cache-hit != 'true' && 'pnpm' || '' }}
         cache-dependency-path: '**/pnpm-lock.yaml'
 
     - name: Warm pnpm store
-      if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
@@ -87,3 +110,46 @@ runs:
         else
           pnpm install --frozen-lockfile
         fi
+
+    # Both packages pick binaries by process.platform, so a Linux tree never
+    # loads these darwin/win32 copies: ~340 MB raw, ~125 MB of the archive.
+    - name: Drop unloadable binaries before save
+      if: >-
+        runner.os == 'Linux' &&
+        steps.node-modules-cache.outcome == 'success' &&
+        steps.node-modules-cache.outputs.cache-hit != 'true' &&
+        (github.event_name == 'push' ||
+        (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository))
+      shell: bash
+      run: |
+        cd node_modules/.pnpm
+        rm -rf onnxruntime-node@*/node_modules/onnxruntime-node/bin/napi-v*/{darwin,win32} \
+          app-builder-bin@*/node_modules/app-builder-bin/{mac,win}
+        # pnpm 9 installs musl builds too (lockfile has no libc). Glibc loaders
+        # never pick them: ~630 MB raw. Keep package.json so a frozen install
+        # still treats them as linked instead of refetching them on every hit.
+        find . -maxdepth 1 \( -name '*-musl@*' -o -name '*linuxmusl-*@*' \) \
+          -exec find {}/node_modules -type f ! -name package.json -delete \;
+
+    # Save right after install, before any job step can write build or test
+    # output under node_modules. Only same-repository push and pull_request
+    # runs save. GitHub scopes each cache to the ref that wrote it (main, or
+    # one PR), so a PR can never seed a tree that main restores. Fork PRs,
+    # pull_request_target, workflow_run and merge_group never save; no later
+    # run restores a merge_group ref's cache.
+    - name: Save installed node_modules (GitHub-hosted)
+      if: >-
+        steps.node-modules-cache.outcome == 'success' &&
+        steps.node-modules-cache.outputs.cache-hit != 'true' &&
+        (github.event_name == 'push' ||
+        (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository))
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+          workers/*/node_modules
+        key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}

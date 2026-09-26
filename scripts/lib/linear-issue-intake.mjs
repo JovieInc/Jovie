@@ -59,6 +59,8 @@ export async function upsertLinearIssueByTitleFingerprint({
   // Optional state name (e.g. 'Todo') resolved from the team's workflow so a
   // newly created issue can skip the default intake state (JOV-5966).
   createStateName = null,
+  // Optional label ids applied only when a new issue is created.
+  createLabelIds = [],
   reopenTerminal = false,
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
@@ -121,6 +123,7 @@ export async function upsertLinearIssueByTitleFingerprint({
             $description: String!
             $priority: Int
             $stateId: String
+            $labelIds: [String!]
           ) {
             issueCreate(input: {
               teamId: "${JOVIE_TEAM_ID}"
@@ -128,6 +131,7 @@ export async function upsertLinearIssueByTitleFingerprint({
               description: $description
               priority: $priority
               stateId: $stateId
+              labelIds: $labelIds
             }) {
               success
               issue { id identifier url }
@@ -139,6 +143,7 @@ export async function upsertLinearIssueByTitleFingerprint({
           description,
           priority,
           ...(createStateId ? { stateId: createStateId } : {}),
+          ...(createLabelIds.length > 0 ? { labelIds: createLabelIds } : {}),
         },
         apiKey,
         fetchImpl,

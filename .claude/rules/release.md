@@ -178,7 +178,11 @@ When evidence is incomplete, keep remediation running until the relevant machine
 4. `/ship` handles tests, review, commit, push, and PR creation/update. It must **not** edit `CHANGELOG.md` or bump the version fan-out (`VERSION`, `version.json`, package versions) — see "Version Stamping (main-only)" and "Changelog" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
 6. The finishing agent requests GitHub's normal Merge when ready for the
-   qualified exact head (`gh pr merge --auto --match-head-commit <head-sha>`).
+   qualified exact head:
+   `node scripts/merge-queue-backend.mjs check-reenroll <pr> && gh pr merge <pr> --auto --match-head-commit <head-sha>`.
+   A PR the queue ejected for failed checks must not be re-enqueued at the same
+   head: push a repair first. Re-enqueuing a rejected head poisons and rebuilds
+   every merge group behind it (JOV-6620).
    Do not wait for the retired Auto-Enroll controller. GitHub owns required
    checks, native queue groups, and final merge; do not bypass them.
    Do not add, read, or retain the retired `merge-queue` label; authoritative

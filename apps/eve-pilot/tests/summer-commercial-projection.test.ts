@@ -217,20 +217,20 @@ describe('commercial recommendation boundary', () => {
     input.candidates[1].repeatedUsefulJobs = null;
     expect(project(input).evidenceBackedInfrastructureIds).toEqual([]);
   });
-  it.each([
-    'hypothesis',
-    'stale',
-    'future',
-    'missing',
-  ])('excludes %s source records without coercing unknowns to zero', kind => {
-    const input = snapshot();
-    if (kind === 'hypothesis') input.sources[0].basis = 'hypothesis';
-    if (kind === 'stale') input.sources[0].observedAt = '2026-09-01T00:00:00Z';
-    if (kind === 'future') input.sources[0].observedAt = '2099-01-01T00:00:00Z';
-    if (kind === 'missing') input.sources = [];
-    expect(project(input).verdict).toBe('hold');
-    expect(project(input).financials.collectedCashCents).toBe('UNKNOWN');
-  });
+  it.each(['hypothesis', 'stale', 'future', 'missing'])(
+    'excludes %s source records without coercing unknowns to zero',
+    kind => {
+      const input = snapshot();
+      if (kind === 'hypothesis') input.sources[0].basis = 'hypothesis';
+      if (kind === 'stale')
+        input.sources[0].observedAt = '2026-09-01T00:00:00Z';
+      if (kind === 'future')
+        input.sources[0].observedAt = '2099-01-01T00:00:00Z';
+      if (kind === 'missing') input.sources = [];
+      expect(project(input).verdict).toBe('hold');
+      expect(project(input).financials.collectedCashCents).toBe('UNKNOWN');
+    }
+  );
   it('rejects duplicate identities and unsafe numeric claims', () => {
     const input = snapshot();
     input.sources.push(input.sources[0]);

@@ -2247,8 +2247,11 @@ describe('unit-test runner capacity', () => {
       "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_test == 'true'"
     );
     expect(unitJob).not.toContain('&& 5 || 3');
-    expect(unitJob).toContain('Each ephemeral runner has 2 CPUs');
-    expect(unitJob).toContain('VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"');
+    // fileParallelism: !isCI in the fast config clamps maxWorkers to 1 unless
+    // the shard opts back in; forks track nproc (4 hosted, 2 self-hosted).
+    expect(unitJob).toContain(
+      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=$(nproc) --fileParallelism"'
+    );
     expect(unitJob).not.toContain(
       'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
     );
@@ -4365,9 +4368,9 @@ describe('ci-fast critical deploy contract', () => {
     // the tests/unit/ci directory run excludes it); setup-doppler-action and
     // the rest of tests/unit/ci run in the directory command.
     const byName =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}';
     const directory =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci';
 
     expect(ciFastLanes).toContain(
       "const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';"
@@ -4379,6 +4382,21 @@ describe('ci-fast critical deploy contract', () => {
       expect(command).not.toContain('--affected');
       expect(command).not.toContain('--passWithNoTests');
     }
+
+    // The contract config swaps only the environment: node, no browser setup,
+    // scoped to tests/unit/ci, everything else inherited from the fast config.
+    const contractConfig = readFileSync(
+      resolve(repoRoot, 'apps/web/vitest.config.ci-contracts.mts'),
+      'utf8'
+    );
+    expect(contractConfig).toContain(
+      "import baseConfig from './vitest.config.fast.mts';"
+    );
+    expect(contractConfig).toContain("environment: 'node',");
+    expect(contractConfig).toContain('setupFiles: [],');
+    expect(contractConfig).toContain(
+      "include: ['tests/unit/ci/**/*.test.ts'],"
+    );
   });
 });
 

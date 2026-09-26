@@ -164,18 +164,25 @@ describe('shipper-gated entrypoint', () => {
 
     expect(entrypoints.length).toBeGreaterThan(0);
 
-    for (const entrypoint of entrypoints) {
-      const result = spawnSync(
-        'python3',
-        ['-m', 'py_compile', join(REPO_ROOT, 'scripts/symphony', entrypoint)],
-        {
-          encoding: 'utf8',
-          env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
-        }
-      );
-      expect(result.stderr).toBe('');
-      expect(result.status).toBe(0);
-    }
+    // One interpreter for every file: py_compile exits non-zero if any file
+    // fails and names it on stderr. Spawning python3 once per entrypoint cost
+    // ~2.6s and timed out under merge-group CPU contention.
+    const result = spawnSync(
+      'python3',
+      [
+        '-m',
+        'py_compile',
+        ...entrypoints.map(entrypoint =>
+          join(REPO_ROOT, 'scripts/symphony', entrypoint)
+        ),
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
+      }
+    );
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
   });
 
   it('documents gbrain and grok preflight gates', () => {
@@ -291,19 +298,19 @@ describe('hermes launchd artifact installation', () => {
     expect(readFileSync(installedPlist, 'utf8')).toBe('ORIGINAL_PLIST\n');
   });
 
-  it.each([
-    'bootstrap-air.sh',
-    'bootstrap-pro-launchd.sh',
-  ])('%s installs launchd artifacts through the validated stage', bootstrapName => {
-    const bootstrap = readFileSync(
-      join(REPO_ROOT, 'scripts/symphony', bootstrapName),
-      'utf8'
-    );
+  it.each(['bootstrap-air.sh', 'bootstrap-pro-launchd.sh'])(
+    '%s installs launchd artifacts through the validated stage',
+    bootstrapName => {
+      const bootstrap = readFileSync(
+        join(REPO_ROOT, 'scripts/symphony', bootstrapName),
+        'utf8'
+      );
 
-    expect(bootstrap).toContain('source "$INSTALL_HELPER"');
-    expect(bootstrap).toContain('hermes_create_launchd_stage');
-    expect(bootstrap).toContain('hermes_install_validated_launchd_artifacts');
-  });
+      expect(bootstrap).toContain('source "$INSTALL_HELPER"');
+      expect(bootstrap).toContain('hermes_create_launchd_stage');
+      expect(bootstrap).toContain('hermes_install_validated_launchd_artifacts');
+    }
+  );
 });
 
 describe('ship-loop pause semantics', () => {

@@ -13,7 +13,7 @@
 
 import { createRequire } from 'node:module';
 import { RuleTester } from 'eslint';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const rule = require('./no-hardcoded-theme-colors.js');
@@ -174,4 +174,19 @@ ruleTester.run('no-hardcoded-theme-colors', rule, {
       errors: [{ messageId: 'arbitraryHexColor' }],
     },
   ],
+});
+
+describe('no-hardcoded-theme-colors messages', () => {
+  const messages = rule.meta.messages as Record<string, string>;
+
+  it('recommends only theme tokens that Tailwind actually emits', () => {
+    // bg-background and border-border have no --color-* token in the theme,
+    // so recommending them sends authors to utilities that emit no CSS.
+    expect(messages.bareBgWhite).toContain('`bg-base` or `bg-surface-1`');
+    expect(messages.bareBgBlack).toContain('`bg-base`');
+    expect(messages.arbitraryHexColor).toContain('`border-subtle`');
+    for (const message of Object.values(messages)) {
+      expect(message).not.toMatch(/`bg-background`|`border-border`/);
+    }
+  });
 });

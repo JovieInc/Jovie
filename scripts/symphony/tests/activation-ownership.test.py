@@ -14,6 +14,10 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
+# The helper lazily imports its sibling emit_gem_service_attestation; resolve
+# it the same way sibling suites do instead of relying on an earlier suite in
+# the runtime proof gate having already put scripts/symphony on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 HELPER = ROOT / "scripts/symphony/symphony_official_runtime.py"
 UNIT = ROOT / "scripts/symphony/systemd/symphony-elixir.service"
 SPEC = importlib.util.spec_from_file_location("symphony_official_runtime", HELPER)
@@ -73,12 +77,14 @@ for name in sys.argv[7:]: print(json.dumps(state['properties'][name]))
         for name in ("bash", "install"):
             self.write_executable(name, "import os,sys\nwith open(os.environ['MUTATIONS'], 'a') as out: out.write(" + repr(name + ":") + "+str(sys.argv[1:])+'\\n')\n")
         # Trace the real child helper for the existing runtime CI coverage merger.
-        self.write_executable("python3", """import json, os, pathlib, runpy, sys, trace
+        self.write_executable("python3", "HELPER = " + repr(str(HELPER)) + "\n" + """import json, os, pathlib, runpy, sys, trace
 args=[arg for arg in sys.argv[1:] if arg != '-B']
 if not os.environ.get('SYMPHONY_RUNTIME_COVERAGE_DIR'):
     os.execv(sys.executable, [sys.executable, '-B', *args])
 sys.argv=args
 tracer=trace.Trace(count=True, trace=False)
+count_lines=tracer.globaltrace
+tracer.globaltrace=lambda frame, why, arg: count_lines(frame, why, arg) if frame.f_code.co_filename == HELPER else None
 try: tracer.runfunc(runpy.run_path, args[0], run_name='__main__')
 finally:
     rows=[[file,line,count] for (file,line),count in tracer.results().counts.items()]

@@ -157,6 +157,30 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayoutJob).toContain('Run deterministic layout behavior guard');
   });
 
+  it('runs the combined Storybook surface matrix on two workers of a 4-vCPU hosted runner', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const storybookJob = getJobBlock(workflow, 'ci-storybook-surfaces');
+    const storybookConfig = readFileSync(
+      resolve(repoRoot, 'apps/web/playwright.config.storybook.ts'),
+      'utf8'
+    );
+
+    // Public-repo ubuntu-latest has 4 vCPU: one Vite dev server plus two
+    // Chromium workers. The specs write only per-test evidence names and
+    // compare (never update) committed baselines, so workers stay isolated.
+    expect(storybookJob).toContain('runs-on: ubuntu-latest');
+    expect(storybookJob).toMatch(
+      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line \\\n\s+--workers=2\n/
+    );
+    expect(storybookJob).not.toContain('--update-snapshots');
+    expect(storybookJob).not.toMatch(/--retries|--repeat-each|--shard/);
+    // The config keeps its CI retry budget and one-worker default for every
+    // other Storybook lane; only this lane opts into two workers.
+    expect(storybookConfig).toContain('fullyParallel: true');
+    expect(storybookConfig).toContain('retries: isCI ? 2 : 0');
+    expect(storybookConfig).toContain('workers: isCI ? 1 : undefined');
+  });
+
   it('keeps refresh self-healing and makes missing-baseline compare fail-closed', () => {
     const workflow = readFileSync(visualRegressionWorkflowPath, 'utf8');
     const ciWorkflow = readFileSync(workflowPath, 'utf8');
@@ -192,6 +216,9 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(compareJob).not.toContain('--update-snapshots');
     expect(compareJob).not.toContain('continue-on-error');
     expect(compareJob).not.toContain('neon-create-branch');
+    // Restore-only cache: read it, never persist or save it.
+    expect(compareJob).toContain("TURBO_ENGINE_READ_ONLY: '1'");
+    expect(compareJob).not.toContain('actions/cache/save@');
     expect(mergeReadyJob).toContain('ci-visual-snapshot-compare');
     expect(mergeReadyJob).toContain(
       'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
@@ -209,6 +236,45 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
     );
     expect(prReadyJob).toContain('skipped is not green (JOV-5960)');
+  });
+
+  it('warms the homepage compare build from the trusted main Turbopack cache read-only', () => {
+    const compareJob = getJobBlock(
+      readFileSync(workflowPath, 'utf8'),
+      'ci-visual-snapshot-compare'
+    );
+    const stepAt = (name: string) =>
+      compareJob.indexOf(`      - name: ${name}\n`);
+    const step = (name: string) => {
+      const start = stepAt(name);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = compareJob.indexOf('\n      - ', start + 1);
+      return compareJob.slice(start, next === -1 ? undefined : next);
+    };
+    const restore = step('Restore Next build cache (read-only)');
+    const homepageGate =
+      "if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'";
+
+    expect(stepAt('Restore Next build cache (read-only)')).toBeLessThan(
+      stepAt('Build homepage for rendered snapshot compare')
+    );
+    expect(step('Resolve Next build cache hour')).toContain(homepageGate);
+    expect(restore).toContain(homepageGate);
+    expect(restore).toContain('uses: actions/cache/restore@');
+    expect(restore).toContain('path: apps/web/.next/cache/turbopack');
+    // Same key family Build + Layout writes from push-to-main only.
+    expect(restore).toContain(
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
+    );
+    expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
+
+    // PR-controlled code never writes the cache, and only compiler state is
+    // restored: no fetch/image cache and no build output.
+    expect(compareJob).not.toContain('actions/cache/save@');
+    expect(compareJob).not.toContain('uses: actions/cache@');
+    expect(compareJob).not.toMatch(/path: apps\/web\/\.next\/cache\s*$/m);
+    expect(compareJob).not.toContain('pull_request_target');
+    expect(compareJob).not.toContain('secrets.');
   });
 
   it('scopes chat visual interactions to the active visible composer', () => {

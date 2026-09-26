@@ -9,7 +9,7 @@ describe('NewSocialProofSection', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: /Beautiful artist profiles Built to convert/i,
+        name: /Beautiful artist profiles\s*Built to convert/i,
       })
     ).toHaveClass('line-clamp-2');
     expect(
