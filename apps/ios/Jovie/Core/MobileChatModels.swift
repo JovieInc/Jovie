@@ -74,9 +74,11 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   var handoffURL: URL?
   var turnId: String? = nil
   var eveWorkId: String? = nil
-  /// Server `createdAt` for fetched messages, stamped once at append for local
-  /// turns. Persisted through the cache round-trip so the load-earlier cursor
-  /// still points at older history after an app restart (JOV-6210).
+  /// Server timestamp (ISO-8601) for fetched messages, stamped once at append
+  /// for local turns. Persisted through the cache round-trip in `persistCache`
+  /// so the load-earlier cursor still points at older history after an app
+  /// restart; `nil` only for locally composed rows with no server row yet
+  /// (JOV-6210).
   var createdAt: String? = nil
 }
 

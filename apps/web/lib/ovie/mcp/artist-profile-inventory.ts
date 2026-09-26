@@ -144,6 +144,10 @@ export function loadProfileCapabilitiesFromDisk(): ProfileCapability[] {
   const candidates = [
     resolve(
       /* turbopackIgnore: true */ process.cwd(),
+      'runtime-data/docs/FEATURE_REGISTRY.md'
+    ),
+    resolve(
+      /* turbopackIgnore: true */ process.cwd(),
       'docs/FEATURE_REGISTRY.md'
     ),
     resolve(

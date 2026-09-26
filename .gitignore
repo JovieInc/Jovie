@@ -258,3 +258,6 @@ test-report.*.flaky.json
 
 # marketing architecture loop state (JOV loop, 2026-07-06)
 .context/marketing-architecture/
+
+# Build-time copies of monorepo runtime files (apps/web/scripts/stage-runtime-data.mjs)
+apps/web/runtime-data/

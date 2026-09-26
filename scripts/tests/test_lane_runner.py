@@ -86,6 +86,13 @@ class GateTest(unittest.TestCase):
                                           self.change("apps/web/lib/a.test.ts")]), [])
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
 
+    def test_xcode_tests_directory_counts_as_test(self):
+        changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
+                   self.change("apps/ios/JovieTests/ChatRepositoryTests.swift")]
+        self.assertEqual(lane.gate_rules(changes), [])
+        self.assertEqual(lane.gate_rules([self.change("apps/ios/Jovie/Core/A.swift")]),
+                         ["code-change-without-test"])
+
     def test_secrets_lockfile_and_size_guards(self):
         self.assertIn("secret-like-file-changed", lane.gate_rules([self.change("apps/web/.env.local")]))
         self.assertIn("lockfile-without-manifest", lane.gate_rules([self.change("pnpm-lock.yaml")]))
@@ -374,6 +381,13 @@ class WorkerTest(unittest.TestCase):
         lane.worker(self.host, "devin")
         self.assertEqual((adopted, self.linear.moves), ([8], []))
 
+    def test_a_held_pr_keeps_its_issue_instead_of_retrying_a_new_pr(self):
+        lane.run_issue = lambda *a: {"verdict": "held", "pr": 7, "prUrl": "u", "reasons": ["check-failed:x"]}
+        lane.worker(self.host, "devin")
+        self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
+        self.assertIn("will fix it on that branch", self.linear.comments[-1][1])
+        self.assertFalse((self.host.state / "failures.json").exists())
+
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -439,6 +453,22 @@ class FixRedTest(unittest.TestCase):
         self.assertIsNone(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1}}))
         self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
+
+    def test_gate_held_prs_go_to_the_fix_loop_with_the_gate_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.record_held(host, 5, "h1", ["check-failed:pnpm", "[component-ship-gate] FAIL - needs stories"])
+            green = self.pr(checks=[{"status": "IN_PROGRESS"}])
+            real = lane.sh
+            lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
+            try:
+                claimed = lane.claim_red_pr(host, "devin", [{**green, "headRefName": "devin/jov-1-20260925204809"}])
+            finally:
+                lane.sh = real
+            self.assertEqual(claimed["number"], 5)
+            self.assertIn("component-ship-gate", lane.render_fix_prompt(claimed, ""))
+            moved = {**green, "headRefOid": "h2", "headRefName": "devin/jov-1-20260925204809"}
+            self.assertIsNone(lane.red_pr([moved], {}, json.loads((host.state / "held.json").read_text())))
 
     def test_merge_conflicts_count_as_stuck_even_with_green_checks(self):
         dirty = {**self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}]),
@@ -576,6 +606,28 @@ class UpdateTest(unittest.TestCase):
                     os.environ.pop("LANES_SELFTEST", None)
                 else:
                     os.environ["LANES_SELFTEST"] = old_env
+
+
+class RequeueTest(unittest.TestCase):
+    def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "requeue.json"
+            path.write_text(json.dumps({"5": "h1", "6": "h1", "7": "h1"}))
+            calls = []
+            def fake_sh(cmd, **kwargs):
+                calls.append(cmd)
+                # PR 6 is still rate-limited; everything else enqueues.
+                return SimpleNamespace(returncode=1 if cmd[1:4] == ["pr", "merge", "6"] else 0, stdout="", stderr="")
+            real, lane.sh = lane.sh, fake_sh
+            try:
+                lane.requeue_verified(host, [{"number": 5, "headRefOid": "h1"}, {"number": 6, "headRefOid": "h1"},
+                                             {"number": 7, "headRefOid": "h2"}])
+            finally:
+                lane.sh = real
+            self.assertEqual(json.loads(path.read_text()), {"6": "h1"})
+            self.assertNotIn("7", [c[3] for c in calls])
+            self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
 
 
 if __name__ == "__main__":
