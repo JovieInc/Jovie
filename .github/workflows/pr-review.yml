@@ -62,8 +62,19 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
+      - name: Download shared model outcomes
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow pr-review-learn.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name model-outcomes --dir "$RUNNER_TEMP/outcomes"
+          fi
+
       - name: Run advisory review
         env:
+          GEM_MODEL_OUTCOMES: ${{ runner.temp }}/outcomes/model-outcomes.json
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           GITHUB_TOKEN: ${{ github.token }}

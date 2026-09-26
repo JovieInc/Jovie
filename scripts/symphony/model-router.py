@@ -416,8 +416,32 @@ def capability_quality(model, capability):
     return float(value if isinstance(value, (int, float)) else model.get("quality") or 0)
 
 
+def shared_outcomes():
+    """Outcome ledger shared across hosts and CI (model-outcomes/v1)."""
+    path = os.environ.get("GEM_MODEL_OUTCOMES")
+    if not path:
+        return {}
+    try:
+        data = json.loads(pathlib.Path(path).read_text())
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict) or data.get("schema") != "model-outcomes/v1":
+        return {}
+    outcomes = data.get("outcomes")
+    return outcomes if isinstance(outcomes, dict) else {}
+
+
 def _outcome(st, model_id, capability):
-    return ((st.get("outcomes") or {}).get(model_id) or {}).get(capability) or {}
+    """Local router state plus the shared ledger, added together."""
+    local = ((st.get("outcomes") or {}).get(model_id) or {}).get(capability) or {}
+    shared = (shared_outcomes().get(model_id) or {}).get(capability) or {}
+    if not shared:
+        return local
+    merged = {}
+    for key in ("attempts", "successes", "tokens_in", "tokens_out", "minutes"):
+        values = [row.get(key) for row in (local, shared)]
+        merged[key] = sum(float(v) for v in values if isinstance(v, (int, float)) and not isinstance(v, bool))
+    return merged
 
 
 def expected_cost_per_success(cfg, model, st, capability, now):

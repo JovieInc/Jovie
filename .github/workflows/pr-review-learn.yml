@@ -1,0 +1,78 @@
+name: PR Review Learn
+# clock-class: temporal-resource
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim
+# necessary-trust-boundary: A weekly job holds the Gateway model key to replay the review kernel on mined historical commits from main; it reads git history only and writes no repository state.
+# removal-trigger: Remove the schedule when review outcomes are recorded from live PR receipts with enough volume that historical replay no longer adds signal.
+#
+# Self-learning loop for review model routing. See
+# docs/evaluations/pr-review-kernel.md.
+# - Mines labelled cases from git history (behavior fixes blamed back to the
+#   PR that introduced the lines), replays the kernel on them within a budget,
+#   and uploads the merged model-outcomes/v1 ledger. pr-review.yml downloads
+#   the latest ledger so the router learns cost per success week over week.
+# - Disabled until vars.PR_REVIEW_LEARN_ENABLED is 'true'.
+# - Never writes to the repository and holds no write token.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: pr-review-learn
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  learn:
+    name: PR Review Learn
+    if: vars.PR_REVIEW_LEARN_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout main policy code with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          package_cache: 'false'
+
+      - name: Download previous model outcomes
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow pr-review-learn.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name model-outcomes --dir "$RUNNER_TEMP/previous"
+          fi
+
+      - name: Mine, replay and score
+        env:
+          PR_REVIEW_AI_GATEWAY_API_KEY: ${{ secrets.PR_REVIEW_AI_GATEWAY_API_KEY }}
+          BUDGET_USD: ${{ vars.PR_REVIEW_LEARN_BUDGET_USD || '5' }}
+        run: >-
+          node scripts/pr-review/learn.mjs
+          --ref HEAD
+          --ledger-in "$RUNNER_TEMP/previous/model-outcomes.json"
+          --ledger-out "$RUNNER_TEMP/model-outcomes.json"
+          --workdir "$RUNNER_TEMP/pr-review-learn"
+          --budget-usd "$BUDGET_USD"
+
+      - name: Upload model outcomes
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-outcomes
+          path: ${{ runner.temp }}/model-outcomes.json
+          if-no-files-found: error
+          retention-days: 90
