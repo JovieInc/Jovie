@@ -10,14 +10,24 @@
  *
  * Storage is Vercel Blob only. Every uploaded object lives under an
  * owner-scoped prefix so the presigned-token routes can prove ownership
- * before signing, mirroring `lib/audio/blob-path.ts`.
+ * before signing, composing the scoped-path builder from
+ * `lib/audio/blob-path.ts`.
  */
 
 import {
   AUDIO_FILE_ACCEPT,
+  extensionFromFileName,
+  findFormatByFileName,
+  findFormatByMimeType,
   getCanonicalAudioMimeType,
   isSupportedAudioFile,
+  normalizeMimeType,
+  resolveMediaFormat,
 } from '@jovie/audio-contracts';
+import {
+  buildScopedBlobPath,
+  getScopedBlobPathPrefix,
+} from '@/lib/audio/blob-path';
 
 export const FILE_KINDS = ['image', 'video', 'document', 'archive'] as const;
 
@@ -235,39 +245,16 @@ export interface FileDescriptor {
   readonly type: string;
 }
 
-function normalizeMimeType(mimeType: string): string {
-  return mimeType.trim().toLowerCase().split(';', 1)[0];
-}
-
-function extensionFromFileName(fileName: string): string | null {
-  const match = fileName
-    .trim()
-    .toLowerCase()
-    .match(/\.([a-z0-9]+)$/);
-  return match?.[1] ?? null;
-}
-
 export function getFileFormatByMimeType(
   mimeType: string
 ): FileFormatDefinition | null {
-  const normalized = normalizeMimeType(mimeType);
-  return (
-    FILE_FORMAT_REGISTRY.find(format =>
-      (format.mimeTypes as readonly string[]).includes(normalized)
-    ) ?? null
-  );
+  return findFormatByMimeType(FILE_FORMAT_REGISTRY, mimeType);
 }
 
 export function getFileFormatByFileName(
   fileName: string
 ): FileFormatDefinition | null {
-  const extension = extensionFromFileName(fileName);
-  if (!extension) return null;
-  return (
-    FILE_FORMAT_REGISTRY.find(format =>
-      (format.extensions as readonly string[]).includes(extension)
-    ) ?? null
-  );
+  return findFormatByFileName(FILE_FORMAT_REGISTRY, fileName);
 }
 
 /**
@@ -278,14 +265,7 @@ export function getFileFormatByFileName(
 export function getFileFormat(
   file: FileDescriptor
 ): FileFormatDefinition | null {
-  const byMimeType = getFileFormatByMimeType(file.type);
-  if (byMimeType) return byMimeType;
-
-  const normalized = normalizeMimeType(file.type);
-  if (normalized.length > 0 && normalized !== 'application/octet-stream') {
-    return null;
-  }
-  return getFileFormatByFileName(file.name);
+  return resolveMediaFormat(FILE_FORMAT_REGISTRY, file);
 }
 
 /** Canonical MIME for an extension, across files and audio. Null if unknown. */
@@ -422,7 +402,7 @@ export function getFileBlobPathPrefix(
   surface: FileUploadSurface,
   userId: string
 ): string {
-  return `${JOVIE_FILE_PATH_PREFIX}/${surface}/${encodeURIComponent(userId)}/`;
+  return getScopedBlobPathPrefix(JOVIE_FILE_PATH_PREFIX, surface, userId);
 }
 
 export function buildFileBlobPath(
@@ -430,10 +410,13 @@ export function buildFileBlobPath(
   userId: string,
   fileName: string
 ): string {
-  const safeName =
-    fileName.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') ||
-    'file';
-  return `${getFileBlobPathPrefix(surface, userId)}${crypto.randomUUID()}-${safeName}`;
+  return buildScopedBlobPath(
+    JOVIE_FILE_PATH_PREFIX,
+    surface,
+    userId,
+    fileName,
+    'file'
+  );
 }
 
 /**

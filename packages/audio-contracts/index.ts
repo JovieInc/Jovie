@@ -176,11 +176,18 @@ export interface AudioFileDescriptor {
   readonly type: string;
 }
 
-function normalizeMimeType(mimeType: string): string {
+/**
+ * Generic MIME/extension format-resolution helpers.
+ *
+ * Shared with `apps/web/lib/media/file-policy.ts` so the "MIME first,
+ * extension fallback" contract lives in one place instead of being
+ * reimplemented per registry.
+ */
+export function normalizeMimeType(mimeType: string): string {
   return mimeType.trim().toLowerCase().split(';', 1)[0];
 }
 
-function extensionFromFileName(fileName: string): string | null {
+export function extensionFromFileName(fileName: string): string | null {
   const match = fileName
     .trim()
     .toLowerCase()
@@ -188,43 +195,60 @@ function extensionFromFileName(fileName: string): string | null {
   return match?.[1] ?? null;
 }
 
+export function findFormatByMimeType<
+  F extends { readonly mimeTypes: readonly string[] },
+>(registry: readonly F[], mimeType: string): F | null {
+  const normalized = normalizeMimeType(mimeType);
+  return registry.find(format => format.mimeTypes.includes(normalized)) ?? null;
+}
+
+export function findFormatByFileName<
+  F extends { readonly extensions: readonly string[] },
+>(registry: readonly F[], fileName: string): F | null {
+  const extension = extensionFromFileName(fileName);
+  if (!extension) return null;
+  return registry.find(format => format.extensions.includes(extension)) ?? null;
+}
+
+/**
+ * Blank or `application/octet-stream` MIME falls back to the extension; a
+ * contradictory MIME (e.g. `text/plain` on `x.png`) returns null.
+ */
+export function resolveMediaFormat<
+  F extends {
+    readonly mimeTypes: readonly string[];
+    readonly extensions: readonly string[];
+  },
+>(
+  registry: readonly F[],
+  file: { readonly name: string; readonly type: string }
+): F | null {
+  const byMimeType = findFormatByMimeType(registry, file.type);
+  if (byMimeType) return byMimeType;
+
+  const normalized = normalizeMimeType(file.type);
+  if (normalized.length > 0 && normalized !== 'application/octet-stream') {
+    return null;
+  }
+  return findFormatByFileName(registry, file.name);
+}
+
 export function getAudioFormatByMimeType(
   mimeType: string
 ): AudioFormatDefinition | null {
-  const normalized = normalizeMimeType(mimeType);
-  return (
-    AUDIO_FORMAT_REGISTRY.find(format =>
-      (format.mimeTypes as readonly string[]).includes(normalized)
-    ) ?? null
-  );
+  return findFormatByMimeType(AUDIO_FORMAT_REGISTRY, mimeType);
 }
 
 export function getAudioFormatByFileName(
   fileName: string
 ): AudioFormatDefinition | null {
-  const extension = extensionFromFileName(fileName);
-  return (
-    AUDIO_FORMAT_REGISTRY.find(format =>
-      (format.extensions as readonly string[]).includes(extension as string)
-    ) ?? null
-  );
+  return findFormatByFileName(AUDIO_FORMAT_REGISTRY, fileName);
 }
 
 export function getAudioFormat(
   file: AudioFileDescriptor
 ): AudioFormatDefinition | null {
-  const formatByMimeType = getAudioFormatByMimeType(file.type);
-  if (formatByMimeType) return formatByMimeType;
-
-  const normalizedMimeType = normalizeMimeType(file.type);
-  if (
-    normalizedMimeType.length > 0 &&
-    normalizedMimeType !== 'application/octet-stream'
-  ) {
-    return null;
-  }
-
-  return getAudioFormatByFileName(file.name);
+  return resolveMediaFormat(AUDIO_FORMAT_REGISTRY, file);
 }
 
 export function isSupportedAudioMimeType(mimeType: string): boolean {
