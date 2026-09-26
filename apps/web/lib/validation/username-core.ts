@@ -49,6 +49,27 @@ export const RESERVED_USERNAMES = [
   'engagement-engine',
   'artist-profiles',
 
+  // Live single-segment marketing roots (data/marketing/routeManifest.ts).
+  // A signup with one of these handles would be permanently unreachable —
+  // the routing layer always resolves the segment to the marketing page
+  // first. Enforced against drift by
+  // tests/unit/lib/validation/marketing-manifest-reserved.test.ts.
+  // `product` is intentionally NOT here — see the comment below.
+  'ai',
+  'api-versioning',
+  'artist-notifications',
+  'artist-profile',
+  'demovideo',
+  'developers',
+  'instant-merch',
+  'investors',
+  'launch',
+  'new',
+  'renders',
+  'smart-links',
+  'voice',
+  'youtube-thumbnails',
+
   // GSC-dead marketing roots — not claimable handles. Status 410 via
   // public-url-policy.ts. Do not add `product` or `you`: /product is
   // DESIGN_READY and shipping; /you is the locked claim-card target.
