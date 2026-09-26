@@ -24,11 +24,6 @@ export async function invalidateProfileCache(
 ): Promise<void> {
   // Invalidate dashboard data cache
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
-  revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, 'max');
-  revalidateTag(CACHE_TAGS.FEATURED_CREATORS, 'max');
-  revalidateTag(CACHE_TAGS.ARTISTS_DIRECTORY, 'max');
-  revalidatePath(APP_ROUTES.ARTISTS);
 
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {

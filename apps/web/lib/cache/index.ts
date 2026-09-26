@@ -36,7 +36,8 @@ export {
   invalidateSocialLinksCache,
   invalidateUsernameChange,
 } from './profile';
-
+// Release cache invalidation map (JOV-6272)
+export { invalidateReleaseCaches } from './releases';
 // Cache tags and constants
 export {
   CACHE_TAGS,
@@ -45,5 +46,6 @@ export {
   type CacheTTL,
   createAvatarTag,
   createProfileTag,
+  createReleasesTag,
   createSocialLinksTag,
 } from './tags';
