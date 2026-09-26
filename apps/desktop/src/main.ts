@@ -6,6 +6,7 @@ import {
   BrowserWindow,
   clipboard,
   desktopCapturer,
+  dialog,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
   ipcMain,
@@ -50,6 +51,7 @@ import {
 } from './desktop-auth-security';
 import {
   buildDesktopUpdateMenuItem,
+  buildManualUpdateCheckFeedback,
   hasNightlyUpdateFlag,
   NIGHTLY_UPDATE_TIMEOUT_MS,
   shouldInstallDownloadedUpdateNow,
@@ -288,6 +290,9 @@ const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
+// Set only for a menu-initiated "Check for updates…" click so its result
+// (up to date / error) shows a dialog; silent background checks stay silent.
+let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
@@ -2290,9 +2295,33 @@ function configureDesktopAutoUpdater(): void {
   autoUpdater.autoInstallOnAppQuit = true;
 }
 
+/** Show the result of a menu-initiated check; a no-op for silent checks. */
+function showManualUpdateCheckFeedback(
+  outcome: 'not-available' | 'error'
+): void {
+  if (!pendingManualUpdateCheck) return;
+  pendingManualUpdateCheck = false;
+
+  const feedback = buildManualUpdateCheckFeedback(outcome);
+  const options = {
+    type: feedback.type,
+    title: feedback.title,
+    message: feedback.title,
+    detail: feedback.message,
+  };
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  void (parent
+    ? dialog.showMessageBox(parent, options)
+    : dialog.showMessageBox(options));
+}
+
 function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
   if (!desktopUpdatesSupported()) {
     return;
+  }
+
+  if (mode === 'notify') {
+    pendingManualUpdateCheck = true;
   }
 
   const pending =
@@ -2300,6 +2329,7 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
       ? autoUpdater.checkForUpdatesAndNotify()
       : autoUpdater.checkForUpdates();
   pending.catch(() => {
+    showManualUpdateCheckFeedback('error');
     if (nightlyUpdateLaunch) {
       app.quit();
     }
@@ -2492,12 +2522,14 @@ function sendToAppWindows(channel: UpdateChannel): void {
 // Wire auto-updater events to renderer IPC so the web UI can show the update pill.
 autoUpdater.on('update-available', () => {
   updateReadyToInstall = false;
+  pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_AVAILABLE_CHANNEL);
 });
 
 autoUpdater.on('update-downloaded', () => {
   updateReadyToInstall = true;
+  pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
 
@@ -2515,12 +2547,14 @@ autoUpdater.on('update-downloaded', () => {
 });
 
 autoUpdater.on('update-not-available', () => {
+  showManualUpdateCheckFeedback('not-available');
   if (nightlyUpdateLaunch) {
     app.quit();
   }
 });
 
 autoUpdater.on('error', () => {
+  showManualUpdateCheckFeedback('error');
   if (nightlyUpdateLaunch) {
     app.quit();
   }
