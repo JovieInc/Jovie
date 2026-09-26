@@ -29,6 +29,19 @@ describe('AuthTextInput', () => {
     expect(input.className).toContain('tracking-[0.3em]');
   });
 
+  it('uses a 16px, 44px mobile field and preserves the compact desktop field', () => {
+    render(<AuthTextInput aria-label='Email address' />);
+
+    const input = screen.getByRole('textbox', { name: 'Email address' });
+
+    expect(input.className).toContain('h-11');
+    expect(input.className).toContain('min-h-11');
+    expect(input.className).toContain('text-base');
+    expect(input.className).toContain('sm:h-10');
+    expect(input.className).toContain('sm:min-h-10');
+    expect(input.className).toContain('sm:text-sm');
+  });
+
   it('forwards refs to the underlying input element', () => {
     const ref = createRef<HTMLInputElement>();
     render(<AuthTextInput ref={ref} aria-label='Password' />);
