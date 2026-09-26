@@ -26,13 +26,40 @@ export interface AdminSocialLink {
   platformType: string;
 }
 
+// Per-platform identity evidence from the enrichment stage (JOV-6529).
+export type AdminIdentityLinkStatus =
+  | 'verified'
+  | 'not_found'
+  | 'not_checked'
+  | 'conflicted';
+
+export interface AdminIdentityPlatformStatus {
+  status: AdminIdentityLinkStatus;
+  observedAt: string;
+  sources: readonly string[];
+  conflicts?: readonly string[];
+}
+
+export interface AdminIdentityEnrichment {
+  observedAt: string;
+  shareReadiness: 'ready' | 'limited';
+  platformStatus: Record<string, AdminIdentityPlatformStatus>;
+}
+
 /**
  * API response structure
  */
 interface AdminSocialLinksResponse {
   success: boolean;
   links?: AdminSocialLink[];
+  identityEnrichment?: AdminIdentityEnrichment | null;
   error?: string;
+}
+
+export interface AdminSocialLinksData {
+  links: AdminSocialLink[];
+  /** Null when the enrichment pass has never run for this profile. */
+  identityEnrichment: AdminIdentityEnrichment | null;
 }
 
 /**
@@ -47,7 +74,7 @@ export interface UseAdminSocialLinksQueryOptions {
 async function fetchAdminSocialLinks(
   profileId: string,
   signal?: AbortSignal
-): Promise<AdminSocialLink[]> {
+): Promise<AdminSocialLinksData> {
   const url = `/api/admin/creator-social-links?profileId=${encodeURIComponent(profileId)}`;
 
   const response = await fetchWithTimeout<AdminSocialLinksResponse>(url, {
@@ -58,7 +85,10 @@ async function fetchAdminSocialLinks(
     throw new Error(response.error ?? 'Failed to fetch social links');
   }
 
-  return response.links;
+  return {
+    links: response.links,
+    identityEnrichment: response.identityEnrichment ?? null,
+  };
 }
 
 /**

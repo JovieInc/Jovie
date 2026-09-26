@@ -115,6 +115,7 @@ describe('Admin Creator Social Links API', () => {
                 url: 'https://instagram.com/test',
               },
             ]),
+            limit: vi.fn().mockResolvedValue([{ settings: null }]),
           }),
         }),
       });

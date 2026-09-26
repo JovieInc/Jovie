@@ -21,6 +21,7 @@ import {
   ProfileLinkList,
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
+import type { AdminIdentityEnrichment } from '@/lib/queries/useAdminSocialLinksQuery';
 import type { Contact } from '@/types';
 import { AlgorithmHealthPanel } from './AlgorithmHealthPanel';
 
@@ -42,12 +43,68 @@ function mapContactLinksToPreviewLinks(contact: Contact): PreviewPanelLink[] {
   }));
 }
 
+const IDENTITY_STATUS_LABELS: Record<string, string> = {
+  verified: 'Verified',
+  not_found: 'Not found',
+  not_checked: 'Not checked',
+  conflicted: 'Conflicted',
+};
+
+// Per-platform identity evidence from the enrichment pass (JOV-6529);
+function IdentityEnrichmentStatusList({
+  enrichment,
+}: {
+  readonly enrichment: AdminIdentityEnrichment;
+}) {
+  const entries = Object.entries(enrichment.platformStatus).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+  return (
+    <div
+      className='mb-3 rounded-md border border-subtle'
+      data-testid='identity-enrichment-status'
+    >
+      <div className='mb-1.5 flex items-center justify-between'>
+        <span className='text-xs font-medium text-secondary-token'>
+          Identity evidence
+        </span>
+        <span className='text-xs text-tertiary-token'>
+          {enrichment.shareReadiness === 'ready'
+            ? 'Share-ready'
+            : 'Limited evidence'}
+        </span>
+      </div>
+      <ul className='space-y-1'>
+        {entries.map(([platform, status]) => (
+          <li
+            key={platform}
+            className='flex items-center justify-between text-xs'
+          >
+            <span className='text-secondary-token'>{platform}</span>
+            <span
+              className='text-tertiary-token'
+              title={
+                status.conflicts?.length
+                  ? `Conflicting identities: ${status.conflicts.join(', ')}`
+                  : undefined
+              }
+            >
+              {IDENTITY_STATUS_LABELS[status.status] ?? status.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 interface AdminProfileSidebarProps {
   readonly profile: AdminCreatorProfileRow | null;
   readonly contact: Contact | null;
   readonly isOpen: boolean;
   readonly onClose: () => void;
   readonly contextMenuItems?: CommonDropdownItem[];
+  readonly identityEnrichment?: AdminIdentityEnrichment | null;
 }
 
 export function AdminProfileSidebar({
@@ -56,6 +113,7 @@ export function AdminProfileSidebar({
   isOpen,
   onClose,
   contextMenuItems,
+  identityEnrichment,
 }: AdminProfileSidebarProps) {
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about' | 'algorithm'
@@ -180,7 +238,6 @@ export function AdminProfileSidebar({
             ariaLabel='Creator profile sidebar view'
           />
         }
-        contentClassName='pt-2'
       >
         {selectedCategory === 'about' ? (
           <ProfileAboutTab
@@ -201,11 +258,16 @@ export function AdminProfileSidebar({
           />
         ) : null}
         {selectedCategory !== 'about' && selectedCategory !== 'algorithm' ? (
-          <ProfileLinkList
-            links={links}
-            selectedCategory={selectedCategory as CategoryOption}
-            surface='plain'
-          />
+          <>
+            {selectedCategory === 'social' && identityEnrichment ? (
+              <IdentityEnrichmentStatusList enrichment={identityEnrichment} />
+            ) : null}
+            <ProfileLinkList
+              links={links}
+              selectedCategory={selectedCategory as CategoryOption}
+              surface='plain'
+            />
+          </>
         ) : null}
       </DrawerTabbedCard>
     </EntitySidebarShell>

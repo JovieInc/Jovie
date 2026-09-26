@@ -102,6 +102,25 @@ describe('composeFriendlyArtistHandleCandidates', () => {
     ]);
   });
 
+  it('consumes enriched artist-controlled destinations as handle evidence (JOV-6529)', () => {
+    const result = composeFriendlyArtistHandleCandidates({
+      registryName: null,
+      providerArtist: undefined,
+      identityLinks: [
+        { platform: 'website', url: 'https://www.feddelegrand.com/' },
+        { platform: 'instagram', url: 'https://instagram.com/feddelegrand' },
+        { platform: 'spotify', url: 'https://open.spotify.com/artist/x' },
+      ],
+    });
+
+    const handles = result.accepted.map(c => c.handle);
+    expect(handles).toContain('feddelegrand');
+    expect(result.accepted.every(c => c.source === 'enriched_identity')).toBe(
+      true
+    );
+    expect(handles).not.toContain('x');
+  });
+
   it('produces identical output for identical inputs (pure/deterministic)', () => {
     const input = {
       registryName: 'Fedde Le Grand',
