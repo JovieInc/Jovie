@@ -99,7 +99,7 @@ describe('watchMinutesPerImpression', () => {
 // ---------------------------------------------------------------------------
 
 describe('computeBayesianProbBOverA', () => {
-  it('returns 0.5 when control has zero impressions', () => {
+  it('returns null when control has zero impressions (no valid estimate, not a guessed 0.5)', () => {
     const noData: VariantMetrics = {
       impressions: 0,
       watchMinutes: 0,
@@ -110,40 +110,26 @@ describe('computeBayesianProbBOverA', () => {
       watchMinutes: 500,
       avgViewDurationSeconds: 180,
     };
-    expect(computeBayesianProbBOverA(noData, good)).toBe(0.5);
+    expect(computeBayesianProbBOverA(noData, good)).toBeNull();
   });
 
-  it('returns 0.5 when treatment has zero impressions', () => {
-    const good: VariantMetrics = {
-      impressions: 1000,
-      watchMinutes: 500,
-      avgViewDurationSeconds: 180,
-    };
-    const noData: VariantMetrics = {
-      impressions: 0,
-      watchMinutes: 0,
-      avgViewDurationSeconds: 0,
-    };
-    expect(computeBayesianProbBOverA(good, noData)).toBe(0.5);
-  });
-
-  it('returns > 0.9 when treatment strongly outperforms control', () => {
+  it('returns null when treatment strongly outperforms control (confidence unavailable, not a guessed high probability)', () => {
     const control: VariantMetrics = {
       impressions: 5000,
       watchMinutes: 500,
       avgViewDurationSeconds: 180,
     };
-    // Treatment has 2× watch-min/impression — clear winner
+    // Treatment has 2× watch-min/impression — but VariantMetrics carries no
+    // variance, so no statistically valid confidence can be produced.
     const treatment: VariantMetrics = {
       impressions: 5000,
       watchMinutes: 1000,
       avgViewDurationSeconds: 200,
     };
-    const prob = computeBayesianProbBOverA(control, treatment);
-    expect(prob).toBeGreaterThan(0.9);
+    expect(computeBayesianProbBOverA(control, treatment)).toBeNull();
   });
 
-  it('returns < 0.1 when treatment strongly underperforms control', () => {
+  it('returns null when treatment strongly underperforms control', () => {
     const control: VariantMetrics = {
       impressions: 5000,
       watchMinutes: 1000,
@@ -154,18 +140,87 @@ describe('computeBayesianProbBOverA', () => {
       watchMinutes: 500,
       avgViewDurationSeconds: 160,
     };
-    const prob = computeBayesianProbBOverA(control, treatment);
-    expect(prob).toBeLessThan(0.1);
+    expect(computeBayesianProbBOverA(control, treatment)).toBeNull();
   });
 
-  it('returns ~0.5 when variants are equal', () => {
+  it('returns null when variants are equal', () => {
     const m: VariantMetrics = {
       impressions: 2000,
       watchMinutes: 800,
       avgViewDurationSeconds: 180,
     };
-    const prob = computeBayesianProbBOverA(m, m);
-    expect(prob).toBeCloseTo(0.5, 2);
+    expect(computeBayesianProbBOverA(m, m)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Units invariance (JOV-6469) — a valid estimator cannot depend on the
+// arbitrary unit chosen for a continuous measurement like watch duration.
+// The prior Poisson-rate model scaled its z-score by √c under a c× unit
+// rescale (e.g. minutes→seconds, c=60), which could flip the decision kind
+// purely from unit choice. These tests fail against that model and pass now
+// that the estimator honestly reports "unavailable" instead.
+// ---------------------------------------------------------------------------
+
+describe('units invariance (JOV-6469)', () => {
+  it('computeBayesianProbBOverA is invariant to rescaling watch-minutes (e.g. minutes vs seconds)', () => {
+    const control: VariantMetrics = {
+      impressions: 5000,
+      watchMinutes: 500,
+      avgViewDurationSeconds: 180,
+    };
+    const treatment: VariantMetrics = {
+      impressions: 5000,
+      watchMinutes: 1000,
+      avgViewDurationSeconds: 200,
+    };
+    const RESCALE = 60; // simulate expressing the same durations in seconds
+    const controlRescaled: VariantMetrics = {
+      ...control,
+      watchMinutes: control.watchMinutes * RESCALE,
+    };
+    const treatmentRescaled: VariantMetrics = {
+      ...treatment,
+      watchMinutes: treatment.watchMinutes * RESCALE,
+    };
+
+    expect(computeBayesianProbBOverA(control, treatment)).toBe(
+      computeBayesianProbBOverA(controlRescaled, treatmentRescaled)
+    );
+  });
+
+  it('evaluatePackagingExperiment reaches the same decision kind regardless of the watch-time unit scale', () => {
+    const state = makeState({
+      control: {
+        impressions: 5000,
+        watchMinutes: 500,
+        avgViewDurationSeconds: 180,
+      },
+      treatment: {
+        impressions: 5000,
+        watchMinutes: 520,
+        avgViewDurationSeconds: 181,
+      },
+    });
+    const RESCALE = 60;
+    const rescaledState = makeState({
+      control: {
+        ...state.control,
+        watchMinutes: state.control.watchMinutes * RESCALE,
+      },
+      treatment: {
+        ...state.treatment,
+        watchMinutes: state.treatment.watchMinutes * RESCALE,
+      },
+    });
+
+    const dBase = evaluatePackagingExperiment(state);
+    const dRescaled = evaluatePackagingExperiment(rescaledState);
+
+    expect(dBase.kind).toBe(dRescaled.kind);
+    expect(dBase.probTreatmentWins).toBe(dRescaled.probTreatmentWins);
+    expect(dBase.kind).not.toBe('swap_treatment');
+    expect(dBase.kind).not.toBe('rollback_control');
   });
 });
 
@@ -271,7 +326,8 @@ describe('evaluatePackagingExperiment — guardrails', () => {
       },
     });
     const d = evaluatePackagingExperiment(state);
-    // Could be continue or swap_treatment, but NOT rollback due to regression
+    // Decision is always 'continue' now (confidence unavailable), but it
+    // must NOT be the regression guardrail causing it.
     expect(
       d.guardrailViolations.every(
         v => v.rule !== 'avg_view_duration_regression'
@@ -284,8 +340,8 @@ describe('evaluatePackagingExperiment — guardrails', () => {
 // evaluatePackagingExperiment — Bayesian decisions
 // ---------------------------------------------------------------------------
 
-describe('evaluatePackagingExperiment — Bayesian decisions', () => {
-  it('returns swap_treatment when treatment strongly wins and autoPublishEnabled=true', () => {
+describe('evaluatePackagingExperiment — Bayesian decisions (deliberate-red: no unsupported auto-winner)', () => {
+  it('does NOT auto-swap even when treatment appears to strongly outperform control — confidence is unavailable', () => {
     const state = makeState({
       control: {
         impressions: 5000,
@@ -299,12 +355,15 @@ describe('evaluatePackagingExperiment — Bayesian decisions', () => {
       },
     });
     const d = evaluatePackagingExperiment(state);
-    expect(d.kind).toBe('swap_treatment');
-    expect(d.probTreatmentWins).toBeGreaterThan(DEFAULT_WIN_THRESHOLD);
+    expect(d.kind).toBe('continue');
+    expect(d.probTreatmentWins).toBeNull();
     expect(d.requiresApproval).toBe(false);
+    expect(
+      d.guardrailViolations.some(v => v.rule === 'confidence_unavailable')
+    ).toBe(true);
   });
 
-  it('returns awaiting_approval when treatment wins but autoPublishEnabled=false', () => {
+  it('does NOT queue awaiting_approval on apparent wins even when autoPublishEnabled=false — confidence is unavailable regardless', () => {
     const state = makeState({
       autoPublishEnabled: false,
       control: {
@@ -319,11 +378,11 @@ describe('evaluatePackagingExperiment — Bayesian decisions', () => {
       },
     });
     const d = evaluatePackagingExperiment(state);
-    expect(d.kind).toBe('awaiting_approval');
-    expect(d.requiresApproval).toBe(true);
+    expect(d.kind).toBe('continue');
+    expect(d.probTreatmentWins).toBeNull();
   });
 
-  it('returns rollback_control when treatment clearly loses', () => {
+  it('does NOT auto-rollback even when treatment appears to clearly lose — confidence is unavailable', () => {
     const state = makeState({
       control: {
         impressions: 5000,
@@ -337,13 +396,12 @@ describe('evaluatePackagingExperiment — Bayesian decisions', () => {
       },
     });
     const d = evaluatePackagingExperiment(state);
-    expect(d.kind).toBe('rollback_control');
-    expect(d.probTreatmentWins).toBeLessThan(DEFAULT_LOSE_THRESHOLD);
+    expect(d.kind).toBe('continue');
+    expect(d.probTreatmentWins).toBeNull();
   });
 
-  it('returns continue when result is between win and lose threshold', () => {
+  it('returns continue when variants are similar (also confidence-unavailable, not threshold ambiguity)', () => {
     const state = makeState({
-      // Very similar rates — no clear winner
       control: {
         impressions: 600,
         watchMinutes: 300,
@@ -356,15 +414,13 @@ describe('evaluatePackagingExperiment — Bayesian decisions', () => {
       },
     });
     const d = evaluatePackagingExperiment(state);
-    // Should be 'continue' since prob is ambiguous (~0.5)
     expect(d.kind).toBe('continue');
   });
 
-  it('returns inconclusive when test exceeds max duration', () => {
+  it('returns inconclusive when test exceeds max duration, with confidence reported unavailable (not a fake 0%)', () => {
     const state = makeState({
       // Started 40 days ago
       startedAt: '2026-05-22T12:00:00.000Z',
-      // Neither variant clearly wins
       control: {
         impressions: 2000,
         watchMinutes: 1000,
@@ -378,6 +434,61 @@ describe('evaluatePackagingExperiment — Bayesian decisions', () => {
     });
     const d = evaluatePackagingExperiment(state);
     expect(d.kind).toBe('inconclusive');
+    expect(d.probTreatmentWins).toBeNull();
+    expect(d.rationale).toContain('unavailable');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluatePackagingExperiment — invalid metrics input (deliberate-red)
+// ---------------------------------------------------------------------------
+
+describe('evaluatePackagingExperiment — invalid metrics (deliberate-red)', () => {
+  it('holds (continue) instead of crashing or deciding on NaN watch minutes', () => {
+    const state = makeState({
+      treatment: {
+        impressions: 1000,
+        watchMinutes: Number.NaN,
+        avgViewDurationSeconds: 185,
+      },
+    });
+    const d = evaluatePackagingExperiment(state);
+    expect(d.kind).toBe('continue');
+    expect(d.probTreatmentWins).toBeNull();
+    expect(Number.isFinite(d.watchMinutesPerImpressionTreatment)).toBe(true);
+    expect(d.guardrailViolations.some(v => v.rule === 'invalid_metrics')).toBe(
+      true
+    );
+  });
+
+  it('holds (continue) on negative impressions instead of deciding', () => {
+    const state = makeState({
+      control: {
+        impressions: -1,
+        watchMinutes: 500,
+        avgViewDurationSeconds: 180,
+      },
+    });
+    const d = evaluatePackagingExperiment(state);
+    expect(d.kind).toBe('continue');
+    expect(d.guardrailViolations.some(v => v.rule === 'invalid_metrics')).toBe(
+      true
+    );
+  });
+
+  it('holds (continue) on non-finite avgViewDurationSeconds instead of deciding', () => {
+    const state = makeState({
+      treatment: {
+        impressions: 1000,
+        watchMinutes: 600,
+        avgViewDurationSeconds: Number.POSITIVE_INFINITY,
+      },
+    });
+    const d = evaluatePackagingExperiment(state);
+    expect(d.kind).toBe('continue');
+    expect(d.guardrailViolations.some(v => v.rule === 'invalid_metrics')).toBe(
+      true
+    );
   });
 });
 
@@ -386,7 +497,7 @@ describe('evaluatePackagingExperiment — Bayesian decisions', () => {
 // ---------------------------------------------------------------------------
 
 describe('evaluatePackagingExperiment — custom config', () => {
-  it('respects custom minImpressionsPerVariant', () => {
+  it('respects custom minImpressionsPerVariant for the min_impressions guardrail', () => {
     const state = makeState({
       control: {
         impressions: 300,
@@ -403,15 +514,14 @@ describe('evaluatePackagingExperiment — custom config', () => {
     const d = evaluatePackagingExperiment(state, {
       minImpressionsPerVariant: 200,
     });
-    // 300 ≥ 200 so min_impressions should not fire; prob ~0.9+ so likely swap
+    // 300 ≥ 200 so min_impressions should not fire
     expect(d.guardrailViolations.every(v => v.rule !== 'min_impressions')).toBe(
       true
     );
   });
 
-  it('respects custom winThreshold', () => {
+  it('never swaps on a custom winThreshold — confidence-unavailable gate applies regardless of threshold', () => {
     const state = makeState({
-      // Moderate treatment advantage
       control: {
         impressions: 2000,
         watchMinutes: 800,
@@ -423,15 +533,12 @@ describe('evaluatePackagingExperiment — custom config', () => {
         avgViewDurationSeconds: 183,
       },
     });
-    // With a high threshold, marginal advantage doesn't trigger swap
     const dHigh = evaluatePackagingExperiment(state, { winThreshold: 0.999 });
-    // With low threshold, it does
-    const dLow = evaluatePackagingExperiment(state, { winThreshold: 0.55 });
-    // High threshold → probably continue; low → probably swap
-    // We just check the thresholds are applied (not the exact decision which depends on prob)
-    expect(
-      dHigh.kind !== 'swap_treatment' || dLow.kind === 'swap_treatment'
-    ).toBe(true);
+    const dLow = evaluatePackagingExperiment(state, { winThreshold: 0.001 });
+    // No threshold, however permissive, can produce an automatic winner from
+    // an unavailable confidence value — both hold on 'continue'.
+    expect(dHigh.kind).toBe('continue');
+    expect(dLow.kind).toBe('continue');
   });
 });
 
