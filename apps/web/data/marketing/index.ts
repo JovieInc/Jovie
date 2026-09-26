@@ -264,6 +264,18 @@ export {
   MARKETING_RECIPES,
 } from './recipes';
 export type {
+  RenderedCopyCertification,
+  RenderedCopyException,
+  RenderedCopyLine,
+  RenderedCopyRegister,
+  RenderedCopySurface,
+} from './renderedCopy';
+export {
+  auditRenderedCopy,
+  createRenderedCopyDigest,
+  RENDERED_COPY_REGISTERS,
+} from './renderedCopy';
+export type {
   MarketingExactPublicRouteTarget,
   MarketingRouteCaptureState,
   MarketingRouteCaptureViewport,
