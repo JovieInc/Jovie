@@ -1012,6 +1012,18 @@ describe('baked runner prerequisite contract', () => {
   it('binds the marker to the pnpm version reported by the host binary', () => {
     const fixture = makeFixture();
     const env = verifierEnvironment(fixture, process.env, { hostPnpm: true });
+    // Like nodeMajor/nodeMinimum in makeFixture, require the runtime under
+    // test: the verifier fails closed on pnpm drift (covered by the drift test
+    // below), and this case proves the marker records the host binary's own
+    // report on any host, not only one that happens to match the image pin.
+    const hostPnpmVersion = execFileSync('pnpm', ['--version'], {
+      encoding: 'utf8',
+      env,
+    }).trim();
+    writeFileSync(
+      fixture.requirementsPath,
+      JSON.stringify({ ...fixture.requirements, pnpmVersion: hostPnpmVersion })
+    );
     execFileSync(
       process.execPath,
       [verifierPath, '--write-marker', fixture.markerPath],
@@ -1020,13 +1032,6 @@ describe('baked runner prerequisite contract', () => {
     const marker = JSON.parse(readFileSync(fixture.markerPath, 'utf8')) as {
       readonly pnpmVersion: string;
     };
-    // Compare with what this host's pnpm reports, not the pinned requirement:
-    // the pin is enforced by the drift test below, and a host whose pnpm
-    // differs from the pin must still record its own version.
-    const hostPnpmVersion = execFileSync('pnpm', ['--version'], {
-      encoding: 'utf8',
-      env,
-    }).trim();
     expect(marker.pnpmVersion).toBe(hostPnpmVersion);
   }, 15_000);
 
