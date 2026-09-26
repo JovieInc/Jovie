@@ -23,6 +23,11 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
   getUserBillingInfo: mockGetUserBillingInfo,
 }));
 
+vi.mock('@/lib/admin/mfa', () => ({
+  hasRecentAdminMfaReverification: async (auth: { has?: () => boolean }) =>
+    Boolean(auth?.has?.()),
+}));
+
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mockIsAdmin,
 }));
