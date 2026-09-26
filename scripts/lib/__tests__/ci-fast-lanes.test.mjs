@@ -25,8 +25,10 @@ import {
   runCommandPool,
   runDesignConformance,
   runStructural,
+  SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+  selectSourceGuards,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -1656,5 +1658,94 @@ describe('failing test identities in lane excerpts', () => {
     expect(lines.every(line => line.length <= 200)).toBe(true);
     expect(extractFailureIdentities('all good\n')).toEqual([]);
     expect(extractFailureIdentities(undefined)).toEqual([]);
+  });
+});
+
+// Guards that read their inputs from disk escape PR selection by import graph
+// and structural path patterns, so the merge queue met each one first:
+// #18703 landed a cron workflow without `# clock-class:` (ci-schedule-inventory
+// ran nowhere), and node-environment-files / static-revalidate-policy ejected
+// merge groups for inputs their source PRs never checked.
+describe('source-read guard selection', () => {
+  const selected = (event, files) =>
+    selectSourceGuards(event, files).map(guard => guard.id);
+
+  it.each([['pull_request'], ['merge_group'], ['push']])(
+    'runs ci-schedule-inventory on %s when a workflow changes',
+    event => {
+      expect(
+        selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
+      ).toEqual(['ci-schedule-inventory']);
+    }
+  );
+
+  it.each([
+    ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
+    [
+      'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
+      ['ci-schedule-inventory'],
+    ],
+    ['.github/workflows/nested/not-loaded.yml', []],
+    ['.github/scripts/run-actionlint.sh', []],
+    [
+      'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
+      ['node-environment-files'],
+    ],
+    ['apps/web/app/api/cron/example/route.test.ts', ['node-environment-files']],
+    ['apps/web/eslint-rules/rule.test.js', ['node-environment-files']],
+    ['apps/web/scripts/tool.test.mjs', ['node-environment-files']],
+    ['apps/web/tests/node-environment-files.json', ['node-environment-files']],
+    ['apps/web/tests/setup-optimized.ts', ['node-environment-files']],
+    [
+      'apps/web/vitest.config.fast.mts',
+      ['node-environment-files', 'static-revalidate-policy'],
+    ],
+    ['apps/web/lib/queries/fetch.ts', ['static-revalidate-policy']],
+    [
+      'apps/web/app/(marketing)/download/page.tsx',
+      ['static-revalidate-policy'],
+    ],
+    [
+      'apps/web/tests/unit/marketing/static-revalidate-policy.test.ts',
+      ['node-environment-files', 'static-revalidate-policy'],
+    ],
+    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
+    ['apps/ios/Jovie/App.swift', []],
+  ])('selects the guards that read %s on a PR', (path, guards) => {
+    expect(selected('pull_request', [path])).toEqual(guards);
+  });
+
+  it('keeps web-only guards to PRs; web merge groups already run them', () => {
+    for (const path of [
+      'apps/web/lib/queries/fetch.ts',
+      'apps/web/tests/node-environment-files.json',
+    ]) {
+      expect(classifyProductLanes([path]).selectedLanes).toContain('web');
+      expect(selected('merge_group', [path])).toEqual([]);
+      expect(selected('push', [path])).toEqual([]);
+    }
+  });
+
+  it('fails closed onto guards for manual, local, and unreadable diffs', () => {
+    const all = SOURCE_GUARDS.map(guard => guard.id);
+    // Manual dispatch runs web Unit Tests and structural, which carry the rest.
+    expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'ci-schedule-inventory',
+    ]);
+    expect(selected('', ['README.md'])).toEqual(all);
+    expect(selected('pull_request', null)).toEqual(all);
+    expect(selected('pull_request', [])).toEqual(all);
+    expect(selected('merge_group', null)).toEqual(['ci-schedule-inventory']);
+  });
+
+  it('points every guard at a test file that exists', () => {
+    for (const guard of SOURCE_GUARDS) {
+      const dir = guard.command.includes('@jovie/web') ? 'apps/web' : 'scripts';
+      const file = guard.command.split(' ').at(-1);
+      expect(
+        readFileSync(join(REPO_ROOT, dir, file), 'utf8'),
+        guard.id
+      ).toContain('describe(');
+    }
   });
 });

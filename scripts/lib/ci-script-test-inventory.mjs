@@ -62,8 +62,6 @@ export const KNOWN_RED_ORPHANS = Object.freeze({
     'red on main: registry.capabilities[4] claims autonomousSafe without its prior gates.',
   'scripts/voice-stack-bake-off/bake-off.test.mjs':
     'red on main: validate-test-script.ts imports zod, which scripts/ cannot resolve.',
-  'scripts/lib/__tests__/ci-schedule-inventory.test.mjs':
-    'red on main: two cron workflows lack a clock-class; fixed separately in #18430.',
   'scripts/lib/__tests__/component-shadcn-outcome-inventory.test.mjs':
     'red on main: composition inventory expects 4 entries, finds 6.',
   'scripts/lib/__tests__/pr-preparation-canary.test.mjs':
