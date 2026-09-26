@@ -19,24 +19,25 @@ export interface ClerkEmailAddressResource {
   destroy: () => Promise<void>;
 }
 
-export type ClerkSessionActivity = {
-  browserName?: string | null;
-  city?: string | null;
-  country?: string | null;
-};
-
-export interface ClerkSessionResource {
+/**
+ * Better Auth `listSessions()` row shape (core session table columns; see
+ * `better-auth/dist/api/routes/session.d.mts`). No Clerk equivalent — this
+ * backs the live SessionManagementCard.
+ */
+export interface BetterAuthSessionResource {
   id: string;
-  latestActivity?: ClerkSessionActivity | null;
-  lastActiveAt?: Date | null;
-  revoke: () => Promise<void>;
+  token: string;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt: Date;
 }
 
 export interface ClerkUserResource {
   primaryEmailAddressId: string | null;
   emailAddresses: ClerkEmailAddressResource[];
   externalAccounts: ClerkExternalAccountResource[];
-  getSessions: () => Promise<ClerkSessionResource[]>;
   createEmailAddress: (args: {
     email: string;
   }) => Promise<ClerkEmailAddressResource>;

@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountSettingsSection } from './AccountSettingsSection';
 
 const useUserSafe = vi.fn();
+const useSessionSafe = vi.fn();
 
 vi.mock('@/hooks/useJovieAuth', () => ({
   useUserSafe: () => useUserSafe(),
+  useSessionSafe: () => useSessionSafe(),
 }));
 
 vi.mock('@/features/dashboard/organisms/SettingsAppearanceSection', () => ({
@@ -16,6 +18,10 @@ vi.mock('@/features/dashboard/organisms/SettingsNotificationsSection', () => ({
   SettingsNotificationsSection: () => (
     <div data-testid='notifications-section' />
   ),
+}));
+
+vi.mock('./SessionManagementCard', () => ({
+  SessionManagementCard: () => <div data-testid='session-management-card' />,
 }));
 
 describe('AccountSettingsSection', () => {
@@ -42,6 +48,11 @@ describe('AccountSettingsSection', () => {
         lastName: 'Artist',
         username: 'ada',
       },
+    });
+    useSessionSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      session: { id: 'ba_session_1', userId: 'ba_user_1' },
     });
 
     render(<AccountSettingsSection />);
@@ -71,7 +82,8 @@ describe('AccountSettingsSection', () => {
     expect(screen.getByTestId('appearance-section')).toBeTruthy();
     expect(screen.getByTestId('notifications-section')).toBeTruthy();
     expect(screen.queryByText(/connected accounts/i)).toBeNull();
-    expect(screen.queryByText(/^sessions$/i)).toBeNull();
+    expect(screen.getByText('Active Sessions')).toBeTruthy();
+    expect(screen.getByTestId('session-management-card')).toBeTruthy();
   });
 
   it('shows a loading skeleton while the session is pending', () => {
@@ -79,6 +91,11 @@ describe('AccountSettingsSection', () => {
       isLoaded: false,
       isSignedIn: false,
       user: null,
+    });
+    useSessionSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      session: null,
     });
 
     render(<AccountSettingsSection />);
@@ -93,6 +110,11 @@ describe('AccountSettingsSection', () => {
       isSignedIn: false,
       user: null,
     });
+    useSessionSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      session: null,
+    });
 
     const { rerender } = render(<AccountSettingsSection />);
     expect(screen.getByTestId('account-identity-loading')).toHaveClass(
@@ -104,10 +126,16 @@ describe('AccountSettingsSection', () => {
       isSignedIn: false,
       user: null,
     });
+    useSessionSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+      session: null,
+    });
     rerender(<AccountSettingsSection />);
 
     expect(screen.getByTestId('account-identity-unsigned')).toHaveClass(
       'min-h-32'
     );
+    expect(screen.queryByTestId('session-management-card')).toBeNull();
   });
 });
