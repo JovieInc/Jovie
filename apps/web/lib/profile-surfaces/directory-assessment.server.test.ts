@@ -257,31 +257,28 @@ describe('MusicBrainz directory assessment persistence', () => {
     { creatorProfileId: '55555555-5555-4555-8555-555555555555' },
     { platform: 'wikipedia' },
     { kind: 'social' },
-  ])(
-    'rejects a surface with a mismatched identity tuple: %o',
-    async mismatch => {
-      arrangeDatabase([surface(mismatch)]);
+  ])('rejects a surface with a mismatched identity tuple: %o', async mismatch => {
+    arrangeDatabase([surface(mismatch)]);
 
-      const {
-        assessAndPersistMusicBrainzDirectoryEntity,
-        DirectoryAssessmentPrerequisiteError,
-      } = await import('./directory-assessment.server');
+    const {
+      assessAndPersistMusicBrainzDirectoryEntity,
+      DirectoryAssessmentPrerequisiteError,
+    } = await import('./directory-assessment.server');
 
-      await expect(
-        assessAndPersistMusicBrainzDirectoryEntity({
-          creatorProfileId: CREATOR_PROFILE_ID,
-          surfaceId: SURFACE_ID,
-          now: NOW,
-        })
-      ).rejects.toEqual(
-        expect.objectContaining<
-          Partial<InstanceType<typeof DirectoryAssessmentPrerequisiteError>>
-        >({ code: 'surface_identity_mismatch' })
-      );
-      expect(mocks.getMusicBrainzArtist).not.toHaveBeenCalled();
-      expect(mocks.insert).not.toHaveBeenCalled();
-    }
-  );
+    await expect(
+      assessAndPersistMusicBrainzDirectoryEntity({
+        creatorProfileId: CREATOR_PROFILE_ID,
+        surfaceId: SURFACE_ID,
+        now: NOW,
+      })
+    ).rejects.toEqual(
+      expect.objectContaining<
+        Partial<InstanceType<typeof DirectoryAssessmentPrerequisiteError>>
+      >({ code: 'surface_identity_mismatch' })
+    );
+    expect(mocks.getMusicBrainzArtist).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
 
   it('stops when the canonical surface is absent', async () => {
     arrangeDatabase([]);

@@ -38,23 +38,19 @@ describe('DashboardSegmentSkeleton route variants', () => {
     );
   });
 
-  it.each(ROUTE_VARIANTS)(
-    'exposes an accessible busy state for the %s route',
-    variant => {
-      render(<DashboardSegmentSkeleton variant={variant} />);
+  it.each(
+    ROUTE_VARIANTS
+  )('exposes an accessible busy state for the %s route', variant => {
+    render(<DashboardSegmentSkeleton variant={variant} />);
 
-      const skeleton = screen.getByTestId('dashboard-segment-skeleton');
-      expect(skeleton).toHaveAttribute('role', 'status');
-      expect(skeleton).toHaveAttribute('aria-busy', 'true');
-      expect(skeleton).toHaveAttribute('aria-live', 'polite');
-      expect(skeleton).toHaveAttribute(
-        'aria-label',
-        ACCESSIBLE_LABELS[variant]
-      );
-      expect(skeleton).toHaveAttribute('data-skeleton-variant', variant);
-      expect(skeleton).toHaveClass('min-h-full', 'w-full');
-    }
-  );
+    const skeleton = screen.getByTestId('dashboard-segment-skeleton');
+    expect(skeleton).toHaveAttribute('role', 'status');
+    expect(skeleton).toHaveAttribute('aria-busy', 'true');
+    expect(skeleton).toHaveAttribute('aria-live', 'polite');
+    expect(skeleton).toHaveAttribute('aria-label', ACCESSIBLE_LABELS[variant]);
+    expect(skeleton).toHaveAttribute('data-skeleton-variant', variant);
+    expect(skeleton).toHaveClass('min-h-full', 'w-full');
+  });
 
   it('reserves the admin health dashboard geometry (JOV-2098)', () => {
     const { container } = render(<DashboardSegmentSkeleton variant='admin' />);
@@ -124,25 +120,21 @@ describe('DashboardSegmentSkeleton route variants', () => {
     expect(table?.querySelectorAll('.hidden.sm\\:block')).toHaveLength(33);
   });
 
-  it.each(ROUTE_VARIANTS)(
-    'keeps the %s geometry deterministic when row keys change',
-    (variant: DashboardSegmentSkeletonVariant) => {
-      const { container, rerender } = render(
-        <DashboardSegmentSkeleton
-          variant={variant}
-          rowKeyPrefix='first-render'
-        />
-      );
-      const first = geometrySignature(container);
+  it.each(
+    ROUTE_VARIANTS
+  )('keeps the %s geometry deterministic when row keys change', (variant: DashboardSegmentSkeletonVariant) => {
+    const { container, rerender } = render(
+      <DashboardSegmentSkeleton variant={variant} rowKeyPrefix='first-render' />
+    );
+    const first = geometrySignature(container);
 
-      rerender(
-        <DashboardSegmentSkeleton
-          variant={variant}
-          rowKeyPrefix='second-render'
-        />
-      );
+    rerender(
+      <DashboardSegmentSkeleton
+        variant={variant}
+        rowKeyPrefix='second-render'
+      />
+    );
 
-      expect(geometrySignature(container)).toEqual(first);
-    }
-  );
+    expect(geometrySignature(container)).toEqual(first);
+  });
 });

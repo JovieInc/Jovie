@@ -39,13 +39,16 @@ describe('parseInboundCommand', () => {
   });
 
   describe('START family', () => {
-    it.each(['START', 'start', 'UNSTOP', 'YES', '  YES  '])(
-      'parses %s as start',
-      input => {
-        const result = parseInboundCommand(input);
-        expect(result.kind).toBe('start');
-      }
-    );
+    it.each([
+      'START',
+      'start',
+      'UNSTOP',
+      'YES',
+      '  YES  ',
+    ])('parses %s as start', input => {
+      const result = parseInboundCommand(input);
+      expect(result.kind).toBe('start');
+    });
   });
 
   describe('HELP family', () => {

@@ -23,29 +23,26 @@ const RAW_COLOR =
   /(?:text|bg|border)-(?:blue|emerald|yellow|amber|sky|orange|purple|pink|red|green)-\d/;
 
 describe('InsightCategoryIcon carbon tokens', () => {
-  it.each(Object.entries(ACCENT_BY_CATEGORY))(
-    'applies a carbon accent token for %s',
-    (category, expectedSolid) => {
-      const { container } = render(
-        <InsightCategoryIcon category={category as InsightCategory} />
-      );
-      const chip = container.firstElementChild as HTMLElement;
-      const icon = chip.querySelector('svg') as SVGElement;
+  it.each(
+    Object.entries(ACCENT_BY_CATEGORY)
+  )('applies a carbon accent token for %s', (category, expectedSolid) => {
+    const { container } = render(
+      <InsightCategoryIcon category={category as InsightCategory} />
+    );
+    const chip = container.firstElementChild as HTMLElement;
+    const icon = chip.querySelector('svg') as SVGElement;
 
-      // No raw Tailwind color classes survive on the chip or icon.
-      expect(chip.className).not.toMatch(RAW_COLOR);
-      expect(icon.getAttribute('class') ?? '').not.toMatch(RAW_COLOR);
+    // No raw Tailwind color classes survive on the chip or icon.
+    expect(chip.className).not.toMatch(RAW_COLOR);
+    expect(icon.getAttribute('class') ?? '').not.toMatch(RAW_COLOR);
 
-      if (expectedSolid) {
-        expect(chip.style.backgroundColor).toContain('--color-accent-');
-        expect(icon.getAttribute('style') ?? '').toContain(expectedSolid);
-      } else {
-        // Neutral timing category uses greyscale tokens, no inline accent var.
-        expect(chip.className).toContain('bg-surface-0');
-        expect(icon.getAttribute('class') ?? '').toContain(
-          'text-tertiary-token'
-        );
-      }
+    if (expectedSolid) {
+      expect(chip.style.backgroundColor).toContain('--color-accent-');
+      expect(icon.getAttribute('style') ?? '').toContain(expectedSolid);
+    } else {
+      // Neutral timing category uses greyscale tokens, no inline accent var.
+      expect(chip.className).toContain('bg-surface-0');
+      expect(icon.getAttribute('class') ?? '').toContain('text-tertiary-token');
     }
-  );
+  });
 });

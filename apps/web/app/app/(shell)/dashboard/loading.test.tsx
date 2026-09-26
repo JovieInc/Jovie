@@ -33,17 +33,14 @@ describe('DashboardLoading', () => {
     [APP_ROUTES.DASHBOARD_PROFILE, 'default'],
     [APP_ROUTES.DASHBOARD_TOUR_DATES, 'tour'],
     [APP_ROUTES.DASHBOARD_EARNINGS, 'default'],
-  ] as const)(
-    'dispatches %s to the %s skeleton',
-    async (pathname, expectedVariant) => {
-      mockHeaders.mockResolvedValue(new Headers({ 'next-url': pathname }));
+  ] as const)('dispatches %s to the %s skeleton', async (pathname, expectedVariant) => {
+    mockHeaders.mockResolvedValue(new Headers({ 'next-url': pathname }));
 
-      render(await DashboardLoading());
+    render(await DashboardLoading());
 
-      expect(screen.getByTestId('dashboard-segment-skeleton')).toHaveAttribute(
-        'data-skeleton-variant',
-        expectedVariant
-      );
-    }
-  );
+    expect(screen.getByTestId('dashboard-segment-skeleton')).toHaveAttribute(
+      'data-skeleton-variant',
+      expectedVariant
+    );
+  });
 });

@@ -41,9 +41,9 @@
     );
     box-shadow:
       0 var(--ap-phone-shadow-y-far) var(--ap-phone-shadow-blur-far)
-      color-mix(in oklab, var(--system-b-cinematic-black) 48%, transparent),
+        color-mix(in oklab, var(--system-b-cinematic-black) 48%, transparent),
       0 var(--ap-phone-shadow-y-near) var(--ap-phone-shadow-blur-near)
-      color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+        color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
   }
 
   .ap-phone-frame[data-size="md"] {

@@ -66,20 +66,19 @@ describe('chat artist-context identity contract', () => {
   it.each([
     { legacyUserId: USER_B, name: 'unrelated legacy owner' },
     { legacyUserId: null, name: 'missing legacy owner' },
-  ])(
-    'denies an unrelated user with $name and no claims',
-    ({ legacyUserId }) => {
-      expect(
-        resolveProfileAccess({
-          appUserId: USER_A,
-          profileId: PROFILE_ID,
-          userRows: [{ id: USER_A }],
-          profileRows: [{ id: PROFILE_ID, legacyUserId }],
-          claimRows: [],
-        })
-      ).toEqual({ ok: false, reason: 'forbidden' });
-    }
-  );
+  ])('denies an unrelated user with $name and no claims', ({
+    legacyUserId,
+  }) => {
+    expect(
+      resolveProfileAccess({
+        appUserId: USER_A,
+        profileId: PROFILE_ID,
+        userRows: [{ id: USER_A }],
+        profileRows: [{ id: PROFILE_ID, legacyUserId }],
+        claimRows: [],
+      })
+    ).toEqual({ ok: false, reason: 'forbidden' });
+  });
 });
 
 const USER_A = '00000000-0000-4000-8000-000000000001';

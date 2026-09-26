@@ -353,26 +353,23 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
     it.each([
       ['a malformed run id', 'unsafe/value', 'test@example.com', 400],
       ['a non-reserved identity', '123-1', 'customer@example.com', 403],
-    ])(
-      'rejects %s before any waitlist write',
-      async (_case, runId, email, status) => {
-        mockAuth.mockResolvedValue({ userId: 'user_123' });
-        mockCurrentUser.mockResolvedValue({
-          primaryEmailAddress: { emailAddress: email },
-        });
+    ])('rejects %s before any waitlist write', async (_case, runId, email, status) => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCurrentUser.mockResolvedValue({
+        primaryEmailAddress: { emailAddress: email },
+      });
 
-        const { POST } = await routeModulePromise;
-        const response = await POST(
-          new Request('http://localhost/api/waitlist', {
-            method: 'POST',
-            headers: { 'x-jovie-waitlist-canary-run-id': runId },
-          })
-        );
+      const { POST } = await routeModulePromise;
+      const response = await POST(
+        new Request('http://localhost/api/waitlist', {
+          method: 'POST',
+          headers: { 'x-jovie-waitlist-canary-run-id': runId },
+        })
+      );
 
-        expect(response.status).toBe(status);
-        expect(mockDbTransaction).not.toHaveBeenCalled();
-      }
-    );
+      expect(response.status).toBe(status);
+      expect(mockDbTransaction).not.toHaveBeenCalled();
+    });
 
     it('returns 429 when a waitlist submission is rate limited', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });

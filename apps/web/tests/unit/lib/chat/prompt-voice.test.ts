@@ -14,12 +14,11 @@ import { lintVoice } from '@/lib/chat/voice-lint';
  * the model is told to imitate — not on the raw prompt text.
  */
 describe('onboarding prompt voice (JOV-3806)', () => {
-  it.each(Object.entries(ONBOARDING_CALIBRATION_EXAMPLES))(
-    'calibration example %s passes the Jovie voice lint',
-    (_name, text) => {
-      expect(lintVoice(text).violations).toEqual([]);
-    }
-  );
+  it.each(
+    Object.entries(ONBOARDING_CALIBRATION_EXAMPLES)
+  )('calibration example %s passes the Jovie voice lint', (_name, text) => {
+    expect(lintVoice(text).violations).toEqual([]);
+  });
 
   it('wires every calibration example into the live prompt', () => {
     for (const text of Object.values(ONBOARDING_CALIBRATION_EXAMPLES)) {

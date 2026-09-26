@@ -943,22 +943,19 @@ describe('performance budgets guard', () => {
     'https://jov.ie',
     'http://127.0.0.1:3000',
     'https://foreign-project-foreign-team.vercel.app',
-  ])(
-    'keeps non-protected measurement target %s free of origin state',
-    async baseUrl => {
-      const fixture = createProtectedOriginBrowserFixture([]);
-      const bootstrapOrigin = vi.fn();
+  ])('keeps non-protected measurement target %s free of origin state', async baseUrl => {
+    const fixture = createProtectedOriginBrowserFixture([]);
+    const bootstrapOrigin = vi.fn();
 
-      await expect(
-        loadPerformanceProtectedOriginCookies(fixture.browser, baseUrl, {
-          bootstrapOrigin,
-        })
-      ).resolves.toEqual([]);
+    await expect(
+      loadPerformanceProtectedOriginCookies(fixture.browser, baseUrl, {
+        bootstrapOrigin,
+      })
+    ).resolves.toEqual([]);
 
-      expect(fixture.newContext).not.toHaveBeenCalled();
-      expect(bootstrapOrigin).not.toHaveBeenCalled();
-    }
-  );
+    expect(fixture.newContext).not.toHaveBeenCalled();
+    expect(bootstrapOrigin).not.toHaveBeenCalled();
+  });
 
   it('verifies staged access once and returns only exact-host infrastructure cookies', async () => {
     const cookie = {

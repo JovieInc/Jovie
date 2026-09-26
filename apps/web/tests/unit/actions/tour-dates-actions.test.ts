@@ -887,21 +887,18 @@ describe('tour-dates/actions.ts', () => {
       ['updateTourDate', { id: 'td_1', title: 'T' }],
       ['deleteTourDate', 'td_1'],
       ['disconnectBandsintown', undefined],
-    ] as const)(
-      '%s throws Unauthorized for unauthenticated users',
-      async (actionName, args) => {
-        const mod = await import(
-          '@/app/app/(shell)/dashboard/tour-dates/actions'
-        );
-        const action = (
-          mod as Record<string, (...a: unknown[]) => Promise<unknown>>
-        )[actionName];
+    ] as const)('%s throws Unauthorized for unauthenticated users', async (actionName, args) => {
+      const mod = await import(
+        '@/app/app/(shell)/dashboard/tour-dates/actions'
+      );
+      const action = (
+        mod as Record<string, (...a: unknown[]) => Promise<unknown>>
+      )[actionName];
 
-        await expect(
-          args !== undefined ? action(args) : action()
-        ).rejects.toThrow('Unauthorized');
-      }
-    );
+      await expect(
+        args !== undefined ? action(args) : action()
+      ).rejects.toThrow('Unauthorized');
+    });
   });
 
   // ========================================================================

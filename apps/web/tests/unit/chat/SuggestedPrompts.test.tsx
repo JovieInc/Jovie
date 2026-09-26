@@ -133,71 +133,73 @@ describe('SuggestedPrompts', () => {
     expect(getByTestId('suggested-prompts-flat')).toBeTruthy();
   });
 
-  it.each(['rail', 'grid', 'flat'] as const)(
-    'keeps album-art loading copy scoped to album art in the %s layout',
-    layout => {
-      const onSelect = vi.fn();
-      const { getByRole } = fastRender(
-        <SuggestedPrompts
-          onSelect={onSelect}
-          layout={layout}
-          albumArtCapability={{
-            availability: 'unknown',
-            reason: 'Checking album art availability...',
-            reasonCode: 'CHECKING',
-          }}
-        />
-      );
+  it.each([
+    'rail',
+    'grid',
+    'flat',
+  ] as const)('keeps album-art loading copy scoped to album art in the %s layout', layout => {
+    const onSelect = vi.fn();
+    const { getByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        layout={layout}
+        albumArtCapability={{
+          availability: 'unknown',
+          reason: 'Checking album art availability...',
+          reasonCode: 'CHECKING',
+        }}
+      />
+    );
 
-      for (const action of defaultStarterActions) {
-        const button = getByRole('button', { name: action.label });
-        expect(button).toHaveAttribute('aria-label', action.label);
+    for (const action of defaultStarterActions) {
+      const button = getByRole('button', { name: action.label });
+      expect(button).toHaveAttribute('aria-label', action.label);
 
-        if (action.label === 'Generate Album Art') {
-          expect(button).toBeDisabled();
-          expect(button).toHaveAttribute(
-            'title',
-            'Checking album art availability...'
-          );
-          continue;
-        }
-
-        expect(button).toBeEnabled();
-        expect(button).toHaveAttribute('title', action.label);
-        expect(button).not.toHaveAttribute(
+      if (action.label === 'Generate Album Art') {
+        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute(
           'title',
           'Checking album art availability...'
         );
+        continue;
       }
-    }
-  );
 
-  it.each(['rail', 'grid', 'flat'] as const)(
-    'clears the album-art loading title when the action becomes available in the %s layout',
-    layout => {
-      const onSelect = vi.fn();
-      const { getByRole } = fastRender(
-        <SuggestedPrompts
-          onSelect={onSelect}
-          layout={layout}
-          albumArtCapability={{
-            availability: 'available',
-            reason: null,
-            reasonCode: null,
-          }}
-        />
+      expect(button).toBeEnabled();
+      expect(button).toHaveAttribute('title', action.label);
+      expect(button).not.toHaveAttribute(
+        'title',
+        'Checking album art availability...'
       );
-
-      const albumArt = getByRole('button', { name: 'Generate Album Art' });
-      expect(albumArt).toBeEnabled();
-      expect(albumArt).toHaveAttribute('aria-label', 'Generate Album Art');
-      expect(albumArt).toHaveAttribute('title', 'Generate Album Art');
-
-      albumArt.click();
-      expect(onSelect).toHaveBeenCalledOnce();
-      expect(onSelect).toHaveBeenCalledWith(defaultStarterActions[1].prompt);
     }
-  );
+  });
+
+  it.each([
+    'rail',
+    'grid',
+    'flat',
+  ] as const)('clears the album-art loading title when the action becomes available in the %s layout', layout => {
+    const onSelect = vi.fn();
+    const { getByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        layout={layout}
+        albumArtCapability={{
+          availability: 'available',
+          reason: null,
+          reasonCode: null,
+        }}
+      />
+    );
+
+    const albumArt = getByRole('button', { name: 'Generate Album Art' });
+    expect(albumArt).toBeEnabled();
+    expect(albumArt).toHaveAttribute('aria-label', 'Generate Album Art');
+    expect(albumArt).toHaveAttribute('title', 'Generate Album Art');
+
+    albumArt.click();
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith(defaultStarterActions[1].prompt);
+  });
 
   it('renders first-session pills including all four starter suggestions', () => {
     const onSelect = vi.fn();

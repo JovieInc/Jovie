@@ -338,21 +338,23 @@ describe('Neon endpoint admission', () => {
     expect(result).toEqual({ deleted: [], active: 2, unknown: 0 });
   });
 
-  it.each([0, -1, 1.5, Number.NaN])(
-    'fails closed before inventory when teardown attempts are invalid: %s',
-    async maxAttempts => {
-      const inventory = vi.fn();
+  it.each([
+    0,
+    -1,
+    1.5,
+    Number.NaN,
+  ])('fails closed before inventory when teardown attempts are invalid: %s', async maxAttempts => {
+    const inventory = vi.fn();
 
-      await expect(
-        awaitEndpointTeardown({
-          inventory,
-          maxAttempts,
-          retrySeconds: 0,
-        })
-      ).rejects.toThrow('maxAttempts must be a positive integer');
-      expect(inventory).not.toHaveBeenCalled();
-    }
-  );
+    await expect(
+      awaitEndpointTeardown({
+        inventory,
+        maxAttempts,
+        retrySeconds: 0,
+      })
+    ).rejects.toThrow('maxAttempts must be a positive integer');
+    expect(inventory).not.toHaveBeenCalled();
+  });
 
   it('emits a fail-closed diagnostic for invalid teardown configuration', () => {
     const result = spawnSync(

@@ -10,19 +10,16 @@ describe('Container', () => {
     ['xl', 'max-w-public-content'],
     ['homepage', 'max-w-public-content'],
     ['full', 'max-w-none'],
-  ] as const)(
-    'maps the %s size to its canonical width class',
-    (size, width) => {
-      const { container } = render(
-        <Container size={size}>
-          <span>content</span>
-        </Container>
-      );
+  ] as const)('maps the %s size to its canonical width class', (size, width) => {
+    const { container } = render(
+      <Container size={size}>
+        <span>content</span>
+      </Container>
+    );
 
-      expect(container.firstElementChild).toHaveClass('mx-auto', 'px-5', width);
-      expect(container.firstElementChild).toHaveTextContent('content');
-    }
-  );
+    expect(container.firstElementChild).toHaveClass('mx-auto', 'px-5', width);
+    expect(container.firstElementChild).toHaveTextContent('content');
+  });
 
   it('uses the public-content width by default and merges instance classes', () => {
     const { container } = render(

@@ -39,12 +39,15 @@ describe('ContentSurfaceCard', () => {
     expect(card.className).toContain('shadow-none');
   });
 
-  it.each(['default', 'details', 'marketing', 'settings', 'table'] as const)(
-    'keeps the %s surface on the established outer-card radius',
-    surface => {
-      expect(contentSurfaceCardVariants({ surface })).toContain('rounded-xl');
-    }
-  );
+  it.each([
+    'default',
+    'details',
+    'marketing',
+    'settings',
+    'table',
+  ] as const)('keeps the %s surface on the established outer-card radius', surface => {
+    expect(contentSurfaceCardVariants({ surface })).toContain('rounded-xl');
+  });
 
   it('keeps the deprecated class contract visually equivalent', () => {
     expect(CONTENT_SURFACE_CARD_CLASSNAME).toContain('rounded-xl');

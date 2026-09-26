@@ -58,34 +58,31 @@ describe('useDspEnrichmentStatusQuery', () => {
     ['discovering', 'matching'],
     ['matching', 'complete'],
     ['enriching', 'complete'],
-  ] as const)(
-    'calls onComplete when phase transitions from %s to %s',
-    async (fromPhase, toPhase) => {
-      const onComplete = vi.fn();
+  ] as const)('calls onComplete when phase transitions from %s to %s', async (fromPhase, toPhase) => {
+    const onComplete = vi.fn();
 
-      mockFetch.mockResolvedValueOnce(createResponse(createStatus(fromPhase)));
+    mockFetch.mockResolvedValueOnce(createResponse(createStatus(fromPhase)));
 
-      const { result } = renderHook(
-        () =>
-          useDspEnrichmentStatusQuery({
-            profileId: 'profile-123',
-            onComplete,
-          }),
-        { wrapper }
-      );
+    const { result } = renderHook(
+      () =>
+        useDspEnrichmentStatusQuery({
+          profileId: 'profile-123',
+          onComplete,
+        }),
+      { wrapper }
+    );
 
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(onComplete).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(onComplete).not.toHaveBeenCalled();
 
-      mockFetch.mockResolvedValueOnce(createResponse(createStatus(toPhase)));
+    mockFetch.mockResolvedValueOnce(createResponse(createStatus(toPhase)));
 
-      await act(async () => {
-        await result.current.refetch();
-      });
+    await act(async () => {
+      await result.current.refetch();
+    });
 
-      await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
-    }
-  );
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+  });
 
   it('does not call onComplete when the phase does not change', async () => {
     const onComplete = vi.fn();
