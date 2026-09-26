@@ -776,6 +776,79 @@ struct ChatRepositoryTests {
     #expect(repository.hasMoreOlder == false)
   }
 
+  /// Restart pagination (JOV-6210): the relaunched repository hydrates only
+  /// from the persisted snapshot, so the load-earlier cursor must be the
+  /// oldest cached message's server `createdAt` — not the timestamp
+  /// `persistCache` wrote — and `hasMoreOlder` must survive the round-trip so
+  /// load-earlier is offered at all for a window under the fetch limit.
+  @Test func loadOlderMessagesAfterRestartUsesCachedServerTimestamp() async {
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-restart")!)
+    let conversation = MobileConversationRecord(
+      id: "conv_restart",
+      title: "Restart",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z"
+    )
+    func message(_ suffix: String, _ content: String, _ createdAt: String) -> MobileConversationMessage {
+      MobileConversationMessage(
+        id: "msg_\(suffix)",
+        role: "user",
+        content: content,
+        clientMessageId: "client_\(suffix)",
+        turnId: "turn_\(suffix)",
+        turnStatus: "completed",
+        createdAt: createdAt,
+        requiresWebHandoff: false
+      )
+    }
+    let client = ScriptedPagedChatClient(
+      pages: [
+        nil: MobileConversationDetailResponse(
+          conversation: conversation,
+          messages: [
+            message("mid", "Middle", "2026-05-01T00:00:00.000Z"),
+            message("new", "Newest", "2026-06-01T00:00:00.000Z"),
+          ],
+          hasMore: true
+        ),
+        "2026-05-01T00:00:00.000Z": MobileConversationDetailResponse(
+          conversation: conversation,
+          messages: [
+            message("old", "Oldest", "2026-04-01T00:00:00.000Z"),
+          ],
+          hasMore: false
+        ),
+      ]
+    )
+
+    let first = ChatRepository(
+      client: client,
+      cache: cache,
+      userID: "user_repo_restart",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+    await first.openConversation("conv_restart")
+    #expect(first.hasMoreOlder)
+
+    let relaunched = ChatRepository(
+      client: client,
+      cache: cache,
+      userID: "user_repo_restart",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+    await relaunched.bootstrap()
+    #expect(relaunched.timeline.map(\.content) == ["Middle", "Newest"])
+    #expect(relaunched.hasMoreOlder)
+
+    await relaunched.loadOlderMessages()
+
+    // The multi-message window proves the cursor comes from the oldest
+    // message, not the newest.
+    #expect(client.lastFetchBefore == "2026-05-01T00:00:00.000Z")
+    #expect(relaunched.timeline.map(\.content) == ["Oldest", "Middle", "Newest"])
+    #expect(relaunched.hasMoreOlder == false)
+  }
+
   @Test func sendInterruptsInFlightTurnWhenComposerSendsAgain() async {
     let client = GateableSendChatClient()
     let repository = ChatRepository(
