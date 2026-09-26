@@ -382,3 +382,40 @@ test('CLI reports dereferenced function trace links', t => {
   assert.match(stdout, /Dereferenced 1 function trace file symlinks/);
   assert.deepEqual(config.read(), { 'link.txt': 'real.txt' });
 });
+
+test('re-points files traced through a hoisted pnpm directory link at their real path', t => {
+  const f = fixture(t);
+  const store =
+    'node_modules/.pnpm/import-in-the-middle@3.5.1/node_modules/import-in-the-middle';
+  f.put(`${store}/index.js`, 'hook');
+  f.link(
+    'node_modules/.pnpm/node_modules/import-in-the-middle',
+    '../import-in-the-middle@3.5.1/node_modules/import-in-the-middle'
+  );
+  f.link(
+    'apps/web/node_modules/next',
+    '../../../node_modules/.pnpm/import-in-the-middle@3.5.1'
+  );
+  const hoisted =
+    'node_modules/.pnpm/node_modules/import-in-the-middle/index.js';
+  const config = resolve(
+    f.root,
+    '.vercel/output/functions/api.func/.vc-config.json'
+  );
+  mkdirSync(dirname(config), { recursive: true });
+  writeFileSync(
+    config,
+    JSON.stringify({
+      filePathMap: {
+        [hoisted]: hoisted,
+        'apps/web/node_modules/next': 'apps/web/node_modules/next',
+      },
+    })
+  );
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  const map = JSON.parse(readFileSync(config, 'utf8')).filePathMap;
+  // Same destination key, real source file; the directory link itself is untouched.
+  assert.equal(map[hoisted], `${store}/index.js`);
+  assert.equal(map['apps/web/node_modules/next'], 'apps/web/node_modules/next');
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});

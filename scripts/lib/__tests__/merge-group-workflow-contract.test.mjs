@@ -795,10 +795,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "github.event_name == 'merge_group' && matrix.shard == '4/10'"
-    );
-    expect(unitTests).toContain(
-      "github.event_name != 'merge_group' && matrix.shard == '1/10'"
+      "run_full_ci == 'true' && matrix.shard == '4/10'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
@@ -1555,6 +1552,10 @@ ${selectedGateScript}`,
       'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
     );
     expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
+    // Non-saving runs skip the cache write; push must still persist it.
+    expect(step('Build exact combined head')).toContain(
+      '[ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1\n'
+    );
     expect(buildLayout).not.toContain('pull_request_target');
     expect(buildLayout).not.toContain('secrets.');
   });
@@ -1643,6 +1644,7 @@ ${selectedGateScript}`,
     // Same web build and public mock env as the combined head build.
     const build = stepIn(warm, 'Build web for cache');
     expect(build).toContain('run: pnpm turbo build --filter=@jovie/web\n');
+    expect(warm).not.toContain('TURBO_ENGINE_READ_ONLY');
     const envLines = step =>
       step.split('\n').filter(line => /^ {10}NEXT_[A-Z_]+:/.test(line));
     const ciBuild = stepIn(buildLayout, 'Build exact combined head');

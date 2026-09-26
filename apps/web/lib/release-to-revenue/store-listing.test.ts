@@ -136,12 +136,58 @@ describe('resolveMerchCardIdsForRun tenant isolation', () => {
     ...overrides,
   });
 
-  it('returns linked ids without a query when the run already has a store listing', async () => {
+  it('owner-filters linked ids and drops another tenant card (JOV-3705)', async () => {
+    const captured: { sql: string; params: unknown[] } = {
+      sql: '',
+      params: [],
+    };
+    const ownedCards = [
+      { id: 'card-A', creatorProfileId: 'profile-A' },
+      { id: 'card-A2', creatorProfileId: 'profile-A' },
+      { id: 'card-B', creatorProfileId: 'profile-B' },
+    ];
+    const chain = {
+      from: () => chain,
+      where: (cond: unknown) => {
+        const q = dialect.sqlToQuery(cond as never);
+        captured.sql = q.sql;
+        captured.params = q.params;
+        const params = q.params as unknown[];
+        return Promise.resolve(
+          ownedCards
+            .filter(
+              card =>
+                params.includes(card.creatorProfileId) &&
+                params.includes(card.id)
+            )
+            .map(card => ({ id: card.id }))
+        );
+      },
+    };
+    mockDbSelect.mockReturnValue(chain);
+
     const ids = await resolveMerchCardIdsForRun(
-      baseStepOutputs({ storeListing: { merchCardIds: ['card-A'] } })
+      baseStepOutputs({
+        storeListing: { merchCardIds: ['card-A2', 'card-B', 'card-A'] },
+      })
     );
 
-    expect(ids).toEqual(['card-A']);
+    expect(ids).toEqual(['card-A2', 'card-A']);
+    expect(captured.sql).toContain('"merch_cards"."creator_profile_id"');
+    expect(captured.params).toContain('profile-A');
+    expect(captured.params).not.toContain('profile-B');
+  });
+
+  it('fails closed on linked ids when the run has no creator owner', async () => {
+    const ids = await resolveMerchCardIdsForRun(
+      baseStepOutputs({
+        designPartner:
+          undefined as unknown as ReleaseToRevenueRunStepOutputs['designPartner'],
+        storeListing: { merchCardIds: ['card-A'] },
+      })
+    );
+
+    expect(ids).toEqual([]);
     expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
