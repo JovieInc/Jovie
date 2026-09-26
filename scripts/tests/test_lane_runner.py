@@ -667,8 +667,8 @@ class UpdateTest(unittest.TestCase):
             origin, clone = tmp / "origin.git", tmp / "clone"
             self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
             self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
-            for rel in ("scripts/lanes/lane_runner.py", "scripts/lanes/providers.json",
-                        "scripts/tests/test_lane_runner.py"):
+            files = [p.relative_to(ROOT) for p in (ROOT / "scripts/lanes").iterdir() if p.is_file()]
+            for rel in [*files, *map(Path, lane.LANE_TESTS)]:
                 (clone / rel).parent.mkdir(parents=True, exist_ok=True)
                 (clone / rel).write_text((ROOT / rel).read_text())
             self.git("add", "-A", cwd=clone)
