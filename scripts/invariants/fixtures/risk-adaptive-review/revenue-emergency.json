@@ -1,0 +1,20 @@
+{
+  "workItem": "revenue-emergency",
+  "expectedTopology": "postflight",
+  "inputs": {
+    "workClass": "hotfix",
+    "blastRadius": "low",
+    "reversibility": "reversible",
+    "novelty": "low",
+    "ambiguity": "low",
+    "precedentStrength": "strong",
+    "securityRisk": "low",
+    "financialRisk": "low",
+    "legalRisk": "low",
+    "dataIntegrityRisk": "low",
+    "productionRisk": "medium",
+    "tested": true,
+    "delayCritical": true,
+    "uncertainties": []
+  }
+}

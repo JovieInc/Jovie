@@ -13,6 +13,12 @@ import { validatePerformanceFactory } from './performance-factory.mjs';
 import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
 import { validateQualityRatchet } from './quality-ratchet.mjs';
 import {
+  readDecisionReceipt,
+  riskAdaptivePolicy,
+  validateDecisionReceipt,
+  validateRiskAdaptiveReviewPolicy,
+} from './risk-adaptive-review.mjs';
+import {
   readWritingSurfacesRegistry,
   validateWritingSurfaces,
 } from './writing-surfaces.mjs';
@@ -24,6 +30,8 @@ import {
 // representative defects block certification and promotion.
 // JOV-INV-035 is composed here so every invariant run checks the
 // outcome-first delivery-model contract.
+// JOV-INV-036 is composed here so every invariant run checks the
+// risk-adaptive review-topology contract.
 
 import {
   readInvariantRegistry,
@@ -60,6 +68,20 @@ const doneSprintErrors = await validateDoneSprintInvariants({
 });
 const gateIntegrityErrors = validateGateIntegrityPolicy(registry);
 const deliveryModelErrors = validateDeliveryModelPolicy(registry);
+const riskAdaptiveErrors = validateRiskAdaptiveReviewPolicy(registry);
+const riskAdaptiveContract = riskAdaptivePolicy(registry);
+if (riskAdaptiveContract?.certificationInbox?.receipt) {
+  try {
+    riskAdaptiveErrors.push(
+      ...validateDecisionReceipt(
+        readDecisionReceipt(riskAdaptiveContract.certificationInbox.receipt),
+        riskAdaptiveContract
+      ).map(error => `certification-inbox-receipt: ${error}`)
+    );
+  } catch {
+    riskAdaptiveErrors.push('certification-inbox-receipt-unreadable');
+  }
+}
 // JOV-6475 composes the writing-surface coverage registry the same way: it
 // validates that every named delivery surface maps to a contract and owner.
 const writingErrors = validateWritingSurfaces(readWritingSurfacesRegistry());
@@ -74,6 +96,7 @@ const errors = [
   ...doneSprintErrors.map(error => `done-sprint: ${error}`),
   ...gateIntegrityErrors.map(error => `gate-integrity: ${error}`),
   ...deliveryModelErrors.map(error => `delivery-model: ${error}`),
+  ...riskAdaptiveErrors.map(error => `risk-adaptive-review: ${error}`),
   ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
 

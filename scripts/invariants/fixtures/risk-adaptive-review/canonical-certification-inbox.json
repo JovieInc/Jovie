@@ -1,0 +1,21 @@
+{
+  "workItem": "canonical-certification-inbox",
+  "expectedTopology": "independent-preflight",
+  "inputs": {
+    "workClass": "canonical-certification-inbox",
+    "blastRadius": "system-wide",
+    "consumerCriticality": "high",
+    "reversibility": "reversible",
+    "novelty": "high",
+    "ambiguity": "medium",
+    "precedentStrength": "moderate",
+    "securityRisk": "medium",
+    "financialRisk": "low",
+    "legalRisk": "low",
+    "dataIntegrityRisk": "medium",
+    "productionRisk": "medium",
+    "tested": true,
+    "delayCritical": false,
+    "uncertainties": ["consumerCriticality"]
+  }
+}

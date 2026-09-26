@@ -1,0 +1,65 @@
+{
+  "schema": "jovie-review-decision-receipt/v1",
+  "id": "receipt-certification-inbox-2026-09-26",
+  "workItem": "unified-ovi-certification-inbox",
+  "decidedAt": "2026-09-26T00:00:00.000Z",
+  "policyRef": {
+    "key": "execution.risk-adaptive-review.contract",
+    "invariant": "JOV-INV-036",
+    "policyVersion": 1
+  },
+  "riskInputs": {
+    "workClass": "canonical-certification-inbox",
+    "blastRadius": "system-wide",
+    "consumerCriticality": "high",
+    "reversibility": "reversible",
+    "migrationBackfillDifficulty": "medium",
+    "novelty": "high",
+    "ambiguity": "medium",
+    "precedentStrength": "moderate",
+    "securityRisk": "medium",
+    "privacyRisk": "medium",
+    "financialRisk": "low",
+    "legalRisk": "low",
+    "productionRisk": "medium",
+    "dataIntegrityRisk": "medium",
+    "implementationDuration": "days",
+    "reviewDuration": "hours",
+    "capacityPressure": "medium",
+    "reworkProbability": "high",
+    "downstreamFailureCost": "high",
+    "revenueOpportunityCost": "medium"
+  },
+  "uncertainties": ["consumerCriticality"],
+  "chosenTopology": "independent-preflight",
+  "capabilityRequirements": [
+    "architecture-review",
+    "adversarial-boundary-analysis",
+    "domain-composition-review"
+  ],
+  "independenceConstraint": "separate-reviewer",
+  "alternativesConsidered": [
+    "single-new-inbox-service-owning-admission-remediation-and-learning",
+    "compose-existing-certification-registry-CAS-postgres-primitives-behind-one-admission-seam",
+    "extend-per-domain-inboxes-with-a-thin-unified-read-model"
+  ],
+  "existingPrimitives": [
+    "certification-registry (canon/invariants.jsonl evidence consumers)",
+    "compare-and-swap admission with stable action id and payload digest",
+    "postgres-backed durable candidate persistence",
+    "existing remediation routing queues per domain"
+  ],
+  "collisionRisks": [
+    "dual admission paths race if per-domain inboxes stay writable",
+    "candidate digest must cover immutable candidate and requested scope, not evaluator sha",
+    "marketing/acquisition consumers must not gain client-authoritative receipts",
+    "remediation routing split-brain if learning feedback bypasses the seam"
+  ],
+  "smallestCorrectSeam": [
+    "one admission function: validate candidate digest -> CAS decision -> atomic decision+dispatch write -> at-least-once idempotent downstream",
+    "incomplete candidate stays working; never admitted",
+    "conflicting duplicate rejected; crash after effect before acknowledgment replays safely"
+  ],
+  "rationale": "The inbox touches certification admission, founder authority, multiple domains, remediation routing, and learning feedback; a wrong abstraction carries high rework and blast-radius cost, so independent preflight critique precedes implementation while a routine low-risk fix would proceed without this ceremony.",
+  "decision": "proceed-after-independent-preflight-approval"
+}

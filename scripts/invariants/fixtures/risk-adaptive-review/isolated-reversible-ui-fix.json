@@ -1,0 +1,20 @@
+{
+  "workItem": "isolated-reversible-ui-fix",
+  "expectedTopology": "postflight",
+  "inputs": {
+    "workClass": "ui-component",
+    "blastRadius": "low",
+    "reversibility": "reversible",
+    "novelty": "low",
+    "ambiguity": "low",
+    "precedentStrength": "strong",
+    "securityRisk": "low",
+    "financialRisk": "low",
+    "legalRisk": "low",
+    "dataIntegrityRisk": "low",
+    "productionRisk": "low",
+    "tested": true,
+    "delayCritical": false,
+    "uncertainties": []
+  }
+}

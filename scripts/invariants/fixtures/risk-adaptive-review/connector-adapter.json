@@ -1,0 +1,21 @@
+{
+  "workItem": "connector-adapter",
+  "expectedTopology": "plan-critique",
+  "inputs": {
+    "workClass": "adapter",
+    "blastRadius": "medium",
+    "reversibility": "reversible",
+    "novelty": "medium",
+    "ambiguity": "medium",
+    "precedentStrength": "moderate",
+    "securityRisk": "medium",
+    "financialRisk": "low",
+    "legalRisk": "low",
+    "dataIntegrityRisk": "medium",
+    "productionRisk": "medium",
+    "tested": true,
+    "delayCritical": false,
+    "prototypeCheaperThanPlan": false,
+    "uncertainties": []
+  }
+}

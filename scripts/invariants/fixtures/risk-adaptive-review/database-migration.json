@@ -1,0 +1,21 @@
+{
+  "workItem": "database-migration",
+  "expectedTopology": "independent-preflight",
+  "inputs": {
+    "workClass": "irreversible-migration",
+    "blastRadius": "system-wide",
+    "reversibility": "irreversible",
+    "migrationBackfillDifficulty": "high",
+    "novelty": "medium",
+    "ambiguity": "low",
+    "precedentStrength": "moderate",
+    "securityRisk": "low",
+    "financialRisk": "low",
+    "legalRisk": "low",
+    "dataIntegrityRisk": "medium",
+    "productionRisk": "medium",
+    "tested": true,
+    "delayCritical": false,
+    "uncertainties": []
+  }
+}

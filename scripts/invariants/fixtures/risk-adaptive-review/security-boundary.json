@@ -1,0 +1,21 @@
+{
+  "workItem": "security-boundary",
+  "expectedTopology": "preflight-and-postflight",
+  "inputs": {
+    "workClass": "authority-boundary",
+    "blastRadius": "system-wide",
+    "reversibility": "reversible",
+    "authorityBoundary": true,
+    "novelty": "medium",
+    "ambiguity": "low",
+    "precedentStrength": "moderate",
+    "securityRisk": "high",
+    "financialRisk": "low",
+    "legalRisk": "low",
+    "dataIntegrityRisk": "medium",
+    "productionRisk": "medium",
+    "tested": true,
+    "delayCritical": false,
+    "uncertainties": []
+  }
+}
