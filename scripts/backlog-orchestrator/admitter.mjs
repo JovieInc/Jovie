@@ -674,26 +674,51 @@ export function evaluateFleetGate(
   const queueRepositoryCapacity = queueRepository
     ? scopedLaneCapacity?.repositories?.[queueRepository]
     : null;
-  const queueRepositoryCapacityAvailable = Boolean(
-    queueRepositoryCapacity &&
-      queueRepositoryCapacity.ready < queueRepositoryCapacity.budget
+  const laneCapacity = evidence?.queue?.laneCapacity;
+  const laneCapacityReceiptValid = Boolean(
+    queueRepository &&
+      laneCapacity &&
+      typeof laneCapacity === 'object' &&
+      !Array.isArray(laneCapacity) &&
+      laneCapacity.schema === 'jovie-lane-capacity/v2' &&
+      laneCapacity.repositories &&
+      typeof laneCapacity.repositories === 'object' &&
+      !Array.isArray(laneCapacity.repositories)
   );
+  const queueRepositoryCapacityConsistent = Boolean(
+    laneCapacityReceiptValid &&
+      queueRepositoryCapacity &&
+      queueRepositoryCapacity.ready === greenReadyPrs &&
+      queueRepositoryCapacity.budget === queueTarget
+  );
+  // Mirror gem-priority-gate (JOV-5340): a lane-capacity receipt vetoes new
+  // leases only when present and contradictory; an absent or unscoped
+  // receipt must not freeze a lane below queue backpressure.
+  const queueRepositoryCapacityAvailable =
+    queueBelowBackpressure &&
+    (!laneCapacityReceiptValid || queueRepositoryCapacityConsistent);
   const newMutationAllowed =
-    concurrency.newMutationAllowed &&
-    queueShapeValid &&
-    queueRepositoryCapacityAvailable;
+    queueShapeValid && queueRepositoryCapacityAvailable;
+  // merge-speed-fast-ui-lanes-v1: a bound-GREEN fleet also admits isolated
+  // UI/docs promotion on source-bound gates.
   const isolatedPromotionAllowed =
-    state === FLEET_GATE_STATE.AMBER &&
     reviewAdmission.allowed &&
     controllerFresh &&
     controllerStatus === 'green' &&
     mainStatus === 'green' &&
-    productionStatus === 'red' &&
     ['clear', 'resolved'].includes(integrityStatus) &&
     queueBelowBackpressure &&
-    reasons.every(
-      reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
-    );
+    ((state === FLEET_GATE_STATE.GREEN &&
+      productionStatus === 'green' &&
+      deploymentBound(
+        evidence?.main?.sha,
+        evidence?.production?.deployedSha
+      )) ||
+      (state === FLEET_GATE_STATE.AMBER &&
+        productionStatus === 'red' &&
+        reasons.every(
+          reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
+        )));
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? [...FLEET_AUTHORITY.RED]
@@ -745,19 +770,20 @@ export function evaluateFleetGate(
         FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
       ].includes(reason)
     );
-  const promotionMode = isolatedPromotionAllowed
-    ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
-    : state === FLEET_GATE_STATE.GREEN
+  const promotionMode =
+    state === FLEET_GATE_STATE.GREEN
       ? FLEET_PROMOTION_MODE.NORMAL
-      : state === FLEET_GATE_STATE.AMBER &&
-          mainStatus === 'red' &&
-          ['clear', 'resolved'].includes(integrityStatus)
-        ? FLEET_PROMOTION_MODE.DRAFT_ONLY
-        : holdIntakeAllowed
-          ? FLEET_PROMOTION_MODE.HOLD_INTAKE
-          : controllerRepairAllowed
-            ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
-            : FLEET_PROMOTION_MODE.BLOCKED;
+      : isolatedPromotionAllowed
+        ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
+        : state === FLEET_GATE_STATE.AMBER &&
+            mainStatus === 'red' &&
+            ['clear', 'resolved'].includes(integrityStatus)
+          ? FLEET_PROMOTION_MODE.DRAFT_ONLY
+          : holdIntakeAllowed
+            ? FLEET_PROMOTION_MODE.HOLD_INTAKE
+            : controllerRepairAllowed
+              ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
+              : FLEET_PROMOTION_MODE.BLOCKED;
   const cohort = alreadyAdmittedCohortSemantics(promotionMode);
   const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
     ? cohort
