@@ -9,6 +9,8 @@
  * - App data: Use these TanStack Query strategies for client caching
  */
 
+import { classifiedQueryRetry, classifiedRetryDelay } from './retry-policy';
+
 // Time constants
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -167,11 +169,13 @@ export const FREQUENT_BACKGROUND_CACHE: CacheStrategyOptions = {
 // =============================================================================
 
 /**
- * Reusable retry config: 3 retries with exponential backoff capped at 30s.
+ * Reusable retry config: classified retries (JOV-6185). Transient
+ * network/deadline/5xx/429 failures retry with bounded backoff and jitter;
+ * cancellation, 4xx, and schema failures stop immediately.
  * Use for: analytics, DSP enrichment, and other queries that benefit from
  * retrying transient failures.
  */
 export const RETRY_BACKOFF = {
-  retry: 3,
-  retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 30_000),
+  retry: classifiedQueryRetry,
+  retryDelay: classifiedRetryDelay,
 } as const;

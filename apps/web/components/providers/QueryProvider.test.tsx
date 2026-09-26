@@ -1,8 +1,26 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  classifiedQueryRetry,
+  classifiedRetryDelay,
+} from '@/lib/queries/retry-policy';
 import { QueryProvider } from './QueryProvider';
+
+function DefaultOptionsProbe() {
+  const queryClient = useQueryClient();
+  const defaults = queryClient.getDefaultOptions();
+  return (
+    <output
+      data-testid='query-defaults'
+      data-query-retry={String(defaults.queries?.retry)}
+      data-query-retry-delay={String(defaults.queries?.retryDelay)}
+      data-mutation-retry={String(defaults.mutations?.retry)}
+    />
+  );
+}
 
 const chrome = vi.hoisted(() => ({ disabled: false }));
 vi.mock('@/lib/demo-recording', () => ({
@@ -79,5 +97,19 @@ describe('QueryProvider devtools hydration', () => {
       </QueryProvider>
     );
     expect(screen.queryByTestId('query-devtools')).toBeNull();
+  });
+});
+
+describe('QueryProvider retry defaults (JOV-6185)', () => {
+  it('wires the classified retry policy and keeps mutations non-retried', () => {
+    render(
+      <QueryProvider>
+        <DefaultOptionsProbe />
+      </QueryProvider>
+    );
+    const probe = screen.getByTestId('query-defaults');
+    expect(probe.dataset.queryRetry).toBe(String(classifiedQueryRetry));
+    expect(probe.dataset.queryRetryDelay).toBe(String(classifiedRetryDelay));
+    expect(probe.dataset.mutationRetry).toBe('0');
   });
 });

@@ -6,6 +6,7 @@ import {
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
 import { queryKeys } from '@/lib/queries/keys';
+import { classifiedQueryRetry } from '@/lib/queries/retry-policy';
 import {
   fenceBrowserQueryClient,
   getBrowserQueryClientForTests,
@@ -43,7 +44,7 @@ describe('QueryProvider cache isolation (JOV-6186)', () => {
     resetBrowserQueryClientForTests();
   });
 
-  it('keeps TanStack Query retry defaults for JOV-6185', () => {
+  it('wires the classified retry policy for JOV-6185', () => {
     const { getByTestId } = render(
       <QueryProvider>
         <RetryProbe />
@@ -51,7 +52,9 @@ describe('QueryProvider cache isolation (JOV-6186)', () => {
       </QueryProvider>
     );
 
-    expect(getByTestId('query-retry').textContent).toBe('3');
+    expect(getByTestId('query-retry').textContent).toBe(
+      String(classifiedQueryRetry)
+    );
     expect(getByTestId('mutation-retry').textContent).toBe('0');
   });
 
@@ -94,6 +97,8 @@ describe('QueryProvider cache isolation (JOV-6186)', () => {
       sessionId: 'sess-b',
     });
 
-    expect(getByTestId('query-retry').textContent).toBe('3');
+    expect(getByTestId('query-retry').textContent).toBe(
+      String(classifiedQueryRetry)
+    );
   });
 });

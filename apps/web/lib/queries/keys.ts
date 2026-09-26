@@ -301,6 +301,14 @@ export const queryKeys = {
     },
   },
 
+  // HUD ops surfaces (admin shell + kiosk). Keys carry only the access
+  // scope — never raw kiosk tokens.
+  hud: {
+    all: ['hud'] as const,
+    metrics: (scope: 'admin' | 'kiosk') =>
+      [...queryKeys.hud.all, 'metrics', scope] as const,
+  },
+
   // Campaign invite queries (admin)
   campaign: {
     all: ['campaign-invites'] as const,
