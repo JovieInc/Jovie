@@ -9,15 +9,18 @@ describe('EntityMentionSpan', () => {
     ['artist', '--system-b-entity-chip-artist-accent'],
     ['track', '--system-b-entity-chip-track-accent'],
     ['event', '--system-b-entity-chip-event-accent'],
-  ] as const)('maps kind=%s to the System B accent variable', (kind, accentVar) => {
-    fastRender(<EntityMentionSpan kind={kind} label={`${kind} label`} />);
+  ] as const)(
+    'maps kind=%s to the System B accent variable',
+    (kind, accentVar) => {
+      fastRender(<EntityMentionSpan kind={kind} label={`${kind} label`} />);
 
-    const span = screen.getByTestId('entity-mention-span');
-    expect(span).toHaveTextContent(`${kind} label`);
-    expect(span).toHaveAttribute('data-entity-kind', kind);
-    expect(span).toHaveClass('system-b-entity-mention-span');
-    expect(span.style.getPropertyValue('--jovie-entity-accent')).toBe(
-      `var(${accentVar})`
-    );
-  });
+      const span = screen.getByTestId('entity-mention-span');
+      expect(span).toHaveTextContent(`${kind} label`);
+      expect(span).toHaveAttribute('data-entity-kind', kind);
+      expect(span).toHaveClass('system-b-entity-mention-span');
+      expect(span.style.getPropertyValue('--jovie-entity-accent')).toBe(
+        `var(${accentVar})`
+      );
+    }
+  );
 });
