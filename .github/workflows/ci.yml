@@ -2187,7 +2187,7 @@ jobs:
 
   ci-fast-structural-python:
     name: ci-fast (structural python)
-    # Structural pytest shards off remaining's CPU-bound pool (aliased steps).
+    # Pytest shards + invariants/control suites off remaining's CPU-bound pool.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 20
