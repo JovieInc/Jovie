@@ -52,10 +52,12 @@ const nextConfig = {
   // Never ship source maps to browsers (Sentry plugin uploads them separately)
   productionBrowserSourceMaps: false,
   output: isVercelPreview ? undefined : 'standalone',
-  // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
-  outputFileTracingRoot: isVercelPreview
-    ? undefined
-    : path.join(__dirname, '../../'),
+  // Monorepo root for output file tracing in every build. Preview/staging
+  // builds (which production promotes) used to leave this unset, so the
+  // monorepo-relative ('../../') tracing includes below escaped the trace
+  // root and Vercel failed at "Extracting deployment files" (prod frozen
+  // 2026-09-21..26).
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   // These request-time readers build data paths dynamically, so NFT cannot
   // reliably infer their files from the compiled route bundles. Keep this
   // list limited to the data they actually read; the broad directory entries

@@ -36,6 +36,7 @@ type VercelConfig = {
 };
 
 type NextConfigForTest = {
+  outputFileTracingRoot?: string;
   outputFileTracingIncludes?: Record<string, string[]>;
   outputFileTracingExcludes?: Record<string, string[]>;
 };
@@ -50,7 +51,7 @@ function readVercelConfig(relativePath: string): VercelConfig {
   return JSON.parse(readFileSync(configPath, 'utf8')) as VercelConfig;
 }
 
-function loadNextConfigForTracingTest(): NextConfigForTest {
+function loadNextConfigForTracingTest(vercelEnv = ''): NextConfigForTest {
   const configPath = resolve(repoRoot, 'apps/web/next.config.js');
   const configDirectory = dirname(configPath);
   const configModule: { exports: NextConfigForTest } = { exports: {} };
@@ -88,7 +89,7 @@ function loadNextConfigForTracingTest(): NextConfigForTest {
           CI: 'false',
           NODE_ENV: 'test',
           NEXT_ENABLE_TOOLBAR: '0',
-          VERCEL_ENV: '',
+          VERCEL_ENV: vercelEnv,
         },
       },
       require: configRequire,
@@ -103,6 +104,7 @@ function loadNextConfigForTracingTest(): NextConfigForTest {
         )
       : undefined;
   return {
+    outputFileTracingRoot: configModule.exports.outputFileTracingRoot,
     outputFileTracingIncludes: copyRouteGlobs(
       configModule.exports.outputFileTracingIncludes
     ),
@@ -144,6 +146,30 @@ function turbopackGlobSource(exclude: string): string {
 }
 
 describe('Vercel function config', () => {
+  it.each(['', 'preview', 'production'])(
+    'keeps every tracing include inside the trace root (VERCEL_ENV=%s)',
+    vercelEnv => {
+      // Preview/staging builds (promoted to production) once left the root
+      // unset, so '../../' includes escaped it and Vercel failed at
+      // "Extracting deployment files" (prod frozen 2026-09-21..26).
+      const nextConfig = loadNextConfigForTracingTest(vercelEnv);
+      const traceRoot = nextConfig.outputFileTracingRoot;
+      expect(traceRoot).toBeTruthy();
+      const appDirectory = resolve(repoRoot, 'apps/web');
+      for (const globs of Object.values(
+        nextConfig.outputFileTracingIncludes ?? {}
+      )) {
+        for (const glob of globs) {
+          const fromRoot = relative(
+            resolve(traceRoot as string),
+            resolve(appDirectory, glob)
+          );
+          expect(fromRoot.startsWith('..'), glob).toBe(false);
+        }
+      }
+    }
+  );
+
   it('uses App Router function globs that Vercel can match', () => {
     const configs = ['vercel.json', 'apps/web/vercel.json'];
 
