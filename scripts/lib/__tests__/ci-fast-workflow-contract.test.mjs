@@ -948,7 +948,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Install actionlint')
+      remaining.indexOf('- name: Run actionlint (structural)')
     );
 
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
@@ -1041,7 +1041,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Install actionlint')
+      remaining.indexOf('- name: Run actionlint (structural)')
     );
 
     for (const requiredPath of [
@@ -1567,6 +1567,46 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('runs actionlint from checksum-pinned binaries instead of a Docker action', () => {
+    // A Docker action's image is built at job start even when its step is
+    // skipped (~30s on the merge-queue critical path). The script pins the
+    // exact toolchain the image shipped and must fail closed on any drift.
+    const script = readFileSync(
+      resolve(REPO_ROOT, '.github/scripts/run-actionlint.sh'),
+      'utf8'
+    );
+    const workflowsDir = resolve(REPO_ROOT, '.github/workflows');
+    for (const file of readdirSync(workflowsDir)) {
+      if (!/\.ya?ml$/.test(file)) continue;
+      expect(
+        readFileSync(join(workflowsDir, file), 'utf8'),
+        `${file} must not use the Docker actionlint action`
+      ).not.toMatch(/uses:\s*rhysd\/actionlint/);
+    }
+    expect(
+      readFileSync(resolve(workflowsDir, 'actionlint.yml'), 'utf8')
+    ).toContain('run: bash .github/scripts/run-actionlint.sh');
+
+    expect(script).toMatch(/^set -euo pipefail$/m);
+    expect(script).toContain("readonly ACTIONLINT_VERSION='1.7.12'");
+    expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
+    expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
+    for (const name of [
+      'ACTIONLINT_SHA256',
+      'SHELLCHECK_TARBALL_SHA256',
+      'SHELLCHECK_BINARY_SHA256',
+      'PYFLAKES_WHEEL_SHA256',
+    ]) {
+      expect(script).toMatch(
+        new RegExp(`^readonly ${name}='[0-9a-f]{64}'$`, 'm')
+      );
+    }
+    expect(script.match(/sha256sum --check --status/g)?.length).toBe(2);
+    expect(script).toContain('--fail');
+    expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
+    expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
+  });
+
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {
     const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
     const remaining = jobBlock(
@@ -1576,9 +1616,11 @@ describe('ci-fast bounded parallel workflow', () => {
     const aggregate = jobBlock('ci-fast', 'ci-promptfoo-evals');
 
     expect(typecheck).not.toMatch(
-      /rhysd\/actionlint|actions\/setup-python|python -m pip install/
+      /run-actionlint\.sh|rhysd\/actionlint|actions\/setup-python|python -m pip install/
     );
-    expect(remaining).toMatch(/rhysd\/actionlint/);
+    expect(remaining).toMatch(
+      /- name: Run actionlint \(structural\)\n\s+if: \$\{\{ success\(\) && steps\.structural\.outputs\.skip != 'true' \}\}\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n/
+    );
     expect(remaining).toMatch(/actions\/setup-python/);
     expect(remaining).toMatch(/python -m pip install/);
     expect(typecheck).not.toContain('ci-fast-remaining');
@@ -1907,7 +1949,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Install actionlint')
+      remaining.indexOf('- name: Run actionlint (structural)')
     );
     const controlPattern = remaining.match(
       /STRUCTURAL_CONTROL_PATTERN='([^']+)'/

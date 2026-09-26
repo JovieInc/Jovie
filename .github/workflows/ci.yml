@@ -1728,9 +1728,12 @@ jobs:
           CI_FAST_SKIP_STRUCTURAL: 'true'
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
         run: node scripts/ci-fast-lanes.mjs
-      - name: Install actionlint (structural)
+      # Checksum-pinned actionlint/shellcheck/pyflakes binaries identical to
+      # the former rhysd/actionlint Docker action, whose image was rebuilt at
+      # every job start (~30s) even when this step was skipped.
+      - name: Run actionlint (structural)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+        run: bash .github/scripts/run-actionlint.sh
       - name: Set up Python (structural regression tests)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
