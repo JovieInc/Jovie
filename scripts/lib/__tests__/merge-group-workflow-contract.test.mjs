@@ -813,6 +813,15 @@ describe('merge_group workflow contract', () => {
     expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
     expect(coverage).toContain("github.event_name == 'merge_group'");
     expect(coverage).toContain('github.event.merge_group.head_sha');
+    // The event PR base SHA goes stale on synchronize; the PR diff base is the
+    // merge base with the fetched base tip, the queue keeps its exact base.
+    expect(coverage).not.toContain('github.event.pull_request.base.sha');
+    expect(coverage).toContain(
+      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+    );
+    expect(coverage).toContain(
+      'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
+    );
     expect(coverage).toContain('.applicable');
     expect(coverage).toContain(
       'pnpm --filter @jovie/web test:coverage --changed'
@@ -946,8 +955,15 @@ describe('merge_group workflow contract', () => {
     expect(fetchStep).toContain(
       "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
     );
+    // The prefetch diffs from the resolved base (PR merge base with the base
+    // tip, or the exact merge-group base), which later steps then consume.
+    expect(fetchStep).toContain('id: coverage-base');
     expect(fetchStep).toContain(
-      "COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+    );
+    expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
+    expect(fetchScript).toContain(
+      'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
     );
     // The base-commit check must not be satisfiable by a promisor fetch.
     const verifyStep = job.slice(
