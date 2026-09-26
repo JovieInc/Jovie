@@ -355,14 +355,79 @@ export function planChangedLineCoverage({
   };
 }
 
+function statementLocationKey(location) {
+  const start = location?.start ?? {};
+  const end = location?.end ?? {};
+  return `${start.line}:${start.column}-${end.line}:${end.column}`;
+}
+
+/**
+ * Merge Istanbul `coverage-final.json` maps from `vitest --shard` runs into
+ * the map one unsharded run would report. Statements are keyed by source
+ * location and their hit counts summed, as Istanbul's FileCoverage.merge (and
+ * therefore `vitest --merge-reports`) does, so a changed line is covered iff
+ * some shard executed a statement spanning it. Only the statement data the
+ * changed-line ratchet reads is carried; a file is present when any shard
+ * reported it.
+ *
+ * @param {Record<string, any>[]} coverages
+ */
+export function mergeCoverageMaps(coverages) {
+  if (!Array.isArray(coverages) || coverages.length === 0) {
+    throw new Error('At least one coverage map is required.');
+  }
+  const merged = new Map();
+  for (const coverage of coverages) {
+    if (!coverage || typeof coverage !== 'object' || Array.isArray(coverage)) {
+      throw new Error('Coverage maps must be Istanbul coverage-final objects.');
+    }
+    for (const [path, fileCoverage] of Object.entries(coverage)) {
+      const file = merged.get(path) ?? new Map();
+      for (const [id, location] of Object.entries(
+        fileCoverage?.statementMap ?? {}
+      )) {
+        const key = statementLocationKey(location);
+        const hits = Number(fileCoverage.s?.[id] ?? 0);
+        const entry = file.get(key);
+        if (entry) {
+          entry.hits += hits;
+        } else {
+          file.set(key, { location, hits });
+        }
+      }
+      merged.set(path, file);
+    }
+  }
+  return Object.fromEntries(
+    [...merged].map(([path, file]) => {
+      const statements = [...file.values()];
+      return [
+        path,
+        {
+          path,
+          statementMap: Object.fromEntries(
+            statements.map(({ location }, index) => [index, location])
+          ),
+          s: Object.fromEntries(
+            statements.map(({ hits }, index) => [index, hits])
+          ),
+        },
+      ];
+    })
+  );
+}
+
 /** @param {*} options */
 export function runChangedLineCoverageCheck({
   base,
   head,
   coveragePath = resolve(REPO_ROOT, 'apps/web/coverage/coverage-final.json'),
+  coveragePaths = [coveragePath],
   repoRoot = REPO_ROOT,
 }) {
-  const coverage = JSON.parse(readFileSync(coveragePath, 'utf8'));
+  const coverage = mergeCoverageMaps(
+    coveragePaths.map(path => JSON.parse(readFileSync(path, 'utf8')))
+  );
   return evaluateChangedLineCoverage({
     changedLines: parseChangedLines(readExactWebDiff({ base, head, repoRoot })),
     coverage,

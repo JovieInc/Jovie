@@ -222,6 +222,7 @@ function workflowDeclaresReadyForReviewType(source) {
 }
 
 const BLOBLESS_BASE_FETCH_JOBS = new Set([
+  'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
 ]);
@@ -838,51 +839,58 @@ describe('merge_group workflow contract', () => {
   });
 
   it('finishes exact-head coverage inside the native merge-queue check budget', () => {
+    // V8 runs in the ci-exact-head-coverage-shard matrix; the gate job
+    // merges the shard reports and runs the changed-line ratchet.
+    const shard = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage-shard');
     const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    const timeout = Number(coverage.match(/timeout-minutes:\s*(\d+)/)?.[1]);
-    expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
-    expect(timeout).toBeLessThan(
-      NATIVE_QUEUE_POLICY.check_response_timeout_minutes
-    );
     expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
-    expect(coverage).toContain("github.event_name == 'merge_group'");
-    expect(coverage).toContain('github.event.merge_group.head_sha');
-    // The event PR base SHA goes stale on synchronize; the PR diff base is the
-    // merge base with the fetched base tip, the queue keeps its exact base.
-    expect(coverage).not.toContain('github.event.pull_request.base.sha');
-    expect(coverage).toContain(
-      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
-    );
-    expect(coverage).toContain(
-      'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
-    );
-    expect(coverage).toContain('.applicable');
-    expect(coverage).toContain(
-      'pnpm --filter @jovie/web test:coverage --changed'
-    );
-    expect(coverage).not.toContain(
-      'pnpm --filter @jovie/web test:coverage -- --changed'
-    );
-    expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
-    expect(coverage).not.toContain(
+    for (const job of [shard, coverage]) {
+      const timeout = Number(job.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+      expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
+      expect(timeout).toBeLessThan(
+        NATIVE_QUEUE_POLICY.check_response_timeout_minutes
+      );
+      expect(job).toContain("github.event_name == 'merge_group'");
+      expect(job).toContain('github.event.merge_group.head_sha');
+      // The event PR base SHA goes stale on synchronize; the PR diff base is
+      // the merge base with the fetched base tip, the queue keeps its base.
+      expect(job).not.toContain('github.event.pull_request.base.sha');
+      expect(job).toContain(
+        'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+      );
+      expect(job).toContain(
+        'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
+      );
+      expect(job).toContain('.applicable');
+      expect(job).not.toContain(
+        'pnpm --filter @jovie/web test:coverage -- --changed'
+      );
+      expect(job).toContain('scripts/check-changed-test-coverage.mjs');
+      expect(job).not.toContain('timeout-minutes: 60');
+    }
+    expect(shard).toContain('pnpm --filter @jovie/web test:coverage --changed');
+    expect(shard).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(shard).not.toContain(
       String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
     );
-    expect(coverage).toContain(
-      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    expect(shard).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\" --bail 1 --shard \"\$COVERAGE_SHARD\"`
     );
-    expect(coverage).toContain('--bail 1');
+    expect(shard).toContain('--bail 1');
     expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
-    expect(coverage).toContain(
+    expect(shard).toContain(
       `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
     );
-    expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
-    expect(coverage).not.toContain('timeout-minutes: 60');
+    expect(coverage).toContain(
+      'needs: [ci-path-changes, ci-exact-head-coverage-shard]'
+    );
   });
 
   it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
     for (const jobId of [
       'ci-fast-remaining',
       'ci-profile-admission-browser',
+      'ci-exact-head-coverage-shard',
       'ci-exact-head-coverage',
     ]) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
@@ -983,79 +991,87 @@ describe('merge_group workflow contract', () => {
     expect(job).toContain('persist-credentials: false');
   });
 
-  it('prefetches exactly the ratchet diff blobs for blobless exact-head coverage', () => {
-    const job = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
-    const ratchetSource = readFileSync(
-      join(REPO_ROOT, 'scripts/lib/changed-test-coverage.mjs'),
-      'utf8'
-    );
-    // The ratchet's diff arguments; the prefetch must replay the same diff so
-    // every blob it reads is local before persist-credentials: false steps.
-    for (const arg of [
-      "'diff'",
-      "'--unified=0'",
-      "'--diff-filter=ACMR'",
-      "'--no-renames'",
-      '`${base}...${head}`',
-      "'apps/web'",
-    ]) {
-      expect(ratchetSource).toContain(arg);
+  it.each(['ci-exact-head-coverage-shard', 'ci-exact-head-coverage'])(
+    'prefetches exactly the ratchet diff blobs for blobless %s',
+    jobId => {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+      const ratchetSource = readFileSync(
+        join(REPO_ROOT, 'scripts/lib/changed-test-coverage.mjs'),
+        'utf8'
+      );
+      // The ratchet's diff arguments; the prefetch must replay the same diff so
+      // every blob it reads is local before persist-credentials: false steps.
+      for (const arg of [
+        "'diff'",
+        "'--unified=0'",
+        "'--diff-filter=ACMR'",
+        "'--no-renames'",
+        '`${base}...${head}`',
+        "'apps/web'",
+      ]) {
+        expect(ratchetSource).toContain(arg);
+      }
+      const ratchetDiff =
+        'diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null';
+      const lines = fetchScript.split('\n');
+      const fetchLine = lines.findIndex(line =>
+        line.includes('fetch --no-tags --unshallow --filter=blob:none')
+      );
+      const baseLine = lines.findIndex(
+        line =>
+          line ===
+          'GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"'
+      );
+      const prefetchLine = lines.findIndex(
+        line =>
+          line.startsWith(
+            'git -c "http.https://github.com/.extraheader=$AUTH_HEADER" '
+          ) && line.endsWith(ratchetDiff)
+      );
+      const offlineLine = lines.findIndex(
+        line => line === `GIT_NO_LAZY_FETCH=1 git ${ratchetDiff}`
+      );
+      expect(fetchLine).toBeGreaterThanOrEqual(0);
+      expect(baseLine).toBeGreaterThan(fetchLine);
+      expect(prefetchLine).toBeGreaterThan(baseLine);
+      expect(offlineLine).toBeGreaterThan(prefetchLine);
+      expect(fetchScript).toContain('set -euo pipefail');
+      const fetchStep = job.slice(
+        job.indexOf('      - name: Fetch base-branch history'),
+        job.indexOf('      - name: Verify exact coverage head and diff base')
+      );
+      expect(fetchStep).toContain(
+        "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+      );
+      // The prefetch diffs from the resolved base (PR merge base with the base
+      // tip, or the exact merge-group base), which later steps then consume.
+      expect(fetchStep).toContain('id: coverage-base');
+      expect(fetchStep).toContain(
+        'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+      );
+      expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
+      expect(fetchScript).toContain(
+        'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
+      );
+      // The base-commit check must not be satisfiable by a promisor fetch.
+      const verifyStart = job.indexOf(
+        '      - name: Verify exact coverage head and diff base'
+      );
+      expect(verifyStart).toBeGreaterThanOrEqual(0);
+      const verifyEnd = job.indexOf('\n      - ', verifyStart + 1);
+      expect(verifyEnd).toBeGreaterThan(verifyStart);
+      const verifyStep = job.slice(verifyStart, verifyEnd);
+      expect(verifyStep).toContain("GIT_NO_LAZY_FETCH: '1'");
+      expect(verifyStep).toContain(
+        'git cat-file -e "${COVERAGE_BASE}^{commit}"'
+      );
+      // Credentials stay step-scoped: no checkout-level blob filter or persisted
+      // token that later test code could reuse.
+      expect(job).not.toContain('filter: blob:none');
+      expect(job).toContain('persist-credentials: false');
     }
-    const ratchetDiff =
-      'diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null';
-    const lines = fetchScript.split('\n');
-    const fetchLine = lines.findIndex(line =>
-      line.includes('fetch --no-tags --unshallow --filter=blob:none')
-    );
-    const baseLine = lines.findIndex(
-      line =>
-        line ===
-        'GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"'
-    );
-    const prefetchLine = lines.findIndex(
-      line =>
-        line.startsWith(
-          'git -c "http.https://github.com/.extraheader=$AUTH_HEADER" '
-        ) && line.endsWith(ratchetDiff)
-    );
-    const offlineLine = lines.findIndex(
-      line => line === `GIT_NO_LAZY_FETCH=1 git ${ratchetDiff}`
-    );
-    expect(fetchLine).toBeGreaterThanOrEqual(0);
-    expect(baseLine).toBeGreaterThan(fetchLine);
-    expect(prefetchLine).toBeGreaterThan(baseLine);
-    expect(offlineLine).toBeGreaterThan(prefetchLine);
-    expect(fetchScript).toContain('set -euo pipefail');
-    const fetchStep = job.slice(
-      job.indexOf('      - name: Fetch base-branch history'),
-      job.indexOf('      - name: Verify exact coverage head and diff base')
-    );
-    expect(fetchStep).toContain(
-      "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
-    );
-    // The prefetch diffs from the resolved base (PR merge base with the base
-    // tip, or the exact merge-group base), which later steps then consume.
-    expect(fetchStep).toContain('id: coverage-base');
-    expect(fetchStep).toContain(
-      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
-    );
-    expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
-    expect(fetchScript).toContain(
-      'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
-    );
-    // The base-commit check must not be satisfiable by a promisor fetch.
-    const verifyStep = job.slice(
-      job.indexOf('      - name: Verify exact coverage head and diff base'),
-      job.indexOf('      - uses: ./.github/actions/setup-node-pnpm')
-    );
-    expect(verifyStep).toContain("GIT_NO_LAZY_FETCH: '1'");
-    expect(verifyStep).toContain('git cat-file -e "${COVERAGE_BASE}^{commit}"');
-    // Credentials stay step-scoped: no checkout-level blob filter or persisted
-    // token that later test code could reuse.
-    expect(job).not.toContain('filter: blob:none');
-    expect(job).toContain('persist-credentials: false');
-  });
+  );
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {
     const secret = getJobBlock(CI_WORKFLOW, 'ci-secret-scan');

@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { rewriteVitestArgs } from '../../../apps/web/scripts/vitest-wrapper.mjs';
@@ -10,9 +12,11 @@ import {
   evaluateChangedLineCoverage,
   findReferencingTests,
   isCoverageSourcePath,
+  mergeCoverageMaps,
   parseChangedLines,
   planChangedLineCoverage,
   resolveTestSpecifierCandidates,
+  runChangedLineCoverageCheck,
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
@@ -79,6 +83,119 @@ describe('changed test coverage', () => {
       repoRoot: '/repo',
     });
     expect(result).toMatchObject({ ok: true, percentage: 66.7 });
+  });
+
+  it('merges vitest --shard coverage maps like one unsharded run', () => {
+    // Shard 1 ran the test covering line 2; shard 2 only saw the file through
+    // coverage.all (zero hits) plus a test covering line 4.
+    const merged = mergeCoverageMaps([
+      coverage([1, 0, 0]),
+      coverage([0, 0, 2]),
+    ]);
+    expect(merged[`/repo/${path}`].s).toEqual({ 0: 1, 1: 0, 2: 2 });
+    expect(
+      evaluateChangedLineCoverage({
+        changedLines: new Map([[path, new Set([2, 3, 4])]]),
+        coverage: merged,
+        repoRoot: '/repo',
+      })
+    ).toMatchObject({ ok: true, coveredLines: 2, coverableLines: 3 });
+  });
+
+  it('deliberate red: merged shards stay below the floor when no shard covers the lines', () => {
+    const result = evaluateChangedLineCoverage({
+      changedLines: new Map([[path, new Set([2, 3, 4])]]),
+      coverage: mergeCoverageMaps([coverage([1, 0, 0]), coverage([0, 0, 0])]),
+      repoRoot: '/repo',
+    });
+    expect(result).toMatchObject({ ok: false, coveredLines: 1 });
+  });
+
+  it('merges shard statements by source location, not statement id', () => {
+    const shifted = {
+      [`/repo/${path}`]: {
+        statementMap: {
+          0: { start: { line: 3 }, end: { line: 3 } },
+          1: { start: { line: 5 }, end: { line: 5 } },
+        },
+        s: { 0: 4, 1: 0 },
+      },
+    };
+    const merged = mergeCoverageMaps([coverage([0, 0, 0]), shifted]);
+    const file = merged[`/repo/${path}`];
+    const hitsByLine = Object.fromEntries(
+      Object.entries(file.statementMap).map(([id, location]) => [
+        location.start.line,
+        file.s[id],
+      ])
+    );
+    expect(hitsByLine).toEqual({ 2: 0, 3: 4, 4: 0, 5: 0 });
+  });
+
+  it('deliberate red: a changed file absent from every shard stays missing', () => {
+    const result = evaluateChangedLineCoverage({
+      changedLines: new Map([[path, new Set([2])]]),
+      coverage: mergeCoverageMaps([{}, {}]),
+      repoRoot: '/repo',
+    });
+    expect(result).toMatchObject({ ok: false, missingFiles: [path] });
+    expect(() => mergeCoverageMaps([])).toThrow(/At least one coverage map/);
+  });
+
+  it('merges every --coverage shard report in the ratchet check', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'changed-coverage-cli-'));
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+    git('init', '-q');
+    git('config', 'user.email', 'ci@example.com');
+    git('config', 'user.name', 'CI');
+    git('config', 'commit.gpgsign', 'false');
+    mkdirSync(join(repo, 'apps/web/lib'), { recursive: true });
+    writeFileSync(join(repo, 'apps/web/lib/example.ts'), 'export {};\n');
+    git('add', '.');
+    git('commit', '-qm', 'base');
+    const base = git('rev-parse', 'HEAD');
+    writeFileSync(
+      join(repo, 'apps/web/lib/example.ts'),
+      'export {};\nconst a = 1;\nconst b = 2;\nconst c = 3;\n'
+    );
+    git('commit', '-qam', 'head');
+    const head = git('rev-parse', 'HEAD');
+    const shard = hits => {
+      const file = join(repo, `shard-${hits.join('')}.json`);
+      const report = coverage(hits)[`/repo/${path}`];
+      writeFileSync(file, JSON.stringify({ [join(repo, path)]: report }));
+      return file;
+    };
+    const check = coveragePaths =>
+      runChangedLineCoverageCheck({
+        base,
+        head,
+        repoRoot: repo,
+        coveragePaths,
+      });
+    const first = shard([1, 0, 0]);
+    const second = shard([0, 1, 0]);
+    expect(check([first])).toMatchObject({ ok: false, coveredLines: 1 });
+    expect(check([first, second])).toMatchObject({
+      ok: true,
+      coveredLines: 2,
+      coverableLines: 3,
+    });
+    const cli = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../check-changed-test-coverage.mjs'),
+        '--base',
+        base,
+        '--head',
+        head,
+        '--coverage',
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(cli.status).toBe(1);
+    expect(cli.stderr).toContain('Missing value for --coverage argument.');
   });
 
   it('maps coverable web sources to Vitest coverage.include paths', () => {
@@ -252,18 +369,23 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
       resolve(import.meta.dirname, '../../../.github/workflows/ci.yml'),
       'utf8'
     );
+    // The V8 run is sharded; the gate job merges the shards and ratchets.
+    const shard = workflow.slice(
+      workflow.indexOf('  ci-exact-head-coverage-shard:'),
+      workflow.indexOf('  ci-exact-head-coverage:')
+    );
     const coverage = workflow.slice(
       workflow.indexOf('  ci-exact-head-coverage:'),
       workflow.indexOf('  ci-a11y:')
     );
-    expect(coverage).toContain("github.event_name == 'pull_request'");
-    expect(coverage).toContain("github.event_name == 'merge_group'");
-    expect(coverage).toContain('github.event.pull_request.head.sha');
-    expect(coverage).toContain('github.event.merge_group.head_sha');
-    expect(coverage).toContain(
-      'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"'
-    );
-    expect(coverage).toContain('has_web_coverage_changes');
+    for (const job of [shard, coverage]) {
+      expect(job).toContain("github.event_name == 'pull_request'");
+      expect(job).toContain("github.event_name == 'merge_group'");
+      expect(job).toContain('github.event.pull_request.head.sha');
+      expect(job).toContain('github.event.merge_group.head_sha');
+      expect(job).toContain('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"');
+      expect(job).toContain('has_web_coverage_changes');
+    }
     const webPkg = JSON.parse(
       readFileSync(
         resolve(import.meta.dirname, '../../../apps/web/package.json'),
@@ -286,51 +408,66 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
     expect(wrapper).toContain('JOVIE_COVERAGE_INCLUDE');
     expect(wrapper).toContain("args[index] === '--changed'");
     expect(wrapper).toContain("'related'");
-    expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
-    expect(coverage).toContain(
-      'pnpm --filter @jovie/web test:coverage --changed'
+    expect(shard).toContain('pnpm --filter @jovie/web test:coverage');
+    expect(shard).toContain('pnpm --filter @jovie/web test:coverage --changed');
+    for (const job of [shard, coverage]) {
+      expect(job).not.toContain(
+        'pnpm --filter @jovie/web test:coverage -- --changed'
+      );
+      expect(job).toContain('scripts/check-changed-test-coverage.mjs');
+      expect(job).not.toContain(
+        String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
+      );
+    }
+    expect(shard).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
+    expect(shard).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);
+    expect(shard).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(shard).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\" --bail 1 --shard \"\$COVERAGE_SHARD\"`
     );
-    expect(coverage).not.toContain(
-      'pnpm --filter @jovie/web test:coverage -- --changed'
+    const shardRun = shard.slice(
+      shard.indexOf('Run exact-head coverage shard')
     );
-    expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
-    expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
-    expect(coverage).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);
-    expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
-    expect(coverage).not.toContain(
-      String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
-    );
-    expect(coverage).toContain(
-      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
-    );
-    const coverageRun = coverage.slice(
-      coverage.indexOf('Run exact-head coverage and changed-behavior ratchet')
-    );
-    const runBody = coverageRun.slice(coverageRun.indexOf('        run: |'));
+    const runBody = shardRun.slice(shardRun.indexOf('        run: |'));
     expect(runBody).not.toMatch(/^\s+#.*`/m);
-    expect(coverage).toContain('--bail 1');
-    expect(coverage).toContain('JOVIE_COVERAGE_INCLUDE');
-    expect(coverage).toContain('.coverageInclude // [] | .[]');
-    expect(coverage).toContain('.relatedTests // [] | .[]');
-    expect(coverage).toContain('JOVIE_COVERAGE_RELATED_TESTS');
+    expect(shard).toContain('--bail 1');
+    expect(shard).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(shard).toContain('.coverageInclude // [] | .[]');
+    expect(shard).toContain('.relatedTests // [] | .[]');
+    expect(shard).toContain('JOVIE_COVERAGE_RELATED_TESTS');
     expect(wrapper).toContain('JOVIE_COVERAGE_RELATED_TESTS');
-    expect(coverage).toContain(
+    expect(shard).toContain(
       'Applicable exact-head coverage plan produced no include paths.'
     );
     expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
-    expect(coverage).toContain(
+    expect(shard).toContain(
       `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
     );
-    const jobTimeout = Number(coverage.match(/timeout-minutes:\s*(\d+)/)?.[1]);
-    expect(jobTimeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
-    expect(jobTimeout).toBeLessThan(
-      NATIVE_QUEUE_POLICY.check_response_timeout_minutes
+    for (const job of [shard, coverage]) {
+      const jobTimeout = Number(job.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+      expect(jobTimeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
+      expect(jobTimeout).toBeLessThan(
+        NATIVE_QUEUE_POLICY.check_response_timeout_minutes
+      );
+      expect(job).not.toContain('timeout-minutes: 60');
+      expect(job).not.toContain('test:coverage:diff');
+      expect(job).not.toContain('exact-head-coverage-baseline.json');
+      expect(job).not.toContain('secrets.CODECOV_TOKEN');
+    }
+    expect(shard).toContain("trap 'stop_coverage; exit 143' TERM");
+    // The gate job never runs Vitest: it requires every shard to pass,
+    // merges exactly one report per shard, and ratchets the exact diff.
+    expect(coverage).not.toContain('test:coverage --changed');
+    expect(coverage).toContain(
+      'needs: [ci-path-changes, ci-exact-head-coverage-shard]'
     );
-    expect(coverage).not.toContain('timeout-minutes: 60');
-    expect(coverage).not.toContain('test:coverage:diff');
-    expect(coverage).not.toContain('exact-head-coverage-baseline.json');
-    expect(coverage).toContain("trap 'stop_coverage; exit 143' TERM");
-    expect(coverage).not.toContain('secrets.CODECOV_TOKEN');
+    expect(coverage).toContain(
+      'SHARD_RESULT: ${{ needs.ci-exact-head-coverage-shard.result }}'
+    );
+    expect(coverage).toContain(`if [[ "$SHARD_RESULT" != 'success' ]]; then`);
+    expect(coverage).toContain('--base "$COVERAGE_BASE"');
+    expect(coverage).toContain('--head "$EXPECTED_HEAD"');
+    expect(coverage).toContain('"${coverage_args[@]}"');
     const mergeReady = workflow.slice(
       workflow.indexOf('  ci-merge-group-ready:'),
       workflow.indexOf('  ci-pr-ready:')
@@ -345,6 +482,47 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
     }
     expect(mergeReady).toContain('Exact-head Coverage:$COVERAGE_RESULT');
     expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
+  });
+
+  it('deliberate red: the gate merges exactly one coverage report per shard', () => {
+    const workflow = readFileSync(
+      resolve(import.meta.dirname, '../../../.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const shard = workflow.slice(
+      workflow.indexOf('  ci-exact-head-coverage-shard:'),
+      workflow.indexOf('  ci-exact-head-coverage:')
+    );
+    const coverage = workflow.slice(
+      workflow.indexOf('  ci-exact-head-coverage:'),
+      workflow.indexOf('  ci-a11y:')
+    );
+    const matrix = shard.match(/^ {8}shard: \[([^\]]+)\]$/m)?.[1];
+    const shards = matrix?.split(',').map(value => Number(value.trim()));
+    expect(shards).toEqual([1, 2, 3, 4]);
+    const count = shards.length;
+    expect(shard).toContain('fail-fast: true');
+    expect(shard).toContain(`COVERAGE_SHARD: \${{ matrix.shard }}/${count}`);
+    expect(shard).toContain(
+      'COVERAGE_REPORT: exact-head-coverage/coverage-final.${{ matrix.shard }}.json'
+    );
+    // Every applicable shard fails closed without its report and uploads it.
+    expect(shard).toContain(
+      String.raw`cp apps/web/coverage/coverage-final.json \"\$COVERAGE_REPORT\"`
+    );
+    expect(shard).toContain(
+      "if: steps.coverage-shard.outputs.applicable == 'true'"
+    );
+    expect(shard).toContain(
+      'name: exact-head-coverage-${{ github.run_id }}-${{ matrix.shard }}'
+    );
+    expect(shard).toContain('if-no-files-found: error');
+    expect(coverage).toContain(
+      'pattern: exact-head-coverage-${{ github.run_id }}-*'
+    );
+    expect(coverage).toContain(`for shard in ${shards.join(' ')}; do`);
+    expect(coverage).toContain(`if [[ "$report_count" -ne ${count} ]]; then`);
+    expect(coverage).toContain('coverage_args+=(--coverage "$report")');
   });
 
   it('passes planned related tests to the hosted repair coverage run', () => {
