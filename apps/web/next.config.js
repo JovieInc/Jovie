@@ -61,18 +61,6 @@ const nextConfig = {
   // list limited to the data they actually read; the broad directory entries
   // are small content and chat-topic catalogs.
   outputFileTracingIncludes: {
-    '/*': [
-      '../../CHANGELOG.md',
-      '../../docs/FEATURE_REGISTRY.md',
-      '../../scripts/symphony/symphony-codex-account-control.py',
-      '../../apps/eve-pilot/identities/jovie/instructions.md',
-      '../../apps/eve-pilot/identities/summer/instructions.md',
-      'tests/quarantine.json',
-      'content/**/*',
-      'lib/chat/knowledge/topics/**/*',
-      'public/fonts/Satoshi-Bold.ttf',
-      'public/fonts/DMSans-Regular.ttf',
-    ],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
   },
