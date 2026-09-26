@@ -334,7 +334,7 @@ describe('redis command budget', () => {
       set: async (key: string) => {
         throw new Error(`unexpected SET ${key}`);
       },
-      // Returns the fixed-window script reply; TData is chosen by the caller.
+      // Returns the rate-limit script reply; TData is chosen by the caller.
       evalsha: (async () => {
         steady.evalsha += 1;
         return [1, 100];
