@@ -2,8 +2,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
-import type { Artist } from '@/types/db';
 import { ProfileUnifiedDrawer } from './ProfileUnifiedDrawer';
+import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 
 vi.mock('@/features/profile/ProfileDrawerShell', () => ({
   ProfileDrawerShell: ({
@@ -85,22 +85,7 @@ vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 
-const artist = {
-  id: 'artist-1',
-  name: 'Tim White',
-  handle: 'timwhite',
-  image_url: null,
-  tagline: 'Producer.',
-  location: null,
-  hometown: null,
-  career_highlights: null,
-  is_verified: true,
-  active_since_year: null,
-  published: true,
-  is_featured: false,
-  marketing_opt_out: false,
-  created_at: '2026-04-24T00:00:00.000Z',
-} satisfies Artist;
+const artist = PROFILE_STORY_ARTIST;
 
 const bookingContact: PublicContact = {
   id: 'contact-1',
