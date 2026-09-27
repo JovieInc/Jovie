@@ -438,10 +438,13 @@ describe('LibrarySurface', () => {
         'Releases, merch, images, videos, and audio will appear here as they land.'
       )
     ).toBeDefined();
-    expect(screen.getByRole('link', { name: 'Open Releases' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.RELEASES
-    );
+    const firstActions = screen.getAllByRole('link', {
+      name: 'Open Releases',
+    });
+    expect(firstActions).toHaveLength(2);
+    for (const action of firstActions) {
+      expect(action).toHaveAttribute('href', APP_ROUTES.RELEASES);
+    }
     expect(emptyState).toHaveClass('py-16', 'min-h-90');
     expect(
       screen.getByRole('heading', { name: 'No Library Items' })

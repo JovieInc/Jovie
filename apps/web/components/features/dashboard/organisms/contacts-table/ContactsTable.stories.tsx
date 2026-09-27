@@ -48,3 +48,12 @@ export const EmptyNarrow: Story = {
     </div>
   ),
 };
+
+export const Loading: Story = {
+  args: { isLoading: true },
+  render: args => (
+    <div className='h-[32rem] bg-(--app-shell-content-surface)'>
+      <ContactsTable {...args} />
+    </div>
+  ),
+};

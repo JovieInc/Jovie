@@ -1,7 +1,8 @@
+import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 
 import type { FetchImplementation } from './client.js';
-import { handleMcpMessage } from './mcp.js';
+import { handleMcpMessage, serveMcp } from './mcp.js';
 
 function context(fetchImpl?: FetchImplementation) {
   return { version: '1.2.3', baseUrl: 'https://jov.ie', fetchImpl };
@@ -116,5 +117,76 @@ describe('MCP server', () => {
       context()
     );
     expect(unknown?.result).toMatchObject({ isError: true });
+  });
+
+  it('returns text results and API failure details', async () => {
+    const text: FetchImplementation = async () => new Response('# docs');
+    await expect(
+      handleMcpMessage(
+        {
+          id: 8,
+          method: 'tools/call',
+          params: { name: 'get_docs', arguments: { full: true } },
+        },
+        context(text)
+      )
+    ).resolves.toMatchObject({
+      result: { content: [{ type: 'text', text: '# docs' }] },
+    });
+
+    const limited: FetchImplementation = async () =>
+      new Response('{"error":{"code":"RATE_LIMITED"}}', {
+        status: 429,
+        headers: { 'Retry-After': '30' },
+      });
+    const failed = await handleMcpMessage(
+      {
+        id: 9,
+        method: 'tools/call',
+        params: { name: 'get_artist', arguments: { username: 'demo' } },
+      },
+      context(limited)
+    );
+    const error = JSON.parse(
+      (failed?.result as { content: Array<{ text: string }> }).content[0].text
+    ).error;
+    expect(error).toMatchObject({
+      code: 'REQUEST_FAILED',
+      apiCode: 'RATE_LIMITED',
+      status: 429,
+      retryAfterSeconds: 30,
+    });
+
+    const missingArgs = await handleMcpMessage(
+      { id: 10, method: 'tools/call', params: { name: 'get_artist' } },
+      context()
+    );
+    expect(missingArgs?.result).toMatchObject({ isError: true });
+  });
+
+  it('serves newline JSON, skipping blanks and reporting parse errors', async () => {
+    let output = '';
+    await serveMcp(
+      Readable.from([
+        '\n',
+        'not json\n',
+        '{"method":"notifications/x"}\n',
+        '{"id":1,"method":"ping"}\n',
+      ]),
+      { write: chunk => (output += chunk) },
+      context()
+    );
+    const lines = output
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    expect(lines).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: null,
+        error: { code: -32700, message: 'Parse error' },
+      },
+      { jsonrpc: '2.0', id: 1, result: {} },
+    ]);
   });
 });
