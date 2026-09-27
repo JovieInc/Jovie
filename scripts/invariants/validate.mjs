@@ -2,7 +2,11 @@
 
 import { validateAssuranceMatrixPolicy } from './assurance-matrix.mjs';
 import { validateDeliveryModelPolicy } from './delivery-model.mjs';
-import { validateDesignSurfaces } from './design-surfaces.mjs';
+import {
+  designSurfacesCertification,
+  formatCertificationSummary,
+  validateDesignSurfaces,
+} from './design-surfaces.mjs';
 import { validateDoneSprintInvariants } from './done-sprint-invariants.mjs';
 import { validateGateIntegrityPolicy } from './gate-integrity.mjs';
 import {
@@ -109,6 +113,11 @@ if (!ok) {
   const receipt = buildHarnessReceipt(registry);
   process.stdout.write(
     `Harness contract valid: ${receipt.principles} principles, ${receipt.partial} expiring exceptions.\n`
+  );
+  // Visual founder rules without an evaluator receipt stay explicitly
+  // not-certified in the receipt, even while their dated record is valid.
+  process.stdout.write(
+    `${formatCertificationSummary(designSurfacesCertification(registry))}\n`
   );
   if (harnessJson) {
     process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
