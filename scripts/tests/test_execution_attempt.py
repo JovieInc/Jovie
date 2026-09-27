@@ -4,7 +4,9 @@ import json
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts/lanes/execution_attempt.py"
@@ -34,20 +36,22 @@ class ExecutionAttemptTest(unittest.TestCase):
         children = [subprocess.Popen([sys.executable, str(MODULE)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) for _ in range(2)]
         results = [json.loads(child.communicate(json.dumps(request))[0]) for child in children]
         self.assertEqual([row["admitted"] for row in results].count(True), 1)
-    def test_github_status_authority_dedupes_independent_local_paths(self):
-        rows = []
+    def test_github_coordination_dedupes_racing_local_paths(self):
+        rows, lock, barrier = [], threading.Lock(), threading.Barrier(2)
         def fake_rows(*_):
-            return rows[:], rows[-1]["_remote"]["statusId"] if rows else None
+            with lock: return rows[:], rows[-1]["_remote"]["statusId"] if rows else None
         def fake_append(_coordination, _ident, row, head):
-            event = f"event-{len(rows) + 1}"
-            rows.append({**row, "_remote": {"prevStatusId": head, "eventId": event, "statusId": len(rows) + 1}}); return event
+            barrier.wait()
+            with lock:
+                if rows: return None
+                event = "event-1"; rows.append({**row, "_remote": {"prevStatusId": head, "eventId": event, "statusId": 1}}); return event
         real = attempt._github_rows, attempt._github_append
         attempt._github_rows, attempt._github_append = fake_rows, fake_append
         self.addCleanup(lambda: (setattr(attempt, "_github_rows", real[0]), setattr(attempt, "_github_append", real[1])))
         coordination = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": "a" * 40}
-        first = self.claim(path=Path(self.tmp.name) / "host-a.jsonl", coordination=coordination)
-        second = self.claim(path=Path(self.tmp.name) / "host-b.jsonl", coordination=coordination)
-        self.assertTrue(first["admitted"]); self.assertEqual(second["reason"], "duplicate_active")
+        with ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(lambda host: self.claim(path=Path(self.tmp.name) / f"host-{host}.jsonl", coordination=coordination), "ab"))
+        self.assertEqual(sorted(result.get("admitted", False) for result in results), [False, True])
     def test_crash_restart_and_redelivery_stay_terminal(self):
         first = self.claim()
         self.assertEqual(self.claim(now=101)["reason"], "duplicate_active")
