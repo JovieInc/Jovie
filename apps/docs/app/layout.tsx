@@ -10,15 +10,24 @@ import {
   filterNavigationPageMap,
   loadArticleRegistry,
 } from '@/lib/article-registry.mjs';
+import { DOCS_ORIGIN } from '@/lib/help-center-seo.mjs';
 import './help-search.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(DOCS_ORIGIN),
   title: {
     default: 'Jovie Help Center',
     template: '%s | Jovie Help Center',
   },
   description:
     'Clear answers for building your profile, sharing your work, and understanding your audience.',
+  openGraph: {
+    siteName: 'Jovie Help Center',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+  },
 };
 
 export default async function RootLayout({
