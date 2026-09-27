@@ -498,6 +498,37 @@ describe('PersistentAudioBar', () => {
     );
   });
 
+  it('prefetches the lyrics route on pointer and keyboard intent', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    const lyricsButton = screen.getByRole('button', { name: 'Lyrics' });
+    fireEvent.pointerEnter(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    prefetch.mockClear();
+    fireEvent.focus(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+  });
+
+  it('does not prefetch the lyrics route when the track has no lyrics', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
+    expect(prefetch).not.toHaveBeenCalled();
+  });
+
   it('closes the canonical lyrics button back to the last non-lyrics route', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
