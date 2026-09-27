@@ -126,7 +126,7 @@ function normalizeReleaseIdentity(value: string): string {
 function getSpotifyAlbumIdentity(album: SpotifyAlbum): string {
   const artists = album.artists
     .map(artist => artist.id || normalizeReleaseIdentity(artist.name))
-    .sort()
+    .sort((left, right) => left.localeCompare(right))
     .join(':');
 
   return `${normalizeReleaseIdentity(album.name)}:${artists}`;
