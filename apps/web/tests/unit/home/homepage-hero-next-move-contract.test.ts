@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { buildHomepageMarkdown } from '@/lib/agent/homepage-markdown';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -71,6 +72,35 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
     expect(pageSource).not.toContain('/images/hero/');
+
+    const primaryAction = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepagePrimaryAction.tsx'),
+      'utf8'
+    );
+    const close = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageClose.tsx'),
+      'utf8'
+    );
+    const noscript = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageNoScriptContent.tsx'),
+      'utf8'
+    );
+    expect(primaryAction).toContain('<HeroSpotifySearch');
+    expect(primaryAction).not.toContain('WAITLIST_ENABLED');
+    expect(primaryAction).not.toContain('homepage-request-access');
+    expect(close).not.toContain('WAITLIST_ENABLED');
+    expect(close).not.toContain('Request access');
+    expect(noscript).toContain('APP_ROUTES.START');
+    expect(noscript).toContain('hero.search.action');
+    expect(noscript).not.toContain('Request access');
+    expect(noscript).not.toContain('Get started');
+  });
+
+  it('publishes the name-search /start handoff in the markdown homepage', () => {
+    const markdown = buildHomepageMarkdown();
+    expect(markdown).toContain('Search your name → Find me:');
+    expect(markdown).toContain('/start');
+    expect(markdown).not.toMatch(/Get started|Request access/);
   });
 
   it('keeps the one-line H1 contract and the two-line phone fallback', () => {
