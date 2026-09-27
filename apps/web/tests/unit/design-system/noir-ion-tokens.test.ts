@@ -22,6 +22,25 @@ const linearTokens = readFileSync(
   join(WEB_ROOT, 'styles', 'linear-tokens.css'),
   'utf8'
 );
+const oklchPalette = JSON.parse(
+  readFileSync(join(WEB_ROOT, 'design', 'oklch-palette.json'), 'utf8')
+) as {
+  authority: string;
+  colorSot: { schema: string; penNode: string };
+  swatches: { ion: { light: { hex: string }; dark: { hex: string } } };
+};
+const ziawiColorSot = JSON.parse(
+  readFileSync(join(WEB_ROOT, 'design', 'ziawi-color-sot.json'), 'utf8')
+) as {
+  schema: string;
+  penNode: string;
+  elevations: {
+    count: number;
+    dark: Record<string, string>;
+    light: Record<string, string>;
+  };
+  accents: { hex: Record<string, string> };
+};
 
 /** Find a dark block that contains a distinctive Noir Ion marker. */
 function darkBlockContaining(css: string, marker: string): string {
@@ -31,9 +50,22 @@ function darkBlockContaining(css: string, marker: string): string {
   return hit ?? '';
 }
 
+function lightBlockContaining(css: string, marker: string): string {
+  const blocks =
+    css.match(/:root(?:\.dark)?(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? [];
+  const hit = blocks.find(
+    block =>
+      /^:root\b(?!\.dark)/.test(block.slice(0, block.indexOf('{'))) &&
+      block.includes(marker)
+  );
+  expect(hit, `expected a :root block containing ${marker}`).toBeTruthy();
+  return hit ?? '';
+}
+
 describe('Noir Ion — approved dark anchors', () => {
   // Surface/accent anchors live in the large Noir Ion :root.dark block.
   const dsDark = darkBlockContaining(designSystem, '--noir-ion-canvas');
+  const dsLight = lightBlockContaining(designSystem, '--noir-ion-canvas');
   // linear-tokens.css still owns --linear-bg-* and --linear-border-* / --linear-row-*.
   // App-shell tokens (--app-shell-*) migrated to design-system.css (JOV-5466).
   const linearDark = darkBlockContaining(linearTokens, '--linear-bg-page');

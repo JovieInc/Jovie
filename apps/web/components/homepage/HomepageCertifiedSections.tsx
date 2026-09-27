@@ -86,10 +86,7 @@ function RelationshipOutcomes({
 
 function ProfileSurface({ image }: Readonly<{ image: MarketingExportImage }>) {
   return (
-    <ArtistProfilePhoneFrame
-      className='homepage-certified-section__device'
-      size='md'
-    >
+    <ArtistProfilePhoneFrame className='homepage-certified-section__device'>
       <Image
         alt={image.alt}
         className='homepage-certified-section__screen'
