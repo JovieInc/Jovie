@@ -14,7 +14,8 @@ import { findNewEmptyStatePaths } from '../app/app-ia-static-guard';
  * Duplicate-component-family guard (count ratchet).
  *
  * Counts component files per drift-prone family (`*Button`, `*Palette`,
- * `*EmptyState`, `*Shell`) under apps/web/components. The count may only go
+ * `*EmptyState`, `*Shell`, `*Header`/`*HeaderCard`) under apps/web/components.
+ * The count may only go
  * DOWN. Convergence collapses duplicate implementations onto one canonical
  * per family; this ratchet stops NEW one-off variants from landing while that
  * work is in flight.
@@ -45,6 +46,9 @@ const FAMILIES = {
   palette: /Palette\.tsx$/,
   emptyState: /EmptyState\.tsx$/,
   shell: /Shell\.tsx$/,
+  // JOV-6777: one EntityHeader owns every right-rail header (Pen odpZ8, D6).
+  // New *Header/*HeaderCard component files fail CI; reuse EntityHeader.
+  header: /Header(?:Card)?\.tsx$/,
 } as const;
 type Family = keyof typeof FAMILIES;
 
@@ -68,7 +72,7 @@ function walk(dir: string, out: string[]): void {
 function countFamilies(): Record<Family, number> {
   const files: string[] = [];
   walk(SCAN_DIR, files);
-  const counts = { button: 0, palette: 0, emptyState: 0, shell: 0 };
+  const counts = { button: 0, palette: 0, emptyState: 0, shell: 0, header: 0 };
   for (const name of files) {
     for (const family of Object.keys(FAMILIES) as Family[]) {
       if (FAMILIES[family].test(name)) counts[family] += 1;

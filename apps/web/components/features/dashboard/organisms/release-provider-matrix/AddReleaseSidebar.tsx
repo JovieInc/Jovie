@@ -28,7 +28,7 @@ import {
   DrawerFormField,
   DrawerSettingsToggle,
   DrawerSurfaceCard,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { GenrePicker } from '@/components/molecules/GenrePicker';
@@ -267,7 +267,7 @@ export function AddReleaseSidebar({
           testId='add-release-header-card'
         >
           <div className='p-3'>
-            <EntityHeaderCard
+            <EntityHeader
               eyebrow='Release preview'
               stableLayout
               titleLineClamp={1}
@@ -275,7 +275,7 @@ export function AddReleaseSidebar({
               reserveSubtitleSlot
               reserveMetaSlot
               metaOverflow='scroll'
-              image={
+              thumbnail={
                 <AvatarUploadable
                   src={stagedArtworkPreviewUrl}
                   alt={title ? `${title} artwork` : 'New release artwork'}

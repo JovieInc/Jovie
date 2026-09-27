@@ -32,7 +32,7 @@ import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-ta
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import {
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -619,8 +619,8 @@ function ChatReleaseEntityPanel({
           if (event.key === 'Escape') onClose();
         }}
         entityHeader={
-          <EntityHeaderCard
-            image={
+          <EntityHeader
+            thumbnail={
               <div
                 className='relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-subtle bg-surface-0 text-tertiary-token'
                 style={releaseArtStyle}
@@ -897,8 +897,8 @@ function ChatContactEntityPanelLoader({
         if (event.key === 'Escape') onClose();
       }}
       entityHeader={
-        <EntityHeaderCard
-          image={
+        <EntityHeader
+          thumbnail={
             <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
               <UserRound className='h-4 w-4' />
             </div>
@@ -1018,8 +1018,8 @@ function ChatTourDateEntityPanelLoader({
         if (keyboardEvent.key === 'Escape') onClose();
       }}
       entityHeader={
-        <EntityHeaderCard
-          image={
+        <EntityHeader
+          thumbnail={
             <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
               <Calendar className='h-4 w-4' />
             </div>

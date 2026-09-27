@@ -49,7 +49,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     </button>
   ),
   DrawerInlineNote: ({ message }: { message: string }) => <div>{message}</div>,
-  DrawerHeader: ({
+  EntityHeader: ({
     title,
     actions,
   }: {

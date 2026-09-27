@@ -9,7 +9,7 @@ import {
   DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -95,7 +95,7 @@ export function AdminUserDetailDrawer({
       emptyMessage='Select a user to view details.'
       entityHeader={
         user ? (
-          <EntityHeaderCard
+          <EntityHeader
             title={user.name ?? 'Unnamed user'}
             stableLayout
             titleLineClamp={1}
@@ -103,7 +103,7 @@ export function AdminUserDetailDrawer({
             reserveSubtitleSlot
             reserveMetaSlot
             metaOverflow='scroll'
-            image={
+            thumbnail={
               <UserAvatar name={user.name ?? user.email ?? 'User'} size='lg' />
             }
             subtitle={
