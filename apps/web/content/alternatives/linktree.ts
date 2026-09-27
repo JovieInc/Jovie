@@ -11,7 +11,7 @@ export const linktreeAlternative: AlternativeData = {
     'Linktree gives you a static list of links. Jovie gives you a profile that adapts to what you share, captures visitors, and notifies them automatically.',
   heroImage: {
     src: '/images/hero/alternatives-linktree.webp',
-    alt: 'A glass, tree-like structure with rounded link-shaped nodes.',
+    alt: 'Abstract pink light blooming through dark smoke.',
   },
   whySwitch: [
     'A static link list treats every visitor the same, no matter what they came for.',
