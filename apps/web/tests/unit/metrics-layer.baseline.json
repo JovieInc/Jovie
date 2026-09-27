@@ -97,7 +97,7 @@
       "tables": 0,
       "rates": 1
     },
-    "app/investor-portal/_components/FundraiseProgress.tsx": {
+    "app/investor-portal/(portal)/_components/FundraiseProgress.tsx": {
       "tables": 0,
       "rates": 1
     },

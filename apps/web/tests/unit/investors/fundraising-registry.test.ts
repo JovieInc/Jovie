@@ -159,7 +159,7 @@ describe('fundraising registry', () => {
     );
     expect(founderClaim).toBeDefined();
     (founderClaim?.provenance[0] as { href: string }).href =
-      '/pitch/index.html';
+      '/investor-portal/deck/index.html';
     expect(validateFundraisingRegistry(registry)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

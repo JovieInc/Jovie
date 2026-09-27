@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Exact source-backed fallback body for web-188-investor-portal. The token-gated server route mounts InvestorBrief in embedded mode; this deterministic state keeps investorName null, matching the shipped no-cookie, missing-record, expired-record, and lookup-failure fallback without fabricating private investor data.',
+          'Exact source-backed fallback body for web-188-investor-portal. The gated server route (investor link or admin session) mounts InvestorBrief; this deterministic state keeps investorName null, matching the shipped no-cookie, missing-record, expired-record, and lookup-failure fallback without fabricating private investor data.',
       },
     },
     pen: {
@@ -25,7 +25,6 @@ const meta = {
   },
   tags: ['autodocs'],
   args: {
-    embedded: true,
     investorName: null,
   },
 } satisfies Meta<typeof InvestorBrief>;

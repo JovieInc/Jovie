@@ -62,8 +62,9 @@ const STATIC_CSP_PARTS = {
   frameAncestors: "frame-ancestors 'none'",
   formAction: "form-action 'self'",
   // Google Fonts (fonts.googleapis.com for the stylesheet, fonts.gstatic.com
-  // for the woff2 files) are loaded by /pitch/index.html (Manrope + JetBrains
-  // Mono — not in the self-hosted font set). The marketing app otherwise uses
+  // for the woff2 files) are loaded by the gated HTML deck at
+  // /investor-portal/deck/index.html (Manrope + JetBrains Mono — not in the
+  // self-hosted font set). The marketing app otherwise uses
   // next/font and self-hosted Geist/DM Sans/Satoshi.
   styleSrc: "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   fontSrc:

@@ -520,7 +520,7 @@ module.exports = [
       'lib/chat/system-prompt.ts',
       'components/organisms/billing/PlanComparisonSection.tsx',
       'components/molecules/PaySelector.tsx',
-      'app/investor-portal/_components/FundraiseProgress.tsx',
+      'app/investor-portal/(portal)/_components/FundraiseProgress.tsx',
       'app/onboarding/checkout/OnboardingCheckoutClient.tsx',
     ],
     rules: {

@@ -1983,34 +1983,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers the marketing investors page for changed-surface certification', () => {
-    const source = 'apps/web/app/(marketing)/investors/page.tsx';
-    const screen = SCREEN_REGISTRY.find(
-      entry => entry.id === 'web.marketing-investors'
-    );
-
-    assert.deepEqual(screen, {
-      id: 'web.marketing-investors',
-      platform: 'web',
-      owner: 'marketing-investors',
-      sources: [source],
-      viewports: ['desktop', 'mobile'],
-    });
-
-    const result = evaluateChangedScreens({
-      changedFiles: [{ path: source, status: 'M' }],
-      headSha: HEAD,
-    });
-    assert.deepEqual(result.issues, []);
-    assert.deepEqual(result.changedScreens, [
-      {
-        id: 'web.marketing-investors',
-        verdict: 'evidence-required',
-        findings: [],
-      },
-    ]);
-  });
-
   it('registers the marketing launch page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/launch/page.tsx';
     const screen = SCREEN_REGISTRY.find(
