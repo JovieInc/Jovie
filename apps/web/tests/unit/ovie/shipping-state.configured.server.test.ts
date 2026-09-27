@@ -49,6 +49,7 @@ describe('configured shipping-state publisher', () => {
     expect(hoisted.defaultLiveIo).toHaveBeenCalledTimes(1);
     expect(hoisted.defaultLiveIo).toHaveBeenCalledWith({
       githubToken: 'test-token',
+      getGithubToken: expect.any(Function),
       githubOwner: 'JovieInc',
       githubRepo: 'Jovie',
     });
