@@ -10,7 +10,6 @@
 import { and, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { recordOnboardingUpgradeOfferEvent } from '@/lib/onboarding/upgrade-offer';
 
@@ -30,10 +29,10 @@ export async function recordOnboardingUpgradeOfferDecision(
   const [profile] = await db
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
       and(
-        eq(users.clerkId, userId),
+        // getCachedAuth().userId is the app users.id, never users.clerkId.
+        eq(creatorProfiles.userId, userId),
         eq(creatorProfiles.id, profileId),
         eq(creatorProfiles.isClaimed, true)
       )
