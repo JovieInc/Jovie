@@ -91,7 +91,7 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Public artist profile and audience capture',
+        name: 'Public Jovie profile and audience capture',
       })
     ).toBeVisible();
     expect(screen.getByTestId('plans-slot')).toBeVisible();
