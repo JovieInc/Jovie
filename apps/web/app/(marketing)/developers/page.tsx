@@ -13,16 +13,14 @@ export const revalidate = false;
 export const metadata: Metadata = {
   title: `Developers - ${APP_NAME}`,
   description:
-    // ui-casing-allow: possessive "Jovie's" isn't recognized as a brand word
-    'Use Jovie’s public, anonymous, read-only artist API and machine-readable site resources.',
+    'Jovie’s public, anonymous, read-only artist API pairs with machine-readable site resources.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
   },
   openGraph: {
     title: `Developers - ${APP_NAME}`,
     description:
-      // ui-casing-allow: possessive "Jovie's" isn't recognized as a brand word
-      'Use Jovie’s public, anonymous, read-only artist API and machine-readable site resources.',
+      'Jovie’s public, anonymous, read-only artist API pairs with machine-readable site resources.',
     url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
     type: 'website',
   },
@@ -36,13 +34,16 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
 const RESOURCE_LINKS = [
   {
     href: '/api/v1',
-    label: 'Public API capability index', // ui-casing-allow: resource label reads as a sentence, not a nav item
+    label: 'Public API Capability Index',
     description:
       'A stable, non-enumerating 200 response describing the anonymous read-only API.',
   },
   {
     href: '/openapi.json',
-    label: 'OpenAPI 3.1 contract', // ui-casing-allow: "OpenAPI" is a fixed technical spec name
+    // "OpenAPI" is a fixed technical spec name the casing linter can't
+    // validate; kept identical to the matching, test-pinned link text on
+    // /api-versioning (ui-casing-allow: fixed technical spec name)
+    label: 'OpenAPI 3.1 contract',
     description: 'The machine-readable contract for the public artist API.',
   },
   {
@@ -53,9 +54,10 @@ const RESOURCE_LINKS = [
   },
   {
     href: '/api-versioning',
-    label: 'API versioning and deprecation policy', // ui-casing-allow: resource label reads as a sentence, not a nav item
+    label: 'API Versioning And Deprecation Policy',
     description:
-      // ui-casing-allow: "Deprecation" and "Sunset" are the literal RFC HTTP header names
+      // "Deprecation" and "Sunset" are the literal RFC 9745/8594 HTTP header
+      // names (ui-casing-allow: literal HTTP header names)
       'Active v1 lifecycle boundary, additive versus breaking changes, and future Deprecation and Sunset signals.',
   },
   {
@@ -70,7 +72,7 @@ const RESOURCE_LINKS = [
   },
   {
     href: DOCS_URL,
-    label: 'Jovie docs', // ui-casing-allow: resource label reads as a sentence, not a nav item
+    label: 'Jovie Docs',
     description: 'Product help and getting-started guidance.',
   },
 ] as const;
@@ -109,8 +111,7 @@ export default function DevelopersPage() {
             id='developers-hero-heading'
             className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'
           >
-            {/* ui-casing-allow: canonical sentence-case heading, asserted verbatim by page.test.tsx */}
-            Public artist data, in the open.
+            Public Artist Data, In The Open.
           </h1>
           <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
             Read public artist profiles, releases, events, and merch with
@@ -163,8 +164,7 @@ export default function DevelopersPage() {
               id='agent-quickstart-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              {/* ui-casing-allow: canonical sentence-case heading, asserted verbatim by page.test.tsx */}
-              Agent quickstart
+              Agent Quickstart
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               Start from the same profile endpoint as the quickstart above, then
@@ -197,8 +197,7 @@ export default function DevelopersPage() {
               id='resources-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              {/* ui-casing-allow: canonical sentence-case heading */}
-              Machine-readable resources
+              Machine-readable Resources
             </h2>
             <ul className='mt-6 grid gap-6 sm:grid-cols-2'>
               {RESOURCE_LINKS.map(resource => (
@@ -222,8 +221,7 @@ export default function DevelopersPage() {
               id='scope-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              {/* ui-casing-allow: canonical sentence-case heading */}
-              Public by design
+              Public By Design
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               This page documents Jovie&apos;s public artist surface: anonymous
