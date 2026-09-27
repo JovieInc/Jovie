@@ -1409,6 +1409,15 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
 
 
+def test_product_screenshots_preserve_the_active_exact_head_capture() -> None:
+    """Frequent main pushes must not discard an in-progress capture."""
+    workflow = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split("\njobs:\n", 1)[0]
+
+    assert "group: screenshots" in concurrency
+    assert "cancel-in-progress: false" in concurrency
+
+
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
     """Declared scheduling must not be confused with activation or rollback."""
     workflow = (WORKFLOWS / "cost-anomaly-gate.yml").read_text(encoding="utf-8")
