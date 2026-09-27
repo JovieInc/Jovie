@@ -14,16 +14,13 @@ import {
 import { HOMEPAGE_OFFSET_COPY_RED_CSS } from './homepage-optical-polish-red-fixtures';
 
 const webRoot = path.resolve(__dirname, '../../..');
-const cssPath = 'app/(home)/home.css';
+const cssPath = 'components/homepage/HomepageIdentity.css';
 const sectionsPath = 'components/homepage/HomepageCertifiedSections.tsx';
 
 function extractCertifiedCss(): string {
   const source = readFileSync(path.join(webRoot, cssPath), 'utf8');
-  const start = source.indexOf('HOMEPAGE CERTIFIED SECTIONS START');
-  const end = source.indexOf('HOMEPAGE CERTIFIED SECTIONS END', start);
-  expect(start, 'certified CSS block exists').toBeGreaterThanOrEqual(0);
-  expect(end, 'certified CSS block is bounded').toBeGreaterThan(start);
-  return source.slice(start, end);
+  expect(source.length, 'homepage identity CSS exists').toBeGreaterThan(0);
+  return source;
 }
 
 /** Right-copy / left-media start on the shared 12-col span-6 contract. */
@@ -39,33 +36,36 @@ function offsetCopyStart(innerWidth: number, readingWidth = 34 * 16): number {
 describe('homepage certified optical grid (homepage-optical-polish-v1 item 1)', () => {
   it('uses explicit desktop column spans for every editorial section', () => {
     const css = extractCertifiedCss();
-    const desktop = css.slice(css.indexOf('@media (min-width: 900px)'));
+    const desktop = css.slice(css.indexOf('@media (min-width: 1024px)'));
 
     expect(desktop).toContain(
       'grid-template-columns: repeat(12, minmax(0, 1fr))'
     );
+    expect(desktop).toContain('grid-column: 1 / span 7');
+    expect(desktop).toContain('grid-column: 9 / span 4');
     expect(desktop).toContain('grid-column: 1 / span 6');
     expect(desktop).toContain('grid-column: 7 / span 6');
+    expect(desktop).toContain('grid-column: 1 / span 4');
+    expect(desktop).toContain('grid-column: 5 / span 8');
     expect(desktop).not.toContain('repeat(2, minmax(0, 1fr))');
-    expect(desktop).not.toContain('[data-media="true"]');
     expect(desktop).not.toMatch(/margin-left:\s*auto/);
     expect(desktop).not.toMatch(/^\s*order:\s*[12]/m);
 
     expect(css).toMatch(
-      /\.homepage-certified-section__copy\s*\{[^}]*max-width:\s*34rem/
+      /\.homepage-identity-section__body\s*\{[^}]*max-width:\s*26rem/
     );
   });
 
-  it('keeps 34rem as a reading-width limit, not the thing that positions the column', () => {
+  it('keeps reading widths as limits, not the thing that positions a column', () => {
     const css = extractCertifiedCss();
-    const copyBlock = css.slice(
-      css.indexOf('.homepage-certified-section__copy {'),
-      css.indexOf('.homepage-certified-section__headline,')
+    const bodyBlock = css.slice(
+      css.indexOf('.homepage-identity-section__body {'),
+      css.indexOf('}', css.indexOf('.homepage-identity-section__body {'))
     );
 
-    expect(copyBlock).toContain('max-width: 34rem');
-    expect(copyBlock).not.toMatch(/margin-left:\s*auto/);
-    expect(copyBlock).not.toMatch(/margin-inline:\s*auto/);
+    expect(bodyBlock).toContain('max-width: 26rem');
+    expect(css).not.toMatch(/margin-left:\s*auto/);
+    expect(css).not.toMatch(/margin-inline:\s*auto/);
   });
 
   it('rejects the offset-copy deliberate-red fixture that would drift at 900px', () => {
@@ -107,9 +107,14 @@ describe('homepage certified optical grid (homepage-optical-polish-v1 item 1)', 
 
   it('does not change locked section ownership, copy, or media pairing', () => {
     const source = readFileSync(path.join(webRoot, sectionsPath), 'utf8');
-    expect(source).toContain("data-align='start'");
     expect(source).toContain('HOMEPAGE_LAUNCH_COPY.certified');
-    expect(source).toContain('ConnectedSection');
-    expect(source).toContain('RelationshipsSection');
+    expect(source).toContain('PresenceSection');
+    expect(source).toContain('StructureSection');
+    expect(source).toContain(
+      "<EditorialSection section={section} dataMedia='true'>"
+    );
+    expect(source).toContain(
+      "<EditorialSection section={section} dataMedia='false'>"
+    );
   });
 });

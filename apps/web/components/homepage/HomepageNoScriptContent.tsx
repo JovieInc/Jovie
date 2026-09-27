@@ -34,14 +34,23 @@ export function HomepageNoScriptContent() {
         <div key={section.id}>
           <h3>{section.headline}</h3>
           <p>{section.body}</p>
-          {'outcomes' in section
-            ? section.outcomes.map(outcome => (
-                <div key={outcome.id}>
-                  <h4>{outcome.headline}</h4>
-                  <p>{outcome.body}</p>
-                </div>
-              ))
-            : null}
+          {section.id === 'presence' ? (
+            <>
+              <h4>{section.step.headline}</h4>
+              <p>{section.step.body}</p>
+            </>
+          ) : (
+            <>
+              <h4>{section.identity.title}</h4>
+              <ul>
+                {section.possibilities.items.map(item => (
+                  <li key={item.id}>
+                    {item.title}: {item.detail}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       ))}
 

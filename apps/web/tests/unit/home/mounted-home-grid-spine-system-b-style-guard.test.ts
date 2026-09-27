@@ -125,21 +125,21 @@ describe('mounted homepage grid spine System B source contract', () => {
     }
 
     // homepage-optical-polish-v1: editorial sections reuse the shared
-    // 12-column desktop spans. 34rem is a reading-width limit, not a
-    // column position. Offset-copy / two-track-only rules belong in the
+    // 12-column desktop spans on the same page spine. Reading widths are
+    // limits, not column positions. Offset-copy rules belong in the
     // certified optical-grid contract test.
-    const certifiedStart = cssSource.indexOf(
-      'HOMEPAGE CERTIFIED SECTIONS START'
-    );
-    const certified = cssSource.slice(
-      certifiedStart,
-      cssSource.indexOf('HOMEPAGE CERTIFIED SECTIONS END', certifiedStart)
+    const certified = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageIdentity.css'),
+      'utf8'
     );
     expect(certified).toContain(
       'grid-template-columns: repeat(12, minmax(0, 1fr))'
     );
     expect(certified).toContain('grid-column: 1 / span 6');
     expect(certified).toContain('grid-column: 7 / span 6');
+    expect(certified).toContain('var(--ds-public-content-max)');
+    expect(certified).toContain('var(--homepage-page-gutter');
+    expect(certified).not.toMatch(/--homepage-[a-z-]*gutter:/);
     expect(certified).not.toMatch(/margin-left:\s*auto/);
   });
 });

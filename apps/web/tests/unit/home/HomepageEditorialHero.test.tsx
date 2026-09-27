@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import {
+  HOMEPAGE_HERO_TEXTURE,
+  HomepageEditorialHero,
+} from '@/components/homepage/HomepageEditorialHero';
 import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
 import {
   HOMEPAGE_CERTIFIED_EVENTS,
@@ -32,15 +37,19 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   }),
 }));
 
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => {
+    const { fill, priority, quality, loading, ...rest } = props;
+    void fill;
+    void priority;
+    void quality;
+    void loading;
+    return <img alt='' {...rest} />;
+  },
+}));
+
 function renderHero() {
-  return render(
-    <HomepageEditorialHero
-      headingId='home-hero-heading'
-      headline='Control how the world sees you.'
-      support='Find what the internet knows. Turn it into relationships.'
-      search={{ placeholder: 'Search your name', action: 'Find me' }}
-    />
-  );
+  return render(<HomepageEditorialHero headingId='home-hero-heading' />);
 }
 
 describe('HomepageEditorialHero', () => {
@@ -86,16 +95,17 @@ describe('HomepageEditorialHero', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(heading).toHaveTextContent('Control how the world sees you.');
+    expect(heading).toHaveTextContent('A living identity for the internet.');
     expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'aria-labelledby',
       heading.id
     );
     expect(
       screen.getByText(
-        'Find what the internet knows. Turn it into relationships.'
+        'Your work, your links, your next chapter. Together in your Jovie profile.'
       )
     ).toBeInTheDocument();
+    expect(screen.getByText('Jovie / Identity, connected')).toBeInTheDocument();
     expect(
       document.querySelectorAll('[data-hero-layer="active"]')
     ).toHaveLength(1);
@@ -122,26 +132,70 @@ describe('HomepageEditorialHero', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  it('keeps the centered hero abstract and free of distracting media', () => {
+  it('docks the blue technical texture as a decorative, priority hero layer', () => {
     renderHero();
 
-    const backdrop = screen.getByTestId('homepage-editorial-hero-backdrop');
-    expect(backdrop).toHaveAttribute('aria-hidden', 'true');
-    expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
-    expect(backdrop).toHaveAttribute(
-      'data-hero-visual',
-      'abstract-light-field'
+    const texture = screen.getByTestId('homepage-identity-hero-texture');
+    expect(texture).toHaveAttribute('aria-hidden', 'true');
+    expect(texture).toHaveAttribute('data-hero-layer', 'decorative');
+    expect(texture).toHaveAttribute('data-hero-visual', 'technical-texture');
+    expect(texture.querySelector('img')).toHaveAttribute(
+      'src',
+      HOMEPAGE_HERO_TEXTURE.src
     );
+    expect(texture.querySelector('img')).toHaveAttribute('alt', '');
+
     const hero = screen.getByTestId('marketing-section-hero');
+    expect(hero).toHaveClass(
+      'marketing-hero-dock',
+      'marketing-hero-dock--inset'
+    );
     expect(hero).toHaveAttribute('data-homepage-testid', 'homepage-hero-shell');
     expect(hero).toHaveAttribute('data-marketing-variant', 'centered-none');
     expect(hero).toHaveAttribute(
       'data-marketing-owner',
       'apps/web/components/homepage/HomepageEditorialHero.tsx'
     );
-    expect(hero.querySelectorAll('picture, img, video, canvas')).toHaveLength(
-      0
+    // Only the texture and the specimen portrait; no video or canvas.
+    expect(hero.querySelectorAll('video, canvas')).toHaveLength(0);
+    expect(hero.querySelectorAll('img')).toHaveLength(2);
+  });
+
+  it('keeps hero motion CSS-only, bounded, offscreen-paused, and reduced-motion still', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'components/homepage/HomepageIdentity.css'),
+      'utf8'
     );
+    const texture = css.slice(
+      css.indexOf('.homepage-identity-hero__texture {'),
+      css.indexOf('}', css.indexOf('.homepage-identity-hero__texture {'))
+    );
+    expect(texture).toContain(
+      'animation: homepage-identity-texture-drift 20s ease-in-out infinite'
+    );
+    expect(texture).toContain('content-visibility: auto');
+    const keyframes = css.slice(
+      css.indexOf('@keyframes homepage-identity-texture-drift'),
+      css.indexOf('@media (prefers-reduced-motion: reduce)')
+    );
+    // <= 12px translate (space-3) and <= 1.02 scale.
+    expect(keyframes).toContain('calc(-1 * var(--space-3))');
+    expect(keyframes).toContain('scale(1.02)');
+    expect(keyframes).not.toMatch(/hue-rotate|filter/);
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.homepage-identity-hero__texture \{\s*animation: none;/
+    );
+    // Text-aware imagery: a static scrim keeps the docked header and hero
+    // copy legible over the texture (Tim rule 2026-09-26).
+    const scrim = css.slice(
+      css.indexOf('.homepage-identity-hero::before {'),
+      css.indexOf('.homepage-identity-hero__texture {')
+    );
+    expect(scrim).toContain('var(--public-shell-header-offset)');
+    expect(scrim).toContain('var(--homepage-identity-hero-ground)');
+    expect(scrim).not.toContain('animation');
+    // Copy and controls never animate.
+    expect(css.match(/animation:/g)).toHaveLength(2);
   });
 });
 

@@ -1,7 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
-import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 // Prelaunch front-door label. JOV-5085 locks Get started → /start.
 // Server-side waitlist gate handles post-/start routing, not the homepage href.
@@ -23,25 +22,42 @@ export interface HomepageHeroCarouselSlide {
 
 export const HOMEPAGE_LAUNCH_COPY = {
   seo: {
-    title: 'Jovie | Control how the world sees you',
-    description: 'Find what the internet knows. Turn it into relationships.',
+    title: 'Jovie | A living identity for the internet',
+    description:
+      'Your work, your links, your next chapter. Together in your Jovie profile.',
   },
   hero: {
-    headline: 'Control how the world sees you.',
-    subhead: 'Find what the internet knows. Turn it into relationships.',
-    // The hero's only conversion control is the existing name search.
+    eyebrow: 'Jovie / Identity, connected',
+    headline: 'A living identity for the internet.',
+    subhead:
+      'Your work, your links, your next chapter. Together in your Jovie profile.',
+    // Waitlist-off fallback: the hero action returns to the existing name
+    // search. Waitlist-on renders the one Request access action instead.
     search: {
       placeholder: 'Search your name',
       action: 'Find me',
     },
-    primaryCta: {
-      ...HOMEPAGE_FRONT_DOOR_CTA.primary,
-      label: 'Get started',
-    },
-    secondaryCta: {
-      // Quiet proof path — not a peer conversion objective to Get started.
-      label: 'See a live profile',
-      href: TIM_WHITE_PROFILE.publicProfilePath,
+    // Avery Chen is fictional illustrative content, not a customer or
+    // evidence of product behavior. The caption labels it as a preview.
+    specimen: {
+      handle: 'jov.ie/avery',
+      name: 'Avery Chen',
+      bio: 'Building tools for a more thoughtful internet.',
+      portraitAlt: 'Portrait of Avery Chen, a fictional example profile',
+      rows: [
+        {
+          id: 'work',
+          title: 'Fieldnotes',
+          detail: 'Tools for thoughtful teams',
+        },
+        {
+          id: 'writing',
+          title: 'On building things that matter',
+          detail: 'Avery’s latest essay',
+        },
+      ],
+      action: 'Get updates',
+      caption: 'Your Jovie profile · Illustrative preview',
     },
   },
   fallbackCta: {
@@ -49,45 +65,47 @@ export const HOMEPAGE_LAUNCH_COPY = {
     href: HOMEPAGE_FRONT_DOOR_CTA.primary.href,
     support: FALLBACK_CTA_SUPPORT,
   },
-  // Certified nine-section homepage: sections 2-9. Section 1 is `hero`.
+  // Canonical Pen homepage (2026-09-26): hero, presence, structure, close.
   certified: {
     sections: [
       {
-        id: 'connected',
-        eyebrow: 'IDENTITY, ACROSS THE INTERNET',
-        headline: 'Everything about you, connected.',
-        body: 'Your work and story are scattered across the internet. Your identity should be easier to see.',
+        id: 'presence',
+        eyebrow: 'Connected presence',
+        headline: 'Your presence, resolved.',
+        body: 'The work you share. The places people find you. Bring them together in your Jovie profile.',
+        step: {
+          headline: 'A clear next step.',
+          body: 'Read the work. Start a conversation. Attend an event or send a payment.',
+        },
       },
       {
-        id: 'relationships',
-        headline: 'Turn attention into relationships.',
-        body: 'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-        outcomes: [
-          {
-            id: 'found',
-            headline: 'Be found. Be understood.',
-            body: 'Share the right version of you, legible wherever people want to know how you can help.',
-          },
-          {
-            id: 'know',
-            headline: 'Know who cares.',
-            body: 'See who is paying attention, what brought them to you, and what they may want next.',
-          },
-          {
-            id: 'built',
-            headline: 'Built around who you are.',
-            body: 'Jovie adapts to your work without reducing you to a category.',
-          },
-        ],
+        id: 'structure',
+        eyebrow: 'An open system',
+        headline: 'Structure that travels.',
+        body: 'One identity. Room for everything you do, and whatever comes next.',
+        identity: {
+          label: '01 / Identity',
+          title: 'Your Jovie profile',
+          handle: 'jov.ie/you',
+        },
+        possibilities: {
+          label: '02 / Possibilities',
+          items: [
+            { id: 'profile', title: 'Profile', detail: 'Name, story, work' },
+            { id: 'links', title: 'Links', detail: 'One place to explore' },
+            { id: 'events', title: 'Events', detail: 'A reason to meet' },
+            {
+              id: 'payments',
+              title: 'Payments',
+              detail: 'A direct way to pay',
+            },
+          ],
+        },
       },
     ],
     close: {
-      headline: 'Take control of your presence.',
+      headline: 'Make it your Jovie profile.',
       action: 'Find your profile',
-    },
-    changelog: {
-      headline: "What's new in Jovie",
-      allPostsLabel: 'All posts',
     },
   },
   workspace: {

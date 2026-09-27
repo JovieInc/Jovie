@@ -3,7 +3,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  MARKETING_FOR_FLYOUT_LINKS,
+  MARKETING_CUSTOMERS_FLYOUT,
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
   MARKETING_TOOLS_FLYOUT_LINKS,
@@ -51,9 +51,9 @@ function routeFileExistsFor(href: string) {
 
 describe('primary marketing navigation contract', () => {
   it('keeps the top-level marketing nav labels exact and ordered', () => {
+    // Canonical Pen header (2026-09-26): Customers flyout, Product, Pricing.
     expect(MARKETING_NAV_LINKS).toEqual([
-      { href: '/about', label: 'About' },
-      { href: '/product', label: 'For Artists' },
+      { href: '/product', label: 'Product' },
       { href: '/pricing', label: 'Pricing' },
     ]);
   });
@@ -65,13 +65,22 @@ describe('primary marketing navigation contract', () => {
     ]);
   });
 
-  it('keeps audience and tools flyouts declared in marketing navigation data', () => {
-    expect(MARKETING_FOR_FLYOUT_LINKS.map(link => link.label)).toEqual([
-      'Artists',
-      'Founders',
-      'Creators',
-      'Authors',
-    ]);
+  it('keeps the Customers flyout and tools declared in marketing navigation data', () => {
+    // Only audiences with their own landing page. Founders, Authors, and
+    // Creators are omitted until their pages ship; never link a stand-in.
+    expect(MARKETING_CUSTOMERS_FLYOUT).toEqual({
+      id: 'customers',
+      label: 'Customers',
+      heading: 'Customers',
+      links: [
+        { href: '/investors', label: 'Investors' },
+        { href: '/artist-profiles', label: 'Artists' },
+      ],
+    });
+    const destinations = MARKETING_CUSTOMERS_FLYOUT.links.map(
+      link => link.href
+    );
+    expect(new Set(destinations).size).toBe(destinations.length);
     expect(MARKETING_TOOLS_FLYOUT_LINKS.map(link => link.label)).toEqual([
       'Music Smart Links',
       'Fan Notifications',
@@ -85,7 +94,7 @@ describe('primary marketing navigation contract', () => {
     for (const link of [
       ...MARKETING_NAV_LINKS,
       ...MARKETING_NAV_UTILITIES,
-      ...MARKETING_FOR_FLYOUT_LINKS,
+      ...MARKETING_CUSTOMERS_FLYOUT.links,
       ...MARKETING_TOOLS_FLYOUT_LINKS,
     ]) {
       expect(routeFileExistsFor(link.href), link.href).toBe(true);
@@ -97,7 +106,7 @@ describe('primary marketing navigation contract', () => {
     expect(headerSource).toContain('getHomepageFrontDoorCtaContract');
     expect(headerSource).toContain('CANONICAL_PUBLIC_SHELL_EVENTS');
     expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
-    expect(headerSource).not.toContain('MARKETING_FOR_FLYOUT_LINKS');
+    expect(headerSource).toContain('MARKETING_CUSTOMERS_FLYOUT');
     expect(headerSource).not.toContain('MARKETING_TOOLS_FLYOUT_LINKS');
     expect(headerSource).not.toContain("label: 'Features'");
     expect(headerSource).not.toContain("label: 'Resources'");

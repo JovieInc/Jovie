@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The homepage close repeats the name search and offers a read-only agent onboarding payload with a visible clipboard fallback.',
+          'Canonical Pen homepage close: "Make it your Jovie profile." with the same Request access action as the header and hero (name-search focus while the waitlist is off).',
       },
     },
   },

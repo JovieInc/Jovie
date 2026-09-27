@@ -20,9 +20,8 @@ describe('marketing CTA intent registry', () => {
     );
     expect(homepage.secondary?.href).toBe(TIM_WHITE_PROFILE.publicProfilePath);
     expect(homepage.secondary?.href).not.toBe(APP_ROUTES.ARTIST_PROFILES);
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
-      TIM_WHITE_PROFILE.publicProfilePath
-    );
+    // The generic homepage hero carries one action and no proof link.
+    expect(HOMEPAGE_LAUNCH_COPY.hero).not.toHaveProperty('secondaryCta');
     expect(getHomepageFrontDoorCtaContract(true).secondary).toBeNull();
   });
 

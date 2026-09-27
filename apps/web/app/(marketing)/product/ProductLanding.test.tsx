@@ -112,7 +112,7 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     render(<ProductLanding />);
 
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Control how the world sees you.'
+      'A living identity for the internet.'
     );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Be found. Be understood.'
@@ -120,7 +120,7 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     expect(
       screen.queryByRole('heading', {
         level: 1,
-        name: 'Control how the world sees you.',
+        name: 'A living identity for the internet.',
       })
     ).toBeNull();
   });

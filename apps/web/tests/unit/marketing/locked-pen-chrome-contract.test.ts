@@ -103,7 +103,7 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(footer).toContain("size='chrome'");
   });
 
-  it('does not reopen the locked homepage IA or Find me conversion', () => {
+  it('does not reopen the canonical homepage IA or Find me fallback', () => {
     const homepagePage = readWebSource('app/(home)/page.tsx');
     const certified = readWebSource(
       'components/homepage/HomepageCertifiedSections.tsx'
@@ -113,7 +113,7 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toHaveLength(2);
     expect(
       HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.id)
-    ).toEqual(['connected', 'relationships']);
+    ).toEqual(['presence', 'structure']);
     expect(homepagePage).toContain('HomepageEditorialHero');
     expect(homepagePage).toContain('HomepageCertifiedSections');
     expect(homepagePage).toContain('HomepageClose');

@@ -56,9 +56,9 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(liveHomepageSource).not.toContain('MarketingShippedSitesShowcase');
     expect(liveHomepageSource).not.toContain('MarketingPlatformSpecBento');
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Control how the world sees you.'
+      'A living identity for the internet.'
     );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe('/tim');
+    expect(HOMEPAGE_LAUNCH_COPY.hero).not.toHaveProperty('secondaryCta');
   });
 
   it('keeps verified public proof, routes, and System B visual lock on `/`', () => {

@@ -1546,7 +1546,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     expect(bindings.slice(1, -1).map(binding => binding.occurrenceId)).toEqual(
       rows.map(row => row.id)
     );
-    expect(rows.map(row => row.id)).toEqual(['connected', 'relationships']);
+    expect(rows.map(row => row.id)).toEqual(['presence', 'structure']);
     expect(bindings.map(binding => binding.sectionId)).toEqual([
       'hero',
       ...rows.map(() => 'feature-split'),

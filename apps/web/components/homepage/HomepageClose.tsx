@@ -10,8 +10,12 @@ import {
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { HomepagePrimaryAction } from './HomepagePrimaryAction';
+import './HomepageIdentity.css';
 
-/** The gated close requests access; the open-state action returns to search. */
+/**
+ * Canonical Pen close (2026-09-26): one headline and the same Request access
+ * action as the header and hero. The open-state action returns to search.
+ */
 export function HomepageClose() {
   const { close } = HOMEPAGE_LAUNCH_COPY.certified;
 
@@ -21,7 +25,7 @@ export function HomepageClose() {
 
   return (
     <MarketingCtaSection
-      className='homepage-close'
+      className='homepage-identity-close'
       data-testid='marketing-section-cta'
       data-marketing-variant='editorial-search'
       data-homepage-testid='homepage-close'
@@ -29,15 +33,15 @@ export function HomepageClose() {
       data-rhythm='close'
       aria-labelledby='homepage-close-heading'
     >
-      <div className='homepage-close__inner'>
+      <div className='homepage-identity-close__inner'>
         <h2
           id='homepage-close-heading'
-          className='homepage-close__headline'
+          className='homepage-identity-close__headline'
           data-homepage-section-heading
         >
           {close.headline}
         </h2>
-        <div className='homepage-close__actions'>
+        <div className='homepage-identity-close__actions'>
           {FEATURE_FLAGS.WAITLIST_ENABLED ? (
             <HomepagePrimaryAction
               submitTestId='homepage-close-cta'

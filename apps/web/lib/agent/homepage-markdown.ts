@@ -13,37 +13,39 @@ function toAbsolutePublicUrl(href: string): string {
 
 /**
  * Markdown representation of the public homepage for Accept: text/markdown.
- * Copy comes from the existing launch document — this is not a redesign.
+ * Copy comes from the canonical homepage copy module, so the Markdown and the
+ * rendered page say the same thing.
  */
 export function buildHomepageMarkdown(): string {
-  const { hero, workspace, productStatement, faq } = HOMEPAGE_LAUNCH_COPY;
-  const callouts = workspace.callouts
-    .map(item => `### ${item.title}\n\n${item.body}`)
-    .join('\n\n');
-  const questions = faq
-    .map(item => `### ${item.question}\n\n${item.answer}`)
-    .join('\n\n');
+  const { hero, certified, fallbackCta } = HOMEPAGE_LAUNCH_COPY;
+  const [presence, structure] = certified.sections;
+  const possibilities = structure.possibilities.items
+    .map(item => `- ${item.title}: ${item.detail}`)
+    .join('\n');
 
   return `# ${hero.headline}
 
 ${hero.subhead}
 
-${hero.primaryCta.label}: ${toAbsolutePublicUrl(hero.primaryCta.href)}
-${hero.secondaryCta.label}: ${toAbsolutePublicUrl(hero.secondaryCta.href)}
+${fallbackCta.label}: ${toAbsolutePublicUrl(fallbackCta.href)}
 
-## ${workspace.kicker}
+## ${presence.headline}
 
-${workspace.headline.replaceAll('\n', ' ')}
+${presence.body}
 
-${callouts}
+### ${presence.step.headline}
 
-## ${productStatement.body}
+${presence.step.body}
 
-${productStatement.description}
+## ${structure.headline}
 
-## Questions
+${structure.body}
 
-${questions}
+### ${structure.identity.title}
+
+${possibilities}
+
+## ${certified.close.headline}
 
 ${buildSiteLlmsGuidance()}
 ## Recovery links

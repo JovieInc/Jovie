@@ -9,12 +9,9 @@ function read(rel: string): string {
 }
 
 function readCertifiedCss(): string {
-  const css = read('app/(home)/home.css');
-  const start = css.indexOf('HOMEPAGE CERTIFIED SECTIONS START');
-  const end = css.indexOf('HOMEPAGE CERTIFIED SECTIONS END', start);
-  expect(start, 'certified CSS block exists').toBeGreaterThanOrEqual(0);
-  expect(end, 'certified CSS block is bounded').toBeGreaterThan(start);
-  return css.slice(start, end);
+  const css = read('components/homepage/HomepageIdentity.css');
+  expect(css.length, 'homepage identity CSS exists').toBeGreaterThan(0);
+  return css;
 }
 
 describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
@@ -37,10 +34,13 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
   it('keeps the editorial body on the shared page background with stable spacing', () => {
     const certifiedCss = readCertifiedCss();
 
-    expect(certifiedCss).toContain('aspect-ratio: 1902 / 827');
-    expect(certifiedCss).toContain('homepage-relationship-outcomes');
+    // The material strip reserves its box at every breakpoint (no CLS).
+    expect(certifiedCss).toContain('aspect-ratio: 5 / 2');
+    expect(certifiedCss).toContain('aspect-ratio: 5 / 1');
+    expect(certifiedCss).toContain('aspect-ratio: 9 / 1');
+    expect(certifiedCss).toContain('homepage-identity-structure__list');
     expect(certifiedCss).toContain(
-      'gap: clamp(var(--space-8), 3vw, var(--space-11))'
+      'padding-block: clamp(var(--space-12), 5vw, var(--space-16))'
     );
     expect(certifiedCss).not.toMatch(/backdrop-filter/);
     expect(certifiedCss).not.toMatch(/box-shadow:/);
@@ -60,8 +60,8 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
     expect(certifiedCss).toContain(
       '.home-viewport [data-homepage-section-heading]'
     );
-    expect(certifiedCss).toContain(
-      '.home-viewport .homepage-certified-section__headline'
+    expect(read('components/homepage/HomepageCertifiedSections.tsx')).toContain(
+      'data-homepage-section-heading'
     );
   });
 });

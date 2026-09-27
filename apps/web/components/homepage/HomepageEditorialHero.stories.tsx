@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Centered, image-free homepage front door with a quiet abstract light field, one headline, one support line, and Request access while gated, or name search when open.',
+          'Canonical Pen homepage hero: the blue technical texture (hero only, 20s CSS drift, still under reduced motion), one headline, one support line, Request access while gated or name search when open, and the illustrative Avery Chen Jovie profile specimen.',
       },
     },
   },
@@ -22,8 +22,5 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     headingId: 'homepage-editorial-hero-heading',
-    headline: 'Control how the world sees you.',
-    support: 'Find what the internet knows. Turn it into relationships.',
-    search: { placeholder: 'Search your name', action: 'Find me' },
   },
 };

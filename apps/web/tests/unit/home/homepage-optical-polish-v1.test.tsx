@@ -12,18 +12,17 @@ function read(rel: string): string {
   return readFileSync(path.join(webRoot, rel), 'utf8');
 }
 
-function readHeroCss(): string {
+function readNameSearchCss(): string {
   const css = read('app/(home)/home.css');
-  const start = css.indexOf('HOMEPAGE EDITORIAL HERO START');
-  const end = css.indexOf('HOMEPAGE EDITORIAL HERO END', start);
+  const start = css.indexOf('HOMEPAGE NAME SEARCH START');
+  const end = css.indexOf('HOMEPAGE NAME SEARCH END', start);
+  expect(start, 'name search CSS block exists').toBeGreaterThanOrEqual(0);
   return css.slice(start, end);
 }
 
-function readCertifiedCss(): string {
-  const css = read('app/(home)/home.css');
-  const start = css.indexOf('HOMEPAGE CERTIFIED SECTIONS START');
-  const end = css.indexOf('HOMEPAGE CERTIFIED SECTIONS END', start);
-  return css.slice(start, end);
+/** Canonical Pen homepage CSS plus the shared name-search fallback. */
+function readHeroCss(): string {
+  return `${read('components/homepage/HomepageIdentity.css')}\n${readNameSearchCss()}`;
 }
 
 function HomepageOpticalPolishRegressionFixture() {
@@ -122,43 +121,34 @@ describe('homepage-optical-polish-v1', () => {
     expect(search).toContain("size='marketing'");
   });
 
-  it('names proof, text, product, and close spacing treatments', () => {
+  it('names section, media, and close spacing treatments', () => {
     const sections = read('components/homepage/HomepageCertifiedSections.tsx');
     const close = read('components/homepage/HomepageClose.tsx');
-    const certifiedCss = readCertifiedCss();
+    const css = read('components/homepage/HomepageIdentity.css');
 
     expect(sections).not.toContain("data-rhythm='proof'");
-    expect(sections).toContain("rhythm='product'");
-    expect(sections).toContain("rhythm='text'");
+    expect(sections).toContain("dataMedia='true'");
+    expect(sections).toContain("dataMedia='false'");
     expect(close).toContain("data-rhythm='close'");
-    expect(certifiedCss).toContain('--homepage-rhythm-proof:');
-    expect(certifiedCss).toContain('--homepage-rhythm-text:');
-    expect(certifiedCss).toContain('--homepage-rhythm-product:');
-    expect(certifiedCss).toContain('--homepage-rhythm-close-start:');
-    expect(certifiedCss).toMatch(
-      /\.homepage-certified-section\[data-rhythm="product"\][\s\S]*?--homepage-rhythm-product/
+    expect(css).toMatch(
+      /\.homepage-identity-section\s*\{[\s\S]*?padding-block: clamp\(/
     );
-    expect(certifiedCss).toMatch(
-      /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*0;/
+    expect(css).toMatch(
+      /\.homepage-identity-close\s*\{[\s\S]*?border-top: var\(--space-px, 1px\) solid var\(--homepage-identity-rule\);/
     );
-    expect(certifiedCss).toContain('.homepage-connected-artwork');
-    expect(certifiedCss).toContain('.homepage-relationship-outcomes');
+    expect(css).toContain('.homepage-identity-presence__material');
+    expect(css).toContain('.homepage-identity-structure__list');
   });
 
-  it('kills the elliptical wireframe and the 55% horizon line', () => {
+  it('keeps the hero free of wireframes, horizon lines, and light-well chrome', () => {
     const heroCss = readHeroCss();
 
-    expect(heroCss).toMatch(
-      /\.homepage-editorial-hero__light-well\s*\{[\s\S]*?border:\s*0;/
-    );
+    expect(heroCss).not.toContain('light-well');
     expect(heroCss).not.toMatch(/transparent 0 55%/);
     expect(heroCss).not.toMatch(/55\.1%/);
-    expect(heroCss).not.toMatch(
-      /\.homepage-editorial-hero__light-well\s*\{[\s\S]*?border:\s*1px solid/
-    );
-    expect(heroCss).toContain('radial-gradient');
+    expect(heroCss).not.toMatch(/border:\s*1px solid white/);
     expect(heroCss).toMatch(
-      /\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space:\s*nowrap;/
+      /\.homepage-identity-hero__headline\s*\{[\s\S]*?text-wrap: balance;/
     );
   });
 

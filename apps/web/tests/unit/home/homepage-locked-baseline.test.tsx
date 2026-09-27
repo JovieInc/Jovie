@@ -2,17 +2,13 @@
 // regressions fail deterministic unit coverage. Literal copy locks here
 // deliberately duplicate nothing already asserted verbatim in
 // homepage-hero-next-move-contract.test.ts (hero headline/subhead/search).
+// Canonical Pen homepage (Tim direction 2026-09-26).
 
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
-import {
-  HOMEPAGE_EDITORIAL_CARDS,
-  HomepageEditorialChangelog,
-} from '@/components/homepage/HomepageEditorialChangelog';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HERO_COPY } from '@/components/homepage/intent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
@@ -83,71 +79,73 @@ vi.mock('next/image', () => ({
 function LockedHomepageBody() {
   return (
     <>
-      <HomepageEditorialHero
-        headingId='home-hero-heading'
-        headline={HERO_COPY.headline}
-        support={HERO_COPY.subhead}
-        search={HERO_COPY.search}
-      />
+      <HomepageEditorialHero headingId='home-hero-heading' />
       <div data-testid='homepage-story-stack'>
         <HomepageCertifiedSections />
-        <HomepageEditorialChangelog />
         <HomepageClose />
       </div>
     </>
   );
 }
 
+// Generic identity homepage: no single-ICP (music/artist) wording and no em
+// dashes (canon/VOICE.md).
+const ICP_LOCKED_TERMS =
+  /\b(?:music|songs?|releases?|tours?|touring|fans?|streams?|albums?|presaves?)\b/i;
+
 describe('JOV-5864 locked homepage baseline', () => {
-  it('pins the certified body, close, changelog, and SEO copy verbatim', () => {
+  it('pins the canonical Pen body, close, and SEO copy verbatim', () => {
     expect(HOMEPAGE_LAUNCH_COPY.seo).toEqual({
-      title: 'Jovie | Control how the world sees you',
-      description: 'Find what the internet knows. Turn it into relationships.',
+      title: 'Jovie | A living identity for the internet',
+      description:
+        'Your work, your links, your next chapter. Together in your Jovie profile.',
     });
 
     expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toEqual([
       {
-        id: 'connected',
-        eyebrow: 'IDENTITY, ACROSS THE INTERNET',
-        headline: 'Everything about you, connected.',
-        body: 'Your work and story are scattered across the internet. Your identity should be easier to see.',
+        id: 'presence',
+        eyebrow: 'Connected presence',
+        headline: 'Your presence, resolved.',
+        body: 'The work you share. The places people find you. Bring them together in your Jovie profile.',
+        step: {
+          headline: 'A clear next step.',
+          body: 'Read the work. Start a conversation. Attend an event or send a payment.',
+        },
       },
       {
-        id: 'relationships',
-        headline: 'Turn attention into relationships.',
-        body: 'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-        outcomes: [
-          {
-            id: 'found',
-            headline: 'Be found. Be understood.',
-            body: 'Share the right version of you, legible wherever people want to know how you can help.',
-          },
-          {
-            id: 'know',
-            headline: 'Know who cares.',
-            body: 'See who is paying attention, what brought them to you, and what they may want next.',
-          },
-          {
-            id: 'built',
-            headline: 'Built around who you are.',
-            body: 'Jovie adapts to your work without reducing you to a category.',
-          },
-        ],
+        id: 'structure',
+        eyebrow: 'An open system',
+        headline: 'Structure that travels.',
+        body: 'One identity. Room for everything you do, and whatever comes next.',
+        identity: {
+          label: '01 / Identity',
+          title: 'Your Jovie profile',
+          handle: 'jov.ie/you',
+        },
+        possibilities: {
+          label: '02 / Possibilities',
+          items: [
+            { id: 'profile', title: 'Profile', detail: 'Name, story, work' },
+            { id: 'links', title: 'Links', detail: 'One place to explore' },
+            { id: 'events', title: 'Events', detail: 'A reason to meet' },
+            {
+              id: 'payments',
+              title: 'Payments',
+              detail: 'A direct way to pay',
+            },
+          ],
+        },
       },
     ]);
 
     expect(HOMEPAGE_LAUNCH_COPY.certified.close).toEqual({
-      headline: 'Take control of your presence.',
+      headline: 'Make it your Jovie profile.',
       action: 'Find your profile',
     });
-
-    expect(HOMEPAGE_LAUNCH_COPY.certified.changelog).toEqual({
-      headline: "What's new in Jovie",
-      allPostsLabel: 'All posts',
-    });
+    expect(HOMEPAGE_LAUNCH_COPY.certified).not.toHaveProperty('changelog');
   });
 
-  it('mounts hero, chapters, changelog, and the terminal close in locked order', () => {
+  it('mounts hero, presence, structure, and the terminal close in locked order', () => {
     const { container } = render(<LockedHomepageBody />);
 
     const sectionIds = [...container.querySelectorAll('section')].map(
@@ -157,35 +155,36 @@ describe('JOV-5864 locked homepage baseline', () => {
     );
     expect(sectionIds).toEqual([
       'homepage-hero-shell',
-      'homepage-section-connected',
-      'homepage-section-relationships',
-      'homepage-editorial-changelog',
+      'homepage-section-presence',
+      'homepage-section-structure',
       'homepage-close',
     ]);
 
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Control how the world sees you.',
+        name: 'A living identity for the internet.',
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { level: 2, name: "What's new in Jovie" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Take control of your presence.',
-      })
-    ).toBeInTheDocument();
+      screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
+    ).toEqual([
+      'Your presence, resolved.',
+      'Structure that travels.',
+      'Make it your Jovie profile.',
+    ]);
+    expect(screen.queryByText("What's new in Jovie")).toBeNull();
   });
 
-  it('uses access links in both conversion positions when gated', () => {
+  it('uses one Request access action in both conversion positions when gated', () => {
     gate.WAITLIST_ENABLED = true;
     render(<LockedHomepageBody />);
-    expect(
-      screen.getAllByRole('link', { name: 'Request access' })
-    ).toHaveLength(2);
+    const actions = screen.getAllByRole('link', { name: 'Request access' });
+    expect(actions).toHaveLength(2);
+    for (const action of actions) {
+      expect(action).toHaveAttribute('href', '/signup');
+    }
+    expect(screen.queryAllByRole('link')).toHaveLength(2);
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
@@ -205,53 +204,89 @@ describe('JOV-5864 locked homepage baseline', () => {
       within(close).getByRole('button', { name: 'Find your profile' })
     ).toBeInTheDocument();
     expect(within(close).queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('homepage-close-search')).toBeNull();
   });
 
-  it('keeps the mounted baseline person-first and category-neutral', () => {
+  it('keeps the mounted baseline generic, person-first, and free of em dashes', () => {
+    gate.WAITLIST_ENABLED = true;
     const { certified, hero, seo } = HOMEPAGE_LAUNCH_COPY;
     const mountedCopy = [
       seo.title,
       seo.description,
+      hero.eyebrow,
       hero.headline,
       hero.subhead,
-      hero.search.placeholder,
-      hero.search.action,
+      hero.specimen.name,
+      hero.specimen.bio,
+      hero.specimen.caption,
+      ...hero.specimen.rows.flatMap(row => [row.title, row.detail]),
       certified.close.headline,
-      certified.close.action,
-      certified.changelog.headline,
-      certified.changelog.allPostsLabel,
       ...certified.sections.flatMap(section => [
-        ...('eyebrow' in section ? [section.eyebrow] : []),
+        section.eyebrow,
         section.headline,
         section.body,
-        ...('outcomes' in section
-          ? section.outcomes.flatMap(outcome => [
-              outcome.headline,
-              outcome.body,
-            ])
-          : []),
-      ]),
-      ...HOMEPAGE_EDITORIAL_CARDS.flatMap(card => [
-        card.title,
-        card.category,
-        card.themeTitle,
-        card.themeSupport,
       ]),
     ];
 
     for (const copy of mountedCopy) {
       expect(copy).not.toMatch(CATEGORY_LOCKED_TERMS);
+      expect(copy).not.toMatch(ICP_LOCKED_TERMS);
+      expect(copy).not.toContain('\u2014');
     }
 
-    const { container } = render(
-      <div data-testid='homepage-story-stack'>
-        <HomepageCertifiedSections />
-        <HomepageEditorialChangelog />
-        <HomepageClose />
-      </div>
+    const { container } = render(<LockedHomepageBody />);
+    const text = container.textContent ?? '';
+    expect(text).not.toMatch(CATEGORY_LOCKED_TERMS);
+    expect(text).not.toMatch(ICP_LOCKED_TERMS);
+    expect(text).not.toContain('\u2014');
+    expect(text).toContain('Jovie profile');
+  });
+
+  it('labels the fictional specimen as an illustrative preview with a real portrait', () => {
+    render(<LockedHomepageBody />);
+    const specimen = screen.getByTestId('homepage-profile-specimen');
+    expect(specimen).toHaveAttribute('data-illustrative', 'true');
+    expect(within(specimen).getByText('Avery Chen')).toBeInTheDocument();
+    expect(
+      within(specimen).getByText('Your Jovie profile · Illustrative preview')
+    ).toBeInTheDocument();
+    const portrait = within(specimen).getByRole('img');
+    expect(portrait).toHaveAttribute(
+      'src',
+      '/assets/generated/homepage-avery-chen-portrait-v1.webp'
     );
-    expect(container.textContent ?? '').not.toMatch(CATEGORY_LOCKED_TERMS);
+    expect(portrait.getAttribute('alt')).toMatch(/fictional example/);
+    // The specimen action is illustrative, never a second CTA.
+    expect(within(specimen).queryByRole('link')).toBeNull();
+    expect(within(specimen).queryByRole('button')).toBeNull();
+  });
+
+  it('uses each background image exactly once on the page', () => {
+    const { container } = render(<LockedHomepageBody />);
+    const backgrounds = [
+      ...container.querySelectorAll('[data-background-image]'),
+    ].map(node => node.getAttribute('data-background-image'));
+    expect(backgrounds).toEqual([
+      '/assets/generated/homepage-hero-technical-texture-v1.webp',
+      '/assets/generated/homepage-presence-satin-v1.webp',
+    ]);
+    expect(new Set(backgrounds).size).toBe(backgrounds.length);
+
+    const sources = [...container.querySelectorAll('img')].map(img =>
+      img.getAttribute('src')
+    );
+    for (const background of backgrounds) {
+      expect(sources.filter(src => src === background)).toHaveLength(1);
+    }
+    expect(
+      screen
+        .getByTestId('homepage-identity-hero-texture')
+        .closest('[data-testid="marketing-section-hero"]')
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByTestId('homepage-presence-material')
+        .closest('[data-homepage-testid="homepage-section-presence"]')
+    ).not.toBeNull();
   });
 
   it('keeps the supported agent path in the shared expanded footer', () => {

@@ -1,7 +1,10 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
+import {
+  HOMEPAGE_PRESENCE_MATERIAL,
+  HomepageCertifiedSections,
+} from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
@@ -26,17 +29,17 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
 
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
-    const { fill, priority, quality, loading, ...rest } = props;
+    const { fill, priority, quality, ...rest } = props;
     void fill;
-    void priority;
     void quality;
-    void loading;
-    return <img alt='' {...rest} />;
+    return (
+      <img alt='' data-priority={priority ? 'true' : undefined} {...rest} />
+    );
   },
 }));
 
 describe('HomepageCertifiedSections', () => {
-  it('renders the locked connected and relationships sections without unsupported proof', () => {
+  it('renders the canonical presence and structure sections without unsupported proof', () => {
     render(<HomepageCertifiedSections />);
 
     expect(
@@ -47,56 +50,60 @@ describe('HomepageCertifiedSections', () => {
     expect(sections).toHaveLength(2);
     expect(
       sections.map(section => section.getAttribute('data-marketing-occurrence'))
-    ).toEqual(['connected', 'relationships']);
+    ).toEqual(['presence', 'structure']);
 
-    const connected = document.querySelector<HTMLElement>(
-      '[data-homepage-testid="homepage-section-connected"]'
+    const [presenceCopy, structureCopy] =
+      HOMEPAGE_LAUNCH_COPY.certified.sections;
+    const presence = document.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-section-presence"]'
     )!;
-    expect(connected).toHaveAttribute('data-marketing-variant', 'editorial');
-    expect(connected).toHaveAttribute('data-rhythm', 'product');
-    expect(connected).toHaveTextContent('IDENTITY, ACROSS THE INTERNET');
-    expect(connected).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[0].headline
-    );
-    expect(connected).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[0].body
-    );
-    expect(connected.querySelector('.ap-phone-frame')).toBeNull();
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'src',
-      '/assets/generated/homepage-identity-optical-v1.webp'
-    );
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'alt',
-      'A conceptual photographic assembly of a profile identity'
-    );
-
-    const relationships = document.querySelector<HTMLElement>(
-      '[data-homepage-testid="homepage-section-relationships"]'
-    )!;
-    expect(relationships).toHaveAttribute('data-rhythm', 'text');
-    expect(relationships).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[1].headline
-    );
-    expect(relationships).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
-    );
-    expect(relationships.querySelectorAll('img')).toHaveLength(0);
-    expect(within(relationships).getByRole('list')).toHaveAttribute(
-      'aria-label',
-      'Relationships'
-    );
-
-    const outcomes = within(relationships).getAllByRole('listitem');
-    expect(outcomes).toHaveLength(3);
-    expect(outcomes.map(outcome => outcome.textContent)).toEqual([
-      expect.stringContaining('Be found. Be understood.'),
-      expect.stringContaining('Know who cares.'),
-      expect.stringContaining('Built around who you are.'),
-    ]);
+    expect(presence).toHaveAttribute('data-marketing-variant', 'editorial');
+    expect(presence).toHaveAttribute('data-media', 'true');
+    expect(presence).toHaveTextContent('Connected presence');
+    expect(presence).toHaveTextContent(presenceCopy.headline);
+    expect(presence).toHaveTextContent(presenceCopy.body);
     expect(
-      outcomes.map(outcome => outcome.querySelector('span')?.textContent)
-    ).toEqual(['01', '02', '03']);
+      within(presence).getByRole('heading', {
+        level: 3,
+        name: 'A clear next step.',
+      })
+    ).toBeInTheDocument();
+    expect(presence).toHaveTextContent(
+      'Read the work. Start a conversation. Attend an event or send a payment.'
+    );
+    const material = within(presence).getByTestId('homepage-presence-material');
+    expect(material).toHaveAttribute('aria-hidden', 'true');
+    expect(material.querySelector('img')).toHaveAttribute(
+      'src',
+      HOMEPAGE_PRESENCE_MATERIAL.src
+    );
+    // Below the fold: lazy, never priority.
+    expect(material.querySelector('img')).toHaveAttribute('loading', 'lazy');
+    expect(material.querySelector('img')).not.toHaveAttribute('data-priority');
+
+    const structure = document.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-section-structure"]'
+    )!;
+    expect(structure).toHaveAttribute('data-media', 'false');
+    expect(structure).toHaveTextContent(structureCopy.headline);
+    expect(structure).toHaveTextContent(structureCopy.body);
+    expect(structure.querySelectorAll('img')).toHaveLength(0);
+    expect(
+      within(structure).getByTestId('homepage-structure-identity')
+    ).toHaveTextContent('01 / IdentityYour Jovie profilejov.ie/you');
+    const list = within(structure).getByRole('list', {
+      name: 'Profile Possibilities',
+    });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map(item => item.textContent)
+    ).toEqual([
+      'ProfileName, story, work',
+      'LinksOne place to explore',
+      'EventsA reason to meet',
+      'PaymentsA direct way to pay',
+    ]);
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
@@ -115,7 +122,7 @@ describe('HomepageClose', () => {
   it('renders the saved closing headline and a single focus-only action', () => {
     render(<HomepageClose />);
     const section = screen.getByRole('region', {
-      name: 'Take control of your presence.',
+      name: 'Make it your Jovie profile.',
     });
     expect(section).toBe(screen.getByTestId('marketing-section-cta'));
     expect(within(section).getAllByRole('button')).toHaveLength(1);

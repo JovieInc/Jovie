@@ -1,150 +1,176 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
+import {
+  CalendarDays,
+  CreditCard,
+  Link2,
+  type LucideIcon,
+  UserRound,
+} from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import type { MarketingExportImage } from '@/lib/screenshots/registry';
-
-export type HomepageCertifiedSectionId =
-  (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number]['id'];
-
-/**
- * Kept as a source-compatible input while the homepage transitions away from
- * product screenshots in the locked editorial pass. The approved composition
- * uses the conceptual identity artwork instead of a profile export.
- */
-export interface HomepageCertifiedPreviews {
-  readonly connected?: MarketingExportImage;
-  readonly relationships?: readonly MarketingExportImage[];
-}
-
-export interface HomepageCertifiedSectionsProps {
-  readonly previews?: HomepageCertifiedPreviews;
-}
-
-const IDENTITY_ARTWORK = {
-  src: '/assets/generated/homepage-identity-optical-v1.webp',
-  width: 1902,
-  height: 827,
-  alt: 'A conceptual photographic assembly of a profile identity',
-} as const;
+import './HomepageIdentity.css';
 
 type HomepageSection = (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number];
-type RelationshipSection = Extract<HomepageSection, { id: 'relationships' }>;
+type PresenceSectionCopy = Extract<HomepageSection, { id: 'presence' }>;
+type StructureSectionCopy = Extract<HomepageSection, { id: 'structure' }>;
+type PossibilityId =
+  StructureSectionCopy['possibilities']['items'][number]['id'];
+
+export type HomepageCertifiedSectionId = HomepageSection['id'];
+
+/**
+ * The purple satin material belongs to the presence strip only. The hero owns
+ * the blue technical texture; no background image is used twice on `/`.
+ */
+export const HOMEPAGE_PRESENCE_MATERIAL = {
+  src: '/assets/generated/homepage-presence-satin-v1.webp',
+  width: 1672,
+  height: 941,
+} as const;
+
+const POSSIBILITY_ICONS: Readonly<Record<PossibilityId, LucideIcon>> = {
+  profile: UserRound,
+  links: Link2,
+  events: CalendarDays,
+  payments: CreditCard,
+};
 
 function EditorialSection({
   children,
-  dataMedia,
-  rhythm,
   section,
+  dataMedia,
 }: Readonly<{
   children: ReactNode;
-  dataMedia: 'true' | 'false';
-  rhythm: 'product' | 'text';
   section: HomepageSection;
+  dataMedia: 'true' | 'false';
 }>) {
   return (
     <section
       id={section.id}
-      className={`homepage-certified-section homepage-certified-section--${section.id}`}
+      className={`homepage-identity-section homepage-identity-section--${section.id}`}
       data-testid='marketing-section-feature-split'
       data-homepage-testid={`homepage-section-${section.id}`}
       data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
       data-marketing-variant='editorial'
       data-marketing-occurrence={section.id}
-      data-align='start'
       data-media={dataMedia}
-      data-rhythm={rhythm}
       aria-labelledby={`homepage-section-${section.id}-heading`}
     >
-      {children}
-    </section>
-  );
-}
-
-function RelationshipOutcomes({
-  outcomes,
-}: Readonly<{ outcomes: RelationshipSection['outcomes'] }>) {
-  return (
-    <ol className='homepage-relationship-outcomes' aria-label='Relationships'>
-      {outcomes.map((outcome, index) => (
-        <li
-          key={outcome.id}
-          className='homepage-relationship-outcome'
-          data-homepage-testid={`homepage-outcome-${outcome.id}`}
-        >
-          <span
-            className='homepage-relationship-outcome__index'
-            aria-hidden='true'
-          >
-            {String(index + 1).padStart(2, '0')}
-          </span>
-          <div className='homepage-relationship-outcome__copy'>
-            <h3>{outcome.headline}</h3>
-            <p>{outcome.body}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function ConnectedSection({
-  section,
-}: Readonly<{
-  section: Extract<HomepageSection, { id: 'connected' }>;
-}>) {
-  return (
-    <EditorialSection dataMedia='true' rhythm='product' section={section}>
-      <div className='homepage-certified-section__inner'>
-        <div className='homepage-connected-header'>
-          <div className='homepage-certified-section__copy'>
-            <p className='homepage-certified-section__eyebrow'>
+      <div className='homepage-identity-section__inner'>
+        <div className='homepage-identity-section__header'>
+          <div>
+            <p className='homepage-identity-section__eyebrow'>
               {section.eyebrow}
             </p>
             <h2
-              id='homepage-section-connected-heading'
-              className='homepage-certified-section__headline'
+              id={`homepage-section-${section.id}-heading`}
+              className='homepage-identity-section__headline'
               data-homepage-section-heading
             >
               {section.headline}
             </h2>
           </div>
-          <p className='homepage-certified-section__body'>{section.body}</p>
+          <p className='homepage-identity-section__body'>{section.body}</p>
         </div>
-        <div className='homepage-connected-artwork'>
-          <Image
-            alt={IDENTITY_ARTWORK.alt}
-            className='homepage-connected-artwork__image'
-            height={IDENTITY_ARTWORK.height}
-            loading='lazy'
-            sizes='(min-width: 1362px) 1298px, 100vw'
-            src={IDENTITY_ARTWORK.src}
-            width={IDENTITY_ARTWORK.width}
-          />
-        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function PresenceSection({
+  section,
+}: Readonly<{ section: PresenceSectionCopy }>) {
+  return (
+    <EditorialSection section={section} dataMedia='true'>
+      <div
+        className='homepage-identity-presence__material'
+        aria-hidden='true'
+        data-background-image={HOMEPAGE_PRESENCE_MATERIAL.src}
+        data-testid='homepage-presence-material'
+      >
+        <Image
+          alt=''
+          className='homepage-identity-presence__material-image'
+          fill
+          loading='lazy'
+          sizes='(min-width: 1440px) 1298px, 100vw'
+          src={HOMEPAGE_PRESENCE_MATERIAL.src}
+        />
+      </div>
+      <div className='homepage-identity-presence__step'>
+        <h3 className='homepage-identity-presence__step-headline'>
+          {section.step.headline}
+        </h3>
+        <p className='homepage-identity-section__body'>{section.step.body}</p>
       </div>
     </EditorialSection>
   );
 }
 
-function RelationshipsSection({
+function StructureSection({
   section,
-}: Readonly<{ section: RelationshipSection }>) {
+}: Readonly<{ section: StructureSectionCopy }>) {
+  const { identity, possibilities } = section;
+
   return (
-    <EditorialSection dataMedia='false' rhythm='text' section={section}>
-      <div className='homepage-certified-section__inner'>
-        <div className='homepage-certified-section__copy'>
-          <h2
-            id='homepage-section-relationships-heading'
-            className='homepage-certified-section__headline'
-            data-homepage-section-heading
+    <EditorialSection section={section} dataMedia='false'>
+      <div className='homepage-identity-structure__anatomy'>
+        <div
+          className='homepage-identity-structure__column'
+          data-testid='homepage-structure-identity'
+        >
+          <p className='homepage-identity-structure__label'>{identity.label}</p>
+          {/* The profile avatar slot of the anatomy, not a decorative badge. */}
+          <span
+            className='homepage-identity-structure__avatar'
+            aria-hidden='true'
           >
-            {section.headline}
-          </h2>
-          <p className='homepage-certified-section__body'>{section.body}</p>
+            <UserRound size={18} strokeWidth={1.6} />
+          </span>
+          <h3 className='homepage-identity-structure__title'>
+            {identity.title}
+          </h3>
+          <p className='homepage-identity-structure__handle'>
+            {identity.handle}
+          </p>
         </div>
-        <div className='homepage-certified-section__media'>
-          <RelationshipOutcomes outcomes={section.outcomes} />
+        <div
+          className='homepage-identity-structure__column'
+          data-testid='homepage-structure-possibilities'
+        >
+          <p className='homepage-identity-structure__label'>
+            {possibilities.label}
+          </p>
+          <ul
+            className='homepage-identity-structure__list'
+            aria-label='Profile Possibilities'
+          >
+            {possibilities.items.map(item => {
+              const Icon = POSSIBILITY_ICONS[item.id];
+              return (
+                <li
+                  key={item.id}
+                  className='homepage-identity-structure__item'
+                  data-homepage-testid={`homepage-possibility-${item.id}`}
+                >
+                  <Icon
+                    aria-hidden='true'
+                    className='homepage-identity-structure__icon'
+                    size={18}
+                    strokeWidth={1.6}
+                  />
+                  <p className='homepage-identity-structure__item-title'>
+                    {item.title}
+                  </p>
+                  <p className='homepage-identity-structure__item-detail'>
+                    {item.detail}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
     </EditorialSection>
@@ -152,23 +178,21 @@ function RelationshipsSection({
 }
 
 /**
- * Founder-locked editorial body. The unsupported logo proof strip is omitted
- * until an attributable adoption or permission receipt exists. The shared
- * full footer remains mounted by PublicPageShell.
+ * Canonical Pen homepage body (2026-09-26): the presence sequence (headline,
+ * purple satin material strip, a clear next step) and the open-system anatomy
+ * (your Jovie profile and what it holds). The shared full footer remains
+ * mounted by PublicPageShell.
  */
-export function HomepageCertifiedSections({
-  previews,
-}: HomepageCertifiedSectionsProps) {
-  void previews;
+export function HomepageCertifiedSections() {
   const { sections } = HOMEPAGE_LAUNCH_COPY.certified;
 
   return (
     <>
       {sections.map((section): ReactNode => {
-        if (section.id === 'connected') {
-          return <ConnectedSection key={section.id} section={section} />;
+        if (section.id === 'presence') {
+          return <PresenceSection key={section.id} section={section} />;
         }
-        return <RelationshipsSection key={section.id} section={section} />;
+        return <StructureSection key={section.id} section={section} />;
       })}
     </>
   );

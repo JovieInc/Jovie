@@ -18,7 +18,7 @@ export function HomepagePrimaryAction(props: HeroSpotifySearchProps) {
   const { primary } = getHomepageFrontDoorCtaContract(true);
   return (
     <div className='homepage-request-access'>
-      <Button asChild variant='primary' size='marketing' className='w-full'>
+      <Button asChild variant='primary' size='marketing'>
         <HomepageTrackedLink
           href={primary.href}
           data-testid={props.submitTestId}

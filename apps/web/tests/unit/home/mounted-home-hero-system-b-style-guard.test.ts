@@ -6,7 +6,7 @@ const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
 const heroComponentPath = 'components/homepage/HomepageEditorialHero.tsx';
 const searchComponentPath = 'components/features/home/HeroSpotifySearch.tsx';
-const cssPath = 'app/(home)/home.css';
+const cssPath = 'components/homepage/HomepageIdentity.css';
 
 const forbiddenPageChromePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -29,13 +29,9 @@ const forbiddenHeroCssPatterns = [
 ] as const;
 
 function extractMountedHeroCss(source: string): string {
-  const start = source.indexOf('HOMEPAGE EDITORIAL HERO START');
-  const end = source.indexOf('HOMEPAGE EDITORIAL HERO END', start);
-
-  expect(start, 'mounted hero CSS block exists').toBeGreaterThanOrEqual(0);
-  expect(end, 'mounted hero CSS block is bounded').toBeGreaterThan(start);
-
-  return source.slice(start, end);
+  // The whole canonical homepage stylesheet is held to the hero contract.
+  expect(source.length, 'mounted hero CSS exists').toBeGreaterThan(0);
+  return source;
 }
 
 function extractMountedHeroPageSource(source: string): string {
@@ -66,8 +62,8 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage owns copy; the hero primitive owns the abstract composition;
-    // the existing name search is the only control.
+    // The homepage copy module owns words; the hero owns the composition; the
+    // one primary action (Request access, or name search) is the only control.
     expect(pageSource).toContain('<HomepageEditorialHero');
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
@@ -77,15 +73,15 @@ describe('mounted homepage hero System B source contract', () => {
       "submitTestId='homepage-primary-cta'"
     );
     expect(heroComponentSource).not.toMatch(/<Button|<Link|href=/);
+    expect(heroComponentSource).toContain('<HomepageProfileSpecimen');
 
     for (const className of [
-      'homepage-editorial-hero',
-      'homepage-editorial-hero__backdrop',
-      'homepage-editorial-hero__light-well',
-      'homepage-editorial-hero__copy',
-      'homepage-editorial-hero__headline',
-      'homepage-editorial-hero__support',
-      'homepage-editorial-hero__search',
+      'homepage-identity-hero',
+      'homepage-identity-hero__texture',
+      'homepage-identity-hero__inner',
+      'homepage-identity-hero__headline',
+      'homepage-identity-hero__support',
+      'homepage-identity-hero__action',
     ]) {
       expect(heroComponentSource).toContain(className);
     }
@@ -113,21 +109,19 @@ describe('mounted homepage hero System B source contract', () => {
       expect(css, `${cssPath} leaked ${pattern}`).not.toMatch(pattern);
     }
 
-    expect(css).toContain('var(--system-b-bg-page)');
+    expect(css).toContain('var(--system-b-cinematic-black)');
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--color-text-secondary-token)');
-    expect(css).toContain('var(--homepage-grid-max)');
-    expect(css).toContain('var(--homepage-grid-gutter)');
+    expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--space-');
-    expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain('font-weight: var(--font-weight-bold);');
-    expect(css).toContain(
-      'letter-spacing: var(--ds-marketing-display-tracking);'
+    expect(css).toContain('var(--font-mono)');
+    expect(css).toContain('border-radius: var(--radius-full);');
+    expect(css).toContain('border-radius: var(--radius-xl);');
+    expect(css).not.toContain('var(--linear-');
+    // Every light-theme hero ink is mixed from a token, never a raw value.
+    const tokenMixes = css.match(
+      /color-mix\(\s*in oklab,\s*var\(--color-text-tooltip\)/g
     );
-    expect(css).toContain('border-radius: var(--radius-pill);');
-    expect(css).toContain('min-height: 100svh;');
-    // Every scrim color is mixed from a token, never a raw value.
-    const tokenMixes = css.match(/color-mix\(\s*in oklab,\s*var\(--system-b-/g);
-    expect(tokenMixes?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(tokenMixes?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 });

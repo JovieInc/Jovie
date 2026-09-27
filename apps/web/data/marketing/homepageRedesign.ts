@@ -37,6 +37,7 @@ export const LIVE_HOMEPAGE_SOURCE_FILES = [
   'apps/web/components/homepage/HomepageEditorialHero.tsx',
   'apps/web/components/homepage/HomepageCertifiedSections.tsx',
   'apps/web/components/homepage/HomepageClose.tsx',
+  'apps/web/components/homepage/HomepageIdentity.css',
   'apps/web/components/features/home/HeroSpotifySearch.tsx',
   'apps/web/components/homepage/intent.ts',
   'apps/web/data/homepageLaunchCopy.ts',
@@ -53,8 +54,8 @@ export const STAGED_HOMEPAGE_SOURCE_FILES = [
 export const HOMEPAGE_PROPOSAL_NARRATIVE_SOURCE =
   'apps/web/components/features/home/CaptureFlowSection.tsx' as const;
 
-// Certified nine-section homepage. Sections 2-8 are copy-driven inside one
-// mount, so the source markers are the hero, the certified body, and the close.
+// Canonical Pen homepage (2026-09-26). Presence and structure are copy-driven
+// inside one mount, so the source markers are the hero, the body, and the close.
 export const LIVE_HOMEPAGE_SECTION_IDS = [
   'hero',
   'certified-sections',

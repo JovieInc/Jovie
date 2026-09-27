@@ -37,7 +37,7 @@ describe('HomepageNoScriptContent', () => {
     );
   });
 
-  it('mirrors the locked editorial sections and outcomes in order', () => {
+  it('mirrors the canonical homepage sections in order', () => {
     const { rawMarkup, section } = renderFallback();
     const text = section?.textContent ?? '';
     expect(text).not.toContain("Proof is earned. We don't borrow it.");
@@ -62,9 +62,14 @@ describe('HomepageNoScriptContent', () => {
       ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
         item.headline,
         item.body,
-        ...('outcomes' in item
-          ? item.outcomes.flatMap(outcome => [outcome.headline, outcome.body])
-          : []),
+        ...(item.id === 'presence'
+          ? [item.step.headline, item.step.body]
+          : [
+              item.identity.title,
+              ...item.possibilities.items.map(
+                possibility => `${possibility.title}: ${possibility.detail}`
+              ),
+            ]),
       ]),
       HOMEPAGE_LAUNCH_COPY.certified.close.headline,
     ];
