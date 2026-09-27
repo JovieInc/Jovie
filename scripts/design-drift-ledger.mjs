@@ -198,6 +198,7 @@ function createScanner(webRoot) {
     return signalCache.get(file);
   };
   const tally = (files, layer) => {
+    /** @type {Record<string, number>} */
     const counts = { files: 0 };
     for (const key of Object.keys(SIGNALS)) counts[key] = 0;
     for (const file of files) {
@@ -261,6 +262,7 @@ export function buildDriftLedger({ repoRoot = REPO_ROOT } = {}) {
     families[key] = componentFiles.filter(file => pattern.test(file));
   }
 
+  /** @type {Record<string, number>} */
   const aggregate = {
     routes: pages.length,
     ...scanner.tally(union, ROUTE_LAYER),
