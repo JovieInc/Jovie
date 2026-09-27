@@ -97,7 +97,7 @@ function assertInstalledTree(root) {
   }
 }
 
-export function prepareDependencyWorkspace(
+function workspaceReceipt(
   root,
   {
     arch = process.arch,
@@ -106,8 +106,7 @@ export function prepareDependencyWorkspace(
     pnpmVersion,
   } = {}
 ) {
-  assertInstalledTree(root);
-  const receipt = {
+  return {
     schema: WORKSPACE_RECEIPT_SCHEMA,
     dependencyInputDigest: dependencyInputDigest(root),
     nodeVersion,
@@ -115,33 +114,22 @@ export function prepareDependencyWorkspace(
     platform,
     arch,
   };
+}
+export function prepareDependencyWorkspace(root, options = {}) {
+  assertInstalledTree(root);
+  const receipt = workspaceReceipt(root, options);
   const receiptPath = join(root, WORKSPACE_RECEIPT_PATH);
   mkdirSync(dirname(receiptPath), { recursive: true });
   writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + '\n');
   return receipt;
 }
 
-export function validateDependencyWorkspace(
-  root,
-  {
-    arch = process.arch,
-    nodeVersion = process.version.slice(1),
-    platform = process.platform,
-    pnpmVersion,
-  } = {}
-) {
+export function validateDependencyWorkspace(root, options = {}) {
   assertInstalledTree(root);
   const receipt = JSON.parse(
     readFileSync(join(root, WORKSPACE_RECEIPT_PATH), 'utf8')
   );
-  const expected = {
-    schema: WORKSPACE_RECEIPT_SCHEMA,
-    dependencyInputDigest: dependencyInputDigest(root),
-    nodeVersion,
-    pnpmVersion,
-    platform,
-    arch,
-  };
+  const expected = workspaceReceipt(root, options);
   for (const [key, value] of Object.entries(expected)) {
     if (JSON.stringify(receipt[key]) !== JSON.stringify(value)) {
       throw new Error('dependency workspace receipt mismatch: ' + key);
