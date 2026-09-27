@@ -37,6 +37,10 @@ const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
 );
+const SETUP_NODE_PNPM_ACTION = readFileSync(
+  resolve(REPO_ROOT, '.github/actions/setup-node-pnpm/action.yml'),
+  'utf8'
+);
 const IOS_CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
   'utf8'
@@ -255,6 +259,33 @@ describe('merge_group workflow contract', () => {
     expect(EVENT.merge_group.base_sha).toMatch(/^[0-9a-f]{40}$/);
     expect(EVENT.merge_group.head_sha).toMatch(/^[0-9a-f]{40}$/);
     expect(EVENT.merge_group.head_ref).toContain('gh-readonly-queue/main/');
+  });
+
+  it('reuses one validated dependency workspace across isolated merge-group jobs', () => {
+    const producer = getJobBlock(CI_WORKFLOW, 'ci-merge-group-workspace');
+    expect(producer).toContain("github.event_name == 'merge_group'");
+    expect(producer).toContain('github.event.merge_group.head_sha');
+    expect(producer).toContain('save_merge_group_workspace:');
+    expect(producer).toContain(
+      'node scripts/lib/ci-dependency-workspace.mjs validate'
+    );
+
+    const consumers =
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+    for (const jobId of consumers.split(' ')) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job, jobId).toContain('ci-merge-group-workspace');
+      expect(job, jobId).toContain("reuse_merge_group_workspace: 'true'");
+    }
+
+    for (const fragment of [
+      'key: pnpm-node-modules-v4-',
+      "github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true'",
+      'Prepared merge-group dependency workspace was not restored.',
+      'node scripts/lib/ci-dependency-workspace.mjs prepare',
+      'node scripts/lib/ci-dependency-workspace.mjs validate',
+    ])
+      expect(SETUP_NODE_PNPM_ACTION).toContain(fragment);
   });
 
   it('runs deterministic CI against the synthetic base-to-head diff', () => {
@@ -838,7 +869,7 @@ describe('merge_group workflow contract', () => {
     expect(migrationGuard).toMatch(
       /- uses: actions\/checkout@[^\n]+\n\s+if: needs\.ci-path-changes\.outputs\.run_drizzle == 'true'\n\s+with:\n\s+fetch-depth: 0/
     );
-    expect(migrationGuard).toContain('timeout-minutes: 3');
+    expect(migrationGuard).toContain('timeout-minutes: 6');
     expect(migrationGuard).toContain(
       'run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}'
     );
@@ -850,6 +881,9 @@ describe('merge_group workflow contract', () => {
     );
     expect(migrationGuard).toContain('./scripts/check-migrations.sh');
     expect(migrationGuard).toContain('./scripts/validate-migrations.sh');
+    expect(migrationGuard).toContain(
+      'pnpm exec tsx scripts/online-index-migrate.ts --validate-only'
+    );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     expect(buildLayout).toContain('runs-on: ubuntu-latest');
     expect(buildLayout).toContain('Build exact combined head');
