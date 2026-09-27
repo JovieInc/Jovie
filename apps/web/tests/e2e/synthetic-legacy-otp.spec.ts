@@ -216,9 +216,14 @@ test.describe('Synthetic Monitoring - Legacy OTP Signup (JOV-2446 cutover)', () 
       await expect(primaryCta).toBeVisible({
         timeout: 15000,
       });
+      await expect(primaryCta).toHaveText('Find me');
 
       console.log('[Synthetic][legacy] Step 3: Sign up flow test');
-      await primaryCta.click();
+      // The locked homepage CTA is the name search, not the signup door.
+      await page.goto(SIGNUP_PATH, {
+        waitUntil: 'commit',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
       await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
         timeout: 20000,
       });

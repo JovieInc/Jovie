@@ -71,6 +71,16 @@ describe('golden-path lock classifier', () => {
     ]);
   });
 
+  it('treats the certified homepage name search as a locked path', () => {
+    const classified = classifyChangedPaths([
+      'apps/web/components/homepage/HomepagePrimaryAction.tsx',
+    ]);
+    expect(classified.touchesGoldenPath).toBe(true);
+    expect(MERGE_GATE_TEST_FILES).toContain(
+      'apps/web/tests/unit/home/HomepageEditorialHero.test.tsx'
+    );
+  });
+
   it('still records docs-only diffs without treating them as a skip', () => {
     const classified = classifyChangedPaths(['docs/launch/LAUNCH_GATES.md']);
     expect(classified.touchesGoldenPath).toBe(false);
