@@ -1,11 +1,11 @@
 // Gateway transport for the review kernel. Models and prices come from the
-// Symphony model registry; this module never picks a model outside it.
+// canonical model registry; this module never picks a model outside it.
 
 import { readFileSync } from 'node:fs';
 import { createGateway, generateText } from 'ai-evaluation';
 
 const REGISTRY_URL = new URL(
-  '../symphony/config/model-registry.json',
+  '../backlog-orchestrator/config/model-registry.json',
   import.meta.url
 );
 
@@ -19,8 +19,8 @@ export const REVIEW_ROUTES = Object.freeze({
 });
 
 /**
- * Models the review may use that the Symphony registry does not list yet.
- * Kept here, not in the registry, so adding them cannot change Symphony
+ * Models the review may use that the model registry does not list yet.
+ * Kept here, not in the registry, so adding them cannot change agent
  * routing. Prices are the published peak rates (USD per 1M tokens) so the
  * budget errs high. Registry entries win when both exist.
  */
