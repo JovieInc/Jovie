@@ -16,7 +16,7 @@ describe('DevelopersPage', () => {
     render(<DevelopersPage />);
 
     expect(
-      screen.getByRole('heading', { name: 'Public Artist Data, In The Open.' })
+      screen.getByRole('heading', { name: 'Public artist data, in the open.' })
     ).toBeInTheDocument();
     expect(
       screen.getByText('curl https://jov.ie/api/v1/{username}')
@@ -64,7 +64,7 @@ describe('DevelopersPage', () => {
     render(<DevelopersPage />);
 
     expect(
-      screen.getByRole('heading', { name: 'Agent Quickstart' })
+      screen.getByRole('heading', { name: 'Agent quickstart' })
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Start from the same profile endpoint/i)

@@ -111,7 +111,8 @@ export default function DevelopersPage() {
             id='developers-hero-heading'
             className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'
           >
-            Public Artist Data, In The Open.
+            {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
+            Public artist data, in the open.
           </h1>
           <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
             Read public artist profiles, releases, events, and merch with
@@ -164,7 +165,8 @@ export default function DevelopersPage() {
               id='agent-quickstart-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              Agent Quickstart
+              {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
+              Agent quickstart
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               Start from the same profile endpoint as the quickstart above, then
@@ -197,7 +199,8 @@ export default function DevelopersPage() {
               id='resources-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              Machine-readable Resources
+              {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
+              Machine-readable resources
             </h2>
             <ul className='mt-6 grid gap-6 sm:grid-cols-2'>
               {RESOURCE_LINKS.map(resource => (
@@ -221,7 +224,8 @@ export default function DevelopersPage() {
               id='scope-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              Public By Design
+              {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
+              Public by design
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               This page documents Jovie&apos;s public artist surface: anonymous
