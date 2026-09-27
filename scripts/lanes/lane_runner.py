@@ -540,7 +540,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         except Exception as error:  # a broken run must still leave a receipt and free its issue
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
             sh(["git", "branch", "-D", branch], cwd=host.repo)
     receipt["endedAt"] = now_iso()
     with open(runs / "ledger.jsonl", "a") as ledger:
@@ -908,7 +908,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
             # The attempt is over: a head it did not move may be tried again by the next lane.
             update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
                 endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
@@ -959,7 +959,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
     if receipt.get("verdict") in ("gate-timeout", "failed"):
         # Not verified: forget the claim so the next adopt pass retries this head.
         update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
@@ -1304,6 +1304,13 @@ def cooling(host: Host, name: str) -> bool:
         return False
 
 
+def remove_worktree(host: Host, worktree: Path) -> None:
+    """Kill whatever still runs from the worktree first: a normal agent exit leaves its
+    backgrounded children (storybook on :6006, esbuild) holding ports for later gates."""
+    sh(["pkill", "-f", str(worktree)])
+    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+
+
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
     """Garbage-collect worktrees a crashed worker left behind; never touch young ones."""
     root = host.state / "worktrees"
@@ -1315,7 +1322,7 @@ def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
         except FileNotFoundError:
             continue  # a worker removed it between listing and stat
         if stale:
-            sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo)
+            remove_worktree(host, path)
             shutil.rmtree(path, ignore_errors=True)
     sh(["git", "worktree", "prune"], cwd=host.repo)
 

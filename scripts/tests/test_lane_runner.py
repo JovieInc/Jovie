@@ -699,6 +699,16 @@ class DispatchTest(unittest.TestCase):
                 lane.ensure_full_history, lane.doctor.run = saved
             self.assertIn("git exploded", json.loads((host.state / "tick.json").read_text())["error"])
 
+    def test_worktree_removal_kills_its_leftover_processes_first(self):
+        fake, real = FakeShell([]), lane.sh
+        lane.sh = fake
+        try:
+            lane.remove_worktree(lane.Host(state=Path("/s"), repo=Path("/r")), Path("/s/worktrees/run-1"))
+        finally:
+            lane.sh = real
+        self.assertEqual(fake.calls, [["pkill", "-f", "/s/worktrees/run-1"],
+                                      ["git", "worktree", "remove", "--force", "/s/worktrees/run-1"]])
+
     def test_prune_survives_a_worktree_removed_mid_scan(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
