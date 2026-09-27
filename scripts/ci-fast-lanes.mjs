@@ -282,6 +282,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/observability-issue-github.test.mjs',
   'scripts/observability-issue-sync.test.mjs',
   'scripts/performance-artifact-retention.test.mjs',
+  'scripts/quality-gap-finder.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',

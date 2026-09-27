@@ -125,6 +125,9 @@ improvement loop and bottleneck ranking (JOV-5817).
    class seen twice or more gets one class-level hardening issue, linked from
    each post-mortem. Report counts and time-to-detect trends in the
    improvement loop.
+   The [quality gap finder](../quality/QUALITY_GAP_FINDER.md) re-checks every
+   class on each post-mortem merge. It proposes a guardrail when no invariant,
+   ledger entry, or script names the class and its actions have closed.
 4. **Closure needs live proof.** An action closes only when its control is
    **verified live**, meaning the alert fired, the gate rejected a deliberate
    red fixture, or the invariant test failed on the old code. Merging the
