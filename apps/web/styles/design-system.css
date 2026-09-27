@@ -1956,6 +1956,99 @@ html[data-profile-initial-mode]
   color: var(--profile-dock-active-fg);
 }
 
+:where(.profile-glass-pill--flat) {
+  /* Flat frosted variant (profile identity Listen action): the same dock
+     lens fill and hairline rim, minus the sheen and top-rim bevel, with its
+     own 16px blur because it sits directly on the page, not on a card. */
+  border-radius: 10px;
+  background: var(--profile-dock-lens-bg);
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-border);
+  backdrop-filter: blur(var(--space-4));
+  -webkit-backdrop-filter: blur(var(--space-4));
+}
+
+/* Public-profile mode cards (Pen D14lo6 / NdEbB / GTSIc / QZvG7). One accent
+   per card, set by lib/profile/mode-card-accent.ts through data-accent. The
+   gradient centers on the exact accent token; the only contrast lever is
+   OKLCH chroma (lightness and hue stay), lowered strongly for art cards.
+   Text, glyphs, and CTAs inside stay neutral. */
+:where(.profile-mode-card) {
+  --profile-mode-card-bg: rgb(5, 6, 8);
+  --profile-mode-card-fg: rgba(255, 255, 255, 0.98);
+  --profile-mode-card-muted: rgba(255, 255, 255, 0.58);
+  --profile-mode-card-hairline: rgba(255, 255, 255, 0.1);
+  --profile-mode-card-well: rgba(255, 255, 255, 0.04);
+  --profile-mode-card-well-active: rgba(255, 255, 255, 0.1);
+  --profile-mode-card-cta-bg: rgba(246, 247, 251, 0.98);
+  --profile-mode-card-cta-fg: rgba(8, 9, 10, 0.96);
+  --profile-mode-card-min-height: 17rem;
+  --profile-mode-card-accent: var(--noir-ion-ion);
+  --profile-mode-card-chroma: 0.72;
+  --profile-mode-card-accent-center: oklch(
+    from var(--profile-mode-card-accent) l
+      calc(c * var(--profile-mode-card-chroma)) h
+  );
+  --profile-mode-card-accent-shade: oklch(
+    from var(--profile-mode-card-accent) calc(l * 0.5)
+      calc(c * var(--profile-mode-card-chroma) * 0.6) h /
+    0.4
+  );
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: var(--profile-mode-card-min-height);
+  border-radius: var(--profile-card-radius);
+  background: var(--profile-mode-card-bg);
+  color: var(--profile-mode-card-fg);
+}
+
+:where(.profile-mode-card)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      80% 42% at 100% 0%,
+      var(--profile-mode-card-accent-center) 0%,
+      var(--profile-mode-card-accent-shade) 42%,
+      transparent 100%
+    ),
+    radial-gradient(
+      42% 16% at 0% 100%,
+      var(--profile-mode-card-accent-shade) 0%,
+      transparent 100%
+    );
+}
+
+.profile-mode-card[data-accent="ultra"] {
+  --profile-mode-card-accent: var(--noir-ion-ultra);
+}
+
+.profile-mode-card[data-accent="pulse"] {
+  --profile-mode-card-accent: var(--noir-ion-pulse);
+}
+
+.profile-mode-card[data-accent="orange"] {
+  --profile-mode-card-accent: var(--noir-ion-orange);
+}
+
+.profile-mode-card[data-accent-strength="art"] {
+  --profile-mode-card-chroma: 0.38;
+}
+
+@media (forced-colors: active) {
+  :where(.profile-mode-card) {
+    border: var(--space-px) solid CanvasText;
+  }
+
+  :where(.profile-mode-card)::before {
+    display: none;
+  }
+}
+
 /* Safari/Media Queries 5 plus a deterministic manual hook for testability and
    clients that expose the OS preference outside CSS. */
 @media (prefers-reduced-transparency: reduce) {
@@ -1980,6 +2073,11 @@ html[data-profile-initial-mode]
 
   :where(.profile-glass-pill) {
     background: var(--profile-dock-solid-bg);
+  }
+
+  :where(.profile-glass-pill--flat) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 
@@ -2013,6 +2111,12 @@ html[data-profile-initial-mode]
   box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-solid-border);
 }
 
+:root[data-reduced-transparency="true"] .profile-glass-pill--flat,
+:root.high-contrast .profile-glass-pill--flat {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 @media (prefers-contrast: more) {
   :where(.profile-liquid-glass-nav) {
     border-color: var(--profile-dock-solid-border);
@@ -2035,6 +2139,11 @@ html[data-profile-initial-mode]
 
   :where(.profile-glass-pill) {
     background: var(--profile-dock-solid-bg);
+  }
+
+  :where(.profile-glass-pill--flat) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 

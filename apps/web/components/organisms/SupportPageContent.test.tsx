@@ -80,7 +80,7 @@ describe('SupportPageContent', () => {
       {
         question: 'How do I get started with Jovie?',
         answer:
-          'Start with Find yourself and follow the setup steps for your profile. Full walkthrough at https://docs.jov.ie/getting-started.',
+          'Start with Find yourself and follow the setup steps for your profile. Full walkthrough at https://docs.jov.ie/docs/jovie-essentials/start-here.',
       },
       {
         question: 'How do music smart links work?',
