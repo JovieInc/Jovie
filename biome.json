@@ -24,6 +24,7 @@
       "!apps/web/lib/design/generated/**",
       "!apps/web/design/oklch-palette.json",
       "!apps/web/typecheck-tests-baseline.json",
+      "!apps/web/data/answer-content/question-map.json",
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
       "!packages/action-contracts/generated/**",
