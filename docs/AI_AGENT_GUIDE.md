@@ -67,6 +67,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/api/agents/profiles` | POST | None (IP rate limit, `AGENT_PROFILE_CREATE` kill switch) | Create or find a claimable profile from a Spotify artist URL (`@jovie/cli profile create`) |
+| `/api/agents/feedback` | POST | None (IP rate limit) | Agent bug/feedback reports into `feedback_items` (source `agent_cli`) for Summer triage (`@jovie/cli report`, MCP `report_issue`) |
 
 ### Audience (public/token-based)
 
