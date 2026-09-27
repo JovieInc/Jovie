@@ -438,10 +438,11 @@ const SECTION_RESOLUTIONS = {
     sourceBacked: true,
     resolvedSource: 'apps/web/components/site/MarketingCtaSection.tsx',
     exportName: 'MarketingCtaSection',
-    penRootIds: [],
-    penRootId: null,
-    penIdentityReason:
-      'No canonical section.cta Pen identity is registered. Existing shell.finalCta/footerCta identities remain separate; production native root and delegated bodies are source-proven only.',
+    // Pen `y8oKXI` is the section.cta registry entry; it points at design owner
+    // `K4ar1`. The rendered root still emits the caller's adapter shell id
+    // (footerCta `LCLXI` / finalCta `iY5Lp`), which Pen indexes through
+    // section.cta, so the proofs below stay source-level.
+    penRootIds: [MARKETING_PEN_CONTRACT_IDS.section.cta],
     rootProofs: [
       {
         source: 'apps/web/components/site/MarketingCtaSection.tsx',
