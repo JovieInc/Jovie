@@ -13,6 +13,7 @@ const common = [
   '.gitignore',
   'agent/channels/photon.ts',
   'agent/lib/imessage-allowlist.ts',
+  'agent/lib/context-budget.ts',
   'agent/lib/runtime-commissioning-health.ts',
   'tests/runtime-commissioning-health.test.ts',
 ];
@@ -124,8 +125,12 @@ export function materializeApp(identity, destination, source = pilot) {
     'agent/agent.ts',
     `import { defineAgent } from 'eve';
 import { assertRuntimeEnvironment } from './lib/application-boundary';
+import { EVE_PILOT_COMPACTION_THRESHOLD_PERCENT } from './lib/context-budget';
 assertRuntimeEnvironment();
-export default defineAgent({ model: 'zai/glm-5.3-flash' });\n`
+export default defineAgent({
+  model: 'zai/glm-5.3-flash',
+  compaction: { thresholdPercent: EVE_PILOT_COMPACTION_THRESHOLD_PERCENT },
+});\n`
   );
   // Health status comes from a verified signed receipt, never a hardcoded
   // commissioned literal. Isolated built proof stays uncommissioned.
