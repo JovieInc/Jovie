@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
+import type { SummerFailureHop } from '@/lib/ovie/summer-failure';
 import { resolveSummerEveCallerOrigin } from '@/lib/ovie/summer-production-pin';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
@@ -19,7 +20,8 @@ const resultSchema = z.object({
   responseText: z.string().max(64 * 1024),
   status: z.enum(['completed', 'failed']),
   nextStartIndex: z.number().int().nonnegative(),
-  model: z.literal('zai/glm-5.3-flash'),
+  // Summer records the gateway model that ran the turn; the founder chat model is config.
+  model: z.string().regex(/^[a-z0-9-]+\/[a-z0-9.-]+$/u),
 });
 const budgetCheckpointSchema = z.object({
   eventId: z.string(),
@@ -101,6 +103,33 @@ async function body(response: Response): Promise<Record<string, unknown>> {
   return value as Record<string, unknown>;
 }
 
+/** Summer will never run these event ids (summer-config#119: abandoned dispatch). */
+const PERMANENT_ADMISSION_REJECTIONS = new Set([
+  'dispatch_abandoned',
+  'event_conflict',
+]);
+
+/** Summer answered admission with something Jovie cannot trust. */
+const ADMISSION_REJECTIONS = new Set([
+  'oversized_summer_response',
+  'invalid_summer_response',
+  'summer_checkpoint_drift',
+  'summer_blocking_result_drift',
+]);
+
+function failureHopFor(
+  error: unknown,
+  stage: 'admission' | 'result'
+): SummerFailureHop {
+  const code = error instanceof Error ? error.message : '';
+  if (code === 'unverified_eve_deployment')
+    return 'summer_deployment_unverified';
+  if (stage === 'result') return 'summer_result_unverified';
+  return ADMISSION_REJECTIONS.has(code) || error instanceof z.ZodError
+    ? 'summer_admission_rejected'
+    : 'summer_unreachable';
+}
+
 export function createEveSummerSpeaker(
   fetchShadow = fetchSummerShadow
 ): SummerSpeaker {
@@ -112,6 +141,7 @@ export function createEveSummerSpeaker(
         conversationId: CURRENT_SUMMER_SESSION_ID,
         clientTurnId: input.clientTurnId ?? '',
       });
+      let stage: 'admission' | 'result' = 'admission';
       try {
         if (!input.clientTurnId) throw new Error('client_turn_id_required');
         if (!input.principalHash) throw new Error('founder_principal_required');
@@ -154,7 +184,7 @@ export function createEveSummerSpeaker(
               text: BLOCKING_RECOVERY_TEXT,
               code: 'summer_turn_pending',
             };
-            yield { type: 'error', state: 'unknown' };
+            yield { type: 'error', state: 'unknown', hop: 'summer_busy' };
             return;
           }
           const blockingResponse = await fetchShadow(
@@ -179,7 +209,7 @@ export function createEveSummerSpeaker(
               text: BLOCKING_RECOVERY_TEXT,
               code: 'summer_turn_pending',
             };
-            yield { type: 'error', state: 'unknown' };
+            yield { type: 'error', state: 'unknown', hop: 'summer_busy' };
             return;
           }
           const blockingResult = resultSchema.parse(blockingTerminal.result);
@@ -225,9 +255,21 @@ export function createEveSummerSpeaker(
               code: 'daily_turn_budget_exhausted',
             };
           }
-          yield { type: 'error', state: 'unavailable' };
+          yield {
+            type: 'error',
+            // This event id can never produce an answer; record it so Retry
+            // sends a new turn instead of replaying a dead one.
+            state: PERMANENT_ADMISSION_REJECTIONS.has(String(admission.code))
+              ? 'failure'
+              : 'unavailable',
+            hop:
+              admission.code === 'daily_turn_budget_exhausted'
+                ? 'summer_budget_exhausted'
+                : 'summer_admission_rejected',
+          };
           return;
         }
+        stage = 'result';
         const terminalPath = `${prefix}/${eventId}/result`;
         const terminalResponse = await fetchShadow(terminalPath, {
           signal: input.signal,
@@ -253,7 +295,14 @@ export function createEveSummerSpeaker(
               code: 'summer_turn_pending',
             };
           }
-          yield { type: 'error', state: 'unknown' };
+          const pending =
+            terminal.code === 'turn_pending' ||
+            terminal.code === 'accepted_turn_unavailable';
+          yield {
+            type: 'error',
+            state: 'unknown',
+            hop: pending ? 'summer_result_pending' : 'summer_result_unreadable',
+          };
           return;
         }
         const result = resultSchema.parse(terminal.result);
@@ -275,12 +324,16 @@ export function createEveSummerSpeaker(
           },
         };
         if (result.status !== 'completed' || !result.responseText.trim()) {
-          yield { type: 'error', state: 'failure' };
+          yield { type: 'error', state: 'failure', hop: 'summer_turn_failed' };
           return;
         }
         yield { type: 'text-delta', text: result.responseText };
-      } catch {
-        yield { type: 'error', state: 'unknown' };
+      } catch (error) {
+        yield {
+          type: 'error',
+          state: 'unknown',
+          hop: failureHopFor(error, stage),
+        };
       }
     },
   };

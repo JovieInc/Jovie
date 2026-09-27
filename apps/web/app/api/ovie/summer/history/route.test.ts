@@ -141,10 +141,10 @@ describe('founder Summer history readback', () => {
       });
       const body = await (await GET()).json();
       expect(body.messages).toHaveLength(1);
-      expect(body.messages[0].content).toContain(
-        `Summer turn status: ${state}.`
+      expect(body.messages[0].content).toBe(
+        'Summer didn’t answer this message.'
       );
-      expect(body.messages[0].content).toContain('Do not resend');
+      expect(body.messages[0].summerFailed).toBe(true);
       expect(body.messages[0].clientMessageId).toBeNull();
     }
   );
@@ -207,7 +207,7 @@ describe('founder Summer history readback', () => {
     const cas = vi.spyOn(store, 'putDecisionIfUnchanged');
     const response = await GET();
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toContain('could not be verified');
+    expect((await response.json()).error).toContain('couldn’t be verified');
     expect(
       await store.getDecisionForUpdate(SUMMER_SESSION_DECISION_ID)
     ).toEqual(before);

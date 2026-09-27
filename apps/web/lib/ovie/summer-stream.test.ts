@@ -2,6 +2,7 @@ import { readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { encodeToolEvents } from '@/lib/chat/tool-events';
 import { MemoryOperatingStore } from './mcp/store';
+import { summerFailureText } from './summer-failure';
 import {
   appendSummerTurn,
   CURRENT_SUMMER_SESSION_ID,
@@ -65,10 +66,16 @@ describe('Summer UI message stream', () => {
         .filter(part => part.type === 'text')
         .map(part => part.text)
         .join('');
-      expect(text).toMatch(/Summer/);
-      expect(text).toMatch(/unavailable|unknown|failed|failure/);
+      const hop =
+        state === 'failure' ? 'summer_turn_failed' : 'summer_unreachable';
+      expect(text).toBe(summerFailureText(hop));
       expect(message.metadata).toMatchObject({
         summerState: state === 'failure' ? 'failure' : 'unavailable',
+        // A recorded failure replays on its id; an unrecorded one is re-read.
+        summerFailure: {
+          hop,
+          retry: state === 'failure' ? 'new-turn' : 'same-turn',
+        },
       });
       // A display diagnostic is not a Summer answer or a new durable receipt.
       const session = await loadCurrentSummerSession(store);
@@ -94,6 +101,50 @@ describe('Summer UI message stream', () => {
     expect(message.parts.filter(part => part.type === 'text')).toEqual([
       expect.objectContaining({ text: notice }),
     ]);
+    expect(message.metadata).toMatchObject({
+      summerFailure: { hop: 'summer_unreachable', retry: 'same-turn' },
+    });
+  });
+
+  it('names a pending result hop and keeps Retry on the same unrecorded turn', async () => {
+    const store = new MemoryOperatingStore();
+    const events: SummerTurnEvent[] = [];
+    for await (const event of runOvieSummerTurn({
+      store,
+      receipts: [],
+      userText: 'What shipped today?',
+      clientTurnId: 'pending-turn',
+      speaker: {
+        id: 'summer',
+        runtime: 'eve',
+        async *speak() {
+          yield {
+            type: 'notice',
+            text: 'Summer is still reconciling this turn.',
+            code: 'summer_turn_pending',
+          };
+          yield {
+            type: 'error',
+            state: 'unknown',
+            hop: 'summer_result_pending',
+          };
+        },
+      },
+    })) {
+      events.push(event);
+    }
+    const message = await readTurn(events);
+    expect(message.parts.filter(part => part.type === 'text')).toEqual([
+      expect.objectContaining({
+        text: summerFailureText('summer_result_pending'),
+      }),
+    ]);
+    expect(message.metadata).toMatchObject({
+      summerFailure: { hop: 'summer_result_pending', retry: 'same-turn' },
+    });
+    expect((await loadCurrentSummerSession(store))?.turns ?? []).toHaveLength(
+      0
+    );
   });
 
   it('discloses a persisted empty failed turn on same-id recovery without speaking again', async () => {
@@ -131,7 +182,7 @@ describe('Summer UI message stream', () => {
     const message = await readTurn(events);
     expect(message.parts.filter(part => part.type === 'text')).toEqual([
       expect.objectContaining({
-        text: expect.stringContaining('Summer connection status: failure.'),
+        text: summerFailureText('summer_turn_failed'),
       }),
     ]);
     expect(message.metadata).toMatchObject({ summerState: 'failure' });
@@ -158,7 +209,7 @@ describe('Summer UI message stream', () => {
     ]);
     expect(message.parts.filter(part => part.type === 'text')).toEqual([
       expect.objectContaining({
-        text: expect.stringContaining('Summer connection status: unknown.'),
+        text: expect.stringContaining(summerFailureText('summer_unreachable')),
       }),
     ]);
     expect(message.metadata).toMatchObject({
@@ -184,7 +235,7 @@ describe('Summer UI message stream', () => {
     const message = await readTurn([{ type: 'state', state: 'failed_tool' }]);
     expect(message.parts.filter(part => part.type === 'text')).toEqual([
       expect.objectContaining({
-        text: expect.stringContaining('Summer connection status: failed_tool.'),
+        text: summerFailureText('summer_turn_failed'),
       }),
     ]);
   });

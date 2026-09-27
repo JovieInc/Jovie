@@ -122,6 +122,8 @@ export function JovieChat({
     isLoading,
     isSubmitting,
     hasMessages,
+    collapsedSummerFailureCount,
+    showCollapsedSummerFailures,
     isLoadingConversation,
     conversationTitle,
     status,
@@ -881,6 +883,8 @@ export function JovieChat({
                   isStuckToBottom={isStuckToBottom}
                   onScrollToBottom={() => scrollToBottom()}
                   conversationId={activeConversationId ?? conversationId}
+                  collapsedFailureCount={collapsedSummerFailureCount}
+                  onShowCollapsedFailures={showCollapsedSummerFailures}
                 />
               </>
             )}

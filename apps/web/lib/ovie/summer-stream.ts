@@ -4,6 +4,11 @@
 
 import { randomUUID } from 'node:crypto';
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
+import {
+  type SummerFailureHop,
+  summerFailureText,
+  summerRetryMode,
+} from '@/lib/ovie/summer-failure';
 import type { SummerTurnEvent } from '@/lib/ovie/summer-transport';
 
 export async function createSummerAssistantStreamResponse(input: {
@@ -20,6 +25,7 @@ export async function createSummerAssistantStreamResponse(input: {
       let metadata: Record<string, unknown> = { ...input.metadata };
       let hasVisibleContent = false;
       let failureState: (SummerTurnEvent & { type: 'state' }) | undefined;
+      let terminalState: string | undefined;
       writer.write({
         type: 'start',
         messageId,
@@ -47,6 +53,7 @@ export async function createSummerAssistantStreamResponse(input: {
         }
         if (event.type === 'state') {
           metadata = { ...metadata, summerState: event.state };
+          terminalState = event.state;
           if (
             [
               'unknown',
@@ -82,14 +89,26 @@ export async function createSummerAssistantStreamResponse(input: {
           });
         }
       }
-      if (failureState && !hasVisibleContent) {
+      if (failureState) {
         // Display-only status, not a Summer answer or a durable turn. Keep
         // admission, same-turn recovery and budget checkpoint semantics intact.
-        writer.write({
-          type: 'text-delta',
-          id: textId,
-          delta: `Summer connection status: ${failureState.state}. No reply is available. Do not resend this message until the original turn has been reconciled.`,
-        });
+        const hop: SummerFailureHop =
+          failureState.hop ??
+          (failureState.state === 'failure' ||
+          failureState.state === 'failed_tool'
+            ? 'summer_turn_failed'
+            : 'summer_unreachable');
+        metadata = {
+          ...metadata,
+          summerFailure: { hop, retry: summerRetryMode(hop, terminalState) },
+        };
+        if (!hasVisibleContent) {
+          writer.write({
+            type: 'text-delta',
+            id: textId,
+            delta: summerFailureText(hop),
+          });
+        }
       }
       writer.write({ type: 'text-end', id: textId });
       writer.write({ type: 'finish-step' });

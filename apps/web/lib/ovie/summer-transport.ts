@@ -23,6 +23,7 @@ import {
   type OvieDoorGenerationKind,
   OvieProgramError,
 } from '@/lib/ovie/program';
+import type { SummerFailureHop } from '@/lib/ovie/summer-failure';
 import {
   appendSummerTurn,
   CURRENT_SUMMER_IDENTITY,
@@ -89,6 +90,7 @@ export type SummerSpeakEvent =
         OperationalTruthState,
         'failure' | 'unavailable' | 'unknown'
       >;
+      readonly hop?: SummerFailureHop;
     };
 
 export type SummerTurnBinding = {
@@ -109,6 +111,7 @@ export type SummerTurnEvent =
         | 'canceled'
         | 'failed_tool'
         | 'completed';
+      readonly hop?: SummerFailureHop;
     }
   | { readonly type: 'text-delta'; readonly text: string }
   | { readonly type: 'tool'; readonly receipt: SummerToolReceipt };
@@ -344,7 +347,9 @@ export async function* runOvieSummerTurn(input: {
         continue;
       }
       if (event.type === 'notice') {
-        yield { type: 'text-delta', text: event.text };
+        // Pending/busy notices are carried by the failure hop, not answer text.
+        if (event.code !== 'summer_turn_pending')
+          yield { type: 'text-delta', text: event.text };
         continue;
       }
       if (event.type === 'text-delta') {
@@ -374,7 +379,11 @@ export async function* runOvieSummerTurn(input: {
         continue;
       }
       terminal = event.state === 'failure' ? 'failure' : 'unavailable';
-      yield { type: 'state', state: event.state };
+      yield {
+        type: 'state',
+        state: event.state,
+        ...(event.hop ? { hop: event.hop } : {}),
+      };
       break;
     }
   } catch {
