@@ -69,7 +69,7 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
   ),
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarProvider: ({ children }: { readonly children: React.ReactNode }) => (
     <div data-testid='sidebar-provider'>{children}</div>
   ),

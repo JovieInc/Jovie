@@ -6,7 +6,7 @@ import {
   AuthShell,
   isWhatsNewBannerEnabled,
 } from '@/components/organisms/AuthShell';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
@@ -45,7 +45,7 @@ vi.mock('@/components/organisms/PersistentAudioBar', () => ({
   PersistentAudioBar: () => null,
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarProvider: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),

@@ -6,7 +6,7 @@ import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCa
 import {
   LINEAR_SURFACE,
   LINEAR_SURFACE_TIER,
-} from '@/features/dashboard/tokens';
+} from '@/components/tokens/linear-surface';
 
 describe('DrawerSurfaceCard', () => {
   it('defaults to the flat variant', () => {
