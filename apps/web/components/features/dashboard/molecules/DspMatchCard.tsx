@@ -10,7 +10,7 @@ import {
   DspProviderIcon,
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
-import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
+import { MatchStatusGlyph } from '@/features/dashboard/atoms/MatchStatusGlyph';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
@@ -143,7 +143,7 @@ export function DspMatchCard({
 
         {/* Status & Confidence Badges */}
         <div className='flex shrink-0 flex-col items-end gap-1.5'>
-          <MatchStatusBadge status={status} size='sm' />
+          <MatchStatusGlyph status={status} size='sm' />
           <ConfidenceBadge score={confidenceScore} size='sm' />
         </div>
       </div>

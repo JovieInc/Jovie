@@ -1,6 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
 import type { VerificationGate } from '@/lib/agent-os/artifact';
-import { VerificationStatusPill } from './WorkflowStatusPill';
+import { VerificationStatusGlyph } from './workflow-status';
 
 const GATE_LABELS: Record<VerificationGate['name'], string> = {
   'gstack.qa.exhaustive': 'GStack / QA / Exhaustive',
@@ -58,7 +58,7 @@ export function VerificationGateList({ gates }: VerificationGateListProps) {
             <span className='text-2xs text-tertiary-token'>
               {gate.required ? 'Required' : 'Optional'}
             </span>
-            <VerificationStatusPill status={gate.status} />
+            <VerificationStatusGlyph status={gate.status} />
           </div>
         </div>
       ))}

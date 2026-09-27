@@ -16,7 +16,7 @@ import {
   DspProviderIcon,
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
-import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
+import { MatchStatusGlyph } from '@/features/dashboard/atoms/MatchStatusGlyph';
 import { useDspMatchActions } from '@/features/dashboard/organisms/dsp-matches/hooks';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
@@ -158,7 +158,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         <div className='space-y-2'>
           <div className='flex items-center justify-between'>
             <span className='text-xs text-tertiary-token'>Status</span>
-            <MatchStatusBadge status={item.status} size='sm' />
+            <MatchStatusGlyph status={item.status} size='sm' />
           </div>
           <div className='flex items-center justify-between'>
             <span className='text-xs text-tertiary-token'>Source</span>

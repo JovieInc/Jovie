@@ -2,7 +2,7 @@
 
 import { MessageSquare } from 'lucide-react';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
-import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
+import { SaveStatusIndicator } from '@/features/dashboard/molecules/SaveStatusIndicator';
 import { useSmsAccessRequestMutation } from '@/lib/queries/useSmsAccessRequestMutation';
 
 interface SettingsSmsAccessSectionProps {
@@ -22,7 +22,7 @@ export function SettingsSmsAccessSection({
   // Always mounted so the header layout never shifts when the request
   // starts or fails; the pill reserves its own space while idle.
   const statusPill = (
-    <SettingsStatusPill
+    <SaveStatusIndicator
       status={{
         saving: isPending,
         success: null,

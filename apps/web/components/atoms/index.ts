@@ -91,8 +91,6 @@ export {
   type StableHeaderLineCount,
   StableHeaderTextSlot,
 } from './StableHeaderSlots';
-export type { StatusBadgeProps } from './StatusBadge';
-export { StatusBadge } from './StatusBadge';
 export type { SwipeToRevealProps } from './SwipeToReveal';
 export { SwipeToReveal, SwipeToRevealGroup } from './SwipeToReveal';
 export { TableErrorFallback } from './TableErrorFallback';

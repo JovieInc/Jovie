@@ -3,7 +3,7 @@
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
-import { StatusBadge } from '@/components/shell/StatusBadge';
+import { ReleaseStatusGlyph } from '@/components/shell/ReleaseStatusGlyph';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { ExpandButton } from '@/features/dashboard/organisms/release-provider-matrix/components/ExpandButton';
 import {
@@ -146,7 +146,7 @@ export function createRightMetaCellRenderer(
             />
           </div>
           <div className='hidden shrink-0 items-center gap-1.5 lg:flex'>
-            <StatusBadge status={releaseStatusToShell(release.status)} />
+            <ReleaseStatusGlyph status={releaseStatusToShell(release.status)} />
             {releaseTypeStyle ? (
               <TypeBadge label={releaseTypeStyle.label} />
             ) : null}

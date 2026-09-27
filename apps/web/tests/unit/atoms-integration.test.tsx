@@ -1,10 +1,9 @@
-import { Badge, Button, Input, Label } from '@jovie/ui';
+import { Badge, Button, Input, Label, StatusGlyph } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DotBadge } from '@/components/atoms/DotBadge';
 import { Icon } from '@/components/atoms/Icon';
 import { NavLink } from '@/components/atoms/NavLink';
-import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 
@@ -158,7 +157,7 @@ describe('Atoms Integration Tests', () => {
               dotClassName: 'bg-green-500',
             }}
           />
-          <StatusBadge variant='green'>Success</StatusBadge>
+          <StatusGlyph state='success' label='Success' />
           <VerifiedBadge />
         </div>
       );
@@ -171,7 +170,7 @@ describe('Atoms Integration Tests', () => {
       ).toBeInTheDocument();
     });
 
-    it('DotBadge with StatusBadge for status indicators', () => {
+    it('DotBadge with StatusGlyph for status indicators', () => {
       render(
         <div>
           <DotBadge
@@ -181,15 +180,12 @@ describe('Atoms Integration Tests', () => {
               dotClassName: 'bg-green-500',
             }}
           />
-          <StatusBadge variant='green' icon={<span>✓</span>}>
-            Connected
-          </StatusBadge>
+          <StatusGlyph state='success' label='Connected' />
         </div>
       );
 
       expect(screen.getByText('Online')).toBeInTheDocument();
       expect(screen.getByText('Connected')).toBeInTheDocument();
-      expect(screen.getByText('✓')).toBeInTheDocument();
     });
 
     it('Badge with VerifiedBadge for user profiles', () => {
@@ -273,15 +269,13 @@ describe('Atoms Integration Tests', () => {
       expect(screen.getByText('New')).toBeInTheDocument();
     });
 
-    it('TruncatedText with StatusBadge for status display', () => {
+    it('TruncatedText with StatusGlyph for status display', () => {
       render(
         <div>
           <TruncatedText lines={2}>
             Lorem ipsum dolor sit amet, consectetur adipiscing elit
           </TruncatedText>
-          <StatusBadge variant='blue' size='sm'>
-            Draft
-          </StatusBadge>
+          <StatusGlyph state='todo' label='Draft' size='sm' />
         </div>
       );
 
@@ -340,9 +334,7 @@ describe('Atoms Integration Tests', () => {
             Product designer and creative developer
           </TruncatedText>
           <div className='flex gap-2 mt-2'>
-            <StatusBadge variant='green' size='sm'>
-              Available
-            </StatusBadge>
+            <StatusGlyph state='success' label='Available' size='sm' />
             <DotBadge
               label='Active'
               variant={{

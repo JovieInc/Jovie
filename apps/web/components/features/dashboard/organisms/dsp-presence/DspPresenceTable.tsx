@@ -10,7 +10,7 @@ import {
   DspProviderIcon,
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
-import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
+import { MatchStatusGlyph } from '@/features/dashboard/atoms/MatchStatusGlyph';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
@@ -64,7 +64,7 @@ const StatusCell = memo(function StatusCell({
   return isManual ? (
     <span className='text-2xs text-tertiary-token'>Manual</span>
   ) : (
-    <MatchStatusBadge status={item.status} size='sm' />
+    <MatchStatusGlyph status={item.status} size='sm' />
   );
 });
 

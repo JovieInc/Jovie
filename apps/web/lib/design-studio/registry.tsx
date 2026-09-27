@@ -13,7 +13,7 @@ import type { ReactNode } from 'react';
 import { AudioBar } from '@/components/shell/AudioBar';
 import { DrawerHero } from '@/components/shell/DrawerHero';
 import { LyricsView } from '@/components/shell/LyricsView';
-import { StatusBadge } from '@/components/shell/StatusBadge';
+import { ReleaseStatusGlyph } from '@/components/shell/ReleaseStatusGlyph';
 import { ThreadAudioCard } from '@/components/shell/ThreadAudioCard';
 import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
 import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
@@ -398,7 +398,7 @@ function TrackViewPreview() {
           title='Midnight Static'
           subtitle='Sora Vale · Deep End'
           artwork={<MockArtwork className='h-[88px] w-[88px]' />}
-          statusBadge={<StatusBadge status='scheduled' />}
+          statusBadge={<ReleaseStatusGlyph status='scheduled' />}
           meta={
             <>
               <TypeBadge label='Track' />

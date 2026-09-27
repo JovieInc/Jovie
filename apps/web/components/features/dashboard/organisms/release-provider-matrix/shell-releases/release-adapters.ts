@@ -3,10 +3,10 @@ import type {
   DspAvatarItem,
   DspStatus,
 } from '@/components/shell/DspAvatarStack';
-import type { ReleaseStatus } from '@/components/shell/StatusBadge';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { DSP_CONFIGS } from '@/lib/dsp-registry';
+import type { ReleaseStatus } from '@/lib/status/release-status';
 
 /**
  * Neutral fallback avatar color for providers missing from both registries.
@@ -74,7 +74,7 @@ const SHELL_DSP_META: ReadonlyArray<{
  * instead of capping at the four hardcoded majors (JovieInc/Jovie#11493).
  *
  * We intentionally drop the `pending`/`error` states because production has
- * no sync-state per provider here (see ProviderStatusDot for the cell-level
+ * no sync-state per provider here (see ProviderStatusGlyph for the cell-level
  * sync indicator that lives in the legacy matrix).
  */
 export function releaseToDspItems(release: ReleaseViewModel): DspAvatarItem[] {

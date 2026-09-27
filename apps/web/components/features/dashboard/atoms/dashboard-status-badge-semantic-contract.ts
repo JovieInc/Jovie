@@ -1,3 +1,4 @@
+import type { StatusGlyphState } from '@jovie/ui';
 import type { DotBadgeVariant } from '@/components/atoms/DotBadge';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import type { AudienceIntentLevel } from '@/types';
@@ -59,6 +60,22 @@ export const MATCH_STATUS_BADGE_STYLES: Record<
     className: 'border-subtle bg-surface-1 text-tertiary-token',
     dotClassName: 'bg-tertiary-token',
   },
+};
+
+/**
+ * DSP match statuses mapped onto the canonical `StatusGlyph` (Pen jAcP1, D5).
+ * `MatchStatusBadge` was deleted; render
+ * `<StatusGlyph state={MATCH_STATUS_GLYPH_STATE[status]}
+ *   label={MATCH_STATUS_BADGE_STYLES[status].label} />`.
+ */
+export const MATCH_STATUS_GLYPH_STATE: Record<
+  DspMatchStatus,
+  StatusGlyphState
+> = {
+  suggested: 'in_review',
+  confirmed: 'success',
+  auto_confirmed: 'success',
+  rejected: 'canceled',
 };
 
 export const AUDIENCE_INTENT_BADGE_STYLES: Record<

@@ -25,8 +25,8 @@ vi.mock('@/features/dashboard/atoms/ConfidenceBadge', () => ({
   }) => <span>{showLabel ? `Confidence ${score}` : `Score ${score}`}</span>,
 }));
 
-vi.mock('@/features/dashboard/atoms/MatchStatusBadge', () => ({
-  MatchStatusBadge: ({ status }: { status: string }) => <span>{status}</span>,
+vi.mock('@/features/dashboard/atoms/MatchStatusGlyph', () => ({
+  MatchStatusGlyph: ({ status }: { status: string }) => <span>{status}</span>,
 }));
 
 vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({

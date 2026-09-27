@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
-import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
+import { SaveStatusIndicator } from '@/features/dashboard/molecules/SaveStatusIndicator';
 import { useAnalyticsFilterMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
@@ -51,7 +51,7 @@ export function SettingsAnalyticsSection({
 
   return (
     <SettingsPanel
-      actions={<SettingsStatusPill status={saveStatus} />}
+      actions={<SaveStatusIndicator status={saveStatus} />}
       bodyClassName='px-4 py-4 sm:px-5'
     >
       {isPro ? (

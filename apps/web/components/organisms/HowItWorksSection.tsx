@@ -1,5 +1,5 @@
+import { Badge } from '@jovie/ui';
 import { SectionHeading } from '@/components/atoms/SectionHeading';
-import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { StepCard } from '@/components/molecules/StepCard';
 
 // Icons
@@ -131,9 +131,10 @@ export function HowItWorksSection({
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>
         <div className='mx-auto max-w-3xl text-center mb-12'>
           <div className='mb-8'>
-            <StatusBadge variant='purple' icon={LightningIcon}>
-              {badgeText}
-            </StatusBadge>
+            <Badge tone='accent'>
+              <span className='shrink-0'>{LightningIcon}</span>
+              <span className='min-w-0'>{badgeText}</span>
+            </Badge>
           </div>
 
           <SectionHeading level={2} size='xl' className='mb-6'>

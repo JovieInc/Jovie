@@ -13,8 +13,8 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useSaveStatus } from '@/features/dashboard/hooks/useSaveStatus';
+import { SaveStatusIndicator } from '@/features/dashboard/molecules/SaveStatusIndicator';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
-import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 import type { PlatformHealth } from '@/lib/queries';
 import {
@@ -574,7 +574,7 @@ export function SettingsAdPixelsSection({
       </SettingsPanel>
 
       <div className='flex items-center justify-end gap-3 pt-2'>
-        <SettingsStatusPill status={saveStatus} />
+        <SaveStatusIndicator status={saveStatus} />
         <Button
           type='submit'
           loading={isPixelSaving || undefined}

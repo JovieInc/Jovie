@@ -1,7 +1,7 @@
 import { ExternalLink } from 'lucide-react';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { VerificationGateList } from './VerificationGateList';
-import { WorkflowStatusPill } from './WorkflowStatusPill';
+import { WorkflowStatusGlyph } from './workflow-status';
 
 const HUMAN_GATE_LABELS: Record<
   AgentRunArtifact['humanGate']['status'],
@@ -104,7 +104,7 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
             {artifact.summary}
           </p>
         </div>
-        <WorkflowStatusPill status={artifact.status} />
+        <WorkflowStatusGlyph status={artifact.status} />
       </div>
 
       <dl className='mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs'>

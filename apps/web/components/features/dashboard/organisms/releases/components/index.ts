@@ -10,4 +10,4 @@ export {
   ProviderCopyButton,
   type ProviderCopyButtonProps,
 } from './ProviderCopyButton';
-export { ProviderStatusDot } from './ProviderStatusDot';
+export { ProviderStatusGlyph } from './ProviderStatusGlyph';

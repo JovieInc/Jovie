@@ -329,9 +329,9 @@ describe('JOV-5466 --linear-app-* retire', () => {
     expect(source).not.toMatch(RETIRED);
   });
 
-  it('keeps components/features/dashboard/organisms/releases/components/ProviderStatusDot.tsx off retired linear-app tokens', () => {
+  it('keeps components/features/dashboard/organisms/releases/components/ProviderStatusGlyph.tsx off retired linear-app tokens', () => {
     const source = readSource(
-      'components/features/dashboard/organisms/releases/components/ProviderStatusDot.tsx'
+      'components/features/dashboard/organisms/releases/components/ProviderStatusGlyph.tsx'
     );
     expect(source).not.toMatch(RETIRED);
   });

@@ -2,7 +2,13 @@
 
 // @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
 
-import { Button, Input, Switch } from '@jovie/ui';
+import {
+  Button,
+  Input,
+  StatusGlyph,
+  type StatusGlyphState,
+  Switch,
+} from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -11,7 +17,24 @@ import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
-import { OutreachStatusBadge } from './OutreachStatusBadge';
+
+const OUTREACH_STATUS_GLYPH: Record<string, StatusGlyphState> = {
+  queued: 'todo',
+  sent: 'success',
+  failed: 'error',
+  skipped: 'canceled',
+  pending_review: 'in_review',
+};
+
+function OutreachStatusGlyph({ status }: { readonly status: string }) {
+  return (
+    <StatusGlyph
+      state={OUTREACH_STATUS_GLYPH[status] ?? 'todo'}
+      label={status.replaceAll('_', ' ')}
+      size='sm'
+    />
+  );
+}
 
 interface EmailQueueLead {
   id: string;
@@ -89,7 +112,7 @@ const EMAIL_QUEUE_COLUMNS: ColumnDef<EmailQueueLead, unknown>[] = [
   }) as ColumnDef<EmailQueueLead, unknown>,
   emailQueueColumnHelper.accessor('outreachStatus', {
     header: 'Status',
-    cell: ({ getValue }) => <OutreachStatusBadge status={getValue()} />,
+    cell: ({ getValue }) => <OutreachStatusGlyph status={getValue()} />,
     size: 120,
   }) as ColumnDef<EmailQueueLead, unknown>,
 ];

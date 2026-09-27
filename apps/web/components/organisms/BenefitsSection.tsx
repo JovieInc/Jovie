@@ -1,5 +1,5 @@
+import { Badge } from '@jovie/ui';
 import { SectionHeading } from '@/components/atoms/SectionHeading';
-import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { FeatureCard } from '@/components/molecules/FeatureCard';
 
 // Icons
@@ -125,9 +125,10 @@ export function BenefitsSection({
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>
         <div className='mx-auto max-w-3xl text-center mb-12'>
           <div className='mb-8'>
-            <StatusBadge variant='green' icon={CheckIcon}>
-              {badgeText}
-            </StatusBadge>
+            <Badge tone='success'>
+              <span className='shrink-0'>{CheckIcon}</span>
+              <span className='min-w-0'>{badgeText}</span>
+            </Badge>
           </div>
 
           <SectionHeading level={2} size='xl' className='mb-6'>

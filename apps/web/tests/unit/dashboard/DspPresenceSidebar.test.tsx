@@ -95,8 +95,8 @@ vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
   ),
 }));
 
-vi.mock('@/features/dashboard/atoms/MatchStatusBadge', () => ({
-  MatchStatusBadge: ({ status }: { status: string }) => <span>{status}</span>,
+vi.mock('@/features/dashboard/atoms/MatchStatusGlyph', () => ({
+  MatchStatusGlyph: ({ status }: { status: string }) => <span>{status}</span>,
 }));
 
 vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({

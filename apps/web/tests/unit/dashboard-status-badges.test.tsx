@@ -12,8 +12,9 @@ import {
   AUDIENCE_INTENT_BADGE_STYLES,
   CONFIDENCE_BADGE_STYLES,
   MATCH_STATUS_BADGE_STYLES,
+  MATCH_STATUS_GLYPH_STATE,
 } from '@/features/dashboard/atoms/dashboard-status-badge-semantic-contract';
-import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
+import { MatchStatusGlyph } from '@/features/dashboard/atoms/MatchStatusGlyph';
 import {
   auditStatusBadgeSource,
   codesOf,
@@ -38,7 +39,7 @@ const webRoot = path.resolve(__dirname, '../..');
 const atomsRoot = path.join(webRoot, 'components/features/dashboard/atoms');
 const productionSourcePaths = [
   path.join(atomsRoot, 'ConfidenceBadge.tsx'),
-  path.join(atomsRoot, 'MatchStatusBadge.tsx'),
+  path.join(atomsRoot, 'MatchStatusGlyph.tsx'),
   path.join(atomsRoot, 'AudienceIntentBadge.tsx'),
   path.join(atomsRoot, 'dashboard-status-badge-semantic-contract.ts'),
 ] as const;
@@ -124,21 +125,24 @@ describe('dashboard status badge semantic ownership', () => {
     );
   });
 
-  it('maps match statuses onto source-backed info/success/neutral roles', () => {
-    const { rerender } = render(<MatchStatusBadge status='suggested' />);
+  it('maps match statuses onto canonical StatusGlyph states and labels', () => {
+    const { rerender } = render(<MatchStatusGlyph status='suggested' />);
     for (const status of [
       'suggested',
       'confirmed',
       'auto_confirmed',
       'rejected',
     ] as const) {
-      rerender(<MatchStatusBadge status={status} />);
+      rerender(<MatchStatusGlyph status={status} />);
       const style = MATCH_STATUS_BADGE_STYLES[status];
-      const root = getBadgeRoot(style.label);
-      expect(root).toHaveClass(...style.className.split(' '));
-      expect(getDot(root)).toHaveClass(style.dotClassName);
-      expect(root.className).not.toMatch(/hover:bg-blue/);
-      expect(root.className).not.toMatch(
+      const root = screen.getByText(style.label).closest('span.inline-flex');
+      expect(root).not.toBeNull();
+      expect(root?.getAttribute('data-status-glyph')).toBe(
+        MATCH_STATUS_GLYPH_STATE[status]
+      );
+      expect(root?.getAttribute('aria-label')).toBe(style.label);
+      expect(root?.className).not.toMatch(/hover:bg-blue/);
+      expect(root?.className).not.toMatch(
         /\b(?:bg|border|text)-(?:red|blue|green|yellow)-\d+/
       );
     }
@@ -158,19 +162,16 @@ describe('dashboard status badge semantic ownership', () => {
   it('keeps long labels legible through canonical Badge wrap geometry', () => {
     render(
       <>
-        <MatchStatusBadge status='auto_confirmed' />
+        <MatchStatusGlyph status='auto_confirmed' />
         <ConfidenceBadge score={0.91} showLabel />
         <AudienceIntentBadge intentLevel='medium' />
       </>
     );
 
-    const autoConfirmed = getBadgeRoot(
-      MATCH_STATUS_BADGE_STYLES.auto_confirmed.label
-    );
     const confidence = getBadgeRoot('91%');
     const intent = getBadgeRoot(AUDIENCE_INTENT_BADGE_STYLES.medium.label);
 
-    for (const root of [autoConfirmed, confidence, intent]) {
+    for (const root of [confidence, intent]) {
       expect(root).toHaveClass('whitespace-normal');
       expect(root).toHaveClass('break-words');
       expect(root.className).not.toMatch(/\boverflow-hidden\b/);

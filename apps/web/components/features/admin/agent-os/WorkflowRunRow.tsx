@@ -5,7 +5,7 @@ import { Button } from '@jovie/ui';
 import { Clock3, ExternalLink } from 'lucide-react';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
-import { WorkflowStatusPill } from './WorkflowStatusPill';
+import { WorkflowStatusGlyph } from './workflow-status';
 
 const HUMAN_GATE_LABELS: Record<
   AgentRunArtifact['humanGate']['status'],
@@ -101,7 +101,7 @@ export function WorkflowRunRow({
           </p>
         </div>
         <div className='grid shrink-0 justify-items-end gap-1'>
-          <WorkflowStatusPill status={artifact.status} />
+          <WorkflowStatusGlyph status={artifact.status} />
           {artifact.humanApprovalRequired ? (
             <span className='rounded-md border border-warning/20 bg-surface-0 px-1.5 py-0.5 text-3xs font-[520] text-warning'>
               {HUMAN_GATE_LABELS[artifact.humanGate.status]}

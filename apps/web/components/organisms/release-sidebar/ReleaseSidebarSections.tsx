@@ -32,15 +32,15 @@ import {
 } from '@/components/shell/DspAvatarStack';
 import { MetaPill } from '@/components/shell/MetaPill';
 import {
-  type ReleaseStatus,
-  STATUS_CHIP,
-} from '@/components/shell/StatusBadge';
-import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
 import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
+import {
+  RELEASE_STATUS_LABEL,
+  type ReleaseStatus,
+} from '@/lib/status/release-status';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Release } from './types';
@@ -161,7 +161,7 @@ function getShellReleaseStatus(release: Release): ReleaseStatus {
 }
 
 // Entity Header status glyph — icon-only. The status word (e.g. "Live",
-// "Scheduled") only ever surfaces through STATUS_CHIP's tooltip + aria-label
+// "Scheduled") only ever surfaces through RELEASE_STATUS_LABEL's tooltip + aria-label
 // text on EntityHeaderStatusGlyph, never as a visible label in the rail.
 const RELEASE_STATUS_ICON: Record<
   ReleaseStatus,
@@ -297,7 +297,7 @@ export function ReleaseEntityHeader({
         statusGlyph={
           <EntityHeaderStatusGlyph
             icon={RELEASE_STATUS_ICON[releaseStatus]}
-            label={STATUS_CHIP[releaseStatus].label}
+            label={RELEASE_STATUS_LABEL[releaseStatus]}
             tone={RELEASE_STATUS_TONE[releaseStatus]}
           />
         }

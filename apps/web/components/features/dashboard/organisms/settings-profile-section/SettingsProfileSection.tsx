@@ -7,7 +7,7 @@ import { toast } from '@/components/feedback';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
-import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
+import { SaveStatusIndicator } from '@/features/dashboard/molecules/SaveStatusIndicator';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
@@ -84,7 +84,7 @@ export function SettingsProfileSection({
     <SettingsPanel
       title='Profile'
       description='Display name, username, image, and place details fans see.'
-      actions={<SettingsStatusPill status={profileSaveStatus} />}
+      actions={<SaveStatusIndicator status={profileSaveStatus} />}
     >
       <div className='space-y-0 px-4 py-4 sm:px-5' style={PROFILE_LAYOUT_VARS}>
         <div className={PROFILE_ROW_CLASS}>

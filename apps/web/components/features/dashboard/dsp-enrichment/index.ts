@@ -13,8 +13,8 @@ export {
   PROVIDER_COLORS,
   PROVIDER_LABELS,
 } from '../atoms/DspProviderIcon';
-export type { MatchStatusBadgeProps } from '../atoms/MatchStatusBadge';
-export { MatchStatusBadge } from '../atoms/MatchStatusBadge';
+export type { MatchStatusGlyphProps } from '../atoms/MatchStatusGlyph';
+export { MatchStatusGlyph } from '../atoms/MatchStatusGlyph';
 export type { DspMatchCardProps } from '../molecules/DspMatchCard';
 // Molecules
 export { DspMatchCard } from '../molecules/DspMatchCard';

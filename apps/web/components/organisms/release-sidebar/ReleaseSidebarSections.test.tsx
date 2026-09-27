@@ -133,23 +133,13 @@ vi.mock('@/components/shell/MetaPill', () => ({
   ),
 }));
 
-vi.mock('@/components/shell/StatusBadge', () => ({
-  STATUS_CHIP: {
-    live: { label: 'Live', dot: '', text: '', tooltip: 'Live on DSPs' },
-    scheduled: {
-      label: 'Scheduled',
-      dot: '',
-      text: '',
-      tooltip: 'Scheduled for release',
-    },
-    announced: {
-      label: 'Announced',
-      dot: '',
-      text: '',
-      tooltip: 'Publicly announced',
-    },
-    draft: { label: 'Draft', dot: '', text: '', tooltip: 'Draft' },
-    hidden: { label: 'Hidden', dot: '', text: '', tooltip: 'Hidden' },
+vi.mock('@/lib/status/release-status', () => ({
+  RELEASE_STATUS_LABEL: {
+    live: 'Live',
+    scheduled: 'Scheduled',
+    announced: 'Announced',
+    draft: 'Draft',
+    hidden: 'Hidden',
   },
 }));
 

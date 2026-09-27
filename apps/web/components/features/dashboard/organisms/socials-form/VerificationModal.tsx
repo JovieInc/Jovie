@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, StatusGlyph } from '@jovie/ui';
 import {
   AlertCircle,
   Check,
@@ -11,7 +11,6 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useState } from 'react';
-import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   Dialog,
@@ -223,12 +222,15 @@ export function VerificationModal({
 
             {/* Actions */}
             <div className='flex items-center justify-between pt-1'>
-              <StatusBadge
-                variant={verificationStatus === 'pending' ? 'blue' : 'gray'}
+              <StatusGlyph
+                state={
+                  verificationStatus === 'pending' ? 'in_progress' : 'todo'
+                }
+                label={
+                  verificationStatus === 'pending' ? 'Pending' : 'Unverified'
+                }
                 size='sm'
-              >
-                {verificationStatus === 'pending' ? 'Pending' : 'Unverified'}
-              </StatusBadge>
+              />
               <Button
                 type='button'
                 variant='primary'

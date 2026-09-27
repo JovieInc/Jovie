@@ -147,6 +147,7 @@ import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
+import { ReleaseStatusGlyph } from '@/components/shell/ReleaseStatusGlyph';
 import { RowWaveform } from '@/components/shell/RowWaveform';
 import { SettingsRow } from '@/components/shell/SettingsRow';
 import {
@@ -165,7 +166,6 @@ import { SidebarThreadsSection } from '@/components/shell/SidebarThreadsSection'
 import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import type { SparklineTrend } from '@/components/shell/Sparkline';
 import { Stat } from '@/components/shell/Stat';
-import { StatusBadge } from '@/components/shell/StatusBadge';
 import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { TabletPlayerCard } from '@/components/shell/TabletPlayerCard';
 import { TaskStatusIcon } from '@/components/shell/TaskStatusIcon';
@@ -5382,7 +5382,7 @@ function DrawerHero({
       artwork={
         <ArtworkThumb src={release.artwork} title={release.title} size={88} />
       }
-      statusBadge={<StatusBadge status={status} />}
+      statusBadge={<ReleaseStatusGlyph status={status} />}
       meta={
         <>
           <TypeBadge label={release.type} />
@@ -6262,7 +6262,7 @@ function TrackRow({
 
       {/* Status as a labeled chip — Live / Queued / Draft. */}
       <div className='w-16 shrink-0 flex justify-end'>
-        <StatusBadge status={track.status} />
+        <ReleaseStatusGlyph status={track.status} />
       </div>
 
       {/* Spacer / thread glyph column — aligns with header's count cell */}

@@ -35,7 +35,7 @@ import {
   EntityHoverLink,
   type EntityPopoverData,
 } from '@/components/shell/EntityPopover';
-import { StatusBadge } from '@/components/shell/StatusBadge';
+import { ReleaseStatusGlyph } from '@/components/shell/ReleaseStatusGlyph';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
@@ -413,7 +413,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       </div>
 
       <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
-        <StatusBadge status={status} />
+        <ReleaseStatusGlyph status={status} />
       </div>
 
       {dropMeta ? (

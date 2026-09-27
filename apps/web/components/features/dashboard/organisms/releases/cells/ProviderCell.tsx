@@ -14,7 +14,7 @@ import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { AddProviderUrlPopover, ProviderStatusDot } from '../components';
+import { AddProviderUrlPopover, ProviderStatusGlyph } from '../components';
 
 interface ProviderConfig {
   label: string;
@@ -212,7 +212,7 @@ export const ProviderCell = memo(function ProviderCell({
 
   return (
     <div className='flex items-center gap-2.5'>
-      <ProviderStatusDot status={status} accent={config.accent} />
+      <ProviderStatusGlyph status={status} />
       {renderProviderContent()}
     </div>
   );

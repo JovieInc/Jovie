@@ -33,9 +33,9 @@ import { ApprovalQueuePanel } from './ApprovalQueuePanel';
 import { ArtifactDrawer } from './ArtifactDrawer';
 import { formatGateName } from './VerificationGateList';
 import {
-  VerificationStatusPill,
-  WorkflowStatusPill,
-} from './WorkflowStatusPill';
+  VerificationStatusGlyph,
+  WorkflowStatusGlyph,
+} from './workflow-status';
 
 const columnHelper = createColumnHelper<AgentRunArtifact>();
 type BadgeVariant = ComponentProps<typeof Badge>['variant'];
@@ -186,7 +186,7 @@ function AgentRunDetailPopover({
                   <p className='truncate text-secondary-token'>
                     {formatGateName(gate.name)}
                   </p>
-                  <VerificationStatusPill status={gate.status} />
+                  <VerificationStatusGlyph status={gate.status} />
                 </div>
               ))}
             </div>
@@ -346,7 +346,7 @@ function renderRunCell({ row }: CellContext<AgentRunArtifact, unknown>) {
 }
 
 function renderStatusCell({ row }: CellContext<AgentRunArtifact, unknown>) {
-  return <WorkflowStatusPill status={row.original.status} />;
+  return <WorkflowStatusGlyph status={row.original.status} />;
 }
 
 function renderRouteCell({ row }: CellContext<AgentRunArtifact, unknown>) {

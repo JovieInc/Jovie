@@ -26,7 +26,7 @@ export interface DrawerHeroProps {
    * 64–88px media. Callers can use their preferred image primitive.
    */
   readonly artwork?: ReactNode;
-  /** Status pill (typically `<StatusBadge>` from `@/components/shell/StatusBadge`). */
+  /** Status glyph (typically `<ReleaseStatusGlyph>` from `@/components/shell/ReleaseStatusGlyph`). */
   readonly statusBadge?: ReactNode;
   /**
    * Below-subtitle row for entity-specific chips (`<TypeBadge>`, `<DropDateChip>`,

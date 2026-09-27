@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { AudienceIntentBadge } from './AudienceIntentBadge';
 import { ConfidenceBadge } from './ConfidenceBadge';
-import { MatchStatusBadge } from './MatchStatusBadge';
+import { MatchStatusGlyph } from './MatchStatusGlyph';
 
 const meta: Meta = {
   title: 'Dashboard/Atoms/StatusBadges',
@@ -28,10 +28,10 @@ function StatusBadgeMatrix() {
       <section className='flex flex-col gap-2'>
         <p className='text-2xs text-tertiary-token'>Match status</p>
         <div className='flex flex-wrap items-center gap-2'>
-          <MatchStatusBadge status='suggested' />
-          <MatchStatusBadge status='confirmed' />
-          <MatchStatusBadge status='auto_confirmed' />
-          <MatchStatusBadge status='rejected' />
+          <MatchStatusGlyph status='suggested' />
+          <MatchStatusGlyph status='confirmed' />
+          <MatchStatusGlyph status='auto_confirmed' />
+          <MatchStatusGlyph status='rejected' />
         </div>
       </section>
       <section className='flex flex-col gap-2'>
@@ -53,7 +53,7 @@ export const SemanticRoles: Story = {
 export const LongLabels: Story = {
   render: () => (
     <div className='flex max-w-xs flex-wrap items-center gap-2'>
-      <MatchStatusBadge status='auto_confirmed' />
+      <MatchStatusGlyph status='auto_confirmed' />
       <ConfidenceBadge score={0.88} showLabel />
       <AudienceIntentBadge intentLevel='medium' />
     </div>

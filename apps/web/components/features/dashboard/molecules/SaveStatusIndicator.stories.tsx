@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { SettingsStatusPill } from './SettingsStatusPill';
+import { SaveStatusIndicator } from './SaveStatusIndicator';
 
-const meta: Meta<typeof SettingsStatusPill> = {
-  title: 'Dashboard/Molecules/SettingsStatusPill',
-  component: SettingsStatusPill,
+const meta: Meta<typeof SaveStatusIndicator> = {
+  title: 'Dashboard/Molecules/SaveStatusIndicator',
+  component: SaveStatusIndicator,
   parameters: {
     layout: 'padded',
   },
@@ -18,7 +18,7 @@ const meta: Meta<typeof SettingsStatusPill> = {
 
 export default meta;
 
-type Story = StoryObj<typeof SettingsStatusPill>;
+type Story = StoryObj<typeof SaveStatusIndicator>;
 
 export const Saving: Story = {
   args: {
