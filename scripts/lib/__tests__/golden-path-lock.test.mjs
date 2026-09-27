@@ -59,6 +59,8 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/api/chat/onboarding-handler.ts',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/components/homepage/HomepageEditorialHero.tsx',
+      'apps/web/data/homepageLaunchCopy.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
       'README.md',
     ]);
@@ -67,6 +69,8 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/api/chat/onboarding-handler.ts',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/components/homepage/HomepageEditorialHero.tsx',
+      'apps/web/data/homepageLaunchCopy.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
     ]);
   });
