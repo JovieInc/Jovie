@@ -125,31 +125,60 @@ function createRateLimitedHtmlResponse(
   });
 }
 
-function createAccountSwitchHtmlResponse(state: string): NextResponse {
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+/**
+ * A native sign-in started while the browser is already signed in. Offer the
+ * signed-in account behind an explicit click (the Linear pattern) and keep
+ * "Use a Different Account", which signs the browser out first. Both are
+ * same-origin POSTs so a prefetch or a crafted link never authorizes the app
+ * on its own.
+ */
+function createAccountChoiceHtmlResponse(
+  state: string,
+  email: string | null
+): NextResponse {
+  const safeEmail = email ? escapeHtml(email) : null;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Choose an account — Jovie</title>
+<title>Choose an account · Jovie</title>
 <style>
 :root { color-scheme: dark; }
 body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: Canvas; color: CanvasText; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-main { max-width: 400px; padding: max(32px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); text-align: center; }
+main { width: min(360px, 100vw); box-sizing: border-box; padding: max(32px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); text-align: center; }
 h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
-p { margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: GrayText; }
-input[type=submit] { appearance: none; min-height: 44px; border: 0; cursor: pointer; background: CanvasText; color: Canvas; font: 600 15px/1 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 10px 24px; border-radius: 9999px; }
+p { margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: GrayText; overflow-wrap: anywhere; }
+form { margin: 0 0 8px; }
+input[type=submit] { appearance: none; width: 100%; min-height: 44px; cursor: pointer; font: 600 15px/1.2 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 10px 24px; border-radius: 9999px; overflow-wrap: anywhere; }
+input.primary { border: 0; background: CanvasText; color: Canvas; }
+input.secondary { border: 1px solid GrayText; background: transparent; color: CanvasText; }
 input[type=submit]:focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
 </style>
 </head>
 <body>
 <main>
 <h1>Choose an account</h1>
-<p>Continue to choose which Jovie account to use in the app.</p>
+<p>${safeEmail ? `You are signed in as ${safeEmail}.` : 'You are already signed in.'} Pick the account to use in the app.</p>
 <form method="post" action="/auth/start">
 <input type="hidden" name="auth_state" value="${state}" />
 <input type="hidden" name="intent" value="sign_in" />
-<input type="submit" value="Choose an Account" />
+<input type="hidden" name="choice" value="continue" />
+<input class="primary" type="submit" value="${safeEmail ? `Continue as ${safeEmail}` : 'Continue With This Account'}" />
+</form>
+<form method="post" action="/auth/start">
+<input type="hidden" name="auth_state" value="${state}" />
+<input type="hidden" name="intent" value="sign_in" />
+<input class="secondary" type="submit" value="Use a Different Account" />
 </form>
 </main>
 </body>
@@ -162,6 +191,17 @@ input[type=submit]:focus-visible { outline: 2px solid Highlight; outline-offset:
       'Content-Type': 'text/html; charset=utf-8',
     },
   });
+}
+
+async function readSignedInEmail(request: Request): Promise<string | null> {
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    const email = session?.user?.email;
+    return typeof email === 'string' && email.length > 0 ? email : null;
+  } catch {
+    // The choice page still works without the address.
+    return null;
+  }
 }
 
 function getAuthPageForIntent(intent: AuthIntent): string {
@@ -291,7 +331,10 @@ export async function GET(request: Request) {
 
     const { userId } = await getCachedAuth();
     if (userId && rawClient !== 'web' && rawIntent === 'sign_in') {
-      return createAccountSwitchHtmlResponse(record.state);
+      return createAccountChoiceHtmlResponse(
+        record.state,
+        await readSignedInEmail(request)
+      );
     }
 
     if (userId) {
@@ -358,6 +401,25 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Account switch expired' },
         { status: 410, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (formData.get('choice') === 'continue') {
+      // Continue with the browser's current account: the callback mints the
+      // native handoff from this session. It re-checks the session and
+      // consumes the one-time state, so a stale page cannot replay it.
+      const { userId } = await getCachedAuth();
+      if (!userId) {
+        const signInPage = new URL(APP_ROUTES.SIGNIN, request.url);
+        signInPage.searchParams.set('auth_state', state);
+        return NextResponse.redirect(signInPage, {
+          status: 303,
+          headers: NO_STORE_HEADERS,
+        });
+      }
+      return NextResponse.redirect(
+        new URL(buildAuthCallbackPath(state), request.url),
+        { status: 303, headers: NO_STORE_HEADERS }
       );
     }
 

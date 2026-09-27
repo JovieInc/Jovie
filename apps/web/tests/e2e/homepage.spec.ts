@@ -494,15 +494,33 @@ test.describe('Homepage', () => {
         'Your work and story are scattered across the internet. Your identity should be easier to see.'
       )
     ).toBeVisible();
-    // The identity artwork remains editorial rather than a profile screenshot.
+    // JOV-6297: the conceptual identity artwork is replaced by the approved
+    // customer-zero profile surface — real avatar plus the real public
+    // profile export on one editorial surface.
     await connected.scrollIntoViewIfNeeded();
-    await expect(connected.locator('img')).toHaveCount(1);
+    await expect(connected.locator('img')).toHaveCount(2);
+    await expect(connected.getByText('Tim White')).toBeVisible();
+    await expect(
+      connected.locator('img[alt="Tim White Profile — Listen"]')
+    ).toBeVisible();
     const relationships = page.locator(
       '[data-homepage-testid="homepage-section-relationships"]'
     );
     await relationships.scrollIntoViewIfNeeded();
-    await expect(relationships.locator('img')).toHaveCount(0);
-    await expect(relationships.getByRole('listitem')).toHaveCount(3);
+    // Static ordered visibility states: the public profile for people and
+    // the shipped {username}/llms.txt surface for agents.
+    const outcomes = relationships.getByRole('list', {
+      name: 'Relationships',
+    });
+    await expect(outcomes.getByRole('listitem')).toHaveCount(3);
+    const visibility = relationships.getByRole('list', {
+      name: 'One Profile, Legible To People And To Agents',
+    });
+    await expect(visibility.getByRole('listitem')).toHaveCount(2);
+    await expect(visibility.locator('[data-audience="agents"]')).toContainText(
+      'Canonical URL'
+    );
+    await expect(relationships.locator('img')).toHaveCount(1);
     const exportSelector =
       '[data-homepage-testid="homepage-section-connected"] img, [data-homepage-testid="homepage-section-relationships"] img';
     await page.waitForFunction(
@@ -532,7 +550,7 @@ test.describe('Homepage', () => {
           })
         )
       );
-    expect(exportQuality).toHaveLength(1);
+    expect(exportQuality).toHaveLength(3);
     for (const image of exportQuality) {
       expect(
         image.naturalWidth,

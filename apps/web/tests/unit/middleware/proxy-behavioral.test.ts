@@ -726,12 +726,29 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBeLessThan(300);
     });
 
+    it('answers retired public investor pages with a neutral noindex 404', async () => {
+      for (const pathname of [
+        '/investors',
+        '/pitch',
+        '/Jovie-Pitch-Deck.pdf',
+      ]) {
+        const res = await callMiddleware(
+          createUnauthenticatedRequest({ pathname })
+        );
+
+        expect(res.status, pathname).toBe(404);
+        expect(res.headers.get('X-Robots-Tag'), pathname).toContain('noindex');
+        expect(res.headers.get('Cache-Control'), pathname).toBe(
+          'private, no-store'
+        );
+      }
+    });
+
     it('does not run the audience block lookup for reserved public routes', async () => {
       const reservedRoutes = [
         '/start',
         '/pricing',
         '/about',
-        '/investors',
         APP_ROUTES.ARTISTS,
         APP_ROUTES.PLAYLISTS,
       ];

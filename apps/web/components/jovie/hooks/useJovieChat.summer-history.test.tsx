@@ -210,8 +210,10 @@ describe('Summer history restoration', () => {
       });
     }
     const view = mount('ov');
-    await screen.findByText(/Summer turn status: failed/);
-    expect(screen.getByText('Question 12')).toBeTruthy();
+    // The empty failed turn collapses into one summary row instead of a
+    // permanent "do not resend" bubble.
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
+    expect(screen.queryByText('Question 12')).toBeNull();
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(
       Array.from(
@@ -228,7 +230,7 @@ describe('Summer history restoration', () => {
     view.unmount();
     resetChatTimelineStateCacheForTests();
     mount('ov');
-    await screen.findByText(/Summer turn status: failed/);
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(h.send).not.toHaveBeenCalled();
   });

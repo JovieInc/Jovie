@@ -128,6 +128,15 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
 
 
+class OrphanPrTest(unittest.TestCase):
+    def test_orphan_prs_from_a_fresh_sweep_raise_one_alert(self):
+        sweep = {"atEpoch": 1_000_000.0 - 60, "orphans": [18938, 18924], "counts": {"open": 150}}
+        alerts = doctor.judge(obs(reconcile=sweep))
+        self.assertIn("#18938 #18924", alerts["orphan-prs"])
+        self.assertNotIn("orphan-prs", doctor.judge(obs(reconcile={**sweep, "orphans": []})))
+        self.assertNotIn("orphan-prs", doctor.judge(obs(reconcile={**sweep, "atEpoch": 0})), "a stale sweep proves nothing")
+
+
 class StatusFeedTest(unittest.TestCase):
     def test_feed_counts_running_and_idle_slots_per_lane(self):
         import fcntl
@@ -146,7 +155,8 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(feed["lanes"]["devin"], {"running": 1, "slots": 2})
         self.assertEqual(feed["alerts"], {"disk-low": "x"})
         self.assertNotIn("gate", feed["lanes"])
-        self.assertEqual((feed["held_by_reason"], feed["failed_by_reason"]), ({}, {}))
+        self.assertEqual((feed["held_by_reason"], feed["failed_by_reason"], feed["prs"], feed["orphan_prs"]),
+                         ({}, {}, {}, []))
 
     def test_feed_publishes_held_and_failed_records_by_reason(self):
         with tempfile.TemporaryDirectory() as tmp:

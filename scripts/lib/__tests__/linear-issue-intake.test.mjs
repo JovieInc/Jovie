@@ -44,6 +44,29 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       reason: 'linear_search_graphql_error',
     });
   });
+  it('types the team id filter variable as ID so Linear accepts the search', async () => {
+    const fetchImpl = vi.fn(async (_url, init) =>
+      JSON.parse(String(init.body)).query.includes('issueCreate')
+        ? new Response(JSON.stringify(created))
+        : new Response(
+            JSON.stringify({ data: { issues: { nodes: [] }, team: null } })
+          )
+    );
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        fingerprint,
+        title: `[${fingerprint}] crash`,
+        description: 'body',
+        apiKey: 'lin-key',
+        fetchImpl,
+      })
+    ).resolves.toMatchObject({ ok: true, action: 'created' });
+    const payload = JSON.parse(String(fetchImpl.mock.calls[0][1].body));
+    expect(payload.query).toContain('$teamFilterId: ID!');
+    expect(payload.query).toContain('team: { id: { eq: $teamFilterId } }');
+    expect(payload.variables.teamFilterId).toBe(payload.variables.teamId);
+  });
+
   it('creates when new and updates the matching title', async () => {
     const fetchImpl = vi.fn(async (_url, init) => {
       const payload = JSON.parse(String(init.body));

@@ -310,7 +310,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('path-selects and runs the disabled DeepSec policy safety tests', () => {
+  it('path-selects and runs the DeepSec policy and closed-loop tests', () => {
     const initial = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
     const additions = [
       ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
@@ -322,6 +322,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/security/deepsec-policy.test.mjs',
       'scripts/security/deepsec/policy.json',
       'scripts/security/deepsec/targets.json',
+      'scripts/security/deepsec-loop.mjs',
     ]) {
       expect(
         spawnSync('grep', ['-Eq', pattern], {
@@ -332,7 +333,7 @@ describe('ci-fast bounded parallel workflow', () => {
       ).toBe(0);
     }
     expect(CI_FAST_SOURCE).toContain(
-      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs'"
+      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs'"
     );
   });
 
@@ -1034,7 +1035,7 @@ describe('ci-fast bounded parallel workflow', () => {
         const [selector] = selectors;
         expect(block).toContain(`name: ${jobName}`);
         expect(block).toMatch(
-          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
         );
         expect(block).not.toContain('always()');
         // Aliased gate jobs share remaining's anchored condition verbatim.
@@ -1339,7 +1340,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
-        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
       );
     }
   });
@@ -1735,7 +1736,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);

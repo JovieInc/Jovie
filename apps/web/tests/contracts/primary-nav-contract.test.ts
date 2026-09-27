@@ -72,10 +72,7 @@ describe('primary marketing navigation contract', () => {
       id: 'customers',
       label: 'Customers',
       heading: 'Customers',
-      links: [
-        { href: '/investors', label: 'Investors' },
-        { href: '/solutions/artists', label: 'Artists' },
-      ],
+      links: [{ href: '/solutions/artists', label: 'Artists' }],
     });
     const destinations = MARKETING_CUSTOMERS_FLYOUT.links.map(
       link => link.href
