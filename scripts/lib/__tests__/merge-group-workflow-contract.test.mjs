@@ -3620,3 +3620,23 @@ describe('merge-group Playwright artifact guard', () => {
     }
   });
 });
+
+describe('merge-queue green enroll scan window (JOV-6831)', () => {
+  const ENROLL = readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
+    'utf8'
+  );
+
+  it('pages through every open PR instead of one oldest-first window', () => {
+    expect(ENROLL).toContain('after: $cursor');
+    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
+    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).not.toMatch(/direction:\s*ASC/);
+  });
+
+  it('keeps the rejected-head rule: no re-enqueue without a new push', () => {
+    expect(ENROLL).toContain(
+      'if (removedAt && committedAt && removedAt > committedAt) continue;'
+    );
+  });
+});
