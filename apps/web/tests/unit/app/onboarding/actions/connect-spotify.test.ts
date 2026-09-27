@@ -203,6 +203,12 @@ vi.mock('@/app/onboarding/actions/post-onboarding', () => ({
 }));
 
 vi.mock('@/lib/cache/tags', () => ({
+  CACHE_TAGS: {
+    PUBLIC_PROFILE: 'profiles-all',
+    SITEMAP_CATALOG: 'sitemap-catalog',
+  },
+  createPublicReleasesTag: vi.fn().mockReturnValue('public-releases-tag'),
+  createReleasesTag: vi.fn().mockReturnValue('releases-tag'),
   createSmartLinkContentTag: vi.fn().mockReturnValue('smart-link-tag'),
 }));
 

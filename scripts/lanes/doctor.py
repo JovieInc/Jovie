@@ -106,6 +106,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_pr_numbers()),
+        "reconcile": read_json(state / "reconcile.json", {}),
         "failedByReason": failed_by_reason(failures),
     }
 
@@ -178,6 +179,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    sweep = obs.get("reconcile") or {}
+    swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
+    if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
+        listed = " ".join(f"#{number}" for number in sweep["orphans"][:20])
+        alerts["orphan-prs"] = (f"{len(sweep['orphans'])} open PRs have no owner (not queued, no live lane-fix label, "
+                                f"no hold): {listed}")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -284,7 +291,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
             "pool": obs.get("pool"), "lastLandingAgeS": obs.get("lastLandingAge"),
             "codexAvailable": len((obs.get("codex") or {}).get("available") or []),
             "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
-            "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {}}
+            "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
+            "prs": (obs.get("reconcile") or {}).get("counts") or {},
+            "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or []}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"

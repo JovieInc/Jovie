@@ -5,11 +5,13 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const openDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
 const copyDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
 const closeDesktopAuthWindowMock = vi.fn().mockResolvedValue({ ok: true });
+const redeemDesktopAuthReturnCodeMock = vi.fn().mockResolvedValue({ ok: true });
+const supportsDesktopAuthReturnCodeMock = vi.fn(() => true);
 const isElectronRuntimeMock = vi.fn(() => true);
 const searchParamsState = { value: '' };
 
@@ -22,6 +24,9 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   copyDesktopAuthUrl: (authUrl: string) => copyDesktopAuthUrlMock(authUrl),
   isElectronRuntime: () => isElectronRuntimeMock(),
   openDesktopAuthUrl: (authUrl: string) => openDesktopAuthUrlMock(authUrl),
+  redeemDesktopAuthReturnCode: (returnCode: string) =>
+    redeemDesktopAuthReturnCodeMock(returnCode),
+  supportsDesktopAuthReturnCode: () => supportsDesktopAuthReturnCodeMock(),
   // JOV-3595: DesktopAuthClient clears the shell boot watchdog on mount
   useDesktopAppBootSignal: vi.fn(),
   notifyDesktopAppBooted: vi.fn(),
@@ -30,6 +35,13 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
 function getAuthUrlParam(): string | null {
   return new URLSearchParams(searchParamsState.value).get('auth_url');
 }
+
+// The handoff pulls in @jovie/ui; warm the module graph once so the first
+// test's 5s budget measures behavior, not a cold transform.
+beforeAll(async () => {
+  await import('../../../app/desktop-auth/DesktopAuthClient');
+  await import('../../../app/desktop-auth/page');
+}, 60_000);
 
 describe('DesktopAuthPage', () => {
   beforeEach(() => {
@@ -247,6 +259,139 @@ describe('DesktopAuthPage', () => {
     );
   });
 
+  it('points at the copy-link path when the browser never returns', async () => {
+    vi.useFakeTimers();
+    try {
+      const { DesktopAuthClient, DESKTOP_AUTH_STILL_WAITING_MS } = await import(
+        '../../../app/desktop-auth/DesktopAuthClient'
+      );
+      render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Continue in Browser' })
+        );
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Check your browser.'
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(DESKTOP_AUTH_STILL_WAITING_MS);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Not seeing it? Copy the sign-in link and paste it into any browser.'
+      );
+      // Reopening restarts the wait instead of nagging immediately.
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Open Browser Again' })
+        );
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Check your browser.'
+      );
+      expect(
+        screen.getByRole('button', { name: 'Copy Sign-In Link' })
+      ).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('redeems the browser return code when the deep link cannot reach the app', async () => {
+    const { DesktopAuthClient, normalizeReturnCodeInput } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+    expect(normalizeReturnCodeInput('bcdf ghjk')).toBe('BCDF-GHJK');
+    expect(normalizeReturnCodeInput('b0c1d')).toBe('BCD');
+    expect(normalizeReturnCodeInput('BCDF-GHJK-LMNP')).toBe('BCDF-GHJK');
+
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enter a Code' })
+    );
+
+    const input = screen.getByRole('textbox', {
+      name: 'Code From Your Browser',
+    });
+    expect(input).toHaveFocus();
+    const continueButton = screen.getByRole('button', { name: 'Continue' });
+    expect(continueButton).toBeDisabled();
+    // Cancel stays reachable in code mode, so the action stack keeps its rows.
+    expect(
+      screen.getByRole('button', { name: 'Cancel Sign-In' })
+    ).toBeInTheDocument();
+
+    redeemDesktopAuthReturnCodeMock.mockResolvedValueOnce({
+      ok: false,
+      reason: 'invalid-code',
+    });
+    fireEvent.change(input, { target: { value: 'bcdfghjl' } });
+    expect(input).toHaveValue('BCDF-GHJL');
+    await act(async () => {
+      fireEvent.click(continueButton);
+    });
+    expect(redeemDesktopAuthReturnCodeMock).toHaveBeenCalledWith('BCDF-GHJL');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'That code did not match. Check it and try again.'
+    );
+
+    fireEvent.change(input, { target: { value: 'BCDF-GHJK' } });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Enter the code your browser shows.'
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Signing in...');
+    expect(
+      screen.getByRole('button', { name: 'Back to Browser Sign-In' })
+    ).toBeDisabled();
+  });
+
+  it.each([
+    [
+      'pkce-expired',
+      'This sign-in expired. Open the browser again for a new code.',
+    ],
+    ['no-pending-flow', 'Open the browser to sign in first.'],
+    ['rate-limited', 'Too many tries. Wait a minute and try again.'],
+    ['network', 'Could not reach Jovie. Check your connection and try again.'],
+  ])('explains a %s return code failure', async (reason, message) => {
+    redeemDesktopAuthReturnCodeMock.mockResolvedValueOnce({
+      ok: false,
+      reason,
+    });
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enter a Code' })
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Code From Your Browser' }),
+      { target: { value: 'BCDFGHJK' } }
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(message);
+  });
+
+  it('hides code entry from Mac builds that cannot redeem codes, without shifting layout', async () => {
+    supportsDesktopAuthReturnCodeMock.mockReturnValueOnce(false);
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+    const { container } = render(
+      <DesktopAuthClient authUrlParam={getAuthUrlParam()} />
+    );
+    expect(screen.queryByRole('button', { name: 'Enter a Code' })).toBeNull();
+    expect(container.querySelector('[aria-hidden="true"].h-7')).not.toBeNull();
+  });
+
   it('copies the validated sign-in link and reports copy failures', async () => {
     const { DesktopAuthClient } = await import(
       '../../../app/desktop-auth/DesktopAuthClient'
@@ -263,7 +408,7 @@ describe('DesktopAuthPage', () => {
       expect(copyDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
     });
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Sign-in link copied.'
+      'Sign-in link copied. Paste it into any browser.'
     );
 
     copyDesktopAuthUrlMock.mockResolvedValueOnce({

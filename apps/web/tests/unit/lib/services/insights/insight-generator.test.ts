@@ -135,6 +135,9 @@ describe('insight-generator', () => {
 
     const generateObjectArg = mockGenerateObject.mock.calls[0]?.[0];
     expect(generateObjectArg).toBeDefined();
-    expect(generateObjectArg.providerOptions).toBeUndefined();
+    // Only Gateway reporting tags; no Anthropic-specific options.
+    expect(generateObjectArg.providerOptions).toEqual({
+      gateway: { tags: ['feature:jovie-insight-generator', 'app:web'] },
+    });
   });
 });

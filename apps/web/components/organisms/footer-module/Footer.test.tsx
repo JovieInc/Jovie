@@ -48,4 +48,20 @@ describe('Footer', () => {
       }
     }
   });
+
+  it('adds a Report link on the profile variant only when a handle is present', () => {
+    const { rerender } = render(
+      <Footer variant='profile' artistHandle='someartist' />
+    );
+
+    for (const link of screen.getAllByRole('link', { name: 'Report' })) {
+      expect(link).toHaveAttribute(
+        'href',
+        `${APP_ROUTES.REPORT}?type=profile&target=someartist`
+      );
+    }
+
+    rerender(<Footer variant='profile' />);
+    expect(screen.queryByRole('link', { name: 'Report' })).toBeNull();
+  });
 });

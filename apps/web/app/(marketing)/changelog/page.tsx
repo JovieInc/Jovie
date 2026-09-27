@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingEditorialHeroPhoto,
+} from '@/components/marketing';
 import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
-import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
+import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getChangelogSnapshot } from '@/lib/changelog-source';
@@ -19,7 +22,7 @@ export const revalidate = false;
 
 export const metadata: Metadata = {
   title: 'Jovie Changelog: Product Updates & New Features',
-  description: `Audience and control updates in ${APP_NAME}. What got better for you — not every deploy.`,
+  description: `Audience and control updates in ${APP_NAME}. What got better for you, not every deploy.`,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
     types: {
@@ -52,49 +55,59 @@ function ReleaseJournalHero({
   readonly latest: readonly CustomerChangelogEntry[];
 }) {
   return (
-    <section className='changelog-hero' aria-labelledby='changelog-hero-title'>
-      <MarketingContainer width='page' className='changelog-hero__inner'>
-        <div className='changelog-hero__masthead'>
-          <p className='changelog-hero__kicker'>Changelog</p>
-          <h1
-            id='changelog-hero-title'
-            className='changelog-hero__title line-clamp-2'
-          >
-            {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial headline casing */}
-            {"What's new in Jovie"}
-          </h1>
-          <p className='changelog-hero__support'>
-            Versioned, dated, and source-backed.
-          </p>
-        </div>
-
-        {latest.length > 0 ? (
-          <div className='changelog-hero__timeline'>
-            <ol className='changelog-hero__timeline-entries'>
-              {latest.map((entry, index) => (
-                <li key={entry.slug}>
-                  <Link
-                    href={`#${entry.slug}`}
-                    className='changelog-hero__timeline-link'
-                  >
-                    <span
-                      aria-hidden='true'
-                      className={`changelog-hero__tone-dot changelog-hero__tone-dot--${TIMELINE_TONES[index % TIMELINE_TONES.length]}`}
-                    />
-                    <span className='changelog-hero__timeline-date'>
-                      {formatTimelineDate(entry.date)}
-                    </span>
-                    <span className='changelog-hero__timeline-title'>
-                      {entry.title}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
+    <div className='marketing-hero-dock relative overflow-hidden'>
+      <MarketingEditorialHeroPhoto
+        src='/images/hero/changelog-index.webp'
+        opacity={0.4}
+        testId='changelog-hero-photo'
+      />
+      <section
+        className='changelog-hero relative z-10'
+        aria-labelledby='changelog-hero-title'
+      >
+        <MarketingContainer width='page' className='changelog-hero__inner'>
+          <div className='changelog-hero__masthead'>
+            <p className='changelog-hero__kicker'>Changelog</p>
+            <h1
+              id='changelog-hero-title'
+              className='changelog-hero__title line-clamp-2'
+            >
+              {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial headline casing */}
+              {"What's new in Jovie"}
+            </h1>
+            <p className='changelog-hero__support'>
+              Versioned, dated, and source-backed.
+            </p>
           </div>
-        ) : null}
-      </MarketingContainer>
-    </section>
+
+          {latest.length > 0 ? (
+            <div className='changelog-hero__timeline'>
+              <ol className='changelog-hero__timeline-entries'>
+                {latest.map((entry, index) => (
+                  <li key={entry.slug}>
+                    <Link
+                      href={`#${entry.slug}`}
+                      className='changelog-hero__timeline-link'
+                    >
+                      <span
+                        aria-hidden='true'
+                        className={`changelog-hero__tone-dot changelog-hero__tone-dot--${TIMELINE_TONES[index % TIMELINE_TONES.length]}`}
+                      />
+                      <span className='changelog-hero__timeline-date'>
+                        {formatTimelineDate(entry.date)}
+                      </span>
+                      <span className='changelog-hero__timeline-title'>
+                        {entry.title}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </MarketingContainer>
+      </section>
+    </div>
   );
 }
 
@@ -159,7 +172,7 @@ export default async function ChangelogPage() {
         </div>
       </MarketingContainer>
 
-      <MarketingFinalCTA
+      <MarketingFooterCta
         title='Take control of your presence.'
         ctaLabel='Find your profile'
         ctaHref='/#handle-input'
