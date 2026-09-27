@@ -170,6 +170,15 @@ export const __profileHomeRailTestUtils = {
   getS2OrderedItems,
 };
 
+/**
+ * Editorial cap (JOV-6199): Home is curated, not a catalog dump. At most one
+ * featured card (the PAC leading slot) plus at most two secondary cards. The
+ * fan-capture ("Get Updates") card counts toward the secondary cap, so when
+ * it renders, only one other secondary item is shown. The full catalog lives
+ * on the Music destination.
+ */
+const SECONDARY_ITEM_CAP = 2;
+
 export const ProfileHomeRail = memo(function ProfileHomeRail({
   artist,
   latestRelease,
@@ -228,9 +237,15 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   );
   const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
 
-  // One ordered card list — back catalog, merch, and shows. The featured
-  // latest release is NOT an entity card here: it lives in the carousel's
-  // leading slot as the PAC card below, so it never renders twice.
+  // The capture card renders as the carousel's trailing secondary slot, so it
+  // consumes one of the two secondary slots under the editorial cap.
+  const showCaptureCard = showAlertsCard && !isSubscribed;
+  const secondaryItemLimit = SECONDARY_ITEM_CAP - (showCaptureCard ? 1 : 0);
+
+  // One ordered card list — merch, shows, then back-catalog fills any
+  // remaining secondary slots. The featured latest release is NOT an entity
+  // card here: it lives in the carousel's leading slot as the PAC card below,
+  // so it never renders twice.
   const carouselItems = useMemo<EntityCardModel[]>(() => {
     const featuredItems: EntityCardModel[] = [];
     const releaseItems: EntityCardModel[] = [];
@@ -325,7 +340,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
         showItems,
       }),
       ...releaseItems,
-    ];
+    ].slice(0, secondaryItemLimit);
   }, [
     artist.handle,
     featuredPlaylistFallback,
@@ -335,6 +350,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     now,
     profilePacAssignment.s2Slot,
     releases,
+    secondaryItemLimit,
     releaseVisibility?.show,
     upcomingTourDates,
   ]);
@@ -380,22 +396,21 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       hasPlayableDestinations
   );
 
-  const alertsCard =
-    !showAlertsCard || isSubscribed ? null : (
-      <HomeAlertsCard
-        artist={artist}
-        onAlertsClick={onAlertsClick}
-        renderMode={renderMode}
-        sourceContext={{
-          artistId: artist.id,
-          profileId: artist.id,
-          profileSlug: artist.handle,
-          currentTab: 'home',
-          ctaLocation: 'home_alerts_card',
-          intent: 'general_alerts',
-        }}
-      />
-    );
+  const alertsCard = !showCaptureCard ? null : (
+    <HomeAlertsCard
+      artist={artist}
+      onAlertsClick={onAlertsClick}
+      renderMode={renderMode}
+      sourceContext={{
+        artistId: artist.id,
+        profileId: artist.id,
+        profileSlug: artist.handle,
+        currentTab: 'home',
+        ctaLocation: 'home_alerts_card',
+        intent: 'general_alerts',
+      }}
+    />
+  );
 
   // Pen parity (Tim, 2026-09-26): the PAC is the featured Listen mode card
   // under the identity header. The rest of the highlights (back catalog,

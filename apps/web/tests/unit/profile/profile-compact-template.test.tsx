@@ -2494,4 +2494,35 @@ describe('ProfileCompactTemplate', () => {
     expect(cta).toHaveTextContent('Request access');
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
   });
+
+  it('routes selected credits into the About destination surfaces (JOV-6199)', () => {
+    const creditSegments = [
+      { type: 'text' as const, text: 'Credited on "' },
+      {
+        type: 'release' as const,
+        text: 'Neon Circuit',
+        href: '/timwhite/neon-circuit',
+      },
+      { type: 'text' as const, text: '".' },
+    ];
+
+    render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        creditSegments={creditSegments}
+      />
+    );
+
+    const panelCall = mockProfilePrimaryTabPanel.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(panelCall?.creditSegments).toBe(creditSegments);
+    const drawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(drawerCall?.creditSegments).toBe(creditSegments);
+  });
 });

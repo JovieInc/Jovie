@@ -1,5 +1,7 @@
 import {
+  type DeliverySummary,
   emptyCounts,
+  emptyDeliverySummary,
   emptyDurations,
   isExactSha,
   M1_SOURCE_TO_PROJECTION_BUDGET_MS,
@@ -128,14 +130,7 @@ export function projectMeanings(
   const wrap = (value: boolean | null) =>
     value == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(value);
   return {
-    merged: wrap(
-      meaningFromHint(
-        sources['fleet-receipt'],
-        'merged',
-        'not-merged',
-        () => null
-      )
-    ),
+    merged: wrap(measuredOrNull(sources['github-merges'], 'merged')),
     queued: wrap(queued),
     ciGreen: wrap(
       meaningFromHint(ci, 'ciGreen', 'ci-not-green', () =>
@@ -165,9 +160,7 @@ function pickCount(
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const startObservation = sources['github-native-merge-queue'].sourceTimestamp
-    ? sources['github-native-merge-queue']
-    : sources['fleet-receipt'];
+  const startObservation = sources['github-native-merge-queue'];
   const endObservation = sources['live-build-info'].sourceTimestamp
     ? sources['live-build-info']
     : sources['production-controller'];
@@ -197,26 +190,6 @@ function revisionFingerprint(
   return SHIPPING_SOURCE_IDS.map(
     sourceId => sources[sourceId].sourceRevision ?? sources[sourceId].state
   ).join('|');
-}
-
-function operationalTaskSource(
-  sources: Readonly<Record<ShippingSourceId, SourceObservation>>,
-  lastKnown?: ShippingStateProjection | null
-) {
-  if (SUCCESS_STATES.has(sources['symphony-runtime'].state)) {
-    return 'symphony-runtime' as const;
-  }
-  if (lastKnown?.operationalTasks.sourceId) {
-    return lastKnown.operationalTasks.sourceId;
-  }
-  const taskReceipt = sources['symphony-task'];
-  if (
-    SUCCESS_STATES.has(taskReceipt.state) &&
-    taskReceipt.entities.some(entity => entity.operationalTask)
-  ) {
-    return 'symphony-task' as const;
-  }
-  return 'symphony-runtime' as const;
 }
 
 function taskDeltas(
@@ -274,7 +247,7 @@ function projectOperationalTasks(input: {
   readonly publishing: boolean;
   readonly lastKnown?: ShippingStateProjection | null;
 }): OperationalTaskFeed {
-  const sourceId = operationalTaskSource(input.sources, input.lastKnown);
+  const sourceId = 'lane-pull-requests' as const;
   const source = input.sources[sourceId];
   const currentTasks = source.entities.flatMap(entity =>
     entity.operationalTask ? [entity.operationalTask] : []
@@ -307,6 +280,26 @@ function projectOperationalTasks(input: {
       currentUsable && last
         ? taskDeltas(last.tasks, currentTasks, input.sequence)
         : [],
+  };
+}
+
+/**
+ * Merge each live source's delivery block over an all-not-measured summary.
+ * A source that failed contributes nothing, so only its metrics read n/a.
+ */
+export function projectDelivery(
+  sources: Readonly<Record<ShippingSourceId, SourceObservation>>
+): DeliverySummary {
+  let delivery = emptyDeliverySummary();
+  for (const sourceId of SHIPPING_SOURCE_IDS) {
+    const source = sources[sourceId];
+    if (!SUCCESS_STATES.has(source.state) || source.delivery == null) continue;
+    delivery = { ...delivery, ...source.delivery };
+  }
+  const lanes = sources['lanes-status'];
+  return {
+    ...delivery,
+    lanes: { ...delivery.lanes, stale: lanes.state === 'stale' },
   };
 }
 
@@ -343,7 +336,7 @@ export function projectShippingState(input: {
   return {
     producerId: SHIPPING_STATE_PRODUCER_ID,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
-    sourceId: 'fleet-receipt',
+    sourceId: 'lanes-status',
     entityId: 'ovie.shipping-state',
     schema: SHIPPING_STATE_SCHEMA,
     eventId,
@@ -359,10 +352,14 @@ export function projectShippingState(input: {
     lastSuccess: successful
       ? { at: input.observationTimestamp, sequence: input.sequence, eventId }
       : (input.lastKnown?.lastSuccess ?? null),
+    // Only a failed source is a projection error. A live read that reports a
+    // negative outcome (CI red, production unverified) is a measured "No".
     lastError:
-      SHIPPING_SOURCE_IDS.map(id => input.sources[id].lastError).find(
-        error => error != null
-      ) ??
+      SHIPPING_SOURCE_IDS.filter(
+        id => !SUCCESS_STATES.has(input.sources[id].state)
+      )
+        .map(id => input.sources[id].lastError)
+        .find(error => error != null) ??
       (input.publishing
         ? null
         : {
@@ -380,6 +377,7 @@ export function projectShippingState(input: {
     retrying: pickCount(input.sources, 'retrying'),
     terminalFailures: pickCount(input.sources, 'terminalFailures'),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
+    delivery: projectDelivery(input.sources),
     operationalTasks: projectOperationalTasks(input),
   };
 }
@@ -415,6 +413,10 @@ export function ageShippingStateProjection(
           aggregateState
         )
       : projection.state,
+    // Delivery is derived from source states (success gating, lanes.stale); re-derive after aging.
+    delivery: projection.delivery
+      ? projectDelivery(sources)
+      : projection.delivery,
     operationalTasks: {
       ...projection.operationalTasks,
       syncState:
@@ -478,6 +480,7 @@ function emptyObservation(
     entities: [],
     counts: emptyCounts(),
     durations: emptyDurations(),
+    delivery: null,
   };
 }
 
@@ -528,7 +531,7 @@ export function unknownProjection(input: {
   return {
     producerId: SHIPPING_STATE_PRODUCER_ID,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
-    sourceId: 'fleet-receipt',
+    sourceId: 'lanes-status',
     entityId: 'ovie.shipping-state',
     schema: SHIPPING_STATE_SCHEMA,
     eventId,
@@ -567,11 +570,12 @@ export function unknownProjection(input: {
     retrying: NOT_MEASURED_COUNT,
     terminalFailures: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,
+    delivery: emptyDeliverySummary(),
     operationalTasks: {
       canonicalSource: 'linear',
       cacheMode: 'local-reconciled',
       syncState: input.publishing ? 'syncing' : 'failed',
-      sourceId: 'symphony-runtime',
+      sourceId: 'lane-pull-requests',
       observedAt: null,
       lastSyncedAt: null,
       freshnessDeadline: null,
