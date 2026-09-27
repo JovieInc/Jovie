@@ -19,6 +19,10 @@ vi.mock('./OvieLauncherRail', () => ({
   OvieLauncherRail: () => null,
 }));
 
+vi.mock('@/components/features/admin/summer-cards', () => ({
+  SummerCardReviewPanel: () => <div data-testid='summer-card-review-panel' />,
+}));
+
 const snapshot: OvieMacHudSnapshot = {
   alive: {
     cashUsd: null,
@@ -58,5 +62,10 @@ describe('OvieMacHud', () => {
   it('exposes a visible Close control back to the canonical shell', () => {
     render(<OvieMacHud snapshot={snapshot} />);
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('renders the Summer card review panel', () => {
+    render(<OvieMacHud snapshot={snapshot} />);
+    expect(screen.getByTestId('summer-card-review-panel')).toBeInTheDocument();
   });
 });

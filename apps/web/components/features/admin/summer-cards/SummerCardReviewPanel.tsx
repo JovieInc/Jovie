@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/components/admin/SummerCardReviewPanel.test.tsx
 'use client';
 
 import { ExternalLink, Loader2 } from 'lucide-react';
