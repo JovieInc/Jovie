@@ -17,6 +17,9 @@ import {
 
 vi.mock('@/features/profile/TourModePanel', () => ({
   TourDrawerContent: () => <div data-testid='mock-tour-drawer-content' />,
+  TourEventAlertsAction: () => (
+    <div data-testid='mock-tour-event-alerts-action' />
+  ),
 }));
 
 vi.mock(
@@ -69,7 +72,7 @@ function renderPanel(
 }
 
 describe('ProfilePrimaryTabPanel', () => {
-  it('renders the Events mode card with a truthful empty state', () => {
+  it('renders the Events mode card with a truthful empty state and the alerts opt-in', () => {
     renderPanel({ mode: 'tour', modeCardAccents: PEN_ACCENTS });
 
     expect(screen.getByTestId('profile-primary-tab-tour')).toBeInTheDocument();
@@ -82,9 +85,11 @@ describe('ProfilePrimaryTabPanel', () => {
       within(card).getByRole('heading', { name: 'No upcoming events' })
     ).toBeInTheDocument();
     expect(within(card).getByText('New dates will appear here.')).toBeVisible();
-    // No invented CTA inside the empty state.
-    expect(within(card).queryByRole('link')).toBeNull();
-    expect(within(card).queryByRole('button')).toBeNull();
+    // Only the event-alerts opt-in; no event list, no invented CTA.
+    expect(
+      within(card).getByTestId('mock-tour-event-alerts-action')
+    ).toBeInTheDocument();
+    expect(within(card).queryByTestId('mock-tour-drawer-content')).toBeNull();
   });
 
   it('lists upcoming events inside the Events mode card', () => {

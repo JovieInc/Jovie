@@ -8,16 +8,19 @@ export interface ProfileEventsCardProps {
   readonly hasEvents: boolean;
   /** The event list, rendered only when `hasEvents` is true. */
   readonly children?: ReactNode;
+  /** Optional event-alerts opt-in under the empty state. */
+  readonly emptyAction?: ReactNode;
 }
 
 /**
- * Events mode card (Pen NdEbB). With no dates it says so plainly, with no
- * invented CTA; with dates it hosts the event list.
+ * Events mode card (Pen NdEbB). With no dates it says so plainly and offers
+ * only the event-alerts opt-in; with dates it hosts the event list.
  */
 export function ProfileEventsCard({
   accent,
   hasEvents,
   children,
+  emptyAction,
 }: Readonly<ProfileEventsCardProps>) {
   if (!hasEvents) {
     return (
@@ -27,7 +30,9 @@ export function ProfileEventsCard({
         title='No upcoming events'
         description='New dates will appear here.'
         dataTestId='profile-primary-tab-events-empty'
-      />
+      >
+        {emptyAction}
+      </ProfileModeCard>
     );
   }
 

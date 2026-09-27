@@ -26,7 +26,10 @@ import {
 } from '@/features/profile/profile-surface-state';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
-import { TourDrawerContent } from '@/features/profile/TourModePanel';
+import {
+  TourDrawerContent,
+  TourEventAlertsAction,
+} from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -502,6 +505,13 @@ export function ProfilePrimaryTabPanel({
         <ProfileEventsCard
           accent={modeCardAccents.events}
           hasEvents={tourDates.length > 0}
+          emptyAction={
+            <TourEventAlertsAction
+              artist={artist}
+              sourceContext={eventsEmptySourceContext}
+              renderMode={renderMode}
+            />
+          }
         >
           <TourDrawerContent
             artist={artist}

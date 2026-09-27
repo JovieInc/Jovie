@@ -33,4 +33,24 @@ describe('ProfileEventsCard', () => {
     expect(within(card).queryByRole('heading')).toBeNull();
     expect(screen.queryByTestId('profile-primary-tab-events-empty')).toBeNull();
   });
+
+  it('renders only the provided alerts opt-in under the empty state', () => {
+    render(
+      <ProfileEventsCard
+        accent={ACCENT}
+        hasEvents={false}
+        emptyAction={
+          <a href='https://jov.ie/tim/alerts'>Turn On Event Alerts</a>
+        }
+      >
+        <p>Hidden list</p>
+      </ProfileEventsCard>
+    );
+
+    const card = screen.getByTestId('profile-primary-tab-events-empty');
+    expect(
+      within(card).getByRole('link', { name: 'Turn On Event Alerts' })
+    ).toBeInTheDocument();
+    expect(within(card).queryByText('Hidden list')).toBeNull();
+  });
 });

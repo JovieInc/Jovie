@@ -68,7 +68,10 @@ export function ProfileIdentityHeader({
       data-testid='profile-identity-header'
     >
       <div className='relative h-20 w-20 shrink-0'>
-        <div className='relative h-full w-full overflow-hidden rounded-full bg-surface-2'>
+        <div
+          className='relative h-full w-full overflow-hidden rounded-full bg-surface-2'
+          data-testid='profile-identity-portrait'
+        >
           <ImageWithFallback
             src={imageUrl}
             alt=''
@@ -93,18 +96,21 @@ export function ProfileIdentityHeader({
         ) : null}
       </div>
 
-      <Heading className='mt-3 min-w-0 max-w-full' data-testid={headingTestId}>
+      <Heading
+        className='mt-1.5 min-w-0 max-w-full'
+        data-testid={headingTestId}
+      >
         <Link
           href={profileHref}
           prefetch={false}
-          className='block truncate rounded-md text-2xl font-normal leading-8 tracking-tight text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+          className='flex min-h-11 min-w-0 items-center justify-center rounded-md text-2xl font-normal leading-8 tracking-tight text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
           data-testid='profile-identity-link'
         >
-          {name}
+          <span className='min-w-0 truncate'>{name}</span>
         </Link>
       </Heading>
       <p
-        className='mt-0.5 max-w-full truncate text-sm leading-5 text-tertiary-token'
+        className='max-w-full truncate text-sm leading-5 text-tertiary-token'
         data-testid='profile-identity-handle'
       >
         {`${HOSTNAME}/${handle}`}
