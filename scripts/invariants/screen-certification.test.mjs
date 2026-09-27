@@ -2374,7 +2374,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.match(result.issues.join('\n'), /missing registration/);
   });
 
-  it('rejects unregistered visible boundary, desktop renderer, iOS screen, and deleted paths', () => {
+  it('rejects unregistered visible boundary, desktop renderer, and iOS screen paths', () => {
     const paths = [
       'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
@@ -2387,13 +2387,33 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     for (const path of paths) {
       assert.equal(kindOf(path), 'unregistered', path);
     }
-    const deleted = evaluateChangedScreens({
-      changedFiles: [{ path: 'apps/web/app/new/page.tsx', status: 'D' }],
+    const added = evaluateChangedScreens({
+      changedFiles: [{ path: 'apps/web/app/new/page.tsx', status: 'A' }],
       headSha: HEAD,
       proofs: [],
       requireExternalEvidence: true,
     });
-    assert.match(deleted.issues.join('\n'), /missing registration/);
+    assert.match(added.issues.join('\n'), /missing registration/);
+  });
+
+  it('records deleted unregistered screens as removed instead of demanding registration', () => {
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/new/page.tsx', status: 'D' },
+        { path: 'apps/web/app/new/layout.tsx', status: 'D' },
+        { path: 'apps/web/app/other/page.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(result.removedScreens, [
+      'apps/web/app/new/page.tsx',
+      'apps/web/app/new/layout.tsx',
+    ]);
+    assert.deepEqual(result.issues, [
+      'missing registration for changed in-scope screen apps/web/app/other/page.tsx',
+    ]);
   });
 
   it('requires exact-head proof for a registered protected source', () => {

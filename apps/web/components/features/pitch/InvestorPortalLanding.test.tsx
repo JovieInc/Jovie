@@ -2,9 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { InvestorBrief } from './InvestorBrief';
-import storyMeta, {
-  Web188AnonymousFallback,
-} from './InvestorPortalLanding.stories';
+import storyMeta, { Web188AnonymousFallback } from './InvestorBrief.stories';
 
 describe('web-188 investor portal source contract', () => {
   it('binds the gated server route to the shared InvestorBrief', () => {
@@ -25,7 +23,7 @@ describe('web-188 investor portal source contract', () => {
     const story = readFileSync(
       resolve(
         process.cwd(),
-        'components/features/pitch/InvestorPortalLanding.stories.tsx'
+        'components/features/pitch/InvestorBrief.stories.tsx'
       ),
       'utf8'
     );

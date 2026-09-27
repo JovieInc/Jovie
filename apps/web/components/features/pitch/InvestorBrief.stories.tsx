@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Exact source-backed fallback body for web-188-investor-portal. The gated server route (investor link or admin session) mounts InvestorBrief; this deterministic state keeps investorName null, matching the shipped no-cookie, missing-record, expired-record, and lookup-failure fallback without fabricating private investor data.',
+          'Exact source-backed fallback body for web-188-investor-portal. The gated server route (investor link or admin session) mounts InvestorBrief; this deterministic state keeps investorName null, matching the admin-session view and investor links without a recorded name, without fabricating private investor data.',
       },
     },
     pen: {
