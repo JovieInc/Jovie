@@ -126,6 +126,11 @@ describe('HomepageCertifiedSections', () => {
     expect(states[1]).toHaveAttribute('data-audience', 'agents');
     expect(states[0]).toHaveTextContent('People');
     expect(states[0]).toHaveTextContent('jov.ie/tim');
+    // The phone frame no longer takes size variants; the frame scales with
+    // its container and must not emit a retired data-size attribute.
+    expect(relationships.querySelector('.ap-phone-frame')).not.toHaveAttribute(
+      'data-size'
+    );
     expect(
       within(states[0])
         .getByAltText('Tim White Profile — Subscribe')
