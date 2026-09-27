@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/chat/InlineChatArea.tool-rendering.test.tsx
 'use client';
 
 /**
