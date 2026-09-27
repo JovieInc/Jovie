@@ -1,11 +1,9 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import {
-  getMarketingExportImage,
-  type MarketingExportImage,
-} from '@/lib/screenshots/registry';
+import type { MarketingExportImage } from '@/lib/screenshots/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export type HomepageCertifiedSectionId =
@@ -14,20 +12,17 @@ export type HomepageCertifiedSectionId =
 /**
  * Real public-profile exports for the approved customer-zero example
  * (jov.ie/tim). `connected` is the single profile surface shown under the
- * identity headline; `relationships[0]` is the People state of the static
+ * identity headline; `relationships` is the People state of the static
  * visibility artifact beside the shipped `{username}/llms.txt` surface.
  */
 export interface HomepageCertifiedPreviews {
-  readonly connected?: MarketingExportImage;
-  readonly relationships?: readonly MarketingExportImage[];
+  readonly connected: MarketingExportImage;
+  readonly relationships: MarketingExportImage;
 }
 
 export interface HomepageCertifiedSectionsProps {
-  readonly previews?: HomepageCertifiedPreviews;
+  readonly previews: HomepageCertifiedPreviews;
 }
-
-const CONNECTED_PROFILE_EXPORT_ID = 'tim-white-profile-listen-mobile';
-const VISIBILITY_PEOPLE_EXPORT_ID = 'tim-white-profile-subscribe-mobile';
 
 type HomepageSection = (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number];
 type RelationshipSection = Extract<HomepageSection, { id: 'relationships' }>;
@@ -89,16 +84,33 @@ function RelationshipOutcomes({
   );
 }
 
+function ProfileSurface({ image }: Readonly<{ image: MarketingExportImage }>) {
+  return (
+    <ArtistProfilePhoneFrame
+      className='homepage-certified-section__device'
+      size='md'
+    >
+      <Image
+        alt={image.alt}
+        className='homepage-certified-section__screen'
+        height={image.height}
+        loading='lazy'
+        quality={85}
+        sizes='(min-width: 900px) 15rem, 62vw'
+        src={image.publicUrl}
+        width={image.width}
+      />
+    </ArtistProfilePhoneFrame>
+  );
+}
+
 function ConnectedSection({
-  preview,
+  image,
   section,
 }: Readonly<{
-  preview?: MarketingExportImage;
+  image: MarketingExportImage;
   section: Extract<HomepageSection, { id: 'connected' }>;
 }>) {
-  const profileImage =
-    preview ?? getMarketingExportImage(CONNECTED_PROFILE_EXPORT_ID);
-
   return (
     <EditorialSection dataMedia='true' rhythm='product' section={section}>
       <div className='homepage-certified-section__inner'>
@@ -117,7 +129,10 @@ function ConnectedSection({
           </div>
           <p className='homepage-certified-section__body'>{section.body}</p>
         </div>
-        <div className='homepage-connected-artwork'>
+        <div
+          className='homepage-connected-artwork homepage-chapter-visual'
+          data-homepage-visual='connected'
+        >
           <div className='homepage-connected-profile'>
             <div className='homepage-connected-profile__identity'>
               <Image
@@ -135,13 +150,13 @@ function ConnectedSection({
               </p>
             </div>
             <Image
-              alt={profileImage.alt}
+              alt={image.alt}
               className='homepage-connected-artwork__image'
-              height={profileImage.height}
+              height={image.height}
               loading='lazy'
               sizes='(min-width: 1362px) 320px, 40vw'
-              src={profileImage.publicUrl}
-              width={profileImage.width}
+              src={image.publicUrl}
+              width={image.width}
             />
           </div>
         </div>
@@ -170,15 +185,7 @@ function RelationshipVisibility({
       >
         <span className='homepage-relationship-visibility__label'>People</span>
         <div className='homepage-relationship-visibility__artifact'>
-          <Image
-            alt={peopleImage.alt}
-            className='homepage-relationship-visibility__screen'
-            height={peopleImage.height}
-            loading='lazy'
-            sizes='(min-width: 900px) 160px, 45vw'
-            src={peopleImage.publicUrl}
-            width={peopleImage.width}
-          />
+          <ProfileSurface image={peopleImage} />
           <p className='homepage-relationship-visibility__url'>
             {TIM_WHITE_PROFILE.publicProfileDisplay}
           </p>
@@ -203,17 +210,14 @@ function RelationshipVisibility({
 }
 
 function RelationshipsSection({
-  previews,
+  image,
   section,
 }: Readonly<{
-  previews?: readonly MarketingExportImage[];
+  image: MarketingExportImage;
   section: RelationshipSection;
 }>) {
-  const peopleImage =
-    previews?.[0] ?? getMarketingExportImage(VISIBILITY_PEOPLE_EXPORT_ID);
-
   return (
-    <EditorialSection dataMedia='true' rhythm='text' section={section}>
+    <EditorialSection dataMedia='true' rhythm='product' section={section}>
       <div className='homepage-certified-section__inner'>
         <div className='homepage-certified-section__copy'>
           <h2
@@ -225,9 +229,12 @@ function RelationshipsSection({
           </h2>
           <p className='homepage-certified-section__body'>{section.body}</p>
         </div>
-        <div className='homepage-certified-section__media'>
+        <div
+          className='homepage-certified-section__media homepage-chapter-visual homepage-relationships-visual'
+          data-homepage-visual='relationships'
+        >
           <RelationshipOutcomes outcomes={section.outcomes} />
-          <RelationshipVisibility peopleImage={peopleImage} />
+          <RelationshipVisibility peopleImage={image} />
         </div>
       </div>
     </EditorialSection>
@@ -250,16 +257,16 @@ export function HomepageCertifiedSections({
         if (section.id === 'connected') {
           return (
             <ConnectedSection
+              image={previews.connected}
               key={section.id}
-              preview={previews?.connected}
               section={section}
             />
           );
         }
         return (
           <RelationshipsSection
+            image={previews.relationships}
             key={section.id}
-            previews={previews?.relationships}
             section={section}
           />
         );
