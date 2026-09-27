@@ -27,11 +27,9 @@ vi.mock('@/lib/http/server-fetch', () => ({
 
 const mockReadMerges = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/ovie/shipping-state/live', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/ovie/shipping-state/live')>();
-  return { ...actual, readMerges: mockReadMerges };
-});
+vi.mock('@/lib/ovie/shipping-state/configured.server', () => ({
+  readConfiguredMerges: mockReadMerges,
+}));
 
 vi.mock('@/lib/admin/stripe-metrics', () => ({
   getAdminStripeOverviewMetrics: vi.fn(),
@@ -244,7 +242,7 @@ describe('getOvieMacHudSnapshot', () => {
 
     expect(snapshot.inFlightPullRequests).toMatchObject({
       availability: 'available',
-      totalOpen: 3,
+      totalOpen: 115,
       truncated: true,
     });
     expect(snapshot.inFlightPullRequests.items.map(pr => pr.number)).toEqual([

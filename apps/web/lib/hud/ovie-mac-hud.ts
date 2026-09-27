@@ -340,12 +340,15 @@ export function composeOvieMacHudInFlightPullRequests(input: {
     .sort(comparePullRequests);
 
   // `totalOpen` counts in-flight (lane or queued) PRs, not every open PR:
-  // dependabot and parked human branches are not in flight.
+  // dependabot and parked human branches are not in flight. A truncated
+  // source page can hide more, so its reported total stays the lower bound.
   const sourceTruncated = input.sourceTruncated === true;
   const shownItems = items.slice(0, limit);
   return {
     availability: 'available',
-    totalOpen: items.length,
+    totalOpen: sourceTruncated
+      ? Math.max(input.totalOpen, items.length)
+      : items.length,
     items: shownItems,
     truncated: sourceTruncated || shownItems.length < items.length,
     errorMessage: null,

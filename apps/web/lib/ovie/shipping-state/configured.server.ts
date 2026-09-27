@@ -38,6 +38,14 @@ export function publishConfiguredShippingState(
   });
 }
 
+/**
+ * Org merge counts through the shared configured reader, so the Mac door and
+ * the Delivery card share one 60s cache and one GitHub rate-limit backoff.
+ */
+export function readConfiguredMerges() {
+  return configuredReaders['github-merges']();
+}
+
 /** A warm instance has a projection to serve before reconciling. */
 export function hasCachedConfiguredShippingState(): boolean {
   return getLastKnownShippingState() != null;

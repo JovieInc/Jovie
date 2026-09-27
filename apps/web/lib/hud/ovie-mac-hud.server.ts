@@ -18,7 +18,7 @@ import {
   windowToWeeklyUsd,
 } from '@/lib/hud/ovie-mac-hud';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
-import { defaultLiveIo, readMerges } from '@/lib/ovie/shipping-state/live';
+import { readConfiguredMerges } from '@/lib/ovie/shipping-state/configured.server';
 
 const OVIE_MAC_HUD_IN_FLIGHT_PRS_QUERY = `
 query OvieMacHudInFlightPullRequests($owner: String!, $name: String!) {
@@ -76,15 +76,9 @@ fragment OvieMacHudPrFields on PullRequest {
 }
 `;
 
-/** Org-wide merged PRs, read with the same HUD token as the in-flight list. */
+/** Org-wide merged PRs from the shared, cached configured reader. */
 async function getOvieMacHudShipping(): Promise<OvieMacHudShippingMetric> {
-  const read = await readMerges(
-    defaultLiveIo({
-      githubToken: env.HUD_GITHUB_TOKEN,
-      githubOwner: env.HUD_GITHUB_OWNER,
-      githubRepo: env.HUD_GITHUB_REPO,
-    })
-  );
+  const read = await readConfiguredMerges();
   const merges = read.status === 'ok' ? read.delivery?.merges : null;
   return shippingFromMerges(
     merges

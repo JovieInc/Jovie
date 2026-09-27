@@ -1098,6 +1098,7 @@
   "tests/unit/ovie/shipping-state-dead-sources-guard.test.ts",
   "tests/unit/ovie/shipping-state-sync.test.ts",
   "tests/unit/ovie/shipping-state.client.test.ts",
+  "tests/unit/ovie/shipping-state.configured-merges.test.ts",
   "tests/unit/ovie/shipping-state.configured.server.test.ts",
   "tests/unit/ovie/shipping-state.contract.test.ts",
   "tests/unit/ovie/shipping-state.live-sources.test.ts",
