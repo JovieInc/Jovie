@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/pay/pay-landing-system-b-source.test.tsx
 import {
   Mail,
   MapPin,
@@ -22,7 +23,7 @@ import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 function TipsHero() {
   return (
-    <section className='relative overflow-hidden'>
+    <section className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
       <div className='hero-glow pointer-events-none absolute inset-0' />
       <MarketingHero
         variant='centered'

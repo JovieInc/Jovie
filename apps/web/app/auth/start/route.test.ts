@@ -131,6 +131,24 @@ describe('GET /auth/start', () => {
     );
   });
 
+  it('records whether the Mac app can redeem a typed return code', async () => {
+    const base =
+      'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256&desktop_flow=desktop_flow_nonce_12345';
+
+    await GET(new Request(`${base}&desktop_return_code=1`));
+    expect(hoisted.createStoredAuthState).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        desktopFlow: 'desktop_flow_nonce_12345',
+        desktopReturnCode: true,
+      })
+    );
+
+    await GET(new Request(base));
+    expect(hoisted.createStoredAuthState).toHaveBeenLastCalledWith(
+      expect.objectContaining({ desktopReturnCode: false })
+    );
+  });
+
   it('clears the browser session only after explicit account-switch confirmation', async () => {
     const response = await POST(
       new Request('http://localhost:3112/auth/start', {

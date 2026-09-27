@@ -9,7 +9,6 @@ const FAMILIES = [
   `(pnpm-node-modules-v3-\\w+-\\w+)-${H}-${H}`,
   `(jovie-production-next-cache-v1-\\w+)-${H}`,
   `(\\w+-turbo)-${H}`,
-  '(symphony-selector-v1-\\w+)-.+',
 ].map(s => new RegExp(`^${s}$`));
 
 export function planSuperseded(caches) {

@@ -2069,6 +2069,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('registers the marketing pricing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/pricing/page.tsx';
+    const layoutSource = 'apps/web/app/(marketing)/pricing/layout.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.marketing-pricing'
     );
@@ -2077,7 +2078,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       id: 'web.marketing-pricing',
       platform: 'web',
       owner: 'marketing-pricing',
-      sources: [source],
+      sources: [source, layoutSource],
       viewports: ['desktop', 'mobile'],
     });
 
@@ -2089,6 +2090,47 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.changedScreens, [
       {
         id: 'web.marketing-pricing',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+
+    const layoutResult = evaluateChangedScreens({
+      changedFiles: [{ path: layoutSource, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(layoutResult.issues, []);
+    assert.deepEqual(layoutResult.changedScreens, [
+      {
+        id: 'web.marketing-pricing',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the staged homepage v2 landing page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/new/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-new'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-new',
+      platform: 'web',
+      owner: 'marketing-new',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-new',
         verdict: 'evidence-required',
         findings: [],
       },

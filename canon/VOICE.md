@@ -82,6 +82,19 @@ headlines, stock transitions (furthermore, moreover). The judge rubric's `human`
 dimension catches what regex cannot: triple beats, perfectly symmetrical
 comparisons, question-then-answer, mic-drop closers, callback bookends.
 
+### Public narrative ownership
+
+Tim owns Jovie's public narrative. Summer may speak as Tim's operator, and
+agents may draft, but a model is never named as the author, excuse, or cause of
+how a launch, post, email, release note, or status landed with people. This
+includes ironic blame, credit, and community-reception jokes. Public copy stays
+plain and specific, with receipts when a claim needs proof. Astra is opt-in and
+is never Jovie's default public voice.
+
+Any public draft that attributes its writing or reception to AI or a named
+model is a floor failure and must not be shown or sent. Short, dry, or snarky
+copy remains valid in the `founder-tim` register when Tim owns the words.
+
 ---
 
 ## Registers
@@ -218,5 +231,6 @@ humans; they do not create it.
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-09-03 | EVENT: Tim owns public narrative. Block model-authorship, AI-alibi, and model-blamed reception copy; Astra remains opt-in. | Tim lock `no-astra-comms-dick-v1` (JOV-5977) |
 | 2026-09-25 | Became the single copy canon. Added the floor, registers, stakes tiers, send authority, landing pipeline, and `@jovie/copy` as the only executable rule set. Em dashes banned everywhere. Retired Slop Gate. | Tim White |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

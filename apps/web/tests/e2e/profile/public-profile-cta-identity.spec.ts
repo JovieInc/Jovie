@@ -1,5 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import {
+  expectCenteredPhoneColumn,
+  expectDesktopSurfaceBuildMatches,
+  PROFILE_DESKTOP_SURFACE_SHIPPED,
+} from '../utils/profile-desktop-surface';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
 import { waitForHydration } from '../utils/smoke-test-utils';
 
@@ -105,12 +110,19 @@ test.describe('Public profile CTA and identity evidence', () => {
       expect(response?.status()).toBe(200);
       await waitForHydration(page);
 
-      const desktop = viewport.width === 1440;
+      // 1440 only owns the wide surface when the build ships it; by default
+      // desktop keeps the mobile profile in a centered phone column.
+      const desktop =
+        viewport.width === 1440 && PROFILE_DESKTOP_SURFACE_SHIPPED;
       const layout = page.getByTestId('public-profile-layout-shell');
       await expect(layout).toHaveAttribute(
         'data-layout',
         desktop ? 'desktop' : 'compact'
       );
+      await expectDesktopSurfaceBuildMatches(page);
+      if (viewport.width === 1440 && !desktop) {
+        await expectCenteredPhoneColumn(page);
+      }
       if (desktop) {
         const surface = page.getByTestId('profile-desktop-surface');
         await expect(surface).toBeVisible();
@@ -174,7 +186,7 @@ test.describe('Public profile CTA and identity evidence', () => {
         expect(metrics?.renderedGap, metricsReceipt).toBeGreaterThanOrEqual(0);
         expect(metrics?.renderedGap, metricsReceipt).toBeLessThanOrEqual(4);
         await expect(
-          page.getByRole('button', { name: 'Shows', exact: true })
+          page.getByRole('button', { name: 'Events', exact: true })
         ).toBeVisible();
       }
       await capture(`${viewport.id}-identity.png`);
@@ -204,7 +216,7 @@ test.describe('Public profile CTA and identity evidence', () => {
         await expect(navigation).toBeVisible();
         await expect(
           navigation.getByRole('button', {
-            name: 'Shows',
+            name: 'Events',
             exact: true,
           })
         ).toBeVisible();
@@ -214,22 +226,22 @@ test.describe('Public profile CTA and identity evidence', () => {
             exact: true,
           })
         ).toHaveAttribute('aria-current', 'page');
-        // Shows stays in shared nav even when empty. Wave 1 owns empty-state
+        // Events stays in shared nav even when empty. Wave 1 owns empty-state
         // copy; this card is destination naming only.
         const overview = surface.getByTestId('profile-desktop-home-overview');
         await expect(overview).toBeVisible();
         const events = overview.locator('section').filter({
-          has: page.getByRole('heading', { name: 'Shows', exact: true }),
+          has: page.getByRole('heading', { name: 'Events', exact: true }),
         });
         await expect(events).toBeVisible();
         await expect(
-          events.getByRole('heading', { name: 'Shows', exact: true })
+          events.getByRole('heading', { name: 'Events', exact: true })
         ).toBeVisible();
         await expect(
           events.getByText('No live shows listed.', { exact: true })
         ).toBeVisible();
         await expect(
-          events.getByRole('button', { name: 'View Shows' })
+          events.getByRole('button', { name: 'View Events' })
         ).toHaveCount(0);
         await expect(
           events.getByRole('button', { name: 'Turn On Event Alerts' })
@@ -243,7 +255,7 @@ test.describe('Public profile CTA and identity evidence', () => {
       );
       const eventsNav = page
         .getByTestId('profile-bottom-nav')
-        .getByRole('button', { name: 'Shows', exact: true });
+        .getByRole('button', { name: 'Events', exact: true });
       await eventsNav.click();
       const emptyEvents = page.getByTestId('profile-primary-tab-events-empty');
       await expect(emptyEvents).toBeVisible();

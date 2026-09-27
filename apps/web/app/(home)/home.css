@@ -1561,26 +1561,20 @@ body:has(.home-viewport)::-webkit-scrollbar {
   [data-testid="header-nav"][data-presentation="homepage-embedded"]
   nav
   > div {
-  height: calc(var(--space-10) + var(--space-1)) !important;
+  /* Docked bar (Tim direction 2026-09-26): the row fills the header height
+     and never carries its own surface. The glass layer is the header's
+     ::before (MarketingHeader.css), so geometry is identical at rest and
+     scrolled — no pill, no margin, no layout shift at the threshold. */
+  height: var(--homepage-header-height) !important;
   max-width: var(--ds-public-content-max);
-  /* Constant margin in both rest and scrolled states: the glass fade-in must
-     never move the pill (scroll jank fix — margin changes skip the color-only
-     transition and jump the bar 8px at the scroll threshold). */
-  margin-top: var(--space-2);
+  margin-top: 0;
   padding-inline: 0;
   border-color: transparent;
-  border-radius: calc(var(--space-5) + var(--space-0-5));
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  transition:
-    background-color var(--ds-motion-subtle-duration)
-    var(--ds-motion-subtle-easing),
-    border-color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    box-shadow var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    backdrop-filter var(--ds-motion-subtle-duration)
-    var(--ds-motion-subtle-easing);
 }
 
 .home-viewport[data-scrolled="true"]
@@ -1624,16 +1618,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
   > div {
   max-width: var(--ds-public-content-max);
   padding-inline: 0;
-  border-radius: calc(var(--space-5) + var(--space-0-5));
-  border-color: color-mix(
-    in oklab,
-    var(--system-b-text-primary) 6%,
-    transparent
-  );
-  background: color-mix(in oklab, var(--system-b-bg-page) 78%, transparent);
+  border-radius: 0;
+  border-color: transparent;
+  background: transparent;
   box-shadow: none;
-  backdrop-filter: blur(var(--space-5)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--space-5)) saturate(150%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .homepage-hero-shell {
@@ -2233,6 +2223,39 @@ body:has(.home-viewport)::-webkit-scrollbar {
     transition: none;
   }
 }
+
+/* JOV-6296 carbon-frame scroll transition. The hero mounts as a true
+   full-viewport field; across the first bounded scroll interval it settles
+   into a rounded frame on near-black gutters. The animation is scroll-driven
+   and geometry-only (scale + radius on the composited section), so layout,
+   the search geometry, and the shared header never move. Browsers without
+   scroll() timelines and reduced-motion users keep the certified still. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-viewport {
+      background: var(--system-b-cinematic-black);
+    }
+
+    .homepage-editorial-hero {
+      will-change: transform;
+      animation: homepage-editorial-hero-frame linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0px 40vh;
+    }
+  }
+}
+
+@keyframes homepage-editorial-hero-frame {
+  from {
+    border-radius: 0;
+    transform: scale(1);
+  }
+
+  to {
+    border-radius: var(--system-b-radius-panel);
+    transform: scale(0.96);
+  }
+}
 /* HOMEPAGE EDITORIAL HERO END */
 
 /* HOMEPAGE CERTIFIED SECTIONS START */
@@ -2582,11 +2605,70 @@ body:has(.home-viewport)::-webkit-scrollbar {
   background: #020305;
 }
 
+/* JOV-6297: one editorial surface carrying the approved customer-zero
+   profile — real avatar + public facts beside the real product export. */
+.homepage-connected-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(var(--space-8), 5vw, var(--space-16));
+  height: 100%;
+  padding: clamp(var(--space-6), 4vw, var(--space-12));
+}
+
+.homepage-connected-profile__identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.homepage-connected-profile__avatar {
+  width: clamp(3rem, 4.5vw, 6rem);
+  height: auto;
+  border-radius: 50%;
+}
+
+.homepage-connected-profile__name {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.homepage-connected-profile__url {
+  margin: 0;
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
 .homepage-connected-artwork__image {
   display: block;
-  width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+@media (max-width: 767px) {
+  .homepage-connected-artwork {
+    aspect-ratio: auto;
+  }
+
+  .homepage-connected-profile {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .homepage-connected-artwork__image {
+    width: min(100%, 16rem);
+    height: auto;
+    margin-inline: auto;
+  }
 }
 
 .homepage-relationship-outcomes {
@@ -2627,6 +2709,76 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-secondary-token);
   font-size: 1.125rem;
   line-height: 1.5;
+}
+
+/* JOV-6297: static ordered states of the shipped visibility surfaces —
+   the public profile people read and the per-profile llms.txt agents read. */
+.homepage-relationship-visibility {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  margin: clamp(var(--space-8), 3vw, var(--space-11)) 0 0;
+  padding: var(--space-6) 0 0;
+  border-top: 1px solid var(--homepage-chapter-rule);
+  list-style: none;
+}
+
+.homepage-relationship-visibility__state {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.homepage-relationship-visibility__label {
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.homepage-relationship-visibility__artifact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: 1px solid var(--homepage-chapter-rule);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.homepage-relationship-visibility__screen {
+  display: block;
+  width: min(100%, 9rem);
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
+.homepage-relationship-visibility__llms {
+  margin: 0;
+  overflow-x: auto;
+  color: var(--color-text-secondary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.homepage-relationship-visibility__url {
+  margin: 0;
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+@media (min-width: 768px) {
+  .homepage-relationship-visibility {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
 
 .homepage-editorial-changelog {
@@ -3559,7 +3711,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     [data-testid="header-nav"][data-presentation="homepage-embedded"]
     nav
     > div {
-    height: calc(var(--space-10) + var(--space-1)) !important;
+    height: var(--homepage-header-height) !important;
   }
 
   .home-viewport[data-scrolled="true"]

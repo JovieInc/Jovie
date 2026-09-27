@@ -62,14 +62,24 @@ describe('HomepageCertifiedSections', () => {
       HOMEPAGE_LAUNCH_COPY.certified.sections[0].body
     );
     expect(connected.querySelector('.ap-phone-frame')).toBeNull();
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'src',
-      '/assets/generated/homepage-identity-optical-v1.webp'
-    );
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'alt',
-      'A conceptual photographic assembly of a profile identity'
-    );
+
+    // JOV-6297: the conceptual artwork is replaced by the approved
+    // customer-zero profile surface — real avatar, name, and public URL
+    // beside the real product export.
+    expect(
+      within(connected)
+        .getByAltText('Tim White Profile — Listen')
+        .getAttribute('src')
+    ).toContain('tim-white-profile-listen-phone.png');
+    const avatar = connected.querySelector<HTMLImageElement>(
+      '.homepage-connected-profile__avatar'
+    )!;
+    expect(avatar).toHaveAttribute('src', '/images/avatars/tim-white.jpg');
+    expect(connected).toHaveTextContent('Tim White');
+    expect(connected).toHaveTextContent('jov.ie/tim');
+    expect(
+      connected.querySelector('[src*="homepage-identity-optical"]')
+    ).toBeNull();
 
     const relationships = document.querySelector<HTMLElement>(
       '[data-homepage-testid="homepage-section-relationships"]'
@@ -81,13 +91,35 @@ describe('HomepageCertifiedSections', () => {
     expect(relationships).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
     );
-    expect(relationships.querySelectorAll('img')).toHaveLength(0);
-    expect(within(relationships).getByRole('list')).toHaveAttribute(
-      'aria-label',
-      'Relationships'
-    );
+    const outcomesList = within(relationships)
+      .getAllByRole('list')
+      .find(list => list.getAttribute('aria-label') === 'Relationships')!;
+    expect(outcomesList).toBeDefined();
 
-    const outcomes = within(relationships).getAllByRole('listitem');
+    // JOV-6297: static ordered states of the shipped visibility surfaces —
+    // the public profile for people and the documented {username}/llms.txt
+    // for agents. No simulated third-party answer or vendor claim.
+    const visibility = within(relationships).getByRole('list', {
+      name: 'One Profile, Legible To People And To Agents',
+    });
+    const states = within(visibility).getAllByRole('listitem');
+    expect(states).toHaveLength(2);
+    expect(states[0]).toHaveAttribute('data-audience', 'people');
+    expect(states[1]).toHaveAttribute('data-audience', 'agents');
+    expect(states[0]).toHaveTextContent('People');
+    expect(states[0]).toHaveTextContent('jov.ie/tim');
+    expect(
+      within(states[0])
+        .getByAltText('Tim White Profile — Subscribe')
+        .getAttribute('src')
+    ).toContain('tim-white-profile-subscribe-phone.png');
+    expect(states[1]).toHaveTextContent('Agents');
+    expect(states[1]).toHaveTextContent('# Tim White');
+    expect(states[1]).toHaveTextContent('Canonical URL');
+    expect(states[1]).toHaveTextContent('jov.ie/tim/llms.txt');
+    expect(relationships).not.toHaveTextContent('VERIFIED');
+
+    const outcomes = within(outcomesList).getAllByRole('listitem');
     expect(outcomes).toHaveLength(3);
     expect(outcomes.map(outcome => outcome.textContent)).toEqual([
       expect.stringContaining('Be found. Be understood.'),

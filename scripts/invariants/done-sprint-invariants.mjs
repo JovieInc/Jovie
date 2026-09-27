@@ -145,6 +145,14 @@ export function scanDoneSprintSources(repoRoot = DEFAULT_ROOT) {
   return errors;
 }
 
+const safeHost = value => {
+  try {
+    return typeof value === 'string' && value ? new URL(value).host : '';
+  } catch {
+    return '';
+  }
+};
+
 /**
  * @param {{
  *   env?: NodeJS.ProcessEnv,
@@ -167,6 +175,10 @@ export async function rescanProduction({
     ];
   }
 
+  // Immutable Vercel deployment URLs sit behind deployment protection. Send
+  // the automation bypass when the release passes it; otherwise a followed
+  // redirect lands on the SSO page and every marker reads as missing.
+  const bypassSecret = (env.VERCEL_AUTOMATION_BYPASS_SECRET || '').trim();
   const errors = [];
   let fetched = 0;
   for (const path of paths) {
@@ -174,7 +186,12 @@ export async function rescanProduction({
     let response;
     try {
       response = await fetchImpl(url, {
-        headers: { Accept: 'text/html' },
+        headers: {
+          Accept: 'text/html',
+          ...(bypassSecret
+            ? { 'x-vercel-protection-bypass': bypassSecret }
+            : {}),
+        },
         redirect: 'follow',
       });
     } catch (error) {
@@ -186,6 +203,13 @@ export async function rescanProduction({
     if (!response?.ok) {
       errors.push(
         `done-sprint: production ${url} returned HTTP ${response?.status ?? 'unknown'}; fail closed`
+      );
+      continue;
+    }
+    const landedHost = safeHost(response?.url);
+    if (landedHost && landedHost !== safeHost(url)) {
+      errors.push(
+        `done-sprint: production fetch ${url} was redirected to ${landedHost} (deployment protection without a bypass secret); fail closed`
       );
       continue;
     }

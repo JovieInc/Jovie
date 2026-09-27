@@ -8,11 +8,7 @@ export default defineConfig({
   root: __dirname,
   test: {
     environment: 'node',
-    include: [
-      'lib/__tests__/**/*.test.mjs',
-      'gate-ladder/**/*.test.mjs',
-      'symphony/lib/__tests__/**/*.test.ts',
-    ],
+    include: ['lib/__tests__/**/*.test.mjs', 'gate-ladder/**/*.test.mjs'],
     name: 'workspace-scripts',
   },
 });
