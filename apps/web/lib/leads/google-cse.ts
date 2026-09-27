@@ -13,6 +13,62 @@ export interface GoogleCSEResult {
 }
 
 // ---------------------------------------------------------------------------
+// Typed provider outcomes
+//
+// Discovery must distinguish "provider failed" from "genuinely zero demand".
+// A failure is never reported as an empty result set and must not earn a
+// successful-run receipt or reset pagination as though the index was exhausted.
+// ---------------------------------------------------------------------------
+
+export type SearchProviderName = 'serpapi' | 'google_cse' | 'none';
+
+export type SearchStatus =
+  /** Provider executed successfully and returned results. */
+  | 'ok'
+  /** Provider executed successfully and returned zero results (true empty). */
+  | 'empty'
+  /** No provider credentials configured — no request was made. */
+  | 'not_configured'
+  /** Rate/quota limited (HTTP 429, daily limit exceeded, SerpAPI quota error). */
+  | 'quota_exceeded'
+  /** Blocked or unauthorized (HTTP 401/403). */
+  | 'unauthorized'
+  /** Request timed out. */
+  | 'timeout'
+  /** Any other provider or network failure. */
+  | 'provider_error';
+
+export interface SearchOutcome {
+  status: SearchStatus;
+  provider: SearchProviderName;
+  results: GoogleCSEResult[];
+  error: string | null;
+}
+
+function outcome(
+  status: SearchStatus,
+  provider: SearchProviderName,
+  results: GoogleCSEResult[] = [],
+  error: string | null = null
+): SearchOutcome {
+  return { status, provider, results, error };
+}
+
+function classifyHttpStatus(status: number): SearchStatus {
+  if (status === 429) return 'quota_exceeded';
+  if (status === 401 || status === 403) return 'unauthorized';
+  return 'provider_error';
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return (
+    (error instanceof Error &&
+      (error.name === 'AbortError' || error.name === 'TimeoutError')) ||
+    (error instanceof Error && /timed out/i.test(error.message))
+  );
+}
+
+// ---------------------------------------------------------------------------
 // SerpAPI integration
 // ---------------------------------------------------------------------------
 
@@ -25,11 +81,31 @@ interface SerpAPIResponse {
   error?: string;
 }
 
+function classifySerpAPIError(
+  message: string,
+  httpStatus: number
+): SearchStatus {
+  if (
+    httpStatus === 429 ||
+    /quota|rate limit|run out of searches/i.test(message)
+  ) {
+    return 'quota_exceeded';
+  }
+  if (
+    httpStatus === 401 ||
+    httpStatus === 403 ||
+    /invalid api key/i.test(message)
+  ) {
+    return 'unauthorized';
+  }
+  return 'provider_error';
+}
+
 async function searchSerpAPI(
   query: string,
   startIndex: number,
   apiKey: string
-): Promise<GoogleCSEResult[]> {
+): Promise<SearchOutcome> {
   const url = new URL('https://serpapi.com/search.json');
   url.searchParams.set('api_key', apiKey);
   url.searchParams.set('engine', 'google');
@@ -50,12 +126,17 @@ async function searchSerpAPI(
 
     if (!response.ok || data.error) {
       const errorMsg = data.error || `SerpAPI returned ${response.status}`;
-      pipelineWarn('discovery', 'SerpAPI error', { error: errorMsg, query });
+      const status = classifySerpAPIError(errorMsg, response.status);
+      pipelineWarn('discovery', 'SerpAPI error', {
+        error: errorMsg,
+        query,
+        status,
+      });
       await captureError('SerpAPI error', new Error(errorMsg), {
         route: 'leads/google-cse',
         contextData: { query, startIndex, status: response.status },
       });
-      return [];
+      return outcome(status, 'serpapi', [], errorMsg);
     }
 
     const results = (data.organic_results ?? []).map(item => ({
@@ -69,14 +150,23 @@ async function searchSerpAPI(
       resultCount: results.length,
     });
 
-    return results;
+    return outcome(results.length > 0 ? 'ok' : 'empty', 'serpapi', results);
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(
+    if (isTimeoutError(error)) {
+      pipelineWarn('discovery', 'SerpAPI request timed out', { query });
+      return outcome(
+        'timeout',
+        'serpapi',
+        [],
         `SerpAPI request timed out after ${GOOGLE_CSE_TIMEOUT_MS}ms`
       );
     }
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    await captureError('SerpAPI request failed', error, {
+      route: 'leads/google-cse',
+      contextData: { query, startIndex },
+    });
+    return outcome('provider_error', 'serpapi', [], message);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -95,27 +185,44 @@ interface GoogleCSEResponse {
   error?: { code: number; message: string };
 }
 
+function classifyCSEError(error: {
+  code: number;
+  message: string;
+}): SearchStatus {
+  if (
+    error.code === 429 ||
+    /dailyLimitExceeded|quotaExceeded|rateLimitExceeded/i.test(error.message)
+  ) {
+    return 'quota_exceeded';
+  }
+  return classifyHttpStatus(error.code);
+}
+
 async function handleCSEApiError(
   error: { code: number; message: string },
   context: { query: string; startIndex: number; attempt: number },
   isLastAttempt: boolean
-): Promise<'retry' | 'empty'> {
-  if (error.code === 429) {
+): Promise<'retry' | SearchOutcome> {
+  const status = classifyCSEError(error);
+
+  if (status === 'quota_exceeded') {
     pipelineWarn('discovery', 'Google CSE quota exhausted (429)', {
       query: context.query,
       attempt: context.attempt,
     });
-    return 'empty';
+    return outcome(status, 'google_cse', [], error.message);
   }
+
   if (isRetryableStatus(error.code) && !isLastAttempt) {
     await sleep(calculateRetryDelayMs(context.attempt));
     return 'retry';
   }
+
   await captureError('Google CSE API error', new Error(error.message), {
     route: 'leads/google-cse',
     contextData: { code: error.code, ...context },
   });
-  return 'empty';
+  return outcome(status, 'google_cse', [], error.message);
 }
 
 async function searchGoogleCSEInternal(
@@ -123,12 +230,10 @@ async function searchGoogleCSEInternal(
   startIndex: number,
   apiKey: string,
   engineId: string
-): Promise<GoogleCSEResult[]> {
+): Promise<SearchOutcome> {
   pipelineLog('discovery', 'CSE search started', { query, startIndex });
 
-  const url = new URL(
-    'https://www.googleapis.com/customsearch/v1/siterestrict'
-  );
+  const url = new URL('https://www.googleapis.com/customsearch/v1');
   url.searchParams.set('key', apiKey);
   url.searchParams.set('cx', engineId);
   url.searchParams.set('q', query);
@@ -150,7 +255,7 @@ async function searchGoogleCSEInternal(
           isLastAttempt
         );
         if (action === 'retry') continue;
-        return [];
+        return action;
       }
 
       const results = (data.items ?? []).map(item => ({
@@ -164,22 +269,40 @@ async function searchGoogleCSEInternal(
         resultCount: results.length,
       });
 
-      return results;
+      return outcome(
+        results.length > 0 ? 'ok' : 'empty',
+        'google_cse',
+        results
+      );
     } catch (error) {
+      if (isTimeoutError(error)) {
+        pipelineWarn('discovery', 'Google CSE request timed out', {
+          query,
+          attempt,
+        });
+        return outcome(
+          'timeout',
+          'google_cse',
+          [],
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+
       if (!isLastAttempt) {
         await sleep(calculateRetryDelayMs(attempt));
         continue;
       }
 
+      const message = error instanceof Error ? error.message : String(error);
       await captureError('Google CSE request failed', error, {
         route: 'leads/google-cse',
         contextData: { query, startIndex, attempts: attempt },
       });
-      return [];
+      return outcome('provider_error', 'google_cse', [], message);
     }
   }
 
-  return [];
+  return outcome('provider_error', 'google_cse', [], 'exhausted retries');
 }
 
 // ---------------------------------------------------------------------------
@@ -187,14 +310,16 @@ async function searchGoogleCSEInternal(
 // ---------------------------------------------------------------------------
 
 /**
- * Searches for results using SerpAPI (preferred) or Google CSE (legacy).
+ * Searches with a typed outcome so callers can distinguish a genuine empty
+ * result from a missing configuration, quota, auth, timeout or provider
+ * failure. SerpAPI is preferred; Google CSE is the legacy fallback.
  * @param query - Search query string (e.g. "site:linktr.ee musician spotify")
  * @param startIndex - 1-based offset for pagination (1, 11, 21, ...)
  */
-export async function searchGoogleCSE(
+export async function searchGoogleCSEWithStatus(
   query: string,
   startIndex = 1
-): Promise<GoogleCSEResult[]> {
+): Promise<SearchOutcome> {
   const serpApiKey = process.env.SERPAPI_API_KEY;
   if (serpApiKey) {
     return searchSerpAPI(query, startIndex, serpApiKey);
@@ -211,14 +336,31 @@ export async function searchGoogleCSE(
       !engineId && 'GOOGLE_CSE_ENGINE_ID',
     ].filter(Boolean);
     pipelineWarn('discovery', 'Search API not configured', { missing });
-    return [];
+    return outcome(
+      'not_configured',
+      'none',
+      [],
+      `missing env: ${missing.join(', ')}`
+    );
   }
 
   return searchGoogleCSEInternal(query, startIndex, apiKey, engineId);
 }
 
+/**
+ * Back-compat wrapper: returns only the results array. Prefer
+ * {@link searchGoogleCSEWithStatus} for truthful failure handling.
+ */
+export async function searchGoogleCSE(
+  query: string,
+  startIndex = 1
+): Promise<GoogleCSEResult[]> {
+  const result = await searchGoogleCSEWithStatus(query, startIndex);
+  return result.results;
+}
+
 function isRetryableStatus(statusCode: number): boolean {
-  return statusCode === 408 || statusCode === 429 || statusCode >= 500;
+  return statusCode === 408 || statusCode >= 500;
 }
 
 function calculateRetryDelayMs(attempt: number): number {
