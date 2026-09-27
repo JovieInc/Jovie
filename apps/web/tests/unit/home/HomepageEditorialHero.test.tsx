@@ -1,26 +1,27 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
 import {
   HOMEPAGE_CERTIFIED_EVENTS,
   HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT,
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
 
-const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
-vi.mock('@/components/homepage/homepage-analytics', () => ({
-  trackHomepageEvent: trackAction,
-}));
-
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
+const push = vi.hoisted(() => vi.fn());
+const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+  page: vi.fn(),
+}));
 beforeEach(() => {
-  gate.WAITLIST_ENABLED = false;
+  gate.WAITLIST_ENABLED = true;
+  push.mockClear();
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -44,43 +45,31 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
-  it('attributes a standalone closing access action to its caller', () => {
-    gate.WAITLIST_ENABLED = true;
-    render(
-      <HomepagePrimaryAction
-        submitTestId='closing-access'
-        submitAnalytics={{
-          eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-          properties: { placement: 'close' },
-        }}
-      />
-    );
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(action).toHaveAttribute('href', '/signup');
-    expect(action).toHaveAttribute('data-testid', 'closing-access');
-    expect(trackAction).toHaveBeenLastCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      { placement: 'close' }
-    );
-  });
-  it('routes waitlist-on visitors to access with no name-search control', () => {
+  it('keeps Search your name → Find me → /start while the waitlist flag is on', async () => {
     gate.WAITLIST_ENABLED = true;
     renderHero();
+
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(trackAction).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      expect.objectContaining({ placement: 'hero' })
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Get started' })
+    ).not.toBeInTheDocument();
+
+    const input = screen.getByRole('combobox');
+    expect(input).toHaveAttribute('placeholder', 'Search your name');
+    const user = userEvent.setup();
+    await user.type(input, 'Ada Lovelace');
+    await user.click(screen.getByRole('button', { name: 'Find me' }));
+
+    expect(push).toHaveBeenCalledTimes(1);
+    const url = String(push.mock.calls[0]?.[0]);
+    expect(url.startsWith('/start?')).toBe(true);
+    expect(new URLSearchParams(url.split('?')[1]).get('starter_prompt')).toBe(
+      "hey, I'm Ada Lovelace. show me my Spotify."
     );
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();
 
