@@ -5,8 +5,11 @@ import {
   aggregateContinuity,
   classifyEndpointObservation,
   continuityIncidentKey,
+  FRESHNESS_INCIDENT_CLASS,
+  FRESHNESS_TARGET_ID,
   forecastBudgetExhaustion,
   observeProductionContinuity,
+  observeProductionFreshness,
   parseCliArgs,
   parseTargets,
   planBudgetContinuityAction,
@@ -300,6 +303,189 @@ describe('founder-first staged budget policy', () => {
         incidentKey: '',
         currentSpendUsd: -1,
       })
+    );
+  });
+});
+
+describe('production freshness', () => {
+  const LIVE = 'c'.repeat(40);
+  const MAIN = 'd'.repeat(40);
+  const freshnessFetch = ({
+    liveSha = LIVE,
+    mainSha = MAIN,
+    aheadBy = 4,
+    oldestAt = '2026-09-13T13:00:00Z',
+    failCompare = false,
+  } = {}) => {
+    const calls = [];
+    const json = (body, status = 200) => ({
+      status,
+      json: async () => body,
+      text: async () => JSON.stringify(body),
+      headers: {},
+    });
+    const fetchImpl = async (url, init) => {
+      calls.push({ url, init });
+      if (url.endsWith('/build-info')) return json({ commitSha: liveSha });
+      if (url.endsWith('/commits/main')) return json({ sha: mainSha });
+      if (url.includes('/compare/')) {
+        if (failCompare) return json({ message: 'boom' }, 500);
+        return json({
+          status: aheadBy > 0 ? 'ahead' : 'identical',
+          ahead_by: aheadBy,
+          commits:
+            aheadBy > 0 ? [{ commit: { committer: { date: oldestAt } } }] : [],
+        });
+      }
+      return json({}, 404);
+    };
+    return { calls, fetchImpl };
+  };
+  const observe = (overrides, options = {}) =>
+    observeProductionFreshness({
+      fetchImpl: freshnessFetch(overrides).fetchImpl,
+      now: NOW,
+      repository: 'JovieInc/Jovie',
+      token: 'ghs_test',
+      ...options,
+    });
+
+  it('reports production-stale once main has carried unshipped commits past the bound', async () => {
+    const stale = await observe({ oldestAt: '2026-09-13T13:00:00Z' });
+    assert.equal(stale.healthy, false);
+    assert.equal(stale.incidentClass, FRESHNESS_INCIDENT_CLASS);
+    assert.equal(stale.id, FRESHNESS_TARGET_ID);
+    assert.equal(stale.unshippedCommits, 4);
+    assert.equal(stale.unshippedAgeSeconds, 9492);
+    assert.equal(stale.liveSha, LIVE);
+    assert.equal(stale.mainSha, MAIN);
+
+    const fresh = await observe({ oldestAt: '2026-09-13T15:00:00Z' });
+    assert.equal(fresh.healthy, true);
+    assert.equal(fresh.incidentClass, null);
+    assert.match(fresh.reason, /^unshipped-for-2292s-within-7200s$/);
+  });
+
+  it('is healthy when production already carries main', async () => {
+    const same = await observe({ mainSha: LIVE });
+    assert.deepEqual([same.healthy, same.reason], [true, 'production-current']);
+    const zero = await observe({ aheadBy: 0 });
+    assert.deepEqual([zero.healthy, zero.reason], [true, 'production-current']);
+  });
+
+  it('fails open with a reason when live, main, or the range is unreadable', async () => {
+    const cases = [
+      [{ liveSha: 'nope' }, 'live-sha-unreadable'],
+      [{ mainSha: '' }, 'main-sha-unreadable'],
+      [{ failCompare: true }, 'unshipped-range-unreadable'],
+    ];
+    for (const [overrides, reason] of cases) {
+      const result = await observe(overrides);
+      assert.equal(result.healthy, true, reason);
+      assert.equal(result.reason, reason);
+    }
+    const unconfigured = await observeProductionFreshness({
+      fetchImpl: async () => {
+        throw new Error('must not be called');
+      },
+      repository: '',
+    });
+    assert.deepEqual(
+      [unconfigured.healthy, unconfigured.reason],
+      [true, 'repository-not-configured']
+    );
+  });
+
+  it('sends the GitHub token only to GitHub and never to production', async () => {
+    const { calls, fetchImpl } = freshnessFetch();
+    await observeProductionFreshness({
+      fetchImpl,
+      now: NOW,
+      repository: 'JovieInc/Jovie',
+      token: 'ghs_test',
+    });
+    for (const call of calls) {
+      const authorized = Boolean(call.init?.headers?.Authorization);
+      assert.equal(
+        authorized,
+        call.url.startsWith('https://api.github.com/'),
+        call.url
+      );
+    }
+  });
+
+  it('pages the founder for a stale production without admitting provider recovery', async () => {
+    const stale = await observe({});
+    const staleOnly = aggregateContinuity(
+      [observation({ status: 200 }), stale],
+      {
+        now: NOW,
+      }
+    );
+    assert.equal(staleOnly.status, 'unhealthy');
+    assert.deepEqual(staleOnly.incidentClasses, [FRESHNESS_INCIDENT_CLASS]);
+    assert.equal(staleOnly.requiresFounderNotification, true);
+    assert.equal(staleOnly.requiresAgentIngress, false);
+
+    const paused = aggregateContinuity(
+      [
+        observation({
+          status: 503,
+          headers: { 'x-vercel-error': 'DEPLOYMENT_PAUSED' },
+        }),
+        stale,
+      ],
+      { now: NOW }
+    );
+    assert.equal(paused.requiresAgentIngress, true);
+  });
+
+  it('includes freshness in the CLI only when a repository is configured', async () => {
+    const { fetchImpl } = freshnessFetch({ oldestAt: '2026-09-13T13:00:00Z' });
+    const outputs = [];
+    const result = await runCli({
+      appendFileImpl: async (_path, text) => outputs.push(text),
+      argv: ['--github-output', '/dev/null'],
+      env: { GITHUB_REPOSITORY: 'JovieInc/Jovie', GH_TOKEN: 'ghs_test' },
+      fetchImpl: async (url, init) => {
+        if (
+          url.endsWith('/runtime/v1/health') ||
+          url === 'https://jov.ie/api/health/build-info'
+        ) {
+          return {
+            status: 200,
+            text: async () => '{"commitSha":"' + LIVE + '"}',
+            json: async () => ({ commitSha: LIVE }),
+            headers: {},
+          };
+        }
+        return fetchImpl(url, init);
+      },
+      now: NOW,
+      stdout: { write() {} },
+      writeFileImpl: async () => {},
+    });
+    assert.equal(result.status, 'unhealthy');
+    assert.deepEqual(result.affectedTargets, [FRESHNESS_TARGET_ID]);
+    assert.match(outputs.join(''), /requires_agent_ingress=false/);
+
+    const without = await runCli({
+      appendFileImpl: async () => {},
+      argv: [],
+      env: {},
+      fetchImpl: async () => ({
+        status: 200,
+        text: async () => 'ok',
+        json: async () => ({}),
+        headers: {},
+      }),
+      now: NOW,
+      stdout: { write() {} },
+      writeFileImpl: async () => {},
+    });
+    assert.equal(
+      without.targets.some(t => t.id === FRESHNESS_TARGET_ID),
+      false
     );
   });
 });
