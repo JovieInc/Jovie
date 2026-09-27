@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ratchet": {
+    "minimumSamples": 3,
+    "warningRegression": 0.1,
+    "failureRegression": 0.2
+  },
+  "scenarios": {
+    "cold-full": { "baselineP95Ms": 107867, "targetP95Ms": 135000 },
+    "warm-full": { "baselineP95Ms": 10120, "targetP95Ms": 15000 },
+    "leaf-edit": { "baselineP95Ms": 19445, "targetP95Ms": 25000 },
+    "wide-edit": { "baselineP95Ms": 95904, "targetP95Ms": 120000 },
+    "package": { "baselineP95Ms": 3170, "targetP95Ms": 5000 },
+    "ci": { "baselineP95Ms": 69791, "targetP95Ms": 90000 },
+    "diagnostics": { "baselineP95Ms": 10770, "targetP95Ms": 15000 }
+  }
+}

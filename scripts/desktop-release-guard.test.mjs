@@ -874,10 +874,13 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
     /runs\/\$TRIGGER_RUN_ID\/attempts\/\$TRIGGER_RUN_ATTEMPT\/jobs\?per_page=100/,
     /\.name == "Production Verified"/,
     /\[ "\$verified_count" = "1" \]/,
+    /\.conclusion == "skipped"/,
+    /\[ "\$\{verified_skipped:-0\}" = "1" \]/,
+    /controller yielded the release lease/,
     /production-generation-verified-\$expected_sha/,
     /repos\/\$REPOSITORY\/commits\/main/,
   ]);
-  assert.equal(proof.match(/' <<<"\$jobs_json"\)"$/gm)?.length, 1);
+  assert.equal(proof.match(/' <<<"\$jobs_json"\)"$/gm)?.length, 2);
   assert.doesNotMatch(proof, /TRIGGER_RUN_NAME/);
   assert.doesNotMatch(header, /contents: write/);
   assert.doesNotMatch(authorize, /secrets\./);

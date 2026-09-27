@@ -10,6 +10,7 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-09-27 | [Production freeze: SBOM step failed every promotion after #18879](2026-09-27-sbom-provenance-freeze.md) | `pre-merge-parity-gap`, `silent-production-staleness`, `green-by-implication` | draft |
 | 2026-09-26 | [Production freeze: jov.ie stuck on `eb15ae0` for five days](2026-09-26-production-freeze.md) | `silent-production-staleness`, `pre-merge-parity-gap`, `serial-layer-discovery`, `non-convergent-control-loop`, `green-by-implication`, `privileged-recovery-only`, `unowned-incident` | reviewed |
 | 2026-07 | [CI/release drain: incident prevention and inheritance](2026-07-ci-release-drain.md) | see the [39-incident CI/release index](../ci/CI_RELEASE_INCIDENTS.md) and [machine ledger](../../.github/ci-harness/ci-release-incidents.json) | contract |
 
@@ -43,8 +44,9 @@ agent that sees a trigger event opens it if none exists:
   loop open or link one for the events above.
 - **Closure gate.** An `incident` issue cannot close until a post-mortem file
   exists on `main`. The closing PR adds or links `docs/postmortems/*.md`, and
-  CI enforces this (JOV-6689). Until that check ships, Summer enforces it in
-  review (JOV-6690).
+  CI enforces this (`scripts/postmortem-linkage-check.mjs`, JOV-6689): warn
+  until `blockingAfter` in `.github/postmortem-linkage-policy.json`, then
+  blocking. Summer keeps enforcing it in review (JOV-6690).
 
 The agent that lands the recovering fix writes the post-mortem within 24 hours
 of recovery. It goes in the fix PR or in a follow-up docs PR. If that agent's
