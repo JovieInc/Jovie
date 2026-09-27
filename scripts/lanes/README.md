@@ -14,6 +14,9 @@ The harness, not the model, owns:
 | Concern | Where |
 |---|---|
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
+| One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
+| Open-PR budget: a lane holding `slots × 2` open non-green PRs only fixes/adopts until it drains | `over_budget()` |
+| Sweep (every 30 min per lane): close duplicate PRs as superseded, close drafts with no green run and no push for 24 h, issue back to Todo | `sweep_lane_prs()` |
 | Slot locks that die with their holder | `Locked` |
 | Fresh worktree from `origin/main`, `pnpm install --prefer-offline`, removal after | `run_issue()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
