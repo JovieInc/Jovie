@@ -1,14 +1,18 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
 import {
+  DELIVERY_MERGE_REPOS,
+  type DeliveryLane,
+  type DeliveryLanes,
+  type DeliveryMergeRepo,
   isExactSha,
+  measuredCount,
+  NOT_MEASURED_COUNT,
   SHIPPING_SOURCE_SCHEMAS,
   type ShippingSourceId,
 } from './contract';
-import { parseTimestamp } from './envelope';
+import { parseTimestamp, sanitizeOpaqueIdentifier } from './envelope';
 import {
   type AuthorityRead,
+  type AuthorityReader,
   disconnectedRead,
   failedRead,
   isRecord,
@@ -18,41 +22,59 @@ import {
 export const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 export const GITHUB_API_URL = 'https://api.github.com';
 
-export const NAMED_AUTHORITY_PATHS = {
-  'fleet-receipt': '~/gem-workspace/state/gem-priority-gate/latest.json',
+/**
+ * Public, read-only delivery authorities. The lanes harness publishes
+ * `symphony-lanes-status/v1` to a gist; Summer serves its own runtime health.
+ * Everything else is GitHub, read with the HUD token.
+ */
+export const NAMED_AUTHORITY_URLS = {
+  'lanes-status':
+    'https://gist.githubusercontent.com/itstimwhite/07ec460956451da7632fe852934f21c5/raw/lanes-status.json',
+  'live-build-info': 'https://jov.ie/api/health/build-info',
+  'summer-runtime': 'https://summer.jov.ie/runtime/v1/health',
 } as const;
 
 /**
- * Durable `symphony-issue-dead-letter/v1` terminal receipts written once per
- * issue by the official Symphony runtime wrapper. These receipts — not the
- * transient `blocked` list — are the terminal-failure authority.
+ * Per-source read reuse. The publisher polls every few seconds; GitHub search
+ * and GraphQL budgets are shared with every other HUD read, so slow-moving
+ * counts are reused for longer than the poll. Failures retry sooner.
  */
-export const NAMED_AUTHORITY_DIRS = {
-  'symphony-runtime': '~/.local/state/symphony-elixir/dead-letters',
-} as const;
+export const SOURCE_CACHE_TTL_MS = {
+  'lanes-status': 10_000,
+  'lane-pull-requests': 15_000,
+  'github-merges': 60_000,
+  'live-build-info': 30_000,
+  'summer-runtime': 30_000,
+} as const satisfies Partial<Record<ShippingSourceId, number>>;
+const FAILED_READ_CACHE_TTL_MS = 5_000;
+const PUBLIC_SOURCE_TIMEOUT_MS = 3_000;
+const GITHUB_TIMEOUT_MS = 2_500;
+/** Search with `mergeable` computes merge state per PR; it runs ~2.5s. */
+const LANE_SEARCH_TIMEOUT_MS = 6_000;
+const LANE_BRANCH_PREFIXES = ['devin', 'codex'] as const;
+const LANES_STATUS_SCHEMA = 'symphony-lanes-status/v1';
+const LANE_BRANCH_RE = /^(?:devin|codex)\//;
+const DAY_MS = 24 * 60 * 60_000;
 
-const DEAD_LETTER_SCHEMA = 'symphony-issue-dead-letter/v1';
-
-export const NAMED_AUTHORITY_URLS = {
-  'symphony-runtime': 'http://127.0.0.1:4041/api/v1/state',
-  'live-build-info': 'https://jov.ie/api/health/build-info',
-} as const;
-
-const ALLOWED_PATHS = new Set<string>(Object.values(NAMED_AUTHORITY_PATHS));
-const ALLOWED_DIRS = new Set<string>(Object.values(NAMED_AUTHORITY_DIRS));
 const MERGE_QUEUE_QUERY =
-  'query ShippingStateMergeQueue($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:1){totalCount}mergeQueue(branch:"main"){entries(first:20){pageInfo{hasNextPage}nodes{id position state pullRequest{number headRefOid}}}}}}';
+  'query ShippingStateMergeQueue($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:1){totalCount}mergeQueue(branch:"main"){entries(first:20){totalCount pageInfo{hasNextPage}nodes{id position state pullRequest{number headRefOid}}}}}}';
+const LANE_PR_FIELDS =
+  'issueCount nodes{... on PullRequest{number title headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position}}}';
+const LANE_PULL_REQUESTS_QUERY = `query ShippingStateLanePullRequests($query:String!){search(type:ISSUE,first:100,query:$query){${LANE_PR_FIELDS}}}`;
+const MERGES_QUERY =
+  'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:1){issueCount}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
+const BEHIND_MAIN_QUERY =
+  'query ShippingStateBehindMain($owner:String!,$name:String!,$sha:String!){repository(owner:$owner,name:$name){ref(qualifiedName:"main"){compare(headRef:$sha){behindBy}}}}';
 const PRODUCTION_VERIFIED_JOB_NAME = 'Production Verified';
 const GITHUB_RATE_LIMIT_MIN_BACKOFF_MS = 60_000;
 const GITHUB_RATE_LIMIT_MAX_BACKOFF_MS = 60 * 60_000;
 
 export type LiveIo = {
-  readonly readFile: (path: string) => Promise<string>;
-  readonly readDir?: (dir: string) => Promise<readonly string[]>;
   readonly fetch: (url: string, init?: RequestInit) => Promise<Response>;
   readonly githubToken?: string;
   readonly githubOwner?: string;
   readonly githubRepo?: string;
+  readonly nowMs?: () => number;
 };
 
 const githubBackoffUntilByIo = new WeakMap<LiveIo, number>();
@@ -72,96 +94,91 @@ function githubRateLimitBackoffMs(response: Response, nowMs: number): number {
   );
 }
 
-function expandHome(path: string): string {
-  return path.startsWith('~/') ? resolve(homedir(), path.slice(2)) : path;
+function nowOf(io: LiveIo): number {
+  return io.nowMs ? io.nowMs() : Date.now();
 }
 
-export function resolveNamedAuthorityPath(
-  sourceId: ShippingSourceId
-): string | null {
-  if (!(sourceId in NAMED_AUTHORITY_PATHS)) return null;
-  return expandHome(
-    NAMED_AUTHORITY_PATHS[sourceId as keyof typeof NAMED_AUTHORITY_PATHS]
-  );
+/** Start of "today" for merge counts: midnight in America/Los_Angeles. */
+export function pacificMidnightIso(nowMs: number): string {
+  const format = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
+  const offsetAt = (ms: number) => {
+    const parts = format.formatToParts(new Date(ms));
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find(p => p.type === type)?.value);
+    const wall = Date.UTC(
+      part('year'),
+      part('month') - 1,
+      part('day'),
+      part('hour'),
+      part('minute'),
+      part('second')
+    );
+    return {
+      offsetMs: wall - Math.floor(ms / 1000) * 1000,
+      midnightWall: Date.UTC(part('year'), part('month') - 1, part('day')),
+    };
+  };
+  const { offsetMs, midnightWall } = offsetAt(nowMs);
+  // Re-read the offset at the candidate so a DST change after midnight
+  // does not move the boundary by an hour.
+  const candidate = midnightWall - offsetMs;
+  return githubSearchTime(midnightWall - offsetAt(candidate).offsetMs);
 }
 
-export function resolveNamedAuthorityDir(
-  sourceId: ShippingSourceId
-): string | null {
-  if (!(sourceId in NAMED_AUTHORITY_DIRS)) return null;
-  return expandHome(
-    NAMED_AUTHORITY_DIRS[sourceId as keyof typeof NAMED_AUTHORITY_DIRS]
-  );
+function githubSearchTime(ms: number): string {
+  return new Date(Math.floor(ms / 1000) * 1000)
+    .toISOString()
+    .replace('.000Z', 'Z');
 }
 
-export function isAllowlistedAuthorityDir(dir: string): boolean {
-  const expanded = expandHome(dir);
-  for (const named of ALLOWED_DIRS) {
-    if (expanded === expandHome(named) || dir === named) return true;
-  }
-  return false;
-}
-
-export function isAllowlistedAuthorityPath(path: string): boolean {
-  const expanded = expandHome(path);
-  for (const named of ALLOWED_PATHS) {
-    if (expanded === expandHome(named) || path === named) return true;
-  }
-  for (const named of ALLOWED_DIRS) {
-    const dir = expandHome(named);
-    if (expanded.startsWith(`${dir}/`)) return true;
-  }
-  return false;
-}
-
-function shaFromSignals(signals: Record<string, unknown>): string | null {
-  const main = isRecord(signals.main) ? signals.main : null;
-  return typeof main?.sha === 'string' ? main.sha : null;
-}
-
-function correlationFromPayload(
-  sourceId: ShippingSourceId,
-  payload: Record<string, unknown>
-) {
-  const signals = isRecord(payload.signals) ? payload.signals : null;
-  const main = signals && isRecord(signals.main) ? signals.main : null;
-  const production =
-    signals && isRecord(signals.production) ? signals.production : null;
-  return {
-    workId: typeof payload.issue === 'string' ? payload.issue : null,
-    leaseId:
-      sourceId === 'lease-guard-capacity'
-        ? 'lease-guard'
-        : typeof payload.leaseId === 'string'
-          ? payload.leaseId
-          : null,
-    prNumber: typeof payload.prNumber === 'number' ? payload.prNumber : null,
-    ciRunId:
-      typeof payload.runId === 'string' || typeof payload.runId === 'number'
-        ? String(payload.runId)
-        : null,
-    deploymentId:
-      typeof production?.deploymentId === 'string'
-        ? production.deploymentId
-        : null,
-    buildId: typeof payload.buildId === 'string' ? payload.buildId : null,
-    sha:
-      typeof payload.commitSha === 'string'
-        ? payload.commitSha
-        : typeof payload.head_sha === 'string'
-          ? payload.head_sha
-          : typeof main?.sha === 'string'
-            ? main.sha
-            : typeof production?.deployedSha === 'string'
-              ? production.deployedSha
-              : null,
+function cachedReader(
+  io: LiveIo,
+  reader: AuthorityReader,
+  ttlMs: number
+): AuthorityReader {
+  let cached: {
+    readonly expiresAt: number;
+    read: Promise<AuthorityRead>;
+  } | null = null;
+  return () => {
+    const now = nowOf(io);
+    if (cached && now < cached.expiresAt) return cached.read;
+    const entry = { expiresAt: now + ttlMs, read: reader() };
+    cached = entry;
+    void entry.read.then(
+      read => {
+        if (read.status !== 'ok' && cached === entry) {
+          cached = {
+            ...entry,
+            expiresAt: Math.min(
+              entry.expiresAt,
+              now + FAILED_READ_CACHE_TTL_MS
+            ),
+          };
+        }
+      },
+      () => {
+        if (cached === entry) cached = null;
+      }
+    );
+    return entry.read;
   };
 }
 
-function okFileRead(
+function okJsonRead(
   sourceId: ShippingSourceId,
   payload: Record<string, unknown>
 ): AuthorityRead {
+  const sha = isExactSha(payload.commitSha) ? payload.commitSha : null;
   return {
     sourceId,
     status: 'ok',
@@ -172,55 +189,17 @@ function okFileRead(
     payload,
     truncated: false,
     sourceTimestamp:
+      parseTimestamp(payload.at) ??
       parseTimestamp(payload.ts) ??
-      parseTimestamp(payload.observedAt) ??
-      parseTimestamp(payload.generated_at) ??
-      parseTimestamp(payload.installedAt),
-    sourceRevision:
-      typeof payload.runtimeRevision === 'string'
-        ? payload.runtimeRevision
-        : typeof payload.sourceRevision === 'string'
-          ? payload.sourceRevision
-          : isRecord(payload.signals)
-            ? shaFromSignals(payload.signals)
-            : typeof payload.commitSha === 'string'
-              ? payload.commitSha
-              : null,
-    sequence: typeof payload.sequence === 'number' ? payload.sequence : null,
-    eventId: typeof payload.eventId === 'string' ? payload.eventId : null,
-    correlation: correlationFromPayload(sourceId, payload),
+      parseTimestamp(payload.observedAt),
+    sourceRevision: sha,
+    sequence: null,
+    eventId: null,
+    correlation: {
+      sha,
+      buildId: typeof payload.buildId === 'string' ? payload.buildId : null,
+    },
   };
-}
-
-async function readNamedJson(
-  io: LiveIo,
-  sourceId: ShippingSourceId
-): Promise<AuthorityRead | null> {
-  const path = resolveNamedAuthorityPath(sourceId);
-  if (path == null || !isAllowlistedAuthorityPath(path)) return null;
-  try {
-    const payload: unknown = JSON.parse(await io.readFile(path));
-    if (!isRecord(payload)) {
-      return failedRead(
-        sourceId,
-        'error',
-        'named authority file was not an object',
-        { errorCode: 'malformed' }
-      );
-    }
-    return okFileRead(sourceId, payload);
-  } catch (error) {
-    const code =
-      isRecord(error) && error.code === 'ENOENT'
-        ? 'disconnected'
-        : 'unavailable';
-    return failedRead(
-      sourceId,
-      code,
-      error instanceof Error ? error.message : 'named authority unreadable',
-      { errorCode: code }
-    );
-  }
 }
 
 async function readNamedUrl(
@@ -259,7 +238,7 @@ async function readNamedUrl(
         { errorCode: 'malformed' }
       );
     }
-    return okFileRead(sourceId, payload);
+    return okJsonRead(sourceId, payload);
   } catch (error) {
     return disconnectedRead(
       sourceId,
@@ -272,7 +251,8 @@ async function githubFetch(
   io: LiveIo,
   sourceId: ShippingSourceId,
   url: string,
-  init: RequestInit
+  init: RequestInit,
+  timeoutMs = GITHUB_TIMEOUT_MS
 ): Promise<Response | AuthorityRead> {
   if (!io.githubToken || !io.githubOwner || !io.githubRepo) {
     return failedRead(
@@ -281,7 +261,7 @@ async function githubFetch(
       'GitHub credentials are not configured'
     );
   }
-  const nowMs = Date.now();
+  const nowMs = nowOf(io);
   if ((githubBackoffUntilByIo.get(io) ?? 0) > nowMs) {
     return failedRead(sourceId, 'unavailable', 'GitHub request rate limited', {
       errorCode: 'rate-limited',
@@ -289,7 +269,7 @@ async function githubFetch(
   }
   const response = await io.fetch(url, {
     ...init,
-    signal: AbortSignal.timeout(2500),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: {
       accept: 'application/vnd.github+json',
       authorization: `Bearer ${io.githubToken}`,
@@ -398,7 +378,9 @@ export async function readMergeQueue(io: LiveIo): Promise<AuthorityRead> {
       !Number.isInteger(openPullRequests) ||
       Number(openPullRequests) < 0 ||
       typeof pageInfo.hasNextPage !== 'boolean' ||
-      (pageInfo.hasNextPage && nodes.length === 0)
+      (pageInfo.hasNextPage && nodes.length === 0) ||
+      !Number.isInteger(entries.totalCount) ||
+      Number(entries.totalCount) < nodes.length
     ) {
       return failedRead(
         'github-native-merge-queue',
@@ -408,12 +390,14 @@ export async function readMergeQueue(io: LiveIo): Promise<AuthorityRead> {
       );
     }
     const truncated = pageInfo.hasNextPage;
+    const totalCount = Number(entries.totalCount);
     return {
       sourceId: 'github-native-merge-queue',
       status: 'ok',
       schema: SHIPPING_SOURCE_SCHEMAS['github-native-merge-queue'],
       payload: {
         entries: nodes,
+        totalCount,
         truncated,
         openPullRequests: Number(openPullRequests),
       },
@@ -425,7 +409,8 @@ export async function readMergeQueue(io: LiveIo): Promise<AuthorityRead> {
           : 'empty',
       sequence: null,
       eventId: null,
-      measuredMeanings: { queued: nodes.length > 0 },
+      measuredMeanings: { queued: totalCount > 0 },
+      delivery: { mergeQueueDepth: measuredCount(totalCount) },
     };
   } catch (error) {
     return failedRead(
@@ -689,189 +674,462 @@ export async function readWorkflow(
   }
 }
 
-/**
- * Count durable `symphony-issue-dead-letter/v1` receipts under the named
- * authority directory. A missing directory is a real zero — no terminal
- * receipts exist. An unreadable or malformed receipt leaves the count
- * unmeasured and flags the read as partial rather than guessing.
- */
-async function deadLetterMeasurement(
-  io: LiveIo,
-  sourceId: ShippingSourceId
-): Promise<{ readonly count: number; readonly partial: boolean } | null> {
-  const dir = resolveNamedAuthorityDir(sourceId);
-  if (dir == null || io.readDir == null) return null;
-  let entries: readonly string[];
-  try {
-    entries = await io.readDir(dir);
-  } catch (error) {
-    if (isRecord(error) && error.code === 'ENOENT') {
-      return { count: 0, partial: false };
+function countRecord(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const out: Record<string, number> = {};
+  for (const [key, count] of Object.entries(value)) {
+    const safeKey = sanitizeOpaqueIdentifier(key, 64);
+    if (safeKey && Number.isSafeInteger(count) && Number(count) >= 0) {
+      out[safeKey] = Number(count);
     }
+  }
+  return out;
+}
+
+function nonNegativeCount(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? measuredCount(Math.floor(value))
+    : NOT_MEASURED_COUNT;
+}
+
+/** Validate a `symphony-lanes-status/v1` document into the lanes block. */
+export function parseLanesStatus(
+  payload: Record<string, unknown>
+): DeliveryLanes | null {
+  if (payload.schema !== LANES_STATUS_SCHEMA) return null;
+  const publishedAt = parseTimestamp(payload.at);
+  if (!publishedAt || !isRecord(payload.lanes)) return null;
+  const lanes: DeliveryLane[] = [];
+  for (const [name, lane] of Object.entries(payload.lanes)) {
+    const safeName = sanitizeOpaqueIdentifier(name, 64);
+    if (
+      !safeName ||
+      !isRecord(lane) ||
+      !Number.isSafeInteger(lane.running) ||
+      !Number.isSafeInteger(lane.slots) ||
+      Number(lane.running) < 0 ||
+      Number(lane.slots) < 0
+    ) {
+      return null;
+    }
+    lanes.push({
+      name: safeName,
+      running: Number(lane.running),
+      slots: Number(lane.slots),
+    });
+  }
+  if (!Number.isSafeInteger(payload.running) || Number(payload.running) < 0) {
     return null;
   }
-  let count = 0;
-  let partial = false;
-  for (const entry of entries) {
-    if (!entry.endsWith('.json')) continue;
-    try {
-      const receipt: unknown = JSON.parse(await io.readFile(join(dir, entry)));
-      if (
-        isRecord(receipt) &&
-        receipt.schema === DEAD_LETTER_SCHEMA &&
-        receipt.status === 'dead-lettered'
-      ) {
-        count += 1;
-      } else {
-        partial = true;
+  const alerts = isRecord(payload.alerts)
+    ? Object.values(payload.alerts)
+        .filter((alert): alert is string => typeof alert === 'string')
+        .map(alert => alert.replace(/\s+/g, ' ').trim().slice(0, 160))
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+  return {
+    running: measuredCount(Number(payload.running)),
+    slots: measuredCount(lanes.reduce((sum, lane) => sum + lane.slots, 0)),
+    idle: nonNegativeCount(payload.idle),
+    pool: nonNegativeCount(payload.pool),
+    lastLandingAgeSeconds: nonNegativeCount(payload.lastLandingAgeS),
+    diskFreePct:
+      typeof payload.diskFreePct === 'number' &&
+      Number.isFinite(payload.diskFreePct)
+        ? payload.diskFreePct
+        : null,
+    lanes,
+    alerts,
+    heldByReason: countRecord(payload.held_by_reason),
+    failedByReason: countRecord(payload.failed_by_reason),
+    publishedAt,
+    stale: false,
+  };
+}
+
+export async function readLanesStatus(io: LiveIo): Promise<AuthorityRead> {
+  const read = await readNamedUrl(
+    io,
+    'lanes-status',
+    NAMED_AUTHORITY_URLS['lanes-status'],
+    PUBLIC_SOURCE_TIMEOUT_MS
+  );
+  if (read.status !== 'ok' || !read.payload) return read;
+  const lanes = parseLanesStatus(read.payload);
+  if (!lanes) {
+    return failedRead(
+      'lanes-status',
+      'unavailable',
+      'Lanes status feed was malformed',
+      { errorCode: 'malformed' }
+    );
+  }
+  return {
+    ...read,
+    sourceRevision: sanitizeOpaqueIdentifier(read.payload.release),
+    delivery: { lanes },
+  };
+}
+
+async function githubGraphql(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  query: string,
+  variables: Record<string, unknown>,
+  timeoutMs = GITHUB_TIMEOUT_MS
+): Promise<Record<string, unknown> | AuthorityRead> {
+  const response = await githubFetch(
+    io,
+    sourceId,
+    GITHUB_GRAPHQL_URL,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    },
+    timeoutMs
+  );
+  if (!('ok' in response)) return response;
+  if (!response.ok) {
+    return failedRead(
+      sourceId,
+      'unavailable',
+      `GitHub GraphQL returned ${response.status}`,
+      { errorCode: `http-${response.status}` }
+    );
+  }
+  const body: unknown = await response.json();
+  if (
+    !isRecord(body) ||
+    !isRecord(body.data) ||
+    (Array.isArray(body.errors) && body.errors.length > 0)
+  ) {
+    return failedRead(
+      sourceId,
+      'unavailable',
+      'GitHub GraphQL response was unavailable',
+      { errorCode: 'graphql-error' }
+    );
+  }
+  return body.data;
+}
+
+function isAuthorityRead(value: unknown): value is AuthorityRead {
+  return (
+    isRecord(value) && typeof value.status === 'string' && 'sourceId' in value
+  );
+}
+
+function malformed(sourceId: ShippingSourceId, message: string) {
+  return failedRead(sourceId, 'unavailable', message, {
+    errorCode: 'malformed',
+  });
+}
+
+function unreachable(sourceId: ShippingSourceId, error: unknown) {
+  return failedRead(
+    sourceId,
+    'unavailable',
+    error instanceof Error ? error.message : `${sourceId} unavailable`,
+    { errorCode: 'unavailable' }
+  );
+}
+
+/**
+ * Open lane PRs (`devin/`, `codex/` heads) via one search request per poll.
+ * Dependabot and human branches are excluded by construction.
+ */
+export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
+  const sourceId = 'lane-pull-requests' as const;
+  const repo = `repo:${io.githubOwner ?? ''}/${io.githubRepo ?? ''}`;
+  try {
+    // One search per lane, in parallel: each is bounded by merge-state work.
+    const settled = await Promise.allSettled(
+      LANE_BRANCH_PREFIXES.map(lane =>
+        githubGraphql(
+          io,
+          sourceId,
+          LANE_PULL_REQUESTS_QUERY,
+          { query: `${repo} is:pr is:open head:${lane}/` },
+          LANE_SEARCH_TIMEOUT_MS
+        )
+      )
+    );
+    const pullRequests: Record<string, unknown>[] = [];
+    let truncated = false;
+    let firstFailure: AuthorityRead | null = null;
+    let succeeded = 0;
+    for (const outcome of settled) {
+      // One lane failing must not discard the lanes that answered; report partial as truncated.
+      if (outcome.status === 'rejected') {
+        firstFailure ??= unreachable(sourceId, outcome.reason);
+        continue;
       }
-    } catch {
-      partial = true;
+      const data = outcome.value;
+      if (isAuthorityRead(data)) {
+        firstFailure ??= data;
+        continue;
+      }
+      succeeded += 1;
+      const search = data.search;
+      if (
+        !isRecord(search) ||
+        !Number.isSafeInteger(search.issueCount) ||
+        !Array.isArray(search.nodes)
+      ) {
+        return malformed(sourceId, 'GitHub lane pull requests were malformed');
+      }
+      if (Number(search.issueCount) > search.nodes.length) truncated = true;
+      for (const node of search.nodes) {
+        if (
+          !isRecord(node) ||
+          !Number.isSafeInteger(node.number) ||
+          typeof node.headRefName !== 'string'
+        ) {
+          return malformed(sourceId, 'GitHub pull request was malformed');
+        }
+        // Search matches `head:` loosely; the branch prefix is the contract.
+        if (!LANE_BRANCH_RE.test(node.headRefName)) continue;
+        const queueEntry = isRecord(node.mergeQueueEntry)
+          ? node.mergeQueueEntry
+          : null;
+        pullRequests.push({
+          number: node.number,
+          title: node.title,
+          headRefName: node.headRefName,
+          headRefOid: node.headRefOid,
+          isDraft: node.isDraft === true,
+          mergeable: node.mergeable,
+          reviewDecision: node.reviewDecision,
+          updatedAt: node.updatedAt,
+          mergeQueuePosition: Number.isInteger(queueEntry?.position)
+            ? queueEntry?.position
+            : null,
+        });
+      }
     }
+    if (succeeded === 0 && firstFailure) return firstFailure;
+    if (firstFailure) truncated = true;
+    return {
+      sourceId,
+      status: 'ok',
+      schema: SHIPPING_SOURCE_SCHEMAS[sourceId],
+      payload: { pullRequests },
+      truncated,
+      sourceTimestamp: null,
+      sourceRevision: null,
+      sequence: null,
+      eventId: null,
+      delivery: truncated
+        ? {}
+        : { inFlight: measuredCount(pullRequests.length) },
+    };
+  } catch (error) {
+    return unreachable(sourceId, error);
   }
-  return { count, partial };
 }
 
-async function defaultReadFile(path: string): Promise<string> {
-  if (!isAllowlistedAuthorityPath(path)) {
-    throw new Error('refused-arbitrary-path');
-  }
-  return readFile(path, 'utf8');
+function issueCount(data: Record<string, unknown>, alias: string) {
+  const search = data[alias];
+  return isRecord(search) &&
+    Number.isSafeInteger(search.issueCount) &&
+    Number(search.issueCount) >= 0
+    ? Number(search.issueCount)
+    : null;
 }
 
-async function defaultReadDir(dir: string): Promise<readonly string[]> {
-  if (!isAllowlistedAuthorityDir(dir)) {
-    throw new Error('refused-arbitrary-path');
+/**
+ * Merged PRs since Pacific midnight per repo and org-wide, plus the last
+ * seven days against the seven before for week-over-week. One GraphQL
+ * request of `search.issueCount`, so it costs a single rate-limit point.
+ */
+export async function readMerges(io: LiveIo): Promise<AuthorityRead> {
+  const sourceId = 'github-merges' as const;
+  const owner = io.githubOwner ?? '';
+  const nowMs = nowOf(io);
+  const since = pacificMidnightIso(nowMs);
+  const weekAgo = githubSearchTime(nowMs - 7 * DAY_MS);
+  const twoWeeksAgo = githubSearchTime(nowMs - 14 * DAY_MS);
+  const merged = 'is:pr is:merged';
+  const repoQuery = (repo: DeliveryMergeRepo) =>
+    `repo:${owner}/${repo} ${merged} merged:>=${since}`;
+  try {
+    const data = await githubGraphql(io, sourceId, MERGES_QUERY, {
+      org: `org:${owner} ${merged} merged:>=${since}`,
+      jovie: repoQuery('Jovie'),
+      lyb: repoQuery('LogYourBody'),
+      summer: repoQuery('summer-config'),
+      last7: `org:${owner} ${merged} merged:>=${weekAgo}`,
+      prior7: `org:${owner} ${merged} merged:${twoWeeksAgo}..${weekAgo}`,
+    });
+    if (isAuthorityRead(data)) return data;
+    const today = issueCount(data, 'org');
+    const byRepo: Record<DeliveryMergeRepo, number | null> = {
+      Jovie: issueCount(data, 'jovie'),
+      LogYourBody: issueCount(data, 'lyb'),
+      'summer-config': issueCount(data, 'summer'),
+    };
+    const last7 = issueCount(data, 'last7');
+    const prior7 = issueCount(data, 'prior7');
+    if (
+      today == null ||
+      last7 == null ||
+      prior7 == null ||
+      DELIVERY_MERGE_REPOS.some(repo => byRepo[repo] == null)
+    ) {
+      return malformed(sourceId, 'GitHub merge counts were malformed');
+    }
+    const count = (value: number | null) =>
+      value == null ? NOT_MEASURED_COUNT : measuredCount(value);
+    return {
+      sourceId,
+      status: 'ok',
+      schema: SHIPPING_SOURCE_SCHEMAS[sourceId],
+      payload: { since, today, byRepo, last7, prior7 },
+      truncated: false,
+      sourceTimestamp: null,
+      sourceRevision: null,
+      sequence: null,
+      eventId: null,
+      measuredMeanings: { merged: today > 0 },
+      delivery: {
+        merges: {
+          since,
+          today: measuredCount(today),
+          byRepo: {
+            Jovie: count(byRepo.Jovie),
+            LogYourBody: count(byRepo.LogYourBody),
+            'summer-config': count(byRepo['summer-config']),
+          },
+          last7Days: measuredCount(last7),
+          prior7Days: measuredCount(prior7),
+        },
+      },
+    };
+  } catch (error) {
+    return unreachable(sourceId, error);
   }
-  return readdir(dir);
+}
+
+async function readBehindMain(io: LiveIo, sha: string) {
+  try {
+    const data = await githubGraphql(io, 'live-build-info', BEHIND_MAIN_QUERY, {
+      owner: io.githubOwner,
+      name: io.githubRepo,
+      sha,
+    });
+    if (isAuthorityRead(data)) return NOT_MEASURED_COUNT;
+    const repository = isRecord(data.repository) ? data.repository : null;
+    const ref = repository && isRecord(repository.ref) ? repository.ref : null;
+    const compare = ref && isRecord(ref.compare) ? ref.compare : null;
+    return compare && Number.isSafeInteger(compare.behindBy)
+      ? nonNegativeCount(compare.behindBy)
+      : NOT_MEASURED_COUNT;
+  } catch {
+    return NOT_MEASURED_COUNT;
+  }
+}
+
+/** jov.ie build-info plus how many main commits production is missing. */
+export async function readLiveBuild(io: LiveIo): Promise<AuthorityRead> {
+  const read = await readNamedUrl(
+    io,
+    'live-build-info',
+    NAMED_AUTHORITY_URLS['live-build-info'],
+    PUBLIC_SOURCE_TIMEOUT_MS
+  );
+  if (read.status !== 'ok' || !read.payload) return read;
+  const payload = read.payload;
+  const sha = isExactSha(payload.commitSha) ? payload.commitSha : null;
+  const deployedAt =
+    typeof payload.deployedAt === 'number' &&
+    Number.isFinite(payload.deployedAt)
+      ? new Date(payload.deployedAt).toISOString()
+      : parseTimestamp(payload.deployedAt);
+  return {
+    ...read,
+    delivery: {
+      production: {
+        sha,
+        version: sanitizeOpaqueIdentifier(payload.version, 32),
+        deployedAt,
+        behindMain: sha ? await readBehindMain(io, sha) : NOT_MEASURED_COUNT,
+      },
+    },
+  };
+}
+
+/** Summer's public runtime health channel (`/runtime/v1/health`). */
+export async function readSummerRuntime(io: LiveIo): Promise<AuthorityRead> {
+  const read = await readNamedUrl(
+    io,
+    'summer-runtime',
+    NAMED_AUTHORITY_URLS['summer-runtime'],
+    PUBLIC_SOURCE_TIMEOUT_MS
+  );
+  if (read.status !== 'ok' || !read.payload) return read;
+  const { identity } = read.payload;
+  // Deployed Summer reports `availability`; the checked-in materializer reports `status`.
+  const availability = read.payload.availability ?? read.payload.status;
+  if (identity !== 'summer' || typeof availability !== 'string') {
+    return malformed('summer-runtime', 'Summer runtime health was malformed');
+  }
+  return {
+    ...read,
+    delivery: {
+      summer: {
+        availability:
+          availability === 'up' || availability === 'down'
+            ? availability
+            : 'degraded',
+      },
+    },
+  };
 }
 
 export function createLiveShippingStateReaders(
   io: LiveIo
 ): NamedAuthorityReaders {
   return {
-    'symphony-runtime': async () => {
-      const live = await readNamedUrl(
-        io,
-        'symphony-runtime',
-        NAMED_AUTHORITY_URLS['symphony-runtime'],
-        750
-      );
-      if (live.status !== 'ok') return live;
-      if (
-        !live.payload ||
-        !Array.isArray(live.payload.running) ||
-        !Array.isArray(live.payload.retrying) ||
-        !Array.isArray(live.payload.blocked) ||
-        live.sourceTimestamp == null
-      ) {
-        return failedRead(
-          'symphony-runtime',
-          'unavailable',
-          'Official Symphony state response was malformed',
-          { errorCode: 'malformed' }
-        );
-      }
-      const deadLetters = await deadLetterMeasurement(io, 'symphony-runtime');
-      const payload =
-        deadLetters == null || deadLetters.partial
-          ? live.payload
-          : { ...live.payload, deadLetterCount: deadLetters.count };
-      return {
-        ...live,
-        payload,
-        truncated: live.truncated || deadLetters?.partial === true,
-        schema: 'symphony-runtime-state/v1',
-      };
-    },
-    'symphony-task': async () => {
-      return failedRead(
-        'symphony-task',
-        'unavailable',
-        'Official Symphony task receipt is not configured',
-        { errorCode: 'not-configured' }
-      );
-    },
-    'lease-guard-capacity': async () => {
-      const fleet = await readNamedJson(io, 'fleet-receipt');
-      const signals =
-        fleet?.status === 'ok' &&
-        fleet.payload &&
-        isRecord(fleet.payload.signals)
-          ? fleet.payload.signals
-          : null;
-      if (fleet?.status === 'ok' && signals && isRecord(signals.lease)) {
-        const lease = signals.lease;
-        const capacity = isRecord(lease.capacity) ? lease.capacity : null;
-        const observedAt = parseTimestamp(lease.observedAt);
-        if (
-          !capacity ||
-          !Number.isSafeInteger(capacity.available) ||
-          Number(capacity.available) < 0 ||
-          !observedAt
-        ) {
-          return failedRead(
-            'lease-guard-capacity',
-            'unavailable',
-            'Canonical fleet lease signal was malformed',
-            { errorCode: 'malformed' }
-          );
-        }
-        return {
-          sourceId: 'lease-guard-capacity',
-          status: 'ok',
-          schema: SHIPPING_SOURCE_SCHEMAS['lease-guard-capacity'],
-          payload: lease,
-          truncated: false,
-          sourceTimestamp: observedAt,
-          sourceRevision: fleet.sourceRevision,
-          sequence: fleet.sequence,
-          eventId: fleet.eventId,
-          correlation: correlationFromPayload('lease-guard-capacity', lease),
-        };
-      }
-      return failedRead(
-        'lease-guard-capacity',
-        fleet?.status ?? 'disconnected',
-        fleet?.errorMessage ?? 'canonical fleet lease signal missing',
-        { errorCode: fleet?.errorCode ?? 'missing-lease-signal' }
-      );
-    },
+    'lanes-status': cachedReader(
+      io,
+      () => readLanesStatus(io),
+      SOURCE_CACHE_TTL_MS['lanes-status']
+    ),
+    'lane-pull-requests': cachedReader(
+      io,
+      () => readLanePullRequests(io),
+      SOURCE_CACHE_TTL_MS['lane-pull-requests']
+    ),
     'github-native-merge-queue': () => readMergeQueue(io),
+    'github-merges': cachedReader(
+      io,
+      () => readMerges(io),
+      SOURCE_CACHE_TTL_MS['github-merges']
+    ),
     'exact-sha-ci': () => readWorkflow(io, 'exact-sha-ci', 'ci.yml'),
     'production-controller': () =>
       readWorkflow(io, 'production-controller', 'production-controller.yml'),
-    'live-build-info': () =>
-      readNamedUrl(
-        io,
-        'live-build-info',
-        NAMED_AUTHORITY_URLS['live-build-info'],
-        2500
-      ),
-    'fleet-receipt': async () => {
-      const fleet =
-        (await readNamedJson(io, 'fleet-receipt')) ??
-        disconnectedRead('fleet-receipt', 'fleet receipt missing');
-      if (fleet.status === 'ok' && fleet.sourceTimestamp == null) {
-        return failedRead(
-          'fleet-receipt',
-          'unavailable',
-          'Canonical fleet receipt timestamp was malformed',
-          { errorCode: 'malformed' }
-        );
-      }
-      return fleet;
-    },
+    'live-build-info': cachedReader(
+      io,
+      () => readLiveBuild(io),
+      SOURCE_CACHE_TTL_MS['live-build-info']
+    ),
+    'summer-runtime': cachedReader(
+      io,
+      () => readSummerRuntime(io),
+      SOURCE_CACHE_TTL_MS['summer-runtime']
+    ),
   };
 }
 
 export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
   return {
-    readFile: overrides.readFile ?? defaultReadFile,
-    readDir: overrides.readDir ?? defaultReadDir,
     fetch: overrides.fetch ?? fetch,
     githubToken: overrides.githubToken,
     githubOwner: overrides.githubOwner,
     githubRepo: overrides.githubRepo,
+    ...(overrides.nowMs ? { nowMs: overrides.nowMs } : {}),
   };
 }

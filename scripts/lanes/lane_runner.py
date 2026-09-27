@@ -35,7 +35,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import doctor  # noqa: E402  (sibling module of the release)
+import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
+import reason_lane  # noqa: E402
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -47,8 +49,8 @@ SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked"})
-HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked"})
+EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked", "reasoning-job"})
+HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked", "reasoning-job"})
 SENSITIVE_PROVIDER = "codex"
 SENSITIVE_REVIEWABLE_LINES = 500
 SENSITIVE_RED_LINES = re.compile(
@@ -64,8 +66,10 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
-              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
+LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py",
+              "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
+              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
+              "scripts/tests/test_reason_lane.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -92,6 +96,12 @@ MAX_REVIEWABLE_LINES = 1500
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def execution_coordination(sha: str) -> dict:
+    if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test" or os.environ.get("LANES_SELFTEST") == "1":
+        return {"kind": "local-test"}
+    return {"kind": "github-status", "repository": REPO_SLUG, "sha": sha, "tokenEnv": "GH_TOKEN"}
 
 
 @dataclass
@@ -491,6 +501,22 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     runs.mkdir(parents=True, exist_ok=True)
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "model": spec.get("model"),
                "issue": issue.identifier, "startedAt": now_iso()}
+    ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
+                                       {"title": issue.title, "description": issue.description})
+    coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
+    policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
+              "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
+              "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"}
+    claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
+                                      {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
+                                       "model": spec.get("model"), "tool": "lane_runner", "accountPool": name},
+                                      policy, {"triggerId": run_id, "correlationId": issue.identifier,
+                                               "causationId": issue.id}, coordination=coordination)
+    receipt["execution"] = claimed
+    if not claimed["admitted"]:
+        receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
+                       reasons=[claimed["reason"]], endedAt=now_iso())
+        return receipt
     branch = f"{name}/{issue.identifier.lower()}-{run_id[:15].lower()}"
     worktree = host.state / "worktrees" / run_id
     with open(runs / f"{run_id}.log", "w") as log:
@@ -503,6 +529,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
             started = time.time()
+            execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                       {"spend": 1, "mutations": 1}, coordination=coordination)
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
             # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
@@ -520,6 +548,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
                 log.flush()
                 handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
+                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                           {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
                                                              "cwd": str(worktree)}), worktree, log, host.agent_timeout)
                 current = nxt_name
@@ -543,6 +573,17 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             remove_worktree(host, worktree)
             sh(["git", "branch", "-D", branch], cwd=host.repo)
     receipt["endedAt"] = now_iso()
+    verdict = receipt.get("verdict")
+    result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout") \
+        else "no_op_stale" if verdict in ("no-change", "not-shippable") else "failed_unknown"
+    receipt["execution"] = execution_attempt.finish(
+        runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], result,
+        {"failureClass": None if result != "failed_unknown" else "unknown_runtime_result",
+         "failureFingerprint": None if result != "failed_unknown" else ":".join(receipt.get("reasons", [verdict])),
+         "evidenceDigest": execution_attempt.digest(receipt.get("reasons", [])),
+         "costs": {"apiCalls": 1}, "mutationsPerformed": receipt.get("pr") and ["pull_request"] or [],
+         "confidence": "high" if result == "succeeded" else "unknown", "dependencies": [name]},
+        coordination=coordination)
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -878,12 +919,34 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     worktree = host.state / "worktrees" / run_id
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "kind": "fix-red",
                "pr": pr["number"], "headBefore": pr["headRefOid"], "startedAt": now_iso()}
+    failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
+               "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
+    ident = execution_attempt.identity("pr-remediation",
+                                       {"repository": REPO_SLUG, "pr": pr["number"], "failure": failure},
+                                       {"headSha": pr["headRefOid"]})
+    coordination = execution_coordination(pr["headRefOid"])
+    claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
+                                      {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
+                                       "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
+                                      {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
+                                       "spend": MAX_FIX_ATTEMPTS, "mutations": MAX_FIX_ATTEMPTS * 2,
+                                       "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
+                                      {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
+                                       "causationId": pr["headRefOid"]}, coordination=coordination)
+    receipt["execution"] = claimed
+    if not claimed["admitted"]:
+        receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
+                       reasons=[claimed["reason"]], endedAt=now_iso())
+        return receipt
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
             add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
-            lockfile_only = pr.get("mergeStateStatus") == "DIRTY" \
-                and resolve_lockfile_conflict(worktree, pr["headRefName"], log)
+            lockfile_only = False
+            if pr.get("mergeStateStatus") == "DIRTY":
+                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                           {"spend": 0, "mutations": 1}, coordination=coordination)
+                lockfile_only = resolve_lockfile_conflict(worktree, pr["headRefName"], log)
             agent = None
             if lockfile_only:
                 receipt.update(resolution="lockfile-regenerated")
@@ -892,6 +955,8 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                 prompt = render_fix_prompt(pr, failure_excerpt(pr))
                 prompt_file = runs / f"{run_id}.prompt.md"
                 prompt_file.write_text(prompt)
+                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                           {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree)}), worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
@@ -915,6 +980,14 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
                 endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
     receipt["endedAt"] = now_iso()
+    pushed = receipt.get("verdict") == "fix-pushed"
+    receipt["execution"] = execution_attempt.finish(
+        runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], "succeeded" if pushed else "failed_known",
+        {"failureClass": None if pushed else "repair_incomplete",
+         "failureFingerprint": None if pushed else execution_attempt.digest(receipt.get("reasons", ["no-head-change"])),
+         "evidenceDigest": execution_attempt.digest({"before": pr["headRefOid"], "after": receipt.get("headAfter")}),
+         "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
+         "confidence": "high", "dependencies": [name]}, coordination=coordination)
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -1196,13 +1269,23 @@ def worker(host: Host, name: str) -> int:
     linear.comment(issue.id, f"🤖 lane `{name}` claimed this issue (model `{spec.get('model')}`).")
     receipt = run_issue(host, name, spec, linear, issue)
     verdict = receipt.get("verdict")
+    if verdict == "duplicate-active":
+        linear.comment(issue.id, "🤖 lane claim reconciled to the existing durable attempt; no second provider call ran.")
+        slot.release()
+        return reexec(host, name)
+    if verdict == "quarantined":
+        linear.move(issue.id, "Triage")
+        linear.comment(issue.id, f"🤖 lane stopped at the durable execution terminal ({receipt['reasons'][0]}). "
+                                 "Re-entry requires new authoritative revision evidence or a bounded policy override.")
+        slot.release()
+        return reexec(host, name)
     if verdict == "provider-error":
         cooldown = host.state / "cooldown" / name
         cooldown.parent.mkdir(parents=True, exist_ok=True)
         cooldown.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
-        linear.move(issue.id, "Todo")
+        linear.move(issue.id, "Triage")
         linear.comment(issue.id, f"🤖 lane `{name}` provider failed before working the issue "
-                                 f"({', '.join(receipt.get('reasons', []))}); lane cooling down, issue back to Todo.")
+                                 f"({', '.join(receipt.get('reasons', []))}); unknown outcome quarantined, lane cooling down.")
         slot.release()
         return 1
     if verdict == "not-shippable":
@@ -1277,6 +1360,10 @@ def dispatch(host: Host) -> int:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
     except Exception as error:  # the ready/orphan queue never takes dispatch down
         tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
+    except Exception as error:  # Summer's reasoning jobs never take dispatch down
+        tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())

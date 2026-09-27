@@ -548,6 +548,15 @@ describe('surface elevation guardrails', () => {
     expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
   });
 
+  it('names the hidden-header release table for screen readers', () => {
+    const releaseTable = readComponent(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
+    );
+
+    expect(releaseTable).toContain('hideHeader');
+    expect(releaseTable).toContain("caption='Releases'");
+  });
+
   it('drops the banned Disc3 empty-state glyph from ReleaseTable', () => {
     const releaseTable = readComponent(
       'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'

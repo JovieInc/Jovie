@@ -430,6 +430,16 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
         : 'unknown',
       defaultStatusDetail: financialStatus.defaultStatusDetail,
       financialDataAvailable,
+      ...(stripeMetrics.isAvailable &&
+      stripeMetrics.mrrUsd7dAgo !== undefined &&
+      stripeMetrics.activeSubscribers7dAgo !== undefined
+        ? {
+            weekAgo: {
+              mrrUsd: stripeMetrics.mrrUsd7dAgo,
+              activeSubscribers: stripeMetrics.activeSubscribers7dAgo,
+            },
+          }
+        : {}),
     },
     operations: operationsStatus,
     reliability: {
