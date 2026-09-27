@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MARKETING_CUSTOMERS_FLYOUT,
   MARKETING_FOOTER_COLUMNS,
-  MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_LEGAL_LINKS,
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
@@ -18,7 +18,7 @@ describe('public marketing navigation', () => {
       ...MARKETING_LEGAL_LINKS,
       ...MARKETING_NAV_LINKS,
       ...MARKETING_NAV_UTILITIES,
-      ...MARKETING_FOR_FLYOUT_LINKS,
+      ...MARKETING_CUSTOMERS_FLYOUT.links,
       ...MARKETING_TOOLS_FLYOUT_LINKS,
     ].map(link => link.href);
 
