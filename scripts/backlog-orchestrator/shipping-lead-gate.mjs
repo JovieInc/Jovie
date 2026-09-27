@@ -1,7 +1,7 @@
 /** Bind one Summer request to the existing canonical admission pipeline. */
 
-import { validateShippingTask } from '../symphony/summer-shipping-lead-contract.mjs';
 import { issueContentHash } from './context-gate.mjs';
+import { validateShippingTask } from './summer-shipping-lead-contract.mjs';
 
 /**
  * Admission is not owner execution acceptance or a terminal outcome. The caller

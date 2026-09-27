@@ -1,5 +1,7 @@
 # Shipping Menu Bar
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 A lightweight macOS menu bar app that shows the status of the Jovie autonomous issue shipper and lets you control it.
 
 ## What it shows
@@ -40,7 +42,7 @@ The app polls `~/.hermes/logs/jobs.jsonl` every 15 seconds and checks `launchctl
 
 ## Shipper integration
 
-The shipper (`scripts/symphony/jobs/codex-issue-shipper.ts`) checks for the pause sentinel at the top of each run. If `~/.hermes/shipping-paused` exists, it logs a `paused_skip` event and exits cleanly without scanning or dispatching.
+The shipper (`symphony-control/jobs/codex-issue-shipper.ts`) checks for the pause sentinel at the top of each run. If `~/.hermes/shipping-paused` exists, it logs a `paused_skip` event and exits cleanly without scanning or dispatching.
 
 ## Menu layout
 

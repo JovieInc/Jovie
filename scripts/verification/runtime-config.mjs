@@ -158,11 +158,38 @@ export function validateRuntimeConfigSnapshot(snapshot) {
       }
     }
   }
+  const recomputedBlockers = new Set();
+  if (Array.isArray(snapshot.entries)) {
+    for (const entry of snapshot.entries) {
+      if (
+        isRecord(entry) &&
+        entry.required === true &&
+        entry.state === 'missing'
+      ) {
+        recomputedBlockers.add(`required-config-missing:${entry.name}`);
+      }
+    }
+  }
   if (
     !Array.isArray(snapshot.blockers) ||
     !snapshot.blockers.every(isNonEmptyString)
   ) {
     errors.push('config blockers must be a string list');
+  } else {
+    const supplied = new Set(snapshot.blockers);
+    for (const blocker of recomputedBlockers) {
+      if (!supplied.has(blocker)) {
+        errors.push(`config blocker missing:${blocker}`);
+      }
+    }
+    for (const blocker of supplied) {
+      if (
+        !recomputedBlockers.has(blocker) &&
+        !/^config-value-invalid:.+/.test(blocker)
+      ) {
+        errors.push(`config blocker unverifiable:${blocker}`);
+      }
+    }
   }
   return errors;
 }

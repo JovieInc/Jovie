@@ -327,12 +327,12 @@ function ProfileMusicErrorState({
       action={
         renderMode === 'preview'
           ? {
-              label: 'Try again',
+              label: 'Try Again',
               onClick: () => {},
               disabled: true,
             }
           : {
-              label: 'Try again',
+              label: 'Try Again',
               onClick: () => {
                 globalThis.location.reload();
               },
@@ -489,7 +489,7 @@ export function ProfilePrimaryTabPanel({
       >
         <div className='px-4 pb-2 pt-3'>
           <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-            Shows
+            Events
           </h2>
         </div>
         <TourDrawerContent

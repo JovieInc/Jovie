@@ -28,12 +28,12 @@ staging, or production as appropriate.
 
 | Deliverable | Status |
 | --- | --- |
-| `AUTH_AUDIT.md` | Created with iOS auth evidence and JOV-2712 evidence gaps |
-| `CHAT_AUDIT.md` | Created with iOS chat screenshot baseline and JOV-2712 evidence gaps |
+| `AUTH_AUDIT.md` | Removed as a stale audit artifact |
+| `CHAT_AUDIT.md` | Removed as a stale audit artifact |
 | `PERFORMANCE.md` | Created with measurement plan and JOV-2712 evidence gaps |
-| `DESIGN_SYSTEM_AUDIT.md` | Created with iOS screenshot baseline and JOV-2712 evidence gaps |
+| `DESIGN_SYSTEM_AUDIT.md` | Removed as a stale audit artifact |
 | `RELIABILITY_AUDIT.md` | Created with iOS callback reliability baseline and JOV-2712 evidence gaps |
 | `PLATFORM_PARITY_AUDIT.md` | Created with cross-platform parity matrix and JOV-2712 evidence gaps |
 | `TEST_COVERAGE_REPORT.md` | Created with current iOS test evidence and JOV-2712 evidence gaps |
 | `RELEASE_CHECKLIST.md` | Created with release gates and JOV-2712 evidence gaps |
-| `CRITICAL_BUGS.md` | Created with critical-risk ledger and JOV-2712 evidence gaps |
+| `CRITICAL_BUGS.md` | Removed as a stale audit artifact |

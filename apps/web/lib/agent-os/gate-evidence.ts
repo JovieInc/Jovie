@@ -5,12 +5,6 @@ import type {
 } from '@/lib/agent-os/artifact';
 import { safeParseAgentRunArtifact } from '@/lib/agent-os/artifact';
 
-export const REQUIRED_NON_DRY_RUN_GSTACK_GATES = [
-  'gstack.qa.exhaustive',
-  'gstack.review',
-  'gstack.ship',
-] as const satisfies readonly AgentRunGateEvidenceName[];
-
 const ARTIFACT_COMMENT_START = '<!-- agent-run-artifact';
 const ARTIFACT_COMMENT_END = '-->';
 
@@ -189,9 +183,19 @@ function getGateEvidenceTimestamp(
   return Date.parse(timestamp);
 }
 
+/**
+ * Evaluates recorded verification evidence.
+ *
+ * With an explicit `requiredGateNames` list, every named gate must have passed
+ * with recorded evidence. Without one, agents choose which skills and gates
+ * fit the change: the gates they declare are the contract, so at least one
+ * gate must have passed with evidence and no gate they marked required (or
+ * that last failed) may be outstanding. No skill, gstack included, is
+ * mandatory by default.
+ */
 export function evaluateAgentRunGateEvidence(
   markdown: string,
-  requiredGateNames: readonly AgentRunGateEvidenceName[] = REQUIRED_NON_DRY_RUN_GSTACK_GATES,
+  requiredGateNames?: readonly AgentRunGateEvidenceName[],
   options: GateEvidenceEvaluationOptions = {}
 ): GateEvidenceEvaluation {
   const extraction = extractAgentRunArtifactReport(markdown);
@@ -206,23 +210,31 @@ export function evaluateAgentRunGateEvidence(
       issue.sourceRunId === undefined ||
       issue.sourceRunId === options.sourceRunId
   );
-  const requiredGateNameSet = new Set(requiredGateNames);
+  const explicitGateNameSet =
+    requiredGateNames === undefined ? undefined : new Set(requiredGateNames);
   const latestGateState = new Map<
     AgentRunGateEvidenceName,
-    { passed: boolean; timestamp: number; index: number }
+    {
+      passed: boolean;
+      blocking: boolean;
+      timestamp: number;
+      index: number;
+    }
   >();
   let gateIndex = 0;
 
   for (const artifact of artifacts) {
     for (const gate of artifact.verificationGates) {
-      if (!requiredGateNameSet.has(gate.name)) {
+      if (explicitGateNameSet && !explicitGateNameSet.has(gate.name)) {
         continue;
       }
 
       const timestamp = getGateEvidenceTimestamp(artifact, gate);
       const current = latestGateState.get(gate.name);
+      const passed = gateHasRecordedEvidence(gate);
       const nextState = {
-        passed: gateHasRecordedEvidence(gate),
+        passed,
+        blocking: !passed && (gate.required || gate.status === 'failed'),
         timestamp,
         index: gateIndex,
       };
@@ -239,15 +251,22 @@ export function evaluateAgentRunGateEvidence(
     }
   }
 
-  const missingGateNames = requiredGateNames.filter(
-    gateName => latestGateState.get(gateName)?.passed !== true
-  );
-  const passedGateNames = requiredGateNames.filter(
+  const evaluatedGateNames = requiredGateNames ?? [...latestGateState.keys()];
+  const missingGateNames = evaluatedGateNames.filter(gateName => {
+    const state = latestGateState.get(gateName);
+    return requiredGateNames
+      ? state?.passed !== true
+      : state?.blocking === true;
+  });
+  const passedGateNames = evaluatedGateNames.filter(
     gateName => latestGateState.get(gateName)?.passed === true
   );
 
   return {
-    passed: missingGateNames.length === 0 && artifactIssues.length === 0,
+    passed:
+      missingGateNames.length === 0 &&
+      passedGateNames.length > 0 &&
+      artifactIssues.length === 0,
     missingGateNames,
     passedGateNames,
     artifacts,
@@ -277,6 +296,11 @@ export function buildGateEvidenceSummary(
   if (evaluation.missingGateNames.length > 0) {
     lines.push(
       `Missing recorded gate evidence for: ${evaluation.missingGateNames.join(', ')}`
+    );
+  }
+  if (evaluation.passedGateNames.length === 0) {
+    lines.push(
+      'No verification gate has passed with recorded evidence. Record the checks this change actually needed (any gate name the agent chose).'
     );
   }
   return lines.join('\n');

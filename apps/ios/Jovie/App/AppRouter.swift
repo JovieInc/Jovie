@@ -1,6 +1,6 @@
 import Foundation
 
-enum AppRouter: Equatable {
+enum AppRouter: Equatable, CaseIterable {
   case launching
   case signedOut
   case needsOnboarding

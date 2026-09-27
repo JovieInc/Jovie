@@ -45,8 +45,9 @@ export function scoreMerchTitle(title: string): number {
   if (words.length === 0) return 0;
 
   const wordCountScore = words.length >= 2 && words.length <= 5 ? 45 : 25;
-  const compactnessScore =
-    title.length <= 28 ? 25 : title.length <= 42 ? 15 : 5;
+  let compactnessScore = 5;
+  if (title.length <= 28) compactnessScore = 25;
+  else if (title.length <= 42) compactnessScore = 15;
   const readabilityScore = /^[\p{L}\p{N}'’&!?. -]+$/u.test(title) ? 15 : 5;
   const visualCueScore =
     /light|night|signal|deep|heart|fire|static|dream|shadow|electric|dark/i.test(

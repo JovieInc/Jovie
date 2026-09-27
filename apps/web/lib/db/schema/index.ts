@@ -5,6 +5,15 @@
  * using explicit named exports for deterministic tree-shaking.
  */
 
+// Pixel Tracking (Events, Creator Configs)
+export {
+  type AcquisitionFirstTouch,
+  type AcquisitionJourney,
+  acquisitionJourneys,
+  insertAcquisitionJourneySchema,
+  type NewAcquisitionJourney,
+  selectAcquisitionJourneySchema,
+} from './acquisition';
 // Admin
 export {
   type AdminAuditLog,
@@ -137,6 +146,7 @@ export {
   baOauthConsents,
   baOauthRefreshTokens,
   baOauthResources,
+  baPasskeys,
   baSessions,
   baUsers,
   baVerifications,
@@ -513,6 +523,21 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Finance (Owner-only personal financial data — JOV-4609)
+export {
+  type FinanceAccount,
+  type FinanceExport,
+  type FinanceInstitution,
+  type FinanceTransaction,
+  financeAccounts,
+  financeExports,
+  financeInstitutions,
+  financeTransactions,
+  type NewFinanceAccount,
+  type NewFinanceExport,
+  type NewFinanceInstitution,
+  type NewFinanceTransaction,
+} from './finance';
 // Identity (Cross-platform artist identity links)
 export {
   type ArtistIdentityLink,
@@ -959,7 +984,6 @@ export {
   type OvieOperatingKvRow,
   ovieOperatingKv,
 } from './ovie';
-// Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
   creatorPixels,

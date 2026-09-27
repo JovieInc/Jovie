@@ -1,5 +1,7 @@
 # AgentOS Architecture
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 > **Retirement notice (2026-09-02):** Hermes and Trigger.dev are retired Jovie tooling. The v1 design below is historical and is not an active deployment or fallback plan. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md).
 
 > Issue: JOV-1922
@@ -66,6 +68,14 @@ Gate evidence names are stable strings:
 - `github.branch-protection`
 - `gstack.land-and-deploy`
 - `sentry.canary`
+
+No skill is mandatory. GStack is a tool, not a gate: agents choose the skills
+and checks a change needs, and record only the gates that actually ran.
+`evaluateAgentRunGateEvidence` treats the gates an agent declares as the contract:
+at least one must pass with recorded evidence, and none the agent marked
+required (or that last failed) may be outstanding. Callers that need specific
+gates pass an explicit list. Scripts must never write a `passed` gate they did
+not observe.
 
 AgentOS may record GStack `qa`/`review`/`ship` artifacts on a PR for the operator board. Those comments are self-attested local CLI runs, not GitHub Actions run IDs, so agent-pipeline auto-approve must not consume them as provenance. Missing GStack comments are incomplete telemetry, not a merge-gate failure. Required merge evidence remains `github.ci` (`PR Ready`) plus the deterministic queue contract.
 
@@ -138,7 +148,7 @@ A dedicated 16 GB MacBook Air runs the Hermes gateway service 24/7 as the always
 
 - Operating contract: [`.claude/rules/hermes-air.md`](../.claude/rules/hermes-air.md)
 - Operator runbook: [`docs/HERMES_AIR.md`](./HERMES_AIR.md)
-- Bootstrap: `scripts/symphony/bootstrap-air.sh`
+- Bootstrap: `symphony-control/bootstrap-air.sh`
 - Cost target: $0/mo via OpenRouter free-model rotation + local Ollama Qwen 3 4B fallback. Sentinel kill switch trips on any paid spend.
 - `HermesAiOpsSource` includes the value `'hermes-air'` so the HUD attributes dispatches that originate from the Air separately from product/CI sources.
 

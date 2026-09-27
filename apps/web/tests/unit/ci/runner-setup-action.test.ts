@@ -121,7 +121,7 @@ describe('self-hosted runner setup action', () => {
       // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
       // workspace, patches and .npmrc, and no prefix match may restore.
       expect(restoreStep).toContain(
-        "key: pnpm-node-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
+        "key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}"
       );
       expect(restoreStep).not.toContain('restore-keys');
     });
@@ -134,9 +134,11 @@ describe('self-hosted runner setup action', () => {
       expect(stepBlock('Warm pnpm store')).toContain(
         "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'"
       );
-      // The frozen install still runs on a hit and re-verifies the tree.
+      // Only validated merge-group consumers skip the redundant frozen install.
       const installStep = stepBlock('Install dependencies');
-      expect(installStep).not.toContain('if:');
+      expect(installStep).toContain(
+        "inputs.reuse_merge_group_workspace != 'true'"
+      );
       expect(installStep).toContain('pnpm install --frozen-lockfile');
     });
 
@@ -158,17 +160,52 @@ describe('self-hosted runner setup action', () => {
       expect(saveStep).toContain(
         "(github.event_name == 'pull_request' &&\n        github.event.pull_request.head.repo.full_name == github.repository))"
       );
-      for (const untrusted of [
-        'pull_request_target',
-        'workflow_run',
-        'merge_group',
-      ]) {
+      expect(saveStep).toContain(
+        "github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true'"
+      );
+      for (const untrusted of ['pull_request_target', 'workflow_run']) {
         expect(saveStep).not.toContain(`== '${untrusted}'`);
       }
       expect(saveStep).toContain(cachedPaths);
       expect(saveStep).toContain(
         'key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}'
       );
+    });
+
+    it('drops only unloadable binaries, on Linux, just before a save', () => {
+      const name = '- name: Drop unloadable binaries before save';
+      const prune = stepBlock('Drop unloadable binaries before save');
+      expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
+        action.indexOf(name)
+      );
+      expect(action.indexOf(name)).toBeLessThan(
+        action.indexOf('- name: Save installed node_modules (GitHub-hosted)')
+      );
+      expect(prune).toContain("runner.os == 'Linux' &&");
+      const saveIf = saveStep.match(/if: >-\n[\s\S]*?\)\)/)?.[0] ?? '';
+      expect(saveIf).not.toBe('');
+      expect(prune).toContain(saveIf.replace('if: >-\n', ''));
+      expect(prune.match(/rm -rf.*/g)).toEqual([
+        'rm -rf app-builder-bin@*/node_modules/app-builder-bin/{mac,win}',
+      ]);
+      // Hollow musl builds but keep package.json, so a restored tree stays
+      // "Already up to date" instead of refetching them on every hit.
+      const hollow =
+        '          -exec find {}/node_modules -type f ! -name package.json -delete \\;';
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name '*-musl@*' -o -name '*linuxmusl-*@*' \\) \\\n" +
+          hollow
+      );
+      // Promptfoo-only native payloads hollow the same way. These exact
+      // patterns leave the SDK wrappers (codex-sdk, claude-agent-sdk) and
+      // onnxruntime-common intact.
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name 'onnxruntime-node@*' -o -name 'onnxruntime-web@*' \\\n" +
+          "          -o -name '@openai+codex@*-linux-*' \\\n" +
+          "          -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \\) \\\n" +
+          hollow
+      );
+      expect(prune.match(/-exec find /g)).toHaveLength(2);
     });
   });
 

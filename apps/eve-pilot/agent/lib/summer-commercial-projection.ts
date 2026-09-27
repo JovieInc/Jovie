@@ -28,6 +28,20 @@ const source = z
     basis: z.enum(['observed', 'hypothesis']),
   })
   .strict();
+const objectiveClass = z.enum([
+  'direct',
+  'unblocker',
+  'risk-invariant',
+  'compounding',
+]);
+const funnelStage = z.enum([
+  'prospects',
+  'conversations',
+  'activated',
+  'paid',
+  'retained',
+  'mrr',
+]);
 const candidate = z
   .object({
     id,
@@ -43,6 +57,14 @@ const candidate = z
       'paid-rescue',
       'control-recovery',
     ]),
+    objectiveClass,
+    causalPath: z.string().trim().min(1).max(500),
+    targetFunnelStage: funnelStage.nullable(),
+    boundedInvariant: z.string().trim().min(1).max(500).nullable(),
+    stopShip: z.boolean(),
+    expectedObjectiveImpact: metric,
+    agentMinutes: metric,
+    ciMinutes: metric,
     safetyCleared: z.boolean(),
     held: z.boolean(),
     noAuto: z.boolean(),
@@ -70,7 +92,41 @@ const candidate = z
 /** A complete producer-reported snapshot, never an additive revenue event. */
 export const summerCommercialSnapshotSchema = z
   .object({
-    schema: z.literal('jovie.summer-commercial.snapshot/v1'),
+    schema: z.literal('jovie.summer-commercial.snapshot/v2'),
+    objective: z
+      .object({
+        issue: z.literal('JOV-6065'),
+        product: z.literal('logyourbody'),
+        outcome: z.literal('shipped-and-5000-usd-mrr'),
+        targetRecurringMrrCents: z.literal(500000),
+        deadline: z.literal('2026-10-05'),
+        revision: z.string().min(1).max(128),
+      })
+      .strict(),
+    bottleneck: z
+      .object({
+        stage: funnelStage,
+        sourceId: id,
+      })
+      .strict(),
+    funnel: z
+      .object({
+        prospects: metric,
+        conversations: metric,
+        activated: metric,
+        paid: metric,
+        retained: metric,
+        mrrCents: metric,
+      })
+      .strict(),
+    capacity: z
+      .object({
+        agentMinutesPerDay: metric,
+        ciMinutesPerDay: metric,
+        founderMinutesPerDay: metric,
+        availableCashCents: signedMetric,
+      })
+      .strict(),
     sources: z.array(source).max(64),
     candidates: z.array(candidate).max(16),
     activeCommercialId: id.nullable(),
@@ -95,6 +151,29 @@ export const summerCommercialSnapshotSchema = z
         });
       }
     }
+    snapshot.candidates.forEach((item, index) => {
+      if (item.objectiveClass === 'risk-invariant' && !item.boundedInvariant) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'risk-invariant work requires a bounded invariant',
+          path: ['candidates', index, 'boundedInvariant'],
+        });
+      }
+      if (item.objectiveClass !== 'risk-invariant' && item.boundedInvariant) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'only risk-invariant work may claim a bounded invariant',
+          path: ['candidates', index, 'boundedInvariant'],
+        });
+      }
+      if (item.objectiveClass === 'direct' && !item.targetFunnelStage) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'direct work requires a target funnel stage',
+          path: ['candidates', index, 'targetFunnelStage'],
+        });
+      }
+    });
   });
 
 export type CommercialSnapshot = z.infer<typeof summerCommercialSnapshotSchema>;
@@ -135,6 +214,20 @@ export function projectSummerCommercial(input: unknown, now: Date) {
       ] as const
     ).map(key => [key, value(snapshot[key], key) ?? 'UNKNOWN'])
   );
+  const bottleneckSourceUsable = sourceUsable(snapshot.bottleneck.sourceId);
+  if (!bottleneckSourceUsable) unknowns.add('bottleneck:evidence_required');
+  const funnel = Object.fromEntries(
+    Object.entries(snapshot.funnel).map(([key, item]) => [
+      key,
+      value(item, `funnel:${key}`) ?? 'UNKNOWN',
+    ])
+  );
+  const capacity = Object.fromEntries(
+    Object.entries(snapshot.capacity).map(([key, item]) => [
+      key,
+      value(item, `capacity:${key}`) ?? 'UNKNOWN',
+    ])
+  );
   const eligible = snapshot.candidates.filter(item => {
     const gates =
       sourceUsable(item.gateSourceId) &&
@@ -143,6 +236,7 @@ export function projectSummerCommercial(input: unknown, now: Date) {
       !item.noAuto &&
       item.consentCleared &&
       item.readinessCleared &&
+      bottleneckSourceUsable &&
       (item.product !== 'logyourbody' || item.lybCanaryPassed);
     if (!gates) unknowns.add(`${item.id}:gate_not_cleared`);
     return gates;
@@ -154,6 +248,11 @@ export function projectSummerCommercial(input: unknown, now: Date) {
       | 'id'
       | 'product'
       | 'kind'
+      | 'objectiveClass'
+      | 'causalPath'
+      | 'targetFunnelStage'
+      | 'boundedInvariant'
+      | 'stopShip'
       | 'safetyCleared'
       | 'held'
       | 'noAuto'
@@ -164,24 +263,52 @@ export function projectSummerCommercial(input: unknown, now: Date) {
     >
   ) => value(item[key], `${item.id}:${key}`);
   const protectedWork = eligible.filter(
-    item => item.kind === 'paid-rescue' || item.kind === 'control-recovery'
+    item =>
+      item.kind === 'paid-rescue' ||
+      item.kind === 'control-recovery' ||
+      (item.objectiveClass === 'risk-invariant' && item.stopShip)
   );
   protectedWork.sort(
     (a, b) =>
       Number(b.kind === 'paid-rescue') - Number(a.kind === 'paid-rescue') ||
       a.id.localeCompare(b.id)
   );
-  const boundedExperiments = eligible
+  const objectiveWork = eligible.filter(
+    item =>
+      item.product === snapshot.objective.product &&
+      (item.objectiveClass === 'direct' ||
+        item.objectiveClass === 'unblocker') &&
+      (item.targetFunnelStage === null ||
+        item.targetFunnelStage === snapshot.bottleneck.stage)
+  );
+  const commercialPool = objectiveWork.length
+    ? objectiveWork
+    : eligible.filter(item => item.objectiveClass === 'compounding');
+  const boundedExperiments = commercialPool
     .filter(item => item.kind === 'commercial')
     .filter(item => {
       const minutes = read(item, 'additionalFounderMinutesPerDay');
       const spend = read(item, 'incrementalSpendCents');
+      const impact = read(item, 'expectedObjectiveImpact');
+      const agent = read(item, 'agentMinutes');
+      const ci = read(item, 'ciMinutes');
       const recorded = financials.recordedFounderMinutesPerDay;
       return (
         minutes !== null &&
         spend === 0 &&
+        impact !== null &&
+        impact > 0 &&
+        agent !== null &&
+        ci !== null &&
         typeof recorded === 'number' &&
-        minutes + recorded <= 240
+        typeof capacity.agentMinutesPerDay === 'number' &&
+        typeof capacity.ciMinutesPerDay === 'number' &&
+        typeof capacity.founderMinutesPerDay === 'number' &&
+        typeof capacity.availableCashCents === 'number' &&
+        agent <= capacity.agentMinutesPerDay &&
+        ci <= capacity.ciMinutesPerDay &&
+        spend <= capacity.availableCashCents &&
+        minutes + recorded <= capacity.founderMinutesPerDay
       );
     });
   const commercial = boundedExperiments.flatMap(item => {
@@ -190,6 +317,10 @@ export function projectSummerCommercial(input: unknown, now: Date) {
     const margin = read(item, 'contributionMarginCents');
     const minutes = read(item, 'additionalFounderMinutesPerDay');
     const days = read(item, 'daysToCash');
+    const impact = read(item, 'expectedObjectiveImpact');
+    const agent = read(item, 'agentMinutes');
+    const ci = read(item, 'ciMinutes');
+    const spend = read(item, 'incrementalSpendCents');
     const recorded = financials.recordedFounderMinutesPerDay;
     if (
       paid === null ||
@@ -197,14 +328,28 @@ export function projectSummerCommercial(input: unknown, now: Date) {
       margin === null ||
       minutes === null ||
       days === null ||
+      impact === null ||
+      agent === null ||
+      ci === null ||
+      spend === null ||
       typeof recorded !== 'number' ||
-      minutes + recorded > 240 ||
+      typeof capacity.agentMinutesPerDay !== 'number' ||
+      typeof capacity.ciMinutesPerDay !== 'number' ||
+      typeof capacity.founderMinutesPerDay !== 'number' ||
+      typeof capacity.availableCashCents !== 'number' ||
+      minutes + recorded > capacity.founderMinutesPerDay ||
+      agent > capacity.agentMinutesPerDay ||
+      ci > capacity.ciMinutesPerDay ||
+      spend > capacity.availableCashCents ||
+      impact <= 0 ||
       paid < 1 ||
       cash <= 0 ||
       margin <= 0
     )
       return [];
-    return [{ item, paid, cash, margin, minutes, days }];
+    return [
+      { item, paid, cash, margin, minutes, days, impact, agent, ci, spend },
+    ];
   });
   // Use Pareto dominance, not invented ROI weights or a permanent product order.
   const frontier = commercial.filter(
@@ -215,11 +360,19 @@ export function projectSummerCommercial(input: unknown, now: Date) {
           b.paid >= a.paid &&
           b.cash >= a.cash &&
           b.margin >= a.margin &&
+          b.impact >= a.impact &&
+          b.agent <= a.agent &&
+          b.ci <= a.ci &&
+          b.spend <= a.spend &&
           b.minutes <= a.minutes &&
           b.days <= a.days &&
           (b.paid > a.paid ||
             b.cash > a.cash ||
             b.margin > a.margin ||
+            b.impact > a.impact ||
+            b.agent < a.agent ||
+            b.ci < a.ci ||
+            b.spend < a.spend ||
             b.minutes < a.minutes ||
             b.days < a.days)
       )
@@ -266,7 +419,8 @@ export function projectSummerCommercial(input: unknown, now: Date) {
       read(item, 'ongoingCostCents') === 0 &&
       minutes !== null &&
       typeof recorded === 'number' &&
-      minutes + recorded <= 240
+      typeof capacity.founderMinutesPerDay === 'number' &&
+      minutes + recorded <= capacity.founderMinutesPerDay
     );
   });
   const selection =
@@ -277,8 +431,8 @@ export function projectSummerCommercial(input: unknown, now: Date) {
   if (!selection)
     unknowns.add('bounded_paid_value_or_tradeoff_evidence_required');
   return {
-    schema: 'jovie.summer-commercial.projection/v1' as const,
-    policyRevision: 'personal-salary-compounding-2026-09-04-v1',
+    schema: 'jovie.summer-commercial.projection/v2' as const,
+    policyRevision: 'lyb-5000-mrr-2026-10-05-v1',
     evidenceDigest: digest({
       ...snapshot,
       sources: [...snapshot.sources].sort((a, b) => a.id.localeCompare(b.id)),
@@ -316,7 +470,31 @@ export function projectSummerCommercial(input: unknown, now: Date) {
       spendingAuthority:
         'none; nonzero costs require separate reconciliation and approval',
     })),
-    commercialTarget: { recurringMrrCents: 500000, withinDays: 30 },
+    objective: snapshot.objective,
+    bottleneck: {
+      stage: snapshot.bottleneck.stage,
+      evidence: bottleneckSourceUsable ? 'current-observation' : 'UNKNOWN',
+    },
+    funnel,
+    capacity,
+    rankedWork: eligible.map(item => ({
+      id: item.id,
+      objectiveClass: item.objectiveClass,
+      causalPath: item.causalPath,
+      targetFunnelStage: item.targetFunnelStage,
+      boundedInvariant: item.boundedInvariant,
+      expectedObjectiveImpact: read(item, 'expectedObjectiveImpact'),
+      constrainedResourceCost: {
+        agentMinutes: read(item, 'agentMinutes'),
+        ciMinutes: read(item, 'ciMinutes'),
+        founderMinutes: read(item, 'additionalFounderMinutesPerDay'),
+        cashCents: read(item, 'incrementalSpendCents'),
+      },
+    })),
+    commercialTarget: {
+      recurringMrrCents: snapshot.objective.targetRecurringMrrCents,
+      deadline: snapshot.objective.deadline,
+    },
     protectedWorkIds: protectedWork.map(item => item.id),
     financials,
     salary: {

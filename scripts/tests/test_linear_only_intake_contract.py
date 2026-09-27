@@ -78,9 +78,6 @@ def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     assert "actions: write" not in visual
 
 def test_active_facades_are_linear_only_and_fail_closed() -> None:
-    tracker = read(ROOT / "scripts/symphony/lib/tracker-client.ts")
-    assert "api.linear.app/graphql" in tracker and "issueCreate" in tracker
-    assert "node:child_process" not in tracker and "gh issue" not in tracker
     legacy = read(ROOT / "scripts/lib/tracker.mjs")
     assert "GITHUB_ISSUE_INTAKE_RETIRED = true" in legacy
     for name in ("buildIssueCreateArgs", "fileGithubIssue", "shouldMirrorLinear", "claimIssue", "finalizeIssueClaim", "transitionIssue", "queryTodoIssues", "shouldDispatchIssue"):
@@ -111,15 +108,6 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     assert gate < autofix.index("cursorRequest", gate)
 
 def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
-    shipper = read(ROOT / "scripts/symphony/jobs/codex-issue-shipper.ts")
-    run = shipper.split("async function runShipper", 1)[1]
-    assert run.index("GITHUB_ISSUE_INTAKE_RETIRED") < run.index("loadHermesEnv()")
-    entry = read(ROOT / "scripts/symphony/shipper-gated-entrypoint.py")
-    main = entry.split("def main() -> int:", 1)[1]
-    assert main.index("GITHUB_ISSUE_INTAKE_RETIRED") < main.index("load_env_file")
-    bootstrap = read(ROOT / "scripts/symphony/bootstrap-pro-launchd.sh")
-    retired = bootstrap.split("for label in co.jovie.hermes.cron-codex-issue-shipper", 1)[1].split("done", 1)[0]
-    assert "launchctl disable" in retired and "launchctl bootstrap" not in retired
     launch = read(ROOT / "scripts/create-launch-issues.sh")
     assert launch.index("exit 78") < launch.index("gh issue create")
     for name in ("plan2issues.mjs", "plan2issues.v2.mjs"):
@@ -131,18 +119,11 @@ def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
 
 def test_reporting_and_instructions_cannot_restore_canonical_github_intake() -> None:
     report = read(WF / "agent-harness-health-report.yml")
-    hud = read(ROOT / "scripts/symphony/gem-ops-hud.py")
     menu = read(ROOT / "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift")
     assert "gh issue" not in report and "GitHub Issues are historical" in report
-    assert "GITHUB_ISSUE_FALLBACK_RETIRED = True" in hud
-    issue_source = hud.split("def fetch_issue_source", 1)[1].split("def process_count", 1)[0]
-    guard = issue_source.index("if GITHUB_ISSUE_FALLBACK_RETIRED")
-    assert guard < issue_source.index("return", guard) < issue_source.index("fetch_github_issues")
     assert "githubIssueFallbackRetired = true" in menu
     assert menu.count("fetchGitHubInProgressCount") == 1
     assert "no GitHub Issue fallback" in menu
-    scoreboard = read(ROOT / "scripts/symphony/jobs/pipeline-scoreboard.ts")
-    assert "GITHUB_ISSUE_SCOREBOARD_RETIRED = true" in scoreboard
     copilot = read(ROOT / ".github/copilot-instructions.md")
     assert "Canonical intake**: Linear only" in copilot
     assert "gh issue create *" not in read(ROOT / ".claude/settings.json")
