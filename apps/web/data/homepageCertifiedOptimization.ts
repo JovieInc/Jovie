@@ -16,7 +16,6 @@ export const HOMEPAGE_CERTIFIED_EVENTS = {
   SEARCH_EXPOSED: 'homepage_certified_search_exposed',
   SEARCH_SUBMITTED: 'homepage_certified_search_submitted',
   ACCESS_EXPOSED: 'homepage_certified_access_exposed',
-  ACCESS_REQUESTED: 'homepage_certified_access_requested',
 } as const;
 
 export const HOMEPAGE_CERTIFIED_PLACEMENTS = ['hero', 'close'] as const;
@@ -34,9 +33,7 @@ export const HOMEPAGE_CERTIFIED_CONTEXT = {
 export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
   variantIdentity: HOMEPAGE_CERTIFIED_VARIANT_ID,
   exposure: HOMEPAGE_CERTIFIED_EVENTS.EXPOSURE,
-  outcome: FEATURE_FLAGS.WAITLIST_ENABLED
-    ? HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED
-    : HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
+  outcome: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
   attribution: {
     surfaces: [
       'analytics',
@@ -59,13 +56,12 @@ export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
     'content-variant',
   ],
   hypothesis:
-    'A broad company homepage converts qualified visitors through Request access while gated, and a name-search hero when open.',
-  primaryMetric: FEATURE_FLAGS.WAITLIST_ENABLED
-    ? 'homepage_certified_access_requested / homepage_certified_exposed'
-    : 'homepage_certified_search_submitted / homepage_certified_exposed',
+    'The locked homepage converts through a name-search hero (Search your name → Find me → /start), including while the waitlist gate is on.',
+  primaryMetric:
+    'homepage_certified_search_submitted / homepage_certified_exposed',
   guardrails: [
     'No implied customers or borrowed logos on `/`.',
-    'No competing hero CTA: Request access while gated, Search your name → Find me when open.',
+    'No competing hero CTA. The conversion is Search your name → Find me with a /start handoff.',
     'Broad company-level copy; do not narrow the homepage to one ICP.',
     'Do not persist search query text in analytics properties.',
   ],
