@@ -214,6 +214,62 @@ describe('getAdminStripeOverviewMetrics', () => {
     expect(metrics.activeSubscribers).toBe(1);
   });
 
+  it('excludes internal/test customers when a classifier is provided (JOV-6673)', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 19900,
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+
+    const thirtyDaysAgoSeconds = Math.floor(
+      (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+    );
+
+    const subscriptions = [
+      {
+        ...makeSubscription({
+          id: 'sub_internal',
+          status: 'active',
+          created: thirtyDaysAgoSeconds - 10 * 24 * 60 * 60,
+          items,
+        }),
+        customer: { id: 'cus_internal', email: 'tim@jov.ie' },
+      } as unknown as Stripe.Subscription,
+      {
+        ...makeSubscription({
+          id: 'sub_external',
+          status: 'active',
+          created: thirtyDaysAgoSeconds - 5 * 24 * 60 * 60,
+          items,
+        }),
+        customer: { id: 'cus_real', email: 'artist@band.com' },
+      } as unknown as Stripe.Subscription,
+    ];
+
+    listMock.mockResolvedValue({ data: subscriptions, has_more: false });
+
+    const metrics = await getAdminStripeOverviewMetrics({
+      isInternalCustomer: ({ email }) => email?.endsWith('@jov.ie') ?? false,
+    });
+
+    expect(listMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expand: expect.arrayContaining(['data.customer']),
+      })
+    );
+    expect(metrics.activeSubscribers).toBe(1);
+    expect(metrics.mrrUsd).toBe(199);
+    expect(metrics.excludedInternalSubscribers).toBe(1);
+    expect(metrics.excludedInternalMrrUsd).toBe(199);
+  });
+
   it('returns isAvailable false when Stripe API fails', async () => {
     listMock.mockRejectedValueOnce(new Error('Stripe API error'));
 

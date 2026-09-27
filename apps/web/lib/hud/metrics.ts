@@ -197,6 +197,8 @@ export function buildDegradedHudMetrics(
     mrrGrowth30dUsd: 0,
     isConfigured: true,
     isAvailable: false,
+    excludedInternalSubscribers: 0,
+    excludedInternalMrrUsd: 0,
     errorMessage: timeoutDetail,
   };
 
