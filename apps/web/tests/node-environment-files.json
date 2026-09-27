@@ -236,7 +236,7 @@
   "lib/seo/",
   "lib/server-analytics.test.ts",
   "lib/services/",
-  "lib/share/",
+  "lib/share/context.test.ts",
   "lib/social/shortcut-platforms.test.ts",
   "lib/spotify/",
   "lib/stripe/",
