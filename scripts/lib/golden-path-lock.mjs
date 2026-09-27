@@ -21,6 +21,7 @@ export const MERGE_GATE_TEST_FILES = Object.freeze([
   'apps/web/tests/unit/onboarding/onboardingChatHelpers.errors.test.ts',
   'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
   'apps/web/tests/unit/api/waitlist/waitlist.test.ts',
+  'apps/web/tests/unit/home/homepage-golden-path-lock.test.tsx',
 ]);
 
 export const GOLDEN_PATH_LOCK_SELF_TEST_FILES = Object.freeze([

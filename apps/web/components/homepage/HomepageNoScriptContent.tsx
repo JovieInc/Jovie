@@ -1,7 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 /**
  * Keep the homepage useful when JavaScript is unavailable.
@@ -16,9 +14,6 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
  */
 export function HomepageNoScriptContent() {
   const { hero, certified } = HOMEPAGE_LAUNCH_COPY;
-  const primary = FEATURE_FLAGS.WAITLIST_ENABLED
-    ? getHomepageFrontDoorCtaContract(true).primary
-    : { href: APP_ROUTES.START, label: certified.close.action };
 
   return (
     <section
@@ -29,6 +24,7 @@ export function HomepageNoScriptContent() {
     >
       <h2 id='homepage-no-script-heading'>{hero.headline}</h2>
       <p>{hero.subhead}</p>
+      <p>{hero.search.placeholder}</p>
 
       {certified.sections.map(section => (
         <div key={section.id}>
@@ -48,7 +44,7 @@ export function HomepageNoScriptContent() {
       <h3>{certified.close.headline}</h3>
 
       <p>
-        <a href={primary.href}>{primary.label}</a>{' '}
+        <a href={APP_ROUTES.START}>{hero.search.action}</a>{' '}
         <a href={APP_ROUTES.SUPPORT}>Contact support</a>
       </p>
     </section>
