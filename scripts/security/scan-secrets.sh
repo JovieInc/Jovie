@@ -16,6 +16,32 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.95.5}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
+# Release downloads hit transient network resets (curl 35 connection resets on
+# ubuntu-latest, JOV-6809); a single failed attempt must not fail the scan.
+# Download to a temp file before extracting so a restarted transfer never
+# streams a concatenated response into tar.
+SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
+fetch_release_tarball() {
+  local url="$1" dest_dir="$2" member="$3"
+  local tmp attempt
+  tmp="$(mktemp)"
+  for attempt in 1 2 3; do
+    if curl -sSfL -o "$tmp" "$url" \
+      && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
+      chmod +x "$dest_dir/$member"
+      rm -f "$tmp"
+      return 0
+    fi
+    if [[ $attempt -lt 3 ]]; then
+      echo "scanner download attempt $attempt failed; retrying" >&2
+      sleep "$SCAN_SECRETS_RETRY_DELAY"
+    fi
+  done
+  rm -f "$tmp"
+  echo "::error title=Secret scanner download failed::Could not fetch $member after 3 attempts ($url)." >&2
+  return 1
+}
+
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then
     return
@@ -36,9 +62,9 @@ ensure_gitleaks() {
   mkdir -p "$cache_dir"
   tarball="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
   if [[ ! -x "$cache_dir/gitleaks" ]]; then
-    curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
-      | tar -xz -C "$cache_dir" gitleaks
-    chmod +x "$cache_dir/gitleaks"
+    fetch_release_tarball \
+      "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
+      "$cache_dir" gitleaks
   fi
   GITLEAKS_BIN="$cache_dir/gitleaks"
 }
@@ -63,9 +89,9 @@ ensure_trufflehog() {
   mkdir -p "$cache_dir"
   tarball="trufflehog_${TRUFFLEHOG_VERSION}_${os}_${arch}.tar.gz"
   if [[ ! -x "$cache_dir/trufflehog" ]]; then
-    curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${tarball}" \
-      | tar -xz -C "$cache_dir" trufflehog
-    chmod +x "$cache_dir/trufflehog"
+    fetch_release_tarball \
+      "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${tarball}" \
+      "$cache_dir" trufflehog
   fi
   TRUFFLEHOG_BIN="$cache_dir/trufflehog"
 }
