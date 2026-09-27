@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SignupFunnelBeacon } from '@/components/features/tracking/SignupFunnelBeacon';
 import {
   type HomepageCertifiedPreviews,
   HomepageCertifiedSections,
@@ -167,6 +168,7 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+      <SignupFunnelBeacon surface='homepage' />
       {children}
       <HomepageNoScriptContent />
     </>

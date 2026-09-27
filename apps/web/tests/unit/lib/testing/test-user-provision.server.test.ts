@@ -664,7 +664,10 @@ describe('test-user-provision.server', () => {
   it('clears proxy-state and dashboard caches without calling production Upstash', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('VERCEL_ENV', '');
-    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://real-kiwi-157253.upstash.io');
+    vi.stubEnv(
+      'UPSTASH_REDIS_REST_URL',
+      'https://nice-walleye-308423.upstash.io'
+    );
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
 
     const { invalidateTestUserCaches } = await import(
@@ -704,7 +707,10 @@ describe('test-user-provision.server', () => {
   it('ignores missing Next cache context during plain Node test seeding', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('VERCEL_ENV', '');
-    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://real-kiwi-157253.upstash.io');
+    vi.stubEnv(
+      'UPSTASH_REDIS_REST_URL',
+      'https://nice-walleye-308423.upstash.io'
+    );
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
     mockRevalidateTag.mockImplementation(() => {
       throw new Error(

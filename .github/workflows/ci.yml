@@ -1361,6 +1361,11 @@ jobs:
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      # The homepage render uses mock keys only, so its screenshots are public.
+      # Without this the producer guard omits every image and a failed compare
+      # uploads no -actual.png, leaving an intentional homepage change no
+      # CI-rendered baseline to adopt (scripts/visual-baseline-adopt.mjs).
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
