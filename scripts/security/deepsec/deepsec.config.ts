@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'deepsec/config';
 
 // Loaded only from the trusted scanner workspace. The scanned source is data:
 // DEEPSEC_SOURCE_ROOT points at a checkout that is never installed or run.
@@ -17,7 +16,9 @@ const root = process.env.DEEPSEC_SOURCE_ROOT;
 if (!root) throw new Error('DEEPSEC_SOURCE_ROOT is required');
 // Provider/env hygiene is enforced by deepsec-run.mjs, which starts deepsec
 // with a minimal environment; deepsec itself sets the gateway route vars.
-export default defineConfig({
+// A plain object: deepsec's defineConfig is an identity helper, and importing
+// it would make repo typechecks depend on the scanner's node_modules.
+export default {
   ai: { mode: 'gateway', provider: 'vercel' },
   dataDir: process.env.DEEPSEC_DATA_ROOT ?? join(here, 'data'),
   projects: [
@@ -29,4 +30,4 @@ export default defineConfig({
       priorityPaths: targets.targets,
     },
   ],
-});
+};
