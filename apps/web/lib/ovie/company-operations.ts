@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import {
   HUD_SOURCE_STALE_AFTER_MS,
   isSourceStale,
@@ -195,7 +196,7 @@ function primaryOutcomeMetric(
     const deltaUsd = metrics.overview.mrrUsd - weekAgo.mrrUsd;
     const percent =
       weekAgo.mrrUsd > 0
-        ? ` (${deltaUsd < 0 ? '' : '+'}${((deltaUsd / weekAgo.mrrUsd) * 100).toFixed(1)}%)`
+        ? ` (${deltaUsd < 0 ? '' : '+'}${computeRatePercent(deltaUsd, weekAgo.mrrUsd).toFixed(1)}%)`
         : '';
     const subscriberDelta =
       metrics.overview.activeSubscribers - weekAgo.activeSubscribers;
