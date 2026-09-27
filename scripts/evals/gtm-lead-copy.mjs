@@ -419,10 +419,27 @@ export function disposition(corpus, metrics, { live = false } = {}) {
   ];
 }
 
-export async function runBenchmark(
-  corpus,
-  { transport, approval, live = false, incumbent = null, reasoning = null } = {}
-) {
+/**
+ * @typedef {{
+ *   transport?: NonNullable<Parameters<typeof runPreparedJevEvaluation>[1]>['transport'],
+ *   approval?: (request: ReturnType<typeof prepareGtmRequest>) => NonNullable<Parameters<typeof runPreparedJevEvaluation>[1]>['approval'],
+ *   live?: boolean,
+ *   incumbent?: Record<string, object> | null,
+ *   reasoning?: Record<string, object> | null,
+ * }} BenchmarkOptions
+ */
+
+/**
+ * @param {BenchmarkOptions} [options]
+ */
+export async function runBenchmark(corpus, options = {}) {
+  const {
+    transport,
+    approval,
+    live = false,
+    incumbent = null,
+    reasoning = null,
+  } = options;
   const rows = [];
   for (const example of corpus.cases) {
     let result;
