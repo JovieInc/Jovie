@@ -1,4 +1,4 @@
-// Canonical Pen homepage v3 hero (dark launch behind HOMEPAGE_V3_ENABLED).
+// Canonical Pen homepage hero (Tim direction 2026-09-26).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';

@@ -165,7 +165,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        'apps/web/components/homepage/HomepageIdentityHero.tsx',
         'hero',
         'centered-none'
       ),
