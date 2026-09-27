@@ -31,6 +31,9 @@ say "   hud: $(systemctl --user is-active jovie-hud.service) on $(readlink "$sta
 say "== 3. Disk"
 df -h / | tail -1
 rm -rf ~/symphony-elixir-workspaces ~/symphony-elixir-logs ~/.local/share/gem-hud-builds 2>/dev/null || true
+# symphony-official-runtime wrote its dashboard frames to syslog: 100 GB active + 165 GB rotated on 2026-09-27.
+sudo -n truncate -s 0 /var/log/syslog 2>/dev/null || true
+sudo -n rm -f /var/log/syslog.[0-9]* 2>/dev/null || true
 df -h / | tail -1
 say "done. On the Mac, stop its lane copy with:"
 say "  launchctl unload ~/Library/LaunchAgents/com.jovie.lanes.plist ~/Library/LaunchAgents/com.jovie.devin-sweep.plist; pkill -f 'lane_runner.py worker'"
