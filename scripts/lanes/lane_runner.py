@@ -69,7 +69,7 @@ HOST = socket.gethostname().split(".")[0]
 LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
-              "scripts/tests/test_reason_lane.py"]
+              "scripts/tests/test_reason_lane.py", "scripts/tests/test_gh_app_token.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -1487,16 +1487,34 @@ def install_release(host: Host) -> int:
     return 0
 
 
-def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env") -> None:
-    """A host-specific GitHub token (GH_TOKEN=...) so each host spends its own API budget
-    instead of everyone sharing one user's 5000/hr."""
+def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
+                    app_key: Path = Path.home() / ".config/jovie-lanes/jovie-bot.pem",
+                    shim_dir: Path | None = None) -> None:
+    """A host-specific GitHub identity so each host spends its own API budget instead of everyone
+    sharing Tim's token (its secondary limit throttled every lane on 2026-09-27, JOV-6878).
+    An explicit GH_TOKEN in github.env wins; otherwise, with the Jovie Bot app key present, a `gh`
+    shim first on PATH mints a fresh 1h installation token (cached) for every gh call, including
+    the agents' own, so a long run never outlives its token."""
     try:
         for line in path.read_text().splitlines():
             key, _, value = line.strip().removeprefix("export ").partition("=")
             if key in ("GH_TOKEN", "GITHUB_TOKEN") and value:
                 os.environ["GH_TOKEN"] = value.strip().strip('"').strip("'")
+                return
     except OSError:
+        pass
+    if not app_key.exists():
         return
+    real = shutil.which("gh")
+    shim_dir = shim_dir or Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "bin"
+    if not real or Path(real).parent == shim_dir:
+        return
+    shim_dir.mkdir(parents=True, exist_ok=True)
+    shim = shim_dir / "gh"
+    shim.write_text(f'#!/bin/sh\nGH_TOKEN="$(python3 {HERE / "gh_app_token.py"})" || exit 1\n'
+                    f'export GH_TOKEN\nexec {real} "$@"\n')
+    shim.chmod(0o755)
+    os.environ["PATH"] = f"{shim_dir}{os.pathsep}{os.environ.get('PATH', '')}"
 
 
 def graphql_budget() -> tuple[int, str] | None:
