@@ -46,7 +46,7 @@ Contract: [`scripts/lib/pr-review-contracts.mjs`](../../scripts/lib/pr-review-co
 
 - **Providers:**
   - Raw source may go to the Gateway providers listed in
-    `scripts/symphony/config/model-registry.json`, for the `pr-review` job class
+    `scripts/backlog-orchestrator/config/model-registry.json`, for the `pr-review` job class
     only.
   - `typesafe-ai/jev` may receive bounded source excerpts for finding
     verification: at most `JEV_CODE_EXCERPT_MAX_BYTES` (16,000) per request, after
@@ -70,7 +70,7 @@ Contract: [`scripts/lib/pr-review-contracts.mjs`](../../scripts/lib/pr-review-co
 **Ship now:** Gateway on hosted runners, with caps.
 **Re-evaluate when:** monthly review spend exceeds `api_burn_fraction_of_sub` (15%)
 of the relevant subscription cost.
-**Then:** move verification to subscription pools through Symphony admission.
+**Then:** move verification to subscription pools through the shipping lanes (`scripts/lanes`).
 
 ## Phases
 
