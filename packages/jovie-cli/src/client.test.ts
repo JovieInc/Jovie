@@ -252,4 +252,19 @@ describe('Jovie public resource client', () => {
       retryAfterSeconds: 120,
     });
   });
+
+  it('parses HTTP-date and invalid Retry-After values', async () => {
+    const future = new Date(Date.now() + 60_000).toUTCString();
+    for (const [header, expected] of [
+      [future, expect.any(Number)],
+      ['not a date', undefined],
+    ] as const) {
+      const { fetchImpl } = createFetch('nope', 503, { 'Retry-After': header });
+      const error = (await fetchOpenApi({ fetchImpl }).catch(
+        (e: unknown) => e
+      )) as { retryAfterSeconds?: number; apiCode?: string };
+      expect(error.retryAfterSeconds).toEqual(expected);
+      expect(error.apiCode).toBeUndefined();
+    }
+  });
 });

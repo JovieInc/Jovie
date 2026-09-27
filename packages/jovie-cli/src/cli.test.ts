@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import {
@@ -339,5 +342,25 @@ describe('jovie CLI', () => {
       (tool: { name: string }) => tool.name
     );
     expect(tools).toContain('create_profile');
+  });
+
+  it('installs the skill with init and rejects a bad MCP base URL', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jovie-cli-init-'));
+    const stdout = createOutput();
+    await expect(
+      runCli(['init', '--dir', dir, '--json'], { stdout: stdout.output })
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read()).installed).toEqual([
+      join(dir, 'jovie/SKILL.md'),
+    ]);
+
+    const stderr = createOutput();
+    await expect(
+      runCli(['mcp', '--base-url', 'ftp://x'], {
+        stdin: Readable.from([]),
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toContain('Base URL must be');
   });
 });
