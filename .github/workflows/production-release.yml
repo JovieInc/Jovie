@@ -870,7 +870,6 @@ jobs:
           PRODUCTION_NEXT_CACHE_SAVE_ENABLED: ${{ vars.JOVIE_PRODUCTION_NEXT_CACHE_SAVE || 'false' }}
           PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
-          RUNNER_IMAGE: ${{ runner.image }}
         run: |
           production_stage() {
             set -euo pipefail
