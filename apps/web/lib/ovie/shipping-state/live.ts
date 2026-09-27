@@ -72,6 +72,8 @@ const GITHUB_RATE_LIMIT_MAX_BACKOFF_MS = 60 * 60_000;
 export type LiveIo = {
   readonly fetch: (url: string, init?: RequestInit) => Promise<Response>;
   readonly githubToken?: string;
+  /** Preferred over githubToken: resolves a fresh (bot) token per call. */
+  readonly getGithubToken?: () => Promise<string | undefined>;
   readonly githubOwner?: string;
   readonly githubRepo?: string;
   readonly nowMs?: () => number;
@@ -254,7 +256,10 @@ async function githubFetch(
   init: RequestInit,
   timeoutMs = GITHUB_TIMEOUT_MS
 ): Promise<Response | AuthorityRead> {
-  if (!io.githubToken || !io.githubOwner || !io.githubRepo) {
+  const githubToken = io.getGithubToken
+    ? await io.getGithubToken()
+    : io.githubToken;
+  if (!githubToken || !io.githubOwner || !io.githubRepo) {
     return failedRead(
       sourceId,
       'unavailable',
@@ -272,7 +277,7 @@ async function githubFetch(
     signal: AbortSignal.timeout(timeoutMs),
     headers: {
       accept: 'application/vnd.github+json',
-      authorization: `Bearer ${io.githubToken}`,
+      authorization: `Bearer ${githubToken}`,
       ...init.headers,
     },
   });
@@ -1128,6 +1133,9 @@ export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
   return {
     fetch: overrides.fetch ?? fetch,
     githubToken: overrides.githubToken,
+    ...(overrides.getGithubToken
+      ? { getGithubToken: overrides.getGithubToken }
+      : {}),
     githubOwner: overrides.githubOwner,
     githubRepo: overrides.githubRepo,
     ...(overrides.nowMs ? { nowMs: overrides.nowMs } : {}),
