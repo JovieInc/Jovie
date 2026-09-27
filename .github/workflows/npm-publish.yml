@@ -303,7 +303,7 @@ jobs:
           installed_cli="$install_root/node_modules/.bin/jovie"
           test -x "$installed_cli"
           test "$("$installed_cli" --version)" = "$RELEASE_VERSION"
-          "$installed_cli" --help | grep -F 'Read-only public Jovie resources'
+          "$installed_cli" --help | grep -F 'Jovie for agents'
           "$installed_cli" api openapi \
             --base-url https://jov.ie \
             --json \
