@@ -192,7 +192,7 @@ describe('Summer Kanban (JOV-5215)', () => {
         .sort()
     );
     expect(board.every(card => card.owner === 'summer')).toBe(true);
-    expect(board.some(card => card.lane === 'engineering')).toBe(false);
+    expect(board.map(card => card.lane)).not.toContain('engineering');
     expect(
       receipts.find(receipt => receipt.destination === DEST_PERSONAL)?.workId
     ).toBeTruthy();
@@ -554,17 +554,20 @@ describe('Summer Kanban (JOV-5215)', () => {
   });
 
   it('skips a blank receipt handle and uses the next one', () => {
-    const initiative = summerKanbanInitiative('ini_receipt_only', {
+    const base = summerKanbanInitiative('ini_receipt_only', {
       routingState: 'done',
       destinationHandle: null,
       evidence: [
         { kind: 'receipt', summary: OVIE_QUEUED_ACK, ref: DEST_KANBAN },
       ],
     });
-    initiative.receipts = [
-      { ...initiative.receipts[0]!, destinationHandle: '   ' },
-      { ...initiative.receipts[0]!, destinationHandle: 'task_from_receipt' },
-    ];
+    const initiative = {
+      ...base,
+      receipts: [
+        { ...base.receipts[0]!, destinationHandle: '   ' },
+        { ...base.receipts[0]!, destinationHandle: 'task_from_receipt' },
+      ],
+    };
 
     expect(toSummerKanbanCard(initiative)?.terminalEvidence).toEqual({
       state: 'proven',
@@ -833,8 +836,8 @@ describe('Summer Kanban (JOV-5215)', () => {
     expect(taste).toBeTruthy();
     expect(board.some(card => card.workId === personal?.workId)).toBe(false);
     expect(board.some(card => card.workId === taste?.workId)).toBe(false);
-    expect(board.some(card => card.lane === 'personal')).toBe(false);
-    expect(board.some(card => card.lane === 'taste')).toBe(false);
+    expect(board.map(card => card.lane)).not.toContain('personal');
+    expect(board.map(card => card.lane)).not.toContain('taste');
     expect(
       board.every(card => card.lane === 'flash' || card.lane === 'heavy')
     ).toBe(true);

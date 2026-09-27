@@ -97,6 +97,7 @@ gstack skill files are part of the agent control plane. Keep them fast, stable, 
 - Put repeatable commands in scripts. Long copied shell/prose blocks increase latency and drift.
 - Keep stable shared text before variable request details so provider prompt caching can work.
 - Run `bun run skill:size-check` after skill-template changes. It is a ratchet, not the final target; new work should reduce skill size when practical.
+- Writing/prompt/template authoring follows the writing-surface contract in `docs/writing/SURFACE_COVERAGE.md` (JOV-6475). Do not copy word lists or rubrics into skills: policy is `canon/VOICE.md`, executable rules are `packages/copy`, per-surface coverage is `scripts/invariants/writing-surfaces-registry.json`. Agent-authored GBrain pages retain source/date and distinguish proposals from observed facts.
 
 ## External Skill Governance
 

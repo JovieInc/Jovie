@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, FormEvent, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TaskWorkspaceHeaderBar } from '@/components/features/dashboard/tasks/TaskWorkspaceHeaderBar';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const WEB_ROOT = join(__dirname, '../../..');
 
@@ -171,12 +172,13 @@ describe('TaskWorkspaceHeaderBar', () => {
     expect(
       screen.getByRole('tablist', { name: 'Task subviews' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'All 2' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
     expect(
-      screen.getByRole('tab', { name: 'Assigned To Me 1' })
+      screen.getByRole('tab', { name: segmentedAccessibleName('All', '2') })
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Me', '1'),
+      })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
     expect(
@@ -189,7 +191,11 @@ describe('TaskWorkspaceHeaderBar', () => {
 
     render(<TaskWorkspaceHeaderBar {...props} mode='default' />);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
 
     expect(props.onSubviewChange).toHaveBeenCalledWith('jovie');
   });

@@ -27,6 +27,7 @@ async function executeTool(
     toolCallId: `test-${args.field}`,
     messages: [],
     abortSignal: new AbortController().signal,
+    context: {},
   });
   // Result is the plain object (not AsyncIterable) when execute returns directly
   return result as {

@@ -121,24 +121,25 @@ vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
 
 const artist = {
   id: 'artist-1',
+  owner_user_id: 'user-1',
   name: 'Tim White',
   handle: 'timwhite',
-  image_url: null,
-  tagline: null,
+  spotify_id: '',
   location: null,
   hometown: null,
   career_highlights: null,
-  is_public: true,
   is_verified: false,
   active_since_year: null,
   published: true,
-  is_verified_flag: false,
+  is_featured: false,
+  marketing_opt_out: false,
+  created_at: '2026-01-01T00:00:00.000Z',
 } satisfies Artist;
 
 const contacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,

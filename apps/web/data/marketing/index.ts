@@ -212,6 +212,36 @@ export {
   resolveJovieSceneColorRole,
 } from './imageColorPolicy';
 export type {
+  MarketingMediaExportApprovalEvidence,
+  MarketingMediaExportApprovalResult,
+  MarketingMediaExportExecutionInput,
+  MarketingMediaExportExecutionResult,
+  MarketingMediaExportFallbackPolicy,
+  MarketingMediaExportFinding,
+  MarketingMediaExportFindingCode,
+  MarketingMediaExportFixture,
+  MarketingMediaExportOutputProfile,
+  MarketingMediaExportOutputReceipt,
+  MarketingMediaExportOutputResult,
+  MarketingMediaExportReceipt,
+  MarketingMediaExportRequest,
+} from './mediaExport';
+export {
+  approveMarketingMediaExportReceipt,
+  computeMarketingMediaExportCacheKey,
+  executeMarketingMediaExportRequest,
+  formatMarketingMediaExportRequestForPrompt,
+  getMarketingMediaExportFixture,
+  isMarketingMediaExportFallbackPolicy,
+  isMarketingMediaExportOutputProfile,
+  MARKETING_MEDIA_EXPORT_FALLBACK_POLICIES,
+  MARKETING_MEDIA_EXPORT_FIXTURES,
+  MARKETING_MEDIA_EXPORT_NEGATIVE_CONSTRAINTS,
+  MARKETING_MEDIA_EXPORT_OUTPUT_PROFILES,
+  MARKETING_MEDIA_EXPORT_SCHEMA,
+  validateMarketingMediaExportRequest,
+} from './mediaExport';
+export type {
   MarketingMediaRecipeDecision,
   MarketingMediaRecipeFinding,
   MarketingMediaRecipeFindingCode,

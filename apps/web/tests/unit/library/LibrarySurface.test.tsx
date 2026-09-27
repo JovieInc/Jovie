@@ -814,7 +814,7 @@ describe('LibrarySurface', () => {
     // Scope Draft clicks to each section so dual "Draft" chips stay independent.
     const releaseDraftChip = within(releaseSection as HTMLElement).getByRole(
       'button',
-      { name: /^Draft /u }
+      { name: /^Draft\s*\d/u }
     );
     fireEvent.click(releaseDraftChip);
 
@@ -836,7 +836,7 @@ describe('LibrarySurface', () => {
 
     const approvalDraftChip = within(approvalSection as HTMLElement).getByRole(
       'button',
-      { name: /^Draft /u }
+      { name: /^Draft\s*\d/u }
     );
     fireEvent.click(approvalDraftChip);
 
@@ -1887,7 +1887,7 @@ describe('LibrarySurface', () => {
     ]) {
       expect(
         within(savedViews).getByRole('button', {
-          name: new RegExp(`^${savedView} `, 'u'),
+          name: new RegExp(`^${savedView}\\s*\\d`, 'u'),
         })
       ).toBeInTheDocument();
     }
@@ -1952,7 +1952,7 @@ describe('LibrarySurface', () => {
     expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^All /u }));
+    await user.click(screen.getByRole('button', { name: /^All\s*\d/u }));
     expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
       scroll: false,
     });

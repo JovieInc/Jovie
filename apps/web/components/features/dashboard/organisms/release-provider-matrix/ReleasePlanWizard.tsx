@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/release-tasks/release-plan-wizard.test.tsx
+
 import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -67,8 +69,8 @@ const RELEASE_FORMAT_CHOICES: Choice<ReleaseFormat>[] = [
 
 const DISTRIBUTION_CHOICES: Choice<DistributionModel>[] = [
   { value: 'diy', label: 'DIY' },
-  { value: 'indie_label', label: 'Indie label' },
-  { value: 'major_label', label: 'Major label' },
+  { value: 'indie_label', label: 'Indie Label' },
+  { value: 'major_label', label: 'Major Label' },
 ];
 
 const PUBLISHER_CHOICES: Choice<PublisherAnswer>[] = [
@@ -82,7 +84,7 @@ const GENRE_CHOICES: Choice<Genre>[] = [
   { value: 'rock', label: 'Rock' },
   { value: 'hiphop', label: 'Hip-hop' },
   { value: 'country', label: 'Country' },
-  { value: 'rnb', label: 'R&B' },
+  { value: 'rnb', label: 'R&B' }, // ui-casing-allow: R&B genre abbreviation
   { value: 'classical', label: 'Classical' },
   { value: 'jazz', label: 'Jazz' },
   { value: 'folk', label: 'Folk' },
@@ -94,8 +96,8 @@ const GOAL_CHOICES: Choice<Goal>[] = [
   { value: 'streams', label: 'Streams' },
   { value: 'radio', label: 'Radio' },
   { value: 'press', label: 'Press' },
-  { value: 'fanbase', label: 'Fanbase growth' },
-  { value: 'catalog', label: 'Catalog depth' },
+  { value: 'fanbase', label: 'Fanbase Growth' },
+  { value: 'catalog', label: 'Catalog Depth' },
 ];
 
 const TERRITORY_CHOICES: Choice<Territory>[] = [
@@ -273,6 +275,7 @@ export function ReleasePlanWizard({
       <Dialog open={open} onClose={handleClose} size='md'>
         <DialogTitle>Release Plan</DialogTitle>
         <DialogDescription>
+          {/* ui-casing-allow: Pro is the plan name */}
           Release plans are a Pro feature. Upgrade to generate a tailored task
           list for{' '}
           <span className='font-medium'>{releaseTitle ?? 'this release'}</span>.
@@ -284,7 +287,7 @@ export function ReleasePlanWizard({
             variant='secondary'
             onClick={handleClose}
           >
-            Maybe later
+            Maybe Later
           </Button>
           <Button type='button' size='sm' onClick={handleUpgrade}>
             Upgrade
@@ -296,7 +299,7 @@ export function ReleasePlanWizard({
 
   return (
     <Dialog open={open} onClose={handleClose} size='lg'>
-      <DialogTitle>Plan for {releaseTitle ?? 'this release'}</DialogTitle>
+      <DialogTitle>Plan For {releaseTitle ?? 'This Release'}</DialogTitle>
       <DialogDescription>
         Six quick questions. Jovie picks a task list tailored to your context.
       </DialogDescription>
@@ -328,7 +331,7 @@ export function ReleasePlanWizard({
                   data-testid={`choice-${choice.value}`}
                   className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                     selected
-                      ? 'bg-foreground text-background border-foreground'
+                      ? 'bg-foreground text-(--color-bg-base) border-foreground'
                       : 'bg-transparent text-foreground border-border hover:border-foreground/60'
                   }`}
                 >

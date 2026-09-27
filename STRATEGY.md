@@ -36,7 +36,7 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 - `apps/web/`: Next.js web application (HUD, marketing, admin)
 - `apps/desktop/`: Electron desktop app
 - `apps/ios/`: Swift iOS app
-- `scripts/symphony/`: Hermes fleet agent code
+- `scripts/lanes/`: Symphony, the shipping lanes harness (the Symphony Elixir control plane is retired; history in JovieInc/symphony-control)
 - `docs/solutions/`: Compound engineering solution docs
 - `docs/decisions/`: Architecture decision records
 

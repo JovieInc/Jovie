@@ -46,7 +46,6 @@ function qualification(): QualificationResult {
 function spotify(): SpotifyLeadEnrichment {
   return {
     status: 'enriched',
-    reason: null,
     artistId: 'artist123',
     spotifyPopularity: 30,
     spotifyFollowers: 900,
@@ -154,7 +153,9 @@ describe('public requalification contract', () => {
     });
 
     expect(withDspLinks.fitScoreBreakdown.multiDspPresence).toBe(5);
-    expect(withDspLinks.fitScoreBreakdown.meta?.dspPlatformCount).toBe(3);
+    expect(withDspLinks.fitScoreBreakdown.meta).toMatchObject({
+      dspPlatformCount: 3,
+    });
     expect(withDspLinks.fitScoreBreakdown.hasContactEmail).toBe(0);
     expect(withDspLinks.sourceRevision).not.toBe(base.sourceRevision);
     expect(withDspLinks.publicObservation.qualification.allLinks).toEqual(

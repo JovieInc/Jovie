@@ -31,13 +31,15 @@ describe('avatar-hosting copyAvatarToBlob', () => {
   });
 
   it('handles missing content-type header without toLowerCase crash', async () => {
+    // A raw byte body carries no content-type header, and unlike a Blob it
+    // never supplies one, so the missing-header path is exercised directly.
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(new Blob(['avatar-bytes']), { status: 200 })
-        )
+      vi.fn().mockResolvedValue(
+        new Response(new TextEncoder().encode('avatar-bytes'), {
+          status: 200,
+        })
+      )
     );
 
     const result = await copyAvatarToBlob(

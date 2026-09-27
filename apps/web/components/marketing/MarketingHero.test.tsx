@@ -91,10 +91,13 @@ describe('MarketingHero source-backed default story', () => {
       'line-clamp-2',
       'marketing-h1-max-two-lines'
     );
-    expect(heading).toHaveStyle({
-      WebkitLineClamp: '3',
-      maxBlockSize: 'calc(3 * 1lh)',
-    });
+    expect(heading).toHaveStyle({ WebkitLineClamp: '3' });
+    // jsdom 30 simplifies the shipped `calc(3 * 1lh)` declaration to `calc(3lh)`.
+    const specifiedMaxBlockSize = heading.style.maxBlockSize.replaceAll(
+      ' ',
+      ''
+    );
+    expect(specifiedMaxBlockSize).toMatch(/^calc\(3(?:\*1)?lh\)$/);
   });
 
   it('binds Storybook directly to MarketingHero and limits the Pen claim', () => {
