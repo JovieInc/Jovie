@@ -511,3 +511,18 @@ describe('Dependabot discovery contract', () => {
     }
   });
 });
+
+describe('Dependabot npm grouping (JOV-6837)', () => {
+  it('lands the vitest family and dev patches as single PRs, never majors', () => {
+    const npm = CONFIG.slice(
+      0,
+      CONFIG.indexOf("package-ecosystem: 'github-actions'")
+    );
+    expect(npm).toMatch(
+      /vitest:\n\s+patterns:\n\s+- 'vitest'\n\s+- '@vitest\/\*'\n\s+update-types:\n\s+- 'minor'\n\s+- 'patch'/
+    );
+    expect(npm).toMatch(
+      /dev-patch:\n\s+dependency-type: 'development'\n\s+update-types:\n\s+- 'patch'\n/
+    );
+  });
+});
