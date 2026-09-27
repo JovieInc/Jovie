@@ -816,6 +816,24 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.failure_excerpt = real, real_excerpt
         self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
 
+    def test_a_pr_merged_before_its_fix_run_is_skipped_not_failed(self):
+        real = lane.sh
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:3] == ["git", "worktree", "add"]:
+                return SimpleNamespace(returncode=128, stdout="",
+                                       stderr="fatal: invalid reference: origin/devin/jov-1")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+            finally:
+                lane.sh = real
+        self.assertEqual(receipt["verdict"], "skipped")
+        self.assertIn("invalid reference", receipt["reasons"][0])
+
     def test_a_lockfile_only_conflict_skips_the_agent_and_re_arms(self):
         real, real_resolve, real_agent = lane.sh, lane.resolve_lockfile_conflict, lane.run_agent
         lane.resolve_lockfile_conflict = lambda worktree, branch, log: True
