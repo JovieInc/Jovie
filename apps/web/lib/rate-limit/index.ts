@@ -97,6 +97,7 @@ export {
   inspectPressSourceHourlyLimiter,
   inspectPressSourceLimiter,
   isrcRescanLimiter,
+  libraryAssetShareAccessLimiter,
   merchCheckoutLimiter,
   musicBrainzLookupLimiter,
   navigationTelemetryLimiter,

@@ -88,6 +88,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   musicBrainzLookup: mandatoryDeny,
 
   claimTokenAccess: advisoryAllow,
+  libraryAssetShareAccess: advisoryAllow,
   publicClick: advisoryAllow,
   aiChat: advisoryAllow,
   avatarUpload: advisoryDeny,
