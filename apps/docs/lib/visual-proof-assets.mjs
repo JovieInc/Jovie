@@ -79,13 +79,13 @@ function sortedFindings(findings) {
 /**
  * Audit visual proof assets.
  *
- * @param {object} input
- * @param {Array} input.articles - registry articles with `visualProofRefs`,
+ * @param {object} [input]
+ * @param {Array} [input.articles] - registry articles with `visualProofRefs`,
  *   `status`, and `lastVerifiedAt`.
- * @param {Array} input.planEntries - capture plan entries (`articleId`, `step`).
- * @param {Map<string, {sha256: string, width: number, height: number}>} input.assets
+ * @param {Array} [input.planEntries] - capture plan entries (`articleId`, `step`).
+ * @param {Map<string, {sha256: string, width: number, height: number}>} [input.assets]
  *   - files on disk keyed by `proof/<name>.png` ref.
- * @param {Array} input.manifestEntries - manifest entries keyed by `ref` with
+ * @param {Array} [input.manifestEntries] - manifest entries keyed by `ref` with
  *   `capturedAt`, `gitSha`, `width`, `height`, `viewportCss`,
  *   `deviceScaleFactor`, and `captureTarget`.
  * @param {string|null} [input.currentGitSha] - build SHA being certified;

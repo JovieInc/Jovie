@@ -146,6 +146,7 @@ async function main() {
       const results = [];
       for (const issue of issues) {
         const result = await upsertLinearIssueByTitleFingerprint({
+          fingerprint: issue.fingerprint,
           title: `[${issue.fingerprint}] ${issue.title}`,
           description: issue.body,
           priority: 2,

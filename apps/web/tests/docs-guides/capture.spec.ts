@@ -138,9 +138,9 @@ async function capturePlanEntry(
   });
 }
 
-test.describe.configure({ mode: 'serial' });
-
 test.describe('docs guide visual proof capture', () => {
+  test.describe.configure({ mode: 'serial' });
+
   for (const entry of DOCS_GUIDE_PLAN.entries) {
     test(`capture ${entry.id}`, async ({ page, browserName }, testInfo) => {
       test.skip(browserName !== 'chromium', 'chromium only');
