@@ -18,6 +18,7 @@ import {
 } from '@/lib/leads/job-qualification';
 import type { QualificationResult } from '@/lib/leads/qualify';
 import type { SpotifyLeadEnrichment } from '@/lib/leads/spotify-enrich-lead';
+import { stableSerialize } from '@/lib/stable-serialize';
 
 export const PUBLIC_REQUALIFICATION_EVENT_TYPE =
   'public_requalification' as const;
@@ -246,19 +247,6 @@ export class PublicRequalificationConflictError extends Error {
     this.incomingSourceRevision = input.incomingSourceRevision;
   }
 }
-function stableSerialize(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(item => stableSerialize(item)).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
-
 function sha256(value: unknown): `sha256:${string}` {
   return `sha256:${createHash('sha256').update(stableSerialize(value)).digest('hex')}`;
 }
