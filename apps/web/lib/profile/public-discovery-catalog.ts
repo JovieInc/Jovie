@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, count, sql as drizzleSql, eq, exists } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, exists } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
@@ -101,6 +101,37 @@ export function toArtistsDirectoryProfiles(
   }));
 }
 
+const PUBLIC_DIRECTORY_PREDICATE = and(
+  eq(creatorProfiles.isPublic, true),
+  eq(creatorProfiles.isClaimed, true)
+);
+
+function selectDirectoryRows() {
+  return db
+    .select({
+      id: creatorProfiles.id,
+      username: creatorProfiles.username,
+      displayName: creatorProfiles.displayName,
+      avatarUrl: creatorProfiles.avatarUrl,
+      bio: creatorProfiles.bio,
+      isPublic: creatorProfiles.isPublic,
+      ownerEmail: users.email,
+      hasPublicRelease: drizzleSql<boolean>`${exists(
+        db
+          .select({ one: drizzleSql`1` })
+          .from(discogReleases)
+          .where(
+            and(
+              eq(discogReleases.creatorProfileId, creatorProfiles.id),
+              publicReleaseEligibilitySqlPredicate()
+            )
+          )
+      )}`,
+    })
+    .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId));
+}
+
 async function queryArtistsDirectoryCatalog(
   cursorParam?: string
 ): Promise<ArtistsDirectoryCatalogResult> {
@@ -116,33 +147,10 @@ async function queryArtistsDirectoryCatalog(
   }
 
   try {
-    const rows = await db
-      .select({
-        id: creatorProfiles.id,
-        username: creatorProfiles.username,
-        displayName: creatorProfiles.displayName,
-        avatarUrl: creatorProfiles.avatarUrl,
-        bio: creatorProfiles.bio,
-        isPublic: creatorProfiles.isPublic,
-        ownerEmail: users.email,
-        hasPublicRelease: drizzleSql<boolean>`${exists(
-          db
-            .select({ one: drizzleSql`1` })
-            .from(discogReleases)
-            .where(
-              and(
-                eq(discogReleases.creatorProfileId, creatorProfiles.id),
-                publicReleaseEligibilitySqlPredicate()
-              )
-            )
-        )}`,
-      })
-      .from(creatorProfiles)
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    const rows = await selectDirectoryRows()
       .where(
         and(
-          eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isClaimed, true),
+          PUBLIC_DIRECTORY_PREDICATE,
           cursor
             ? drizzleSql`(${directorySortKey}, ${creatorProfiles.id}) > (${cursor.key}, ${cursor.id})`
             : undefined
@@ -181,16 +189,14 @@ async function queryArtistsDirectoryCount(): Promise<number | null> {
   }
 
   try {
-    const [row] = await db
-      .select({ value: count() })
-      .from(creatorProfiles)
-      .where(
-        and(
-          eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isClaimed, true)
-        )
-      );
-    return row?.value ?? null;
+    // Count the same identities the directory renders. Eligibility (QA
+    // handles, placeholder identities, empty profiles, test accounts) is
+    // enforced in filterPublicDiscoveryIdentities, so a raw SQL count would
+    // over-report and disagree with the cards on the page (JOV-6435).
+    const rows = await selectDirectoryRows().where(PUBLIC_DIRECTORY_PREDICATE);
+    return filterPublicDiscoveryIdentities(
+      rows.map(row => ({ ...row, handle: row.username }))
+    ).length;
   } catch (error) {
     Sentry.captureException(error);
     return null;

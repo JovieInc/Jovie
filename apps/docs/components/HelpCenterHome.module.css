@@ -1,0 +1,167 @@
+.root {
+  position: relative;
+  isolation: isolate;
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;
+  padding: 5.5rem 1.5rem 6rem;
+  color: hsl(var(--nextra-primary-hue) 10% 12%);
+}
+
+.gridLines {
+  position: absolute;
+  z-index: -1;
+  inset: 1.5rem 0 auto;
+  height: 28rem;
+  opacity: 0.34;
+  pointer-events: none;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 18%,
+    transparent 90%
+  );
+  background-image:
+    linear-gradient(to right, rgb(127 127 127 / 0.09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(127 127 127 / 0.09) 1px, transparent 1px);
+  background-size: 4rem 4rem;
+}
+
+.hero {
+  margin-inline: auto;
+  max-width: 42rem;
+  text-align: center;
+}
+
+.mark {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-inline: auto;
+  fill: currentColor;
+}
+
+.hero h1 {
+  margin: 1.25rem 0 0;
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.06;
+}
+
+.hero p {
+  margin: 1.25rem auto 0;
+  max-width: 38rem;
+  color: hsl(var(--nextra-primary-hue) 7% 38%);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+
+.destinations {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.875rem;
+  margin-top: 4rem;
+}
+
+.card {
+  min-width: 0;
+  min-height: 10.5rem;
+  padding: 1.5rem;
+  border: 1px solid rgb(127 127 127 / 0.2);
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 0.58);
+  color: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.card:hover {
+  border-color: rgb(127 127 127 / 0.4);
+  background: rgb(255 255 255 / 0.82);
+}
+
+.card:focus-visible {
+  outline: 2px solid hsl(var(--nextra-primary-hue) 85% 50%);
+  outline-offset: 3px;
+}
+
+.icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: hsl(var(--nextra-primary-hue) 8% 42%);
+}
+
+.cardTitle,
+.cardDescription {
+  display: block;
+}
+
+.cardTitle {
+  margin-top: 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+}
+
+.cardDescription {
+  margin-top: 0.55rem;
+  color: hsl(var(--nextra-primary-hue) 7% 40%);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+@media (prefers-color-scheme: dark) {
+  .root {
+    color: hsl(var(--nextra-primary-hue) 8% 92%);
+  }
+
+  .hero p,
+  .cardDescription {
+    color: hsl(var(--nextra-primary-hue) 6% 67%);
+  }
+
+  .card {
+    background: rgb(255 255 255 / 0.025);
+    border-color: rgb(255 255 255 / 0.1);
+  }
+
+  .card:hover {
+    background: rgb(255 255 255 / 0.045);
+    border-color: rgb(255 255 255 / 0.2);
+  }
+
+  .icon {
+    color: hsl(var(--nextra-primary-hue) 7% 65%);
+  }
+}
+
+@media (max-width: 64rem) {
+  .destinations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .root {
+    padding: 3.5rem 1rem 4rem;
+  }
+
+  .destinations {
+    grid-template-columns: 1fr;
+    margin-top: 3rem;
+  }
+
+  .card {
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

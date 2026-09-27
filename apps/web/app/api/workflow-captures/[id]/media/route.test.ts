@@ -106,6 +106,67 @@ describe('GET /api/workflow-captures/[id]/media', () => {
     );
   });
 
+  it('preserves byte-range semantics when a viewer seeks the recording', async () => {
+    const ownerId = 'c67f31fc-4b61-43de-b690-b9d8045de8e0';
+    mocks.resolvePrincipal.mockResolvedValue({
+      authenticated: true,
+      isAdmin: true,
+      subject: ownerId,
+      scopes: ['ovie:read'],
+    });
+    mocks.loadCapture.mockResolvedValue({
+      captureId: 'capture-123',
+      payload: { expiresAt: '2099-09-04T18:00:00.000Z' },
+      executionResult: {
+        schemaVersion: 1,
+        state: 'ready',
+        blobUrl: 'https://private.blob.vercel-storage.com/capture.webm',
+        pathname: `workflow-captures/${ownerId}/capture-123/capture.webm`,
+        contentType: 'video/webm',
+        sha256: 'a'.repeat(64),
+        byteSize: 5,
+        durationMs: 6000,
+        uploadedAt: '2026-08-28T18:00:00.000Z',
+        readyAt: '2026-08-28T18:01:00.000Z',
+      },
+      status: 'executed',
+    });
+    mocks.getBlob.mockResolvedValue({
+      statusCode: 200,
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('video'));
+          controller.close();
+        },
+      }),
+      headers: new Headers({
+        'accept-ranges': 'bytes',
+        'content-length': '5',
+        'content-range': 'bytes 0-4/20',
+      }),
+      blob: {
+        contentType: 'video/webm',
+        etag: 'capture-etag',
+      },
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/api/workflow-captures/capture-123/media', {
+        headers: { Range: 'bytes=0-4' },
+      }),
+      params
+    );
+
+    expect(response.status).toBe(206);
+    expect(response.headers.get('Accept-Ranges')).toBe('bytes');
+    expect(response.headers.get('Content-Length')).toBe('5');
+    expect(response.headers.get('Content-Range')).toBe('bytes 0-4/20');
+    expect(mocks.getBlob).toHaveBeenCalledWith(
+      `workflow-captures/${ownerId}/capture-123/capture.webm`,
+      { access: 'private', useCache: false, headers: { Range: 'bytes=0-4' } }
+    );
+  });
+
   it('returns the capture error when the stored media is revoked', async () => {
     const ownerId = 'c67f31fc-4b61-43de-b690-b9d8045de8e0';
     mocks.resolvePrincipal.mockResolvedValue({

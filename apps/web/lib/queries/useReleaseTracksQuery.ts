@@ -1,10 +1,11 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { type QueryClient, useQuery } from '@tanstack/react-query';
 import type { TrackViewModel } from '@/lib/discography/types';
 import { STANDARD_CACHE } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import { createClassifiedRetry } from './retry-policy';
 
 export type ReleaseTrack = Pick<
   TrackViewModel,
@@ -44,6 +45,28 @@ export function useReleaseTracksQuery(releaseId: string, enabled = true) {
     queryFn: ({ signal }) => fetchReleaseTracks(releaseId, signal),
     ...STANDARD_CACHE,
     enabled: enabled && Boolean(releaseId),
-    retry: 1,
+    retry: createClassifiedRetry(1),
+  });
+}
+
+/**
+ * Intent-driven prefetch for the release track list.
+ *
+ * Call on genuine row intent (pointer enter / keyboard focus) so opening the
+ * release detail sidebar does not waterfall the tracks request behind the
+ * drawer mount. Shares the same query key, fetcher, and cache strategy as
+ * `useReleaseTracksQuery`, so TanStack dedupes repeat intent and in-flight
+ * requests. `prefetchQuery` never rejects — a failed or aborted prefetch
+ * leaves the sidebar's normal fetch path untouched.
+ */
+export function prefetchReleaseTracks(
+  queryClient: QueryClient,
+  releaseId: string
+) {
+  if (!releaseId) return Promise.resolve();
+  return queryClient.prefetchQuery({
+    queryKey: queryKeys.releases.tracks(releaseId),
+    queryFn: ({ signal }) => fetchReleaseTracks(releaseId, signal),
+    ...STANDARD_CACHE,
   });
 }

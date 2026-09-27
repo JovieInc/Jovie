@@ -5,6 +5,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfilePacCard } from '@/components/features/profile/pac/ProfilePacCard';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 import { EntityCard } from './EntityCard';
 import type { EntityCardModel } from './types';
@@ -432,6 +433,35 @@ describe('ProfilePacCard landscape states', () => {
     ).toBe(false);
   });
 
+  it('labels an upcoming ticketed show with the generalized Events copy', () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+        captureEnabled={false}
+        hasPlayableDestinations={false}
+        nextShow={
+          {
+            id: 'show-1',
+            title: 'Night One',
+            venueName: 'The Venue',
+            city: 'Los Angeles',
+            ticketUrl: 'https://tickets.test/night-one',
+          } as unknown as TourDateViewModel
+        }
+      />
+    );
+
+    expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+      'data-state',
+      'tickets'
+    );
+    expect(screen.getByText('Upcoming Events')).toBeInTheDocument();
+    expect(screen.queryByText('On Tour')).toBeNull();
+  });
+
   it('re-resolves when playable destinations arrive without another inventory change', async () => {
     mockUseTrackAudioPlayer.mockReturnValue({
       playbackState: {
@@ -480,6 +510,64 @@ describe('ProfilePacCard landscape states', () => {
     );
     expect(screen.getByRole('link', { name: 'Listen' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Manage' })).toBeNull();
+  });
+
+  it('renders the listen slot as flat glass while conversion actions stay solid', async () => {
+    mockUseTrackAudioPlayer.mockReturnValue({
+      playbackState: {
+        activeTrackId: null,
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+      },
+      toggleTrack: vi.fn(),
+      seek: vi.fn(),
+    });
+
+    const view = render(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+        captureEnabled={false}
+        hasPlayableDestinations
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+        'data-state',
+        'idle'
+      )
+    );
+    const listen = screen.getByRole('link', { name: 'Listen' });
+    // Same material as the bottom tab bar lens; geometry and hit area unchanged.
+    expect(listen).toHaveClass('profile-glass-pill', 'h-11', 'px-3');
+    expect(listen).not.toHaveClass('bg-btn-primary');
+    expect(listen).not.toHaveClass('shadow-sm');
+
+    view.rerender(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+        captureEnabled={false}
+        hasTip
+        hasPlayableDestinations={false}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+        'data-state',
+        'tip'
+      )
+    );
+    const tip = screen.getByRole('link', { name: /Tip/ });
+    expect(tip).toHaveClass('bg-btn-primary', 'h-11');
+    expect(tip).not.toHaveClass('profile-glass-pill');
   });
 
   it('gives the capture form the full compact row width after the listen threshold', async () => {

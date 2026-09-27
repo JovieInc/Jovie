@@ -278,6 +278,8 @@ export async function GET(request: Request) {
       state,
       codeChallenge,
       desktopFlow,
+      // Declared by Mac app builds that can redeem a typed return code.
+      desktopReturnCode: getStringParam(url, 'desktop_return_code') === '1',
     });
 
     await trackAuthEvent('auth_started', {

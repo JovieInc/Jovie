@@ -27,6 +27,8 @@
 		296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */; };
 		2C6C36E98540C94E3F1EF74A /* Configuration.local.plist in Resources */ = {isa = PBXBuildFile; fileRef = D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */; };
 		3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71290AE6A5F14D6941193B70 /* AppRouter.swift */; };
+		A0J0V6095000000000000002 /* AppRouteManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V6095000000000000001 /* AppRouteManifest.swift */; };
+		A0J0V6095000000000000004 /* AppRouteManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V6095000000000000003 /* AppRouteManifestTests.swift */; };
 		33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
 		4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD30F57584F71E958D8C0514 /* LaunchMode.swift */; };
 		52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */; };
@@ -188,6 +190,8 @@
 		A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryAccessibilityUITests.swift; sourceTree = "<group>"; };
 		A0C045720000000000000001 /* DogfoodExplorationUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DogfoodExplorationUITests.swift; sourceTree = "<group>"; };
 		6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		A0J0V6095000000000000001 /* AppRouteManifest.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouteManifest.swift; sourceTree = "<group>"; };
+		A0J0V6095000000000000003 /* AppRouteManifestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouteManifestTests.swift; sourceTree = "<group>"; };
 		71290AE6A5F14D6941193B70 /* AppRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		71445144CE0970267C0508C6 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VenueModeView.swift; sourceTree = "<group>"; };
@@ -423,6 +427,7 @@
 				5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */,
 				F4562819B40056163650929C /* JovieAppIntentsTests.swift */,
 				A0J0V11070000000000000003 /* ConversationUserActivityTests.swift */,
+				A0J0V6095000000000000003 /* AppRouteManifestTests.swift */,
 			);
 			name = JovieTests;
 			path = JovieTests;
@@ -620,6 +625,7 @@
 			isa = PBXGroup;
 			children = (
 				71290AE6A5F14D6941193B70 /* AppRouter.swift */,
+				A0J0V6095000000000000001 /* AppRouteManifest.swift */,
 				71445144CE0970267C0508C6 /* AppState.swift */,
 				E4EAFC467F76300BCFC2659F /* Configuration.swift */,
 				00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */,
@@ -817,6 +823,7 @@
 				71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */,
 				F232904F618A4671B805D0BC /* JovieAppIntentsTests.swift in Sources */,
 				A0J0V11070000000000000004 /* ConversationUserActivityTests.swift in Sources */,
+				A0J0V6095000000000000004 /* AppRouteManifestTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -825,6 +832,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */,
+				A0J0V6095000000000000002 /* AppRouteManifest.swift in Sources */,
 				045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */,
 				EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */,
 				89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */,
