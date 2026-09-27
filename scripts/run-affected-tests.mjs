@@ -339,7 +339,6 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
@@ -647,7 +646,6 @@ const NO_UNATTENDED_RED_LANE = new Set([
   'scripts/fleet-gate/tests/gem-priority-gate.test.py',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/invariants/registry.test.mjs',
   'scripts/tests/test_agent_workflow_hygiene.py',
 ]);
@@ -668,7 +666,6 @@ const NO_UNATTENDED_RED_SCRIPT_TESTS = [
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
 ];
 const RETOUCH_PROMPT_SOURCES = [
   'components/features/admin/system-map/AdminSystemMapSkillsTab.tsx',
