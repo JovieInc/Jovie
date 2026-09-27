@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AudioLines, Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
@@ -57,17 +58,15 @@ export const SidebarBottomNowPlaying = React.memo(
     if (collapsed) {
       return (
         <Tooltip label={trackTitle || 'Now playing'} side='right'>
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon-sm'
             onClick={onPlay}
             aria-label={
               isPlaying ? `Pause ${trackTitle}` : `Play ${trackTitle}`
             }
-            className={cn(
-              'relative mx-auto block size-7 rounded-xs focus-ring-themed',
-              'before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
-              className
-            )}
+            className='mx-auto'
           >
             <ArtworkFrame size={28} className='size-7 bg-surface-2'>
               {artworkUrl ? (
@@ -86,7 +85,7 @@ export const SidebarBottomNowPlaying = React.memo(
                 <AudioLines aria-hidden='true' className='size-2.5' />
               </span>
             ) : null}
-          </button>
+          </Button>
         </Tooltip>
       );
     }
@@ -111,31 +110,32 @@ export const SidebarBottomNowPlaying = React.memo(
               />
             ) : null}
           </ArtworkFrame>
-          <button
-            type='button'
-            onClick={onPlay}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-            className={cn(
-              'absolute left-1/2 top-1/2 grid size-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-tooltip-foreground opacity-0 transition-opacity duration-subtle ease-subtle focus-visible:opacity-100 focus-ring-themed group-hover/now-playing:opacity-100',
-              'before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]'
-            )}
-          >
-            {isPlaying ? (
-              <Pause
-                aria-hidden='true'
-                className='size-3'
-                strokeWidth={2.5}
-                fill='currentColor'
-              />
-            ) : (
-              <Play
-                aria-hidden='true'
-                className='size-3 translate-x-px'
-                strokeWidth={2.5}
-                fill='currentColor'
-              />
-            )}
-          </button>
+          <div className='absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon-sm'
+              onClick={onPlay}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+            >
+              <span className='pointer-events-none absolute inset-0 rounded-full bg-black/55' />
+              {isPlaying ? (
+                <Pause
+                  aria-hidden='true'
+                  className='relative size-3 text-tooltip-foreground'
+                  strokeWidth={2.5}
+                  fill='currentColor'
+                />
+              ) : (
+                <Play
+                  aria-hidden='true'
+                  className='relative size-3 translate-x-px text-tooltip-foreground'
+                  strokeWidth={2.5}
+                  fill='currentColor'
+                />
+              )}
+            </Button>
+          </div>
         </div>
         <div className='min-w-0 flex-1'>
           <div
