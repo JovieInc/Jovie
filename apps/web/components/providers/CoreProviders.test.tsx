@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   getCoreProviderVariant,
   isThemeEnabledRoute,
 } from '@/components/providers/CoreProviders';
+
+// These cases cover the theme-switching policy itself; production ships with
+// theme switching off (dark forced), covered in lib/theme/route-policy.test.ts.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = '1';
+});
 
 describe('getCoreProviderVariant', () => {
   it('returns full for authenticated app route groups', () => {

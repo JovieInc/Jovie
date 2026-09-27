@@ -102,6 +102,35 @@ describe('composeFriendlyArtistHandleCandidates', () => {
     ]);
   });
 
+  it('ranks artist-controlled destination handles from the JOV-6529 enrichment pass', () => {
+    const result = composeFriendlyArtistHandleCandidates({
+      // Registry/provider names normalize to a reserved word; only the
+      // verified destination handle supplies a friendly candidate.
+      registryName: 'Top',
+      providerArtist: { id: 'sp-1', name: 'Top' },
+      evidenceHandles: ['thecollective'],
+    });
+
+    expect(result.accepted).toEqual([
+      {
+        rank: 0,
+        handle: 'thecollective',
+        source: 'artist_controlled_destination',
+      },
+    ]);
+  });
+
+  it('dedupes a destination handle that matches the composed name form', () => {
+    const result = composeFriendlyArtistHandleCandidates({
+      registryName: 'Fedde Le Grand',
+      providerArtist: undefined,
+      evidenceHandles: ['feddelegrand'],
+    });
+    expect(
+      result.accepted.filter(c => c.handle === 'feddelegrand')
+    ).toHaveLength(1);
+  });
+
   it('produces identical output for identical inputs (pure/deterministic)', () => {
     const input = {
       registryName: 'Fedde Le Grand',

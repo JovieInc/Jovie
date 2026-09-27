@@ -176,6 +176,97 @@ export const APP_FLAG_DESCRIPTIONS = {
 } as const satisfies Record<AppFlagName, string>;
 
 /**
+ * Removal criteria are deliberately separate from product descriptions: a
+ * flag without an exit condition is an indefinite second product state.
+ */
+export const APP_FLAG_REMOVAL_CONDITIONS = {
+  BILLING_UPGRADE_DIRECT:
+    'Remove after direct checkout is the only supported upgrade path.',
+  SMARTLINK_PRE_SAVE:
+    'Remove after the pre-save fallback has no supported callers.',
+  IOS_APPLE_MUSIC_PRIORITY:
+    'Remove after Apple Music priority is the permanent iOS behavior.',
+  SPOTIFY_OAUTH:
+    'Remove after Spotify sign-in is either permanently supported or retired.',
+  STRIPE_CONNECT_ENABLED:
+    'Remove after payout operations have an independent incident stop control.',
+  PLAYLIST_ENGINE:
+    'Remove after the playlist engine fallback has no supported callers.',
+  ALBUM_ART_GENERATION:
+    'Remove after album-art generation has an independent provider kill switch.',
+  CHAT_JANK_MONITOR:
+    'Remove after the instrumentation is permanent or superseded.',
+  RELEASE_PLAN_DEMO: 'Remove when the demo route is promoted or deleted.',
+  RELEASE_TO_REVENUE_AUTOPILOT:
+    'Remove when the design-partner pilot is promoted or ended.',
+  AI_CONNECTORS_BETA:
+    'Remove when connector access is governed only by connector lifecycle state.',
+  MERCH_MVP:
+    'Remove after merch is generally available with an independent incident stop control.',
+  BULK_PRESS_PHOTO_IMPORT:
+    'Remove after activation evidence is the sole ingestion gate.',
+  APPLE_WALLET_PROFILE_PASS:
+    'Remove after Wallet passes are permanent or retired.',
+  TELEPROMPTER_RECORDING:
+    'Remove after recording is permanent and its experiment is concluded.',
+  INBOX_HOME:
+    'Remove when Inbox is either the canonical app home or no longer a candidate.',
+  PROFILES_WORKSPACE:
+    'Remove when Profiles is either the canonical workspace or retired.',
+  PROFILE_SEARCH_MONITORING:
+    'Remove when monitoring is permanently available or retired.',
+  ONBOARDING_WOW_TASK_QUEUE:
+    'Retain until task seeding has an independent queue incident stop control.',
+  PAID_WELCOME_EMAIL:
+    'Retain while external-recipient delivery requires a founder-controlled stop.',
+  MERCH_QA_GATE:
+    'Remove when the real visual reviewer is mandatory and the stub path is deleted.',
+} as const satisfies Record<AppFlagName, string>;
+
+export const APP_FLAG_AUDIT_OWNER = '@itstimwhite' as const;
+
+export interface AppFlagAuditRecord {
+  readonly owner: typeof APP_FLAG_AUDIT_OWNER;
+  readonly purpose: string;
+  readonly safeDefault: boolean;
+  readonly targeting: 'dev_staging_prod_override';
+  readonly removalCondition: string;
+  readonly schemaAssumption: 'feature_flag_overrides_optional';
+  readonly killSwitch: {
+    readonly disabledValue: false;
+    readonly activationBoundary: 'next_flag_resolution_after_audited_write';
+  };
+  readonly certificationStates: readonly ['off', 'on'];
+}
+
+/**
+ * Audit projection for the existing app-flag family. This is metadata for the
+ * canonical registry above, not another evaluator or flag platform.
+ *
+ * Every active runtime flag is treated as critical because it can select a
+ * distinct product state. The `satisfies` boundary and guardrail test make a
+ * new, renamed, stale, or ownerless flag fail closed in source certification.
+ */
+export const APP_FLAG_AUDIT_REGISTRY = Object.fromEntries(
+  (Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[]).map(flagName => [
+    flagName,
+    {
+      owner: APP_FLAG_AUDIT_OWNER,
+      purpose: APP_FLAG_DESCRIPTIONS[flagName],
+      safeDefault: APP_FLAG_DEFAULTS[flagName],
+      targeting: 'dev_staging_prod_override',
+      removalCondition: APP_FLAG_REMOVAL_CONDITIONS[flagName],
+      schemaAssumption: 'feature_flag_overrides_optional',
+      killSwitch: {
+        disabledValue: false,
+        activationBoundary: 'next_flag_resolution_after_audited_write',
+      },
+      certificationStates: ['off', 'on'],
+    },
+  ])
+) as unknown as Record<AppFlagName, AppFlagAuditRecord>;
+
+/**
  * Flags that live in APP_FLAG_DEFAULTS but intentionally have NO Statsig gate mapping.
  * These are resolved entirely by the local default — there is no dashboard control.
  *

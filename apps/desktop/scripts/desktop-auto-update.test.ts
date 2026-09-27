@@ -4,12 +4,16 @@ import {
   buildManualUpdateCheckFeedback,
   desktopBundlePathFromExecutable,
   hasNightlyUpdateFlag,
+  IDLE_UPDATE_INSTALL_SECONDS,
   NIGHTLY_UPDATE_FLAG,
   nightlyUpdateLaunchAgentLabel,
   nightlyUpdateMinute,
   renderNightlyUpdateLaunchAgentPlist,
   shouldInstallDownloadedUpdateNow,
+  shouldInstallDownloadedUpdateWhileRunning,
+  shouldRunWakeUpdateCheck,
   shouldScheduleDesktopAutoUpdate,
+  WAKE_UPDATE_CHECK_MIN_INTERVAL_MS,
 } from '../src/desktop-auto-update.ts';
 
 test('local darwin builds do not enable Check for updates (JOV-5471)', () => {
@@ -175,4 +179,63 @@ test('nightly LaunchAgent plist opens the packaged app hidden with the in-tree f
       '/Applications/Jovie.app/Contents/MacOS/Jovie'
     )
   ).toBe('/Applications/Jovie.app');
+});
+
+const idleOvernight = {
+  updateReadyToInstall: true,
+  localHour: 3,
+  systemIdleSeconds: IDLE_UPDATE_INSTALL_SECONDS,
+  audible: false,
+  hasUnsentInput: false,
+};
+
+test('a running app restarts into a downloaded update only overnight and idle', () => {
+  expect(shouldInstallDownloadedUpdateWhileRunning(idleOvernight)).toBe(true);
+  expect(
+    shouldInstallDownloadedUpdateWhileRunning({
+      ...idleOvernight,
+      localHour: 1,
+    })
+  ).toBe(true);
+  for (const localHour of [0, 6, 12, 23]) {
+    expect(
+      shouldInstallDownloadedUpdateWhileRunning({ ...idleOvernight, localHour })
+    ).toBe(false);
+  }
+  expect(
+    shouldInstallDownloadedUpdateWhileRunning({
+      ...idleOvernight,
+      systemIdleSeconds: IDLE_UPDATE_INSTALL_SECONDS - 1,
+    })
+  ).toBe(false);
+});
+
+test('an idle restart never interrupts audio, drafts, or a missing download', () => {
+  for (const guard of [
+    { audible: true },
+    { hasUnsentInput: true },
+    { updateReadyToInstall: false },
+  ]) {
+    expect(
+      shouldInstallDownloadedUpdateWhileRunning({ ...idleOvernight, ...guard })
+    ).toBe(false);
+  }
+});
+
+test('wake and unlock re-check for updates at most once per window', () => {
+  expect(shouldRunWakeUpdateCheck({ nowMs: 1_000, lastCheckMs: null })).toBe(
+    true
+  );
+  expect(
+    shouldRunWakeUpdateCheck({
+      nowMs: WAKE_UPDATE_CHECK_MIN_INTERVAL_MS - 1,
+      lastCheckMs: 0,
+    })
+  ).toBe(false);
+  expect(
+    shouldRunWakeUpdateCheck({
+      nowMs: WAKE_UPDATE_CHECK_MIN_INTERVAL_MS,
+      lastCheckMs: 0,
+    })
+  ).toBe(true);
 });

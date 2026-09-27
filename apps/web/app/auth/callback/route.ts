@@ -10,6 +10,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { auth } from '@/lib/auth/better-auth';
 import {
   consumeStoredAuthState,
+  createStoredDesktopHandback,
   createStoredNativeExchangeCode,
 } from '@/lib/auth/routing-state.server';
 import { captureError } from '@/lib/error-tracking';
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
     // store it in the exchange record. The native exchange route reads it
     // back to verify (iOS) or hands it to native-complete (Electron).
     let ott: string | null = null;
+    let returnCode: string | null = null;
     if (nativeClient) {
       exchangeCode = createExchangeCode();
       ott = await mintNativeOneTimeToken(request.headers);
@@ -119,7 +121,7 @@ export async function GET(request: Request) {
           }
         );
       }
-      await createStoredNativeExchangeCode({
+      const exchangeRecord = await createStoredNativeExchangeCode({
         code: exchangeCode,
         client: nativeClient,
         state: stateRecord.state,
@@ -128,6 +130,28 @@ export async function GET(request: Request) {
         codeChallenge: stateRecord.codeChallenge,
         ott,
       });
+
+      if (
+        nativeClient === 'electron' &&
+        stateRecord.desktopReturnCode &&
+        stateRecord.desktopFlow &&
+        stateRecord.codeChallenge
+      ) {
+        // Return code for when the deep link cannot reach the app. Best
+        // effort: the deep link still works on its own.
+        returnCode = await createStoredDesktopHandback({
+          code: exchangeCode,
+          state: stateRecord.state,
+          desktopFlow: stateRecord.desktopFlow,
+          codeChallenge: stateRecord.codeChallenge,
+          expiresAt: exchangeRecord.expiresAt,
+        }).catch(async error => {
+          await captureError('Desktop handback record failed', error, {
+            route: '/auth/callback',
+          });
+          return null;
+        });
+      }
     }
 
     const resolved = resolveAuthCallback({ stateRecord, exchangeCode });
@@ -151,6 +175,7 @@ export async function GET(request: Request) {
           code: exchangeCode,
           state: stateRecord.state,
           desktopFlow: stateRecord.desktopFlow,
+          returnCode,
         }),
         request.url
       );

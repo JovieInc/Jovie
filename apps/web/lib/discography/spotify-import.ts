@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -114,6 +114,58 @@ function getEffectiveMaxTracksPerRelease(override: number | undefined): number {
     MAX_TRACKS_PER_RELEASE,
     getMaxTracksPerRelease()
   );
+}
+
+function normalizeReleaseIdentity(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replaceAll(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+}
+
+function getSpotifyAlbumIdentity(album: SpotifyAlbum): string {
+  const artists = album.artists
+    .map(artist => artist.id || normalizeReleaseIdentity(artist.name))
+    .sort((left, right) => left.localeCompare(right))
+    .join(':');
+
+  return `${normalizeReleaseIdentity(album.name)}:${artists}`;
+}
+
+function getAlbumMetadataScore(
+  album: SpotifyAlbum,
+  fullAlbum: SpotifyAlbumFull | undefined
+): number {
+  const images = fullAlbum?.images?.length ?? album.images.length;
+  const tracks = fullAlbum?.tracks?.items ?? [];
+
+  return (
+    (fullAlbum?.external_ids?.upc ? 8 : 0) +
+    (images > 0 ? 4 : 0) +
+    tracks.filter(track => track.preview_url).length * 2 +
+    tracks.filter(track => track.external_ids?.isrc).length
+  );
+}
+
+function dedupeSpotifyAlbums(
+  albums: readonly SpotifyAlbum[],
+  fullAlbumMap: ReadonlyMap<string, SpotifyAlbumFull>
+): SpotifyAlbum[] {
+  const canonicalByIdentity = new Map<string, SpotifyAlbum>();
+
+  for (const album of albums) {
+    const identity = getSpotifyAlbumIdentity(album);
+    const existing = canonicalByIdentity.get(identity);
+    if (
+      !existing ||
+      getAlbumMetadataScore(album, fullAlbumMap.get(album.id)) >
+        getAlbumMetadataScore(existing, fullAlbumMap.get(existing.id))
+    ) {
+      canonicalByIdentity.set(identity, album);
+    }
+  }
+
+  return [...canonicalByIdentity.values()];
 }
 
 export interface SpotifyImportResult {
@@ -457,10 +509,19 @@ export async function importReleasesFromSpotify(
           fullAlbumMap.set(album.id, enrichedAlbum);
         }
 
-        // 3. Import each album
+        // Spotify can return market-specific editions with different album IDs
+        // for the same creator/title. Collapse those editions before writes and
+        // prefer the edition with the richest artwork/audio identifiers.
+        const canonicalAlbums = dedupeSpotifyAlbums(
+          albumsToImport,
+          fullAlbumMap
+        );
+        result.total = canonicalAlbums.length;
+
+        // 3. Import each canonical album
         await importAlbumBatch(
           creatorProfileId,
-          albumsToImport,
+          canonicalAlbums,
           fullAlbumMap,
           effectiveMaxTracksPerRelease,
           result
@@ -830,10 +891,11 @@ async function importSingleRelease(
   maxTracksPerRelease: number
 ): Promise<void> {
   const metadata = sanitizeAlbumMetadata(album, fullAlbum);
+  const normalizedTitle = normalizeReleaseIdentity(metadata.sanitizedTitle);
 
-  // If this album was previously imported for this creator, preserve its slug
-  // for stability even when provider_links cannot store a duplicate
-  // external_id under the current global unique index.
+  // Spotify IDs can vary by market/edition. Reuse the existing creator release
+  // by provider ID, UPC, or normalized title so re-imports cannot create a new
+  // row merely because Spotify returned another edition identifier.
   const [existingRelease] = await db
     .select({
       id: discogReleases.id,
@@ -843,7 +905,13 @@ async function importSingleRelease(
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
-        drizzleSql`${discogReleases.metadata} ->> 'spotifyId' = ${album.id}`
+        or(
+          drizzleSql`${discogReleases.metadata} ->> 'spotifyId' = ${album.id}`,
+          metadata.sanitizedUpc
+            ? eq(discogReleases.upc, metadata.sanitizedUpc)
+            : undefined,
+          drizzleSql`regexp_replace(lower(${discogReleases.title}), '[^a-z0-9]+', '', 'g') = ${normalizedTitle}`
+        )
       )
     )
     .limit(1);

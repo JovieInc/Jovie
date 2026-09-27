@@ -1983,34 +1983,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers the marketing investors page for changed-surface certification', () => {
-    const source = 'apps/web/app/(marketing)/investors/page.tsx';
-    const screen = SCREEN_REGISTRY.find(
-      entry => entry.id === 'web.marketing-investors'
-    );
-
-    assert.deepEqual(screen, {
-      id: 'web.marketing-investors',
-      platform: 'web',
-      owner: 'marketing-investors',
-      sources: [source],
-      viewports: ['desktop', 'mobile'],
-    });
-
-    const result = evaluateChangedScreens({
-      changedFiles: [{ path: source, status: 'M' }],
-      headSha: HEAD,
-    });
-    assert.deepEqual(result.issues, []);
-    assert.deepEqual(result.changedScreens, [
-      {
-        id: 'web.marketing-investors',
-        verdict: 'evidence-required',
-        findings: [],
-      },
-    ]);
-  });
-
   it('registers the marketing launch page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/launch/page.tsx';
     const screen = SCREEN_REGISTRY.find(
@@ -2069,6 +2041,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('registers the marketing pricing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/pricing/page.tsx';
+    const layoutSource = 'apps/web/app/(marketing)/pricing/layout.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.marketing-pricing'
     );
@@ -2077,7 +2050,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       id: 'web.marketing-pricing',
       platform: 'web',
       owner: 'marketing-pricing',
-      sources: [source],
+      sources: [source, layoutSource],
       viewports: ['desktop', 'mobile'],
     });
 
@@ -2089,6 +2062,47 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.changedScreens, [
       {
         id: 'web.marketing-pricing',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+
+    const layoutResult = evaluateChangedScreens({
+      changedFiles: [{ path: layoutSource, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(layoutResult.issues, []);
+    assert.deepEqual(layoutResult.changedScreens, [
+      {
+        id: 'web.marketing-pricing',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the staged homepage v2 landing page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/new/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-new'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-new',
+      platform: 'web',
+      owner: 'marketing-new',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-new',
         verdict: 'evidence-required',
         findings: [],
       },
@@ -2360,7 +2374,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.match(result.issues.join('\n'), /missing registration/);
   });
 
-  it('rejects unregistered visible boundary, desktop renderer, iOS screen, and deleted paths', () => {
+  it('rejects unregistered visible boundary, desktop renderer, and iOS screen paths', () => {
     const paths = [
       'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
@@ -2373,13 +2387,33 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     for (const path of paths) {
       assert.equal(kindOf(path), 'unregistered', path);
     }
-    const deleted = evaluateChangedScreens({
-      changedFiles: [{ path: 'apps/web/app/new/page.tsx', status: 'D' }],
+    const added = evaluateChangedScreens({
+      changedFiles: [{ path: 'apps/web/app/new/page.tsx', status: 'A' }],
       headSha: HEAD,
       proofs: [],
       requireExternalEvidence: true,
     });
-    assert.match(deleted.issues.join('\n'), /missing registration/);
+    assert.match(added.issues.join('\n'), /missing registration/);
+  });
+
+  it('records deleted unregistered screens as removed instead of demanding registration', () => {
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/new/page.tsx', status: 'D' },
+        { path: 'apps/web/app/new/layout.tsx', status: 'D' },
+        { path: 'apps/web/app/other/page.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(result.removedScreens, [
+      'apps/web/app/new/page.tsx',
+      'apps/web/app/new/layout.tsx',
+    ]);
+    assert.deepEqual(result.issues, [
+      'missing registration for changed in-scope screen apps/web/app/other/page.tsx',
+    ]);
   });
 
   it('requires exact-head proof for a registered protected source', () => {

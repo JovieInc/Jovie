@@ -43,7 +43,7 @@ test.describe('Pricing Page', () => {
     await expect(page.locator('h1')).toHaveText('Pricing');
     await expect(
       page.getByRole('heading', {
-        name: 'Public artist profile and audience capture',
+        name: 'Public Jovie profile and audience capture',
       })
     ).toBeVisible();
 

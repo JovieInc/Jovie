@@ -131,7 +131,11 @@ export function AccountDashboard() {
             <Link href='/support'>Contact Support</Link>
           </Button>
           <Button variant='outline' size='sm' asChild>
-            <a href={DOCS_URL} target='_blank' rel='noopener noreferrer'>
+            <a
+              href={`${DOCS_URL}/docs`}
+              target='_blank'
+              rel='noopener noreferrer'
+            >
               View Documentation
             </a>
           </Button>

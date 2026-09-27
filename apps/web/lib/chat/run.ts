@@ -2,6 +2,8 @@ import {
   convertToModelMessages,
   type LanguageModel,
   type ModelMessage,
+  pruneMessages,
+  type SystemModelMessage,
   smoothStream,
   stepCountIs,
   type ToolSet,
@@ -40,7 +42,11 @@ import {
 } from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { resolveChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
-import { buildSystemPrompt } from '@/lib/chat/system-prompt';
+import {
+  buildSystemPromptParts,
+  joinSystemPromptParts,
+  type SystemPromptParts,
+} from '@/lib/chat/system-prompt';
 import {
   isChatToolStepCapExhausted,
   resolveChatToolStepLimit,
@@ -140,6 +146,56 @@ export function recentUserTexts(uiMessages: UIMessage[], limit = 3): string[] {
  */
 export function selectKnowledgeContextForTurn(uiMessages: UIMessage[]): string {
   return selectKnowledgeContext(recentUserTexts(uiMessages).join(' '));
+}
+
+/**
+ * User turns whose tool calls and results are replayed verbatim. Older turns
+ * keep their text only, so large tool outputs are not re-sent on every turn.
+ */
+export const CHAT_TOOL_HISTORY_USER_TURNS = 2;
+
+/**
+ * Drops tool calls/results older than the last
+ * `CHAT_TOOL_HISTORY_USER_TURNS` user turns (AI SDK `pruneMessages`).
+ */
+export function pruneStaleToolHistory(
+  messages: ModelMessage[]
+): ModelMessage[] {
+  let userTurns = 0;
+  for (let index = messages.length - 1; index > 0; index -= 1) {
+    if (messages[index]?.role !== 'user') continue;
+    userTurns += 1;
+    if (userTurns === CHAT_TOOL_HISTORY_USER_TURNS) {
+      return pruneMessages({
+        messages,
+        toolCalls: `before-last-${messages.length - index}-messages`,
+      });
+    }
+  }
+  return messages;
+}
+
+/**
+ * The stable prompt goes first with an Anthropic cache breakpoint, so tools
+ * plus the stable prompt are read from cache on later turns. Per-turn context
+ * follows as a separate, uncached system block.
+ */
+export function buildCachedSystemMessages(
+  parts: SystemPromptParts
+): SystemModelMessage[] {
+  const messages: SystemModelMessage[] = [
+    {
+      role: 'system',
+      content: parts.stable,
+      providerOptions: {
+        anthropic: { cacheControl: { type: 'ephemeral' } },
+      },
+    },
+  ];
+  if (parts.dynamic) {
+    messages.push({ role: 'system', content: parts.dynamic });
+  }
+  return messages;
 }
 
 export interface ExecuteChatTurnInput {
@@ -295,9 +351,9 @@ export async function executeChatTurn(
   // music-industry knowledge context (which is keyed on the artist's profile,
   // not relevant pre-account). Authenticated `mode='app'` keeps the existing
   // buildSystemPrompt path so this refactor is behaviour-stable for in-app chat.
-  let systemPrompt: string;
+  let systemPromptParts: SystemPromptParts;
   if (mode === 'onboarding') {
-    systemPrompt = ONBOARDING_SYSTEM_PROMPT;
+    systemPromptParts = { stable: ONBOARDING_SYSTEM_PROMPT, dynamic: '' };
   } else {
     // Runtime guard rather than a `as ArtistContext` cast — the type system
     // can't express "non-null when mode='app'" without a discriminated union,
@@ -319,7 +375,7 @@ export async function executeChatTurn(
     });
     const pinnedOpportunityBlock =
       buildPinnedOpportunityBlock(pinnedOpportunity);
-    systemPrompt = buildSystemPrompt(artistContext, releases, {
+    const parts = buildSystemPromptParts(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
       insightsEnabled,
@@ -329,12 +385,18 @@ export async function executeChatTurn(
       pinnedOpportunity: pinnedOpportunityBlock,
       lockedTools,
     });
-    if (identity) {
-      systemPrompt = applyEveIdentityToSystemPrompt(systemPrompt, identity);
-    }
+    systemPromptParts = identity
+      ? {
+          stable: applyEveIdentityToSystemPrompt(parts.stable, identity),
+          dynamic: parts.dynamic,
+        }
+      : parts;
   }
+  const systemPrompt = joinSystemPromptParts(systemPromptParts);
 
-  const modelMessages = await convertToModelMessages(uiMessages);
+  const modelMessages = pruneStaleToolHistory(
+    await convertToModelMessages(uiMessages)
+  );
 
   // `forceLightModel` is the runtime lever (Statsig `ai_chat_force_light`)
   // that degrades the entire chat surface to the light model during a
@@ -491,7 +553,7 @@ export async function executeChatTurn(
           PROMPT_DISCLOSURE_REFUSAL
         ) as unknown as LanguageModel)
       : (rotatingModel as unknown as LanguageModel),
-    system: systemPrompt,
+    system: buildCachedSystemMessages(systemPromptParts),
     messages: modelMessages,
     tools: blockedForDisclosure ? undefined : tools,
     stopWhen: blockedForDisclosure ? undefined : stepCountIs(toolStepLimit),
@@ -508,6 +570,9 @@ export async function executeChatTurn(
           return {};
         },
     abortSignal: signal,
+    providerOptions: {
+      gateway: { tags: ['feature:jovie-chat', `surface:${mode}`] },
+    },
     // JOV-3525: pace raw model deltas into a steady word-level reveal so the
     // client render cadence is smooth; pairs with useChat
     // experimental_throttle in useJovieChat.
