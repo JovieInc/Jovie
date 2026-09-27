@@ -132,7 +132,7 @@ changes never shift the column: action stack, two-line status, one text row.
 
 | State | Action stack | Status line | Text row |
 | --- | --- | --- | --- |
-| Idle | Continue in Browser / Copy Sign-In Link / Cancel Sign-In | (empty) | Enter a Code |
+| Idle | Continue in Browser / Copy Sign-In Link / Cancel Sign-In | (empty) | Enter a Code (canonical link Button, sm) |
 | Opening | Opening Browser... (disabled) / Copy (disabled) / Cancel | (empty) | Enter a Code |
 | Waiting | Open Browser Again / Copy Sign-In Link / Cancel | Check your browser. | Enter a Code |
 | Waiting 30s+ | same | Not seeing it? Copy the sign-in link and paste it into any browser. | Enter a Code |

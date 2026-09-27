@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import {
   type FormEvent,
   useCallback,
@@ -54,9 +55,6 @@ const RETURN_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
 const RETURN_CODE_LENGTH = 8;
 const INPUT_CLASS =
   'h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-center font-mono text-app uppercase tracking-widest text-white placeholder:text-white/32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25';
-const TEXT_ACTION_CLASS =
-  'mt-1 inline-flex h-8 items-center justify-center rounded-full px-3 text-xs font-medium text-white/56 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25';
-
 export function normalizeReturnCodeInput(value: string): string {
   let normalized = '';
   for (const char of value.toUpperCase()) {
@@ -391,18 +389,20 @@ export function DesktopAuthHandoffActions({
         {hasAuthUrl ? statusText : 'Start sign-in again from Jovie.'}
       </p>
       {canRedeemCode && hasAuthUrl ? (
-        <button
+        <Button
           type='button'
-          className={TEXT_ACTION_CLASS}
+          variant='link'
+          size='sm'
+          className='mt-3'
           disabled={redeemState === 'redeeming' || redeemState === 'redeemed'}
           onClick={toggleCodeMode}
         >
           {codeMode ? 'Back to Browser Sign-In' : 'Enter a Code'}
-        </button>
+        </Button>
       ) : (
         // Reserve the row so the centered shell does not shift once the
         // bridge capability check resolves after mount.
-        <div aria-hidden='true' className='mt-1 h-8' />
+        <div aria-hidden='true' className='mt-3 h-7' />
       )}
     </>
   );

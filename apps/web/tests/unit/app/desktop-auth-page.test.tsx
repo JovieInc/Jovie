@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const openDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
 const copyDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
@@ -35,6 +35,13 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
 function getAuthUrlParam(): string | null {
   return new URLSearchParams(searchParamsState.value).get('auth_url');
 }
+
+// The handoff pulls in @jovie/ui; warm the module graph once so the first
+// test's 5s budget measures behavior, not a cold transform.
+beforeAll(async () => {
+  await import('../../../app/desktop-auth/DesktopAuthClient');
+  await import('../../../app/desktop-auth/page');
+}, 60_000);
 
 describe('DesktopAuthPage', () => {
   beforeEach(() => {
@@ -382,7 +389,7 @@ describe('DesktopAuthPage', () => {
       <DesktopAuthClient authUrlParam={getAuthUrlParam()} />
     );
     expect(screen.queryByRole('button', { name: 'Enter a Code' })).toBeNull();
-    expect(container.querySelector('[aria-hidden="true"].h-8')).not.toBeNull();
+    expect(container.querySelector('[aria-hidden="true"].h-7')).not.toBeNull();
   });
 
   it('copies the validated sign-in link and reports copy failures', async () => {
