@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
@@ -37,7 +38,14 @@ vi.mock('next/image', () => ({
 
 describe('HomepageCertifiedSections', () => {
   it('renders the locked connected and relationships sections without unsupported proof', () => {
-    render(<HomepageCertifiedSections />);
+    render(
+      <HomepageCertifiedSections
+        previews={{
+          connected: HOMEPAGE_MEDIA_MAP.connected.asset,
+          relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+        }}
+      />
+    );
 
     expect(
       screen.queryByTestId('marketing-section-logo-cloud')
@@ -61,27 +69,33 @@ describe('HomepageCertifiedSections', () => {
     expect(connected).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[0].body
     );
-    expect(connected.querySelector('.ap-phone-frame')).toBeNull();
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'src',
-      '/assets/generated/homepage-identity-optical-v1.webp'
+    expect(connected.querySelector('.ap-phone-frame')).toBeInTheDocument();
+    expect(connected.querySelectorAll('[data-homepage-visual]')).toHaveLength(
+      1
     );
     expect(connected.querySelector('img')).toHaveAttribute(
-      'alt',
-      'A conceptual photographic assembly of a profile identity'
+      'src',
+      HOMEPAGE_MEDIA_MAP.connected.asset.publicUrl
     );
 
     const relationships = document.querySelector<HTMLElement>(
       '[data-homepage-testid="homepage-section-relationships"]'
     )!;
-    expect(relationships).toHaveAttribute('data-rhythm', 'text');
+    expect(relationships).toHaveAttribute('data-rhythm', 'product');
     expect(relationships).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[1].headline
     );
     expect(relationships).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
     );
-    expect(relationships.querySelectorAll('img')).toHaveLength(0);
+    expect(relationships.querySelectorAll('img')).toHaveLength(1);
+    expect(
+      relationships.querySelectorAll('[data-homepage-visual]')
+    ).toHaveLength(1);
+    expect(relationships.querySelector('img')).toHaveAttribute(
+      'src',
+      HOMEPAGE_MEDIA_MAP.relationships.asset.publicUrl
+    );
     expect(within(relationships).getByRole('list')).toHaveAttribute(
       'aria-label',
       'Relationships'
@@ -100,6 +114,19 @@ describe('HomepageCertifiedSections', () => {
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('records publication and fallback receipts for every homepage asset', () => {
+    for (const media of Object.values(HOMEPAGE_MEDIA_MAP)) {
+      expect(media.publicationState).toBe('current-public-export');
+      expect(media.rightsPrivacyApproval).toContain('approved');
+      expect(media.placeholder).toBe(false);
+      expect(media.expiration).toBeNull();
+      expect(media.intendedCrop.desktop).toContain('uncropped');
+      expect(media.intendedCrop.mobile).toContain('uncropped');
+      expect(media.loading).toBe('lazy');
+      expect(media.reducedMotionFallback).toContain('static');
+    }
   });
 });
 

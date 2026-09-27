@@ -1,32 +1,21 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
 
 export type HomepageCertifiedSectionId =
   (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number]['id'];
 
-/**
- * Kept as a source-compatible input while the homepage transitions away from
- * product screenshots in the locked editorial pass. The approved composition
- * uses the conceptual identity artwork instead of a profile export.
- */
 export interface HomepageCertifiedPreviews {
-  readonly connected?: MarketingExportImage;
-  readonly relationships?: readonly MarketingExportImage[];
+  readonly connected: MarketingExportImage;
+  readonly relationships: MarketingExportImage;
 }
 
 export interface HomepageCertifiedSectionsProps {
-  readonly previews?: HomepageCertifiedPreviews;
+  readonly previews: HomepageCertifiedPreviews;
 }
-
-const IDENTITY_ARTWORK = {
-  src: '/assets/generated/homepage-identity-optical-v1.webp',
-  width: 1902,
-  height: 827,
-  alt: 'A conceptual photographic assembly of a profile identity',
-} as const;
 
 type HomepageSection = (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number];
 type RelationshipSection = Extract<HomepageSection, { id: 'relationships' }>;
@@ -88,9 +77,31 @@ function RelationshipOutcomes({
   );
 }
 
+function ProfileSurface({ image }: Readonly<{ image: MarketingExportImage }>) {
+  return (
+    <ArtistProfilePhoneFrame
+      className='homepage-certified-section__device'
+      size='md'
+    >
+      <Image
+        alt={image.alt}
+        className='homepage-certified-section__screen'
+        height={image.height}
+        loading='lazy'
+        quality={85}
+        sizes='(min-width: 900px) 15rem, 62vw'
+        src={image.publicUrl}
+        width={image.width}
+      />
+    </ArtistProfilePhoneFrame>
+  );
+}
+
 function ConnectedSection({
+  image,
   section,
 }: Readonly<{
+  image: MarketingExportImage;
   section: Extract<HomepageSection, { id: 'connected' }>;
 }>) {
   return (
@@ -111,16 +122,11 @@ function ConnectedSection({
           </div>
           <p className='homepage-certified-section__body'>{section.body}</p>
         </div>
-        <div className='homepage-connected-artwork'>
-          <Image
-            alt={IDENTITY_ARTWORK.alt}
-            className='homepage-connected-artwork__image'
-            height={IDENTITY_ARTWORK.height}
-            loading='lazy'
-            sizes='(min-width: 1362px) 1298px, 100vw'
-            src={IDENTITY_ARTWORK.src}
-            width={IDENTITY_ARTWORK.width}
-          />
+        <div
+          className='homepage-chapter-visual homepage-connected-identity'
+          data-homepage-visual='connected'
+        >
+          <ProfileSurface image={image} />
         </div>
       </div>
     </EditorialSection>
@@ -128,10 +134,14 @@ function ConnectedSection({
 }
 
 function RelationshipsSection({
+  image,
   section,
-}: Readonly<{ section: RelationshipSection }>) {
+}: Readonly<{
+  image: MarketingExportImage;
+  section: RelationshipSection;
+}>) {
   return (
-    <EditorialSection dataMedia='false' rhythm='text' section={section}>
+    <EditorialSection dataMedia='true' rhythm='product' section={section}>
       <div className='homepage-certified-section__inner'>
         <div className='homepage-certified-section__copy'>
           <h2
@@ -143,7 +153,13 @@ function RelationshipsSection({
           </h2>
           <p className='homepage-certified-section__body'>{section.body}</p>
         </div>
-        <div className='homepage-certified-section__media'>
+        <div
+          className='homepage-certified-section__media homepage-chapter-visual homepage-relationships-visual'
+          data-homepage-visual='relationships'
+        >
+          <div className='homepage-relationships-visual__profile'>
+            <ProfileSurface image={image} />
+          </div>
           <RelationshipOutcomes outcomes={section.outcomes} />
         </div>
       </div>
@@ -159,16 +175,27 @@ function RelationshipsSection({
 export function HomepageCertifiedSections({
   previews,
 }: HomepageCertifiedSectionsProps) {
-  void previews;
   const { sections } = HOMEPAGE_LAUNCH_COPY.certified;
 
   return (
     <>
       {sections.map((section): ReactNode => {
         if (section.id === 'connected') {
-          return <ConnectedSection key={section.id} section={section} />;
+          return (
+            <ConnectedSection
+              image={previews.connected}
+              key={section.id}
+              section={section}
+            />
+          );
         }
-        return <RelationshipsSection key={section.id} section={section} />;
+        return (
+          <RelationshipsSection
+            image={previews.relationships}
+            key={section.id}
+            section={section}
+          />
+        );
       })}
     </>
   );
