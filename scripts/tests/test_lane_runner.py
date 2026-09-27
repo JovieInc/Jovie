@@ -499,7 +499,7 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(lane.worker(self.host, "devin"), 1)
         self.assertTrue(lane.cooling(self.host, "devin"))
         self.assertFalse((self.host.state / "failures.json").exists())
-        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Triage"))
         self.assertEqual(self.execs, [])
 
     def test_red_prs_are_fixed_before_new_issues_are_claimed(self):

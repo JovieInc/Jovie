@@ -34,6 +34,25 @@ const FORBIDDEN_ENV = Object.freeze([
   'E2E_PROD_EMAIL',
   'E2E_CLERK_USER',
 ]);
+const EXECUTION_LEDGER =
+  process.env.EXECUTION_ATTEMPT_LEDGER ??
+  `/tmp/golden-path-lock-${process.pid}/execution-attempts.jsonl`;
+
+function executionAttempt(command, input) {
+  const result = spawnSync(
+    'python3',
+    [resolve('scripts/lanes/execution_attempt.py')],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({ command, ...input }),
+    }
+  );
+  const output = JSON.parse(result.stdout || '{}');
+  if (result.status !== 0 || output.error) {
+    throw new Error(output.error || `execution-attempt-${command}-failed`);
+  }
+  return output;
+}
 
 function usage() {
   return [
@@ -468,6 +487,54 @@ async function runAutofix(args) {
       `Golden-path prod probe failed; open autofix PR #${plan.openPrNumber} owns ${receipt.fingerprint}. No new Cursor launch.`
     );
   }
+  if (plan.action === 'dedup') {
+    fail(
+      `Golden-path prod probe failed; active agents ${plan.existingAgentIds.join(',')} own ${receipt.fingerprint}.`
+    );
+  }
+
+  const executionIdentity = executionAttempt('identity', {
+    domain: 'production-verification-remediation',
+    work: { origin: receipt.origin, failureFingerprint: receipt.fingerprint },
+    generation: {
+      deployment: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+    },
+  });
+  const execution = executionAttempt('claim', {
+    path: EXECUTION_LEDGER,
+    ident: executionIdentity,
+    owner: {
+      owner: process.env.GITHUB_RUN_ID || 'local',
+      runtime: 'golden-path-prod-autofix',
+      provider: 'cursor',
+      model: null,
+      tool: 'cursor-agent-api',
+      accountPool: 'cursor',
+    },
+    policy: {
+      attempts: 1,
+      concurrency: 1,
+      wallSeconds: 900,
+      spend: 1,
+      mutations: 2,
+      leaseSeconds: 900,
+      version: 'golden-path-autofix-v1',
+    },
+    trigger: {
+      triggerId: process.env.GITHUB_RUN_ID || 'local',
+      correlationId: receipt.fingerprint,
+      causationId: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+    },
+  });
+  if (!execution.admitted) {
+    fail(`Golden-path autofix execution denied: ${execution.reason}.`);
+  }
+  executionAttempt('boundary', {
+    path: EXECUTION_LEDGER,
+    ident: executionIdentity,
+    fence: execution.fencingToken,
+    reservation: { spend: 1, mutations: 2 },
+  });
 
   const prompt = buildAutofixPrompt({
     fingerprint: receipt.fingerprint,
@@ -482,6 +549,19 @@ async function runAutofix(args) {
     prompt,
   });
   if (!linear.ok) {
+    executionAttempt('finish', {
+      path: EXECUTION_LEDGER,
+      ident: executionIdentity,
+      fence: execution.fencingToken,
+      result: 'failed_unknown',
+      detail: {
+        failureClass: 'intake_unknown',
+        failureFingerprint: linear.reason,
+        evidenceDigest: receipt.fingerprint,
+        costs: {},
+        dependencies: ['linear'],
+      },
+    });
     fail(
       `Linear intake failed closed: ${linear.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
       JSON.stringify(linear.body ?? null)
@@ -494,6 +574,19 @@ async function runAutofix(args) {
       body: JSON.stringify(plan.request),
     });
     if (!launched.ok) {
+      executionAttempt('finish', {
+        path: EXECUTION_LEDGER,
+        ident: executionIdentity,
+        fence: execution.fencingToken,
+        result: 'failed_unknown',
+        detail: {
+          failureClass: 'provider_unknown',
+          failureFingerprint: `cursor:${launched.status}`,
+          evidenceDigest: receipt.fingerprint,
+          costs: { apiCalls: 1 },
+          dependencies: ['cursor'],
+        },
+      });
       fail(
         `Cursor-direct launch failed (status ${launched.status}).`,
         JSON.stringify(launched.body)
@@ -502,6 +595,19 @@ async function runAutofix(args) {
     console.error(
       `Launched Cursor-direct autofix ${launched.body?.id ?? ''} fingerprint=${receipt.fingerprint}`
     );
+    executionAttempt('finish', {
+      path: EXECUTION_LEDGER,
+      ident: executionIdentity,
+      fence: execution.fencingToken,
+      result: 'succeeded',
+      detail: {
+        evidenceDigest: receipt.fingerprint,
+        costs: { apiCalls: 1 },
+        mutationsPerformed: ['linear_issue', 'cursor_agent'],
+        confidence: 'high',
+        dependencies: ['linear', 'cursor'],
+      },
+    });
   } else {
     console.error(
       `Deduped Cursor-direct autofix fingerprint=${receipt.fingerprint} agents=${plan.existingAgentIds.join(',')}`

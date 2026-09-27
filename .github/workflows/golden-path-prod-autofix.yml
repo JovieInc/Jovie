@@ -1,9 +1,9 @@
 name: Golden Path Prod Autofix
 
-# JOV-5085: event-driven live-path probe + Cursor-direct autofix.
-# Separate from Post-Deploy Probes, which are read-only and must not mutate.
-# Detect without a ship lock is a hole.
-#
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Trusted-main workflow_run observes deployed runtime; only this bounded job receives Linear/Cursor mutation credentials and it never deploys or merges.
+# removal-trigger: Remove when Production Controller emits the same durable attempt receipt and dispatches this bounded autofix without a downstream workflow hop.
 # Does not read signup-account secrets. Missing CURSOR_API_KEY fails closed.
 
 on:
@@ -40,6 +40,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+      EXECUTION_GENERATION: ${{ github.event.workflow_run.head_sha || github.sha }}
+      EXECUTION_ATTEMPT_LEDGER: /tmp/golden-path-lock/execution-attempts.jsonl
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,3 +101,11 @@ jobs:
           fi
           node scripts/golden-path-lock.mjs autofix \
             --receipt /tmp/golden-path-lock/receipt.json
+
+      - name: Preserve execution-attempt receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: golden-path-execution-attempts-${{ github.run_id }}
+          path: /tmp/golden-path-lock/execution-attempts.jsonl
+          if-no-files-found: ignore
