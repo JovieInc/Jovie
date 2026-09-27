@@ -1,5 +1,7 @@
 # Symphony proof-v2 substrate
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 This additive source slice introduces explicit `V2_*` constants and `v2_*`
 validation APIs. Legacy public gate APIs remain byte-identical. Existing
 admission consumers do not use v2 until the separate consumer migration lands.
@@ -37,7 +39,7 @@ writer. No provider probe or live service observation was performed by these tes
 Provider completion and process observations use explicit test fixtures, with
 separate synthetic runtime and Codex files. Tests exercise the real process parser.
 
-`python3 scripts/symphony/tests/run-proof-gate.py` runs v2-only tests and enforces
+`python3 symphony-control/tests/run-proof-gate.py` runs v2-only tests and enforces
 90% execution-derived line coverage separately for v2 contract functions, context,
 producer and projector. A byte-equivalence test preserves the legacy contract.
 Coverage is not live runtime certification. The successor wiring slice owns CI

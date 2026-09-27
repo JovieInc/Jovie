@@ -166,7 +166,7 @@ Operator install packet: docs/ops/summer-bounded-operator-e1-install.md
 Post-install proof (same Summer predicates):
   node scripts/summer-commissioning/verify-e1-attestation-observations.mjs \\
     --observation-a obs-a.json --observation-b obs-b.json
-Local publisher tests: python3 scripts/symphony/tests/gem-service-attestation.test.py (on main).
+Publisher tests live in JovieInc/symphony-control (the Gem publisher is retired from Jovie).
 Local close-path readiness (--self-test) is covered by the E1 observation gate suite above;
 that does NOT close E1 without real Gem observations.
 `);

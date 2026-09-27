@@ -30,12 +30,38 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels
 
 class SelectionTest(unittest.TestCase):
     def test_orders_like_symphony_priority_then_age_with_none_last(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
             issue("JOV-3", priority=0),
             issue("JOV-2", priority=1, created="2026-09-03T00:00:00Z"),
             issue("JOV-1", priority=1, created="2026-09-02T00:00:00Z"),
-        ], {})
+        ], {}, now=now)
         self.assertEqual(picked.identifier, "JOV-1")
+
+    def test_newer_urgent_work_stays_ahead_of_work_inside_aging_window(self):
+        now = datetime(2026, 9, 3, 12, tzinfo=timezone.utc).timestamp()
+        picked = lane.pick_issue([
+            issue("JOV-1", priority=1, created="2026-09-03T11:00:00Z"),
+            issue("JOV-2", priority=2, created="2026-09-02T13:00:00Z"),
+        ], {}, now=now)
+        self.assertEqual(picked.identifier, "JOV-1")
+
+    def test_aged_work_eventually_precedes_a_sustained_urgent_stream(self):
+        now = datetime(2026, 9, 5, tzinfo=timezone.utc).timestamp()
+        picked = lane.pick_issue([
+            issue("JOV-1", priority=1, created="2026-09-04T23:00:00Z"),
+            issue("JOV-4", priority=4, created="2026-09-01T00:00:00Z"),
+        ], {}, now=now)
+        self.assertEqual(picked.identifier, "JOV-4")
+
+    def test_unprioritized_work_ages_without_malformed_dates_jumping_the_queue(self):
+        now = datetime(2026, 9, 6, tzinfo=timezone.utc).timestamp()
+        picked = lane.pick_issue([
+            issue("JOV-1", priority=1, created="2026-09-05T23:00:00Z"),
+            issue("JOV-0", priority=0, created="2026-09-01T00:00:00Z"),
+            issue("JOV-BAD", priority=0, created="not-a-date"),
+        ], {}, now=now)
+        self.assertEqual(picked.identifier, "JOV-0")
 
     def test_skips_excluded_and_exhausted_work_but_drains_the_shared_pool(self):
         picked = lane.pick_issue([
@@ -256,7 +282,11 @@ class ProviderAndLockTest(unittest.TestCase):
 
 class FakeLinear:
     def __init__(self, issues):
-        self.issues, self.moves, self.comments = issues, [], []
+        self.issues, self.moves, self.comments, self.triaged = issues, [], [], []
+
+    def create_triage(self, title, description):
+        self.triaged.append(title)
+        return "triage-id"
 
     def lane_issues(self, label):
         return self.issues
@@ -374,11 +404,17 @@ class RunIssueTest(unittest.TestCase):
 class WorkerTest(unittest.TestCase):
     def setUp(self):
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-                      lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues)
+                      lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
+                      lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
+                      lane.pr_events.claim_event_pr)
+        lane.pr_events.queued_prs = lambda module, kinds: []
+        lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs: None
         lane.lane_prs = lambda name: []
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
+        lane.fix_candidates = lambda name: []
+        lane.escalate_exhausted = lambda host, prs, linear: None
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
         self.linear = FakeLinear([issue("JOV-3")])
@@ -389,7 +425,9 @@ class WorkerTest(unittest.TestCase):
 
     def tearDown(self):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
-         lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues) = self.saved
+         lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
+         lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
+         lane.pr_events.claim_event_pr) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -431,6 +469,17 @@ class WorkerTest(unittest.TestCase):
         lane.worker(self.host, "devin")
         self.assertEqual((fixed, self.linear.moves), ([5], []))
         self.assertEqual(len(self.execs), 1)
+
+    def test_event_queued_prs_are_fixed_first_and_escalated_once(self):
+        fixed, escalated = [], []
+        lane.fix_candidates = lambda name: [{"number": 5}, {"number": 6}]
+        lane.pr_events.queued_prs = lambda module, kinds: [{"number": 6, "eventKinds": ["red"]}]
+        lane.pr_events.claim_event_pr = lambda host, module, name, prs: prs[0]
+        lane.claim_red_pr = lambda host, name, prs=None: self.fail("the event queue goes first")
+        lane.escalate_exhausted = lambda host, prs, linear: escalated.append(sorted(pr["number"] for pr in prs))
+        lane.fix_red_pr = lambda host, name, spec, pr: fixed.append(pr["number"])
+        lane.worker(self.host, "devin")
+        self.assertEqual((fixed, escalated), ([6], [[5, 6]]))
 
     def test_late_remote_drafts_are_adopted_and_gated(self):
         adopted = []
@@ -701,6 +750,46 @@ class FixRedTest(unittest.TestCase):
         finally:
             lane.sh = real
 
+    def test_changes_requested_counts_as_red_and_every_repo_pr_is_a_candidate(self):
+        human = {**self.pr(number=42), "headRefName": "tim/jov-1-manual", "isDraft": False,
+                 "reviewDecision": "CHANGES_REQUESTED", "statusCheckRollup": [{"conclusion": "SUCCESS"}]}
+        self.assertEqual(lane.red_pr([human], {})["number"], 42)
+        clean = {**human, "reviewDecision": "APPROVED"}
+        self.assertIsNone(lane.red_pr([clean], {}))
+        real = lane.sh
+        lane.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([
+            {**human, "isCrossRepository": False}, {**human, "number": 43, "isCrossRepository": True}]))
+        try:
+            self.assertEqual([pr["number"] for pr in lane.repo_prs()], [42], "fork PRs cannot be pushed to")
+        finally:
+            lane.sh = real
+
+    def test_exhausted_heads_escalate_once_to_triage(self):
+        stuck = {**self.pr(number=7), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
+        attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}
+        self.assertEqual([pr["number"] for pr in lane.exhausted_prs([stuck], attempts)], [7])
+        self.assertEqual([pr["number"] for pr in lane.exhausted_prs([{**stuck, "headRefOid": "h2"}], attempts)], [7],
+                         "the head the last fix pushed is still stuck: spent attempts escalate, never wait silently")
+        green = {**stuck, "headRefOid": "h2", "mergeStateStatus": "CLEAN",
+                 "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}]}
+        self.assertEqual(lane.exhausted_prs([green], attempts), [], "a head that went green is not escalated")
+        self.assertEqual(lane.exhausted_prs([stuck], {"7": {**attempts["7"], "escalated": True}}), [])
+        real = lane.sh
+        posted = []
+        lane.sh = lambda args, **k: posted.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
+        linear = FakeLinear([])
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            try:
+                lane.escalate_exhausted(host, [stuck], linear)
+                lane.escalate_exhausted(host, [stuck], linear)
+            finally:
+                lane.sh = real
+            self.assertEqual(linear.triaged, ["Fix loop exhausted: PR #7 stuck one"], "escalated exactly once")
+            self.assertEqual(len([p for p in posted if p[:3] == ["gh", "pr", "comment"]]), 1)
+            self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
+
     def test_claim_records_attempt_before_work(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
@@ -714,8 +803,9 @@ class FixRedTest(unittest.TestCase):
                 self.assertIsNone(lane.claim_red_pr(host, "devin"))
             finally:
                 lane.sh = real
-            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()),
-                             {"5": {"sha": "h1", "count": 1}})
+            record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
+            self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
+            self.assertAlmostEqual(record["at"], time.time(), delta=60)
 
     def test_unverified_drafts_are_adopted_once_per_head(self):
         draft = {**self.pr(), "isDraft": True, "headRefName": "hyperagent/jov-6438-20260925t213221"}

@@ -1612,7 +1612,6 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
-        REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1740,7 +1739,7 @@ def test_retired_admission_commands_stay_disabled() -> None:
 def test_fleet_controllers_share_one_evaluate_action() -> None:
     """FGR and production-controller share the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
-    script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
+    script = REPO_ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
@@ -1749,7 +1748,7 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     for workflow, job_name, _step in callers:
         text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
         assert f"uses: ./{action}" in text, workflow
-        assert "python3 scripts/symphony/gem-priority-gate.py" not in text, workflow
+        assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production

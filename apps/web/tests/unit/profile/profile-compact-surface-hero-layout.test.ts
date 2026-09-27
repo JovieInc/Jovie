@@ -3,9 +3,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * JOV-INV-012 exception: the tokenized 34svh cover-height composition is a
- * design invariant (identity/brand permanence), not an experiment arm.
- * Public-profile conversion inventory below the hero stays on existing
+ * JOV-INV-012 exception: the Pen identity header composition (80px portrait,
+ * name, handle, Listen action and socials above one mode card) is a founder
+ * design invariant (identity/brand permanence, Tim 2026-09-26), not an
+ * experiment arm. It supersedes the 34svh cover-photo hero control.
+ * Public-profile conversion inventory below the header stays on existing
  * analytics (`profile_views`, `social_click`, `profile_tab_click`), PAC,
  * audience events, and release-to-revenue surfaces.
  */
@@ -13,12 +15,13 @@ export const PUBLIC_MOBILE_HERO_LAYOUT_OPTIMIZATION_EXCEPTION = {
   kind: 'non-optimizable',
   invariant: 'JOV-INV-012',
   justification:
-    'clamp(220px, 34svh, 400px) is the tokenized public-mobile hero geometry. Auto-promoting a challenger height would fight DESIGN.md and the layout contract tests. This PR restores that control; it does not introduce a variant.',
-  variantIdentity: 'public-profile-compact-hero:cover-height-34svh:control-v1',
+    'The Pen identity header (80px portrait, name, handle, Listen action, socials) is the founder-approved public-mobile identity composition. It replaces the 34svh cover-photo hero as the control; it does not introduce a variant.',
+  variantIdentity:
+    'public-profile-compact-hero:identity-header-80px:control-v2',
   exposure:
-    'Not an experiment exposure. Every public compact home render uses the same --cover-height token. Existing profile_views remains the page-level exposure on analytics.',
+    'Not an experiment exposure. Every public compact render uses the same identity header. Existing profile_views remains the page-level exposure on analytics.',
   outcome:
-    'Artist-business outcomes on the public profile (listen/social/tip clicks, capture) stay on canonical metrics. Hero height is not a treatment.',
+    'Artist-business outcomes on the public profile (listen/social/tip clicks, capture) stay on canonical metrics. Header geometry is not a treatment.',
   attribution: {
     surfaces: [
       'analytics',
@@ -36,23 +39,23 @@ export const PUBLIC_MOBILE_HERO_LAYOUT_OPTIMIZATION_EXCEPTION = {
     'artist-plus-career-era',
   ],
   hypothesis:
-    'Not an experiment. The approved 34svh media slot plus in-flow identity band is the control composition for 390x844 and other tall mobile viewports.',
+    'Not an experiment. The Pen identity header plus one mode card is the control composition for 390x844 and other mobile viewports.',
   primaryMetric:
-    'None for hero height. Public-profile conversion continues to use canonical CTR / capture_rate from apps/web/lib/analytics/metrics.ts.',
+    'None for header geometry. Public-profile conversion continues to use canonical CTR / capture_rate from apps/web/lib/analytics/metrics.ts.',
   guardrails: [
-    'Do not restore short-viewport shrink-wrap (max-height:820px flex-none / min-h-0 / cover-height override).',
-    'Do not restyle IconButton; pearlQuiet owns top-chrome appearance.',
-    'Do not invent a parallel analytics stack or auto-promote cover-height.',
+    'Do not restore the full-bleed cover photo or put a gradient, overlay, or text over the portrait.',
+    'Keep every identity control at a 44px hit area.',
+    'Do not invent a parallel analytics stack or auto-promote header geometry.',
   ],
   privacyAndConsent:
     'Anonymous public-profile analytics only. No sensitive demographic inference. No consent-gated identity stitching.',
   optimizerOwner: 'Product',
   cadence:
-    'No auto-optimization of hero geometry. Re-evaluate only if DESIGN.md changes the cover-height token.',
+    'No auto-optimization of header geometry. Re-evaluate only if the founder Pen profile design changes.',
   decisionWriteback:
-    'Keep cover-height-34svh as control. Write decisions back on JOV-6254. Challengers require a new variantIdentity and a design-invariant change, not an experiment arm.',
+    'Keep identity-header-80px as control. Challengers require a new variantIdentity and a design-invariant change, not an experiment arm.',
   rollbackOrControl:
-    'Revert this branch to restore the prior compact-hero source. The tokenized 34svh control remains the intended composition.',
+    'Revert this branch to restore the prior cover-photo hero source.',
 } as const;
 
 const PROFILE_COMPACT_SURFACE = join(
@@ -62,6 +65,13 @@ const PROFILE_COMPACT_SURFACE = join(
   'profile',
   'templates',
   'ProfileCompactSurface.tsx'
+);
+const PROFILE_IDENTITY_HEADER = join(
+  process.cwd(),
+  'components',
+  'features',
+  'profile',
+  'ProfileIdentityHeader.tsx'
 );
 const DESIGN_SYSTEM = join(process.cwd(), 'styles', 'design-system.css');
 const PROFILE_MOBILE_OVERFLOW = join(
@@ -73,38 +83,15 @@ const PROFILE_MOBILE_OVERFLOW = join(
   'useProfileMobileOverflow.ts'
 );
 
-/**
- * Public profile home hero with real artwork has ONE definite token-driven
- * height on every viewport: h-(--cover-height) with
- * --cover-height: clamp(220px, 34svh, 400px). Profiles without real artwork
- * use the compact no-media geometry so an empty decorative field cannot crowd
- * the conversion inventory below it.
- * The old short-viewport shrink-wrap (flex-none + min-h-0 + ≤190px cap) made
- * the hero collapse to ~60px on viewports ≤820px tall, hiding the artist
- * photo and name — it must never come back. The carousel below the hero owns
- * the remaining viewport height.
- */
-describe('ProfileCompactSurface home hero layout', () => {
-  it('declares a justified non-optimizable JOV-INV-012 exception for cover-height', () => {
+describe('ProfileCompactSurface identity header layout', () => {
+  it('declares a justified non-optimizable JOV-INV-012 exception for the identity header', () => {
     expect(PUBLIC_MOBILE_HERO_LAYOUT_OPTIMIZATION_EXCEPTION).toMatchObject({
       kind: 'non-optimizable',
       invariant: 'JOV-INV-012',
       variantIdentity:
-        'public-profile-compact-hero:cover-height-34svh:control-v1',
+        'public-profile-compact-hero:identity-header-80px:control-v2',
       optimizerOwner: 'Product',
     });
-    expect(
-      PUBLIC_MOBILE_HERO_LAYOUT_OPTIMIZATION_EXCEPTION.justification
-    ).toMatch(/34svh/);
-    expect(
-      PUBLIC_MOBILE_HERO_LAYOUT_OPTIMIZATION_EXCEPTION.attribution.surfaces
-    ).toEqual([
-      'analytics',
-      'model-experiments',
-      'audience-events',
-      'youtube-experiments',
-      'release-to-revenue',
-    ]);
     expect(
       PUBLIC_MOBILE_HERO_LAYOUT_OPTIMIZATION_EXCEPTION.primaryMetric
     ).toMatch(/metrics\.ts/);
@@ -113,80 +100,39 @@ describe('ProfileCompactSurface home hero layout', () => {
     ).toMatch(/Revert/);
   });
 
-  it('locks the home hero to the token-driven cover height (no flex/shrink-wrap)', () => {
-    const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
+  it('renders one identity header for every mode instead of a cover-photo hero', () => {
+    const surface = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
 
-    expect(contents).toMatch(
-      /isHomeMode[\s\S]{0,120}resolvedHeroImageUrl[\s\S]{0,80}'h-\(--cover-height\) shrink-0'[\s\S]{0,80}'profile-home-fluid-hero--no-media shrink-0'/
-    );
-    // The short-viewport shrink-wrap band must not come back.
-    expect(contents).not.toMatch(/\[@media\(max-height:820px\)\]:flex-none/);
-    expect(contents).not.toMatch(/\[@media\(max-height:820px\)\]:min-h-0/);
-    expect(contents).not.toMatch(/\[@media\(max-height:820px\)\]:max-h-/);
-    expect(contents).not.toMatch(/min-h-\(--cover-height\)\s+flex-1/);
-    expect(contents).toMatch(
-      /homeContentColumnClassName\s*=\s*'min-h-0 flex-1'/
-    );
-    expect(contents).toMatch(
-      /homeContentScrollClassName\s*=\s*'min-h-0 flex-1'/
-    );
-    expect(contents).not.toContain(
-      'profile-top-chrome-icon text-white dark:text-white'
+    expect(surface.match(/<ProfileIdentityHeader\b/g)).toHaveLength(1);
+    expect(surface).not.toContain('h-(--cover-height)');
+    expect(surface).not.toContain('profile-home-fluid-hero');
+    expect(surface).not.toContain('profile-cover-home-gradient');
+    // The chrome floats over the header and never blocks it.
+    expect(surface).toContain(
+      "'profile-cover-chrome pointer-events-none absolute inset-x-0 top-0 z-20"
     );
   });
 
-  it('uses ONE legibility gradient limited to the bottom of the hero', () => {
-    const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
+  it('keeps the portrait art untouched: 80px circle, no overlay but the verified glyph', () => {
+    const header = readFileSync(PROFILE_IDENTITY_HEADER, 'utf8');
 
-    // The stacked full-height scrim pair is replaced by a single class-driven
-    // gradient; the fade layer is removed entirely.
-    expect(contents).toMatch(/profile-cover-home-gradient/);
-    expect(contents).not.toMatch(/profile-cover-home-fade/);
-    expect(contents).not.toMatch(
-      /profile-cover-home-gradient[^/]*bg-\[linear-gradient/
-    );
-
-    const css = readFileSync(DESIGN_SYSTEM, 'utf8');
-    expect(css).toMatch(
-      /\.profile-cover-home-gradient\)\s*\{[\s\S]{0,200}height:\s*55%/
-    );
+    expect(header).toContain("'relative h-20 w-20 shrink-0'");
+    expect(header).toContain('overflow-hidden rounded-full');
+    expect(header).toContain("sizes='80px'");
+    expect(header).not.toMatch(/gradient|backdrop-blur|bg-black\//);
   });
 
-  it('sets --cover-height to clamp(220px, 34svh, 400px) with no short-viewport override', () => {
-    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
+  it('keeps every identity control on a 44px hit area with a 28px Listen face', () => {
+    const header = readFileSync(PROFILE_IDENTITY_HEADER, 'utf8');
 
-    const assignments = contents.match(
-      /--cover-height:\s*clamp\(220px,\s*34svh,\s*400px\)/g
+    expect(header).toContain(
+      'inline-flex h-11 w-11 shrink-0 touch-manipulation'
     );
-    // :root and .profile-viewport both define the mobile value.
-    expect(assignments?.length).toBeGreaterThanOrEqual(2);
-    // No max-height media band may shrink the hero token anymore.
-    expect(contents).not.toMatch(
-      /max-height:\s*820px\)[\s\S]{0,120}--cover-height/
+    expect(header).toContain(
+      "'group flex h-11 min-w-0 flex-1 touch-manipulation items-center"
     );
-    // Desktop compact shell keeps a proportional hero override (short
-    // windows share shell height instead of crushing the carousel).
-    expect(contents).toMatch(
-      /\.public-profile-compact-shell\s*\{[\s\S]{0,400}--cover-height:\s*clamp\(200px,\s*45%,\s*340px\)/
-    );
-  });
-
-  it('keeps the mobile media token additive to identity and reserves the dock', () => {
-    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
-
-    // The media slot owns the token; the in-flow identity band is additive.
-    // The browser layout suite proves the resulting geometry and composition.
-    expect(contents).toMatch(
-      /@media \(max-width: 767px\)[\s\S]*?\.profile-home-fluid-hero[\s\S]*?flex:\s*0 0 auto;[\s\S]*?height:\s*auto;[\s\S]*?min-height:\s*calc\([\s\S]*?var\(--cover-height\)\s*\+\s*var\(--profile-hero-identity-min-height\)[\s\S]*?\);/
-    );
-    expect(contents).toMatch(
-      /@media \(max-width: 767px\)[\s\S]*?\.profile-cover-home-media[\s\S]*?flex:\s*0 0 var\(--cover-height\);[\s\S]*?height:\s*var\(--cover-height\);/
-    );
-    expect(contents).toMatch(
-      /@media \(max-width: 767px\)[\s\S]*?\.profile-home-content-column[\s\S]*?flex:\s*1 1 0%;[\s\S]*?min-height:\s*0;[\s\S]*?margin-bottom:\s*var\(--profile-bottom-nav-height\);/
-    );
-    expect(contents).toMatch(
-      /@media \(max-width: 767px\)[\s\S]*?profile-home-rail[\s\S]*?justify-content:\s*flex-start;[\s\S]*?\[data-testid="profile-compact-surface"\][\s\S]*?\.profile-home-content-scroll\s*\{\s*padding-bottom:\s*0;/
+    expect(header).toContain(
+      "'profile-glass-pill profile-glass-pill--flat flex h-7 w-full"
     );
   });
 
@@ -243,14 +189,6 @@ describe('ProfileCompactSurface home hero layout', () => {
 
     expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
       'data-profile-overflow-mode'
-    );
-  });
-
-  it('keeps the collapsed deep-link mode header behavior untouched', () => {
-    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
-
-    expect(contents).toMatch(
-      /html\[data-profile-initial-mode\][\s\S]{0,200}--cover-height:\s*calc\(3\.5rem/
     );
   });
 

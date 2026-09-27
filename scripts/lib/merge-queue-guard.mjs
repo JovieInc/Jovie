@@ -1013,12 +1013,6 @@ export function serializationKeysForFile(file) {
       reason: 'web library subsystem',
       file: normalized,
     });
-  } else if (normalized.startsWith('scripts/symphony/')) {
-    keys.push({
-      key: `subsystem:${firstDirectory(normalized, 3)}`,
-      reason: 'Symphony automation subsystem',
-      file: normalized,
-    });
   } else if (normalized.startsWith('scripts/')) {
     keys.push({
       key: `subsystem:${firstDirectory(normalized, 2)}`,

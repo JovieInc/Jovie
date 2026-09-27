@@ -1258,14 +1258,9 @@ export async function uploadAndPublish({
     version,
     draft: true,
   });
-  if (environment === 'staging') {
-    await client.assertMainlineAncestor(releaseSha);
-  } else {
-    invariant(
-      (await client.currentMainSha()) === releaseSha,
-      'Desktop generation was superseded before release publication.'
-    );
-  }
+  // Forward-only for both channels: a verified generation main has since
+  // advanced past still publishes; a rewound or diverged one never does.
+  await client.assertMainlineAncestor(releaseSha);
 
   release = await client.publishRelease(release.id, environment, version);
   validateReleaseAssets({

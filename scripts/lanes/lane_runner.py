@@ -35,6 +35,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import doctor  # noqa: E402  (sibling module of the release)
+import pr_events  # noqa: E402
+# This module as imported: the event hooks take it as `lane`. Bound once, because other
+# loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
+THIS = sys.modules[__name__]
 REPO_SLUG = "JovieInc/Jovie"
 # `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
 # the rest stay with humans.
@@ -51,11 +55,15 @@ CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
-              "scripts/tests/test_doctor.py"]
+              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
 PROVIDER_COOLDOWN_S = 900
+# Waiting work gains one priority level per day, capped at urgent. This preserves
+# urgent-first admission while guaranteeing that a sustained P1 stream cannot
+# starve older work forever.
+PRIORITY_AGING_S = 24 * 3600
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
@@ -106,11 +114,22 @@ def failure_record(value) -> dict:
     return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
 
 
+def created_at_epoch(value: str) -> float | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.timestamp() if parsed.tzinfo is not None else None
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset()) -> Issue | None:
-    """Symphony's order: priority 1..4 then none, oldest first; skip excluded work,
-    3x failures, issues still inside their retry backoff, and issues that already have an
-    open lane PR anywhere (one PR per issue: the fix/adopt loop owns those)."""
+    """Symphony orders by aged priority then age, while preserving urgent-first admission.
+
+    Waiting work gains one priority level per day until it reaches P1, preventing a
+    sustained stream of newer urgent work from starving older work. Excluded work,
+    3x failures, retry backoff, and issues with an open lane PR remain ineligible.
+    """
     now = time.time() if now is None else now
     in_flight = {identifier.lower() for identifier in in_flight}
 
@@ -123,7 +142,15 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
         if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
         and issue.identifier.lower() not in in_flight
     ]
-    eligible.sort(key=lambda issue: (issue.priority or 5, issue.created_at))
+
+    def admission_order(issue: Issue) -> tuple[int, float]:
+        created_at = created_at_epoch(issue.created_at)
+        base_priority = issue.priority or 5
+        waited = max(0, now - created_at) if created_at is not None else 0
+        effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
+        return effective_priority, created_at if created_at is not None else float("inf")
+
+    eligible.sort(key=admission_order)
     return eligible[0] if eligible else None
 
 
@@ -289,6 +316,16 @@ class Linear:
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
                 for n in data["issues"]["nodes"]]
+
+    def create_triage(self, title: str, description: str) -> str | None:
+        team = self.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                        {})["teams"]["nodes"][0]
+        triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
+        labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
+        data = self.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id}}}',
+                        {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": 2,
+                               "title": title[:200], "description": description}})
+        return data["issueCreate"]["issue"]["id"]
 
     def state_of(self, issue_id: str) -> str:
         data = self.gql('query($id:String!){issue(id:$id){state{name}}}', {"id": issue_id})
@@ -555,7 +592,7 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
     path = held_path(host)
     path.parent.mkdir(parents=True, exist_ok=True)
     held = json.loads(path.read_text()) if path.exists() else {}
-    held[str(number)] = {"sha": head, "evidence": evidence[-60:]}
+    held[str(number)] = pr_events.held_record(head, evidence)
     path.write_text(json.dumps(held))
 
 
@@ -566,7 +603,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
         gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
-        if not conflicted and not gate_held:
+        reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
+        if not conflicted and not gate_held and not reviewed:
             if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
@@ -576,6 +614,45 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             continue
         return pr
     return None
+
+
+def exhausted_prs(prs: list[dict], attempts: dict) -> list[dict]:
+    """Heads the fix loop tried MAX_FIX_ATTEMPTS times and that are still stuck, not yet escalated."""
+    stuck = []
+    for pr in prs:
+        record = attempts.get(str(pr["number"]), {})
+        # Spent attempts are terminal for the PR (red_pr never retries it), so a head the last
+        # fix pushed that is still stuck escalates too instead of waiting silently.
+        if record.get("count", 0) >= MAX_FIX_ATTEMPTS and not record.get("escalated"):
+            checks = pr.get("statusCheckRollup") or []
+            if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED" \
+                    or any(check.get("conclusion") in RED for check in checks):
+                stuck.append(pr)
+    return stuck
+
+
+def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
+    """Bug intake, never Tim: comment on the PR, open a Linear Triage issue once, mark it escalated."""
+    path = host.state / "fix-attempts.json"
+    attempts = json.loads(path.read_text()) if path.exists() else {}
+    for pr in exhausted_prs(prs, attempts):
+        body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
+                f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
+                "Filed through bug intake (Linear Triage); the lanes stop here.")
+        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+        record = attempts.get(str(pr["number"]), {})
+        try:
+            linear.create_triage(f"Fix loop exhausted: PR #{pr['number']} {pr.get('title', '')[:80]}",
+                                 pr_events.bug_report(pr, f"{body}\n\nHost `{HOST}`, {now_iso()}.", HOST, record))
+        except Exception:
+            pass
+        attempts[str(pr["number"])] = {**record, "escalated": True}
+        update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
+            pr["headRefOid"], ["fix-exhausted", *held.get(str(pr["number"]), {}).get("evidence", [])])}))
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        if found and found.group("lane") in pr_events.disabled_lanes(load_providers()):
+            pr_events.return_to_pool(THIS, linear, pr, "orphaned lane PR after its fix attempts ran out")
+    path.write_text(json.dumps(attempts))
 
 
 def failure_excerpt(pr: dict, limit: int = 6000) -> str:
@@ -592,7 +669,24 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
     return "\n\n".join(parts)[:limit]
 
 
+def review_excerpt(pr: dict, limit: int = 4000) -> str:
+    """The reviewers' own words, so the fixer addresses what was asked, not what it guesses."""
+    if pr.get("reviewDecision") != "CHANGES_REQUESTED" and "review" not in pr.get("eventKinds", ()):
+        return ""
+    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/comments?per_page=50", "--jq",
+                 '.[] | "- \\(.path):\\(.line // .original_line // 0) \\(.body | gsub("\\n"; " "))"'])
+    reviews = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/reviews?per_page=20", "--jq",
+                  '.[] | select(.state == "CHANGES_REQUESTED" or (.state == "COMMENTED" and (.body | length) > 0)) '
+                  '| "- review: \\(.body | gsub("\\n"; " "))"'])
+    text = "\n".join(part for part in ((reviews.stdout or "").strip(), (listed.stdout or "").strip()) if part)
+    return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no comment text readable)."
+
+
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
+    review = review_excerpt(pr) if pr.get("reviewDecision") == "CHANGES_REQUESTED" \
+        or "review" in pr.get("eventKinds", ()) else ""
+    if review:
+        excerpt = review + ("\n\n" + excerpt if excerpt else "")
     if pr.get("gateEvidence"):
         excerpt = "Lane gate (the repo's pre-push-gate) held this PR:\n" + "\n".join(pr["gateEvidence"]) + \
             ("\n\n" + excerpt if excerpt else "")
@@ -603,6 +697,10 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
+    if "dequeued" in pr.get("eventKinds", ()):
+        problem += ["The merge queue removed this PR (its merge group failed) and will not take the same",
+                    "head again. Merge origin/main into the branch, run",
+                    "`bash scripts/hooks/pre-push-gate.sh affected`, fix what fails, and push.", ""]
     return "\n".join([
         f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
         "",
@@ -716,10 +814,31 @@ def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
     prs = []
     for owner in names:
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
-                     "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus"])
+                     "--json", PR_FIELDS])
         own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
         prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
     return prs
+
+
+PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository"
+
+
+def repo_prs() -> list[dict]:
+    """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
+    Tim: no open PR should ever need his action; the fix loop owns them all."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "60",
+                 "--search", "draft:false sort:updated-desc", "--json", PR_FIELDS])
+    return [pr for pr in json.loads(listed.stdout or "[]") if not pr.get("isCrossRepository")]
+
+
+def fix_candidates(name: str) -> list[dict]:
+    """Lane PRs (all lanes) plus every other open non-draft PR, de-duplicated by number."""
+    seen, merged = set(), []
+    for pr in lane_prs(name) + repo_prs():
+        if pr["number"] not in seen:
+            seen.add(pr["number"])
+            merged.append(pr)
+    return merged
 
 
 def in_flight_issues() -> frozenset[str]:
@@ -750,6 +869,8 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    order, now = pr_events.cost_order(load_providers()), time.time()
+    prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
     if pr:
         entry = held.get(str(pr["number"]), {})
@@ -758,7 +879,8 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             return None  # another host is already fixing this head; no attempt is charged
         record = attempts.get(str(pr["number"]), {})
-        attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
+        attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1,
+                                       "lane": name, "at": now}
         path.write_text(json.dumps(attempts))
         post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
@@ -785,10 +907,14 @@ def worker(host: Host, name: str) -> int:
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
-        # Finish before starting: red PRs, then ungated drafts, then new issues.
+        # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
+        # then ungated lane drafts, then new issues.
         prs = lane_prs(name)
+        candidates = fix_candidates(name)
+        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
         requeue_verified(host, prs)
-        red = claim_red_pr(host, name, prs)
+        escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+        red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
         if red is None and adopt is None:
@@ -840,8 +966,9 @@ def worker(host: Host, name: str) -> int:
         claim = Locked(host.state / "claim.lock", blocking=True)
         try:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            record = failure_record(failures.get(issue.identifier))
-            failures[issue.identifier] = {"count": record["count"] + 1, "at": time.time()}
+            count = failure_record(failures.get(issue.identifier))["count"] + 1
+            failures[issue.identifier] = {"count": count, "at": time.time(),
+                                          **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
             failures_path(host).write_text(json.dumps(failures))
         finally:
             claim.release()
@@ -886,6 +1013,10 @@ def dispatch(host: Host) -> int:
                 tick["spawned"].append(name)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
+    try:
+        tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
+    except Exception as error:  # the ready/orphan queue never takes dispatch down
+        tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())

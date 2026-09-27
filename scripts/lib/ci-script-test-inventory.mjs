@@ -50,8 +50,6 @@ export const RUNNER_ONLY_EXCEPTIONS = Object.freeze({});
  * @type {Readonly<Record<string, string>>}
  */
 export const KNOWN_RED_ORPHANS = Object.freeze({
-  'scripts/backlog-orchestrator/__tests__/symphony-launcher.test.mjs':
-    'red on main: 7 of 11 launcher subprocess cases exit non-zero (24s file).',
   'scripts/generate-llms-design-manifest.test.mjs':
     'red on main: "--check detects drift" reports no drift.',
   'scripts/repo-hygiene-guard.test.mjs':

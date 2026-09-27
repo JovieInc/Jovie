@@ -110,6 +110,7 @@ async function runRetouchGatewayRequest(params: {
           ],
         },
       ],
+      providerOptions: { gateway: { tags: ['feature:jovie-retouching'] } },
     });
   } catch (error) {
     if (GatewayAuthenticationError.isInstance(error)) {
