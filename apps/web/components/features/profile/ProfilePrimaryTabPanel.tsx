@@ -33,6 +33,7 @@ import {
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import {
   type ProfileCardAccentAssignment,
   type ProfileModeCardKind,
@@ -40,6 +41,7 @@ import {
 } from '@/lib/profile/mode-card-accent';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
+import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
@@ -68,6 +70,8 @@ interface ProfilePrimaryTabPanelProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  readonly contacts?: readonly PublicContact[];
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly tourDates?: readonly TourDateViewModel[];
   readonly releases?: readonly PublicRelease[];
   readonly catalogLoadFailed?: boolean;
@@ -375,6 +379,8 @@ export function ProfilePrimaryTabPanel({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  contacts = [],
+  creditSegments,
   tourDates = [],
   releases = [],
   catalogLoadFailed = false,
@@ -569,6 +575,8 @@ export function ProfilePrimaryTabPanel({
             genres={genres}
             pressPhotos={pressPhotos}
             allowPhotoDownloads={allowPhotoDownloads}
+            creditSegments={creditSegments}
+            contacts={contacts}
           />
         </div>
       </div>
