@@ -7,10 +7,7 @@ import {
 } from 'eve/channels/photon';
 
 import { admitOvieIMessage } from '../lib/imessage-allowlist';
-import {
-  bindEvePilotIdentity,
-  photonIdentityFromEnvironment,
-} from '../select-identity';
+import { photonIdentityFromEnvironment } from '../select-identity';
 
 type PhotonAuthor = {
   readonly handle?: string;
@@ -107,7 +104,6 @@ export function onPhotonIMessage(
   }
 
   const auth = defaultPhotonAuth(message as never);
-  const turn = bindEvePilotIdentity(identity);
   const audience = identity === 'summer' ? 'private-company' : 'public-artist';
   return {
     auth: {
@@ -123,7 +119,8 @@ export function onPhotonIMessage(
         thread_binding: photonThreadBinding(identity, ctx.thread.id),
       },
     },
-    context: [turn.instructions],
+    // No per-message context: Eve appends it to history on every message.
+    // instructions/channel-identity.ts binds the pack once per session.
     title: identity === 'summer' ? 'Summer via Ovie' : 'Jovie iMessage',
   };
 }

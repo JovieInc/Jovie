@@ -15,6 +15,7 @@ const workflow = readFileSync(
 it('keeps the external guard bounded, ordered, deduplicated, and credential-free', () => {
   for (const required of [
     /cron: '\*\/5 \* \* \* \*'/,
+    /workflow_run:\n\s+workflows: \[Production Controller\]\n\s+types: \[completed\]\n\s+branches: \[main\]/,
     /production-continuity\.mjs/,
     /cancel-in-progress: false/,
     /Slack acknowledged the production incident alert/,

@@ -563,8 +563,8 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
-            title='Shows'
-            actionLabel={hasEventsDestination ? 'View Shows' : undefined}
+            title='Events'
+            actionLabel={hasEventsDestination ? 'View Events' : undefined}
             onAction={
               hasEventsDestination ? () => onModeSelect('tour') : undefined
             }
@@ -878,7 +878,7 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'tour' ? (
       <DesktopSurfaceCard
-        title='Shows'
+        title='Events'
         className='flex-1'
         testId='profile-primary-tab-tour'
       >

@@ -12,6 +12,7 @@ const mockCacheQuery = vi.hoisted(() => vi.fn());
 const mockApplyVipBoost = vi.hoisted(() => vi.fn());
 const mockApplyVipBoostWithMeta = vi.hoisted(() => vi.fn());
 const mockAnnotateClaimedStatus = vi.hoisted(() => vi.fn());
+const mockAnnotateClaimedStatusForCurrentUser = vi.hoisted(() => vi.fn());
 const mockAnnotateClaimedStatusWithMeta = vi.hoisted(() => vi.fn());
 const mockBoostClaimedArtists = vi.hoisted(() => vi.fn());
 
@@ -44,6 +45,7 @@ vi.mock('@/app/api/spotify/search/helpers', () => ({
     (_param: string | null, defaultVal: number, _max: number) => defaultVal
   ),
   annotateClaimedStatus: mockAnnotateClaimedStatus,
+  annotateClaimedStatusForCurrentUser: mockAnnotateClaimedStatusForCurrentUser,
   annotateClaimedStatusWithMeta: mockAnnotateClaimedStatusWithMeta,
 }));
 
@@ -90,6 +92,9 @@ describe('GET /api/spotify/search', () => {
     mockGetAlphabetResults.mockResolvedValue(null);
     mockAnnotateClaimedStatus.mockImplementation((results: unknown[]) =>
       Promise.resolve(results)
+    );
+    mockAnnotateClaimedStatusForCurrentUser.mockImplementation(
+      (results: unknown[]) => Promise.resolve(results)
     );
     mockAnnotateClaimedStatusWithMeta.mockImplementation((results: unknown[]) =>
       Promise.resolve({ degraded: false, results })
@@ -310,6 +315,43 @@ describe('GET /api/spotify/search', () => {
       2,
       'ip:127.0.0.1'
     );
+  });
+
+  it('annotates caller-owned profiles after shared response enrichment', async () => {
+    const results = [
+      {
+        id: 'artist_1',
+        name: 'Artist One',
+        url: 'https://open.spotify.com/artist/artist_1',
+        popularity: 42,
+      },
+    ];
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockSearchArtists.mockResolvedValue([
+      {
+        spotifyId: 'artist_1',
+        name: 'Artist One',
+        imageUrl: null,
+        popularity: 42,
+        followerCount: 1234,
+      },
+    ]);
+    mockAnnotateClaimedStatusForCurrentUser.mockResolvedValue([
+      { ...results[0], isClaimed: true, isClaimedByCurrentUser: true },
+    ]);
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/spotify/search?q=artist')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockAnnotateClaimedStatusForCurrentUser).toHaveBeenCalledWith(
+      expect.any(Array),
+      'user_123'
+    );
+    expect(await response.json()).toEqual([
+      { ...results[0], isClaimed: true, isClaimedByCurrentUser: true },
+    ]);
   });
 
   it('falls back to IP rate limiting when auth lookup is temporarily unavailable', async () => {

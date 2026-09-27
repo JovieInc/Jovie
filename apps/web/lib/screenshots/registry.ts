@@ -104,6 +104,7 @@ interface TimWhiteProfileMobileVariant {
   readonly slug: string;
   readonly title: string;
   readonly queryKey: 'mode' | 'release';
+  readonly featureFocus?: ScreenshotScenario['featureFocus'];
 }
 
 /**
@@ -117,7 +118,7 @@ interface TimWhiteProfileMobileVariant {
 function timWhiteProfileMobile(
   variant: TimWhiteProfileMobileVariantWithTimestamp
 ): ScreenshotScenarioSeed {
-  const { slug, title, queryKey, playerTimestamp } = variant;
+  const { slug, title, queryKey, playerTimestamp, featureFocus } = variant;
   return {
     id: `tim-white-profile-${slug}-mobile`,
     title: `Tim White Profile — ${title}`,
@@ -126,6 +127,7 @@ function timWhiteProfileMobile(
     viewport: 'mobile',
     publicExportPath: `tim-white-profile-${slug}-phone.png`,
     ...(playerTimestamp !== undefined && { playerTimestamp }),
+    ...(featureFocus !== undefined && { featureFocus }),
   };
 }
 
@@ -150,7 +152,18 @@ const TIM_WHITE_PROFILE_MOBILE_VARIANTS: readonly TimWhiteProfileMobileVariantWi
       playerTimestamp: '1:24',
     },
     { slug: 'tour', title: 'Tour', queryKey: 'mode' },
-    { slug: 'pay', title: 'Pay', queryKey: 'mode', playerTimestamp: '2:47' },
+    {
+      slug: 'pay',
+      title: 'Pay',
+      queryKey: 'mode',
+      playerTimestamp: '2:47',
+      featureFocus: {
+        label: 'Pay with Venmo',
+        // The Venmo pay CTA and custom-amount control in the pay sheet —
+        // verified against tim-white-profile-pay-phone.png.
+        region: { x: 4, y: 80, width: 92, height: 15 },
+      },
+    },
     {
       slug: 'live',
       title: 'Latest Release',
@@ -526,6 +539,12 @@ export const SCREENSHOT_SCENARIO_IDS = new Set(
 
 export function getScreenshotScenario(id: string): ScreenshotScenario | null {
   return SCREENSHOT_SCENARIOS.find(scenario => scenario.id === id) ?? null;
+}
+
+export function getScreenshotFeatureFocus(
+  id: string
+): ScreenshotScenario['featureFocus'] | null {
+  return getScreenshotScenario(id)?.featureFocus ?? null;
 }
 
 const PUBLIC_EXPORT_URL_PREFIX = '/product-screenshots';

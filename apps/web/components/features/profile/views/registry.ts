@@ -135,7 +135,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   tour: {
     key: 'tour',
     title: 'Events',
-    subtitle: 'Tour dates and ticket updates.',
+    subtitle: 'Upcoming events and tickets.',
     icon: Ticket,
     menuOrder: 5,
     analyticsEvent: 'tour_drawer_open',

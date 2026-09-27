@@ -1,0 +1,86 @@
+---
+id: find-your-profile
+title: Find your Jovie profile
+description: Search for your artist identity, verify the right result, and know when to stop instead of choosing an uncertain match.
+documentType: guide
+category: jovie-essentials
+productBacked: true
+featureId: public-profile-pages
+productRoute: /start
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - find my page
+  - find my profile
+  - find myself
+  - search artist
+redirectAliases: []
+visualProofRefs:
+  - proof/find-your-profile-search.png
+  - proof/find-your-profile-results.png
+uiLabels:
+  - Search your name
+  - Find me
+  - Pick the exact Spotify artist
+  - Search Spotify artists
+  - None of These
+productSourceRefs:
+  - apps/web/components/features/home/HeroSpotifySearch.tsx
+  - apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx
+  - apps/web/data/homepageLaunchCopy.ts
+  - apps/web/lib/chat/onboarding-script/widget-events.ts
+launchPath: true
+---
+
+<HelpArticle id="find-your-profile">
+
+# Find your Jovie profile
+
+<HelpOutcome>Find the public Jovie profile tied to your exact Spotify artist identity without claiming the wrong artist.</HelpOutcome>
+
+<HelpSteps>
+
+<HelpStep title="Start with your artist name">
+On the Jovie landing page, enter the name fans see on Spotify in **Search your name**, then choose **Find me**. You can also open [Start](https://jov.ie/start) directly.
+
+<HelpScreenshot src="/proof/find-your-profile-search.png" alt="Jovie artist search with the Search your name field and Find me button" caption="Start with the public artist search." />
+</HelpStep>
+
+<HelpStep title="Compare the Spotify results">
+At **Pick the exact Spotify artist**, compare the artist name, image, follower count, and popularity. Use **Search Spotify artists** to make the query more specific.
+
+<HelpScreenshot src="/proof/find-your-profile-results.png" alt="Spotify artist results showing names and follower counts under Pick the exact Spotify artist" caption="Choose only the Spotify identity you can verify." />
+</HelpStep>
+
+<HelpStep title="Select only a trustworthy match">
+Choose the row that points to your real Spotify artist page. If none is trustworthy, choose **None of These** and search again; do not select the nearest name.
+</HelpStep>
+
+<HelpStep title="Open the public profile without claiming it">
+Viewing a result or a public `jov.ie/{username}` page does not transfer ownership. A separate **Claim Profile**, **Continue Claim**, or **Verify & Claim** action starts a claim.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+You can view and share the public profile. To edit an unclaimed profile, complete [Claim your profile](/docs/jovie-essentials/find-or-claim-your-profile/claim-your-profile).
+
+<HelpTroubleshooting>
+
+### No exact result appears
+
+Search the artist name exactly as Spotify displays it, or paste the Spotify artist URL into the Start chat. If Jovie still cannot identify a trustworthy match, stop and [contact support](/docs/manage-jovie/contact-support).
+
+### Several artists have the same name
+
+Open the Spotify pages and compare artwork, releases, genres, and follower counts before selecting one. A shared name alone is not proof.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="find-your-profile" ids={['claim-your-profile', 'create-account-or-log-in']} />
+
+<HelpFeedback articleId="find-your-profile" />
+
+</HelpArticle>

@@ -150,6 +150,10 @@ ideation/screenshots/
 
 # npm lockfiles (pnpm monorepo uses pnpm-lock.yaml)
 package-lock.json
+# The trusted DeepSec scanner workspace pins its full npm dependency tree.
+!scripts/security/deepsec/package-lock.json
+scripts/security/deepsec/data/
+scripts/security/deepsec/node_modules/
 
 # Xcode
 DerivedData/
@@ -204,6 +208,7 @@ apps/desktop/*
 apps/desktop/src/*
 !apps/desktop/src/system-b-tokens.ts
 !apps/desktop/src/desktop-auth-security.ts
+!apps/desktop/src/desktop-auth-handback.ts
 !apps/desktop/src/desktop-auto-update.ts
 !apps/desktop/src/desktop-csp-watchdog.ts
 !apps/desktop/src/desktop-permissions.ts
@@ -221,6 +226,7 @@ apps/desktop/src/*
 !apps/desktop/src/nightly-update-launch-agent.ts
 !apps/desktop/src/window-state-store.ts
 !apps/desktop/src/main-liveness.ts
+!apps/desktop/src/voice-session.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs
 !apps/desktop/scripts/
 !apps/desktop/scripts/desktop-csp-watchdog.test.ts
@@ -258,3 +264,6 @@ test-report.*.flaky.json
 
 # marketing architecture loop state (JOV loop, 2026-07-06)
 .context/marketing-architecture/
+
+# Build-time copies of monorepo runtime files (apps/web/scripts/stage-runtime-data.mjs)
+apps/web/runtime-data/

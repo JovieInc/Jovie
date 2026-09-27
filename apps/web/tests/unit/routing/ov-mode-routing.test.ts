@@ -87,7 +87,6 @@ describe('OV mode routing', () => {
       missing: [
         { type: 'query', key: 'fs', value: '1' },
         { type: 'query', key: 'kiosk' },
-        { type: 'query', key: 'ovie', value: 'mac' },
         { type: 'query', key: 'mode', value: 'kiosk' },
       ],
       destination: `${APP_ROUTES.OV}/hud`,

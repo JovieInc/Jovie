@@ -285,3 +285,18 @@ describe('Golden Path Lock merge-gate contract', () => {
     expect(lockJob).not.toMatch(/secrets\.[A-Z0-9_]+/);
   });
 });
+
+describe('Golden Path prod autofix dedupe contract (JOV-6832)', () => {
+  it('lets the job read open fix PRs and dedupes before any launch', () => {
+    expect(WORKFLOW).toContain('pull-requests: read');
+    expect(WORKFLOW).not.toMatch(/pull-requests:\s*write/);
+    expect(WORKFLOW).toContain('GH_TOKEN: ${{ github.token }}');
+    const dedupe = SCRIPT.indexOf('findOpenAutofixPr(listOpenPrs()');
+    const intake = SCRIPT.indexOf('await createGoldenPathLinearIssue(');
+    const launch = SCRIPT.indexOf('Launched Cursor-direct autofix');
+    expect(dedupe).toBeGreaterThan(-1);
+    expect(intake).toBeGreaterThan(dedupe);
+    expect(launch).toBeGreaterThan(dedupe);
+    expect(SCRIPT).toContain('refusing to launch a possible duplicate');
+  });
+});

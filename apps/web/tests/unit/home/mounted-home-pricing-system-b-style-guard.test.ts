@@ -100,6 +100,13 @@ describe('mounted homepage pricing System B source contract', () => {
     expect(source).toContain('proClaim.priceLabel');
     expect(source).not.toContain('release tools');
     expect(source).toContain('with limited access');
+
+    // JOV-naming-sweep (2026-09-26): outside the artist ICP pages the product
+    // is "your Jovie profile," never "artist profile" — guard against
+    // regressing the mounted homepage pricing copy back to artist-only
+    // wording.
+    expect(source).toContain('Jovie profiles are free forever');
+    expect(source).not.toContain('Artist profiles are free forever');
   });
 
   it('keeps mounted homepage CTA headings explicitly clamped', () => {

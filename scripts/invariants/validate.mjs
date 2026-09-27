@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { validateAssuranceMatrixPolicy } from './assurance-matrix.mjs';
+import { validateDeliveryModelPolicy } from './delivery-model.mjs';
 import { validateDoneSprintInvariants } from './done-sprint-invariants.mjs';
 import { validateGateIntegrityPolicy } from './gate-integrity.mjs';
 import {
@@ -11,6 +13,7 @@ import { validateLatencySensitiveExecution } from './latency-sensitive-execution
 import { validatePerformanceFactory } from './performance-factory.mjs';
 import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
 import { validateQualityRatchet } from './quality-ratchet.mjs';
+import { validateSonarRepairContract } from './sonar-repair-contract.mjs';
 import {
   readWritingSurfacesRegistry,
   validateWritingSurfaces,
@@ -21,6 +24,11 @@ import {
 // JOV-INV-033 is composed here so every CI invariant run rescans Done-sprint sources.
 // JOV-INV-034 is composed here so the required Structural Contract proves
 // representative defects block certification and promotion.
+// JOV-INV-035 is composed here so every invariant run checks the
+// outcome-first delivery-model contract.
+// JOV-INV-036 is composed here so Sonar repairs retain executable prevention.
+// JOV-INV-037 is composed here so the canonical assurance matrix stays bound
+// to its exact revision and reports uncovered objects and missing layers.
 
 import {
   readInvariantRegistry,
@@ -56,6 +64,9 @@ const doneSprintErrors = await validateDoneSprintInvariants({
   mode: 'source',
 });
 const gateIntegrityErrors = validateGateIntegrityPolicy(registry);
+const assuranceErrors = validateAssuranceMatrixPolicy(registry);
+const deliveryModelErrors = validateDeliveryModelPolicy(registry);
+const sonarRepairErrors = validateSonarRepairContract(registry);
 // JOV-6475 composes the writing-surface coverage registry the same way: it
 // validates that every named delivery surface maps to a contract and owner.
 const writingErrors = validateWritingSurfaces(readWritingSurfacesRegistry());
@@ -69,6 +80,9 @@ const errors = [
   ...iosScrollErrors.map(error => `ios-web-no-scroll-jank: ${error}`),
   ...doneSprintErrors.map(error => `done-sprint: ${error}`),
   ...gateIntegrityErrors.map(error => `gate-integrity: ${error}`),
+  ...assuranceErrors.map(error => `assurance-matrix: ${error}`),
+  ...deliveryModelErrors.map(error => `delivery-model: ${error}`),
+  ...sonarRepairErrors.map(error => `sonar-repair: ${error}`),
   ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
 

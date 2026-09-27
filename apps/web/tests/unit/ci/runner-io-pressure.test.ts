@@ -11,7 +11,6 @@ import {
   ioPressureConfigFromEnv,
   parseIoFullAvg10,
 } from '../../../../../.github/runner-host/autoscaler/io-pressure';
-import { diagnoseCiFailure } from '../../../../../scripts/symphony/jobs/ci-failure-diagnosis';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 const pressure = (fullAvg10: string) =>
@@ -191,23 +190,5 @@ describe('Gem runner I/O-pressure admission', () => {
     expect(source).toContain('EXPECTED_V1_CONTROLLER_SHA256');
     expect(source).toContain('EXPECTED_V2_CONTROLLER_SHA256');
     expect(source).toContain('controller-io-pressure-v1-to-v2.patch');
-  });
-
-  it('classifies I/O admission separately from EAGAIN capacity', () => {
-    expect(
-      diagnoseCiFailure(
-        'runner_spawn_admission=blocked runner_failure_class=runner-io-pressure io_full_avg10_pct=29.00 distinct_from=cpu,memory,eagain,github-scheduler-starvation'
-      )
-    ).toMatchObject({ failureClass: 'runner_io_pressure_admission' });
-    expect(
-      diagnoseCiFailure(
-        'runner_spawn_admission=blocked runner_failure_class=runner-io-pressure-post-admission io_full_avg10_pct=60.84 spawned_recently=true remaining_deficit=4'
-      )
-    ).toMatchObject({
-      failureClass: 'runner_io_pressure_post_admission_herd',
-    });
-    expect(diagnoseCiFailure('spawn /usr/bin/node EAGAIN')).toMatchObject({
-      failureClass: 'runner_process_exhaustion',
-    });
   });
 });

@@ -215,6 +215,18 @@ jobs:
                 done
               done
               echo "Nightly QA bypass personas are ready."
+              # Warm the auth landing path through the enter route. Playwright
+              # global setup skips route warmup when BASE_URL is external, so
+              # without this the first page navigation eats the cold webpack
+              # compile of /app and blows the 45s navigationTimeout (JOV-6818).
+              # Non-fatal on timeout: a slow compile may still finish before
+              # the spec runs.
+              if curl -fsSL --max-time 180 -o /dev/null \
+                "http://127.0.0.1:3100/api/dev/test-auth/enter?persona=creator&redirect=/app"; then
+                echo "Nightly QA /app landing path is warm."
+              else
+                echo "⚠ /app warmup timed out; auth setup may hit a cold compile." >&2
+              fi
               exit 0
             fi
             sleep 2

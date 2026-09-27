@@ -54,19 +54,25 @@ describe('profile shell token contract', () => {
       'utf8'
     );
     expect(compactSurfaceContents).toContain('--profile-content-bg');
-    // The hero legibility gradient lives in design-system.css
-    // (.profile-cover-home-gradient) and is the --profile-stage-bg consumer.
+    // The identity header's verified glyph sits on the stage token so its
+    // ring reads as a cut-out of the page in every theme.
     const designSystemContents = readFileSync(DESIGN_SYSTEM, 'utf8');
     expect(designSystemContents).toContain('--profile-stage-bg');
-    expect(designSystemContents).toMatch(
-      /\.profile-cover-home-gradient[\s\S]{0,400}var\(--profile-stage-bg\)/
-    );
+    expect(
+      readFileSync(
+        join(
+          process.cwd(),
+          'components/features/profile/ProfileIdentityHeader.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('bg-(--profile-stage-bg)');
   });
 
   it('keeps the production desktop stage on the canonical public width token', () => {
     const designSystemContents = readFileSync(DESIGN_SYSTEM, 'utf8');
     const desktopRule = designSystemContents.match(
-      /@media \(min-width: 1180px\)[\s\S]*?\.profile-viewport:not\(\.profile-viewport--embedded\)[\s\S]*?\.public-profile-layout-frame \{([\s\S]*?)\}/
+      /@media \(min-width: 1180px\)[\s\S]*?\.profile-viewport--desktop-surface:not\(\.profile-viewport--embedded\)[\s\S]*?\.public-profile-layout-frame \{([\s\S]*?)\}/
     )?.[1];
 
     expect(desktopRule).toContain('var(--ds-public-content-max)');
@@ -80,14 +86,31 @@ describe('profile shell token contract', () => {
     )?.[1];
 
     expect(desktopMedia).toContain(
-      '.profile-viewport:not(.profile-viewport--embedded)\n    .public-profile-layout-compact-slot'
+      '.profile-viewport--desktop-surface:not(.profile-viewport--embedded)\n    .public-profile-layout-compact-slot'
     );
     expect(desktopMedia).toContain('clip: rect(0, 0, 0, 0)');
-    expect(desktopMedia).toContain(
-      '.profile-viewport:not(.profile-viewport--embedded)[data-desktop-ready="true"]\n    .public-profile-layout-compact-slot'
+    expect(desktopMedia).toMatch(
+      /\.profile-viewport--desktop-surface:not\(\s*\.profile-viewport--embedded\s*\)\[data-desktop-ready="true"\]\s*\.public-profile-layout-compact-slot/
     );
     expect(desktopMedia).toMatch(
       /\[data-desktop-ready="true"\][\s\S]*?display:\s*none/
     );
+  });
+
+  it('scopes the 1180px desktop hand-off to builds that ship the desktop surface', () => {
+    const designSystemContents = readFileSync(DESIGN_SYSTEM, 'utf8');
+    const desktopMedia = designSystemContents.match(
+      /@media \(min-width: 1180px\) \{([\s\S]*?)\n\}/
+    )?.[1];
+
+    // With NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE off (the default) the
+    // viewport has no --desktop-surface class, so nothing at 1180px+ hides the
+    // compact surface or widens the frame: the compact shell keeps its base
+    // phone-column width token, centered like the md card.
+    expect(desktopMedia).not.toMatch(/\.profile-viewport:not\(/);
+    expect(designSystemContents).toMatch(
+      /\.public-profile-compact-shell \{\s*max-width: min\(var\(--profile-shell-max-width\), 100%\);/
+    );
+    expect(designSystemContents).toContain('--profile-shell-max-width: 430px;');
   });
 });
