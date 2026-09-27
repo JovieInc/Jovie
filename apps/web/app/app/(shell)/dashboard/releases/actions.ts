@@ -64,6 +64,7 @@ import {
   checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
+import { requireOwnedReleaseProfile } from '@/lib/releases/owned-profile';
 import { shouldArchiveOnlyRelease } from '@/lib/releases/release-archive-policy';
 import {
   archiveRelease,
@@ -483,11 +484,11 @@ export async function saveReleaseMetadata(params: {
   });
 }
 
-const EDITABLE_RELEASE_STATUSES: ReadonlyArray<ReleaseViewModel['status']> = [
+const EDITABLE_RELEASE_STATUSES = new Set<ReleaseViewModel['status']>([
   'draft',
   'scheduled',
   'released',
-];
+]);
 
 /** Update a release's lifecycle status (draft / scheduled / released) inline. */
 export async function saveReleaseStatus(params: {
@@ -495,7 +496,7 @@ export async function saveReleaseStatus(params: {
   releaseId: string;
   status: ReleaseViewModel['status'];
 }): Promise<ReleaseViewModel> {
-  if (!EDITABLE_RELEASE_STATUSES.includes(params.status)) {
+  if (!EDITABLE_RELEASE_STATUSES.has(params.status)) {
     throw new TypeError('Invalid release status');
   }
 
@@ -832,7 +833,7 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
-  void trackServerEvent('release_isrc_rescan', {
+  await trackServerEvent('release_isrc_rescan', {
     profileId: profile.id,
     releaseId: params.releaseId,
     linksFound,
@@ -935,7 +936,7 @@ export async function rescanAppleMusicLinks(): Promise<{
   invalidateReleaseCaches(userId, profile.id);
   revalidatePath(APP_ROUTES.RELEASES);
 
-  void trackServerEvent('apple_music_rescan', {
+  await trackServerEvent('apple_music_rescan', {
     profileId: profile.id,
     linksFound: result.releasesEnriched,
   });
@@ -993,7 +994,7 @@ export async function syncFromSpotify(): Promise<{
   revalidatePath(APP_ROUTES.RELEASES);
 
   if (result.success) {
-    void trackServerEvent('releases_synced', {
+    await trackServerEvent('releases_synced', {
       profileId: profile.id,
       imported: result.imported,
       source: 'spotify',
@@ -1146,11 +1147,7 @@ export async function checkSpotifyConnectionForProfile(
 }> {
   noStore();
 
-  // Auth guard: verify caller owns this profile
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
   const settings = profile.settings;
   const artistName = (settings?.spotifyArtistName as string) ?? null;
@@ -1175,7 +1172,7 @@ export async function checkSpotifyConnectionForProfile(
       '[checkSpotifyConnectionForProfile] Spotify state inconsistency: artistName set but spotifyId is null',
       new Error('Spotify state inconsistency'),
       {
-        profileId: profile.profileId,
+        profileId: owned.profileId,
         artistName,
         spotifyImportStatus: spotifyImportStatus ?? 'none',
       }
@@ -1191,7 +1188,7 @@ export async function checkSpotifyConnectionForProfile(
     .from(dspArtistMatches)
     .where(
       and(
-        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.creatorProfileId, owned.profileId),
         eq(dspArtistMatches.providerId, 'spotify')
       )
     )
@@ -1435,7 +1432,7 @@ export async function connectSpotifyArtist(params: {
     revalidatePath(APP_ROUTES.RELEASES);
 
     if (result.success) {
-      void trackServerEvent('releases_synced', {
+      await trackServerEvent('releases_synced', {
         profileId: profile.id,
         imported: result.imported,
         source: 'spotify',
@@ -1688,11 +1685,7 @@ export async function checkAppleMusicConnectionForProfile(
 }> {
   noStore();
 
-  // Auth guard: verify caller owns this profile
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
   const [match] = await db
     .select({
@@ -1703,7 +1696,7 @@ export async function checkAppleMusicConnectionForProfile(
     .from(dspArtistMatches)
     .where(
       and(
-        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.creatorProfileId, owned.profileId),
         eq(dspArtistMatches.providerId, 'apple_music')
       )
     )
@@ -1957,7 +1950,7 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
   invalidateReleaseCaches(userId, profile.id);
   revalidatePath(APP_ROUTES.RELEASES);
 
-  void trackServerEvent(archiveOnly ? 'release_archived' : 'release_deleted', {
+  await trackServerEvent(archiveOnly ? 'release_archived' : 'release_deleted', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
@@ -2002,7 +1995,7 @@ export async function archiveLibraryRelease(
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
 
-  void trackServerEvent('release_archived', {
+  await trackServerEvent('release_archived', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,
@@ -2040,7 +2033,7 @@ export async function restoreRelease(params: DeleteReleaseParams): Promise<{
   revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.LIBRARY);
 
-  void trackServerEvent('release_restored', {
+  await trackServerEvent('release_restored', {
     profileId: profile.id,
     releaseId: params.releaseId,
     releaseTitle: release.title,

@@ -40,6 +40,9 @@ export const CACHE_TAGS = {
   // Featured creators list
   FEATURED_CREATORS: 'featured-creators',
 
+  // Public /artists directory catalog
+  ARTISTS_DIRECTORY: 'artists-directory',
+
   // Billing/subscription data
   BILLING_DATA: 'billing-data',
 
@@ -96,6 +99,15 @@ export function createAvatarTag(userId: string): string {
 
 export function createSmartLinkContentTag(profileId: string): string {
   return `smartlink-content:${profileId}`;
+}
+
+/**
+ * Public release projections embedded in profile pages and release feeds.
+ * Keyed by profile ID so release mutations can invalidate them without
+ * resolving a mutable profile handle.
+ */
+export function createPublicReleasesTag(profileId: string): string {
+  return `public-releases:${profileId}`;
 }
 
 /**

@@ -14,15 +14,12 @@ describe('JOV-6272 unified release entity cache contract', () => {
 
     // One key family: (userId, profileId, scope). The handle must never
     // participate — a rename must not fork the cache entry.
+    expect(loader).toContain("matrix: ['releases-matrix', userId, profileId]");
     expect(loader).toContain(
-      "matrix: ['releases-matrix', userId, profileId] as const"
+      "matrixArchived: ['releases-matrix-archived', userId, profileId]"
     );
-    expect(loader).toContain(
-      "matrixArchived: ['releases-matrix-archived', userId, profileId] as const"
-    );
-    expect(loader).toContain(
-      `entity: (releaseId: string) =>
-      ['release-entity', userId, profileId, releaseId] as const`
+    expect(loader).toMatch(
+      /entity: \(releaseId: string\) => \[\s*'release-entity',\s*userId,\s*profileId,\s*releaseId,?\s*\]/
     );
 
     // The handle-in-key fork this contract retires (the handle remains a
@@ -36,7 +33,7 @@ describe('JOV-6272 unified release entity cache contract', () => {
     const loader = readSource('lib/releases/release-matrix-loader.ts');
     expect(loader).toContain('tags: [createReleasesTag(userId, profile.id)]');
     expect(loader).toContain(
-      'tags: [createReleasesTag(profile.userId, profile.profileId)]'
+      'tags: [createReleasesTag(owned.userId, owned.profileId)]'
     );
     expect(loader).not.toContain('`releases:${');
   });
@@ -70,6 +67,11 @@ describe('JOV-6272 unified release entity cache contract', () => {
     expect(map).toContain(
       "revalidateTag(createSmartLinkContentTag(profileId), 'max');"
     );
+    expect(map).toContain(
+      "revalidateTag(createPublicReleasesTag(profileId), 'max');"
+    );
+    expect(map).toContain("revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');");
+    expect(map).toContain("revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, 'max');");
 
     // The mutation sites route through the map, not through tag pairs.
     const actions = readSource('app/app/(shell)/dashboard/releases/actions.ts');

@@ -12,7 +12,10 @@ vi.mock('@/lib/db', () => ({
   doesTableExist: vi.fn(),
 }));
 
-import { getReleasesForProfile } from '@/lib/discography/queries';
+import {
+  getReleasesForProfile,
+  getReleasesForProfileLite,
+} from '@/lib/discography/queries';
 
 const PROFILE_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 
@@ -52,6 +55,18 @@ describe('getReleasesForProfile deterministic bounded list (JOV-6272)', () => {
     expect(limitArg).toBeLessThanOrEqual(500);
 
     // Related-record reads never run for an empty list (graceful early return).
+    expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('orders the public projection newest-first with an id tiebreaker', async () => {
+    const chain = createReleaseListChain([]);
+    hoisted.selectMock.mockImplementationOnce(() => chain);
+
+    await getReleasesForProfileLite(PROFILE_ID);
+
+    expect(chain.orderBy).toHaveBeenCalledTimes(1);
+    expect(chain.orderBy.mock.calls[0]).toHaveLength(2);
+    expect(chain.limit).toHaveBeenCalledWith(200);
     expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
   });
 });

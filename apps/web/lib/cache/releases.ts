@@ -1,5 +1,10 @@
 import { revalidateTag } from 'next/cache';
-import { createReleasesTag, createSmartLinkContentTag } from './tags';
+import {
+  CACHE_TAGS,
+  createPublicReleasesTag,
+  createReleasesTag,
+  createSmartLinkContentTag,
+} from './tags';
 
 /**
  * Mutation-to-invalidation map for release caches (JOV-6272).
@@ -15,6 +20,12 @@ import { createReleasesTag, createSmartLinkContentTag } from './tags';
  *   never participates, so a rename does not fork the family).
  * - `smartlink-content:<profileId>` — smart-link content derived from
  *   release rows.
+ * - `public-releases:<profileId>` — the public profile/feed release
+ *   projection, keyed by immutable profile ID.
+ * - `profiles-all` — the public profile snapshot also embeds latest-release
+ *   data but is keyed by mutable handle, so it is invalidated as one family.
+ * - `sitemap-catalog` — public release and track URLs derived from release
+ *   rows.
  *
  * Authorization is checked by each caller BEFORE persistence; this map only
  * runs after a successful write. Old-handle/new-handle public profile paths
@@ -27,4 +38,7 @@ export function invalidateReleaseCaches(
 ): void {
   revalidateTag(createReleasesTag(userId, profileId), 'max');
   revalidateTag(createSmartLinkContentTag(profileId), 'max');
+  revalidateTag(createPublicReleasesTag(profileId), 'max');
+  revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
+  revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, 'max');
 }

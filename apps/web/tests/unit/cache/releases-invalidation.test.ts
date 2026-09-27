@@ -22,10 +22,10 @@ describe('invalidateReleaseCaches (JOV-6272)', () => {
     );
   });
 
-  it('invalidates exactly the release family and smart-link content tags', () => {
+  it('invalidates private, public, smart-link, and sitemap release consumers', () => {
     invalidateReleaseCaches(USER_ID, PROFILE_ID);
 
-    expect(revalidateTag).toHaveBeenCalledTimes(2);
+    expect(revalidateTag).toHaveBeenCalledTimes(5);
     expect(revalidateTag).toHaveBeenCalledWith(
       `releases:${USER_ID}:${PROFILE_ID}`,
       'max'
@@ -34,17 +34,25 @@ describe('invalidateReleaseCaches (JOV-6272)', () => {
       `smartlink-content:${PROFILE_ID}`,
       'max'
     );
+    expect(revalidateTag).toHaveBeenCalledWith(
+      `public-releases:${PROFILE_ID}`,
+      'max'
+    );
+    expect(revalidateTag).toHaveBeenCalledWith('profiles-all', 'max');
+    expect(revalidateTag).toHaveBeenCalledWith('sitemap-catalog', 'max');
   });
 
   it('never invalidates a handle-keyed release tag (one key family)', () => {
     invalidateReleaseCaches(USER_ID, PROFILE_ID);
 
-    for (const call of vi.mocked(revalidateTag).mock.calls) {
-      const tag = call[0] as string;
-      expect(tag.startsWith('releases:')).toBe(true);
-      // The family is keyed by (userId, profileId) only — exactly two
-      // segments after the prefix.
-      expect(tag.split(':')).toHaveLength(3);
-    }
+    const releaseTags = vi
+      .mocked(revalidateTag)
+      .mock.calls.map(call => call[0] as string)
+      .filter(tag => tag.startsWith('releases:'));
+
+    expect(releaseTags).toEqual([`releases:${USER_ID}:${PROFILE_ID}`]);
+    // The family is keyed by (userId, profileId) only — exactly two
+    // segments after the prefix.
+    expect(releaseTags[0]?.split(':')).toHaveLength(3);
   });
 });

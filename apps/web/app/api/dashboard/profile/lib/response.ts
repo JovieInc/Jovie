@@ -4,7 +4,6 @@
  * Helper functions for building profile API responses.
  */
 
-import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import {
   invalidateHomepageCache,
   invalidateProfileCache,
@@ -12,6 +11,7 @@ import {
 } from '@/lib/cache/profile';
 import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import type { creatorProfiles } from '@/lib/db/schema/profiles';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { logger } from '@/lib/utils/logger';
 
 export function addAvatarCacheBust(
@@ -76,7 +76,12 @@ export async function finalizeProfileResponse({
   // entity caches never serve rows built from the stale handle.
   invalidateReleaseCaches(clerkUserId, updatedProfile.id);
 
-  trackServerEvent('dashboard_profile_updated', undefined, clerkUserId).catch(
-    error => logger.warn('Analytics tracking failed:', error)
+  const delivery = await trackServerEvent(
+    'dashboard_profile_updated',
+    { profileId: updatedProfile.id },
+    clerkUserId
   );
+  if (!delivery.ok) {
+    logger.warn('Analytics tracking failed', { error: delivery.error });
+  }
 }

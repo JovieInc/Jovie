@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   getWeeklyReleaseClickCounts: vi.fn(),
   cacheStore: new Map<string, unknown>(),
   withDbSessionTx: vi.fn(),
-  verifyProfileOwnership: vi.fn(),
+  getAuthenticatedProfile: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({
@@ -40,7 +40,7 @@ vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: mocks.withDbSessionTx,
 }));
 vi.mock('@/lib/db/queries/shared', () => ({
-  verifyProfileOwnership: mocks.verifyProfileOwnership,
+  getAuthenticatedProfile: mocks.getAuthenticatedProfile,
 }));
 vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfile: mocks.getReleasesFromDb,
@@ -53,14 +53,26 @@ vi.mock('@/lib/discography/view-models', () => ({
   buildProviderLabels: () => ({}),
 }));
 vi.mock('@/lib/releases/release-view-models', () => ({
-  mapReleaseToViewModel: (release: { id: string }) => ({ id: release.id }),
+  mapReleaseToViewModel: (
+    release: { id: string },
+    _providerLabels: unknown,
+    profileId: string,
+    profileHandle: string
+  ) => ({
+    id: release.id,
+    profileId,
+    smartLinkPath: `/${profileHandle}/${release.id}`,
+  }),
 }));
 
-function context(profileId: string): ReleaseProfileContext {
+function context(
+  profileId: string,
+  profileHandle = 'caller-supplied-handle'
+): ReleaseProfileContext {
   return {
     userId: APP_USER_ID,
     profileId,
-    profileHandle: 'handle',
+    profileHandle,
     spotifyId: null,
     appleMusicId: null,
     settings: null,
@@ -82,12 +94,15 @@ describe('release matrix ownership (JOV-6267)', () => {
     const { loadReleaseMatrixForProfile, loadArchivedReleaseMatrixForProfile } =
       await import('@/lib/releases/release-matrix-loader');
 
-    mocks.verifyProfileOwnership.mockResolvedValue({ id: OWN_PROFILE_ID });
+    mocks.getAuthenticatedProfile.mockResolvedValue({
+      id: OWN_PROFILE_ID,
+      usernameNormalized: 'canonical-handle',
+    });
     await loadReleaseMatrixForProfile(context(OWN_PROFILE_ID));
     await loadArchivedReleaseMatrixForProfile(context(OWN_PROFILE_ID));
 
     mocks.getReleasesFromDb.mockClear();
-    mocks.verifyProfileOwnership.mockResolvedValue(null);
+    mocks.getAuthenticatedProfile.mockResolvedValue(null);
     await expect(
       loadReleaseMatrixForProfile(context(OTHER_PROFILE_ID))
     ).rejects.toThrow('Unauthorized');
@@ -95,10 +110,33 @@ describe('release matrix ownership (JOV-6267)', () => {
       loadArchivedReleaseMatrixForProfile(context(OTHER_PROFILE_ID))
     ).rejects.toThrow('Unauthorized');
     expect(mocks.getReleasesFromDb).not.toHaveBeenCalled();
-    expect(mocks.verifyProfileOwnership).toHaveBeenCalledWith(
+    expect(mocks.getAuthenticatedProfile).toHaveBeenCalledWith(
       expect.anything(),
       OTHER_PROFILE_ID,
       APP_USER_ID
     );
+  });
+
+  it('maps cached releases with the canonical current handle outside the cache entry', async () => {
+    const { loadReleaseMatrixForProfile } = await import(
+      '@/lib/releases/release-matrix-loader'
+    );
+
+    mocks.getAuthenticatedProfile.mockResolvedValue({
+      id: OWN_PROFILE_ID,
+      usernameNormalized: 'canonical-handle',
+    });
+    mocks.getReleasesFromDb.mockResolvedValue([{ id: 'release-1' }]);
+
+    const first = await loadReleaseMatrixForProfile(
+      context(OWN_PROFILE_ID, 'forged-handle')
+    );
+    const second = await loadReleaseMatrixForProfile(
+      context(OWN_PROFILE_ID, 'another-forged-handle')
+    );
+
+    expect(mocks.getReleasesFromDb).toHaveBeenCalledTimes(1);
+    expect(first[0]?.smartLinkPath).toBe('/canonical-handle/release-1');
+    expect(second[0]?.smartLinkPath).toBe('/canonical-handle/release-1');
   });
 });

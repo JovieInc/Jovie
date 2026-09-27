@@ -9,12 +9,14 @@ import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TTL, createReleasesTag } from '@/lib/cache/tags';
 import { getWeeklyReleaseClickCounts } from '@/lib/db/queries/analytics';
+import type { ReleaseWithProviders } from '@/lib/discography/queries';
 import {
   getReleaseForProfileById,
   getReleasesForProfile as getReleasesFromDb,
 } from '@/lib/discography/queries';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { buildProviderLabels } from '@/lib/discography/view-models';
+import { requireOwnedReleaseProfile } from './owned-profile';
 import type { ReleaseProfileContext } from './release-types';
 import { mapReleaseToViewModel } from './release-view-models';
 
@@ -56,19 +58,26 @@ async function requireProfile(profileId?: string): Promise<{
  */
 function releaseCacheKeys(userId: string, profileId: string) {
   return {
-    matrix: ['releases-matrix', userId, profileId] as const,
-    matrixArchived: ['releases-matrix-archived', userId, profileId] as const,
-    entity: (releaseId: string) =>
-      ['release-entity', userId, profileId, releaseId] as const,
+    matrix: ['releases-matrix', userId, profileId],
+    matrixArchived: ['releases-matrix-archived', userId, profileId],
+    entity: (releaseId: string) => [
+      'release-entity',
+      userId,
+      profileId,
+      releaseId,
+    ],
   };
+}
+
+interface CachedReleaseMatrix {
+  readonly releases: ReleaseWithProviders[];
+  readonly weeklyClickCounts: Array<[string, number]>;
 }
 
 async function fetchReleaseMatrixCore(
   profileId: string,
-  profileHandle: string,
   lifecycle: 'active' | 'archived' = 'active'
-): Promise<ReleaseViewModel[]> {
-  const providerLabels = buildProviderLabels();
+): Promise<CachedReleaseMatrix> {
   const [releases, weeklyClickCounts] = await Promise.all([
     getReleasesFromDb(profileId, { includeDrafts: true, lifecycle }),
     // Weekly metric degrades gracefully: a failed aggregate never blocks the
@@ -78,7 +87,21 @@ async function fetchReleaseMatrixCore(
     ),
   ]);
 
-  return releases.map(release => {
+  return {
+    releases,
+    weeklyClickCounts: Array.from(weeklyClickCounts.entries()),
+  };
+}
+
+function mapReleaseMatrix(
+  cached: CachedReleaseMatrix,
+  profileId: string,
+  profileHandle: string
+): ReleaseViewModel[] {
+  const providerLabels = buildProviderLabels();
+  const weeklyClickCounts = new Map(cached.weeklyClickCounts);
+
+  return cached.releases.map(release => {
     const viewModel = mapReleaseToViewModel(
       release,
       providerLabels,
@@ -92,17 +115,11 @@ async function fetchReleaseMatrixCore(
 
 async function fetchReleaseEntityCore(
   profileId: string,
-  profileHandle: string,
   releaseId: string
-): Promise<ReleaseViewModel | null> {
-  const providerLabels = buildProviderLabels();
-  const release = await getReleaseForProfileById(profileId, releaseId, {
+): Promise<ReleaseWithProviders | null> {
+  return getReleaseForProfileById(profileId, releaseId, {
     includeDrafts: true,
   });
-
-  return release
-    ? mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
-    : null;
 }
 
 async function resolveReleaseMatrix(
@@ -116,14 +133,16 @@ async function resolveReleaseMatrix(
 
   const profile = await requireProfile(profileId);
 
-  return unstable_cache(
-    () => fetchReleaseMatrixCore(profile.id, profile.handle),
+  const cached = await unstable_cache(
+    () => fetchReleaseMatrixCore(profile.id),
     releaseCacheKeys(userId, profile.id).matrix,
     {
       revalidate: CACHE_TTL.MEDIUM,
       tags: [createReleasesTag(userId, profile.id)],
     }
   )();
+
+  return mapReleaseMatrix(cached, profile.id, profile.handle);
 }
 
 const loadReleaseMatrixCached = cache(resolveReleaseMatrix);
@@ -146,14 +165,23 @@ async function resolveReleaseEntity(params: {
 
   const profile = await requireProfile(params.profileId);
 
-  return unstable_cache(
-    () => fetchReleaseEntityCore(profile.id, profile.handle, params.releaseId),
+  const release = await unstable_cache(
+    () => fetchReleaseEntityCore(profile.id, params.releaseId),
     releaseCacheKeys(userId, profile.id).entity(params.releaseId),
     {
       revalidate: CACHE_TTL.MEDIUM,
       tags: [createReleasesTag(userId, profile.id)],
     }
   )();
+
+  return release
+    ? mapReleaseToViewModel(
+        release,
+        buildProviderLabels(),
+        profile.id,
+        profile.handle
+      )
+    : null;
 }
 
 const loadReleaseEntityCached = cache(resolveReleaseEntity);
@@ -168,40 +196,33 @@ export async function loadReleaseEntity(params: {
 export async function loadReleaseMatrixForProfile(
   profile: ReleaseProfileContext
 ): Promise<ReleaseViewModel[]> {
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
-  return unstable_cache(
-    () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
-    releaseCacheKeys(profile.userId, profile.profileId).matrix,
+  const cached = await unstable_cache(
+    () => fetchReleaseMatrixCore(owned.profileId),
+    releaseCacheKeys(owned.userId, owned.profileId).matrix,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [createReleasesTag(profile.userId, profile.profileId)],
+      tags: [createReleasesTag(owned.userId, owned.profileId)],
     }
   )();
+
+  return mapReleaseMatrix(cached, owned.profileId, owned.profileHandle);
 }
 
 export async function loadArchivedReleaseMatrixForProfile(
   profile: ReleaseProfileContext
 ): Promise<ReleaseViewModel[]> {
-  const { userId } = await getCachedAuth();
-  if (!userId || userId !== profile.userId) {
-    throw new Error('Unauthorized');
-  }
+  const owned = await requireOwnedReleaseProfile(profile.profileId);
 
-  return unstable_cache(
-    () =>
-      fetchReleaseMatrixCore(
-        profile.profileId,
-        profile.profileHandle,
-        'archived'
-      ),
-    releaseCacheKeys(profile.userId, profile.profileId).matrixArchived,
+  const cached = await unstable_cache(
+    () => fetchReleaseMatrixCore(owned.profileId, 'archived'),
+    releaseCacheKeys(owned.userId, owned.profileId).matrixArchived,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [createReleasesTag(profile.userId, profile.profileId)],
+      tags: [createReleasesTag(owned.userId, owned.profileId)],
     }
   )();
+
+  return mapReleaseMatrix(cached, owned.profileId, owned.profileHandle);
 }

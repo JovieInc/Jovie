@@ -46,6 +46,7 @@ export {
   type CacheTTL,
   createAvatarTag,
   createProfileTag,
+  createPublicReleasesTag,
   createReleasesTag,
   createSocialLinksTag,
 } from './tags';
