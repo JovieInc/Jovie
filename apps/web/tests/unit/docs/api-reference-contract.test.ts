@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const API_REFERENCE_RELATIVE_PATH = 'apps/docs/app/docs/api-reference/page.mdx';
+const API_REFERENCE_RELATIVE_PATH =
+  'apps/docs/app/docs/developers/api-reference/page.mdx';
 const API_REFERENCE_PATH = [
   resolve(process.cwd(), API_REFERENCE_RELATIVE_PATH),
   resolve(process.cwd(), '..', '..', API_REFERENCE_RELATIVE_PATH),

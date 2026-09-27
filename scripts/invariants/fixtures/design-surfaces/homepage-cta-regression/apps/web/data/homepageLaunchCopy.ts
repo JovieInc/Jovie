@@ -1,4 +1,4 @@
-// Deliberate-red fixture (JOV-6039 / JOV-INV-036): the founder-locked
+// Deliberate-red fixture (JOV-6039 / JOV-INV-038): the founder-locked
 // homepage hero action is "Find me", not "Get started".
 export const HOMEPAGE_LAUNCH_COPY = {
   hero: {

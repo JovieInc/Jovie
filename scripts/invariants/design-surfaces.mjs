@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * JOV-INV-036: founder design invariants are certification rules, not
+ * JOV-INV-038: founder design invariants are certification rules, not
  * prompt-only guidance (JOV-6039, extends the blocking-ui pack locked by
  * Tim 2026-08-30 — no second invariant set).
  *
@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readInvariantRegistry } from './registry.mjs';
 
-export const DESIGN_SURFACES_INVARIANT_ID = 'JOV-INV-036';
+export const DESIGN_SURFACES_INVARIANT_ID = 'JOV-INV-038';
 export const DESIGN_SURFACES_SCHEMA = 'jovie-design-invariants/v1';
 export const DESIGN_SURFACES_SLUG =
   'jovie/coordination/founder-design-invariants-v1';

@@ -15,7 +15,7 @@ import { readInvariantRegistry } from './registry.mjs';
 
 const canonical = readInvariantRegistry();
 
-describe('founder design invariants (JOV-INV-036)', () => {
+describe('founder design invariants (JOV-INV-038)', () => {
   it('accepts the canonical design-invariants contract', () => {
     assert.deepEqual(validateDesignSurfacesContract(canonical), []);
   });
@@ -24,7 +24,7 @@ describe('founder design invariants (JOV-INV-036)', () => {
     const invariant = canonical.invariants.find(
       item => item.id === DESIGN_SURFACES_INVARIANT_ID
     );
-    assert.ok(invariant, 'JOV-INV-036 present in the registry');
+    assert.ok(invariant, 'JOV-INV-038 present in the registry');
     assert.equal(invariant.policy.value.schema, DESIGN_SURFACES_SCHEMA);
     const rules = invariant.policy.value.rules;
     assert.equal(rules.length, 8);

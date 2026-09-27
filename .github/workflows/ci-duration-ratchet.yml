@@ -67,6 +67,10 @@ jobs:
         if: steps.unchanged.outputs.skip != 'true'
         run: node scripts/dev-loop-latency.mjs
 
+      - name: Enforce repeated typecheck performance ratchet
+        if: github.event_name != 'push' && steps.unchanged.outputs.skip != 'true'
+        run: pnpm typecheck:performance -- --scenario ci --samples 3 --enforce --output "$RUNNER_TEMP/typecheck-performance.json"
+
       - name: Slack alert on failure
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         run: |

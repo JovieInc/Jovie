@@ -314,13 +314,30 @@ describe('artists directory pagination (JOV-6451)', () => {
     expect(result.profiles).toHaveLength(1);
   });
 
-  it('runs the total as a separate bounded count query', async () => {
+  it('counts only the identities the directory renders (JOV-6435)', async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
-    const chain = mockDbSelectRows([{ value: 12345 }]);
+    const chain = mockDbSelectRows([
+      makeCatalogRow(0),
+      makeCatalogRow(1),
+      {
+        ...makeCatalogRow(2),
+        username: 'tim1',
+        displayName: 'tim1',
+        hasPublicRelease: true,
+      },
+      {
+        ...makeCatalogRow(3),
+        username: 'timwhite1',
+        hasPublicRelease: false,
+      },
+      { ...makeCatalogRow(4), ownerEmail: 'e2e+qa@jov.ie' },
+    ]);
 
     const total = await loadArtistsDirectoryCount();
-    expect(total).toBe(12345);
 
+    // Placeholder identity, empty profile, and test-account rows are excluded,
+    // matching the rendered card list instead of the raw claimed-public count.
+    expect(total).toBe(2);
     // The count path never takes a LIMIT-scanned row payload.
     expect(chain.limitCalls).toEqual([]);
   });

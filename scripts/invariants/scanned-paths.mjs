@@ -61,7 +61,7 @@ export const INVARIANT_SCANNED_PATHS = Object.freeze(
       SCROLL_JANK_ESLINT_CONFIG_PATH,
       // JOV-INV-033 Done-sprint source locks.
       ...SEED_DONE_INVARIANTS.flatMap(entry => entry.files),
-      // JOV-INV-036 founder design invariants (marketing/app surfaces).
+      // JOV-INV-038 founder design invariants (marketing/app surfaces).
       ...DESIGN_SURFACE_ROOTS,
       NAVIGATION_SOURCE,
       RECIPES_SOURCE,

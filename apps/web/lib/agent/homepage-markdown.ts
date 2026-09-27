@@ -51,7 +51,7 @@ ${buildSiteLlmsGuidance()}
 - Home: ${BASE_URL}${APP_ROUTES.HOME}
 - About: ${BASE_URL}${APP_ROUTES.ABOUT}
 - Support: ${BASE_URL}${APP_ROUTES.SUPPORT}
-- Docs: ${DOCS_URL}
+- Docs: ${DOCS_URL}/docs
 - OpenAPI: ${BASE_URL}/openapi.json
 - llms.txt: ${BASE_URL}/llms.txt
 - Sitemap: ${BASE_URL}/sitemap.xml
@@ -70,7 +70,7 @@ That path does not exist on ${APP_NAME}. Recover from one of these public surfac
 - ${APP_NAME} developer resources: ${BASE_URL}/llms.txt
 - OpenAPI 3.1: ${BASE_URL}/openapi.json
 - Public artist API: ${BASE_URL}/api/v1/{username}
-- Docs: ${DOCS_URL}
+- Docs: ${DOCS_URL}/docs
 - Sitemap: ${BASE_URL}/sitemap.xml
 - Full site guide: ${BASE_URL}/llms-full.txt
 - About: ${BASE_URL}${APP_ROUTES.ABOUT}
