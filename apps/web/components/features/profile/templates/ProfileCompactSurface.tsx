@@ -163,6 +163,8 @@ function getNewestPublicRelease(
 }
 
 interface ProfileCompactSurfaceProps {
+  /** Opens the release credits sheet from the overflow menu. */
+  readonly onOpenReleaseCredits?: () => void;
   readonly renderMode?: ProfileRenderMode;
   readonly presentation?: ProfileSurfacePresentation;
   readonly artist: Artist;
@@ -270,6 +272,7 @@ function resolveActivePrimaryTab(params: {
 export function ProfileCompactSurface({
   renderMode = 'interactive',
   presentation = 'standalone',
+  onOpenReleaseCredits,
   artist,
   socialLinks,
   contacts,
@@ -860,6 +863,7 @@ export function ProfileCompactSurface({
           creditSegments={creditSegments}
           tourDates={tourDates}
           releases={releases}
+          onOpenReleaseCredits={onOpenReleaseCredits}
         />
       ) : null}
     </div>
