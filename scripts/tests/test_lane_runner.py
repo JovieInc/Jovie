@@ -651,8 +651,8 @@ class DispatchTest(unittest.TestCase):
     def test_spawns_one_worker_per_slot_of_healthy_enabled_providers_and_prunes(self):
         saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run)
         spawned = []
-        lane.load_providers = lambda: {"a": {"slots": 2}, "b": {"slots": 3}, "c": {"slots": 1, "enabled": False}}
-        lane.provider_healthy = lambda spec: spec["slots"] == 2
+        lane.load_providers = lambda: {"a": {"slots": 2}, "b": {"slots": 3}, "c": {"slots": 1, "enabled": False}, "d": {"slots": 4}}
+        lane.provider_healthy = lambda spec: self.fail("host-scoped-off provider was probed") if spec["slots"] == 4 else spec["slots"] == 2
         lane.subprocess.Popen = lambda args, **kw: spawned.append(args[-1])
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
@@ -660,10 +660,12 @@ class DispatchTest(unittest.TestCase):
             old = Path(tmp) / "worktrees/old"
             old.mkdir(parents=True)
             os.utime(old, (0, 0))
+            os.environ["LANES_SLOTS_D"] = "0"  # d is scoped off this host
             try:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
                 self.assertEqual(lane.dispatch(host), 0)
             finally:
+                os.environ.pop("LANES_SLOTS_D", None)
                 lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run = saved
             self.assertFalse(old.exists())
             tick = json.loads((host.state / "tick.json").read_text())
@@ -696,6 +698,16 @@ class DispatchTest(unittest.TestCase):
             finally:
                 lane.ensure_full_history, lane.doctor.run = saved
             self.assertIn("git exploded", json.loads((host.state / "tick.json").read_text())["error"])
+
+    def test_worktree_removal_kills_its_leftover_processes_first(self):
+        fake, real = FakeShell([]), lane.sh
+        lane.sh = fake
+        try:
+            lane.remove_worktree(lane.Host(state=Path("/s"), repo=Path("/r")), Path("/s/worktrees/run-1"))
+        finally:
+            lane.sh = real
+        self.assertEqual(fake.calls, [["pkill", "-f", "/s/worktrees/run-1"],
+                                      ["git", "worktree", "remove", "--force", "/s/worktrees/run-1"]])
 
     def test_prune_survives_a_worktree_removed_mid_scan(self):
         real = lane.sh
