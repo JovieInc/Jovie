@@ -10,6 +10,7 @@ import { env } from '@/lib/env-server';
 import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
 import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
+import { getGbrainHealth } from '@/lib/hud/gbrain-health';
 import { mapHermesEventsToAgentRunArtifacts } from '@/lib/hud/hermes-events';
 import { getHermesEventsPayload } from '@/lib/hud/hermes-events-store';
 import { buildHudMetricSources } from '@/lib/hud/source-trust';
@@ -352,6 +353,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     dbHealth,
     deployments,
     aiOps,
+    gbrain,
   ] = await Promise.all([
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
@@ -360,6 +362,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     checkDbHealth(),
     getHudDeployments(),
     getHudAiOpsSummary(requestedAt),
+    getGbrainHealth(env.GBRAIN_HEALTH_URL),
   ]);
 
   // Stamp the payload after every producer resolves. Provider observations are
@@ -442,6 +445,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     aiOps,
     sources,
     agentRuns: buildHudAgentRuns(),
+    ...(gbrain ? { gbrain } : {}),
     generatedAtIso: fetchedAtIso,
   };
 }
