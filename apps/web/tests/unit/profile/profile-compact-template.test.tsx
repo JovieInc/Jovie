@@ -58,7 +58,7 @@ const {
         { 'aria-label': 'Profile Navigation' },
         React.createElement('button', { type: 'button' }, 'Home'),
         React.createElement('button', { type: 'button' }, 'Music'),
-        React.createElement('button', { type: 'button' }, 'Shows'),
+        React.createElement('button', { type: 'button' }, 'Events'),
         React.createElement('button', { type: 'button' }, 'About')
       )
     );
@@ -882,7 +882,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Shows', 'About']) {
+    for (const label of ['Home', 'Music', 'Events', 'About']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();

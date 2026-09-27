@@ -40,20 +40,20 @@ function makeProps(overrides?: Partial<BottomTabBarProps>): BottomTabBarProps {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — tab rendering', () => {
-  it('renders the shared Home · Music · Shows · About destinations', () => {
+  it('renders the shared Home · Music · Events · About destinations', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: true })} />);
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Events' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Shows' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Get updates' })).toBeNull();
   });
 
   it('keeps Shows when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
-    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
   });
 
@@ -66,7 +66,7 @@ describe('BottomTabBar — tab rendering', () => {
 
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
     const grid = container.querySelector('[style*="grid-template-columns"]');
@@ -119,7 +119,7 @@ describe('BottomTabBar — active state', () => {
     render(<BottomTabBar {...makeProps({ activeTab: 'subscribe' })} />);
     expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Get updates' })).toBeNull();
-    for (const name of ['Home', 'Music', 'Shows', 'About']) {
+    for (const name of ['Home', 'Music', 'Events', 'About']) {
       expect(screen.getByRole('button', { name })).not.toHaveAttribute(
         'aria-current',
         'page'
@@ -182,7 +182,7 @@ describe('BottomTabBar — interaction handlers', () => {
     render(
       <BottomTabBar {...makeProps({ onTabSelect, hasTourDates: true })} />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Shows' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Events' }));
     expect(onTabSelect).toHaveBeenCalledWith('tour');
   });
 

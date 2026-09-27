@@ -110,7 +110,7 @@ const PREFERENCE_META: Record<
     icon: Music2,
   },
   tourDates: {
-    label: 'Shows',
+    label: 'Events',
     icon: CalendarDays,
   },
   merch: {
@@ -758,7 +758,6 @@ export function ProfileMobileNotificationsFlow({
                         checked={enabled}
                         onCheckedChange={() => onTogglePref(key)}
                         aria-label={meta.label}
-                        className='data-[state=checked]:bg-(--mobile-flow-accent) data-[state=unchecked]:bg-white/14'
                       />
                     </div>
                   );
@@ -791,7 +790,6 @@ export function ProfileMobileNotificationsFlow({
                         onArtistEmailToggle?.(checked)
                       }
                       aria-label='Artist Emails'
-                      className='data-[state=checked]:bg-(--mobile-flow-accent) data-[state=unchecked]:bg-white/14'
                     />
                   </div>
                 </div>
