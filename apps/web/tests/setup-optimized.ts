@@ -172,6 +172,21 @@ vi.mock('next/cache', () => ({
 
 // Mock animation and UI-heavy dependencies globally to reduce per-file mock
 // setup overhead in component tests.
+function createInertMotionValue<T>(initial: T) {
+  let current = initial;
+  return {
+    get: () => current,
+    set: (next: T) => {
+      current = next;
+    },
+    jump: (next: T) => {
+      current = next;
+    },
+    on: () => () => {},
+    destroy: () => {},
+  };
+}
+
 vi.mock('motion/react', () => ({
   AnimatePresence: ({ children }: { children: unknown }) => children,
   motion: new Proxy(
@@ -184,6 +199,12 @@ vi.mock('motion/react', () => ({
     }
   ),
   useReducedMotion: () => false,
+  // Motion-value hooks return inert stand-ins; the proxied `motion.*`
+  // components above never read them.
+  useMotionValue: createInertMotionValue,
+  useSpring: createInertMotionValue,
+  useTransform: () => createInertMotionValue(undefined),
+  useVelocity: () => createInertMotionValue(0),
 }));
 
 vi.mock('@headlessui/react', async () => {

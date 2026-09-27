@@ -1,47 +1,98 @@
-/* Locked Pen header GTcgO → master eoUUU (Floating Bar capsule).
+/* Locked Pen header GTcgO → master eoUUU, re-seated as a docked bar
+   (Tim direction 2026-09-26; supersedes the Floating Bar capsule).
    Overrides live on MarketingHeader only so HeaderNav.css (#17511) stays put.
-   Optical grid: outer 64 / pill 44 / CTA 28 / chrome mark 20. Noir-ion atoms.
-   Selector stays more specific than HeaderNav.css so tokens win the cascade. */
+   Optical grid: outer 64 / row 44 / CTA 28 / chrome mark 20. Noir-ion atoms.
+   Selector stays more specific than HeaderNav.css so tokens win the cascade.
+
+   Docked contract:
+   - At scroll top the bar has no background; heroes bleed under it to y=0.
+   - After a few px of scroll (HeaderNav sentinel → data-scrolled) a flat
+     noir glass layer fades in on ::before: translucent near-black tint,
+     backdrop blur + saturate, hairline bottom rim, no shadow.
+   - Only opacity animates; the bar height never changes on scroll. */
 
 .marketing-glass-header[data-presentation="marketing-glass"] {
   --marketing-glass-top: var(--space-2-5);
   --marketing-glass-height: 2.75rem;
   --marketing-glass-gutter: var(--space-6);
-  --marketing-glass-shell: color-mix(
-    in oklab,
-    var(--noir-ion-shell) 82%,
-    transparent
-  );
-  --marketing-glass-shell-scrolled: color-mix(
-    in oklab,
-    var(--noir-ion-shell) 90%,
-    transparent
-  );
-  --marketing-glass-border: var(--noir-ion-border-subtle);
-  --marketing-glass-border-strong: var(--noir-ion-border-default);
   --marketing-glass-text: var(--noir-ion-text-primary);
   --marketing-glass-muted: var(--noir-ion-text-muted);
 }
 
-.marketing-glass-header[data-presentation="marketing-glass"]
-  .marketing-glass-header__shell {
-  min-height: var(--marketing-glass-height);
-  padding-block: var(--space-2);
-  padding-inline: var(--space-3) !important;
-  border-color: var(--marketing-glass-border);
-  background: var(--marketing-glass-shell);
-  backdrop-filter: blur(20px) saturate(165%);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
+/* Shared docked material for every marketing presentation
+   (marketing-glass and the homepage-embedded bar). */
+.header-nav--docked {
+  --marketing-dock-glass: color-mix(
+    in oklab,
+    var(--noir-ion-shell) 82%,
+    transparent
+  );
+  --marketing-dock-glass-open: color-mix(
+    in oklab,
+    var(--noir-ion-shell) 90%,
+    transparent
+  );
+  --marketing-dock-rim: var(--noir-ion-border-subtle);
 }
 
-.marketing-glass-header[data-presentation="marketing-glass"][data-scrolled="true"]
-  .marketing-glass-header__shell,
-.marketing-glass-header[data-presentation="marketing-glass"]:has(
-    .marketing-glass-header__flyout--open
-  )
+.header-nav--docked::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+  border-bottom: var(--space-px) solid var(--marketing-dock-rim);
+  background: var(--marketing-dock-glass);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  opacity: 0;
+  transition: opacity var(--duration-normal) var(--ease-cinematic);
+}
+
+.header-nav--docked[data-scrolled="true"]::before,
+.header-nav--docked:has(.marketing-glass-header__flyout--open)::before {
+  opacity: 1;
+}
+
+.header-nav--docked:has(.marketing-glass-header__flyout--open)::before {
+  background: var(--marketing-dock-glass-open);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-nav--docked::before {
+    transition: none;
+  }
+}
+
+/* Solid fallback: no translucency when the user asks for less of it or for
+   more contrast. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .header-nav--docked::before {
+    border-bottom-color: var(--noir-ion-border-default);
+    background: var(--noir-ion-shell);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .header-nav--docked::before {
+    border-bottom-color: CanvasText;
+    background: Canvas;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__shell {
-  border-color: var(--marketing-glass-border-strong);
-  background: var(--marketing-glass-shell-scrolled);
+  min-height: calc(
+    var(--marketing-glass-height) +
+    var(--marketing-glass-top) *
+    2
+  );
+  padding-block: var(--marketing-glass-top);
+  padding-inline: var(--marketing-glass-gutter) !important;
 }
 
 .marketing-glass-header[data-presentation="marketing-glass"]
@@ -154,5 +205,45 @@
     --marketing-glass-top: var(--space-2-5);
     --marketing-glass-height: 2.75rem;
     --marketing-glass-gutter: var(--space-6);
+  }
+}
+
+/* Leading-hero dock contract.
+   PublicPageShell keeps main's header offset so ordinary content always
+   clears the fixed bar. A hero that opens the page opts in with
+   .marketing-hero-dock: it pulls up by the same offset token (bleeding its
+   background to y=0). With --inset it adds that token back as inner padding
+   so its copy stays exactly where it was. Any element with a preceding
+   in-flow sibling resets the offset, so a hero lower on the page never
+   climbs into the section above it. */
+.public-shell-main--docked {
+  --marketing-dock-offset: var(--public-shell-header-offset);
+}
+
+.public-shell-main--docked
+  :not([hidden], script, style, link, template, noscript)
+  ~ * {
+  --marketing-dock-offset: 0px;
+}
+
+.marketing-hero-dock {
+  margin-top: calc(-1 * var(--marketing-dock-offset, 0px));
+}
+
+.marketing-hero-dock--inset {
+  padding-top: calc(
+    var(--marketing-dock-offset, 0px) +
+    var(--marketing-hero-dock-inset, 0px)
+  );
+}
+
+/* MarketingHero landing mode keeps its legacy copy offset as dock inset. */
+.marketing-hero-landing {
+  --marketing-hero-dock-inset: 5.75rem;
+}
+
+@media (min-width: 768px) {
+  .marketing-hero-landing {
+    --marketing-hero-dock-inset: 6.25rem;
   }
 }
