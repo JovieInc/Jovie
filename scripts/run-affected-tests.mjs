@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,19 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/tests/setup.ts',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
+// Any web source that uses TanStack Virtual must stay out of React Compiler
+// memoization (JOV-6702); the invariant has no import edge to such files.
+const VIRTUALIZER_COMPILER_INVARIANT_TEST =
+  'apps/web/tests/unit/virtualization/virtualizer-compiler-optout.test.ts';
+const USES_TANSTACK_VIRTUAL =
+  /useVirtualizer\(|\.getVirtualItems\(|\.getTotalSize\(/;
+function readRepoFile(file) {
+  try {
+    return readFileSync(resolve(REPO_ROOT, file), 'utf8');
+  } catch {
+    return '';
+  }
+}
 const INVESTOR_NOTE_INGESTION_TESTS = [
   'apps/web/tests/unit/investors/note-ingestion.test.ts',
   'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
@@ -937,7 +950,10 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
 
 export function buildAffectedTestPlan(
   changedFiles,
-  { isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)) } = {}
+  {
+    isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
+    readFile = readRepoFile,
+  } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
@@ -1552,6 +1568,16 @@ export function buildAffectedTestPlan(
   }
   if (files.some(isInvestorNoteIngestionInput)) {
     mandatoryTests.push(...INVESTOR_NOTE_INGESTION_TESTS);
+  }
+  if (
+    files.some(
+      file =>
+        file.startsWith('apps/web/') &&
+        /\.[jt]sx?$/.test(file) &&
+        USES_TANSTACK_VIRTUAL.test(readFile(file))
+    )
+  ) {
+    mandatoryTests.push(VIRTUALIZER_COMPILER_INVARIANT_TEST);
   }
   const hasCiCancellationHealerChange = files.some(file =>
     CI_CANCELLATION_HEALER_PRIMARY_INPUTS.has(file)

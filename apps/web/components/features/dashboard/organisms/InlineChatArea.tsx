@@ -58,6 +58,8 @@ export const InlineChatArea = forwardRef<
   InlineChatAreaRef,
   InlineChatAreaProps
 >(({ artistContext, profileId, expanded = false, onExpandedChange }, ref) => {
+  // Reads live virtualizer state each render; see virtualizer-compiler-optout.test.ts.
+  'use no memo';
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Use shared hook — handles persistence, error handling, and conversation management
