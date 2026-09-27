@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { withDbSessionTx } from '@/lib/auth/session';
-import { verifyProfileOwnership } from '@/lib/db/queries/shared';
+import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 
 /**
  * Resolve profile ownership from trusted membership on a pinned RLS
@@ -10,12 +10,17 @@ import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 export async function requireOwnedReleaseProfile(profileId: string): Promise<{
   readonly userId: string;
   readonly profileId: string;
+  readonly profileHandle: string;
 }> {
   return withDbSessionTx(async (tx, sessionUserId) => {
-    const owned = await verifyProfileOwnership(tx, profileId, sessionUserId);
+    const owned = await getAuthenticatedProfile(tx, profileId, sessionUserId);
     if (!owned) {
       throw new Error('Unauthorized');
     }
-    return { userId: sessionUserId, profileId: owned.id };
+    return {
+      userId: sessionUserId,
+      profileId: owned.id,
+      profileHandle: owned.usernameNormalized,
+    };
   });
 }

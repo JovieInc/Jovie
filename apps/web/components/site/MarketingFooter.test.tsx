@@ -77,10 +77,9 @@ describe('MarketingFooter', () => {
       'href',
       '/legal/terms'
     );
-    expect(screen.getByRole('link', { name: 'Investors' })).toHaveAttribute(
-      'href',
-      '/investors'
-    );
+    // Investor pages are private: the public footer never links them.
+    expect(screen.queryByRole('link', { name: 'Investors' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Pitch' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
       'line-clamp-2'
     );
@@ -176,6 +175,32 @@ describe('MarketingFooter', () => {
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    '/blog',
+    '/blog/the-contact-problem',
+    '/blog/category/artist-management',
+    '/changelog',
+    '/changelog/26.9.0',
+    '/engineering',
+    '/engineering/some-story',
+  ])('omits the duplicate footer CTA on the editorial route %s', pathname => {
+    mockUsePathname.mockReturnValue(pathname);
+
+    render(<MarketingFooter />);
+
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the terminal CTA on the founder-only engineering preview gallery', () => {
+    mockUsePathname.mockReturnValue('/engineering/preview');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
   });
 
   it('links to the canonical Card route without duplicating its terminal CTA', () => {

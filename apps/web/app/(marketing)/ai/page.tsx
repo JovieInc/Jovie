@@ -106,9 +106,6 @@ export default function AiPage() {
             </p>
             <div className='flex flex-wrap gap-3'>
               <Button asChild variant='secondary'>
-                <Link href={APP_ROUTES.INVESTORS}>Investor Overview</Link>
-              </Button>
-              <Button asChild variant='secondary'>
                 <Link href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}>
                   Read The Memo
                 </Link>
