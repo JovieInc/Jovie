@@ -9,9 +9,13 @@ import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { HomepageTrackedLink } from './HomepageTrackedLink';
 
-/** Both Bloom actions use the same build-time gate; auth still owns access. */
+/**
+ * Non-editorial placements still follow the waitlist gate. The editorial hero
+ * is the locked name search (Search your name → Find me → /start, JOV-5864 /
+ * JOV-5085) and must not be replaced by Request access.
+ */
 export function HomepagePrimaryAction(props: HeroSpotifySearchProps) {
-  if (!FEATURE_FLAGS.WAITLIST_ENABLED) {
+  if (!FEATURE_FLAGS.WAITLIST_ENABLED || props.appearance === 'editorial') {
     return <HeroSpotifySearch {...props} />;
   }
 
