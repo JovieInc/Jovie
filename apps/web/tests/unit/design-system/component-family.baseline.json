@@ -3,7 +3,9 @@
     "button": 37,
     "palette": 4,
     "emptyState": 6,
-    "shell": 21
+    "shell": 21,
+    "status": 9,
+    "entityHeader": 5
   },
   "allowedEmptyStatePaths": [
     "components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx",
@@ -13,5 +15,5 @@
     "components/molecules/EmptyState.tsx",
     "components/organisms/table/atoms/TableEmptyState.tsx"
   ],
-  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule. button current floor 37 recorded 2026-08-13 after SortableHeaderButton canonicalization."
+  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule. button current floor 37 recorded 2026-08-13 after SortableHeaderButton canonicalization. status seeded at 9 on 2026-09-27 (JOV-6841, docs/design-system/drift-audit-2026-09-27.md D5): `@jovie/ui` StatusGlyph (Pen jAcP1) is the canonical owner and the 7 legacy forks migrate onto it in follow-up PRs — the count only goes down; a new file here is a new fork and fails CI. entityHeader 5 seeded 2026-09-27 (JOV-6777): forks of Pen odpZ8 entity header stay frozen until design decision D6 names the owner."
 }
