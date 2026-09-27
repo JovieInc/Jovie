@@ -33,6 +33,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import doctor  # noqa: E402  (sibling module of the release)
 REPO_SLUG = "JovieInc/Jovie"
 # `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
 # the rest stay with humans.
@@ -48,11 +50,16 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py"]
+LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
+              "scripts/tests/test_doctor.py"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
 PROVIDER_COOLDOWN_S = 900
+# Waiting work gains one priority level per day, capped at urgent. This preserves
+# urgent-first admission while guaranteeing that a sustained P1 stream cannot
+# starve older work forever.
+PRIORITY_AGING_S = 24 * 3600
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
@@ -103,11 +110,22 @@ def failure_record(value) -> dict:
     return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
 
 
+def created_at_epoch(value: str) -> float | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.timestamp() if parsed.tzinfo is not None else None
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset()) -> Issue | None:
-    """Symphony's order: priority 1..4 then none, oldest first; skip excluded work,
-    3x failures, issues still inside their retry backoff, and issues that already have an
-    open lane PR anywhere (one PR per issue: the fix/adopt loop owns those)."""
+    """Symphony orders by aged priority then age, while preserving urgent-first admission.
+
+    Waiting work gains one priority level per day until it reaches P1, preventing a
+    sustained stream of newer urgent work from starving older work. Excluded work,
+    3x failures, retry backoff, and issues with an open lane PR remain ineligible.
+    """
     now = time.time() if now is None else now
     in_flight = {identifier.lower() for identifier in in_flight}
 
@@ -120,7 +138,15 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
         if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
         and issue.identifier.lower() not in in_flight
     ]
-    eligible.sort(key=lambda issue: (issue.priority or 5, issue.created_at))
+
+    def admission_order(issue: Issue) -> tuple[int, float]:
+        created_at = created_at_epoch(issue.created_at)
+        base_priority = issue.priority or 5
+        waited = max(0, now - created_at) if created_at is not None else 0
+        effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
+        return effective_priority, created_at if created_at is not None else float("inf")
+
+    eligible.sort(key=admission_order)
     return eligible[0] if eligible else None
 
 
@@ -148,6 +174,10 @@ def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
         "  Do not mark it ready or merge it: an independent gate does that after verifying.",
         "- If the issue is not code-shippable or already fixed, open no PR and end with a",
         "  line `NOT-SHIPPABLE: <reason>`.",
+        "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
+        "  non-interactive path. Do not run gstack or other skill workflows (ship, review, qa,",
+        "  upgrade) and do not upgrade any tooling: commit with git and open the PR with",
+        "  `gh pr create --draft`.",
         "- End with a handoff: what changed, what you verified, concerns and deviations.",
     ])
 
@@ -283,6 +313,20 @@ class Linear:
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
                 for n in data["issues"]["nodes"]]
 
+    def create_triage(self, title: str, description: str) -> str | None:
+        team = self.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                        {})["teams"]["nodes"][0]
+        triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
+        labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
+        data = self.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id}}}',
+                        {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": 2,
+                               "title": title[:200], "description": description}})
+        return data["issueCreate"]["issue"]["id"]
+
+    def state_of(self, issue_id: str) -> str:
+        data = self.gql('query($id:String!){issue(id:$id){state{name}}}', {"id": issue_id})
+        return data["issue"]["state"]["name"]
+
     def move(self, issue_id: str, state_name: str) -> None:
         states = self.gql('query($id:String!){issue(id:$id){team{states{nodes{id name}}}}}', {"id": issue_id})
         target = next((s["id"] for s in states["issue"]["team"]["states"]["nodes"] if s["name"] == state_name), None)
@@ -324,6 +368,28 @@ def template(args: list[str], values: dict) -> list[str]:
     return [arg.format(**{"here": str(HERE), **values}) for arg in args]
 
 
+def run_agent(cmd: list[str], cwd: Path, log, timeout: int) -> subprocess.CompletedProcess:
+    """The provider and every child it spawns live in one process group, so a timeout kills
+    all of them instead of leaving an agent editing a worktree the runner already gave up on."""
+    import signal
+    proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        code = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
+            try:
+                os.killpg(proc.pid, sig)
+            except ProcessLookupError:
+                break
+            try:
+                proc.wait(timeout=grace)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        raise subprocess.TimeoutExpired(cmd, timeout)
+    return subprocess.CompletedProcess(cmd, code)
+
+
 # ---------------------------------------------------------------- one run
 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
@@ -344,9 +410,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
             started = time.time()
-            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                                   cwd=worktree, stdout=log, stderr=subprocess.STDOUT, text=True,
-                                   timeout=host.agent_timeout)
+            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
+                              worktree, log, host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started))
             log.flush()
@@ -494,8 +559,10 @@ def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None
     """True when another host recorded a live claim for this exact head and kind on the PR.
     Local state files are per host; the PR's comments are the truth every host can see."""
     now = time.time() if now is None else now
-    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments", "--paginate",
+    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
                  "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"])
+    if listed.returncode != 0:
+        return True  # fail closed: an unreadable claim list is not permission to take the head
     for line in (listed.stdout or "").splitlines():
         fields = dict(part.split("=", 1) for part in line.split()[3:] if "=" in part)
         try:
@@ -528,11 +595,12 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
 def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
         gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
-        if not conflicted and not gate_held:
+        reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
+        if not conflicted and not gate_held and not reviewed:
             if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
@@ -542,6 +610,38 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             continue
         return pr
     return None
+
+
+def exhausted_prs(prs: list[dict], attempts: dict) -> list[dict]:
+    """Heads the fix loop tried MAX_FIX_ATTEMPTS times and that are still stuck, not yet escalated."""
+    stuck = []
+    for pr in prs:
+        record = attempts.get(str(pr["number"]), {})
+        if record.get("sha") == pr["headRefOid"] and record.get("count", 0) >= MAX_FIX_ATTEMPTS \
+                and not record.get("escalated"):
+            checks = pr.get("statusCheckRollup") or []
+            if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED" \
+                    or any(check.get("conclusion") in RED for check in checks):
+                stuck.append(pr)
+    return stuck
+
+
+def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
+    """Bug intake, never Tim: comment on the PR, open a Linear Triage issue once, mark it escalated."""
+    path = host.state / "fix-attempts.json"
+    attempts = json.loads(path.read_text()) if path.exists() else {}
+    for pr in exhausted_prs(prs, attempts):
+        body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
+                f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
+                "Filed for triage; the lane retries when the head moves.")
+        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+        try:
+            linear.create_triage(f"Fix loop exhausted: PR #{pr['number']} {pr.get('title', '')[:80]}",
+                                 f"{pr.get('url')}\n\n{body}\n\nHost `{HOST}`, {now_iso()}.")
+        except Exception:
+            pass
+        attempts[str(pr["number"])] = {**attempts.get(str(pr["number"]), {}), "escalated": True}
+    path.write_text(json.dumps(attempts))
 
 
 def failure_excerpt(pr: dict, limit: int = 6000) -> str:
@@ -558,7 +658,22 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
     return "\n\n".join(parts)[:limit]
 
 
+def review_excerpt(pr: dict, limit: int = 4000) -> str:
+    """The reviewers' own words, so the fixer addresses what was asked, not what it guesses."""
+    if pr.get("reviewDecision") != "CHANGES_REQUESTED":
+        return ""
+    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/comments?per_page=50", "--jq",
+                 '.[] | "- \\(.path):\\(.line // .original_line // 0) \\(.body | gsub("\\n"; " "))"'])
+    reviews = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/reviews?per_page=20", "--jq",
+                  '.[] | select(.state == "CHANGES_REQUESTED") | "- review: \\(.body | gsub("\\n"; " "))"'])
+    text = "\n".join(part for part in ((reviews.stdout or "").strip(), (listed.stdout or "").strip()) if part)
+    return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no comment text readable)."
+
+
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
+    review = review_excerpt(pr) if pr.get("reviewDecision") == "CHANGES_REQUESTED" else ""
+    if review:
+        excerpt = review + ("\n\n" + excerpt if excerpt else "")
     if pr.get("gateEvidence"):
         excerpt = "Lane gate (the repo's pre-push-gate) held this PR:\n" + "\n".join(pr["gateEvidence"]) + \
             ("\n\n" + excerpt if excerpt else "")
@@ -603,9 +718,8 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             prompt = render_fix_prompt(pr, failure_excerpt(pr))
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
-            agent = subprocess.run(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                                   cwd=worktree, stdout=log, stderr=subprocess.STDOUT, text=True,
-                                   timeout=host.agent_timeout)
+            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
+                              worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
@@ -626,9 +740,24 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     return receipt
 
 
+def best_per_issue(prs: list[dict]) -> list[dict]:
+    """One PR per issue, retroactively: when the old runner left several open PRs for one
+    issue, the lanes spend effort only on the one furthest along (ready over draft, clean over
+    conflicted, then newest). The others stay open for a human to close; nothing is deleted."""
+    by_issue: dict[str, list[dict]] = {}
+    rest = []
+    for pr in prs:
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        (by_issue.setdefault(found.group("issue"), []) if found else rest).append(pr)
+    keep = list(rest)
+    for group in by_issue.values():
+        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
+    return sorted(keep, key=lambda pr: pr["number"])
+
+
 def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     """A lane draft whose head the gate has never seen, e.g. a remote agent that finished late."""
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         if pr.get("isDraft") and verified.get(str(pr["number"])) != pr["headRefOid"]:
             return pr
     return None
@@ -660,12 +789,39 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     return receipt
 
 
-def lane_prs(name: str) -> list[dict]:
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{name}/",
-                 "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus"])
-    # Only PRs this lane opened (its dated run branches), never other agents' `devin/...` work.
-    own = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
-    return [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
+    """This lane's open PRs (its dated run branches), plus the orphaned PRs of disabled lanes:
+    nobody else will fix or gate those, and any enabled lane can."""
+    providers = load_providers() if providers is None else providers
+    names = [name] + [other for other, spec in providers.items() if not spec.get("enabled", True) and other != name]
+    prs = []
+    for owner in names:
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
+                     "--json", PR_FIELDS])
+        own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
+        prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+    return prs
+
+
+PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository"
+
+
+def repo_prs() -> list[dict]:
+    """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
+    Tim: no open PR should ever need his action; the fix loop owns them all."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "60",
+                 "--search", "draft:false sort:updated-desc", "--json", PR_FIELDS])
+    return [pr for pr in json.loads(listed.stdout or "[]") if not pr.get("isCrossRepository")]
+
+
+def fix_candidates(name: str) -> list[dict]:
+    """Lane PRs (all lanes) plus every other open non-draft PR, de-duplicated by number."""
+    seen, merged = set(), []
+    for pr in lane_prs(name) + repo_prs():
+        if pr["number"] not in seen:
+            seen.add(pr["number"])
+            merged.append(pr)
+    return merged
 
 
 def in_flight_issues() -> frozenset[str]:
@@ -682,10 +838,10 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     verified = json.loads(path.read_text()) if path.exists() else {}
     pr = unverified_pr(prs, verified)
     if pr:
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+            return None  # another host is gating this head; we look again next pass
         verified[str(pr["number"])] = pr["headRefOid"]
         path.write_text(json.dumps(verified))
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
-            return None  # another host is gating this head; our local mark keeps us off it
         post_claim(pr["number"], pr["headRefOid"], "gate")
     return pr
 
@@ -701,11 +857,11 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            return None  # another host is already fixing this head; no attempt is charged
         record = attempts.get(str(pr["number"]), {})
         attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
         path.write_text(json.dumps(attempts))
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
-            return None  # another host is already fixing this head
         post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
 
@@ -718,6 +874,8 @@ def failures_path(host: Host) -> Path:
 
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
+    if not spec.get("enabled", True):
+        return 0  # a lane turned off in a newer release stops at its next re-exec
     slot = None
     for index in range(host.slots(name, spec.get("slots", 1))):
         lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
@@ -729,15 +887,20 @@ def worker(host: Host, name: str) -> int:
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
-        # Finish before starting: red PRs, then ungated drafts, then new issues.
+        # Finish before starting: red PRs (any open PR in the repo), then ungated lane drafts,
+        # then new issues.
         prs = lane_prs(name)
+        candidates = fix_candidates(name)
         requeue_verified(host, prs)
-        red = claim_red_pr(host, name, prs)
+        escalate_exhausted(host, candidates, linear)
+        red = claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
         if red is None and adopt is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues())
+            if issue and linear.state_of(issue.id) != "Todo":
+                issue = None  # another host claimed it between our read and now
             if issue:
                 linear.move(issue.id, "In Progress")
     finally:
@@ -811,16 +974,44 @@ def ensure_full_history(host: Host) -> None:
 
 
 def dispatch(host: Host) -> int:
-    ensure_full_history(host)
-    prune_worktrees(host)
-    for name, spec in load_providers().items():
-        if not spec.get("enabled", True) or cooling(host, name) or not provider_healthy(spec):
-            continue
-        for _ in range(host.slots(name, spec.get("slots", 1))):
-            subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
-                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=True)
-    return 0
+    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "spawned": [], "error": None}
+    try:
+        ensure_full_history(host)
+        prune_worktrees(host)
+        for name, spec in load_providers().items():
+            if not spec.get("enabled", True) or cooling(host, name):
+                continue
+            if not provider_healthy(spec):
+                tick["unhealthy"].append(name)
+                continue
+            for _ in range(host.slots(name, spec.get("slots", 1))):
+                subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 start_new_session=True)
+                tick["spawned"].append(name)
+    except Exception as error:  # the tick must still leave a receipt the doctor can raise
+        tick["error"] = f"{type(error).__name__}: {error}"[:300]
+    update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
+    try:
+        doctor.run(host, sys.modules[__name__], codex_lane_module())
+    except Exception as error:  # never let the doctor take dispatch down
+        update_json(host.state / "tick.json", lambda data: data.update(doctorError=f"{type(error).__name__}: {error}"[:200]))
+    return 1 if tick["error"] else 0
+
+
+def read_marker(host: Host) -> str | None:
+    try:
+        return (host.state / "current" / ".tree").read_text().strip()[:7]
+    except OSError:
+        return None
+
+
+def codex_lane_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("codex_lane", HERE / "codex_lane.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def cooling(host: Host, name: str) -> bool:
@@ -851,9 +1042,28 @@ def needs_update(current_tree: str | None, main_tree: str) -> bool:
     return bool(main_tree) and current_tree != main_tree
 
 
+def read_marker(host: Host) -> str | None:
+    try:
+        return (host.state / "current" / ".tree").read_text().strip()[:7]
+    except OSError:
+        return None
+
+
 def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
-    Only the `current` symlink moves; running workers finish on their release."""
+    Only the `current` symlink moves; running workers finish on their release. The outcome is
+    written to update.json so a refused release is an alert, not a traceback in a journal."""
+    try:
+        code = install_release(host)
+        error = None if code == 0 else "release tests failed"
+    except Exception as failure:
+        code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
+    update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
+        at=now_iso(), ok=code == 0, error=error, current=read_marker(host))))
+    return code
+
+
+def install_release(host: Host) -> int:
     sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
     tree = sh(["git", "rev-parse", "origin/main:scripts/lanes"], cwd=host.repo).stdout.strip()
     current = host.state / "current"
@@ -868,9 +1078,12 @@ def update(host: Host) -> int:
         archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+        # The self-test must never touch this host's live state: point it at a scratch dir.
+        scratch = staging / ".selftest-state"
+        scratch.mkdir(exist_ok=True)
         test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                               cwd=staging, capture_output=True, text=True, timeout=300,
-                              env={**os.environ, "LANES_SELFTEST": "1"})
+                              env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
         if test.returncode != 0:
             print(f"lane update refused: release tests failed\n{test.stderr[-2000:]}", file=sys.stderr)
             return 1

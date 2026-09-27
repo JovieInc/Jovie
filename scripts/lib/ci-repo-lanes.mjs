@@ -47,7 +47,7 @@ const DOC_FILE = /\.(md|mdx|txt)$/i;
  */
 const LANE_PREFIXES = Object.freeze([
   {
-    prefix: 'scripts/symphony/',
+    prefix: 'scripts/fleet-gate/',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
   {
@@ -92,10 +92,6 @@ const LANE_PREFIXES = Object.freeze([
   },
   {
     prefix: 'scripts/run-affected-tests.mjs',
-    lanes: [CI_LANES.SYMPHONY_CONTROL],
-  },
-  {
-    prefix: 'scripts/tests/test_symphony',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
   {

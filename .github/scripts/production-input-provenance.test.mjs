@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import {
   artifactSnapshot,
   bindDeployment,
+  buildSbom,
   captureArtifact,
   captureInputs,
   compareSources,
@@ -52,9 +53,9 @@ process.stdout.write(JSON.stringify(deployment));
 `
   );
   chmodSync(cli, 0o755);
-  captureInputs(f.root, f.sha, f.input);
+  f.captureInputs();
   f.makeOutput();
-  const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact);
+  const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom);
   const deployment = f.ready(receipt);
   writeFileSync(responsePath, JSON.stringify(deployment));
   const inspected = JSON.parse(
@@ -116,12 +117,46 @@ function fixture(t) {
   git('config', 'user.name', 'Fixture');
   writeFileSync(resolve(root, 'page.tsx'), 'canonical page\n');
   writeFileSync(resolve(root, '.gitignore'), '.vercel/\n.env.local\n');
+  mkdirSync(resolve(root, 'apps/web'), { recursive: true });
+  for (const [path, contents] of [
+    ['pnpm-lock.yaml', "lockfileVersion: '9.0'\n"],
+    ['pnpm-workspace.yaml', "packages:\n  - 'apps/*'\n"],
+    ['package.json', '{"name":"fixture","packageManager":"pnpm@9.15.9"}\n'],
+    ['.npmrc', 'engine-strict=false\n'],
+    ['.nvmrc', '22.23.2\n'],
+    ['apps/web/package.json', '{"name":"@jovie/web"}\n'],
+    ['apps/web/next.config.js', 'export default {}\n'],
+    ['apps/web/vercel.json', '{}\n'],
+  ])
+    writeFileSync(resolve(root, path), contents);
   git('add', '.');
   git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
   const sha = git('rev-parse', 'HEAD');
   const input = resolve(base, 'inputs.json'),
     artifact = resolve(base, 'artifact.json'),
-    bound = resolve(base, 'deployment.json');
+    bound = resolve(base, 'deployment.json'),
+    sbom = resolve(base, 'sbom.cdx.json');
+  writeFileSync(
+    sbom,
+    JSON.stringify(
+      buildSbom(
+        {
+          MIT: [
+            { name: '@fixture/runtime', versions: ['1.2.3'], license: 'MIT' },
+          ],
+        },
+        sha
+      )
+    )
+  );
+  const capture = (expectedSha = sha) =>
+    captureInputs(root, expectedSha, input, sbom, {
+      os: 'Linux',
+      arch: 'X64',
+      name: 'fixture-runner',
+      environment: 'github-hosted',
+      image: 'ubuntu24',
+    });
   const makeOutput = () => {
     mkdirSync(resolve(root, '.vercel/output'), { recursive: true });
     writeFileSync(resolve(root, '.vercel/output/config.json'), '{"version":3}');
@@ -138,18 +173,30 @@ function fixture(t) {
       gitDirty: '1',
     },
   });
-  return { root, sha, base, input, artifact, bound, git, makeOutput, ready };
+  return {
+    root,
+    sha,
+    base,
+    input,
+    artifact,
+    bound,
+    sbom,
+    git,
+    makeOutput,
+    ready,
+    captureInputs: capture,
+  };
 }
 
 test('records clean baseline, dirty paths and artifact/deployment binding without leaking file bodies', t => {
   const f = fixture(t);
   writeFileSync(resolve(f.root, '.env.local'), 'SECRET_VALUE_NEVER_PUBLISH');
-  const before = captureInputs(f.root, f.sha, f.input);
+  const before = f.captureInputs();
   assert.equal(before.source.gitDirty, false);
   writeFileSync(resolve(f.root, 'page.tsx'), 'changed during build');
   writeFileSync(resolve(f.root, 'generated file\nname.ts'), 'generated output');
   f.makeOutput();
-  const artifact = captureArtifact(f.root, f.sha, f.input, f.artifact);
+  const artifact = captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom);
   assert.deepEqual(
     artifact.changesDuringBuild.map(x => x.classification),
     ['added-during-build', 'changed-during-build']
@@ -166,6 +213,7 @@ test('records clean baseline, dirty paths and artifact/deployment binding withou
     f.bound
   );
   assert.equal(bound.deployment.gitDirty, '1');
+  assert.equal(bound.contract, 'jovie.certification/v1');
   assert.equal(bound.artifactReceiptDigest, artifact.digest);
   assert.equal(bound.inputReceiptDigest, before.digest);
   assert.match(bound.qualification, /inspect deltas/);
@@ -202,10 +250,7 @@ test('captures preexisting untracked inputs, deleted tracked paths, staged edits
 
 test('rejects wrong checkout SHA before recording inputs', t => {
   const f = fixture(t);
-  assert.throws(
-    () => captureInputs(f.root, 'a'.repeat(40), f.input),
-    /Checkout SHA/
-  );
+  assert.throws(() => f.captureInputs('a'.repeat(40)), /Checkout SHA/);
   assert.throws(() => sourceSnapshot(f.root, 'not-a-sha'), /Invalid expected/);
 });
 
@@ -226,9 +271,9 @@ test('binds traced symlink target bytes and refuses escaped/cyclic artifact link
 
 test('rejects tampered input receipts and missing build outputs', t => {
   const f = fixture(t);
-  captureInputs(f.root, f.sha, f.input);
+  f.captureInputs();
   assert.throws(
-    () => captureArtifact(f.root, f.sha, f.input, f.artifact),
+    () => captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom),
     /ENOENT|Missing/
   );
   const input = JSON.parse(readFileSync(f.input));
@@ -236,16 +281,56 @@ test('rejects tampered input receipts and missing build outputs', t => {
   writeFileSync(f.input, JSON.stringify(input));
   f.makeOutput();
   assert.throws(
-    () => captureArtifact(f.root, f.sha, f.input, f.artifact),
+    () => captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom),
     /Receipt digest/
+  );
+});
+
+for (const target of ['pnpm-lock.yaml', 'sbom.cdx.json'])
+  test(`rejects dependency evidence tampering: ${target}`, t => {
+    const f = fixture(t);
+    f.captureInputs();
+    f.makeOutput();
+    const path = target === 'sbom.cdx.json' ? f.sbom : resolve(f.root, target);
+    writeFileSync(path, 'tampered\n');
+    assert.throws(
+      () => captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom),
+      /Supply-chain build inputs changed|Production SBOM changed/
+    );
+  });
+
+test('builds a deterministic CycloneDX production dependency inventory', () => {
+  const sha = 'a'.repeat(40);
+  const sbom = buildSbom(
+    {
+      MIT: [
+        { name: 'plain', versions: ['2.0.0'], license: 'MIT' },
+        { name: '@scope/pkg', versions: ['1.0.0'], license: 'Apache-2.0' },
+      ],
+    },
+    sha
+  );
+  assert.equal(sbom.bomFormat, 'CycloneDX');
+  assert.equal(sbom.specVersion, '1.6');
+  assert.deepEqual(
+    sbom.components.map(component => component.purl),
+    ['pkg:npm/%40scope/pkg@1.0.0', 'pkg:npm/plain@2.0.0']
+  );
+  assert.equal(sbom.metadata.component['bom-ref'], `git:${sha}`);
+  assert.ok(
+    sbom.metadata.properties.some(
+      property =>
+        property.name === 'jovie:certification-contract' &&
+        property.value === 'jovie.certification/v1'
+    )
   );
 });
 
 test('accepts the workflow normalized inspect shapes and rejects non-origin URLs', t => {
   const f = fixture(t);
-  captureInputs(f.root, f.sha, f.input);
+  f.captureInputs();
   f.makeOutput();
-  const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact);
+  const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom);
   for (const alias of ['state', 'status']) {
     const deployment = f.ready(receipt);
     delete deployment.readyState;
@@ -295,9 +380,11 @@ test('executes the workflow CLI phases with stdin metadata and preserves prior r
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-  run(['inputs', f.input]);
+  run(['inputs', f.input, f.sbom]);
   f.makeOutput();
-  const digests = run(['artifact', f.artifact, f.input]).trim().split(' ');
+  const digests = run(['artifact', f.artifact, f.input, f.sbom])
+    .trim()
+    .split(' ');
   const receipt = JSON.parse(readFileSync(f.artifact));
   assert.deepEqual(digests, [receipt.digest, receipt.artifact.digest]);
   run(['bind', f.bound, f.artifact], JSON.stringify(f.ready(receipt)));
@@ -305,8 +392,8 @@ test('executes the workflow CLI phases with stdin metadata and preserves prior r
     JSON.parse(readFileSync(f.bound)).deployment.id,
     'dpl_fixture123'
   );
-  assert.throws(() => run(['inputs', f.input]), /EEXIST/);
-  assert.throws(() => run(['unknown', f.input]), /Expected inputs/);
+  assert.throws(() => run(['inputs', f.input, f.sbom]), /EEXIST/);
+  assert.throws(() => run(['unknown', f.input]), /Expected sbom/);
 });
 
 for (const [field, value] of [
@@ -320,9 +407,9 @@ for (const [field, value] of [
 ])
   test('rejects mismatched deployment ' + field, t => {
     const f = fixture(t);
-    captureInputs(f.root, f.sha, f.input);
+    f.captureInputs();
     f.makeOutput();
-    const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact);
+    const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom);
     const deployment = f.ready(receipt);
     if (field.startsWith('meta.')) deployment.meta[field.slice(5)] = value;
     else deployment[field] = value;
@@ -335,9 +422,9 @@ for (const [field, value] of [
 for (const changed of ['page.tsx', '.vercel/output/config.json'])
   test('rejects post-capture drift: ' + changed, t => {
     const f = fixture(t);
-    captureInputs(f.root, f.sha, f.input);
+    f.captureInputs();
     f.makeOutput();
-    const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact);
+    const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact, f.sbom);
     writeFileSync(resolve(f.root, changed), 'drift');
     assert.throws(
       () =>
@@ -356,6 +443,7 @@ test('workflow records inputs before build and binds inspected deployment before
     workflow.indexOf('  staging-deployment-receipt:')
   );
   const order = [
+    'production-input-provenance.mjs sbom',
     'production-input-provenance.mjs inputs',
     'vercel build --prod',
     'production-input-provenance.mjs artifact',

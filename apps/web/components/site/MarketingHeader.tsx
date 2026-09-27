@@ -16,6 +16,10 @@ import {
   CANONICAL_PUBLIC_SHELL_EVENTS,
 } from '@/data/canonicalPublicShellOptimization';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
+import {
+  type MarketingHeaderBrand,
+  resolveMarketingHeaderBrand,
+} from '@/data/marketing/headerBrand';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import {
@@ -40,6 +44,9 @@ const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
       index === 0 ? { ...link, treatment: 'leading' } : link
   ),
 ];
+// Icon-only pages drop the desktop wordmark; the logo reveals it on hover.
+const MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY: readonly MarketingHeaderNavLink[] =
+  MARKETING_GLASS_DESKTOP_LINKS.filter(link => link.treatment !== 'wordmark');
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
   MARKETING_NAV_LINKS;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
@@ -53,6 +60,12 @@ const MARKETING_HEADER_CTA_BY_PATH: Readonly<
 
 export interface MarketingHeaderProps
   extends Readonly<{
+    /**
+     * Brand presentation. Defaults to the per-page config in
+     * `data/marketing/headerBrand.ts` (icon-only when the hero H1 already
+     * says "Jovie").
+     */
+    readonly brand?: MarketingHeaderBrand;
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
@@ -70,7 +83,8 @@ interface ResolvedNavConfig {
 function resolveNavConfig(
   hasSimpleNav: boolean,
   centerNavDisabled: boolean,
-  simpleNavLinks: readonly MarketingHeaderNavLink[]
+  simpleNavLinks: readonly MarketingHeaderNavLink[],
+  iconOnly: boolean
 ): ResolvedNavConfig {
   if (hasSimpleNav) {
     return {
@@ -85,11 +99,14 @@ function resolveNavConfig(
   return {
     flyoutMenus: undefined,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
-    desktopNavLinks: MARKETING_GLASS_DESKTOP_LINKS,
+    desktopNavLinks: iconOnly
+      ? MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY
+      : MARKETING_GLASS_DESKTOP_LINKS,
   };
 }
 
 export function MarketingHeader({
+  brand,
   logoSize = 'xs',
   logoVariant = 'word',
   navLinks,
@@ -143,21 +160,21 @@ export function MarketingHeader({
   const hasSimpleNav = isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
   const centerNavDisabled = !centerNavEnabled;
   const hideCenterNav = isMinimal || centerNavDisabled;
+  const iconOnly = resolveMarketingHeaderBrand(pathname, brand) === 'icon';
   const navConfig = resolveNavConfig(
     hasSimpleNav,
     centerNavDisabled,
-    resolvedNavLinks
+    resolvedNavLinks,
+    iconOnly
   );
   const resolvedPrimaryCta =
     primaryCta ??
     (pathname === null ? undefined : MARKETING_HEADER_CTA_BY_PATH[pathname]) ??
     DEFAULT_MARKETING_CTA;
   const resolvedLogoVariant =
-    presentation === 'marketing-glass'
+    presentation === 'marketing-glass' || isArtistProfiles || iconOnly
       ? 'icon'
-      : isArtistProfiles
-        ? 'icon'
-        : logoVariant;
+      : logoVariant;
 
   const header = (
     <HeaderNav
@@ -167,6 +184,7 @@ export function MarketingHeader({
         presentation === 'marketing-glass' || isArtistProfiles ? 'sm' : logoSize
       }
       logoVariant={resolvedLogoVariant}
+      logoReveal={resolvedLogoVariant === 'icon'}
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}

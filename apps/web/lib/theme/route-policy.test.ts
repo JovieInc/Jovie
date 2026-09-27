@@ -1,8 +1,35 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
-import { isThemeRoute, THEME_ROUTE_POLICY } from './route-policy';
 
-describe('theme route policy', () => {
+async function loadPolicy() {
+  vi.resetModules();
+  return import('./route-policy');
+}
+
+describe('theme route policy with THEME_SWITCHING off (default)', () => {
+  it.each(['/', '/pricing', '/app', '/app/settings', '/blog/entry', '/tim'])(
+    'forces dark on %s',
+    async pathname => {
+      const { isThemeRoute, THEME_ROUTE_POLICY } = await loadPolicy();
+      expect(THEME_ROUTE_POLICY).toEqual({ exact: [], prefixes: [] });
+      expect(isThemeRoute(pathname)).toBe(false);
+    }
+  );
+});
+
+describe('theme route policy with THEME_SWITCHING on', () => {
+  let isThemeRoute: (pathname: string) => boolean;
+  let THEME_ROUTE_POLICY: unknown;
+
+  beforeAll(async () => {
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_THEME_SWITCHING', '1');
+    ({ isThemeRoute, THEME_ROUTE_POLICY } = await loadPolicy());
+  });
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('is serializable for the synchronous root-layout bootstrap', () => {
     expect(JSON.parse(JSON.stringify(THEME_ROUTE_POLICY))).toEqual(
       THEME_ROUTE_POLICY

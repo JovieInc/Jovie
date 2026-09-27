@@ -1561,26 +1561,20 @@ body:has(.home-viewport)::-webkit-scrollbar {
   [data-testid="header-nav"][data-presentation="homepage-embedded"]
   nav
   > div {
-  height: calc(var(--space-10) + var(--space-1)) !important;
+  /* Docked bar (Tim direction 2026-09-26): the row fills the header height
+     and never carries its own surface. The glass layer is the header's
+     ::before (MarketingHeader.css), so geometry is identical at rest and
+     scrolled — no pill, no margin, no layout shift at the threshold. */
+  height: var(--homepage-header-height) !important;
   max-width: var(--ds-public-content-max);
-  /* Constant margin in both rest and scrolled states: the glass fade-in must
-     never move the pill (scroll jank fix — margin changes skip the color-only
-     transition and jump the bar 8px at the scroll threshold). */
-  margin-top: var(--space-2);
+  margin-top: 0;
   padding-inline: 0;
   border-color: transparent;
-  border-radius: calc(var(--space-5) + var(--space-0-5));
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  transition:
-    background-color var(--ds-motion-subtle-duration)
-    var(--ds-motion-subtle-easing),
-    border-color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    box-shadow var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    backdrop-filter var(--ds-motion-subtle-duration)
-    var(--ds-motion-subtle-easing);
 }
 
 .home-viewport[data-scrolled="true"]
@@ -1624,16 +1618,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
   > div {
   max-width: var(--ds-public-content-max);
   padding-inline: 0;
-  border-radius: calc(var(--space-5) + var(--space-0-5));
-  border-color: color-mix(
-    in oklab,
-    var(--system-b-text-primary) 6%,
-    transparent
-  );
-  background: color-mix(in oklab, var(--system-b-bg-page) 78%, transparent);
+  border-radius: 0;
+  border-color: transparent;
+  background: transparent;
   box-shadow: none;
-  backdrop-filter: blur(var(--space-5)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--space-5)) saturate(150%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .homepage-hero-shell {
@@ -3559,7 +3549,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     [data-testid="header-nav"][data-presentation="homepage-embedded"]
     nav
     > div {
-    height: calc(var(--space-10) + var(--space-1)) !important;
+    height: var(--homepage-header-height) !important;
   }
 
   .home-viewport[data-scrolled="true"]

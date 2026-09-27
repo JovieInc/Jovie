@@ -6,10 +6,9 @@ const H = '[0-9a-f]+';
 const FAMILIES = [
   `(\\w+-next-build-web-v1)-${H}-\\d{8}(?:\\d{2})?`,
   `(jovie-web-tsbuildinfo-v2-\\w+)-${H}-(h\\d{10}|${H})`,
-  `(pnpm-node-modules-v2-\\w+-\\w+)-${H}-${H}`,
+  `(pnpm-node-modules-v3-\\w+-\\w+)-${H}-${H}`,
   `(jovie-production-next-cache-v1-\\w+)-${H}`,
   `(\\w+-turbo)-${H}`,
-  '(symphony-selector-v1-\\w+)-.+',
 ].map(s => new RegExp(`^${s}$`));
 
 export function planSuperseded(caches) {
@@ -21,7 +20,7 @@ export function planSuperseded(caches) {
         Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id
     )
     .filter(({ key }) => {
-      if (key.startsWith('pnpm-node-modules-v1-')) return true;
+      if (/^pnpm-node-modules-v[12]-/.test(key)) return true;
       const stem = FAMILIES.map(re => key.match(re)?.[1]).find(Boolean);
       if (!stem) return false;
       if (seen.has(stem)) return true;

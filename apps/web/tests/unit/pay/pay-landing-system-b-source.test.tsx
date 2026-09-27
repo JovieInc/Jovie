@@ -70,4 +70,16 @@ describe('pay landing System B source contract', () => {
     );
     expect(finalControls).toHaveLength(2);
   });
+
+  it('bleeds the hero glow under the docked header without moving the copy', () => {
+    render(<PayLanding />);
+
+    const dock = screen.getByTestId('pay-hero').parentElement;
+    expect(dock?.tagName).toBe('SECTION');
+    expect(dock).toHaveClass(
+      'marketing-hero-dock',
+      'marketing-hero-dock--inset'
+    );
+    expect(dock?.querySelector(':scope > .hero-glow')).not.toBeNull();
+  });
 });

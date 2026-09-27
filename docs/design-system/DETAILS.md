@@ -367,19 +367,42 @@ prior anchors without a second theme provider).
 
 | Role | Hex | Soft | Meaning |
 |------|-----|------|---------|
-| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Focus, active nav, links, selection |
-| Ultra (violet) | `#8E56F5` | `rgba(142,86,245,.12)` | Agent intelligence or ranking state only |
-| Pulse (pink) | `#F52BB5` | `rgba(245,43,181,.12)` | Launch or creative-status state only |
+| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Focus, active nav, links, selection; rotation slot 1 on backgrounds |
+| Ultra (violet) | `#8E56F5` | `rgba(142,86,245,.12)` | Agent intelligence or ranking state; rotation slot 2 on backgrounds |
+| Pulse (pink) | `#F52BB5` | `rgba(245,43,181,.12)` | Launch or creative-status state; rotation slot 3 on backgrounds |
 | Mint (green) | `#3FFA8B` | `rgba(63,250,139,.12)` | Success. Aqua aliases this hex. |
-| Orange | `#FF7800` | `rgba(255,120,0,.12)` | Warning. Gold aliases this hex. |
+| Orange | `#FF7800` | `rgba(255,120,0,.12)` | Warning; rotation slot 4 after Ion, Ultra, Pulse. Gold aliases this hex. |
 | Red | `#F72A36` | `rgba(247,42,54,.12)` | Danger / error. Flare aliases this hex. |
 
 CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
 Every status also uses text, icon, shape, or pattern — color alone never carries meaning.
 
-Accent color is semantic only. Do not rotate accent colors for decoration, use
-accent title text as ornament, or put a decorative icon on a colored square.
+Accent color follows the founder rotation rule (Tim, 2026-09-26). It applies
+app-wide: web, mobile web, iOS, macOS, marketing, and public profiles.
+
+- **Neutral by default.** Color appears only through the rotation below. The
+  interactive focus/link accent never rotates. Red and green keep their status
+  meaning. CTAs stay neutral high-contrast pills.
+- **Background only.** A rotating accent fills a card or section background
+  (tint, gradient, shader). Text, glyphs, and CTAs stay neutral.
+- **Visual-order rotation.** Assign blue (Ion) → purple (Ultra) → pink (Pulse) in
+  reading order on each surface. Two consecutive sections or cards never share
+  an accent. Orange enters only after those three are used on that surface.
+  Red and green enter only after all four, since they read as error and success.
+- **Image anchor.** When a card carries album art, release artwork, or a photo,
+  choose the accent that best complements the image by color theory, and reject
+  accents that clash with it (skin tones included). That choice anchors the
+  rotation, and the next section cannot reuse it.
+- **One accent per gradient.** A gradient, shader, or background uses one
+  accent only, never two in the same section. Its central hue is the exact accent
+  token value, with the most weight there. Other stops are shades of that hue.
+- **Saturation is the contrast lever.** Colors are OKLCH. When the foreground
+  needs to pop, lower chroma only (keep lightness and hue), by an optically
+  equal amount across accents. Behind album art or a profile picture,
+  desaturate strongly so the art wins. Text-only cards keep more chroma.
+
+Never use accent title text as ornament or put a decorative icon on a colored square.
 
 Specimen: Storybook `Design System/Noir Ion Specimen`.
 
@@ -776,11 +799,20 @@ keep them at semibold (~590) and do not drop medium surfaces to book/400.
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
+| Accent active RGB | `236 238 241` | `168 176 195 / 0.1` |
 | Item foreground RGB | `88 90 96` | `214 218 226` |
 | Item icon RGB | `122 125 132` | `116 120 128` |
 | Muted RGB | `112 116 124` | `107 111 118` |
 | Nav font | 12px / weight 500 | — |
 | Item font | 13px / weight 450 | — |
+
+Linear-scale density (founder lock 2026-09-25): 28px nav/history rows, 16px
+sidebar icons, 44px app header everywhere (single token, no separate
+"compact" variant). Selected nav row uses the neutral Accent active tint
+above with primary-token text — no ion/blue background, no border.
+Today/Earlier day headers are sentence case, no letterspacing, 11px medium,
+quiet color. Account footer is a single compact 32px row: 20px avatar, name
+only, no workspace subtitle line.
 
 ### App Shell Frame
 
