@@ -214,6 +214,8 @@
     "test:web:surface-receipt": "node scripts/web-test-surface-receipt.mjs",
     "typecheck:scripts": "node scripts/typecheck-scripts.mjs",
     "typecheck:scripts:update": "node scripts/typecheck-scripts.mjs --update-baseline",
+    "typecheck:performance": "node scripts/typecheck-performance.mjs",
+    "typecheck:performance:safety": "bash scripts/typecheck-safety-probe.sh",
     "pre-push": "bash scripts/hooks/biome-pre-push.sh && pnpm --filter=@jovie/web run pre-push",
     "pre-push:gate": "bash scripts/hooks/pre-push-gate.sh lint",
     "pre-push:gate:test": "bash scripts/hooks/pre-push-gate.sh test",
