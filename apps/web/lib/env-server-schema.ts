@@ -235,6 +235,7 @@ export const ServerEnvSchema = z.object({
   HUD_GITHUB_WORKFLOW: z.string().optional(),
   GBRAIN_API_URL: z.string().optional(),
   GBRAIN_API_KEY: z.string().optional(),
+  GBRAIN_HEALTH_URL: z.string().trim().url().optional(),
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
@@ -564,6 +565,7 @@ export const ENV_KEYS = [
   'HUD_GITHUB_WORKFLOW',
   'GBRAIN_API_URL',
   'GBRAIN_API_KEY',
+  'GBRAIN_HEALTH_URL',
   'REVALIDATE_SECRET',
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
