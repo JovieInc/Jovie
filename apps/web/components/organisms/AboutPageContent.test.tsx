@@ -29,6 +29,7 @@ describe('AboutPageContent', () => {
       'Why Jovie Exists',
       'What Jovie Does',
       'Frequently Asked Questions',
+      'Ready to build your Jovie profile?',
     ]);
     expect(screen.getByText('— Tim White, Founder')).toBeVisible();
     for (const feature of [

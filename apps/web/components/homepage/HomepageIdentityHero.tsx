@@ -30,9 +30,9 @@ export const HOMEPAGE_HERO_TEXTURE = {
 
 /**
  * Canonical Pen homepage hero (2026-09-26): the blue technical texture docked
- * under the header, one headline, one support line, the one Request access
- * action (name search while the waitlist is off), and an illustrative Jovie
- * profile specimen. The texture drifts once per 20s cycle in CSS only; copy
+ * under the header, one headline, one support line, the certified name search
+ * (JOV-5085: Search your name, Find me, /start; never Request access), and an
+ * illustrative Jovie profile specimen. The texture drifts once per 20s cycle in CSS only; copy
  * and controls never move.
  */
 export function HomepageIdentityHero({

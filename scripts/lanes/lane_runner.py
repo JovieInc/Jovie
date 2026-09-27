@@ -69,6 +69,11 @@ LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lan
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
+# JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
+# new issues and only fixes/adopts what it already opened.
+OPEN_PRS_PER_SLOT = 2
+STALE_DRAFT_S = 24 * 3600
+SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
 # Waiting work gains one priority level per day, capped at urgent. This preserves
 # urgent-first admission while guaranteeing that a sustained P1 stream cannot
@@ -840,7 +845,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
 def best_per_issue(prs: list[dict]) -> list[dict]:
     """One PR per issue, retroactively: when the old runner left several open PRs for one
     issue, the lanes spend effort only on the one furthest along (ready over draft, clean over
-    conflicted, then newest). The others stay open for a human to close; nothing is deleted."""
+    conflicted, then newest). sweep_lane_prs closes the others as superseded."""
     by_issue: dict[str, list[dict]] = {}
     rest = []
     for pr in prs:
@@ -848,7 +853,8 @@ def best_per_issue(prs: list[dict]) -> list[dict]:
         (by_issue.setdefault(found.group("issue"), []) if found else rest).append(pr)
     keep = list(rest)
     for group in by_issue.values():
-        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
+        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), is_green(pr),
+                                               pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
     return sorted(keep, key=lambda pr: pr["number"])
 
 
@@ -887,7 +893,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     return receipt
 
 
-def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
+def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list[dict]:
     """This lane's open PRs (its dated run branches), plus the orphaned PRs of disabled lanes:
     nobody else will fix or gate those, and any enabled lane can."""
     providers = load_providers() if providers is None else providers
@@ -895,13 +901,16 @@ def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
     prs = []
     for owner in names:
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
-                     "--json", PR_FIELDS])
+                     *(["--limit", "200", "--json", fields] if fields else ["--json", PR_FIELDS])])
         own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
         prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
     return prs
 
 
 PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
+# Every lane PR without check rollups: rollups over ~90 PRs time out (HTTP 504), so the full
+# field set stays at gh's default page of 30 and the budget/sweep read this light set.
+LIGHT_PR_FIELDS = "number,url,isDraft,headRefName,mergeStateStatus"
 
 
 def repo_prs() -> list[dict]:
@@ -922,13 +931,96 @@ def fix_candidates(name: str) -> list[dict]:
     return merged
 
 
-def in_flight_issues() -> frozenset[str]:
-    """Issues that already have an open lane PR from any lane on any host (GitHub is the
-    shared truth, so two hosts cannot both open a PR for one issue)."""
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "300",
-                 "--json", "headRefName"])
-    found = (LANE_BRANCH.match(pr["headRefName"]) for pr in json.loads(listed.stdout or "[]"))
-    return frozenset(match.group("issue").upper() for match in found if match)
+ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
+
+
+def in_flight_issues() -> frozenset[str] | None:
+    """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
+    lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
+    unknown in-flight set is not permission to open a duplicate PR (JOV-6833)."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "500",
+                 "--json", "headRefName,body"])
+    if listed.returncode != 0:
+        return None
+    keys = set()
+    for pr in json.loads(listed.stdout or "[]"):
+        branch = LANE_BRANCH.match(pr.get("headRefName") or "")
+        marker = ISSUE_MARKER.search(pr.get("body") or "")
+        keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
+    return frozenset(keys)
+
+
+def is_green(pr: dict) -> bool:
+    return not pr.get("isDraft") and pr.get("mergeStateStatus") in ("CLEAN", "HAS_HOOKS")
+
+
+def over_budget(name: str, prs: list[dict], slots: int) -> bool:
+    """Slots bound worktrees, not open PRs; without this a lane keeps opening while its earlier
+    PRs rot (84 devin PRs, 0 green drafts on 2026-09-27). Over budget = fix/adopt only."""
+    own = [pr for pr in prs if (pr.get("headRefName") or "").startswith(f"{name}/")]
+    return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
+
+
+def last_pushes() -> dict[int, float]:
+    """Open PR number -> head commit time, in one paginated query (`gh pr list --json commits`
+    over 200 PRs exceeds GitHub's GraphQL node limit). Empty when GitHub cannot be read."""
+    owner, name = REPO_SLUG.split("/")
+    listed = sh(["gh", "api", "graphql", "--paginate", "-f", f"owner={owner}", "-f", f"name={name}", "-f",
+                 "query=query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){"
+                 "pullRequests(states:OPEN,first:100,after:$endCursor){pageInfo{hasNextPage endCursor}"
+                 "nodes{number commits(last:1){nodes{commit{committedDate}}}}}}}",
+                 "--jq", ".data.repository.pullRequests.nodes[] | "
+                         "\"\\(.number) \\(.commits.nodes[0].commit.committedDate)\""])
+    pushes = {}
+    for line in (listed.stdout or "").splitlines() if listed.returncode == 0 else []:
+        number, _, date = line.partition(" ")
+        if number.isdigit() and created_at_epoch(date) is not None:
+            pushes[int(number)] = created_at_epoch(date)
+    return pushes
+
+
+def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[list[tuple[dict, int]], list[dict]]:
+    """(duplicates to close as superseded by the kept PR, stale drafts to close).
+    Only lane-branch PRs; the kept PR per issue is best_per_issue's pick."""
+    kept = {LANE_BRANCH.match(pr["headRefName"]).group("issue"): pr
+            for pr in best_per_issue(prs) if LANE_BRANCH.match(pr.get("headRefName") or "")}
+    superseded, stale = [], []
+    for pr in prs:
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        if not found:
+            continue
+        keep = kept[found.group("issue")]
+        if keep["number"] != pr["number"]:
+            superseded.append((pr, keep["number"]))
+            continue
+        pushed = pushes.get(pr["number"])
+        if pr.get("isDraft") and not is_green(pr) and pushed is not None and now - pushed >= STALE_DRAFT_S:
+            stale.append(pr)
+    return superseded, stale
+
+
+def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
+    """On the existing lane tick (at most every SWEEP_EVERY_S per host): leave one open PR per
+    issue and close drafts with no green run and no push for a day, returning their issue to Todo."""
+    now = time.time() if now is None else now
+    marker = host.state / f"sweep-{name}.json"
+    if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
+        return
+    marker.write_text(json.dumps({"at": now}))
+    superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
+    for pr, keep in superseded:
+        sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
+            f"🤖 lane sweep: superseded by #{keep} (one open PR per Linear issue, JOV-6833)."])
+    for pr in stale:
+        issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
+        closed = sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
+                     "🤖 lane sweep: closing this draft; no green run and no push for 24 h (JOV-6833). "
+                     f"{issue} goes back to Todo for a fresh attempt."])
+        # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
+        if closed.returncode == 0 and linear.state_of(issue) == "In Progress":
+            linear.move(issue, "Todo")
+            linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
+                                  "no push for 24 h); back to Todo.")
 
 
 def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
@@ -998,9 +1090,13 @@ def worker(host: Host, name: str) -> int:
         red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
-        if red is None and adopt is None:
+        sweep_lane_prs(host, name, linear)
+        in_flight = None if red or adopt or over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
+                                                        host.slots(name, spec.get("slots", 1))) \
+            else in_flight_issues()
+        if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues(),
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
                                provider=name)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now

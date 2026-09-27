@@ -18,8 +18,7 @@ function toAbsolutePublicUrl(href: string): string {
  */
 export function buildHomepageMarkdown(): string {
   const { hero } = HOMEPAGE_IDENTITY_COPY;
-  const { fallbackCta, workspace, productStatement, faq } =
-    HOMEPAGE_LAUNCH_COPY;
+  const { workspace, productStatement, faq } = HOMEPAGE_LAUNCH_COPY;
   const callouts = workspace.callouts
     .map(item => `### ${item.title}\n\n${item.body}`)
     .join('\n\n');
@@ -31,7 +30,7 @@ export function buildHomepageMarkdown(): string {
 
 ${hero.subhead}
 
-${fallbackCta.label}: ${toAbsolutePublicUrl(fallbackCta.href)}
+${hero.search.placeholder} → ${hero.search.action}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
 
 ## ${workspace.kicker}
 

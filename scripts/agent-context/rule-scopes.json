@@ -17,7 +17,7 @@
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "f63b9f10c6a648253edb94de57708f6ae569eef6834638b2e8f9569115e26656"
+    "bodySha256": "4e1b3dc1066ae0ce224369eac942cbc97d07e4d30c518c47ec1885ff429688b0"
   },
   {
     "file": ".claude/rules/environment.md",
