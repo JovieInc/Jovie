@@ -28,6 +28,11 @@ ACCOUNTS_ROOT = Path(os.environ.get("CODEX_ACCOUNTS_ROOT", Path.home() / ".codex
 STATE = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "codex-accounts.json"
 DEFAULT_COOLDOWN_S = int(os.environ.get("CODEX_DEFAULT_COOLDOWN_S", 5 * 3600))
 LIMIT = re.compile(r"usage limit|rate limit|too many requests|\b429\b|quota", re.I)
+# A short burst limit (429 / "rate limit") backs off briefly and rotates; only a spent
+# plan (usage limit / quota) banks the account until its reset.
+USAGE = re.compile(r"usage limit|quota|insufficient", re.I)
+RATE_BACKOFF_S = int(os.environ.get("CODEX_RATE_BACKOFF_S", 120))
+ROTATE_PAUSE_S = float(os.environ.get("CODEX_ROTATE_PAUSE_S", 20))
 AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token|credential)|\b401\b", re.I)
 # "Try again at 3:15 PM", "try again in 2 hours 5 minutes", "resets at 2026-09-27T01:00:00Z"
 RESET_AT = re.compile(r"(?:try again|resets?|available)\s+(?:at|on)\s+([0-9T:\-\. ]+(?:AM|PM|Z)?)", re.I)
@@ -114,10 +119,16 @@ def parse_reset(text: str, now: float) -> float | None:
 
 
 def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
-    """(kind, exhausted_until): kind is ok | limit | auth | error."""
+    """(kind, exhausted_until): kind is ok | rate | limit | auth | error."""
     tail = output[-20000:]
-    if LIMIT.search(tail) and (code != 0 or not tail.strip().endswith("OK")):
-        return "limit", parse_reset(tail, now) or now + DEFAULT_COOLDOWN_S
+    # Only a failed run can be an exhausted account. A successful run's transcript often
+    # mentions "429", "quota" or "rate limit" (Jovie has a rate limiter), and matching that
+    # banked all 5 healthy accounts for 5h on 2026-09-27. Read only codex's closing lines.
+    closing = "\n".join(tail.splitlines()[-30:])
+    if code != 0 and LIMIT.search(closing):
+        if not USAGE.search(closing):
+            return "rate", parse_reset(closing, now) or now + RATE_BACKOFF_S
+        return "limit", parse_reset(closing, now) or now + DEFAULT_COOLDOWN_S
     if code != 0 and AUTH.search(tail):
         return "auth", now + 24 * 3600
     return ("ok" if code == 0 else "error"), None
@@ -149,31 +160,48 @@ def pick(state: dict, now: float, names: list[str] | None = None):
 
 
 def run(args) -> int:
-    now = time.time()
-    state = read_state()
-    name, handle = pick(state, now)
-    if name is None:
-        print("codex-lane: no available account (all exhausted or leased)", file=sys.stderr)
-        return NO_ACCOUNT_EXIT
-    home = ACCOUNTS_ROOT / name
+    """One lane run. When an account hits a limit or auth failure mid-run, bank it and rotate to
+    the next available account on the same worktree, so the work finishes instead of stalling.
+    Returns NO_ACCOUNT_EXIT only when every account is spent, so the lane fails over to another
+    provider."""
     prompt = Path(args.prompt_file).read_text()
     last = Path(args.cwd or ".") / ".codex-last-message.txt"
-    cmd = ["codex", "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
-           "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
+    base = ["codex", "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
+            "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
     if args.model:
-        cmd += ["-m", args.model]
+        base += ["-m", args.model]
     if args.reasoning_effort:
-        cmd += ["-c", f'model_reasoning_effort="{args.reasoning_effort}"']
+        base += ["-c", f'model_reasoning_effort="{args.reasoning_effort}"']
     if args.cwd:
-        cmd += ["-C", args.cwd]
-    cmd.append("-")
+        base += ["-C", args.cwd]
+    base.append("-")
+    tried: list[str] = []
+    while True:
+        now = time.time()
+        name, handle = pick(read_state(), now, [n for n in accounts() if n not in tried])
+        if name is None:
+            print("codex-lane: no available account (all exhausted or leased)", file=sys.stderr)
+            return NO_ACCOUNT_EXIT
+        tried.append(name)
+        text = prompt if len(tried) == 1 else (
+            "A previous attempt on this worktree stopped when its account hit a limit. Continue from the "
+            "current state of the worktree (check `git status` and `git diff`); do not start over.\n\n" + prompt)
+        code, kind, until = run_account(name, handle, base, text, args.cwd, now)
+        if kind not in ("rate", "limit", "auth"):
+            return code
+        print(f"codex-lane: account {name} {kind}; banked until {iso(until)}; rotating", file=sys.stderr)
+        time.sleep(ROTATE_PAUSE_S)
+
+
+def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float):
+    home = ACCOUNTS_ROOT / name
     env = {**os.environ, "CODEX_HOME": str(home)}
     update_state(lambda st: st.setdefault(name, {}).update(lastUsed=now, runs=int(st.get(name, {}).get("runs") or 0) + 1))
     print(f"codex-lane: account={name} home={home}", flush=True)
     from collections import deque
     tail = deque(maxlen=400)  # classification only needs the end of the output
     try:
-        proc = subprocess.Popen(cmd, cwd=args.cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True)
         proc.stdin.write(prompt)
         proc.stdin.close()
@@ -195,10 +223,7 @@ def run(args) -> int:
         else:
             entry.pop("exhaustedUntil", None)
     update_state(record)
-    if kind in ("limit", "auth"):
-        print(f"codex-lane: account {name} {kind}; banked until {iso(until)}", file=sys.stderr)
-        return NO_ACCOUNT_EXIT if code == 0 else code
-    return code
+    return code, kind, until
 
 
 def status(now: float | None = None, names: list[str] | None = None, state: dict | None = None) -> dict:

@@ -453,6 +453,29 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int) -> subprocess.Comple
     return subprocess.CompletedProcess(cmd, code)
 
 
+PROVIDER_HANDOFFS = 2
+HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit {code}), most likely an "
+                "exhausted account or provider failure. Its partial work is in this worktree: check "
+                "`git status`, `git diff` and `git log origin/main..HEAD`, then finish the task. Do not "
+                "start over.\n\n")
+
+
+def cool_down(host: Host, name: str) -> None:
+    path = host.state / "cooldown" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+
+
+def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
+    """The cheapest enabled, healthy, non-cooling lane not yet tried on this run."""
+    for name, spec in (providers or load_providers()).items():
+        if name in exclude or not spec.get("enabled", True) or cooling(host, name):
+            continue
+        if provider_healthy(spec):
+            return name, spec
+    return None
+
+
 # ---------------------------------------------------------------- one run
 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
@@ -475,6 +498,26 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             started = time.time()
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
+            # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
+            # lane finishes it on the same worktree.
+            handoffs, current = [], name
+            while agent.returncode != 0 and len(handoffs) < PROVIDER_HANDOFFS:
+                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
+                if nxt is None:
+                    break
+                cool_down(host, current)
+                nxt_name, nxt_spec = nxt
+                handoff_prompt = HANDOFF_NOTE.format(prev=current, code=agent.returncode) + prompt
+                handoff_file = runs / f"{run_id}.handoff{len(handoffs) + 1}.prompt.md"
+                handoff_file.write_text(handoff_prompt)
+                log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
+                log.flush()
+                handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
+                agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
+                                                             "cwd": str(worktree)}), worktree, log, host.agent_timeout)
+                current = nxt_name
+            if handoffs:
+                receipt.update(handoffs=handoffs, finishedBy=current)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
                                            sensitive=issue_is_sensitive(issue)))
