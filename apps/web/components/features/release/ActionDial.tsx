@@ -32,6 +32,15 @@ function wrapIndex(index: number, count: number): number {
   return ((index % count) + count) % count;
 }
 
+function relativeIndex(
+  index: number,
+  activeIndex: number,
+  count: number
+): number {
+  const forward = wrapIndex(index - activeIndex, count);
+  return forward > count / 2 ? forward - count : forward;
+}
+
 function prefersReducedMotion(): boolean {
   return typeof globalThis.matchMedia === 'function'
     ? globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -55,6 +64,7 @@ export function ActionDial({
   const [visualIndex, setVisualIndex] = useState(selectedIndex);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const reducedMotion = prefersReducedMotion();
   const pointerRef = useRef<{
     id: number;
     y: number;
@@ -102,13 +112,13 @@ export function ActionDial({
       // Vibration requires a live user gesture on supporting browsers. The
       // preference itself is persisted only after the reel settles.
       selectionHaptic();
-      if (prefersReducedMotion()) {
+      if (reducedMotion) {
         commit(next);
       } else {
         snapTimerRef.current = setTimeout(() => commit(next), SNAP_MS);
       }
     },
-    [commit, options, selectionHaptic]
+    [commit, options, reducedMotion, selectionHaptic]
   );
 
   const onPointerDown = useCallback(
@@ -170,6 +180,37 @@ export function ActionDial({
   );
 
   const active = options[visualIndex] ?? options[0];
+  const hasActionIcons = options.some(option => option.icon);
+  const actionIcon =
+    reducedMotion || !hasActionIcons ? (
+      active?.icon
+    ) : (
+      <span
+        className='relative h-5 w-5 shrink-0 overflow-hidden'
+        aria-hidden='true'
+        data-testid='action-dial-icon-track'
+      >
+        {options.map((option, index) => {
+          const offset = relativeIndex(index, visualIndex, options.length);
+          return option.icon ? (
+            <span
+              key={option.id}
+              className={cn(
+                'absolute inset-0 transition-[transform,opacity] duration-subtle ease-subtle motion-reduce:transition-none',
+                isDragging && 'transition-none',
+                Math.abs(offset) <= 1 ? 'opacity-100' : 'opacity-0'
+              )}
+              style={{
+                transform: `translateY(${offset * 100 + (dragY / SWIPE_STEP_PX) * 100}%)`,
+              }}
+              data-testid={`action-dial-icon-${option.id}`}
+            >
+              {option.icon}
+            </span>
+          ) : null;
+        })}
+      </span>
+    );
   const visible = useMemo(() => {
     if (options.length === 0) return [];
     const offsets =
@@ -277,7 +318,7 @@ export function ActionDial({
         </div>
         <SmartLinkProviderButton
           label={actionLabel}
-          icon={active.icon}
+          icon={actionIcon}
           href={active.href}
           providerKey={active.id}
           primary
