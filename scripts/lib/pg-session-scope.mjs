@@ -12,22 +12,29 @@ const DB_COMMAND =
   /\b(psql|pgcli|pg_dump|pg_restore)\b|DATABASE_URL|postgres(ql)?:\/\/|\.neon\.tech\b|\bneon\(/i;
 
 // A SET that begins a statement: at the start, after `;`, a newline, or an
-// opening quote (`-c "SET ...`). `UPDATE t SET col = 1` is not a statement start.
+// opening quote (`-c "SET ...`). Every form except SET LOCAL / TRANSACTION /
+// CONSTRAINTS is session-scoped, including SET TIME ZONE and SET SCHEMA.
+// `set -e` is a shell builtin.
 const SESSION_SET =
-  /(?:^|[;\n]|["'`])\s*SET\s+(?!LOCAL\b|TRANSACTION\b|CONSTRAINTS\b)(?:SESSION\s+)?(?:CHARACTERISTICS\b|ROLE\b|AUTHORIZATION\b|[\w.]+\s*(?:=|\bTO\b))/i;
+  /(?:^|[;\n]|["'`])\s*SET\s+(?!LOCAL\b|TRANSACTION\b|CONSTRAINTS\b|[-+])\S+/i;
 const SESSION_SET_CONFIG = /set_config\s*\([^()]*,\s*false\s*\)/i;
 // Role/database defaults persist for every future session, pooled or not.
 const PERSISTENT_SET = /\bALTER\s+(?:ROLE|USER|DATABASE)\b[^;]*\bSET\b/i;
 
-// SQL comments can sit between keywords (`SET /* x */ foo = on`). Strip block
-// comments and `-- ` line comments; shell flags (`--no-psqlrc`) have no space.
+// SQL comments can sit between keywords (`SET /* x */ foo`, `SET--x\nfoo`).
+// Strip block comments and line comments; a shell flag (`--no-psqlrc`) starts
+// after whitespace and has no space after `--`, so it is kept.
 function stripSqlComments(text) {
-  return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--\s[^\n]*/g, ' ');
+  return text
+    .replace(/\\n/g, '\n') // $'...\n...' shell strings expand at run time
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(?<=\S)--[^\n]*|--\s[^\n]*/g, ' ');
 }
 
 // Statement-leading transaction control would end a read-only wrapper.
+// SET TRANSACTION can switch the wrapper's transaction to READ WRITE.
 const TRANSACTION_CONTROL =
-  /(?:^|[;\n])\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE|PREPARE\s+TRANSACTION)\b/i;
+  /(?:^|[;\n])\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE|PREPARE\s+TRANSACTION|SET\s+TRANSACTION|SET\s+SESSION\s+CHARACTERISTICS)\b/i;
 
 export function findTransactionControl(sql) {
   const match = stripSqlComments(String(sql ?? '')).match(TRANSACTION_CONTROL);
