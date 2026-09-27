@@ -177,6 +177,32 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([
+    '/blog',
+    '/blog/the-contact-problem',
+    '/blog/category/artist-management',
+    '/changelog',
+    '/changelog/26.9.0',
+    '/engineering',
+    '/engineering/some-story',
+  ])('omits the duplicate footer CTA on the editorial route %s', pathname => {
+    mockUsePathname.mockReturnValue(pathname);
+
+    render(<MarketingFooter />);
+
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the terminal CTA on the founder-only engineering preview gallery', () => {
+    mockUsePathname.mockReturnValue('/engineering/preview');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
+  });
+
   it('links to the canonical Card route without duplicating its terminal CTA', () => {
     mockUsePathname.mockReturnValue('/card');
 

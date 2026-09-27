@@ -71,6 +71,11 @@ describe('ChangelogReleasePage', () => {
   it('renders the release header, body sections, resources, and navigation', async () => {
     await renderVersion('26.9.0');
 
+    const heroPhoto = screen.getByTestId('changelog-version-hero-photo');
+    expect(heroPhoto).toBeInTheDocument();
+    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
+      'changelog-version.webp'
+    );
     expect(
       screen.getByRole('heading', { level: 1, name: 'v26.9.0' })
     ).toBeVisible();

@@ -11,7 +11,7 @@ export const linktreeComparison: ComparisonData = {
     'Linktree gives you a static list of links. Jovie gives you a profile that captures visitors and keeps working after they leave. Here’s how they compare.',
   heroImage: {
     src: '/images/hero/compare-linktree.webp',
-    alt: 'A dark sphere with a glowing blue rim, lit from the edge.',
+    alt: 'An abstract field of dark crimson light and shadow.',
   },
   features: [
     {

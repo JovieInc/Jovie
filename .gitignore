@@ -150,6 +150,10 @@ ideation/screenshots/
 
 # npm lockfiles (pnpm monorepo uses pnpm-lock.yaml)
 package-lock.json
+# The trusted DeepSec scanner workspace pins its full npm dependency tree.
+!scripts/security/deepsec/package-lock.json
+scripts/security/deepsec/data/
+scripts/security/deepsec/node_modules/
 
 # Xcode
 DerivedData/
