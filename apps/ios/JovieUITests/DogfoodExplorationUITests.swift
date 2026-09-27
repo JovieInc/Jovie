@@ -99,7 +99,13 @@ final class DogfoodExplorationUITests: XCTestCase {
         checks: [
           elementExistsCheck("share-profile") { $0.buttons["dashboard-share-profile-button"] },
           elementExistsCheck("open-public-profile") { $0.buttons["Open Public Profile"] },
-          elementExistsCheck("open-settings") { $0.buttons["Open Settings"] },
+          // JOV-5353: Settings moved into the single trailing Actions menu.
+          { app in
+            app.buttons["shell-actions-menu"].tap()
+            let passed = app.buttons["Open Settings"].waitForExistence(timeout: 4)
+            app.buttons["shell-actions-menu"].tap()
+            return DogfoodCheck(name: "open-settings", passed: passed, detail: nil)
+          },
         ]
       ),
       DogfoodSurface(

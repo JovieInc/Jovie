@@ -5,8 +5,8 @@
  * (the real ceiling per docs/PR_FLOW.md: "Throughput ceiling is CI cost and
  * queue reliability, not merge wiring"); latency percentiles are SECONDARY
  * diagnostics. No experiment loop, no auto keep/rollback lives here — this
- * module only computes numbers from already-fetched GitHub data so the I/O job
- * (scripts/symphony/jobs/ci-metrics.ts) and unit tests share one tested core.
+ * module only computes numbers from already-fetched GitHub data so any I/O
+ * caller and the unit tests share one tested core.
  *
  * Percentiles use the same nearest-rank method as the duration ratchet, so the
  * gate p95 we report agrees with .github/workflows/ci-duration-ratchet.yml.

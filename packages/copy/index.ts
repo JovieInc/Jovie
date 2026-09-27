@@ -4,5 +4,6 @@
  * persona, founder drafts, customer-voice generation) gates through here.
  */
 export * from './judge';
+export * from './landing';
 export * from './lint';
 export * from './rules';

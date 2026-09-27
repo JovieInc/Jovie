@@ -368,21 +368,6 @@ def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
     assert "ci-harness/manifest.json" not in workflow
 
 
-def test_slop_gate_is_post_merge_informational() -> None:
-    """Copy smell stays off PR Ready; taste is post-ship."""
-    workflow = (WORKFLOWS / "slop-gate.yml").read_text(encoding="utf-8")
-    trigger_block = workflow.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert "schedule:" in trigger_block
-    assert "workflow_dispatch:" in trigger_block
-    assert "pull_request" not in trigger_block
-    assert "ci-harness/manifest.json" in workflow
-    assert "continue-on-error: true" in workflow
-    assert "HEAD~1" not in workflow
-    assert "--before='7 days ago'" in workflow
-
-
 def test_agent_pipeline_retires_dead_qc_wires() -> None:
     """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
     workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
@@ -442,7 +427,6 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
         "actionlint.yml",
         "brand-scrub.yml",
         "ci.yml",
-        "slop-gate.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert install_command in workflow, workflow_name
@@ -1628,7 +1612,6 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
-        REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1756,7 +1739,7 @@ def test_retired_admission_commands_stay_disabled() -> None:
 def test_fleet_controllers_share_one_evaluate_action() -> None:
     """FGR and production-controller share the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
-    script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
+    script = REPO_ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
@@ -1765,7 +1748,7 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     for workflow, job_name, _step in callers:
         text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
         assert f"uses: ./{action}" in text, workflow
-        assert "python3 scripts/symphony/gem-priority-gate.py" not in text, workflow
+        assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production

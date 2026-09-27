@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ingestSummerBottleneckSnapshot,
@@ -32,6 +32,85 @@ const PRODUCER_PUBLIC_KEY = producerKeys.publicKey
   .toString();
 const PRODUCER_KEY_ID = 'jovie-production-2026-09';
 
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${canonical(child)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function digest(value: unknown): string {
+  return createHash('sha256').update(canonical(value)).digest('hex');
+}
+
+function existingRepair(observedAt: string, sourceVersion = SOURCE) {
+  const observedMs = Date.parse(observedAt);
+  return {
+    mode: 'isolated-cli' as const,
+    identifier: 'JOV-5800',
+    issueId: '11111111-1111-4111-8111-111111111111',
+    ownerId: '22222222-2222-4222-8222-222222222222',
+    issueRevision: new Date(observedMs - 60_000).toISOString(),
+    repository: 'JovieInc/Jovie' as const,
+    pr: 17005,
+    head: sourceVersion,
+    workspace: '/Users/gem/worktrees/jovie-repair',
+    writerUnit: 'symphony-gem.service',
+    assignmentDigest: 'a'.repeat(64),
+    expiresAt: new Date(observedMs + 60 * 60_000).toISOString(),
+  };
+}
+
+function taskAdmissions(
+  selectedId: SummerCiImprovementClassId,
+  observedAt: string,
+  sourceVersion: string,
+  assignment: ReturnType<typeof existingRepair>
+) {
+  const providerObservation = {
+    providerGrantDigest: '1'.repeat(64),
+    provider: 'grok',
+    model: 'grok-4',
+    accountUserId: 'account-1',
+    authPoolIdentity: '2'.repeat(64),
+    executableDigest: '3'.repeat(64),
+    routerDigest: '4'.repeat(64),
+    outputDigest: '5'.repeat(64),
+    quotaObservedAt: observedAt,
+    quotaSourceDigest: '6'.repeat(64),
+    includedRemainingPercent: 75,
+  };
+  const expiresAt = assignment.expiresAt;
+  return {
+    schema: 'jovie.eve.summer-task-admissions/v1',
+    assignmentDigest: assignment.assignmentDigest,
+    selectedId,
+    sourceRevision: sourceVersion,
+    runtimeRevision: sourceVersion,
+    runtimeGeneration: '7'.repeat(64),
+    runtimeInvocationId: '8'.repeat(32),
+    providerEligibility: {
+      state: 'ALLOWED',
+      observedAt,
+      expiresAt,
+      sourceDigest: digest(providerObservation),
+      reason: 'provider-included-allowance-observed',
+    },
+    downstreamHealth: {
+      state: 'ALLOWED',
+      observedAt,
+      expiresAt,
+      sourceDigest: '9'.repeat(64),
+      reason: 'observed-target-available',
+    },
+    providerObservation,
+  };
+}
+
 function snapshot(
   overrides: {
     eventId?: string;
@@ -42,10 +121,19 @@ function snapshot(
     release?: Record<string, unknown>;
     runner?: Record<string, unknown>;
     ciAudit?: Record<string, unknown> | null;
+    existingRepair?: Record<string, unknown> | null;
+    taskAdmissions?: Record<string, unknown> | null;
   } = {}
 ) {
   const source = overrides.sourceVersion ?? SOURCE;
   const observedAt = overrides.observedAt ?? NOW.toISOString();
+  const assignment = existingRepair(observedAt, source);
+  const admissions = taskAdmissions(
+    'merge-group-flake-baseline-ratchet',
+    observedAt,
+    source,
+    assignment
+  );
   const body = {
     schema: 'jovie.eve.summer-bottleneck-snapshot/v1',
     eventId: overrides.eventId ?? 'evt_bottleneck_0001',
@@ -80,10 +168,10 @@ function snapshot(
         observedAt,
         sourceDigest: '3'.repeat(64),
         sourceRevision: source,
-        blockedSince: '2026-09-02T07:00:00.000Z',
+        blockedSince: null,
         mainSha: source,
-        productionSha: 'b'.repeat(40),
-        unverifiedMerges: 3,
+        productionSha: source,
+        unverifiedMerges: 0,
         ...overrides.release,
       },
       runner: {
@@ -107,8 +195,17 @@ function snapshot(
         },
         capacityAvailable: 2,
         queuedWork: 0,
+        runtimeGeneration: '7'.repeat(64),
+        runtimeInvocationId: '8'.repeat(32),
         ...overrides.runner,
       },
+      ...(overrides.existingRepair === null
+        ? {}
+        : { existingRepair: overrides.existingRepair ?? assignment }),
+      ...(overrides.taskAdmissions === null
+        ? {}
+        : { taskAdmissions: overrides.taskAdmissions ?? admissions }),
+      admissions: {},
       ciAudit: {
         schema: 'jovie-ci-bottleneck-audit/v1',
         observedAt,
@@ -188,6 +285,10 @@ function ciAuditBottleneckSnapshot(
     readonly selectedId?: SummerCiImprovementClassId;
     readonly selectedState?: 'open' | 'partial';
     readonly sourceVersion?: string;
+    readonly observedAt?: string;
+    readonly existingRepair?: Record<string, unknown> | null;
+    readonly taskAdmissions?: Record<string, unknown> | null;
+    readonly runner?: Record<string, unknown>;
   } = {}
 ) {
   const {
@@ -196,8 +297,31 @@ function ciAuditBottleneckSnapshot(
     ...snapshotOverrides
   } = overrides;
   const baseline = snapshot(snapshotOverrides);
+  const observedAt = overrides.observedAt ?? NOW.toISOString();
+  const sourceVersion = overrides.sourceVersion ?? SOURCE;
+  const assignment = Object.hasOwn(overrides, 'existingRepair')
+    ? overrides.existingRepair
+    : existingRepair(observedAt, sourceVersion);
+  const assignmentForAdmissions =
+    assignment ?? existingRepair(observedAt, sourceVersion);
+  const selectedTaskAdmissions = Object.hasOwn(overrides, 'taskAdmissions')
+    ? overrides.taskAdmissions
+    : taskAdmissions(
+        selectedId,
+        observedAt,
+        sourceVersion,
+        assignmentForAdmissions as ReturnType<typeof existingRepair>
+      );
   return snapshot({
     ...snapshotOverrides,
+    observedAt,
+    existingRepair: assignment,
+    taskAdmissions: selectedTaskAdmissions,
+    runner: {
+      ...overrides.runner,
+      runtimeGeneration: '7'.repeat(64),
+      runtimeInvocationId: '8'.repeat(32),
+    },
     release: {
       blockedSince: null,
       productionSha: overrides.sourceVersion ?? SOURCE,
@@ -248,22 +372,93 @@ function harness(
   store = memoryStore(),
   overrides: Partial<SummerBottleneckDependencies> = {}
 ) {
-  const dispatchToSymphony = vi.fn(async () => ({
-    handle: 'symphony:task_0001',
-  }));
-  const observeSymphonyOutcome = vi.fn(async () => ({
-    status: 'succeeded' as const,
-    detail: 'release certification recovered',
-  }));
+  let dispatchedTask:
+    | import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask
+    | undefined;
+  const dispatchToSymphony = vi.fn(
+    async (
+      task: import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask
+    ) => {
+      dispatchedTask = task;
+      return { handle: 'symphony:task_0001' };
+    }
+  );
+  const defaultObserve: SummerBottleneckDependencies['observeSymphonyOutcome'] =
+    async () => ({
+      status: 'succeeded',
+      detail: 'assigned CI repair completed',
+    });
+  const observeImplementation =
+    overrides.observeSymphonyOutcome ?? defaultObserve;
+  const observeSymphonyOutcome = vi.fn(
+    async (input: {
+      readonly handle: string;
+      readonly idempotencyKey: string;
+    }) => {
+      const observed = await observeImplementation(input);
+      const persistedTask = [...store.records.values()]
+        .map(record => record.task)
+        .find(
+          candidate =>
+            candidate !== null &&
+            typeof candidate === 'object' &&
+            (candidate as { taskKey?: unknown }).taskKey ===
+              input.idempotencyKey &&
+            (candidate as { schema?: unknown }).schema ===
+              'jovie-symphony-repair-task/v3'
+        );
+      const task =
+        dispatchedTask?.taskKey === input.idempotencyKey
+          ? dispatchedTask
+          : (persistedTask as typeof dispatchedTask);
+      if (
+        observed.status === 'pending' ||
+        observed.terminalOutcome ||
+        !task ||
+        task.schema !== 'jovie-symphony-repair-task/v3'
+      ) {
+        return observed;
+      }
+      const status = observed.status;
+      const detail = observed.detail;
+      return {
+        ...observed,
+        terminalOutcome: {
+          schema: 'jovie.symphony-repair-outcome/v3',
+          taskKey: input.idempotencyKey,
+          decisionFingerprint: task.decisionFingerprint,
+          status,
+          detail,
+          completedAt: '2026-09-02T08:01:00.000Z',
+          source: { ...task.source, action: task.action },
+          existingRepair: task.existingRepair,
+          execution: {
+            assignmentDigest: task.existingRepair.assignmentDigest,
+            baseHead: task.existingRepair.head,
+            finalHead:
+              status === 'succeeded'
+                ? 'b'.repeat(40)
+                : task.existingRepair.head,
+            verification: {
+              headChanged: status === 'succeeded',
+              taskAccepted: status === 'succeeded',
+            },
+          },
+          signatureKeyId: 'symphony-outcome-2026-09',
+          signature: `ed25519=${'a'.repeat(86)}`,
+        },
+      };
+    }
+  );
   const dependencies: SummerBottleneckDependencies = {
     dispatchToSymphony,
     now: () => NOW,
-    observeSymphonyOutcome,
     producerVerificationKeys: new Map([[PRODUCER_KEY_ID, PRODUCER_PUBLIC_KEY]]),
     receiptSigningKey: KEY,
     receiptSigningKeyId: KEY_ID,
     store: store.store,
     ...overrides,
+    observeSymphonyOutcome,
   };
   return { ...store, dependencies, dispatchToSymphony, observeSymphonyOutcome };
 }
@@ -285,6 +480,12 @@ describe('Summer bottleneck loop', () => {
         blockedSince: '2026-09-02T07:30:00.000Z',
         capacityAvailable: 0,
         queuedWork: 1,
+      },
+      release: {
+        blockedSince: '2026-09-02T07:00:00.000Z',
+        mainSha: 'b'.repeat(40),
+        productionSha: SOURCE,
+        unverifiedMerges: 1,
       },
     });
 
@@ -390,7 +591,7 @@ describe('Summer bottleneck loop', () => {
   });
 
   it.each(summerCiImprovementClassIds)(
-    'admits only the bounded source-repair task for CI class %s',
+    'admits only the host-assigned v3 task for CI class %s',
     async selectedId => {
       const proof = harness();
       const expected = snapshot().signals.ciAudit.classes.find(
@@ -414,8 +615,13 @@ describe('Summer bottleneck loop', () => {
       });
       expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'remediate-selected-ci-audit-class',
-          authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
+          schema: 'jovie-symphony-repair-task/v3',
+          action: 'execute-existing-owned-repair',
+          authority: 'host-assigned-isolated-repair-only',
+          decisionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
+          existingRepair: expect.objectContaining({
+            assignmentDigest: 'a'.repeat(64),
+          }),
           selected: {
             id: selectedId,
             sourceRevision: SOURCE,
@@ -429,58 +635,122 @@ describe('Summer bottleneck loop', () => {
     }
   );
 
-  it('dispatches the in-envelope release bottleneck and signs a source-bound terminal receipt', async () => {
+  it('requires a fresh assignment and exact provider, target, selection, source, and runtime admission join', async () => {
+    const assignment = existingRepair(NOW.toISOString());
+    const staleAt = new Date(NOW.getTime() - 11 * 60_000).toISOString();
+    const admitted = (
+      target = assignment,
+      selectedId: SummerCiImprovementClassId = 'merge-group-flake-baseline-ratchet',
+      observedAt = NOW.toISOString()
+    ) => taskAdmissions(selectedId, observedAt, SOURCE, target);
+    const expiredAssignment = {
+      ...assignment,
+      expiresAt: new Date(NOW.getTime() - 60_000).toISOString(),
+    };
+    const unknownProvider = {
+      ...admitted(),
+      providerEligibility: {
+        state: 'UNKNOWN',
+        observedAt: null,
+        expiresAt: null,
+        sourceDigest: null,
+        reason: 'provider-included-allowance-unavailable',
+      },
+      providerObservation: null,
+    };
+    const cases = [
+      {
+        reason: 'existing-repair-assignment-missing',
+        overrides: { existingRepair: null },
+      },
+      {
+        reason: 'selection-bound-task-admissions-missing',
+        overrides: { taskAdmissions: null },
+      },
+      {
+        reason: 'task-admission-assignment-or-selection-mismatch',
+        overrides: {
+          taskAdmissions: admitted(assignment, 'controller-cascade-coalescing'),
+        },
+      },
+      {
+        reason: 'existing-repair-assignment-expired-or-stale',
+        overrides: {
+          existingRepair: expiredAssignment,
+          taskAdmissions: admitted(expiredAssignment),
+        },
+      },
+      {
+        reason: 'task-admission-provider-eligibility-unavailable-or-stale',
+        overrides: { taskAdmissions: unknownProvider },
+      },
+      {
+        reason: 'task-admission-provider-eligibility-unavailable-or-stale',
+        overrides: {
+          taskAdmissions: admitted(assignment, undefined, staleAt),
+        },
+      },
+      {
+        reason: 'task-admission-runtime-mismatch',
+        overrides: {
+          taskAdmissions: {
+            ...admitted(),
+            runtimeInvocationId: 'f'.repeat(32),
+          },
+        },
+      },
+    ] as const;
+
+    for (const [index, testCase] of cases.entries()) {
+      const proof = harness();
+      const receipt = await ingestSummerBottleneckSnapshot(
+        ciAuditBottleneckSnapshot({
+          eventId: `evt_hold_case_${index + 1}`,
+          ...testCase.overrides,
+        }),
+        proof.dependencies
+      );
+      expect(receipt).toMatchObject({
+        decision: 'held-host-assignment',
+        executionHold: {
+          kind: 'host-assignment',
+          reason: testCase.reason,
+        },
+        terminal: true,
+      });
+      expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
+      expect(proof.observeSymphonyOutcome).not.toHaveBeenCalled();
+    }
+  });
+
+  it('holds a release bottleneck outside the selection-bound CI task policy', async () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
-      snapshot(),
+      snapshot({
+        ciAudit: null,
+        release: {
+          blockedSince: '2026-09-02T07:00:00.000Z',
+          productionSha: 'b'.repeat(40),
+          unverifiedMerges: 3,
+        },
+      }),
       proof.dependencies
     );
 
     expect(receipt).toMatchObject({
       schema: 'jovie.eve.summer-bottleneck-outcome/v1',
-      decision: 'symphony-succeeded',
+      decision: 'held-host-assignment',
       owner: 'Summer',
       handle: 'symphony',
       selected: { id: 'release-certification-starvation' },
-      source: {
-        sourceVersion: SOURCE,
-        snapshotDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      executionHold: {
+        kind: 'host-assignment',
+        reason: 'selection-outside-task-admission-allowlist',
       },
-      symphony: { handle: 'symphony:task_0001' },
       terminal: true,
     });
-    expect(receipt.ranking).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: 'merge-group-flake-baseline-ratchet',
-          owner: 'ci-reliability',
-          handle: 'audit:merge-group-flakes',
-        }),
-        expect.objectContaining({ id: 'controller-cascade-coalescing' }),
-        expect.objectContaining({ id: 'auto-enroll-self-cancel-churn' }),
-        expect.objectContaining({ id: 'controller-check-run-pagination-cap' }),
-        expect.objectContaining({ id: 'obsolete-unaffected-native-lanes' }),
-        expect.objectContaining({ id: 'affected-only-unit-selection' }),
-      ])
-    );
     expect(verifySummerBottleneckReceipt(receipt, KEY)).toBe(true);
-    expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
-      expect.objectContaining({
-        schema: 'jovie-symphony-repair-task/v1',
-        action: 'reconcile-release-certification-starvation',
-        authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
-        owner: 'symphony',
-        safety: 'exact-source-ci-native-queue-production-gates-remain-required',
-        selected: expect.objectContaining({
-          id: 'release-certification-starvation',
-          sourceRevision: SOURCE,
-          sourceDigest: '3'.repeat(64),
-          owner: 'Summer',
-          handle: 'symphony',
-        }),
-      }),
-      { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
-    );
+    expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
   });
 
   it('dispatches the selected CI audit class with its exact source and owner binding', async () => {
@@ -509,6 +779,15 @@ describe('Summer bottleneck loop', () => {
         sourceDigest: '5'.repeat(64),
       },
       terminal: true,
+      symphony: {
+        terminalOutcome: {
+          schema: 'jovie.symphony-repair-outcome/v3',
+          decisionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
+          existingRepair: expect.objectContaining({
+            assignmentDigest: 'a'.repeat(64),
+          }),
+        },
+      },
     });
     expect(unchanged).toMatchObject({
       decision: 'unchanged-noop',
@@ -522,9 +801,13 @@ describe('Summer bottleneck loop', () => {
     expect(proof.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
     expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
       expect.objectContaining({
-        schema: 'jovie-symphony-repair-task/v1',
-        action: 'remediate-selected-ci-audit-class',
-        authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
+        schema: 'jovie-symphony-repair-task/v3',
+        action: 'execute-existing-owned-repair',
+        authority: 'host-assigned-isolated-repair-only',
+        decisionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        existingRepair: expect.objectContaining({
+          assignmentDigest: 'a'.repeat(64),
+        }),
         selected: {
           id: 'merge-group-flake-baseline-ratchet',
           sourceRevision: SOURCE,
@@ -577,17 +860,24 @@ describe('Summer bottleneck loop', () => {
   it('dispatches once when only freshness metadata changes on a later cadence', async () => {
     const shared = memoryStore();
     const first = harness(shared);
-    await ingestSummerBottleneckSnapshot(snapshot(), first.dependencies);
+    const original = snapshot();
+    await ingestSummerBottleneckSnapshot(original, first.dependencies);
     const later = new Date(NOW.getTime() + 60_000);
     const second = harness(shared, { now: () => later });
     const replay = await ingestSummerBottleneckSnapshot(
-      snapshot({ observedAt: later.toISOString() }),
+      snapshot({
+        observedAt: later.toISOString(),
+        existingRepair: original.signals.existingRepair,
+        taskAdmissions: original.signals.taskAdmissions,
+      }),
       second.dependencies
     );
     const unchanged = await ingestSummerBottleneckSnapshot(
       snapshot({
         eventId: 'evt_bottleneck_0002',
         observedAt: later.toISOString(),
+        existingRepair: original.signals.existingRepair,
+        taskAdmissions: original.signals.taskAdmissions,
       }),
       second.dependencies
     );
@@ -606,7 +896,7 @@ describe('Summer bottleneck loop', () => {
     expect(second.observeSymphonyOutcome).not.toHaveBeenCalled();
   });
 
-  it('dispatches the oldest in-envelope bottleneck when closure-health-red ranks first', async () => {
+  it('holds closure-health repair even when it ranks first outside the CI admission policy', async () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
       snapshot({
@@ -625,18 +915,20 @@ describe('Summer bottleneck loop', () => {
     );
 
     expect(receipt).toMatchObject({
-      decision: 'symphony-succeeded',
+      decision: 'held-host-assignment',
       selected: { id: 'closure-health-red', inEnvelope: true },
       terminal: true,
     });
-    expect(proof.dispatchToSymphony).toHaveBeenCalledTimes(1);
-    expect(proof.dispatchToSymphony.mock.calls[0][0]).toMatchObject({
-      action: 'reconcile-closure-health-red',
-      selected: { id: 'closure-health-red' },
+    expect(receipt).toMatchObject({
+      executionHold: {
+        kind: 'host-assignment',
+        reason: 'selection-outside-task-admission-allowlist',
+      },
     });
+    expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
   });
 
-  it('still dispatches release certification when the queue is healthy', async () => {
+  it('keeps the selection-bound CI repair when the queue is healthy', async () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
       snapshot({
@@ -651,16 +943,17 @@ describe('Summer bottleneck loop', () => {
 
     expect(receipt).toMatchObject({
       decision: 'symphony-succeeded',
-      selected: { id: 'release-certification-starvation', inEnvelope: true },
+      selected: { id: 'merge-group-flake-baseline-ratchet', inEnvelope: true },
       terminal: true,
     });
     expect(proof.dispatchToSymphony.mock.calls[0][0]).toMatchObject({
-      action: 'reconcile-release-certification-starvation',
-      selected: { id: 'release-certification-starvation' },
+      schema: 'jovie-symphony-repair-task/v3',
+      action: 'execute-existing-owned-repair',
+      selected: { id: 'merge-group-flake-baseline-ratchet' },
     });
   });
 
-  it('dispatches closure-health-red instead of holding when it is the only ranked bottleneck', async () => {
+  it('holds a closure-health-only bottleneck without matching CI task evidence', async () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
       snapshot({
@@ -685,16 +978,17 @@ describe('Summer bottleneck loop', () => {
     );
 
     expect(receipt).toMatchObject({
-      decision: 'symphony-succeeded',
+      decision: 'held-host-assignment',
       selected: { id: 'closure-health-red', inEnvelope: true },
       handle: 'symphony',
       terminal: true,
     });
-    expect(proof.dispatchToSymphony).toHaveBeenCalledTimes(1);
-    expect(proof.dispatchToSymphony.mock.calls[0][0]).toMatchObject({
-      action: 'reconcile-closure-health-red',
-      selected: { id: 'closure-health-red' },
+    expect(receipt).toMatchObject({
+      executionHold: {
+        reason: 'selection-outside-task-admission-allowlist',
+      },
     });
+    expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
   });
 
   it('rejects a duplicate event before a second dispatch or observation', async () => {
@@ -926,10 +1220,11 @@ describe('Summer bottleneck loop', () => {
 
   it('reconciles a freshness-admitted event after a delayed heartbeat', async () => {
     const shared = memoryStore();
+    const failedDispatch = vi.fn(async () => {
+      throw new Error('dispatch transport unavailable');
+    });
     const failed = harness(shared, {
-      dispatchToSymphony: vi.fn(async () => {
-        throw new Error('dispatch transport unavailable');
-      }),
+      dispatchToSymphony: failedDispatch,
     });
     await expect(
       ingestSummerBottleneckSnapshot(snapshot(), failed.dependencies)
@@ -941,8 +1236,17 @@ describe('Summer bottleneck loop', () => {
     await expect(
       reconcileMissedSummerBottleneckEvents(delayed.dependencies)
     ).resolves.toEqual([
-      expect.objectContaining({ decision: 'symphony-succeeded' }),
+      expect.objectContaining({
+        decision: 'held-host-assignment',
+        executionHold: {
+          kind: 'host-assignment',
+          reason: 'task-admission-provider-eligibility-unavailable-or-stale',
+        },
+        terminal: true,
+      }),
     ]);
+    expect(failedDispatch).toHaveBeenCalledTimes(1);
+    expect(delayed.dispatchToSymphony).not.toHaveBeenCalled();
   });
 
   it('does not strand a pending event behind more than 25 terminal events', async () => {
@@ -1250,7 +1554,6 @@ describe('Summer bottleneck loop', () => {
         },
       },
       'closure-health-red',
-      'reconcile-closure-health-red',
     ],
     [
       'runner',
@@ -1262,11 +1565,10 @@ describe('Summer bottleneck loop', () => {
         },
       },
       'runner-capacity-starvation',
-      'reconcile-runner-capacity-starvation',
     ],
   ])(
-    'source-binds and dispatches the selected %s bottleneck inside the repair envelope',
-    async (_name, change, expectedId, expectedAction) => {
+    'holds selected %s bottleneck outside the CI task admission policy',
+    async (_name, change, expectedId) => {
       const proof = harness();
       const receipt = await ingestSummerBottleneckSnapshot(
         snapshot({
@@ -1281,16 +1583,14 @@ describe('Summer bottleneck loop', () => {
         proof.dependencies
       );
       expect(receipt).toMatchObject({
-        decision: 'symphony-succeeded',
+        decision: 'held-host-assignment',
         selected: { id: expectedId, inEnvelope: true, handle: 'symphony' },
+        executionHold: {
+          kind: 'host-assignment',
+          reason: 'selection-outside-task-admission-allowlist',
+        },
       });
-      expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: expectedAction,
-          selected: expect.objectContaining({ id: expectedId }),
-        }),
-        { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
-      );
+      expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
     }
   );
 
