@@ -50,6 +50,10 @@ PHASES = [
 ]
 LANE_LABELS = ("agent-ready", "devin", "codex")
 REFRESH_REMOTE_S = 90
+# JOV-6836: promotion-loss metrics take ~25 s of GitHub reads; refresh them far less often.
+PROMOTION_SCRIPT = HERE.parent / "promotion-loss-metrics.mjs"
+PROMOTION_EVERY_S = 900
+_promotion: dict = {"at": 0.0, "data": None}
 GREEN, RED, ORANGE, PURPLE, BLUE = (52, 199, 89), (255, 69, 58), (255, 159, 10), (169, 130, 255), (17, 175, 255)
 DIM, FG, WHITE = (138, 138, 148), (236, 236, 240), (255, 255, 255)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -269,9 +273,43 @@ def github_model() -> dict:
                          "resetAt": datetime.fromtimestamp(limits["resources"]["graphql"]["reset"], timezone.utc).isoformat()}
     except Exception as error:
         model["errors"]["rate"] = f"{type(error).__name__}: {error}"[:100]
+    model["promotion"] = promotion_model()
     model["ok"] = not model["errors"]
     model["fetchedAt"] = utcnow().isoformat()
     return model
+
+
+def promotion_model(now: float | None = None, run=subprocess.run) -> dict:
+    """Last 8 h of promotion-loss metrics (scripts/promotion-loss-metrics.mjs), cached."""
+    now = time.time() if now is None else now
+    if _promotion["data"] is None or now - _promotion["at"] >= PROMOTION_EVERY_S:
+        _promotion["at"] = now
+        try:
+            result = run(["node", str(PROMOTION_SCRIPT), "--since", "8h", "--json"],
+                         capture_output=True, text=True, timeout=180)
+            if result.returncode != 0:
+                raise RuntimeError((result.stderr or "exit %d" % result.returncode).strip()[-100:])
+            _promotion["data"] = json.loads(result.stdout)
+        except Exception as error:
+            _promotion["data"] = {"error": f"{type(error).__name__}: {error}"[:100]}
+    return _promotion["data"]
+
+
+def promotion_line(metrics: dict) -> str:
+    if not metrics or metrics.get("error"):
+        return rgb(FG, "PROMOTION 8h  ", bold=True) + rgb(RED, (metrics or {}).get("error", "unread"))
+    first = metrics["firstPass"]["rate"]
+    back = metrics["reenqueueMinutes"]
+    intake = metrics["intake"]
+    occupancy = metrics["occupancy"]
+    rate_color = GREEN if first is not None and first >= 0.9 else ORANGE
+    return (rgb(FG, "PROMOTION 8h  ", bold=True)
+            + rgb(rate_color, f"first-pass {'n/a' if first is None else f'{round(first * 100)}%'}")
+            + rgb(DIM, f" · ejected→back p75 {back['p75'] if back['p75'] is not None else 'n/a'}m ({back['pending']} waiting)"
+                       f" · open→enqueue p75 {metrics['openToFirstEnqueueMinutes']['p75']}m"
+                       f" · opens/h {intake['opensPerHour']} vs merges/h {intake['mergesPerHour']}"
+                       f" · CLEAN not queued {occupancy['cleanNotQueued']}"
+                       f" · keys >1 PR {intake['keysWithMultipleOpenPrs']}"))
 
 
 def system_model() -> dict:
@@ -442,7 +480,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     if "open" in github.get("errors", {}):
         head += " · " + rgb(RED, "PR list: " + github["errors"]["open"])
     lines.append(rgb(FG, head, bold=True))
-    pipeline_budget = max(4, height - len(lines) - 14)
+    pipeline_budget = max(4, height - len(lines) - 15)
     merge_colors = {"CLEAN": GREEN, "UNSTABLE": ORANGE, "BLOCKED": ORANGE, "DIRTY": RED, "BEHIND": DIM, "HAS_HOOKS": DIM, "UNKNOWN": DIM}
     for pr in open_prs[:pipeline_budget]:
         merge = pr.get("merge") or "UNKNOWN"
@@ -477,6 +515,8 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                  + ("" if "merged" not in github.get("errors", {}) else "  " + rgb(RED, github["errors"]["merged"])))
     for m in merged[:3]:
         lines.append(pad(f" {rgb(GREEN, '✓')} #{m['number']} {clip(m['title'], 90)} {rgb(DIM, (m['lane'] or 'human') + ' · ' + age(m['mergedAt'], now))}", width))
+
+    lines.append(promotion_line(github.get("promotion")))
 
     # needs attention
     ledger = local["ledger24h"]
