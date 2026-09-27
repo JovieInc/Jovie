@@ -43,14 +43,14 @@
   },
   {
     "file": ".claude/rules/hermes-air.md",
-    "paths": ["scripts/symphony/**", "docs/hermes/**"],
-    "bodySha256": "a8e1c32a2b612b5c3757357e063442b173513929642771fb228cab8796fbceb6"
+    "paths": ["docs/HERMES_AIR.md"],
+    "bodySha256": "26c7560e73f11bf7137a09a2b962eaa023feec0691251b7c3d70368d8ff404d8"
   },
   {
     "file": ".claude/rules/infra.md",
     "paths": [
       ".github/**",
-      "scripts/symphony/**",
+      "scripts/fleet-gate/**",
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
@@ -65,7 +65,7 @@
     "file": ".claude/rules/linear.md",
     "paths": [
       "scripts/backlog-orchestrator/**",
-      "scripts/symphony/**",
+      "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
     "bodySha256": "61546096d949fab333264a7dc4a34a40edfe5d61502f01e85f6910398b1ba9d9"
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "fd485bc83b0443bf9e686122b5935dea4c7d3ecc56276739d7d08f61a87bb422"
+    "bodySha256": "004d0cee425c2987da84ab1bf3fa5562cf59ca0f99a4292542fcf75d5612c876"
   },
   {
     "file": ".claude/rules/security.md",
@@ -121,7 +121,7 @@
   {
     "file": ".claude/rules/swarm.md",
     "paths": [
-      "scripts/symphony/**",
+      "scripts/lanes/**",
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
@@ -147,6 +147,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "1b9a4c8bf35485f87bdc4f6d7154be9da5996460e8144dcd74dc2eb21a10e51b"
+    "bodySha256": "f888b7c0a2f120391392b7f67bbd656e21bc32958d2515a24715b900e33784d6"
   }
 ]

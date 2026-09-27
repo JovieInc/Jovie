@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import {
   createUpstashProductionOperator,
+  evaluateQuotaHeadroom,
   JOVIE_PRODUCTION_REDIS,
+  QUOTA_ALERT_THRESHOLDS,
   verifyJovieProductionDatabase,
 } from './upstash-production-operator.mjs';
 
@@ -111,7 +113,78 @@ test('no arbitrary management operation is exposed', () => {
     apiKey: 'secret',
     fetchImpl: async () => jsonResponse({}),
   });
-  assert.deepEqual(Object.keys(operator).sort(), ['resetPassword', 'status']);
+  assert.deepEqual(Object.keys(operator).sort(), [
+    'quota',
+    'resetPassword',
+    'status',
+  ]);
   assert.equal('changePlan' in operator, false);
   assert.equal('deleteDatabase' in operator, false);
+});
+
+test('evaluateQuotaHeadroom reports 70/85/95 thresholds in order', () => {
+  const limit = JOVIE_PRODUCTION_REDIS.monthlyRequestLimit;
+  assert.equal(limit, 500_000);
+  assert.deepEqual(QUOTA_ALERT_THRESHOLDS, [70, 85, 95]);
+
+  const ok = evaluateQuotaHeadroom(Math.floor(limit * 0.6999));
+  assert.equal(ok.status, 'ok');
+  assert.equal(ok.breachedThreshold, null);
+
+  for (const [used, expected] of [
+    [limit * 0.7, 70],
+    [limit * 0.85, 85],
+    [limit * 0.95, 95],
+    [limit, 95],
+  ]) {
+    const result = evaluateQuotaHeadroom(used);
+    assert.equal(result.status, 'alert');
+    assert.equal(result.breachedThreshold, expected);
+    assert.equal(result.monthlyRequests, used);
+    assert.equal(result.limit, limit);
+  }
+});
+
+test('evaluateQuotaHeadroom fails closed on malformed usage', () => {
+  assert.throws(() => evaluateQuotaHeadroom(undefined), /Quota headroom/);
+  assert.throws(() => evaluateQuotaHeadroom(-1), /Quota headroom/);
+  assert.throws(() => evaluateQuotaHeadroom(1.5), /Quota headroom/);
+  assert.throws(() => evaluateQuotaHeadroom(10, 0), /Quota headroom/);
+});
+
+test('quota verifies identity then evaluates monthly usage', async () => {
+  const calls = [];
+  const operator = createUpstashProductionOperator({
+    email: 'operator@example.com',
+    apiKey: 'secret',
+    async fetchImpl(url, init) {
+      calls.push({ url, method: init.method });
+      return jsonResponse(
+        String(url).includes('/stats/')
+          ? { total_monthly_requests: 450_000 }
+          : database
+      );
+    },
+  });
+
+  const result = await operator.quota();
+  assert.equal(result.identity.databaseId, JOVIE_PRODUCTION_REDIS.databaseId);
+  assert.deepEqual(result.headroom, {
+    monthlyRequests: 450_000,
+    limit: 500_000,
+    percentUsed: 90,
+    breachedThreshold: 85,
+    status: 'alert',
+  });
+  assert.equal(calls.length, 2);
+});
+
+test('quota fails closed when stats omit monthly requests', async () => {
+  const operator = createUpstashProductionOperator({
+    email: 'operator@example.com',
+    apiKey: 'secret',
+    fetchImpl: async url =>
+      jsonResponse(String(url).includes('/stats/') ? {} : database),
+  });
+  await assert.rejects(operator.quota(), /Quota headroom/);
 });

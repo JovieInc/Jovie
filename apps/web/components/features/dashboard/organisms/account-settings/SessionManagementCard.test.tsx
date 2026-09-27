@@ -1,81 +1,33 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManagementCard } from './SessionManagementCard';
 
-const { mockFetchWithTimeout, mockNotifySuccess, mockNotifyError } = vi.hoisted(
-  () => ({
-    mockFetchWithTimeout: vi.fn(),
-    mockNotifySuccess: vi.fn(),
-    mockNotifyError: vi.fn(),
-  })
-);
+const listSessions = vi.fn();
+const revokeSession = vi.fn();
+const revokeOtherSessions = vi.fn();
 
-vi.mock('@/lib/queries', () => ({
-  fetchWithTimeout: mockFetchWithTimeout,
+vi.mock('@/lib/auth/client', () => ({
+  authClient: {
+    listSessions: (...args: unknown[]) => listSessions(...args),
+    revokeSession: (...args: unknown[]) => revokeSession(...args),
+    revokeOtherSessions: (...args: unknown[]) => revokeOtherSessions(...args),
+  },
 }));
 
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => ({
-    success: mockNotifySuccess,
-    error: mockNotifyError,
-  }),
-}));
-
-vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
-
-vi.mock('@/components/molecules/LoadingSkeleton', () => ({
-  LoadingSkeleton: () => <div data-testid='loading-skeleton' />,
-}));
-
-vi.mock('@jovie/ui', () => ({
-  Badge: ({ children }: { children: ReactNode }) => <span>{children}</span>,
-  Button: ({
-    children,
-    onClick,
-    disabled,
-  }: {
-    children: ReactNode;
-    onClick?: () => void;
-    disabled?: boolean;
-  }) => (
-    <button type='button' onClick={onClick} disabled={disabled}>
-      {children}
-    </button>
-  ),
-  ConfirmDialog: ({
-    open,
-    title,
-    confirmLabel,
-    onConfirm,
-  }: {
-    open: boolean;
-    title: ReactNode;
-    confirmLabel: ReactNode;
-    onConfirm: () => void | Promise<void>;
-  }) =>
-    open ? (
-      <div role='alertdialog' aria-label={String(title)}>
-        <button type='button' onClick={() => onConfirm()}>
-          {confirmLabel}
-        </button>
-      </div>
-    ) : null,
-}));
-
-const CURRENT_SESSION = {
+const currentSession = {
   id: 'session-current',
-  ipAddress: '1.1.1.1',
-  userAgent: 'ua-1',
-  lastActiveAt: new Date(Date.now() - 60_000).toISOString(),
-  isCurrent: true,
+  token: 'token-current',
+  userAgent: 'Electron',
+  updatedAt: new Date('2026-09-26T00:00:00Z'),
 };
-const OTHER_SESSION = {
+
+const otherSession = {
   id: 'session-other',
-  ipAddress: '2.2.2.2',
-  userAgent: 'ua-2',
-  lastActiveAt: new Date(Date.now() - 120_000).toISOString(),
-  isCurrent: false,
+  token: 'token-other',
+  userAgent:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  updatedAt: new Date('2026-09-25T00:00:00Z'),
 };
 
 describe('SessionManagementCard', () => {
@@ -83,87 +35,91 @@ describe('SessionManagementCard', () => {
     vi.clearAllMocks();
   });
 
-  it('shows an error state when the sessions request fails', async () => {
-    mockFetchWithTimeout.mockRejectedValue(new Error('network down'));
+  it('shows an error state when the session list request fails', async () => {
+    listSessions.mockResolvedValue({ data: null, error: new Error('boom') });
 
-    render(<SessionManagementCard />);
+    render(<SessionManagementCard activeSessionId='session-current' />);
 
     expect(
-      await screen.findByText(/unable to load active sessions/i)
-    ).toBeInTheDocument();
+      await screen.findByText('Unable to load active sessions right now.')
+    ).toBeVisible();
   });
 
-  it('shows an empty state when there are no active sessions', async () => {
-    mockFetchWithTimeout.mockResolvedValue({ sessions: [] });
+  it('shows an empty state when there are no sessions', async () => {
+    listSessions.mockResolvedValue({ data: [], error: null });
 
-    render(<SessionManagementCard />);
+    render(<SessionManagementCard activeSessionId='session-current' />);
 
-    expect(await screen.findByText('No active sessions.')).toBeInTheDocument();
+    expect(await screen.findByText('No active sessions.')).toBeVisible();
   });
 
-  it('lists sessions and marks the current one', async () => {
-    mockFetchWithTimeout.mockResolvedValue({
-      sessions: [CURRENT_SESSION, OTHER_SESSION],
-    });
+  it('lists sessions, labels the current device, and hides the bulk action with one session', async () => {
+    listSessions.mockResolvedValue({ data: [currentSession], error: null });
 
-    render(<SessionManagementCard />);
+    render(<SessionManagementCard activeSessionId='session-current' />);
 
-    expect(await screen.findByTestId('sessions-list')).toBeInTheDocument();
-    expect(screen.getByText('Current Session')).toBeInTheDocument();
+    expect(await screen.findByText('This device')).toBeVisible();
+    expect(screen.getByText('Current Session')).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Sign out 1 other session' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Sign out other sessions' })
+    ).not.toBeInTheDocument();
   });
 
-  it('ends a session after confirmation', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce({
-      sessions: [CURRENT_SESSION, OTHER_SESSION],
+  it('ends a single other session after confirming', async () => {
+    const user = userEvent.setup();
+    listSessions.mockResolvedValue({
+      data: [currentSession, otherSession],
+      error: null,
     });
-    mockFetchWithTimeout.mockResolvedValueOnce(undefined);
+    revokeSession.mockResolvedValue({ data: { status: true }, error: null });
 
-    render(<SessionManagementCard />);
-    await screen.findByTestId('sessions-list');
+    render(<SessionManagementCard activeSessionId='session-current' />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'End session' }));
-    const dialog = await screen.findByRole('alertdialog', {
-      name: 'End session?',
+    expect(await screen.findByText('Safari on iPhone')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'End session' }));
+    const confirmButtons = screen.getAllByRole('button', {
+      name: 'End session',
     });
-    fireEvent.click(dialog.querySelector('button')!);
+    await user.click(confirmButtons[confirmButtons.length - 1]);
 
     await waitFor(() => {
-      expect(mockFetchWithTimeout).toHaveBeenCalledWith(
-        `/api/account/sessions/${OTHER_SESSION.id}`,
-        { method: 'DELETE' }
-      );
+      expect(revokeSession).toHaveBeenCalledWith({ token: 'token-other' });
     });
-    expect(mockNotifySuccess).toHaveBeenCalledWith('Session ended');
+    await waitFor(() => {
+      expect(screen.queryByText('Safari on iPhone')).not.toBeInTheDocument();
+    });
   });
 
-  it('signs out every other session after confirmation', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce({
-      sessions: [CURRENT_SESSION, OTHER_SESSION],
+  it('signs out every other session via the bulk action', async () => {
+    const user = userEvent.setup();
+    listSessions.mockResolvedValue({
+      data: [currentSession, otherSession],
+      error: null,
     });
-    mockFetchWithTimeout.mockResolvedValueOnce(undefined);
+    revokeOtherSessions.mockResolvedValue({
+      data: { status: true },
+      error: null,
+    });
 
-    render(<SessionManagementCard />);
-    await screen.findByTestId('sessions-list');
+    render(<SessionManagementCard activeSessionId='session-current' />);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Sign out 1 other session' })
+    await screen.findByText('Safari on iPhone');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Sign out other sessions' })
     );
-    const dialog = await screen.findByRole('alertdialog', {
-      name: 'Sign out other sessions?',
+    const dialogConfirm = screen.getAllByRole('button', {
+      name: 'Sign out other sessions',
     });
-    fireEvent.click(dialog.querySelector('button')!);
+    await user.click(dialogConfirm[dialogConfirm.length - 1]);
 
     await waitFor(() => {
-      expect(mockFetchWithTimeout).toHaveBeenCalledWith(
-        '/api/account/sessions/revoke-others',
-        { method: 'POST' }
-      );
+      expect(revokeOtherSessions).toHaveBeenCalledTimes(1);
     });
-    expect(mockNotifySuccess).toHaveBeenCalledWith(
-      'Signed out of all other sessions'
-    );
+    await waitFor(() => {
+      expect(screen.queryByText('Safari on iPhone')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('This device')).toBeVisible();
   });
 });

@@ -201,8 +201,9 @@ describe('public CTA guard', () => {
 
     // JOV-5349: the production mobile authenticated slot must render the
     // design-system showUserInfo variant, not the bare compact avatar.
-    expect(headerNav).toContain(
-      'authenticatedUserSlot={\n                  <UserButton showUserInfo settingsHref={APP_ROUTES.SETTINGS} />\n                }'
+    // Match structure, not indentation: formatter reflow must not break it.
+    expect(headerNav).toMatch(
+      /authenticatedUserSlot=\{\s*<UserButton\s+showUserInfo\s+settingsHref=\{APP_ROUTES\.SETTINGS\}\s*\/>\s*\}/
     );
   });
 

@@ -84,7 +84,7 @@ describe('self-hosted runner setup action', () => {
     expect(setupNodeStep).toContain('uses: actions/setup-node@');
     expect(setupNodeStep).toContain("node-version-file: '.nvmrc'");
     expect(setupNodeStep).toContain(
-      "runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
+      "runner.environment == 'github-hosted' && inputs.package_cache == 'true' && github.event_name != 'merge_group' &&"
     );
     expect(setupNodeStep).toContain(
       "cache-dependency-path: '**/pnpm-lock.yaml'"
@@ -121,7 +121,7 @@ describe('self-hosted runner setup action', () => {
       // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
       // workspace, patches and .npmrc, and no prefix match may restore.
       expect(restoreStep).toContain(
-        "key: pnpm-node-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
+        "key: pnpm-node-modules-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
       );
       expect(restoreStep).not.toContain('restore-keys');
     });
@@ -169,6 +169,42 @@ describe('self-hosted runner setup action', () => {
       expect(saveStep).toContain(
         'key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}'
       );
+    });
+
+    it('drops only unloadable binaries, on Linux, just before a save', () => {
+      const name = '- name: Drop unloadable binaries before save';
+      const prune = stepBlock('Drop unloadable binaries before save');
+      expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
+        action.indexOf(name)
+      );
+      expect(action.indexOf(name)).toBeLessThan(
+        action.indexOf('- name: Save installed node_modules (GitHub-hosted)')
+      );
+      expect(prune).toContain("runner.os == 'Linux' &&");
+      const saveIf = saveStep.match(/if: >-\n[\s\S]*?\)\)/)?.[0] ?? '';
+      expect(saveIf).not.toBe('');
+      expect(prune).toContain(saveIf.replace('if: >-\n', ''));
+      expect(prune.match(/rm -rf.*/g)).toEqual([
+        'rm -rf app-builder-bin@*/node_modules/app-builder-bin/{mac,win}',
+      ]);
+      // Hollow musl builds but keep package.json, so a restored tree stays
+      // "Already up to date" instead of refetching them on every hit.
+      const hollow =
+        '          -exec find {}/node_modules -type f ! -name package.json -delete \\;';
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name '*-musl@*' -o -name '*linuxmusl-*@*' \\) \\\n" +
+          hollow
+      );
+      // Promptfoo-only native payloads hollow the same way. These exact
+      // patterns leave the SDK wrappers (codex-sdk, claude-agent-sdk) and
+      // onnxruntime-common intact.
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name 'onnxruntime-node@*' -o -name 'onnxruntime-web@*' \\\n" +
+          "          -o -name '@openai+codex@*-linux-*' \\\n" +
+          "          -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \\) \\\n" +
+          hollow
+      );
+      expect(prune.match(/-exec find /g)).toHaveLength(2);
     });
   });
 

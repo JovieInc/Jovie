@@ -396,7 +396,6 @@ module.exports = [
       'lib/eval/calibration.ts',
       'lib/hud/ovie-mac-hud.server.ts',
       'lib/hud/shipper-state.ts',
-      'lib/hud/symphony-codex-accounts.server.ts',
       'lib/library-share/passphrase.ts',
       'lib/merch/artwork.ts',
       'lib/ovie/identity.ts',
@@ -482,16 +481,28 @@ module.exports = [
         'warn',
         {
           default: 'allow',
-          rules: [
+          policies: [
             {
-              from: ['atoms'],
-              disallow: ['molecules', 'organisms', 'features'],
+              from: [{ element: { type: 'atoms' } }],
+              disallow: {
+                to: {
+                  element: {
+                    types: { anyOf: ['molecules', 'organisms', 'features'] },
+                  },
+                },
+              },
               message:
                 'Atoms cannot import from molecules, organisms, or features. Keep atoms props-driven.',
             },
             {
-              from: ['molecules'],
-              disallow: ['organisms', 'features'],
+              from: [{ element: { type: 'molecules' } }],
+              disallow: {
+                to: {
+                  element: {
+                    types: { anyOf: ['organisms', 'features'] },
+                  },
+                },
+              },
               message:
                 'Molecules cannot import from organisms or features. Compose only from atoms.',
             },

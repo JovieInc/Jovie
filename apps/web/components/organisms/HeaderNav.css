@@ -79,7 +79,9 @@
   --marketing-glass-text: rgba(255, 255, 255, 0.92);
   --marketing-glass-muted: rgba(255, 255, 255, 0.58);
   --marketing-glass-subtle: transparent;
-  top: calc(var(--marketing-glass-top) + env(safe-area-inset-top)) !important;
+  /* Docked: the bar sits flush with the viewport top (safe-area padding is
+     applied inline by HeaderNav). The glass layer lives on ::before. */
+  top: 0 !important;
   pointer-events: none;
   color: var(--marketing-glass-text);
 }
@@ -88,41 +90,20 @@
   pointer-events: auto;
   display: flex;
   min-height: var(--marketing-glass-height);
-  max-width: min(
-    90rem,
-    calc(100vw - var(--marketing-glass-gutter) * 2)
-  ) !important;
+  max-width: var(--ds-public-content-max) !important;
   align-items: center;
-  padding-inline: clamp(1.35rem, 2.3vw, 2rem) !important;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: var(--marketing-glass-shell);
+  padding-inline: var(--marketing-glass-gutter) !important;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    backdrop-filter 180ms ease,
-    -webkit-backdrop-filter 180ms ease;
 }
 
 .marketing-glass-header__shell > div {
   height: var(--marketing-glass-height) !important;
   gap: clamp(0.62rem, 1.5vw, 1.1rem);
-}
-
-.marketing-glass-header[data-scrolled="true"] .marketing-glass-header__shell,
-.marketing-glass-header:has(.marketing-glass-header__flyout--open)
-  .marketing-glass-header__shell {
-  border-color: var(--marketing-glass-border-strong);
-  background: var(--marketing-glass-shell-scrolled);
-  box-shadow:
-    0 12px 34px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px) saturate(165%);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
 }
 
 .marketing-glass-header__nav {
@@ -226,8 +207,9 @@
 .marketing-glass-header__flyout {
   position: fixed;
   top: calc(
-    var(--marketing-glass-top) +
     env(safe-area-inset-top) +
+    var(--marketing-glass-top) *
+    2 +
     var(--marketing-glass-height) +
     0.38rem
   );
@@ -347,7 +329,6 @@
 @media (prefers-reduced-motion: reduce) {
   .header-nav :where(a, button),
   .artist-profiles-home-header[data-presentation="homepage-embedded"] nav > div,
-  .marketing-glass-header__shell,
   .marketing-glass-header__nav-link,
   .marketing-glass-header__text-link,
   .marketing-glass-header__cta,
@@ -367,5 +348,30 @@
   .marketing-glass-header__shell {
     min-height: var(--marketing-glass-height);
     padding-inline: 0.82rem !important;
+  }
+}
+
+/* Docked-header scroll sentinel: an invisible marker at the top of the
+   document. HeaderNav observes it; once it leaves the viewport the header
+   gains data-scrolled and fades in its glass layer. */
+.header-nav__scroll-sentinel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--space-px);
+  height: var(--space-2);
+  pointer-events: none;
+}
+
+/* Icon-only rule: the logo reveal runs only while the header shows the mark
+   alone. When the desktop nav already renders the wordmark, the mark stays
+   still and the reveal wordmark is suppressed. */
+@media (min-width: 1024px) {
+  .header-nav[data-brand-lockup="desktop"] .logo-reveal .logo-reveal__mark {
+    rotate: 0deg;
+  }
+
+  .header-nav[data-brand-lockup="desktop"] .logo-reveal .logo-reveal__wordmark {
+    display: none;
   }
 }

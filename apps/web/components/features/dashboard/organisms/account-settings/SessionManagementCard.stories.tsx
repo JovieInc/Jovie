@@ -2,117 +2,156 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
 import { SessionManagementCard } from './SessionManagementCard';
 
-interface StorySession {
-  readonly id: string;
-  readonly ipAddress: string | null;
-  readonly userAgent: string | null;
-  readonly lastActiveAt: string;
-  readonly isCurrent: boolean;
-}
-
-const NOW = Date.now();
-
-const CURRENT_SESSION: StorySession = {
+const CURRENT_SESSION = {
   id: 'session-current',
-  ipAddress: '203.0.113.4',
-  userAgent: 'Chrome on macOS',
-  lastActiveAt: new Date(NOW - 2 * 60_000).toISOString(),
-  isCurrent: true,
+  token: 'token-current',
+  userAgent: 'Electron',
+  createdAt: '2026-09-20T00:00:00.000Z',
+  updatedAt: '2026-09-26T09:00:00.000Z',
+  expiresAt: '2026-10-26T09:00:00.000Z',
 };
 
-const OTHER_SESSION: StorySession = {
+const OTHER_SESSION = {
   id: 'session-other',
-  ipAddress: '198.51.100.7',
-  userAgent: 'Safari on iPhone',
-  lastActiveAt: new Date(NOW - 3 * 24 * 60 * 60_000).toISOString(),
-  isCurrent: false,
+  token: 'token-other',
+  userAgent:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  createdAt: '2026-09-18T00:00:00.000Z',
+  updatedAt: '2026-09-25T12:00:00.000Z',
+  expiresAt: '2026-10-25T12:00:00.000Z',
 };
+
+type MockMode = 'pending' | 'sessions' | 'empty' | 'error';
 
 function createSessionsFetchMock(
-  sessions: readonly StorySession[] | 'error',
+  mode: MockMode,
+  sessions: ReadonlyArray<Record<string, unknown>>,
   originalFetch: typeof fetch
 ): typeof fetch {
-  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+  return ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
-    if (url.endsWith('/api/account/sessions')) {
-      if (sessions === 'error') {
-        return new Response('Internal error', { status: 500 });
+    if (url.includes('/list-sessions')) {
+      if (mode === 'pending') return new Promise<Response>(() => undefined);
+      if (mode === 'error') {
+        return Promise.resolve(new Response('Internal error', { status: 500 }));
       }
-      return Response.json({ sessions });
+      return Promise.resolve(
+        new Response(JSON.stringify(mode === 'empty' ? [] : sessions), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
     }
-    if (url.includes('/api/account/sessions/')) {
-      return new Response(null, { status: 204 });
+    if (
+      url.includes('/revoke-session') ||
+      url.includes('/revoke-other-sessions')
+    ) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ status: true }), { status: 200 })
+      );
     }
     return originalFetch(input as RequestInfo, init);
   }) as typeof fetch;
 }
 
-function WithSessions({
+function WithSessionsFetch({
   children,
-  sessions,
+  mode,
+  sessions = [],
 }: Readonly<{
   children: React.ReactNode;
-  sessions: readonly StorySession[] | 'error';
+  mode: MockMode;
+  sessions?: ReadonlyArray<Record<string, unknown>>;
 }>) {
   const originalFetchRef = React.useRef<typeof fetch | null>(null);
 
   React.useLayoutEffect(() => {
     originalFetchRef.current = globalThis.fetch;
-    globalThis.fetch = createSessionsFetchMock(sessions, globalThis.fetch);
+    globalThis.fetch = createSessionsFetchMock(
+      mode,
+      sessions,
+      globalThis.fetch
+    );
     return () => {
       if (originalFetchRef.current) {
         globalThis.fetch = originalFetchRef.current;
       }
     };
-  }, [sessions]);
+  }, [mode, sessions]);
 
   return <>{children}</>;
 }
 
-const meta: Meta<typeof SessionManagementCard> = {
+const meta = {
   title: 'Dashboard/Organisms/AccountSettings/SessionManagementCard',
   component: SessionManagementCard,
   parameters: {
     layout: 'padded',
   },
+  args: {
+    activeSessionId: CURRENT_SESSION.id,
+  },
   decorators: [
     Story => (
-      <div className='max-w-2xl rounded-xl border border-subtle bg-surface-1'>
+      <div className='max-w-2xl'>
         <Story />
       </div>
     ),
   ],
-};
+} satisfies Meta<typeof SessionManagementCard>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  decorators: [
-    Story => (
-      <WithSessions sessions={[CURRENT_SESSION, OTHER_SESSION]}>
-        <Story />
-      </WithSessions>
-    ),
-  ],
-};
-
 export const CurrentDeviceOnly: Story = {
   decorators: [
     Story => (
-      <WithSessions sessions={[CURRENT_SESSION]}>
+      <WithSessionsFetch mode='sessions' sessions={[CURRENT_SESSION]}>
         <Story />
-      </WithSessions>
+      </WithSessionsFetch>
     ),
   ],
 };
 
-export const LoadFailed: Story = {
+export const MultipleSessions: Story = {
   decorators: [
     Story => (
-      <WithSessions sessions='error'>
+      <WithSessionsFetch
+        mode='sessions'
+        sessions={[CURRENT_SESSION, OTHER_SESSION]}
+      >
         <Story />
-      </WithSessions>
+      </WithSessionsFetch>
+    ),
+  ],
+};
+
+export const Loading: Story = {
+  decorators: [
+    Story => (
+      <WithSessionsFetch mode='pending'>
+        <Story />
+      </WithSessionsFetch>
+    ),
+  ],
+};
+
+export const Empty: Story = {
+  decorators: [
+    Story => (
+      <WithSessionsFetch mode='empty'>
+        <Story />
+      </WithSessionsFetch>
+    ),
+  ],
+};
+
+export const ErrorState: Story = {
+  decorators: [
+    Story => (
+      <WithSessionsFetch mode='error'>
+        <Story />
+      </WithSessionsFetch>
     ),
   ],
 };

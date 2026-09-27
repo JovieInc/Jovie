@@ -10,6 +10,7 @@ export { EmailManagementCard } from './EmailManagementCard';
 export { SessionManagementCard } from './SessionManagementCard';
 
 export type {
+  BetterAuthSessionResource,
   ClerkEmailAddressResource,
   ClerkEmailVerification,
   ClerkExternalAccountResource,
