@@ -1091,6 +1091,10 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
 
 test('desktop main-window hub regression contracts (desktop QA)', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
   const authRouteSource = await readFile(
     join(desktopRoot, 'src/desktop-auth-browser-route.ts'),
     'utf8'
@@ -1199,6 +1203,37 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   assert.match(
     mainSource,
     /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,[\s\S]{0,400}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,300}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,200}?win\.close\(\);/
+  );
+
+  // Deep-link-independent return: a typed return code is redeemed in the
+  // main process with the pending PKCE verifier (never a background poll,
+  // which would enable device-code phishing), the jovie:// handler is
+  // reclaimed before each browser handoff, and a late deep link carrying
+  // the same code never reopens sign-in after success.
+  assert.match(
+    mainSource,
+    /REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,[\s\S]{0,300}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,300}?desktopBrowserAuthRouteState\.pendingPkce[\s\S]{0,600}?redeemDesktopReturnCode\(/
+  );
+  assert.match(
+    mainSource,
+    /desktopBrowserAuthRouteState\.pendingPkce !== pending\)[\s\S]{0,120}?no-pending-flow[\s\S]{0,120}?handleAuthCompletion\(result\.completion\)/
+  );
+  assert.match(
+    mainSource,
+    /net\.fetch\(url, \{ \.\.\.init, credentials: 'omit' \}\)/
+  );
+  assert.doesNotMatch(mainSource, /setInterval\([\s\S]{0,200}?HANDBACK/);
+  assert.match(
+    mainSource,
+    /OPEN_DESKTOP_AUTH_URL_CHANNEL,[\s\S]{0,900}?ensureAuthReturnProtocolRegistered\(\);[\s\S]{0,80}?openExternalUrl\(/
+  );
+  assert.match(
+    mainSource,
+    /function handleAuthCompletion\([\s\S]{0,200}?if \(completion\.code === lastCompletedAuthCode\) return;/
+  );
+  assert.match(
+    preloadSource,
+    /redeemDesktopAuthReturnCode: \(returnCode: string\) =>[\s\S]{0,120}?REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL/
   );
 
   // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.
