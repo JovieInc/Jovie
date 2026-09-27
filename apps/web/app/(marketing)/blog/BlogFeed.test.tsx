@@ -51,6 +51,11 @@ describe('BlogFeed', () => {
   it('renders the first entry as featured and the remainder in the feed', () => {
     const { container } = render(<BlogFeed entries={entries} />);
 
+    const heroPhoto = screen.getByTestId('blog-hero-photo');
+    expect(heroPhoto).toBeInTheDocument();
+    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
+      'blog-index.webp'
+    );
     expect(
       screen.getByRole('heading', { level: 1, name: 'Blog' })
     ).toBeVisible();
@@ -70,6 +75,7 @@ describe('BlogFeed', () => {
   it('renders the production empty state without inventing posts', () => {
     render(<BlogFeed entries={[]} />);
 
+    expect(screen.getByTestId('blog-hero-photo')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { level: 1, name: 'Blog' })
     ).toBeVisible();
