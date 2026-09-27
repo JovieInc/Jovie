@@ -72,7 +72,7 @@ const TEXT_TOKENS = {
     'secondary-token': '#555558', // oklch(40% 0.015 272)
   },
   dark: {
-    'secondary-token': '#d7dce8', // Noir Ion secondary
+    'secondary-token': '#a0a5af', // Noir Ion secondary (cinematic depth ramp, 2026-09-25)
   },
 } as const;
 

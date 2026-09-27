@@ -965,11 +965,13 @@ describe('coverage-via executable evidence', () => {
     ).toBe(true);
   });
 
+  // Full-repo audit: reads and TypeScript-parses every coverage-via receipt
+  // (161 today) — measured 1.6s in-suite, 3.7s under ci-fast CPU contention.
   it('has zero invalid existing coverage-via receipts', () => {
     const audit = auditCoverageViaReceipts();
     expect(audit.invalid).toEqual([]);
     expect(audit.ok).toBe(true);
-  });
+  }, 15_000);
 });
 
 describe('multi-root ratchet', () => {

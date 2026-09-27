@@ -335,6 +335,7 @@ describe('source PR path-output reachability contract', () => {
       'ci-integration-ready',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-build-public',
@@ -1218,6 +1219,10 @@ describe('deploy workflow Vercel env resolution', () => {
       'Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT'
     );
     expect(readinessJob).toContain('Ovie Build:$OVIE_BUILD_RESULT');
+    expect(readinessJob).toContain(
+      'Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT'
+    );
+    expect(readinessJob).toContain('Ovie Typecheck:$OVIE_TYPECHECK_RESULT');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
     expect(readinessJob).toContain('RUN_PROMPTFOO');
@@ -2247,15 +2252,29 @@ describe('unit-test runner capacity', () => {
       "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_test == 'true'"
     );
     expect(unitJob).not.toContain('&& 5 || 3');
-    expect(unitJob).toContain('Each ephemeral runner has 2 CPUs');
     // fileParallelism: !isCI in the fast config clamps maxWorkers to 1 unless
-    // the shard opts back in; without it one of the two CPUs sits idle.
+    // the shard opts back in; forks track nproc (4 hosted, 2 self-hosted).
     expect(unitJob).toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=2 --fileParallelism"'
+      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=$(nproc) --fileParallelism"'
     );
     expect(unitJob).not.toContain(
       'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
     );
+    // Each isolated fork re-parses the DOM environment and other externals;
+    // the shared V8 compile cache lets later forks load bytecode instead.
+    const compileCacheEnv =
+      'NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache';
+    for (const stepName of [
+      'Run unit tests',
+      'Run quarantined unit tests (retries)',
+      'Run packages/ui unit tests',
+    ]) {
+      const start = unitJob.indexOf(`- name: ${stepName}\n`);
+      expect(start, stepName).toBeGreaterThan(-1);
+      const next = unitJob.indexOf('\n      - ', start + 1);
+      const step = unitJob.slice(start, next === -1 ? undefined : next);
+      expect(step, stepName).toContain(compileCacheEnv);
+    }
   });
 });
 
@@ -4369,9 +4388,9 @@ describe('ci-fast critical deploy contract', () => {
     // the tests/unit/ci directory run excludes it); setup-doppler-action and
     // the rest of tests/unit/ci run in the directory command.
     const byName =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}';
     const directory =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci';
 
     expect(ciFastLanes).toContain(
       "const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';"
@@ -4383,6 +4402,21 @@ describe('ci-fast critical deploy contract', () => {
       expect(command).not.toContain('--affected');
       expect(command).not.toContain('--passWithNoTests');
     }
+
+    // The contract config swaps only the environment: node, no browser setup,
+    // scoped to tests/unit/ci, everything else inherited from the fast config.
+    const contractConfig = readFileSync(
+      resolve(repoRoot, 'apps/web/vitest.config.ci-contracts.mts'),
+      'utf8'
+    );
+    expect(contractConfig).toContain(
+      "import baseConfig from './vitest.config.fast.mts';"
+    );
+    expect(contractConfig).toContain("environment: 'node',");
+    expect(contractConfig).toContain('setupFiles: [],');
+    expect(contractConfig).toContain(
+      "include: ['tests/unit/ci/**/*.test.ts'],"
+    );
   });
 });
 

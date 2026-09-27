@@ -252,6 +252,14 @@ export const creatorProfiles = pgTable(
       .where(
         drizzleSql`is_public = true AND is_featured = true AND marketing_opt_out = false`
       ),
+    // Cursor-backed public artists directory scan (JOV-6451):
+    // WHERE is_public = true AND is_claimed = true
+    // ORDER BY coalesce(display_name, ''), id — bounded pages, deterministic.
+    publicDiscoveryDirectoryIndex: index(
+      'idx_creator_profiles_public_discovery'
+    )
+      .on(drizzleSql`coalesce(${table.displayName}, '')`, table.id)
+      .where(drizzleSql`is_public = true AND is_claimed = true`),
     usernameNormalizedUnique: uniqueIndex(
       'creator_profiles_username_normalized_unique'
     )

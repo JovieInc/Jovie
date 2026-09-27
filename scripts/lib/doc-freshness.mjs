@@ -57,7 +57,16 @@ export function expandDocScopes(scopes, repoRoot = REPO_ROOT) {
   const files = new Set();
 
   function walk(currentDir) {
-    for (const entry of readdirSync(currentDir, { withFileTypes: true })) {
+    let entries;
+    try {
+      entries = readdirSync(currentDir, { withFileTypes: true });
+    } catch (error) {
+      // Parallel CI commands create and delete build/coverage output while
+      // this walk runs; a directory that vanished holds no docs to scan.
+      if (error?.code === 'ENOENT') return;
+      throw error;
+    }
+    for (const entry of entries) {
       if (entry.name === '.git' || entry.name === 'node_modules') continue;
       const absolutePath = join(currentDir, entry.name);
       const relativePath = toPosixPath(relative(repoRoot, absolutePath));

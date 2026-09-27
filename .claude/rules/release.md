@@ -178,7 +178,11 @@ When evidence is incomplete, keep remediation running until the relevant machine
 4. `/ship` handles tests, review, commit, push, and PR creation/update. It must **not** edit `CHANGELOG.md` or bump the version fan-out (`VERSION`, `version.json`, package versions) — see "Version Stamping (main-only)" and "Changelog" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
 6. The finishing agent requests GitHub's normal Merge when ready for the
-   qualified exact head (`gh pr merge --auto --match-head-commit <head-sha>`).
+   qualified exact head:
+   `node scripts/merge-queue-backend.mjs check-reenroll <pr> && gh pr merge <pr> --auto --match-head-commit <head-sha>`.
+   A PR the queue ejected for failed checks must not be re-enqueued at the same
+   head: push a repair first. Re-enqueuing a rejected head poisons and rebuilds
+   every merge group behind it (JOV-6620).
    Do not wait for the retired Auto-Enroll controller. GitHub owns required
    checks, native queue groups, and final merge; do not bypass them.
    Do not add, read, or retain the retired `merge-queue` label; authoritative
@@ -399,7 +403,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
+| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
 | Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. | none |
 | Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. JOV-INV-033 rescans Done-sprint HTML (JOV-6218 pricing truth, JOV-6260 directory hygiene) against that same URL before the `Production Verified` marker. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -420,7 +424,8 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Exact-head Coverage` | both | exact-head-coverage | `pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>` |
 | `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |
-| `Ovie Build (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck && pnpm --filter @jovie/ovie build` |
+| `Ovie Build (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie build` |
+| `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
 | `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |

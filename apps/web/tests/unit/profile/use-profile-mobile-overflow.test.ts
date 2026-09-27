@@ -414,7 +414,10 @@ describe('useProfileMobileOverflow', () => {
 
   it('keeps embedded previews and missing surfaces outside the overflow contract', () => {
     const fixture = createSurfaceFixture();
-    const { result, rerender } = renderHook(
+    const { result, rerender } = renderHook<
+      boolean,
+      { isPreviewEmbedded: boolean; surface: HTMLDivElement | null }
+    >(
       ({ isPreviewEmbedded, surface }) =>
         useProfileMobileOverflow({
           isHomeMode: true,

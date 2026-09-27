@@ -13,6 +13,14 @@ import {
 } from './source-candidates';
 
 describe('merch source candidates', () => {
+  it('scores compact titles above mid-length titles and both above long titles', () => {
+    expect(scoreMerchTitle('Alpha Beta Gamma')).toBe(90);
+    expect(scoreMerchTitle('Alpha Beta Gamma Delta Epsilon')).toBe(80);
+    expect(scoreMerchTitle('Extraordinary Unbelievable Phenomenological')).toBe(
+      70
+    );
+  });
+
   it('ranks a compact, visual confirmed title above a generic long title', () => {
     const candidates = rankMerchSources([
       {

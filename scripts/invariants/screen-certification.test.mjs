@@ -1754,6 +1754,56 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the authenticated account and billing shells for changed-surface certification', () => {
+    const shells = [
+      ['web.account-shell', 'account-shell', 'apps/web/app/account/layout.tsx'],
+      ['web.billing-shell', 'billing-shell', 'apps/web/app/billing/layout.tsx'],
+    ];
+    for (const [id, owner, source] of shells) {
+      assert.deepEqual(
+        SCREEN_REGISTRY.find(entry => entry.id === id),
+        {
+          id,
+          platform: 'web',
+          owner,
+          sources: [source],
+          viewports: ['desktop', 'mobile'],
+        }
+      );
+    }
+
+    const result = evaluateChangedScreens({
+      changedFiles: shells.map(([, , source]) => ({
+        path: source,
+        status: 'M',
+      })),
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.account-shell', verdict: 'evidence-required', findings: [] },
+      { id: 'web.billing-shell', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
+  it('keeps the billing success screen registered separately from the billing shell', () => {
+    assert.equal(
+      classifyScreenPath('apps/web/app/billing/success/page.tsx').entry?.id,
+      'web.billing-success'
+    );
+  });
+
+  it('registers the waitlist error boundary with the waitlist screen', () => {
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: 'apps/web/app/waitlist/error.tsx', status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.waitlist', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
   it('registers the canonical /cli landing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/cli/page.tsx';
     const screen = SCREEN_REGISTRY.find(

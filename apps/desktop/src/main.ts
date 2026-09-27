@@ -73,6 +73,12 @@ import {
   isHudRoutePath,
 } from './hud-build-reload';
 import { resolveIpcSenderUrl } from './ipc-sender';
+import {
+  type MainLivenessMonitor,
+  createMainLivenessMonitor,
+  spawnMainLivenessWorker,
+  summarizeUnhandledRejection,
+} from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
@@ -88,8 +94,6 @@ import {
   terminalLaunchSpec,
 } from './operator-launch';
 import {
-  OVIE_OPERATOR_TALK_ROUTE,
-  ovieOperatorOpsHref,
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
@@ -148,8 +152,6 @@ if (APP_ENV === 'staging') {
 const APP_ORIGIN = new URL(APP_URL).origin;
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
-const OVIE_OPERATOR_TALK_URL = buildAppUrl(OVIE_OPERATOR_TALK_ROUTE);
-const OVIE_OPERATOR_OPS_URL = buildAppUrl(ovieOperatorOpsHref());
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
@@ -305,6 +307,43 @@ let desktopBrowserAuthRouteState = emptyDesktopBrowserAuthRouteState();
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
+let mainLivenessMonitor: MainLivenessMonitor | null = null;
+
+// Observe async rejections in the main process instead of letting Node's
+// default warning be the only trace. The summary is bounded and redacted;
+// observing a rejection never marks the app healthy — the liveness probe
+// below is the only responsiveness verdict.
+process.on('unhandledRejection', reason => {
+  console.error('[Jovie Desktop] Unhandled rejection', {
+    reason: summarizeUnhandledRejection(reason),
+  });
+});
+
+// JOV-6192: a blocked main process must be detected by a scheduler outside
+// the blocked loop. The probe Worker owns the deadline on its own thread; a
+// timer scheduled on the main loop could never fire to report the block.
+function startMainLivenessMonitor(): void {
+  if (mainLivenessMonitor) return;
+  mainLivenessMonitor = createMainLivenessMonitor({
+    spawnProbe: () => spawnMainLivenessWorker(),
+    onVerdict: message => {
+      if (message.verdict === 'blocked') {
+        console.error('[Jovie Desktop] Main process unresponsive', {
+          pongLagMs: message.pongLagMs,
+        });
+      } else {
+        console.info('[Jovie Desktop] Main process responsive again', {
+          pongLagMs: message.pongLagMs,
+        });
+      }
+    },
+    onProbeError: error => {
+      console.error('[Jovie Desktop] Main liveness probe failed to start', {
+        reason: summarizeUnhandledRejection(error),
+      });
+    },
+  });
+}
 
 /**
  * Per-webContents boot-watchdog controllers (JOV-3595). The hosted web app
@@ -2231,26 +2270,6 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   return win;
 }
 
-function openOvieOperatorTalkDoor(): void {
-  if (isAuthHandoffOpen()) return;
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    createWindow(OVIE_OPERATOR_TALK_URL);
-    return;
-  }
-  void mainWindow.loadURL(OVIE_OPERATOR_TALK_URL);
-  showWindow(mainWindow);
-}
-
-function openOvieOperatorOpsDoor(): void {
-  if (isAuthHandoffOpen()) return;
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    createWindow(OVIE_OPERATOR_OPS_URL);
-    return;
-  }
-  void mainWindow.loadURL(OVIE_OPERATOR_OPS_URL);
-  showWindow(mainWindow);
-}
-
 function openPreferences(): void {
   // Mid-handoff the focused window is the small, non-resizable auth window and
   // the main window is intentionally hidden — loading settings into either
@@ -2441,14 +2460,6 @@ function buildApplicationMenu(): Menu {
             accelerator: 'Command+,',
             click: openPreferences,
           },
-          {
-            label: 'Ovie',
-            click: openOvieOperatorOpsDoor,
-          },
-          {
-            label: 'Talk',
-            click: openOvieOperatorTalkDoor,
-          },
           { type: 'separator' },
           { role: 'services' },
           { type: 'separator' },
@@ -2622,6 +2633,8 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
 });
 
 app.on('before-quit', event => {
+  mainLivenessMonitor?.dispose();
+  mainLivenessMonitor = null;
   summerRuntimeBridge?.stop();
   summerRuntimeBridge = null;
   if (windowStateQuitFlushed || !windowStateStore.needsFlush()) return;
@@ -2902,6 +2915,10 @@ app.whenReady().then(async () => {
     nightlyTimeout.unref?.();
     return;
   }
+
+  // Detection lives on the probe worker's own timers, so this stays correct
+  // even while the main loop is blocked — start before any window work.
+  startMainLivenessMonitor();
 
   // The first window paints the boot splash, so the cached wordmark must be
   // resolved before createWindow runs. Start it alongside window-state

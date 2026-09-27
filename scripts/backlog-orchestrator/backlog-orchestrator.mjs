@@ -30,6 +30,7 @@ import { preAdmissionDecision } from './admission-policy.mjs';
 // Keep the complete control-plane dependency closure visible to source sync and
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
+import * as backlogHygiene from './backlog-hygiene.mjs';
 import * as backlogReduction from './backlog-reduction.mjs';
 import * as backlogRemediation from './backlog-remediation.mjs';
 import * as classifier from './classifier.mjs';
@@ -149,6 +150,7 @@ Usage:
   node backlog-orchestrator.mjs remediate --dry-run   Inventory and report without mutations
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
+  node backlog-orchestrator.mjs backlog-hygiene       Aged dedup + stale Sentry-only hygiene pass (dry-run)
   node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
@@ -178,6 +180,8 @@ Usage:
     await runIntakeReadiness(cache, issueArg);
   } else if (command === 'backlog-reduction') {
     await runBacklogReduction(cache);
+  } else if (command === 'backlog-hygiene') {
+    await runBacklogHygiene(cache);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else if (command === 'approve-research') {
@@ -246,6 +250,26 @@ async function runBacklogReduction(cache) {
     mutations: 0,
   };
   saveCache({ ...cache, backlogReduction: { lastReceipt: result } });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runBacklogHygiene(cache) {
+  const teams = [];
+  for (const team of TEAM_CONFIGS) {
+    const issues = await linear.fetchTeamIntakeIssues(team.id);
+    teams.push({
+      team: team.key,
+      ...backlogHygiene.buildBacklogHygieneReceipt(issues),
+    });
+  }
+  const result = {
+    schema: 'backlog-hygiene/multiteam/v1',
+    mode: 'dry-run',
+    observedAt: new Date().toISOString(),
+    teams,
+    mutations: 0,
+  };
+  saveCache({ ...cache, backlogHygiene: { lastReceipt: result } });
   console.log(JSON.stringify(result, null, 2));
 }
 

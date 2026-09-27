@@ -551,6 +551,15 @@ describe('surface elevation guardrails', () => {
     expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
   });
 
+  it('drops the banned Disc3 empty-state glyph from ReleaseTable', () => {
+    const releaseTable = readComponent(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
+    );
+
+    expect(releaseTable).not.toContain('Disc3');
+    expect(releaseTable).toContain("name='Layers'");
+  });
+
   it('does not nest DrawerInlineNote inside a card (card-within-card)', () => {
     // DrawerInlineNote should use variant='flat', not variant='card'.
     // It is always rendered inside an existing card container.

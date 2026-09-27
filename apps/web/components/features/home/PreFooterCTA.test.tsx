@@ -10,7 +10,7 @@ describe('PreFooterCTA', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: /Ready to turn fans into streams/i,
+        name: /Ready to turn fans\s*into streams/i,
       })
     ).toHaveClass('line-clamp-2');
     expect(
