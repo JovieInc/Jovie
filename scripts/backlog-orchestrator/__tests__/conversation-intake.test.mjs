@@ -83,6 +83,7 @@ describe('conversation issue reconciliation', () => {
     });
 
     assert.equal(receipt.disposition, 'existing_issue');
+    assert.ok('canonicalIssue' in receipt);
     assert.equal(receipt.canonicalIssue.identifier, 'JOV-4423');
     assert.equal(receipt.canonicalIssue.state, 'Todo');
     assert.deepEqual(receipt.counts, {
@@ -134,7 +135,7 @@ describe('conversation issue reconciliation', () => {
           comments: { nodes: api.calls.comments },
         },
       ],
-      coverage: { complete: true },
+      coverage: { complete: true, pages: 1, scanned: 1 },
     });
     const second = await reconcileConversationRequest({
       request,
@@ -165,6 +166,7 @@ describe('conversation issue reconciliation', () => {
       client: api,
     });
     assert.equal(receipt.disposition, 'human_review');
+    assert.ok('reviewCandidates' in receipt);
     assert.equal(receipt.mutation, 'none');
     assert.equal(receipt.reviewCandidates[0].identifier, 'JOV-4425');
     assert.equal(api.calls.creates.length, 0);
@@ -189,6 +191,7 @@ describe('conversation issue reconciliation', () => {
       client: api,
     });
     assert.equal(receipt.disposition, 'new_issue');
+    assert.ok('canonicalIssue' in receipt);
     assert.equal(receipt.canonicalIssue.identifier, 'JOV-5000');
     assert.equal(api.calls.creates.length, 1);
     assert.match(api.calls.creates[0].description, /Conversation receipts/);
@@ -198,7 +201,7 @@ describe('conversation issue reconciliation', () => {
     const api = client([]);
     api.fetchTeamActiveIssueSnapshot = async () => ({
       issues: [],
-      coverage: { complete: false },
+      coverage: { complete: false, pages: 0, scanned: 0 },
     });
     await assert.rejects(
       reconcileConversationRequest({
