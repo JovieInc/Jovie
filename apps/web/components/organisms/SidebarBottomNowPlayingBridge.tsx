@@ -4,7 +4,10 @@ import { useCallback } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { cn } from '@/lib/utils';
-import { useAudioChromeSnapshot } from './audio-chrome-state';
+import {
+  requestFullAudioPlayer,
+  useAudioChromeSnapshot,
+} from './audio-chrome-state';
 
 /**
  * SidebarBottomNowPlayingBridge — production audio adapter for the shell
@@ -60,6 +63,7 @@ export function SidebarBottomNowPlayingBridge() {
         isPlaying={playbackState.isPlaying}
         onPlay={handlePlay}
         onDismiss={stop}
+        onExpand={requestFullAudioPlayer}
         className='border-0 bg-transparent shadow-none transition-[opacity,transform,background-color] duration-cinematic ease-cinematic'
       />
     </div>

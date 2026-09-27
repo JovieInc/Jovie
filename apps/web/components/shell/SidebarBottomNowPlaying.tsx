@@ -37,12 +37,15 @@ export const SidebarBottomNowPlaying = React.memo(
     isPlaying,
     onPlay,
     onDismiss,
+    onExpand,
     className,
   }: {
     readonly track: NowPlayingTrack;
     readonly isPlaying: boolean;
     readonly onPlay: () => void;
     readonly onDismiss?: () => void;
+    /** Reopen the full docked player (JOV-6680). Tapping the track info expands. */
+    readonly onExpand?: () => void;
     readonly className?: string;
   }) {
     const trackTitle = track.trackTitle ?? '';
@@ -70,17 +73,36 @@ export const SidebarBottomNowPlaying = React.memo(
             />
           )}
         </ArtworkFrame>
-        <div className='min-w-0 flex-1'>
-          <div
-            className='truncate text-xs font-caption text-primary-token leading-tight'
-            style={{ letterSpacing: '-0.005em' }}
+        {onExpand ? (
+          <button
+            type='button'
+            onClick={onExpand}
+            aria-label='Show Player'
+            className='min-w-0 flex-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
           >
-            {trackTitle}
+            <div
+              className='truncate text-xs font-caption text-primary-token leading-tight'
+              style={{ letterSpacing: '-0.005em' }}
+            >
+              {trackTitle}
+            </div>
+            <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
+              {artistName}
+            </div>
+          </button>
+        ) : (
+          <div className='min-w-0 flex-1'>
+            <div
+              className='truncate text-xs font-caption text-primary-token leading-tight'
+              style={{ letterSpacing: '-0.005em' }}
+            >
+              {trackTitle}
+            </div>
+            <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
+              {artistName}
+            </div>
           </div>
-          <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
-            {artistName}
-          </div>
-        </div>
+        )}
         <button
           type='button'
           onClick={onPlay}
