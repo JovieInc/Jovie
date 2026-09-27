@@ -24,6 +24,11 @@ The harness, not the model, owns:
 | Receipts (`runs/ledger.jsonl`), per-run log and prompt, Linear handoff comments | `run_issue()`, `worker()` |
 | Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
 | Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), 2 attempts per head, then one Triage issue | `fix_candidates()`, `red_pr()`, `escalate_exhausted()` |
+| Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
+| Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
+| Ready on green: a CLEAN lane draft gets `gh pr ready` plus its merge intent in one writer action | `pr_events.ready_green()` |
+| Disabled-lane drafts: closed when superseded or done, else adopted; closed and the issue returned to Todo once their fix attempts run out | `pr_events.retire_orphan()`, `return_to_pool()` |
+| Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run, bank exhausted ones until their reset | `codex_lane.py` |
@@ -31,6 +36,23 @@ The harness, not the model, owns:
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
+
+## Event queue (JOV-6672)
+
+Gem has no inbound webhook, so `.github/workflows/lane-fix-relay.yml` turns each GitHub signal
+into a label on the exact PR: CI failure `lane-fix-red`, merge-queue removal `lane-fix-dequeued`,
+a push to main that leaves the PR conflicting `lane-fix-conflict`, requested changes or a human
+review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`. Every worker pass
+does one label search and takes a queued PR ahead of the rest of its work. Labels are consumed
+on claim, or when the PR's own state no longer backs them. A PR whose attempts are spent keeps
+its label, so the PR shows why it is waiting. The dispatch tick handles `green` (ready +
+merge intent) and `orphan`. Run the workflow manually once to label the backlog that predates
+the relay.
+
+Held reason codes (`held.json`): `secret-file`, `fix-exhausted`, `empty-diff`, `diff-too-large`,
+`lockfile-without-manifest`, `missing-test`, `gate-check-failed`, `gate-timeout`, `unclassified`.
+Green CI overrides only `gate-check-failed` and `gate-timeout`, which are verdicts from the local
+gate. The other codes are diff policy or unknown, and the PR stays a draft.
 
 ## Nothing fails silently
 
@@ -71,7 +93,8 @@ State and receipts live under `~/.local/state/jovie-lanes`.
 ## Tests
 
 ```sh
-python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py
+python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
+  scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py
 ```
 
 The same files run inside `update()` before a release is installed anywhere.
