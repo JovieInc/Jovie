@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: A failed scheduled run has no PR or reviewer to surface it, so one job with only issues:write opens or updates a single standing issue per lane (GOVERNANCE.md: nothing fails silently).
+# removal-trigger: Remove the report-scheduled-failure job when a shared scheduled-failure reporter covers every scheduled workflow.
 # Visual regression for public marketing/auth surfaces + admin chrome (JOV-4060/4062).
 # Also covers the previously orphaned visual specs (JOV-4039): auth modal/pages,
 # chat composer, and the public profile surface audit.
@@ -334,3 +338,40 @@ jobs:
           pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
             echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
           }
+
+  report-scheduled-failure:
+    # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red scheduled
+    # run opens or updates one standing issue, deduped by title. Not required.
+    name: Report scheduled failure
+    needs: [visual-regression]
+    if: ${{ always() && github.event_name == 'schedule' && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update standing issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="Visual regression lane red"
+          BODY=$(cat <<EOF
+          The scheduled $GITHUB_WORKFLOW run failed on ${GITHUB_SHA::8}.
+
+          Run: $RUN_URL
+
+          Spec: \`apps/web/tests/e2e/visual-regression.spec.ts\` (Playwright report is attached to the run).
+          EOF
+          )
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq '.[] | select(.title == "Visual regression lane red") | .number' | head -1)
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body "$BODY"
+            echo "Updated standing issue #$EXISTING"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label "design-governance" \
+              || gh issue create --title "$TITLE" --body "$BODY"
+          fi

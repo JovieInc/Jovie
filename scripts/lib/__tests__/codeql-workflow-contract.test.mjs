@@ -63,7 +63,12 @@ describe('CodeQL workflow version coherence', () => {
 
   it('groups CodeQL action updates so Dependabot moves every component together', () => {
     expect(GITHUB_ACTIONS_DEPENDABOT).toMatch(
-      /groups:\n(?:\s+#.*\n)*\s+codeql-action:\n\s+patterns:\n\s+- 'github\/codeql-action'/
+      /groups:\n(?:\s+#.*\n)*\s+codeql-action:\n\s+patterns:\n(?:\s+#.*\n)*\s+- 'github\/codeql-action\*'/
+    );
+    // An exact name missed github/codeql-action/analyze and /upload-sarif, which
+    // then arrived as separate PRs (#18829, #18832) (JOV-6837).
+    expect(GITHUB_ACTIONS_DEPENDABOT).not.toContain(
+      "- 'github/codeql-action'\n"
     );
   });
 
