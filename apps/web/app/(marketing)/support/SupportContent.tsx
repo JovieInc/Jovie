@@ -100,33 +100,3 @@ export function SupportChannels() {
     </MarketingContainer>
   );
 }
-
-export function SupportCta() {
-  return (
-    <MarketingContainer width='prose' className='pb-24'>
-      <section data-testid='support-cta'>
-        <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
-          Still Need Help?
-        </h2>
-        <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-          Our team is happy to help with anything not covered in the docs.
-        </p>
-        <Button
-          asChild
-          variant='secondary'
-          size='marketing'
-          className='mt-6'
-          aria-label={`Send email to support team at ${SUPPORT_EMAIL}`}
-          onClick={() =>
-            track('Support Email Clicked', {
-              email: SUPPORT_EMAIL,
-              source: 'support_page_cta',
-            })
-          }
-        >
-          <a href={`mailto:${SUPPORT_EMAIL}`}>Contact Support</a>
-        </Button>
-      </section>
-    </MarketingContainer>
-  );
-}

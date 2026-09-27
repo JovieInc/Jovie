@@ -17,12 +17,12 @@ export const SUPPORT_SEO_COPY = {
 export const SUPPORT_FAQ_ITEMS = [
   {
     question: 'How do I get started with Jovie?',
-    answer: `Start with Find yourself and follow the setup steps for your profile. Full walkthrough at ${DOCS_URL}/getting-started.`,
+    answer: `Start with Find yourself and follow the setup steps for your Jovie profile. Full walkthrough at ${DOCS_URL}/getting-started.`,
   },
   {
-    question: 'How do music smart links work?',
+    question: 'How do smart links work?',
     answer:
-      'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
+      'When you add a link, Jovie generates a smart link that detects each visitor\u2019s preferred platform and routes them there automatically.',
   },
   {
     question: 'How do I upgrade my plan?',
@@ -31,6 +31,6 @@ export const SUPPORT_FAQ_ITEMS = [
   },
   {
     question: 'How do I contact support?',
-    answer: `Email ${SUPPORT_EMAIL} \u2014 we typically respond within one business day.`,
+    answer: `Email ${SUPPORT_EMAIL}. We typically respond within one business day.`,
   },
 ] as const;

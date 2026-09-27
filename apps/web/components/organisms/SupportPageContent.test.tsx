@@ -47,11 +47,11 @@ describe('SupportPageContent', () => {
     expect(sectionHeadings).toEqual([
       "We're Here To Help.",
       'How Can We Help?',
-      'Frequently Asked Questions',
+      'FAQ',
       'Still Need Help?',
     ]);
     expect(screen.getAllByRole('article')).toHaveLength(3);
-    expect(screen.getAllByTestId('support-cta')).toHaveLength(1);
+    expect(screen.getAllByTestId('marketing-footer-cta')).toHaveLength(1);
     for (const action of screen
       .getAllByRole('link')
       .filter(link =>
@@ -71,7 +71,7 @@ describe('SupportPageContent', () => {
       expect(action).not.toHaveClass('public-action-inline');
     }
     expect(
-      screen.getByRole('link', { name: /send email to support team/i })
+      screen.getByRole('link', { name: 'Contact Support' })
     ).toHaveAttribute('href', 'mailto:support@jov.ie');
   });
 
@@ -80,12 +80,12 @@ describe('SupportPageContent', () => {
       {
         question: 'How do I get started with Jovie?',
         answer:
-          'Start with Find yourself and follow the setup steps for your profile. Full walkthrough at https://docs.jov.ie/getting-started.',
+          'Start with Find yourself and follow the setup steps for your Jovie profile. Full walkthrough at https://docs.jov.ie/getting-started.',
       },
       {
-        question: 'How do music smart links work?',
+        question: 'How do smart links work?',
         answer:
-          'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
+          'When you add a link, Jovie generates a smart link that detects each visitor\u2019s preferred platform and routes them there automatically.',
       },
       {
         question: 'How do I upgrade my plan?',
@@ -95,7 +95,7 @@ describe('SupportPageContent', () => {
       {
         question: 'How do I contact support?',
         answer:
-          'Email support@jov.ie \u2014 we typically respond within one business day.',
+          'Email support@jov.ie. We typically respond within one business day.',
       },
     ]);
 
