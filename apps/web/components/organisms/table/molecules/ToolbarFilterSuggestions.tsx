@@ -1,6 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/table/ToolbarFilterSuggestions.test.tsx
+import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -22,11 +23,6 @@ export interface ToolbarFilterSuggestionsProps {
   readonly className?: string;
   readonly 'data-testid'?: string;
 }
-
-const SUGGESTION_PILL_CLASS = cn(
-  'inline-flex h-7 shrink-0 items-center whitespace-nowrap rounded-full border border-subtle bg-transparent px-3 text-2xs font-medium text-tertiary-token transition-colors duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none'
-);
 
 /**
  * Hover/focus-revealed row of quick-apply filter suggestions shown next to
@@ -56,16 +52,18 @@ export function ToolbarFilterSuggestions({
       )}
     >
       {suggestions.map(suggestion => (
-        <button
+        <Button
           key={suggestion.id}
           type='button'
+          variant='ghost'
+          size='sm'
           tabIndex={hidden ? -1 : 0}
           onClick={suggestion.onSelect}
           aria-label={suggestion.ariaLabel}
-          className={SUGGESTION_PILL_CLASS}
+          className='shrink-0 whitespace-nowrap'
         >
           {suggestion.label}
-        </button>
+        </Button>
       ))}
     </div>
   );
