@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { getMarketingPageContractForPathname } from '@/data/marketing/pageContracts';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
-import { MARKETING_FOR_FLYOUT_LINKS } from '@/data/marketingNavigation';
+import { MARKETING_CUSTOMERS_FLYOUT } from '@/data/marketingNavigation';
 
 describe('/solutions/artists artist solution route (JOV-5861)', () => {
   it('binds the route to the artist-lp recipe in the manifest', () => {
@@ -23,8 +23,8 @@ describe('/solutions/artists artist solution route (JOV-5861)', () => {
     expect(contract?.primaryCta.href).toBe(APP_ROUTES.SIGNUP);
   });
 
-  it('is reachable from the published Solutions flyout as an ordinary link', () => {
-    const artistsLink = MARKETING_FOR_FLYOUT_LINKS.find(
+  it('is reachable from the published Customers flyout as an ordinary link', () => {
+    const artistsLink = MARKETING_CUSTOMERS_FLYOUT.links.find(
       link => link.label === 'Artists'
     );
     expect(artistsLink?.href).toBe('/solutions/artists');

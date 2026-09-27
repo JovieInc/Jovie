@@ -54,7 +54,7 @@ describe('marketing header language independence', () => {
       expect.objectContaining({
         navLinks: [
           { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-          { ...renamedLinks[0], treatment: 'leading' },
+          renamedLinks[0],
           renamedLinks[1],
           renamedLinks[2],
         ],

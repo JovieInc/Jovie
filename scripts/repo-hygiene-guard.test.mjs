@@ -620,6 +620,18 @@ test('reports all regular files while preserving the legacy compatibility count'
   }
 });
 
+test('tracked-bytes budget raise stays within the documented +10% cap', () => {
+  // JOV-6635: origin/main measured 178.14 MiB against the 180 MiB budget
+  // (99.0%, over the >=90% raise threshold). The policy caps a single payload
+  // raise at +10%, so the budget is pinned at 198 MiB.
+  const previousBudget = 180 * 1024 * 1024;
+  assert.equal(HYGIENE_LIMITS.maxTrackedBytes, 198 * 1024 * 1024);
+  assert.ok(
+    HYGIENE_LIMITS.maxTrackedBytes <= previousBudget * 1.1,
+    'payload budget raises are capped at +10% per docs/ci/repository-health.md'
+  );
+});
+
 test('tracked payload skips missing paths and symlinks without following them', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-repo-links-'));
   try {
