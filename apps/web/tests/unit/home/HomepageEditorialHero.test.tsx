@@ -1,26 +1,37 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
+import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import {
   HOMEPAGE_CERTIFIED_EVENTS,
   HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT,
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
+import { evaluateHomepageHtml } from '../../../../../scripts/lib/golden-path-lock.mjs';
 
-const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
+const { trackAction, mockPush } = vi.hoisted(() => ({
+  trackAction: vi.fn(),
+  mockPush: vi.fn(),
+}));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: trackAction,
 }));
+vi.mock('@/lib/analytics', () => ({
+  track: trackAction,
+  page: vi.fn(),
+}));
 
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
+const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
 beforeEach(() => {
-  gate.WAITLIST_ENABLED = false;
+  gate.WAITLIST_ENABLED = true;
+  mockPush.mockReset();
+  trackAction.mockReset();
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -44,42 +55,43 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
-  it('attributes a standalone closing access action to its caller', () => {
-    gate.WAITLIST_ENABLED = true;
-    render(
-      <HomepagePrimaryAction
-        submitTestId='closing-access'
-        submitAnalytics={{
-          eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-          properties: { placement: 'close' },
-        }}
-      />
-    );
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(action).toHaveAttribute('href', '/signup');
-    expect(action).toHaveAttribute('data-testid', 'closing-access');
-    expect(trackAction).toHaveBeenLastCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      { placement: 'close' }
-    );
-  });
-  it('routes waitlist-on visitors to access with no name-search control', () => {
-    gate.WAITLIST_ENABLED = true;
+  it('keeps the name search and /start handoff while the waitlist gate is on', () => {
     renderHero();
+
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Get started')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search your name'), {
+      target: { value: 'Ada Lovelace' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Find me' }));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const handoff = String(mockPush.mock.calls[0]?.[0]);
+    expect(handoff.startsWith('/start?')).toBe(true);
+    expect(handoff).toContain('starter_prompt=');
     expect(trackAction).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      expect.objectContaining({ placement: 'hero' })
+      HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
+      expect.objectContaining({ placement: 'hero', freeText: true })
     );
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+
+    const html = renderToStaticMarkup(
+      <>
+        <HomepageEditorialHero
+          headingId='home-hero-heading'
+          headline='Control how the world sees you.'
+          support='Find what the internet knows. Turn it into relationships.'
+          search={{ placeholder: 'Search your name', action: 'Find me' }}
+        />
+        <HomepageNoScriptContent />
+      </>
+    );
+    expect(evaluateHomepageHtml(html)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+    });
   });
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();
