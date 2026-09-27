@@ -263,7 +263,7 @@ function renderLibraryWithSidebarProbe(assets: readonly LibraryReleaseAsset[]) {
 }
 
 function clickGridView() {
-  fireEvent.click(screen.getByRole('button', { name: 'Grid View' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Grid View' }));
 }
 
 function expectDesktop32Control(
@@ -582,15 +582,17 @@ describe('LibrarySurface', () => {
       screen.getByRole('button', { name: /Large cards/u }),
       { square: true }
     );
-    expectDesktop32Control(screen.getByRole('button', { name: 'Grid View' }), {
-      square: true,
-    });
-    expectDesktop32Control(screen.getByRole('button', { name: 'List View' }), {
-      square: true,
-    });
-    expectDesktop32Control(screen.getByRole('button', { name: 'Table View' }), {
-      square: true,
-    });
+    // The view slider (2026-09-25 header/toolbar IA) is a single fixed-size
+    // sliding control rather than three independently-densified buttons, so
+    // it intentionally stays at the founder-specified 28px visible size
+    // instead of picking up the desktop 32px density override.
+    for (const name of ['Grid View', 'List View', 'Table View']) {
+      const visibleOption = screen
+        .getByRole('radio', { name })
+        .closest('label');
+      expect(visibleOption).toHaveClass('h-7', 'w-7');
+      expect(visibleOption).not.toHaveClass('h-8');
+    }
   });
 
   it('renders aspect-ratio-aware artwork frames in grid cards', () => {
@@ -1089,7 +1091,12 @@ describe('LibrarySurface', () => {
       ).not.toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    await user.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /Archived/u }
+      )
+    );
     actions = within(screen.getByTestId('library-row-actions-release-1'));
     await user.click(actions.getByRole('button', { name: 'More actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
@@ -1135,7 +1142,12 @@ describe('LibrarySurface', () => {
       });
     });
 
-    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    await user.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /Archived/u }
+      )
+    );
     actions = within(screen.getByTestId('library-row-actions-merch-card-1'));
     await user.click(actions.getByRole('button', { name: 'More actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
@@ -1292,7 +1304,7 @@ describe('LibrarySurface', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
     clickGridView();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
 
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(
@@ -1317,7 +1329,7 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
 
     // Catalog rows render with the minimal column header.
     expect(
@@ -1345,7 +1357,7 @@ describe('LibrarySurface', () => {
     );
 
     // No regression: switching back to list restores release rows.
-    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
     expect(
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
@@ -1358,7 +1370,7 @@ describe('LibrarySurface', () => {
   it('renders the full dense Tracks-catalog column set in table mode (JOV-4846)', () => {
     renderLibrary([buildAsset()]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
 
     // Full experiment column set: status · artwork · title · artist · type ·
     // BPM · key · energy · rating · length · waveform · DSP providers.
@@ -1415,7 +1427,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
     expect(
       screen.getByTestId('library-catalog-row-release-1')
     ).toBeInTheDocument();
@@ -1648,6 +1660,65 @@ describe('LibrarySurface', () => {
 
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+  });
+
+  it('surfaces quick-apply filter suggestions next to the filter button, hidden while the filter dropdown is open', () => {
+    renderLibrary([
+      buildAsset({ id: 'release-1', status: 'draft' }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        status: 'draft',
+      }),
+      buildAsset({
+        id: 'release-3',
+        title: 'Reel',
+        artist: 'Third Artist',
+        status: 'released',
+      }),
+    ]);
+
+    const suggestions = screen.getByTestId('library-filter-suggestions');
+    expect(suggestions).not.toHaveAttribute('aria-hidden');
+    expect(
+      within(suggestions).getByRole('button', { name: 'Status · Draft' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+
+    expect(suggestions).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('applies a "Status" suggestion pill as a real filter, not a decorative pill', async () => {
+    renderLibrary([
+      buildAsset({ id: 'release-1', status: 'draft' }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        status: 'draft',
+      }),
+      buildAsset({
+        id: 'release-3',
+        title: 'Reel',
+        artist: 'Third Artist',
+        status: 'released',
+      }),
+    ]);
+
+    expect(screen.getByText('Reel')).toBeInTheDocument();
+
+    const suggestions = screen.getByTestId('library-filter-suggestions');
+    fireEvent.click(
+      within(suggestions).getByRole('button', { name: 'Status · Draft' })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+      expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+      expect(screen.queryByText('Reel')).not.toBeInTheDocument();
+    });
   });
 
   it('keeps global header search as the only Library search surface', () => {

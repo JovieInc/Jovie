@@ -93,7 +93,7 @@ save/readback proof**, not bindings:
 
 ## Guardrails
 
-Landed in #18960 (retire deprecated sidebar and token shims) and #18970 (canonical Badge and status tokens in billing and work feed):
+Guardrails in PR #18960 (retire deprecated sidebar and token shims) and PR #18970 (canonical Badge and status tokens in billing and work feed):
 
 - `apps/web/data/designSystem/retired-modules.json` is the registry of
   retired forks, shims, and exports. Each row names its canonical

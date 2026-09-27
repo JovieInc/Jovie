@@ -2,6 +2,7 @@
 
 import { validateAssuranceMatrixPolicy } from './assurance-matrix.mjs';
 import { validateDeliveryModelPolicy } from './delivery-model.mjs';
+import { validateDesignSurfaces } from './design-surfaces.mjs';
 import { validateDoneSprintInvariants } from './done-sprint-invariants.mjs';
 import { validateGateIntegrityPolicy } from './gate-integrity.mjs';
 import {
@@ -29,6 +30,8 @@ import {
 // JOV-INV-036 is composed here so Sonar repairs retain executable prevention.
 // JOV-INV-037 is composed here so the canonical assurance matrix stays bound
 // to its exact revision and reports uncovered objects and missing layers.
+// JOV-INV-038 is composed here so every invariant run checks the founder
+// design invariants against the deterministic marketing/app surface gates.
 
 import {
   readInvariantRegistry,
@@ -67,6 +70,7 @@ const gateIntegrityErrors = validateGateIntegrityPolicy(registry);
 const assuranceErrors = validateAssuranceMatrixPolicy(registry);
 const deliveryModelErrors = validateDeliveryModelPolicy(registry);
 const sonarRepairErrors = validateSonarRepairContract(registry);
+const designSurfaceErrors = validateDesignSurfaces(undefined, { registry });
 // JOV-6475 composes the writing-surface coverage registry the same way: it
 // validates that every named delivery surface maps to a contract and owner.
 const writingErrors = validateWritingSurfaces(readWritingSurfacesRegistry());
@@ -83,6 +87,7 @@ const errors = [
   ...assuranceErrors.map(error => `assurance-matrix: ${error}`),
   ...deliveryModelErrors.map(error => `delivery-model: ${error}`),
   ...sonarRepairErrors.map(error => `sonar-repair: ${error}`),
+  ...designSurfaceErrors.map(error => `design-surfaces: ${error}`),
   ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
 
