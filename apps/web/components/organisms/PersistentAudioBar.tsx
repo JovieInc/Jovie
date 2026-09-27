@@ -14,7 +14,6 @@ import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
-import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
   APP_ROUTES,
   buildLyricsRoute,
@@ -34,9 +33,6 @@ const SHELL_AUDIO_BAR_TRANSITION =
 // Flat player (founder spec 2026-09-25 #1): no border to transition anymore.
 const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
   'transition-[max-height,opacity,transform,background-color] duration-cinematic ease-cinematic';
-/** Docked now-playing chip — flat, no elevation into the content canvas (JOV-3511). */
-const SHELL_NOW_PLAYING_CARD_CLASSNAME =
-  'max-w-56 border-0 bg-transparent px-1 py-1 shadow-none transition-[opacity] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
@@ -420,12 +416,6 @@ export function PersistentAudioBar() {
     musicalKey: playbackState.musicalKey,
   };
   const lyricsPath = buildLyricsRoute(activeTrackId);
-  const nowPlayingTrack = {
-    trackTitle: playbackState.trackTitle,
-    artistName: playbackState.artistName,
-    artworkUrl: playbackState.artworkUrl,
-  };
-
   return (
     <>
       {/* Desktop player host — sits below main content, sharing its surface
@@ -467,14 +457,7 @@ export function PersistentAudioBar() {
               : SHELL_AUDIO_BAR_TRANSITION,
           }}
         >
-          <div className='grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] items-center gap-3 px-4 py-1.5 lg:px-6'>
-            <SidebarNowPlaying
-              track={nowPlayingTrack}
-              isPlaying={playbackState.isPlaying}
-              onPlay={handleToggle}
-              playOverlayVisible={false}
-              className={SHELL_NOW_PLAYING_CARD_CLASSNAME}
-            />
+          <div className='px-4 py-1.5 lg:px-6'>
             <AudioBar
               isPlaying={playbackState.isPlaying}
               onPlay={handleToggle}
