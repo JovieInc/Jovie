@@ -29,6 +29,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+const trackFunnelStep = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/signup-funnel-client', () => ({ trackFunnelStep }));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
@@ -75,6 +78,41 @@ beforeEach(() => {
 });
 
 describe('EmailCodeAuthForm', () => {
+  it('records a signup auth_start, then an error step when the send fails', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: null,
+      error: { status: 500, statusText: 'Server Error' },
+    });
+    renderForm();
+    await submitEmail();
+
+    await waitFor(() => expect(trackFunnelStep).toHaveBeenCalledTimes(2));
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(1, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      surface: 'signup',
+    });
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(2, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      outcome: 'error',
+      surface: 'signup',
+      reason: 'otp_send_failed',
+    });
+  });
+
+  it('does not count sign-in as a signup funnel step', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
+    await submitEmail();
+
+    await waitFor(() => expect(sendVerificationOtp).toHaveBeenCalledTimes(1));
+    expect(trackFunnelStep).not.toHaveBeenCalled();
+  });
+
   it('stays on the email step and shows an error when send returns an error result', async () => {
     sendVerificationOtp.mockResolvedValueOnce({
       data: null,

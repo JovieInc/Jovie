@@ -37,7 +37,6 @@ import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 import './HomepageV2Route.css';
-import { SignupFunnelBeacon } from '@/features/tracking/SignupFunnelBeacon';
 
 export { HomepageV2FinalCta, HomepageV2Pricing } from './HomepageV2Ctas';
 
@@ -46,7 +45,6 @@ export function HomepageV2Route() {
     <MarketingPageShell
       penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.homepage}
     >
-      <SignupFunnelBeacon surface='homepage' />
       <HomepageV2Hero />
       <HomepageV2BelowHero />
     </MarketingPageShell>

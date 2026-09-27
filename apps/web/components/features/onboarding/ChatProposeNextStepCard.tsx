@@ -5,7 +5,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
 import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
-import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 /**
@@ -57,11 +56,6 @@ export function ChatProposeNextStepCard({
         score: payload.decision.score,
         surface: 'start_chat',
       });
-      trackFunnelStep({
-        funnel: 'artist_signup',
-        step: 'qualified',
-        surface: 'onboarding',
-      });
     }
 
     if (kind === 'waitlist' && !decisionTrackedRef.current) {
@@ -69,13 +63,6 @@ export function ChatProposeNextStepCard({
       track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_DECISION_RENDERED, {
         score: payload.decision.score,
         surface: 'start_chat',
-      });
-      trackFunnelStep({
-        funnel: 'artist_signup',
-        step: 'qualified',
-        outcome: 'dropped',
-        surface: 'onboarding',
-        reason: 'waitlist',
       });
     }
   }, [kind, payload.decision.score]);

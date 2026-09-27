@@ -34,7 +34,6 @@ import {
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
 import { track } from '@/lib/analytics';
-import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import {
   ONBOARDING_WIDGET_EVENTS,
   widgetEventDisplayText,
@@ -792,11 +791,6 @@ export function OnboardingChat({
         track(ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED, {
           surface: 'start_chat',
         });
-        trackFunnelStep({
-          funnel: 'artist_signup',
-          step: 'chat_started',
-          surface: 'onboarding',
-        });
       }
       sendMessage({ text, ...(metadata ? { metadata } : {}) });
       chipTray.clear();
@@ -996,11 +990,6 @@ export function OnboardingChat({
       hasTrackedChatCompletedRef.current = true;
       track(ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED, {
         surface: 'start_chat',
-      });
-      trackFunnelStep({
-        funnel: 'artist_signup',
-        step: 'chat_completed',
-        surface: 'onboarding',
       });
     }
     onConversationActivity?.();

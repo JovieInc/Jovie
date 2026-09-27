@@ -56,3 +56,46 @@ export function consumeSignupFirstValue(): void {
     surface: 'dashboard',
   });
 }
+
+/**
+ * Existing client analytics events that already mark a funnel step. `track()`
+ * forwards them here, so the product components keep one tracking call.
+ */
+export function forwardAnalyticsEventToFunnel(
+  event: string,
+  properties?: Record<string, unknown>
+): void {
+  switch (event) {
+    case 'onboarding_started':
+    case 'chat_started':
+    case 'chat_completed':
+    case 'qualified':
+      trackFunnelStep({
+        funnel: 'artist_signup',
+        step: event,
+        surface: 'onboarding',
+      });
+      return;
+    case 'waitlist_decision_rendered':
+      trackFunnelStep({
+        funnel: 'artist_signup',
+        step: 'qualified',
+        outcome: 'dropped',
+        surface: 'onboarding',
+        reason: 'waitlist',
+      });
+      return;
+    case 'alert_cta_click':
+      // Subscribers reopening the flow to manage it are not funnel entries.
+      if (properties?.flow_origin === 'subscribe') {
+        trackFunnelStep({
+          funnel: 'fan_subscribe',
+          step: 'cta_click',
+          surface: 'profile',
+        });
+      }
+      return;
+    default:
+      return;
+  }
+}

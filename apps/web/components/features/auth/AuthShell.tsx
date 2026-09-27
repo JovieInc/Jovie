@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/AuthShell.test.tsx
 'use client';
 
 import Link from 'next/link';
