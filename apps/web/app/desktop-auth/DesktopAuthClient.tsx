@@ -12,6 +12,7 @@ import {
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
+  completeDesktopPasskeySignIn,
   copyDesktopAuthUrl,
   type DesktopAuthActionResult,
   openDesktopAuthUrl,
@@ -24,9 +25,12 @@ import { MacCinematicSurface } from './MacCinematicSurface';
 export type DesktopAuthOpenState = 'idle' | 'opening' | 'opened' | 'error';
 type CopyState = 'idle' | 'copying' | 'copied' | 'error';
 type RedeemState = 'idle' | 'redeeming' | 'redeemed' | 'error';
+type TouchIdState = 'idle' | 'working' | 'signed-in' | 'error';
 
 interface DesktopAuthClientProps {
   readonly authUrlParam: string | null;
+  /** Main process hint: this Mac enrolled Touch ID sign-in. */
+  readonly touchIdHint?: boolean;
 }
 
 interface DesktopAuthHandoffActionsProps {
@@ -34,6 +38,7 @@ interface DesktopAuthHandoffActionsProps {
   readonly onOpenStateChange?: (state: DesktopAuthOpenState) => void;
   readonly resolveAuthUrl?: () => string | null;
   readonly showCancelSignIn?: boolean;
+  readonly showTouchId?: boolean;
 }
 
 const DESKTOP_AUTH_ACTION_TIMEOUT_MS = 5000;
@@ -50,6 +55,9 @@ const STATUS_COPIED = 'Sign-in link copied. Paste it into any browser.';
 const STATUS_ENTER_CODE =
   'Signed in but Jovie did not open? Enter the code your browser shows.';
 const STATUS_REDEEMING = 'Signing in...';
+const STATUS_TOUCH_ID_WORKING = 'Waiting for Touch ID...';
+const STATUS_TOUCH_ID_FAILED =
+  'Touch ID did not sign you in. Continue in the browser instead.';
 // Matches the return page: consonants only, formatted XXXX-XXXX.
 const RETURN_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
 const RETURN_CODE_LENGTH = 8;
@@ -140,6 +148,7 @@ export function DesktopAuthHandoffActions({
   onOpenStateChange,
   resolveAuthUrl,
   showCancelSignIn = false,
+  showTouchId = false,
 }: DesktopAuthHandoffActionsProps) {
   const [openState, setOpenState] = useState<DesktopAuthOpenState>('idle');
   const [openError, setOpenError] = useState<string | null>(null);
@@ -151,6 +160,7 @@ export function DesktopAuthHandoffActions({
   const [redeemState, setRedeemState] = useState<RedeemState>('idle');
   const [redeemError, setRedeemError] = useState<string | null>(null);
   const [canRedeemCode, setCanRedeemCode] = useState(false);
+  const [touchIdState, setTouchIdState] = useState<TouchIdState>('idle');
   const primaryActionRef = useRef<HTMLButtonElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
 
@@ -272,6 +282,22 @@ export function DesktopAuthHandoffActions({
     [redeemState, returnCode]
   );
 
+  const signInWithTouchId = useCallback(async () => {
+    if (touchIdState === 'working' || touchIdState === 'signed-in') return;
+    setTouchIdState('working');
+    try {
+      // Loaded on demand: the handoff stays light for browser sign-in.
+      const { authClient } = await import('@/lib/auth/client');
+      const signedIn = await authClient.signIn.passkey();
+      if (signedIn?.error) throw new Error(signedIn.error.message);
+      const completed = await completeDesktopPasskeySignIn();
+      if (!completed.ok) throw new Error(completed.reason);
+      setTouchIdState('signed-in');
+    } catch {
+      setTouchIdState('error');
+    }
+  }, [touchIdState]);
+
   const toggleCodeMode = useCallback(() => {
     setCodeMode(current => !current);
     setRedeemState('idle');
@@ -301,7 +327,27 @@ export function DesktopAuthHandoffActions({
     redeemState === 'redeeming' || redeemState === 'redeemed'
       ? STATUS_REDEEMING
       : (redeemError ?? STATUS_ENTER_CODE);
-  const statusText = codeMode ? codeStatusText : actionStatusText;
+  const touchIdStatusText =
+    touchIdState === 'working' || touchIdState === 'signed-in'
+      ? STATUS_TOUCH_ID_WORKING
+      : touchIdState === 'error'
+        ? STATUS_TOUCH_ID_FAILED
+        : null;
+  const statusText =
+    touchIdStatusText ?? (codeMode ? codeStatusText : actionStatusText);
+  // Present in both modes so switching to code entry keeps the row count.
+  const touchIdButton = showTouchId ? (
+    <Button
+      type='button'
+      variant='primary'
+      size='lg'
+      className='w-full'
+      disabled={touchIdState === 'working' || touchIdState === 'signed-in'}
+      onClick={signInWithTouchId}
+    >
+      Sign In With Touch ID
+    </Button>
+  ) : null;
   const cancelButton = showCancelSignIn ? (
     <button
       type='button'
@@ -323,6 +369,7 @@ export function DesktopAuthHandoffActions({
           data-testid='desktop-auth-code-form'
           onSubmit={submitReturnCode}
         >
+          {touchIdButton}
           <input
             ref={codeInputRef}
             aria-label='Code From Your Browser'
@@ -344,7 +391,9 @@ export function DesktopAuthHandoffActions({
           />
           <button
             type='submit'
-            className={PRIMARY_ACTION_CLASS}
+            className={
+              showTouchId ? SECONDARY_ACTION_CLASS : PRIMARY_ACTION_CLASS
+            }
             disabled={
               !isCompleteReturnCode(returnCode) ||
               redeemState === 'redeeming' ||
@@ -361,10 +410,13 @@ export function DesktopAuthHandoffActions({
           data-desktop-auth-state={openState}
           data-testid='desktop-auth-actions'
         >
+          {touchIdButton}
           <button
             ref={primaryActionRef}
             type='button'
-            className={PRIMARY_ACTION_CLASS}
+            className={
+              showTouchId ? SECONDARY_ACTION_CLASS : PRIMARY_ACTION_CLASS
+            }
             disabled={!hasAuthUrl || isBusy}
             onClick={openAuthUrl}
           >
@@ -408,7 +460,10 @@ export function DesktopAuthHandoffActions({
   );
 }
 
-export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
+export function DesktopAuthClient({
+  authUrlParam,
+  touchIdHint = false,
+}: DesktopAuthClientProps) {
   useDesktopAppBootSignal();
   const [openState, setOpenState] = useState<DesktopAuthOpenState>('idle');
   const appOrigin = getAppOrigin();
@@ -425,6 +480,7 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
           authUrl={authUrl}
           onOpenStateChange={setOpenState}
           showCancelSignIn
+          showTouchId={touchIdHint}
         />
       </section>
     </MacCinematicSurface>

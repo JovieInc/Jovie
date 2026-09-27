@@ -1236,6 +1236,32 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
     /redeemDesktopAuthReturnCode: \(returnCode: string\) =>[\s\S]{0,120}?REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL/
   );
 
+  // Touch ID (JOV-6727): WebAuthn is configured only from the pure resolver
+  // (signed build + embedded provisioning profile), the account picker
+  // always answers, state writes are allowlisted, and in-app passkey
+  // completion is limited to the trusted auth surfaces.
+  assert.match(
+    mainSource,
+    /resolveDesktopWebAuthnConfig\(\{[\s\S]{0,300}?embedded\.provisionprofile[\s\S]{0,300}?app\.configureWebAuthn\(\{ touchID: config \}\)/
+  );
+  assert.match(
+    mainSource,
+    /'select-webauthn-account'[\s\S]{0,1200}?\.catch\(\(\) => callback\(\)\)/
+  );
+  assert.match(
+    mainSource,
+    /SET_DESKTOP_PASSKEY_STATE_CHANNEL,[\s\S]{0,300}?applyDesktopPasskeyStateUpdate\(update\)[\s\S]{0,120}?isTrustedIpcSender\(event\)/
+  );
+  assert.match(
+    mainSource,
+    /COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL,[\s\S]{0,200}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,120}?!desktopPasskeyAvailable/
+  );
+  assert.match(mainSource, /mode: 0o600/);
+  assert.match(
+    preloadSource,
+    /completeDesktopPasskeySignIn: \(\) =>[\s\S]{0,120}?COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL/
+  );
+
   // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.
   assert.match(mainSource, /function surfaceNoPendingAuthFlow\(\): void/);
   assert.match(mainSource, /surfaceNoPendingAuthFlow\(\);/);

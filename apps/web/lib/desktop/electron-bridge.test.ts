@@ -306,6 +306,53 @@ describe('electron-bridge — defensive guards', () => {
     ).resolves.toEqual({ ok: true });
   });
 
+  it('reads Touch ID state through the bridge and fails closed without it', async () => {
+    const getDesktopPasskeyState = vi.fn(async () => ({
+      available: true,
+      enrolled: 'yes',
+      dismissed: false,
+    }));
+    const setDesktopPasskeyState = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({ ok: true })
+    );
+    const completeDesktopPasskeySignIn = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({
+        ok: false,
+        reason: 'invalid-request',
+      })
+    );
+    setElectronAPI({
+      getDesktopPasskeyState,
+      setDesktopPasskeyState,
+      completeDesktopPasskeySignIn,
+    });
+
+    await expect(__testing.getDesktopPasskeyState()).resolves.toEqual({
+      available: true,
+      enrolled: false,
+      dismissed: false,
+    });
+    await expect(__testing.setDesktopPasskeyState('enrolled')).resolves.toEqual(
+      { ok: true }
+    );
+    expect(setDesktopPasskeyState).toHaveBeenCalledWith('enrolled');
+    await expect(__testing.completeDesktopPasskeySignIn()).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-request',
+    });
+
+    setElectronAPI({ versions: { app: '0.1.0' } });
+    await expect(__testing.getDesktopPasskeyState()).resolves.toEqual({
+      available: false,
+      enrolled: false,
+      dismissed: false,
+    });
+    await expect(__testing.completeDesktopPasskeySignIn()).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-passkey-bridge-unavailable',
+    });
+  });
+
   it('reports return codes unsupported on a stale bridge', async () => {
     setElectronAPI({ versions: { app: '0.1.0' } });
 

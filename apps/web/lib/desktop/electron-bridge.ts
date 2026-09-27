@@ -70,6 +70,17 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /** Touch ID sign-in capability and this Mac's enrollment choice. */
+  readonly getDesktopPasskeyState?: () => Promise<DesktopPasskeyState>;
+  /** Record that this Mac enrolled or declined Touch ID sign-in. */
+  readonly setDesktopPasskeyState?: (
+    update: DesktopPasskeyStateUpdate
+  ) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
+  /** Finish an in-app Touch ID sign-in: close the handoff, open the app. */
+  readonly completeDesktopPasskeySignIn?: () => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
   /** Open the current isolated public profile in the system browser. */
   readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
@@ -124,6 +135,20 @@ export type DesktopAuthCompletionResult =
       readonly ok: false;
       readonly reason?: string;
     };
+
+export interface DesktopPasskeyState {
+  readonly available: boolean;
+  readonly enrolled: boolean;
+  readonly dismissed: boolean;
+}
+
+export type DesktopPasskeyStateUpdate = 'enrolled' | 'dismissed' | 'reset';
+
+const NO_DESKTOP_PASSKEY: DesktopPasskeyState = {
+  available: false,
+  enrolled: false,
+  dismissed: false,
+};
 
 export interface DesktopAuthActionResult {
   readonly ok: boolean;
@@ -561,6 +586,47 @@ export async function redeemDesktopAuthReturnCode(
   return { ok: false, reason: 'desktop-auth-return-code-bridge-unavailable' };
 }
 
+export async function getDesktopPasskeyState(): Promise<DesktopPasskeyState> {
+  const api = getRawElectronAPI();
+  if (typeof api?.getDesktopPasskeyState !== 'function') {
+    return NO_DESKTOP_PASSKEY;
+  }
+  try {
+    const state = await api.getDesktopPasskeyState();
+    return {
+      available: state?.available === true,
+      enrolled: state?.enrolled === true,
+      dismissed: state?.dismissed === true,
+    };
+  } catch {
+    return NO_DESKTOP_PASSKEY;
+  }
+}
+
+export async function setDesktopPasskeyState(
+  update: DesktopPasskeyStateUpdate
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (typeof api?.setDesktopPasskeyState !== 'function') {
+    return { ok: false, reason: 'desktop-passkey-bridge-unavailable' };
+  }
+  const result = await api.setDesktopPasskeyState(update);
+  return result.ok
+    ? { ok: true }
+    : { ok: false, reason: result.reason ?? 'desktop-passkey-state-failed' };
+}
+
+export async function completeDesktopPasskeySignIn(): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (typeof api?.completeDesktopPasskeySignIn !== 'function') {
+    return { ok: false, reason: 'desktop-passkey-bridge-unavailable' };
+  }
+  const result = await api.completeDesktopPasskeySignIn();
+  return result.ok
+    ? { ok: true }
+    : { ok: false, reason: result.reason ?? 'desktop-passkey-complete-failed' };
+}
+
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.openPublicProfileInBrowser === 'function') {
@@ -817,6 +883,9 @@ export const __testing = {
   copyDesktopAuthUrl,
   redeemDesktopAuthReturnCode,
   supportsDesktopAuthReturnCode,
+  getDesktopPasskeyState,
+  setDesktopPasskeyState,
+  completeDesktopPasskeySignIn,
   openPublicProfileInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,
