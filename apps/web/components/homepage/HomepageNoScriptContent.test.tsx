@@ -81,11 +81,20 @@ describe('HomepageNoScriptContent', () => {
     // The only conversion is the name search; the fallback links it to /start.
     const links = [...(section?.querySelectorAll('a') ?? [])];
     expect(links.map(link => link.textContent)).toEqual([
-      'Request access',
+      'Find me',
       'Contact support',
     ]);
-    expect(links[0]?.getAttribute('href')).toBe('/signup');
-    expect(text).not.toMatch(/Get started|Drop more music|waitlist/i);
+    expect(links[0]?.getAttribute('href')).toBe('/start');
+    const form = section?.querySelector('form');
+    expect(form?.getAttribute('action')).toBe('/start');
+    expect(form?.getAttribute('method')).toBe('get');
+    const input = form?.querySelector('input');
+    expect(input?.getAttribute('placeholder')).toBe('Search your name');
+    expect(input?.getAttribute('name')).toBe('starter_prompt');
+    expect(form?.querySelector('button')?.textContent).toBe('Find me');
+    expect(text).not.toMatch(
+      /Get started|Drop more music|Request access|waitlist/i
+    );
   });
 
   it('hides only the progressive fallback for scripting-enabled browsers', () => {

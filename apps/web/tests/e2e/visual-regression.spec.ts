@@ -250,6 +250,8 @@ async function assertPrimaryCtaVisible(
   viewport: { width: number; label: string }
 ): Promise<void> {
   const ctaSelectors = [
+    // Locked homepage conversion: Search your name → Find me.
+    '[data-testid="homepage-primary-cta"]',
     // Homepage hero CTA
     'a[href="/signup"][data-testid]',
     // Generic signup links
