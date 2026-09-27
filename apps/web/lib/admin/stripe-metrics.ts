@@ -11,6 +11,10 @@ export interface AdminStripeOverviewMetrics {
   activeSubscribers: number;
   mrrUsd30dAgo: number;
   mrrGrowth30dUsd: number;
+  /** Net MRR 7 days ago, including subscriptions that have since churned. */
+  mrrUsd7dAgo?: number;
+  /** Paying subscriptions active 7 days ago, including since-churned ones. */
+  activeSubscribers7dAgo?: number;
   /** Indicates whether Stripe credentials are configured */
   isConfigured: boolean;
   /** Indicates whether the Stripe API call succeeded */
@@ -147,6 +151,8 @@ interface SubscriptionMetricsAccumulator {
   mrrCents: number;
   activeSubscribers: number;
   pastMrrCents: number;
+  weekAgoMrrCents: number;
+  weekAgoSubscribers: number;
 }
 
 // Process a single subscription and accumulate metrics.
@@ -154,13 +160,27 @@ interface SubscriptionMetricsAccumulator {
 function processSubscription(
   sub: Stripe.Subscription,
   thirtyDaysAgoSeconds: number,
-  accumulator: SubscriptionMetricsAccumulator
+  accumulator: SubscriptionMetricsAccumulator,
+  weekAgoSeconds = thirtyDaysAgoSeconds
 ): void {
-  if (!isActiveSubscription(sub.status)) return;
   if (!Array.isArray(sub.items.data) || sub.items.data.length === 0) return;
+  const netMrrCents = netMonthlyCents(sub);
 
+  // Week-ago baseline counts churned subscriptions too, so WoW is net of churn.
+  if (isSubscriptionActiveAt(sub, weekAgoSeconds)) {
+    accumulator.weekAgoMrrCents += netMrrCents;
+    accumulator.weekAgoSubscribers += 1;
+  }
+
+  if (!isActiveSubscription(sub.status)) return;
   accumulator.activeSubscribers += 1;
+  accumulator.mrrCents += netMrrCents;
+  if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
+    accumulator.pastMrrCents += netMrrCents;
+  }
+}
 
+function netMonthlyCents(sub: Stripe.Subscription): number {
   // Sum gross MRR across all line items
   let grossMrrCents = 0;
   for (const item of sub.items.data) {
@@ -170,15 +190,10 @@ function processSubscription(
   // Apply discount: percentage coupons scale the total, fixed coupons subtract
   const discountMultiplier = getDiscountMultiplier(sub);
   const fixedDiscountCents = getFixedDiscountCentsPerMonth(sub);
-  const netMrrCents = Math.max(
+  return Math.max(
     0,
     Math.round(grossMrrCents * discountMultiplier) - fixedDiscountCents
   );
-
-  accumulator.mrrCents += netMrrCents;
-  if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
-    accumulator.pastMrrCents += netMrrCents;
-  }
 }
 
 // Build the success response from accumulated metrics
@@ -190,6 +205,8 @@ function buildSuccessResponse(
     activeSubscribers: accumulator.activeSubscribers,
     mrrUsd30dAgo: accumulator.pastMrrCents / 100,
     mrrGrowth30dUsd: (accumulator.mrrCents - accumulator.pastMrrCents) / 100,
+    mrrUsd7dAgo: accumulator.weekAgoMrrCents / 100,
+    activeSubscribers7dAgo: accumulator.weekAgoSubscribers,
     isConfigured: true,
     isAvailable: true,
     observedAtIso: new Date().toISOString(),
@@ -235,10 +252,15 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
       mrrCents: 0,
       activeSubscribers: 0,
       pastMrrCents: 0,
+      weekAgoMrrCents: 0,
+      weekAgoSubscribers: 0,
     };
     let startingAfter: string | undefined;
     const thirtyDaysAgoSeconds = Math.floor(
       (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+    );
+    const weekAgoSeconds = Math.floor(
+      (Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000
     );
 
     for (;;) {
@@ -250,7 +272,12 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
       });
 
       for (const sub of page.data) {
-        processSubscription(sub, thirtyDaysAgoSeconds, accumulator);
+        processSubscription(
+          sub,
+          thirtyDaysAgoSeconds,
+          accumulator,
+          weekAgoSeconds
+        );
       }
 
       if (!page.has_more || page.data.length === 0) break;
