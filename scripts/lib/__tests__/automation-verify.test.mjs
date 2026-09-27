@@ -14,6 +14,7 @@ import {
   buildVerificationEnv,
   CONTROL_TEST_CONCURRENCY,
   controlCoverageReportsDirectory,
+  formatAffectedTestPlanDiagnostic,
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
@@ -2319,9 +2320,73 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  it('maps a unit-test-only diff to its focused Vitest command', () => {
+    const testFile =
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts';
+    const plan = buildAffectedTestPlan([testFile]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([testFile]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
+  it('maps a known fixture-only diff to its focused Vitest command', () => {
+    const fixture =
+      'apps/web/tests/unit/design-system/arbitrary-values.baseline.json';
+    const testFile =
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts';
+    const plan = buildAffectedTestPlan([fixture]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual([testFile]);
+    expect(plan.selectedTests).toEqual([testFile]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+    expect(
+      buildAffectedTestPlan([fixture], {
+        isFileAvailable: file => file !== testFile,
+      }).mode
+    ).toBe('full');
+  });
+
   it('fails closed when a web source has no test lane', () => {
-    expect(buildAffectedTestPlan(['apps/web/lib/unknown.ts']).mode).toBe(
-      'full'
+    const plan = buildAffectedTestPlan(['apps/web/lib/unknown.ts']);
+
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'uncovered source path(s): apps/web/lib/unknown.ts'
+    );
+    expect(formatAffectedTestPlanDiagnostic(plan)).toBe(
+      '[affected-tests] mode=full related=1 mandatory=0 fallbackReason="uncovered source path(s): apps/web/lib/unknown.ts"'
     );
   });
 
