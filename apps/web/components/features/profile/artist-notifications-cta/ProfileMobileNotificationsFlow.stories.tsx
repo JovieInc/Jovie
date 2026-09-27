@@ -59,7 +59,7 @@ const meta: Meta<typeof ProfileMobileNotificationsFlow> = {
   },
   decorators: [
     Story => (
-      <div className='dark min-h-screen max-w-[430px] bg-base text-primary-token'>
+      <div className='dark min-h-screen max-w-md bg-base text-primary-token'>
         <Story />
       </div>
     ),

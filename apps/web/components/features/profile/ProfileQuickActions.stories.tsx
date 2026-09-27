@@ -13,7 +13,7 @@ const meta: Meta<typeof ProfileQuickActions> = {
   },
   decorators: [
     Story => (
-      <div className='dark w-[390px] bg-base text-primary-token'>
+      <div className='dark w-96 bg-base text-primary-token'>
         <Story />
       </div>
     ),
