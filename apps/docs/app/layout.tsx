@@ -5,6 +5,8 @@ import 'nextra-theme-docs/style.css';
 import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { ArticleFeedback } from '@/components/ArticleFeedback';
+import { HelpCenterAnalytics } from '@/components/HelpCenterAnalytics';
 import { HelpCenterSearch } from '@/components/HelpCenterSearch';
 import {
   filterNavigationPageMap,
@@ -75,6 +77,8 @@ export default async function RootLayout({
           search={<HelpCenterSearch variant='desktop-only' />}
         >
           {children}
+          <ArticleFeedback />
+          <HelpCenterAnalytics />
         </Layout>
       </body>
     </html>
