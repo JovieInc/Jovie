@@ -2223,6 +2223,39 @@ body:has(.home-viewport)::-webkit-scrollbar {
     transition: none;
   }
 }
+
+/* JOV-6296 carbon-frame scroll transition. The hero mounts as a true
+   full-viewport field; across the first bounded scroll interval it settles
+   into a rounded frame on near-black gutters. The animation is scroll-driven
+   and geometry-only (scale + radius on the composited section), so layout,
+   the search geometry, and the shared header never move. Browsers without
+   scroll() timelines and reduced-motion users keep the certified still. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-viewport {
+      background: var(--system-b-cinematic-black);
+    }
+
+    .homepage-editorial-hero {
+      will-change: transform;
+      animation: homepage-editorial-hero-frame linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0px 40vh;
+    }
+  }
+}
+
+@keyframes homepage-editorial-hero-frame {
+  from {
+    border-radius: 0;
+    transform: scale(1);
+  }
+
+  to {
+    border-radius: var(--system-b-radius-panel);
+    transform: scale(0.96);
+  }
+}
 /* HOMEPAGE EDITORIAL HERO END */
 
 /* HOMEPAGE CERTIFIED SECTIONS START */
