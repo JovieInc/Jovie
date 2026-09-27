@@ -3,8 +3,8 @@ import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
-// Prelaunch front-door label. JOV-5085 locks Get started → /start.
-// Server-side waitlist gate handles post-/start routing, not the homepage href.
+// Header and other marketing CTAs still follow the waitlist front door.
+// The homepage hero conversion is the name search, not this contract.
 export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract(
   FEATURE_FLAGS.WAITLIST_ENABLED
 );
@@ -35,11 +35,11 @@ export const HOMEPAGE_LAUNCH_COPY = {
       action: 'Find me',
     },
     primaryCta: {
-      ...HOMEPAGE_FRONT_DOOR_CTA.primary,
-      label: 'Get started',
+      label: 'Find me',
+      href: APP_ROUTES.START,
     },
     secondaryCta: {
-      // Quiet proof path — not a peer conversion objective to Get started.
+      // Quiet proof path — not a second conversion next to Find me.
       label: 'See a live profile',
       href: TIM_WHITE_PROFILE.publicProfilePath,
     },

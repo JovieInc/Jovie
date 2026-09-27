@@ -70,6 +70,15 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(heroSource).not.toContain('primaryCta');
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
+
+    const actionSource = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepagePrimaryAction.tsx'),
+      'utf8'
+    );
+    expect(actionSource).not.toMatch(
+      /WAITLIST_ENABLED|Request access|Get started/
+    );
+    expect(actionSource).toContain('HeroSpotifySearch');
     expect(pageSource).not.toContain('/images/hero/');
   });
 

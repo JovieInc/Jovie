@@ -61,6 +61,9 @@ describe('negotiateAgentMarkdown', () => {
 
     const body = await res?.text();
     expect(body).toContain(`# ${HOMEPAGE_LAUNCH_COPY.hero.headline}`);
+    expect(body).toContain('Search your name → Find me:');
+    expect(body).toContain('/start');
+    expect(body).not.toContain('Get started');
     expect(body).toContain('## When to use Jovie');
     expect(body).toContain('/openapi.json');
   });

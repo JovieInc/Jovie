@@ -28,7 +28,7 @@ export function buildHomepageMarkdown(): string {
 
 ${hero.subhead}
 
-${hero.primaryCta.label}: ${toAbsolutePublicUrl(hero.primaryCta.href)}
+${hero.search.placeholder} → ${hero.search.action}: ${toAbsolutePublicUrl(hero.primaryCta.href)}
 ${hero.secondaryCta.label}: ${toAbsolutePublicUrl(hero.secondaryCta.href)}
 
 ## ${workspace.kicker}
