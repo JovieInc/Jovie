@@ -196,7 +196,7 @@ export function ActionDial({
             <span
               key={option.id}
               className={cn(
-                'absolute inset-0 transition-[transform,opacity] duration-subtle ease-subtle motion-reduce:transition-none',
+                'absolute inset-0 transition duration-subtle ease-subtle motion-reduce:transition-none',
                 isDragging && 'transition-none',
                 Math.abs(offset) <= 1 ? 'opacity-100' : 'opacity-0'
               )}
