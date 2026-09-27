@@ -91,6 +91,7 @@ export const RESERVED_USERNAMES = [
   'jobs',
   'team',
   'company',
+  'report',
 
   // Features
   'pricing',

@@ -175,6 +175,8 @@ export const APP_ROUTES = {
   ENGINEERING_PREVIEW: '/engineering/preview',
   DOWNLOAD: '/download',
   SUPPORT: '/support',
+  /** Public abuse/security report intake page (JOV-6599). */
+  REPORT: '/report',
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
