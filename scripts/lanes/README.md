@@ -23,6 +23,7 @@ The harness, not the model, owns:
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`), per-run log and prompt, Linear handoff comments | `run_issue()`, `worker()` |
 | Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
+| Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), 2 attempts per head, then one Triage issue | `fix_candidates()`, `red_pr()`, `escalate_exhausted()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run, bank exhausted ones until their reset | `codex_lane.py` |
@@ -30,6 +31,18 @@ The harness, not the model, owns:
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
+
+## Nothing fails silently
+
+`doctor.py` runs at the end of every dispatch tick. It judges the tick receipt
+(`tick.json`), the ledger, slot locks, Codex accounts, the Linear pool, GitHub quota,
+disk and the HUD heartbeat, and writes `doctor.json` (the HUD's NEEDS ATTENTION row).
+Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony doctor:
+<key>") so Summer routes it; when the condition clears the issue is commented and moved
+to Done; a key that fires again within six hours reopens the same issue. Keys:
+`tick-error`, `provider-down:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
+`pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `github-quota`,
+`hud-stale`.
 
 ## Codex lane
 

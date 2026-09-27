@@ -30,7 +30,8 @@ It adds no registry, queue, controller, or certification authority.
 3. Confidence sets the human window. High confidence gets about 1h, then
    promotes without Tim. Low confidence escalates to stronger models before a
    card reaches Tim.
-4. Certified dogfooder cohorts live in an Ovie table with customer certification.
+4. Only Tim is human certification. Advisors and alpha/beta pools are weighted
+   signal, never certifiers (section 7). They live in an Ovie roster table.
    Summer contacts them only through an approved Ovie outbound card.
 5. Summer tracks and improves the metrics in section 8.
 6. Ovie, Jovie, and LogYourBody lanes never hold each other.
@@ -41,7 +42,7 @@ It adds no registry, queue, controller, or certification authority.
 | --- | --- | --- | --- |
 | `working` | Any blocker, rejection, kill switch, or changes requested | Flag off | Nothing |
 | `machine_certified` | All six taste tiers pass (unchanged v1 rules) and same-source `ci` passes | None yet | Nothing |
-| `dogfooding` | `queue_merge` and `deploy` receipts for the exact head; subject flag on for the dogfood cohort only | Agents, Tim, certified dogfooders | Dogfood missions |
+| `dogfooding` | `queue_merge` and `deploy` receipts for the exact head; subject flag on for the dogfood cohort only | Agents, Tim, advisors, qualified pool members | Dogfood missions |
 | `dogfood_certified` | Dogfood receipts satisfy the subject's mission set (section 4) with required reliability | Same | Confidence evaluation |
 | `human_window` | Confidence tier computed; escalation chain finished (section 5) | Same | One Taste Inbox card with a deadline |
 | `rolling_out` | Founder `approved`, or window expired with silence and tier permits silent promotion | Staged ladder (section 6) | Stage receipts |
@@ -92,7 +93,7 @@ stales a valid founder decision.
 | `local_agent` | Local coding agents driving a local or preview build | gstack `qa`/`qa-swarm` skills | Yes |
 | `mac_closed_loop` | Mac app opened and driven on Tim's Mac | `cua-driver`; prior art `docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json` | Yes, when the Mac is reachable |
 | `founder_real_account` | Tim's real profile, music, and smart links | Production, Tim's session | Agent-driven read missions; writes only if reversible |
-| `human_cohort` | Certified dogfooders (section 7) | Their own accounts, feedback by text or DM | Human |
+| `human_signal` | Advisors and pool members (section 7) | Their own accounts, feedback by text or DM | Human; weighted signal, never certification |
 
 `jovie.dogfood-receipt/v1` generalizes the existing
 `jovie.summer-dogfood-observation/v1` shape rather than replacing it:
@@ -126,8 +127,9 @@ counts for a mission only if it passes the mission on the exact deploy:
 
 If no agent kind meets the rule for a required mission, the subject is
 `machineCertifiable: false`. It can still reach `dogfood_certified`, but only
-through `human_cohort` or `founder_real_account` receipts, and its confidence
-tier is `low` (section 5). Summer treats every such subject as coverage debt.
+through `founder_real_account` receipts or Tim's decision. `human_signal`
+never substitutes for either. Its confidence tier is `low` (section 5). Summer
+treats every such subject as coverage debt.
 
 **Tim's real account.** Agents may run read missions on it at any time the flag
 is on. Write missions are limited to reversible operations with a recorded undo
@@ -151,6 +153,7 @@ score here because every promotion must be explainable in one card line.
 | Surface risk class: `presentation`, `product`, `money_path` (auth, billing, payouts, migrations) | Assurance profile |
 | Surface escaped-defect rate, trailing 30 promotions | Section 8 |
 | Open defects linked to the subject | Linear |
+| Human signal aggregate (section 7) | `human_signal` receipts, weighted by tier |
 
 **Tiers and windows**
 
@@ -171,7 +174,19 @@ Re-evaluate when: `money_path` escaped-defect rate is at most 2% over 50
 promotions. Then: allow `high`.
 
 A low item held at `dogfooding` is not blocked from the people dogfooding it.
-Only real users wait.
+Only real users wait. Tim confirmed (2026-09-26): with no answer, a low item
+stays with dogfooders indefinitely and never reaches real users without him.
+The 1h/8h/24h windows and the `money_path` medium cap are also confirmed.
+
+**How human signal enters.** Signal can move a tier but never certify:
+
+- A negative aggregate (net weighted score below -1.0) drops the subject one
+  tier and is shown on Tim's card.
+- A positive aggregate (net weighted score at least +1.0, with at least 5
+  qualified pool members reporting) may stand in for the second agent kind in
+  `high`. It never sets `machineCertifiable`.
+- No single pool member can move a tier. Pool receipts count only in aggregate.
+- If a human call is needed, it goes to Tim.
 
 **Escalation chain (runs before any card reaches Tim).** Low-confidence items go
 up judge rungs until one is confident or the chain ends:
@@ -197,7 +212,7 @@ stays under alpha = 0.10 with delta = 0.05, per Trust or Escalate.
 
 ## 6. Staged rollout
 
-One flag per subject. Stages: `dogfood` (agents, Tim, certified dogfooders),
+One flag per subject. Stages: `dogfood` (agents, Tim, advisors, qualified pool),
 `alpha`, `beta`, `10%`, `50%`, `100%`.
 
 - Cohort stages target by user id through the existing flags stack
@@ -211,7 +226,7 @@ One flag per subject. Stages: `dogfood` (agents, Tim, certified dogfooders),
   from observed time-to-detect.
 - Canary or dogfood failure at any rung is the kill switch in section 2.
 
-## 7. Dogfooder roster (Ovie)
+## 7. Signal roster (Ovie)
 
 One Postgres table (migration through the normal Migration Guard path),
 readable only through `authorizeSummerControl`, projected as an Ovie table.
@@ -220,22 +235,38 @@ readable only through `authorizeSummerControl`, projected as an Ovie table.
 | --- | --- |
 | `id` | uuid |
 | `displayName` | e.g. "Daniel" |
-| `cohort` | `advisor`, `alpha`, `beta`, `trusted` |
+| `tier` | `advisor`, `alpha`, `beta` (trusted people reached by text or DM join a pool) |
 | `products` | subset of `jov`, `lyb`, `ovie`; lanes are independent |
 | `channel` | `imessage`, `sms`, `x_dm`, `email` |
 | `handle` | contact address; never leaves the server |
 | `jovieUserId` | nullable; links to their account for flag targeting |
 | `consent` | `{ grantedAt, scope, source, revokedAt }`; no contact without unrevoked consent |
-| `certState` | `invited`, `consented`, `onboarded`, `certified`, `paused`, `retired` |
-| `certEvidence` | calibration mission completed, feedback quality score |
+| `signalState` | `invited`, `consented`, `calibrating`, `qualified`, `paused`, `retired` |
+| `vouchedBy` | `tim` for advisors he vouches for; skips calibration |
+| `calibration` | calibration mission result, feedback quality score |
 | `contactBudget` | Ship now: at most 1 outbound per 7 days per person |
 | `lastContactedAt`, `lastFeedbackAt` | For the budget and the health metrics |
 
-**Customer certification.** A person is `certified` after consent, a completed
-calibration mission (a known-good and a known-broken build, and they tell them
-apart), and two feedback reports Summer could act on. Only `certified` people
-produce `human_cohort` receipts that count toward `dogfood_certified`. Others
-still give feedback. It just counts as signal, not evidence.
+**Only Tim certifies (Tim, 2026-09-26).** Nobody on this roster is a certifier.
+Everyone here is weighted signal, and the roster is the only place those
+weights come from.
+
+| Source | Ship now weight per report | Qualifies when |
+| --- | --- | --- |
+| Tim (as a user, not a decision) | 1.0 | Always |
+| Advisor vouched by Tim (e.g. Daniel) | 0.5 | On `vouchedBy: tim`; no calibration |
+| Alpha pool member | 0.2 | After calibration |
+| Beta pool member | 0.1 | After calibration |
+
+Calibration: consent, then a mission on a known-good and a known-broken build
+where they tell the two apart, then two feedback reports Summer could act on.
+Uncalibrated pool members still send feedback. It is logged, and it can open a
+bug (see [BUG_INTAKE_LOOP.md](BUG_INTAKE_LOOP.md)), but it adds zero weight.
+
+The aggregate is the sum of weights, positive minus negative, per subject.
+Section 5 says how it moves a tier. Ship now: the weights above. Re-evaluate
+when: 50 subjects have both signal and a Tim decision. Then: refit each tier's
+weight to its agreement with Tim.
 
 **Outbound.** Summer never messages a person directly. She files a Summer card
 of kind `outbound` (`apps/web/lib/ovie/summer-cards.ts`) with `recipient`, the
@@ -244,9 +275,10 @@ join a cohort use the same card. The send path ships disabled and is enabled as
 a separate post-landing authority action.
 
 **Feedback ingestion.** Replies map to a `jovie.dogfood-receipt/v1` of kind
-`human_cohort` on the subject. Summer classifies each reply as defect (Linear
-issue linked to the subject, which blocks `high`), taste (Taste Inbox signal),
-or noise.
+`human_signal` on the subject, carrying the sender's tier and weight. Summer
+classifies each reply as defect, taste (Taste Inbox signal), or noise. Defects
+go through the bug intake loop ([BUG_INTAKE_LOOP.md](BUG_INTAKE_LOOP.md)); an
+open linked defect blocks `high`.
 
 ## 8. Metrics Summer owns
 
@@ -265,7 +297,7 @@ or noise.
 | Escalation mix | Share and cost resolved at each rung | Earlier rungs |
 | Cycle time | `machine_certified` to `100%`, p50 and p90, per tier | Down |
 | Kill-switch MTTR | Failure receipt to flag off | Down |
-| Cohort health | Certified dogfooders per lane, reply rate, feedback-to-fix latency | Up / down |
+| Signal health | Advisors and qualified pool members per lane, reply rate, signal agreement with Tim | Up |
 
 Summer's loop: pick the metric that is the current bottleneck (constitution
 Law 1), file the smallest Linear issue that moves it, measure again.
@@ -308,7 +340,20 @@ subjects file cards under `company` until that enum grows an `ovie` value.
   fail-closed behavior on missing, stale, or ambiguous receipts.
 - At most one Taste Inbox card per subject.
 
-## 12. Research basis
+## 12. Customer certification
+
+Customer certification runs on the same kernel: a prospect's built profile is
+the test, product defects it exposes are fixed and re-checked, Tim approves each
+prospect, and outbound is card-approved until a message type earns auto-send.
+Spec: [CERTIFICATION_V2_CUSTOMERS.md](CERTIFICATION_V2_CUSTOMERS.md).
+
+## 13. Bug intake
+
+Bugs from any source run a separate closed loop (intake, source weight, Jev
+scoring, dedupe and repro, prioritized Linear bug, dispatch, reporter reply):
+[BUG_INTAKE_LOOP.md](BUG_INTAKE_LOOP.md).
+
+## 14. Research basis
 
 - Meta ships to employees first, then 2% of production, then 100%, with
   Gatekeeper flags as the rollback

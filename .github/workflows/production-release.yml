@@ -1,4 +1,12 @@
 name: Production Release
+# Invariant consumer: JOV-INV-022 (bounded hop). JOV-INV-029: merge is not activation.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: Forward-only release lineage must prove that an authorized SHA
+#   is still an ancestor of main; that ancestry lives only behind the GitHub
+#   compare API, because every job checks out the exact release SHA, not main.
+# revisit-trigger: Revisit when the controller carries lineage on its own
+#   workflow_run payload or promotion moves to a webhook-dispatched writer.
 
 on:
   workflow_call:
@@ -63,11 +71,19 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before lease work began."
+          # Forward-only lineage: after the controller authorizes a generation,
+          # main advancing does not cancel it. An authorized SHA that is still an
+          # ancestor of main ships; only a rewind or force-push yields. Exact
+          # equality at every later recheck starved production during PR drains
+          # (2026-09-26: jov.ie 572 commits behind, every generation superseded
+          # mid-pipeline). Stale generations still yield at the controller's
+          # coalesce/authorize boundary before any work starts.
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before lease work began."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
   deploy-staging:
@@ -495,11 +511,12 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD before staging alias."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before staging alias."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before staging alias."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
   alias-staging:
@@ -532,11 +549,12 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD at staging alias."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha at staging alias."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at staging alias."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Alias verified deployment
         if: ${{ steps.head.outputs.is_current == 'true' }}
@@ -685,11 +703,12 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD before production mutation."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before production mutation."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before production mutation."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
   migrate-production:
@@ -815,12 +834,13 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD at production mutation."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha at production mutation."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at production mutation."
             echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
       # This is deliberately a restore-only cache by default. The cache is a
       # Next compiler/build cache, never a Vercel deployment artifact. Writes
@@ -1230,8 +1250,9 @@ jobs:
             echo "::error::Could not resolve an exact main HEAD immediately before production promotion."
             exit 1
           fi
-          if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]; then
-            echo "::notice::Release $EXPECTED_MAIN_SHA was superseded by $current_main_sha after its staged production build; skipping production mutation."
+          if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_MAIN_SHA}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_MAIN_SHA left main's lineage (main is $current_main_sha) after its staged production build; skipping production mutation."
             echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
             exit 0
