@@ -123,6 +123,23 @@ describe('authenticated app screen registry', () => {
         issue => issue.code
       )
     ).toContain('component-pen-root-readback-mismatch');
+
+    const promoteTable = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === bound?.id
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    expect(
+      validateAppScreenSystem({ components: promoteTable }).map(
+        issue => issue.code
+      )
+    ).toContain('reference-component-with-pending-pen-decision');
+    expect(
+      validateAppScreenSystem({
+        components: promoteTable,
+        penPendingDecisions: [],
+      }).map(issue => issue.code)
+    ).not.toContain('reference-component-with-pending-pen-decision');
   });
 
   it('keeps every recipe behind a real error boundary', () => {
