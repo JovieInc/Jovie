@@ -78,7 +78,7 @@ describe('marketing media recipe contract (JOV-6246)', () => {
 
     expect(headerCss).toContain('GTcgO');
     expect(headerCss).toContain('eoUUU');
-    expect(headerCss).toContain('Floating Bar capsule');
+    expect(headerCss).toContain('re-seated as a docked bar');
     expect(headerCss).toContain('--marketing-glass-height: 2.75rem');
     expect(headerCss).toContain('var(--noir-ion-shell) 82%');
     expect(headerCss).toContain('var(--noir-ion-shell) 90%');
