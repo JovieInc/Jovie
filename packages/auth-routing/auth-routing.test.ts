@@ -294,6 +294,71 @@ describe('auth routing boundary', () => {
     ).toBe(
       `${NATIVE_HANDBACK_BOUNCE_PATHS.electron}?code=electron_code&state=electron_state&desktop_flow=flow_nonce`
     );
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopFlow: 'flow_nonce',
+        returnCode: 'BCDFGHJK',
+      })
+    ).toBe(
+      `${NATIVE_HANDBACK_BOUNCE_PATHS.electron}?code=electron_code&state=electron_state&desktop_flow=flow_nonce&return_code=BCDFGHJK`
+    );
+    // A return code is only meaningful with a desktop flow to redeem against,
+    // and never leaks onto the iOS bounce.
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        returnCode: 'BCDFGHJK',
+      })
+    ).not.toContain('return_code');
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'ios',
+        code: 'ios_code',
+        state: 'ios_state',
+        desktopFlow: 'flow_nonce',
+        returnCode: 'BCDFGHJK',
+      })
+    ).toBe(`${NATIVE_HANDBACK_BOUNCE_PATHS.ios}?code=ios_code&state=ios_state`);
+  });
+
+  it('only lets Electron flows with a flow nonce opt into return codes', () => {
+    const base = {
+      intent: 'sign_in' as const,
+      state: 'state_123',
+      codeChallenge: 'challenge',
+      now: 1_000,
+    };
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopFlow: 'flow_nonce_abcdef123456',
+        desktopReturnCode: true,
+      }).desktopReturnCode
+    ).toBe(true);
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopReturnCode: true,
+      }).desktopReturnCode
+    ).toBe(false);
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'ios',
+        returnTo: '/app',
+        desktopFlow: 'flow_nonce_abcdef123456',
+        desktopReturnCode: true,
+      }).desktopReturnCode
+    ).toBe(false);
   });
 
   it.each([
