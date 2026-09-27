@@ -2606,7 +2606,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: 100%;
   margin-top: clamp(var(--space-8), 4vw, var(--space-12));
   overflow: hidden;
-  aspect-ratio: 1902 / 827;
 }
 
 .homepage-connected-identity {
@@ -2648,13 +2647,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* JOV-6297: one editorial surface carrying the approved customer-zero
-   profile — real avatar + public facts beside the real product export. */
+   profile — real avatar + public facts beside the real product export.
+   The identity and the export sit together as one centered pair; the card
+   height follows the uncropped export (no fixed aspect ratio, no dead
+   column). Text on the warm-white artifact uses the inverse page ink. */
 .homepage-connected-profile {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto auto;
+  justify-content: center;
   align-items: center;
-  gap: clamp(var(--space-8), 5vw, var(--space-16));
-  height: 100%;
+  gap: clamp(var(--space-12), 7vw, var(--space-24));
   padding: clamp(var(--space-6), 4vw, var(--space-12));
 }
 
@@ -2666,14 +2668,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-connected-profile__avatar {
-  width: clamp(3rem, 4.5vw, 6rem);
+  width: clamp(4rem, 7vw, 7.5rem);
   height: auto;
   border-radius: 50%;
 }
 
 .homepage-connected-profile__name {
   margin: 0;
-  color: var(--color-text-primary-token);
+  color: var(--system-b-bg-page);
   font-size: clamp(1.25rem, 2vw, 1.75rem);
   font-weight: 590;
   letter-spacing: -0.01em;
@@ -2682,7 +2684,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-connected-profile__url {
   margin: 0;
-  color: var(--color-text-tertiary-token);
+  color: color-mix(in oklab, var(--system-b-bg-page) 64%, transparent);
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.875rem;
   line-height: 1.4;
@@ -2690,20 +2692,19 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-connected-artwork__image {
   display: block;
-  height: 100%;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
+  width: min(100%, 20rem);
+  height: auto;
 }
 
 @media (max-width: 767px) {
-  .homepage-connected-artwork {
-    aspect-ratio: auto;
-  }
-
   .homepage-connected-profile {
     grid-template-columns: minmax(0, 1fr);
-    height: auto;
+    justify-items: center;
+  }
+
+  .homepage-connected-profile__identity {
+    align-items: center;
+    text-align: center;
   }
 
   .homepage-connected-artwork__image {
