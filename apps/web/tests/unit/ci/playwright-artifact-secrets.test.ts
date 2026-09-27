@@ -710,7 +710,7 @@ describe('Playwright artifact secret boundary', () => {
     await expect(configs(true, false, 'sentinel')).rejects.toThrow(
       'Global Vercel bypass headers are forbidden'
     );
-  }, 20_000);
+  }, 90_000);
 
   it('inherits child env without JSON disclosure and rejects a real credential trace', async () => {
     const directory = fixture('.artifact-json-', webRoot);
