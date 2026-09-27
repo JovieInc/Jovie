@@ -47,11 +47,11 @@ describe('DevelopersPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('links the read-only CLI and the API versioning policy alongside the contract', () => {
+  it('links the CLI and the API versioning policy alongside the contract', () => {
     render(<DevelopersPage />);
 
     expect(
-      screen.getByRole('link', { name: /read-only jovie cli/i })
+      screen.getByRole('link', { name: /jovie cli and mcp server/i })
     ).toHaveAttribute('href', '/cli');
     expect(
       screen.getByRole('link', {
@@ -113,31 +113,35 @@ describe('developer guide contract vs llms guidance (JOV-6265)', () => {
   });
 
   it('keeps /cli command documentation aligned with the actual CLI surface', () => {
-    const cliSource = readWebSource('../../packages/jovie-cli/src/cli.ts');
+    const cliSource = [
+      '../../packages/jovie-cli/src/cli.ts',
+      '../../packages/jovie-cli/src/commands.ts',
+    ]
+      .map(readWebSource)
+      .join('\n');
     const cliPageSource = readWebSource(
       'components/marketing/CliLandingPage.tsx'
     );
 
     // Every command the CLI landing page documents must exist in the CLI
-    // implementation help text, and the CLI must stay read-only.
-    for (const command of [
-      'artist get <username>',
-      'artist llms <username>',
-      'api openapi',
-      'docs llms',
+    // command table. The only write the CLI may expose is profile create.
+    for (const [page, path] of [
+      ['artist get <username>', "path: ['artist', 'get']"],
+      ['artist llms <username>', "path: ['artist', 'llms']"],
+      ['api openapi', "path: ['api', 'openapi']"],
+      ['docs llms', "path: ['docs', 'llms']"],
+      ['profile create <spotify-artist-url>', "path: ['profile', 'create']"],
     ]) {
-      expect(
-        cliPageSource,
-        `CLI landing page must document ${command}`
-      ).toContain(`jovie ${command}`);
-      expect(
-        cliSource,
-        `CLI implementation must implement ${command}`
-      ).toContain(command);
+      expect(cliPageSource, `CLI landing page must document ${page}`).toContain(
+        `jovie ${page}`
+      );
+      expect(cliSource, `CLI implementation must implement ${page}`).toContain(
+        path
+      );
     }
 
     expect(cliSource).not.toMatch(
-      /\bjovie (create|update|delete|patch|post|put|write)\b/i
+      /path: \['\w+', '(update|delete|patch|put|write)'\]/i
     );
   });
 });
