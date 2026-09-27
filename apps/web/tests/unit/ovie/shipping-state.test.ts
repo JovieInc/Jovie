@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { OPERATIONAL_TRUTH_STATES } from '@/lib/ovie/program';
 import {
   type AuthorityRead,
+  ageShippingStateProjection,
   publishShippingState,
   resetShippingStatePublisher,
   SHIPPING_SOURCE_SCHEMAS,
@@ -277,6 +278,33 @@ describe('ovie.shipping-state.v1 client', () => {
 
     expect(disconnected.view.truth).toBe('disconnected');
     expect(disconnected.view.revision).toBe('rev-4');
+  });
+
+  it('re-derives delivery when a cached projection ages its sources', async () => {
+    const published = await publishShippingState({
+      readers: snapshotReaders({
+        'lanes-status': ok(
+          'lanes-status',
+          {
+            schema: 'symphony-lanes-status/v1',
+            running: 1,
+            idle: 0,
+          },
+          { sourceTimestamp: new Date().toISOString() }
+        ),
+      }),
+    });
+    expect(published.sources['lanes-status'].state).not.toBe('stale');
+    expect(published.delivery?.lanes.stale).toBe(false);
+
+    const aged = ageShippingStateProjection(
+      published,
+      new Date(
+        Date.parse(published.observationTimestamp) + 24 * 60 * 60 * 1000
+      ).toISOString()
+    );
+    expect(aged.sources['lanes-status'].state).toBe('stale');
+    expect(aged.delivery?.lanes.stale).toBe(true);
   });
 
   it('parses a publisher projection without turning missing sources into zero', async () => {

@@ -413,6 +413,10 @@ export function ageShippingStateProjection(
           aggregateState
         )
       : projection.state,
+    // Delivery is derived from source states (success gating, lanes.stale); re-derive after aging.
+    delivery: projection.delivery
+      ? projectDelivery(sources)
+      : projection.delivery,
     operationalTasks: {
       ...projection.operationalTasks,
       syncState:
