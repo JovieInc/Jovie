@@ -137,6 +137,12 @@ const STATIC_CSP_PARTS = {
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)
   frameSrcBase: [
     "frame-src 'self'",
+    // Native auth bounce pages launch these registered app protocols in a
+    // hidden iframe so the visible fallback page remains available.
+    'jovie:',
+    'jovie-staging:',
+    'jovie-local:',
+    'ie.jov.jovie:',
     'https://js.stripe.com',
     'https://checkout.stripe.com',
     'https://challenges.cloudflare.com',
