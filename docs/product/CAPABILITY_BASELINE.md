@@ -52,9 +52,9 @@ profiles and smart links, fan-facing), **Agents** (API, MCP, CLI).
 
 | ID | Capability | Applies to | Peer evidence |
 |---|---|---|---|
-| NOTIF-1 | Notification preferences (one level, not a matrix) | Web, iOS, LYB | Linear, Spotify for Artists |
+| NOTIF-1 | Notification preferences (one level, not a matrix) | Web, iOS, LYB | Linear, artist analytics apps |
 | NOTIF-2 | One-click unsubscribe in every marketing/fan email | Web, Public | RFC 8058, Gmail/Yahoo sender rules |
-| NOTIF-3 | Native notifications **(native)** | Mac, iOS, LYB | Linear, Slack, Spotify for Artists |
+| NOTIF-3 | Native notifications **(native)** | Mac, iOS, LYB | Linear, Slack, artist analytics apps |
 
 ### Data
 
