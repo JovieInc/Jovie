@@ -14,6 +14,7 @@ const {
   mockGetPlanFromPriceId,
   mockCaptureCriticalError,
   mockLogFallback,
+  mockTrackServerEvent,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
@@ -22,6 +23,7 @@ const {
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
+  mockTrackServerEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -57,6 +59,10 @@ vi.mock('@/lib/error-tracking', () => ({
   logFallback: mockLogFallback,
 }));
 
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
+}));
+
 import { PaymentHandler } from '@/lib/stripe/webhooks/handlers/payment-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 
@@ -73,6 +79,7 @@ describe('@critical PaymentHandler - payment succeeded', () => {
       appUserId: 'app_user_test',
     });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
+    mockTrackServerEvent.mockResolvedValue({ ok: true, eventId: 'evt-test' });
   });
 
   afterEach(() => {

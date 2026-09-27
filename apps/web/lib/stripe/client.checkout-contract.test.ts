@@ -12,6 +12,9 @@ vi.mock('@/lib/env-server', () => ({
 vi.mock('@/lib/env-public', () => ({
   publicEnv: { NEXT_PUBLIC_PROFILE_URL: 'https://example.test' },
 }));
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: vi.fn().mockResolvedValue({ ok: true, eventId: 'evt-1' }),
+}));
 vi.mock('./config', () => ({
   ACTIVE_PRICE_MAPPINGS: {
     price_visibility: { amount: 19900, currency: 'usd', interval: 'month' },

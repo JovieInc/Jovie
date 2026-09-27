@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
   returning: vi.fn(),
   values: vi.fn(),
+  onConflictDoNothing: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -58,7 +59,11 @@ describe('server analytics contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.returning.mockResolvedValue([{ id: 'event-1' }]);
-    mocks.values.mockReturnValue({ returning: mocks.returning });
+    mocks.onConflictDoNothing.mockReturnValue({ returning: mocks.returning });
+    mocks.values.mockReturnValue({
+      returning: mocks.returning,
+      onConflictDoNothing: mocks.onConflictDoNothing,
+    });
     mocks.insert.mockReturnValue({ values: mocks.values });
   });
 
@@ -72,13 +77,13 @@ describe('server analytics contract', () => {
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
-    expect(countProductionCallSites(WEB_ROOT)).toBe(29);
+    expect(countProductionCallSites(WEB_ROOT)).toBe(34);
     expect(
       SERVER_ANALYTICS_CALLSITE_INVENTORY.reduce(
         (total, entry) => total + entry.invocations,
         0
       )
-    ).toBe(29);
+    ).toBe(34);
 
     for (const entry of SERVER_ANALYTICS_CALLSITE_INVENTORY) {
       const source = readFileSync(join(WEB_ROOT, entry.path), 'utf8');
@@ -268,6 +273,58 @@ describe('server analytics contract', () => {
           event_name: 'release_deleted',
         }),
       })
+    );
+  });
+
+  it('dedupes idempotent deliveries through the conflict target', async () => {
+    mocks.returning.mockResolvedValueOnce([]);
+
+    const result = await trackServerEvent(
+      'payment_succeeded',
+      {
+        appUserId: PROFILE_ID,
+        billing_reason: 'subscription_cycle',
+      },
+      undefined,
+      { idempotencyKey: 'stripe_event:evt_123' }
+    );
+
+    expect(result).toEqual({ ok: true, eventId: null });
+    expect(mocks.onConflictDoNothing).toHaveBeenCalledWith({
+      target: expect.anything(),
+    });
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'payment_succeeded',
+        idempotencyKey: 'stripe_event:evt_123',
+        properties: {
+          appUserId: PROFILE_ID,
+          billing_reason: 'subscription_cycle',
+        },
+      })
+    );
+  });
+
+  it('rejects malformed idempotency keys without writing', async () => {
+    const result = await trackServerEvent(
+      'onboarding_completed',
+      { profileId: PROFILE_ID },
+      undefined,
+      { idempotencyKey: 'bad key with spaces!' }
+    );
+
+    expect(result).toEqual({ ok: false, error: 'invalid_properties' });
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it('writes unkeyed events without the conflict clause', async () => {
+    await trackServerEvent('dashboard_profile_updated', {
+      profileId: PROFILE_ID,
+    });
+
+    expect(mocks.onConflictDoNothing).not.toHaveBeenCalled();
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: null })
     );
   });
 });

@@ -13,6 +13,7 @@ const hoisted = vi.hoisted(() => {
   const cacheHandleAvailabilityMock = vi.fn();
   const invalidateProxyUserStateCacheMock = vi.fn();
   const attributeLeadSignupFromAppUserIdMock = vi.fn();
+  const recordOnboardingCompletedReceiptMock = vi.fn();
   const invalidateProfileCacheMock = vi.fn();
   const markWaitlistSignedUpInTxMock = vi.fn();
   const enforceOnboardingRateLimitMock = vi.fn();
@@ -21,6 +22,7 @@ const hoisted = vi.hoisted(() => {
 
   return {
     attributeLeadSignupFromAppUserIdMock,
+    recordOnboardingCompletedReceiptMock,
     cacheHandleAvailabilityMock,
     captureErrorMock,
     cookiesMock,
@@ -97,6 +99,8 @@ vi.mock('@/lib/error-tracking', () => ({
 vi.mock('@/lib/leads/funnel-events', () => ({
   attributeLeadSignupFromAppUserId:
     hoisted.attributeLeadSignupFromAppUserIdMock,
+  recordOnboardingCompletedReceipt:
+    hoisted.recordOnboardingCompletedReceiptMock,
 }));
 
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
@@ -173,6 +177,10 @@ describe('completeOnboarding', () => {
     hoisted.cacheHandleAvailabilityMock.mockResolvedValue(undefined);
     hoisted.invalidateProxyUserStateCacheMock.mockResolvedValue(undefined);
     hoisted.attributeLeadSignupFromAppUserIdMock.mockResolvedValue(undefined);
+    hoisted.recordOnboardingCompletedReceiptMock.mockResolvedValue({
+      ok: true,
+      eventId: 'evt-onboarding',
+    });
     hoisted.invalidateProfileCacheMock.mockResolvedValue(undefined);
     hoisted.withDbSessionTxMock.mockImplementation(async operation => {
       return operation({} as never, 'clerk_123');

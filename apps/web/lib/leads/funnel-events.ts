@@ -22,6 +22,10 @@ import { captureError } from '@/lib/error-tracking';
 import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
+  type ServerAnalyticsDelivery,
+  trackServerEvent,
+} from '@/lib/server-analytics';
+import {
   type CheckoutCorrelation,
   hasCheckoutCorrelation,
   toCheckoutCorrelationReceiptFields,
@@ -540,6 +544,24 @@ export async function attributeLeadPaidConversionByAppUserId(
       { idempotent: true, required: true }
     );
   }
+}
+
+/**
+ * Durable activation receipt for the self-serve (organic or claimed)
+ * onboarding path. `creator_profiles.onboarding_completed_at` is the
+ * authoritative state transition; this persists the canonical
+ * `onboarding_completed` funnel event beside it. The idempotency key is
+ * derived from the owned profile id, so onboarding replays across refreshes,
+ * tabs, devices, and action retries collapse to one row. A non-ok result
+ * means the transition happened but is not yet measured — callers should
+ * surface a receipt-pending outcome rather than pretending delivery.
+ */
+export async function recordOnboardingCompletedReceipt(
+  profileId: string
+): Promise<ServerAnalyticsDelivery> {
+  return trackServerEvent('onboarding_completed', { profileId }, undefined, {
+    idempotencyKey: `onboarding_completed:${profileId}`,
+  });
 }
 
 export async function countLeadEventsSince(

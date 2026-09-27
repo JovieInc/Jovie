@@ -34,7 +34,10 @@ import {
   OnboardingErrorCode,
   onboardingErrorToError,
 } from '@/lib/errors/onboarding';
-import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
+import {
+  attributeLeadSignupFromAppUserId,
+  recordOnboardingCompletedReceipt,
+} from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { isTokenBackedClaimFixture } from '@/lib/profile/public-profile-identity-policy';
@@ -407,6 +410,23 @@ export async function completeOnboarding({
       await attributeLeadSignupFromAppUserId(userId);
     } catch (error) {
       throw createOnboardingReceiptPendingError(error);
+    }
+
+    // JOV-6459: the durable activation receipt is server-side and keyed by
+    // the owned profile id, so a blocked/missing analytics script can never
+    // erase activation evidence. A failed write returns receipt-pending so
+    // the completed transaction is reconciled instead of left unmeasured.
+    if (completion.profileId) {
+      const activationReceipt = await recordOnboardingCompletedReceipt(
+        completion.profileId
+      );
+      if (!activationReceipt.ok) {
+        throw createOnboardingReceiptPendingError(
+          new Error(
+            `onboarding_completed receipt failed: ${activationReceipt.error}`
+          )
+        );
+      }
     }
 
     if (pendingClaim?.mode === 'token_backed') {

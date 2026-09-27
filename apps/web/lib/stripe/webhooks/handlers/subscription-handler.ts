@@ -24,6 +24,7 @@ import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
 import { expireReferralOnChurn } from '@/lib/referrals/service';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -363,6 +364,24 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     }
 
     await invalidateBillingCache(result.appUserId ?? userId);
+
+    // JOV-6459: churn is measured from the verified subscription.deleted
+    // webhook keyed by the Stripe event id, so retries dedupe. A delivery
+    // failure throws so Stripe retries instead of leaving the downgrade
+    // permanently unmeasured.
+    if (result.success && !result.skipped && result.appUserId) {
+      const churnReceipt = await trackServerEvent(
+        'subscription_churned',
+        { appUserId: result.appUserId },
+        undefined,
+        { idempotencyKey: `stripe_event:${stripeEventId}` }
+      );
+      if (!churnReceipt.ok) {
+        throw new Error(
+          `subscription_churned analytics receipt failed: ${churnReceipt.error}`
+        );
+      }
+    }
 
     return {
       success: true,

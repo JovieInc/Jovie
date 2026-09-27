@@ -28,7 +28,8 @@ interface ServerAnalyticsEventDefinition {
     | 'release'
     | 'tour'
     | 'notification'
-    | 'entitlement';
+    | 'entitlement'
+    | 'billing';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -67,6 +68,40 @@ export const SERVER_ANALYTICS_EVENTS = {
   auth_exchange_failed: authEvent,
   auth_returned_to_client: authEvent,
   auth_wrong_surface_prevented: authEvent,
+  /**
+   * Canonical self-serve activation receipt. Emitted once per owned profile
+   * from completeOnboarding, keyed by profile id so refresh/multi-tab/multi-
+   * device replays collapse to one durable row.
+   */
+  onboarding_completed: {
+    category: 'profile',
+    properties: ['profileId'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  /**
+   * Checkout session creation is the server-side checkout start. Stripe
+   * checkout session ids are not persisted; the idempotency key is a hash.
+   */
+  checkout_initiated: {
+    category: 'billing',
+    properties: ['plan'],
+  },
+  /**
+   * Verified subscription payment emitted from the invoice.payment_succeeded
+   * webhook handler, keyed by the Stripe event id so webhook retries dedupe.
+   */
+  payment_succeeded: {
+    category: 'billing',
+    properties: ['appUserId', 'billing_reason'],
+  },
+  subscription_renewed: {
+    category: 'billing',
+    properties: ['appUserId', 'billing_reason'],
+  },
+  subscription_churned: {
+    category: 'billing',
+    properties: ['appUserId'],
+  },
   dashboard_profile_updated: {
     category: 'profile',
     properties: ['profileId'],
@@ -249,6 +284,26 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['smart_link_clicked'],
   },
   {
+    path: 'lib/leads/funnel-events.ts',
+    invocations: 1,
+    events: ['onboarding_completed'],
+  },
+  {
+    path: 'lib/stripe/client.ts',
+    invocations: 1,
+    events: ['checkout_initiated'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/payment-handler.ts',
+    invocations: 2,
+    events: ['payment_succeeded', 'subscription_renewed'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/subscription-handler.ts',
+    invocations: 1,
+    events: ['subscription_churned'],
+  },
+  {
     path: 'lib/notifications/analytics.ts',
     invocations: 7,
     events: [
@@ -274,6 +329,7 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
 type SafePropertyValue = string | number | boolean | null;
 
 const UUID_PROPERTY_NAMES = new Set([
+  'appUserId',
   'artist_id',
   'eventId',
   'profileId',
@@ -284,6 +340,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'code',
   'error_type',
   'gate',
+  'plan',
   'planRequired',
   'provider',
   'reason',
@@ -292,6 +349,18 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'toolName',
 ]);
 const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
+  // Stripe invoice.billing_reason enum; subscription_cycle marks renewals.
+  billing_reason: new Set([
+    'automatic_pending_invoice_item_invoice',
+    'manual',
+    'quote_accept',
+    'subscription',
+    'subscription_create',
+    'subscription_cycle',
+    'subscription_threshold',
+    'subscription_update',
+    'upcoming',
+  ]),
   channel: new Set(['email', 'sms']),
   client: new Set(['web', 'ios', 'electron']),
   intent: new Set(['sign_in', 'sign_up']),
@@ -381,7 +450,14 @@ const UUID_PATTERN =
 const SAFE_TOKEN_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export type ServerAnalyticsDelivery =
-  | { readonly ok: true; readonly eventId: string }
+  | {
+      readonly ok: true;
+      /**
+       * Persisted row id. `null` when a caller-supplied idempotency key
+       * matched an existing row — the event was already durably recorded.
+       */
+      readonly eventId: string | null;
+    }
   | {
       readonly ok: false;
       readonly error:
@@ -443,10 +519,21 @@ function sanitizeProperties(
   return sanitized;
 }
 
+export interface ServerAnalyticsTrackOptions {
+  /**
+   * Stable, server-derived dedupe key (e.g. `stripe_event:evt_...` or
+   * `onboarding_completed:<profile uuid>`). When supplied, the insert uses
+   * the unique `idempotency_key` index so retries collapse to one row and a
+   * duplicate call resolves `ok: true` with `eventId: null`.
+   */
+  readonly idempotencyKey?: string;
+}
+
 export async function trackServerEvent(
   event: string,
   properties?: Record<string, unknown>,
-  _distinctId?: string
+  _distinctId?: string,
+  options?: ServerAnalyticsTrackOptions
 ): Promise<ServerAnalyticsDelivery> {
   // JOV-5245 owns identity. This sink deliberately keeps its no-op identity
   // contract and never persists the raw distinct id.
@@ -481,29 +568,58 @@ export async function trackServerEvent(
     return { ok: false, error: 'invalid_properties' };
   }
 
+  const idempotencyKey =
+    options?.idempotencyKey && SAFE_TOKEN_PATTERN.test(options.idempotencyKey)
+      ? options.idempotencyKey
+      : null;
+
+  if (options?.idempotencyKey && !idempotencyKey) {
+    Sentry.captureException(
+      new Error('Invalid server analytics idempotency key'),
+      {
+        tags: {
+          context: 'server_analytics_contract',
+          contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+          event_name: event,
+        },
+      }
+    );
+    return { ok: false, error: 'invalid_properties' };
+  }
+
   try {
+    const insert = db.insert(serverAnalyticsEvents).values({
+      contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
+      eventName: event,
+      category: definition.category,
+      privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
+      consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
+      sourceEntityType: definition.source?.type ?? null,
+      sourceEntityId:
+        typeof sourceEntityId === 'string' ? sourceEntityId : null,
+      properties: sanitized,
+      idempotencyKey,
+      occurredAt: new Date(),
+    });
+
     const [stored] = await withTimeout(
-      db
-        .insert(serverAnalyticsEvents)
-        .values({
-          contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
-          eventName: event,
-          category: definition.category,
-          privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
-          consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
-          sourceEntityType: definition.source?.type ?? null,
-          sourceEntityId:
-            typeof sourceEntityId === 'string' ? sourceEntityId : null,
-          properties: sanitized,
-          occurredAt: new Date(),
-        })
-        .returning({ id: serverAnalyticsEvents.id }),
+      (idempotencyKey
+        ? insert.onConflictDoNothing({
+            target: serverAnalyticsEvents.idempotencyKey,
+          })
+        : insert
+      ).returning({ id: serverAnalyticsEvents.id }),
       {
         timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
         context: 'Server analytics delivery',
       }
     );
 
+    // An idempotency-keyed conflict is a durable duplicate, not a failure:
+    // the transition was already measured by the earlier write.
+    if (!stored && idempotencyKey) {
+      return { ok: true, eventId: null };
+    }
     if (!stored) throw new Error('Server analytics insert returned no row');
     return { ok: true, eventId: stored.id };
   } catch (error) {

@@ -28,6 +28,7 @@ const {
   mockNormalizeUsername,
   mockProfileIsPublishable,
   mockReadPendingClaimContext,
+  mockRecordOnboardingCompletedReceipt,
   mockRedirect,
   mockReservePrebuiltProfileForUser,
   mockResolveClerkIdentity,
@@ -68,6 +69,7 @@ const {
   mockNormalizeUsername: vi.fn(),
   mockProfileIsPublishable: vi.fn(),
   mockReadPendingClaimContext: vi.fn(),
+  mockRecordOnboardingCompletedReceipt: vi.fn(),
   mockRedirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
   }),
@@ -143,6 +145,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/leads/funnel-events', () => ({
   attributeLeadSignupFromAppUserId: mockAttributeLeadSignupFromAppUserId,
+  recordOnboardingCompletedReceipt: mockRecordOnboardingCompletedReceipt,
 }));
 
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
@@ -257,6 +260,10 @@ describe('completeOnboarding', () => {
     mockAttributeLeadSignupFromAppUserId.mockResolvedValue({
       leadId: null,
       userId: null,
+    });
+    mockRecordOnboardingCompletedReceipt.mockResolvedValue({
+      ok: true,
+      eventId: 'evt-onboarding',
     });
     mockEnsureEmailAvailable.mockResolvedValue(undefined);
     mockEnsureHandleAvailable.mockResolvedValue(undefined);

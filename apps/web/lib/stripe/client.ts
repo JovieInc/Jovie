@@ -4,11 +4,13 @@
  */
 
 import 'server-only';
+import { createHash } from 'node:crypto';
 import Stripe from 'stripe';
 import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { trackServerEvent } from '@/lib/server-analytics';
 import {
   type CheckoutCorrelation,
   hasCheckoutCorrelation,
@@ -224,6 +226,22 @@ export async function createCheckoutSession({
         },
       },
       requestOptions
+    );
+
+    // JOV-6459: checkout start is a durable server-side funnel event, not a
+    // client-only beacon. Keyed by a hash of the Stripe session id so retries
+    // dedupe; the raw session id is never persisted. Best-effort: a delivery
+    // failure is captured by the sink (Sentry) and must not break checkout.
+    await trackServerEvent(
+      'checkout_initiated',
+      { plan: plan ?? null },
+      undefined,
+      {
+        idempotencyKey: `checkout:${createHash('sha256')
+          .update(session.id)
+          .digest('hex')
+          .slice(0, 32)}`,
+      }
     );
 
     return session;

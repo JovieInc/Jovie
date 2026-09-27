@@ -24,6 +24,7 @@ import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { recordCommission } from '@/lib/referrals/service';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -238,6 +239,44 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         throw new Error('Billing update omitted canonical app user ID');
       }
       await invalidateBillingCache(result.appUserId);
+
+      // JOV-6459: payment success is measured from this verified webhook,
+      // never inferred from the buyer reaching a return page. Keyed by the
+      // Stripe event id, so webhook retries dedupe instead of double-count.
+      // A delivery failure throws so Stripe retries the delivery rather than
+      // leaving a successful entitlement write permanently unmeasured.
+      const paymentReceipt = await trackServerEvent(
+        'payment_succeeded',
+        {
+          appUserId: result.appUserId,
+          billing_reason: invoice.billing_reason ?? null,
+        },
+        undefined,
+        { idempotencyKey: `stripe_event:${stripeEventId}` }
+      );
+      if (!paymentReceipt.ok) {
+        throw new Error(
+          `payment_succeeded analytics receipt failed: ${paymentReceipt.error}`
+        );
+      }
+
+      if (invoice.billing_reason === 'subscription_cycle') {
+        const renewalReceipt = await trackServerEvent(
+          'subscription_renewed',
+          {
+            appUserId: result.appUserId,
+            billing_reason: invoice.billing_reason,
+          },
+          undefined,
+          { idempotencyKey: `stripe_event:${stripeEventId}:renewal` }
+        );
+        if (!renewalReceipt.ok) {
+          throw new Error(
+            `subscription_renewed analytics receipt failed: ${renewalReceipt.error}`
+          );
+        }
+      }
+
       await this.tryRecordReferralCommission(result.appUserId, invoice);
       this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
 

@@ -35,16 +35,35 @@ function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
   }
 }
 
-export function track(event: string, properties?: Record<string, unknown>) {
+/**
+ * Attempt a GA4 dispatch. Returns true only when `window.gtag` was actually
+ * invoked. GA4 offers no delivery acknowledgement, so `true` means "the tag
+ * accepted the call", never proof the event was persisted or delivered — the
+ * durable source of truth for revenue-critical transitions is the server
+ * analytics ledger (`trackServerEvent`).
+ */
+function dispatchGtagEvent(
+  event: string,
+  properties?: Record<string, unknown>
+): boolean {
   const analyticsWindow = getAnalyticsWindow();
-  if (!analyticsWindow?.gtag) return;
+  if (!analyticsWindow?.gtag) return false;
 
   const envTag = getEnvTag(analyticsWindow.location.hostname);
 
-  analyticsWindow.gtag('event', event, {
-    ...properties,
-    env: envTag,
-  });
+  try {
+    analyticsWindow.gtag('event', event, {
+      ...properties,
+      env: envTag,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function track(event: string, properties?: Record<string, unknown>) {
+  dispatchGtagEvent(event, properties);
 }
 
 export function page(name?: string, properties?: Record<string, unknown>) {
@@ -65,10 +84,39 @@ export {
 } from '@/lib/flags/client';
 export type { AppFlagName as FeatureFlagName } from '@/lib/flags/contracts';
 
+function readDispatchMarker(key: string): boolean {
+  try {
+    return globalThis.localStorage?.getItem(key) != null;
+  } catch {
+    // Blocked/throwing storage is treated as "no marker" so a later
+    // successful dispatch still fires. Never throws.
+    return false;
+  }
+}
+
+function writeDispatchMarker(key: string): void {
+  try {
+    globalThis.localStorage?.setItem(key, String(Date.now()));
+  } catch {
+    // Storage failures are non-fatal and never block the user action.
+  }
+}
+
 /**
- * Track the "magic moment" — when a profile has all 4 key elements:
- * avatar + display name + at least 1 DSP link + at least 1 release.
- * Uses localStorage to ensure it fires only once per profile.
+ * Supplemental client telemetry for the "magic moment" — when a profile has
+ * all 4 key elements: avatar + display name + at least 1 DSP link + at least
+ * 1 release.
+ *
+ * The localStorage entry is a dispatch marker, not a delivery receipt: it is
+ * written only after `window.gtag` was actually invoked, and GA4 provides no
+ * delivery acknowledgement, so it can never prove durable delivery. The
+ * canonical activation evidence is the server-side `onboarding_completed`
+ * event keyed by profile id (see `recordOnboardingCompletedReceipt`), which
+ * fires regardless of ad blockers, consent state, or storage availability.
+ *
+ * Returns true only when the GA4 dispatch was attempted this call. A skipped
+ * dispatch (missing/blocked gtag, late loader) returns false and leaves the
+ * marker unset so a later load can still record the telemetry point.
  */
 export function trackMagicMomentIfReady(params: {
   profileId: string;
@@ -89,11 +137,11 @@ export function trackMagicMomentIfReady(params: {
   }
 
   const key = `magic_moment_achieved_${params.profileId}`;
-  if (globalThis.window !== undefined && globalThis.localStorage.getItem(key)) {
+  if (globalThis.window !== undefined && readDispatchMarker(key)) {
     return false;
   }
 
-  track('magic_moment_achieved', {
+  const dispatched = dispatchGtagEvent('magic_moment_achieved', {
     timeToMagicMoment: Date.now() - params.signupTimestamp,
     hasAvatar: params.hasAvatar,
     hasDisplayName: params.hasDisplayName,
@@ -102,10 +150,11 @@ export function trackMagicMomentIfReady(params: {
     enrichmentStatus: params.enrichmentStatus,
   });
 
-  if (globalThis.window !== undefined) {
-    globalThis.localStorage.setItem(key, String(Date.now()));
-  }
+  // Only mark dispatch after a real invocation — never after a skipped or
+  // failed dispatch, which would permanently erase the telemetry attempt.
+  if (!dispatched) return false;
 
+  writeDispatchMarker(key);
   return true;
 }
 

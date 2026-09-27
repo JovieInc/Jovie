@@ -388,6 +388,13 @@ export const serverAnalyticsEvents = pgTable(
       .$type<Record<string, string | number | boolean | null>>()
       .default({})
       .notNull(),
+    /**
+     * Server-derived dedupe key for revenue-critical transitions. Callers
+     * supply a stable key (e.g. the Stripe event id or the owned profile id)
+     * so retries, refreshes, and duplicate webhook deliveries collapse to a
+     * single row instead of double-counting the funnel.
+     */
+    idempotencyKey: text('idempotency_key'),
     occurredAt: timestamp('occurred_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -396,6 +403,11 @@ export const serverAnalyticsEvents = pgTable(
       .notNull(),
   },
   table => ({
+    idempotencyKeyUnique: uniqueIndex(
+      'server_analytics_events_idempotency_key_unique'
+    )
+      .on(table.idempotencyKey)
+      .where(drizzleSql`idempotency_key IS NOT NULL`),
     eventOccurredAtIdx: index(
       'server_analytics_events_event_occurred_at_idx'
     ).on(table.eventName, table.occurredAt),
