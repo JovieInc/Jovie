@@ -53,8 +53,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE = join(HERE, 'deepsec');
 const LEDGER_BRANCH = 'security/deepsec-ledger';
 const LEDGER_PATH = 'ledger.json';
-// Files per deepsec invocation: the unit of budget measurement.
-const CHUNK = 20;
+const CHUNK = 20; // files per deepsec call: the unit of budget measurement
 
 const targets = () =>
   JSON.parse(readFileSync(join(WORKSPACE, 'targets.json'), 'utf8')).targets;
@@ -318,8 +317,12 @@ function listJson(dir) {
     );
 }
 
-function deepsec(args, env) {
-  const result = spawnSync(join(WORKSPACE, 'node_modules/.bin/deepsec'), args, {
+function deepsec(
+  args,
+  env,
+  bin = join(WORKSPACE, 'node_modules/.bin/deepsec')
+) {
+  const result = spawnSync(bin, args, {
     cwd: WORKSPACE,
     env,
     stdio: 'inherit',
@@ -423,7 +426,8 @@ export async function scan(env, deps = {}) {
         '--concurrency',
         '6',
       ],
-      scannerEnvVars
+      scannerEnvVars,
+      deps.bin
     );
     const fresh = [...knownRuns()].filter(id => !before.has(id));
     runIds.push(...fresh);
@@ -431,9 +435,14 @@ export async function scan(env, deps = {}) {
     // auto-created empty project; treat "no run recorded" as a hard error.
     if (!error && fresh.length === 0)
       error = `deepsec ${args[0]} recorded no run in ${projectDir}`;
-    const { cost } = measure();
+    const { entries, cost } = measure();
     largestChunkUsd = Math.max(largestChunkUsd, cost - spentUsd);
     spentUsd = cost;
+    // Exit 1 also means errored batches (gateway 402, auth): every file in
+    // the chunk needs an analysis from this run, or the scan stops.
+    const done = entries.filter(entry => fresh.includes(entry.runId)).length;
+    if (!error && done < files.length)
+      error = `deepsec analyzed ${done} of ${files.length} files in a chunk (errored batches: gateway budget, auth or model failure); stopped`;
     return !error;
   };
   const priced = model => {
@@ -458,7 +467,8 @@ export async function scan(env, deps = {}) {
     if (!error && !stopped)
       error = deepsec(
         ['scan', '--project-id', policy.projectId],
-        scannerEnvVars
+        scannerEnvVars,
+        deps.bin
       );
     if (!error)
       run(
@@ -491,11 +501,6 @@ export async function scan(env, deps = {}) {
     for (const key of Object.keys(usage)) usage[key] += part[key];
   }
   usage.costUsd = Math.round(usage.costUsd * 10_000) / 10_000;
-  const missing = (planned.files ?? []).filter(
-    path => !analyzed.some(row => row.path === path)
-  );
-  if (!error && !stopped && missing.length)
-    error = `deepsec skipped ${missing.length} planned file(s): ${missing.join(', ')}`;
   const result = {
     kind: planned.kind,
     gatewayId: planned.model.gatewayId,

@@ -5,18 +5,11 @@ name: DeepSec Security Scan
 # necessary-trust-boundary: The scan job holds only the AI Gateway key and never runs PR code; the record job runs trusted main code with contents write for the ledger branch, PR comment write, and the Linear key.
 # revisit-trigger: Revisit when the guarded lane (JOV-6696) owns security findings end to end, or after two months of ledger spend data.
 #
-# AI security scanning (vercel-labs/deepsec) on top of the existing gitleaks,
-# TruffleHog and CodeQL gates. Advisory only: this workflow never blocks a PR
-# or the merge queue. Policy, models and budgets: scripts/security/deepsec/.
-#   - pull_request: diff-only scan of auth/billing/security-sensitive files
-#     with the cheap pinned model; the result is a PR comment.
-#   - daily: when a new model enters the DeepSecBench top 3, one budgeted
-#     full-repo scan with it, recorded so it never runs twice.
-#   - weekly: full scan with the cheap model plus same-model re-scans that
-#     verify fixes before Linear issues are closed.
-# Every run is capped per run and per month (fail closed) and reports tokens
-# and dollars in the job summary. Kill switch: repo variable
-# DEEPSEC_SCAN_ENABLED=false, or policy.json execution.status=disabled.
+# Advisory AI security scans (vercel-labs/deepsec); never blocks a PR or the
+# queue. PR: diff-only sensitive files. Daily: one budgeted full scan per new
+# DeepSecBench top-3 model. Weekly: cheap backlog scan + fix verification.
+# Caps, models, kill switch: scripts/security/deepsec/policy.json and the
+# DEEPSEC_SCAN_ENABLED=false repo variable.
 
 on:
   pull_request:
@@ -153,7 +146,9 @@ jobs:
           path: ${{ runner.temp }}
       - name: Scan within budget
         env:
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          # A dedicated key (with its own Vercel budget) is preferred for
+          # attribution; the shared key is the fallback until it exists.
+          AI_GATEWAY_API_KEY: ${{ secrets.DEEPSEC_AI_GATEWAY_API_KEY || secrets.AI_GATEWAY_API_KEY }}
           SRC_ROOT: ${{ github.workspace }}/src
           PLAN_FILE: ${{ runner.temp }}/plan.json
           RESULT_FILE: ${{ runner.temp }}/result.json

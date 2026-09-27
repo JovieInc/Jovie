@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   loadPolicy,
   modelFor,
   plan,
   readLedger,
+  scan,
   scannerEnv,
   updateLedger,
 } from './deepsec-run.mjs';
@@ -331,4 +341,129 @@ test('the scanner process gets a minimal env with only the gateway credential', 
     'ai-reporting-tags: security-scan,deepsec'
   );
   assert.equal(env.TMPDIR, '/tmp/r');
+});
+
+// A stand-in for the deepsec CLI: writes run metadata and FileRecords the way
+// deepsec does, driven by fake.json in the data root (the scanner env is
+// minimal, so behavior cannot come from environment variables).
+const FAKE_DEEPSEC = `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.join(process.env.DEEPSEC_DATA_ROOT, 'jovie');
+const fake = JSON.parse(fs.readFileSync(path.join(process.env.DEEPSEC_DATA_ROOT, 'fake.json'), 'utf8'));
+const args = process.argv.slice(2);
+if (fake.noRun) process.exit(0);
+const runId = 'run-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+fs.writeFileSync(path.join(root, 'runs', runId + '.json'), JSON.stringify({ runId }));
+const files = args[args.indexOf('--files') + 1].split(',');
+const model = args[args.indexOf('--model') + 1];
+for (const file of files) {
+  if ((fake.skip ?? []).includes(file)) continue;
+  const out = path.join(root, 'files', file + '.json');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, JSON.stringify({
+    filePath: file,
+    fileHash: 'hash-' + file,
+    status: 'analyzed',
+    candidates: [],
+    analysisHistory: [{ runId, model, usage: { inputTokens: 1000000, outputTokens: 0 } }],
+    findings: file === fake.vulnerable
+      ? [{ severity: 'HIGH', vulnSlug: 'auth-bypass', title: 'Bypass', description: 'd', recommendation: 'r', confidence: 'high', lineNumbers: [3], producedByRunId: runId }]
+      : [],
+  }));
+}
+process.exit(fake.exit ?? 0);
+`;
+
+async function scanWith(fake, planOverrides = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'deepsec-scan-'));
+  const bin = join(dir, 'deepsec');
+  writeFileSync(bin, FAKE_DEEPSEC);
+  chmodSync(bin, 0o755);
+  mkdirSync(join(dir, 'deepsec-data'));
+  writeFileSync(join(dir, 'deepsec-data', 'fake.json'), JSON.stringify(fake));
+  const plan = {
+    kind: 'pr',
+    headSha: 'abc123',
+    capUsd: 2,
+    monthSpentUsd: 0,
+    model: {
+      gatewayId: 'openai/gpt-6-luna',
+      agent: 'codex',
+      model: 'gpt-6-luna',
+      reasoning: 'xhigh',
+    },
+    files: ['a.ts', 'b.ts', 'c.ts'],
+    ...planOverrides,
+  };
+  writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan));
+  const pricing = {
+    data: [
+      {
+        id: 'openai/gpt-6-luna',
+        pricing: { input: '0.0000001', output: '0.0000005' },
+      },
+    ],
+  };
+  const result = await scan(
+    {
+      PATH: process.env.PATH,
+      RUNNER_TEMP: dir,
+      SRC_ROOT: dir,
+      PLAN_FILE: join(dir, 'plan.json'),
+      RESULT_FILE: join(dir, 'result.json'),
+      GITHUB_STEP_SUMMARY: join(dir, 'summary.md'),
+    },
+    { bin, fetchImpl: async () => json(200, pricing), now: new Date(NOW) }
+  );
+  return { result, summary: readFileSync(join(dir, 'summary.md'), 'utf8') };
+}
+
+test('a complete PR scan reports cost, analyzed files and grouped findings', async () => {
+  const { result, summary } = await scanWith({ vulnerable: 'b.ts', exit: 1 });
+  assert.equal(result.status, 'complete');
+  assert.equal(result.error, null);
+  assert.deepEqual(result.analyzed.map(row => row.path).sort(), [
+    'a.ts',
+    'b.ts',
+    'c.ts',
+  ]);
+  assert.equal(result.usage.inputTokens, 3_000_000);
+  // 3M input tokens at $0.10/M times the 1.75 safety factor.
+  assert.equal(result.usage.costUsd, 0.525);
+  assert.equal(result.groups.length, 1);
+  assert.equal(result.groups[0].path, 'b.ts');
+  assert.match(summary, /DeepSec pr scan: complete/);
+});
+
+test('errored batches (exit 1 with missing analyses, e.g. a gateway 402) stop the scan as an error', async () => {
+  const { result } = await scanWith({ skip: ['c.ts'], exit: 1 });
+  assert.equal(result.status, 'error');
+  assert.match(result.error, /analyzed 2 of 3 files/);
+});
+
+test('a scanner that records no run (config failed to load) is an error, not a clean scan', async () => {
+  const { result } = await scanWith({ noRun: true });
+  assert.equal(result.status, 'error');
+  assert.match(result.error, /recorded no run/);
+});
+
+test('an unpriced model is skipped before any scanner call, and a spent cap stops at a chunk', async () => {
+  const unpriced = await scanWith(
+    { noRun: true },
+    {
+      model: {
+        gatewayId: 'acme/unknown',
+        agent: 'pi',
+        model: 'acme/unknown',
+        reasoning: 'high',
+      },
+    }
+  );
+  assert.equal(unpriced.result.status, 'error');
+  assert.match(unpriced.result.error, /no gateway price.*fail closed/);
+  const capped = await scanWith({}, { capUsd: 0.01 });
+  assert.equal(capped.result.status, 'partial-budget');
+  assert.equal(capped.result.usage.analyses, 0);
 });
