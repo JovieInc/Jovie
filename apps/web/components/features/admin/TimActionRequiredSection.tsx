@@ -226,7 +226,7 @@ export function TimActionRequiredSection() {
             className='h-2 w-2 shrink-0 rounded-full bg-warning'
             aria-hidden='true'
           />
-          <p className='text-xs font-caption text-tertiary-token'>Needs Tim</p>
+          <p className='text-xs font-caption text-tertiary-token'>Needs You</p>
           {!isLoading && visibleIssues.length > 0 ? (
             <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
               {visibleIssues.length}

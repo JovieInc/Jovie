@@ -3,6 +3,7 @@ import {
   Banknote,
   Briefcase,
   Cable,
+  CircleAlert,
   Flag,
   FolderKanban,
   Gauge,
@@ -26,7 +27,9 @@ import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 const OPERATOR_ICON_BY_ID = {
   overview: LayoutDashboard,
   chat: MessageSquare,
-  ops: Gauge,
+  product: Flag,
+  operations: Gauge,
+  needs_you: CircleAlert,
   people: Users,
   growth: FolderKanban,
   platform_connections: Cable,
