@@ -5,6 +5,7 @@ import { Ship } from 'lucide-react';
 import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { CountMeasurement } from '@/lib/ovie/shipping-state';
 import type {
   ShippingMeaningView,
@@ -53,7 +54,7 @@ function formatWeek(merges: Delivery['merges']): string {
   if (last === null) return NOT_MEASURED;
   const total = last.toLocaleString('en-US');
   if (prior === null || prior === 0) return total;
-  const change = Math.round(((last - prior) / prior) * 100);
+  const change = computeRatePercent(last - prior, prior, 0);
   return `${total} (${change >= 0 ? '+' : ''}${change}% WoW)`;
 }
 

@@ -277,6 +277,25 @@ describe('lane-pull-requests (open devin/ and codex/ PRs)', () => {
     expect(read).toMatchObject({ status: 'ok', truncated: true, delivery: {} });
   });
 
+  it('keeps the lanes that answered when one lane search fails', async () => {
+    const read = await readLanePullRequests(
+      io(async (_url, init) => {
+        if (graphqlBody(init).variables.query?.includes('head:codex/')) {
+          throw timeoutError();
+        }
+        return json({
+          data: { search: { issueCount: 1, nodes: [lanePr({ number: 7 })] } },
+        });
+      })
+    );
+    expect(read).toMatchObject({ status: 'ok', truncated: true, delivery: {} });
+    expect(
+      (read.payload?.pullRequests as Array<{ number: number }>).map(
+        pr => pr.number
+      )
+    ).toEqual([7]);
+  });
+
   it('fails soft to n/a on timeout', async () => {
     const read = await readLanePullRequests(
       io(async () => {
@@ -498,6 +517,13 @@ describe('summer-runtime (summer.jov.ie /runtime/v1/health)', () => {
       status: 'ok',
       delivery: { summer: { availability: 'up' } },
     });
+  });
+
+  it('accepts the materializer health shape that reports status', async () => {
+    const read = await readSummerRuntime(
+      io(async () => json({ identity: 'summer', status: 'up' }))
+    );
+    expect(read.delivery?.summer).toEqual({ availability: 'up' });
   });
 
   it('maps an unrecognised availability to degraded, never up', async () => {

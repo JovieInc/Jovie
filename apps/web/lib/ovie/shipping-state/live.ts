@@ -62,7 +62,7 @@ const LANE_PR_FIELDS =
   'issueCount nodes{... on PullRequest{number title headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position}}}';
 const LANE_PULL_REQUESTS_QUERY = `query ShippingStateLanePullRequests($query:String!){search(type:ISSUE,first:100,query:$query){${LANE_PR_FIELDS}}}`;
 const MERGES_QUERY =
-  'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:0){issueCount}jovie:search(type:ISSUE,query:$jovie,first:0){issueCount}lyb:search(type:ISSUE,query:$lyb,first:0){issueCount}summer:search(type:ISSUE,query:$summer,first:0){issueCount}last7:search(type:ISSUE,query:$last7,first:0){issueCount}prior7:search(type:ISSUE,query:$prior7,first:0){issueCount}}';
+  'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:1){issueCount}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
 const BEHIND_MAIN_QUERY =
   'query ShippingStateBehindMain($owner:String!,$name:String!,$sha:String!){repository(owner:$owner,name:$name){ref(qualifiedName:"main"){compare(headRef:$sha){behindBy}}}}';
 const PRODUCTION_VERIFIED_JOB_NAME = 'Production Verified';
@@ -845,7 +845,7 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
   const repo = `repo:${io.githubOwner ?? ''}/${io.githubRepo ?? ''}`;
   try {
     // One search per lane, in parallel: each is bounded by merge-state work.
-    const pages = await Promise.all(
+    const settled = await Promise.allSettled(
       LANE_BRANCH_PREFIXES.map(lane =>
         githubGraphql(
           io,
@@ -858,8 +858,20 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
     );
     const pullRequests: Record<string, unknown>[] = [];
     let truncated = false;
-    for (const data of pages) {
-      if (isAuthorityRead(data)) return data;
+    let firstFailure: AuthorityRead | null = null;
+    let succeeded = 0;
+    for (const outcome of settled) {
+      // One lane failing must not discard the lanes that answered; report partial as truncated.
+      if (outcome.status === 'rejected') {
+        firstFailure ??= unreachable(sourceId, outcome.reason);
+        continue;
+      }
+      const data = outcome.value;
+      if (isAuthorityRead(data)) {
+        firstFailure ??= data;
+        continue;
+      }
+      succeeded += 1;
       const search = data.search;
       if (
         !isRecord(search) ||
@@ -897,6 +909,8 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
         });
       }
     }
+    if (succeeded === 0 && firstFailure) return firstFailure;
+    if (firstFailure) truncated = true;
     return {
       sourceId,
       status: 'ok',
@@ -1055,7 +1069,9 @@ export async function readSummerRuntime(io: LiveIo): Promise<AuthorityRead> {
     PUBLIC_SOURCE_TIMEOUT_MS
   );
   if (read.status !== 'ok' || !read.payload) return read;
-  const { identity, availability } = read.payload;
+  const { identity } = read.payload;
+  // Deployed Summer reports `availability`; the checked-in materializer reports `status`.
+  const availability = read.payload.availability ?? read.payload.status;
   if (identity !== 'summer' || typeof availability !== 'string') {
     return malformed('summer-runtime', 'Summer runtime health was malformed');
   }
