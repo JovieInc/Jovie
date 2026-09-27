@@ -125,7 +125,131 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
     affectedTargets: unhealthy.map(item => item.id),
     incidentClasses: [...new Set(unhealthy.map(item => item.incidentClass))],
     requiresFounderNotification: unhealthy.length > 0,
-    requiresAgentIngress: unhealthy.length > 0,
+    // A stale production is a release-pipeline failure, not a provider
+    // outage: it pages the founder but never admits a provider-recovery task.
+    requiresAgentIngress: unhealthy.some(
+      item => item.incidentClass !== FRESHNESS_INCIDENT_CLASS
+    ),
+  };
+}
+
+export const FRESHNESS_TARGET_ID = 'jovie-production-freshness';
+export const FRESHNESS_INCIDENT_CLASS = 'production-stale';
+// Twice the controller's own starvation bound (release-lineage-gate.sh), so
+// this only fires once the in-band guard has already failed to ship.
+export const DEFAULT_STALE_AFTER_SECONDS = 7200;
+const SHA_PATTERN = /^[0-9a-f]{40}$/;
+
+/**
+ * Production freshness: how long has main carried commits that production
+ * lacks? Reads the live SHA from build-info and the unshipped range from the
+ * GitHub compare API. Fails open (healthy with a reason) when either source is
+ * unreadable so a GitHub hiccup never pages; runtime outages are already
+ * reported by the jovie-production target.
+ */
+export async function observeProductionFreshness({
+  buildInfoUrl = DEFAULT_TARGETS[0].url,
+  fetchImpl = fetch,
+  githubApiUrl = 'https://api.github.com',
+  now = new Date(),
+  repository,
+  staleAfterSeconds = DEFAULT_STALE_AFTER_SECONDS,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  token = '',
+} = {}) {
+  const base = {
+    id: FRESHNESS_TARGET_ID,
+    url: buildInfoUrl,
+    healthy: true,
+    incidentClass: null,
+    status: null,
+    providerError: null,
+    liveSha: null,
+    mainSha: null,
+    unshippedCommits: 0,
+    oldestUnshippedAt: null,
+    unshippedAgeSeconds: 0,
+  };
+  if (!/^[^/]+\/[^/]+$/.test(repository ?? '')) {
+    return { ...base, reason: 'repository-not-configured' };
+  }
+  const readJson = async (url, headers = {}) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(url, {
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          ...headers,
+        },
+        signal: controller.signal,
+      });
+      if (response.status !== 200) return null;
+      return await response.json();
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+  const buildInfo = await readJson(buildInfoUrl);
+  const liveSha = buildInfo?.commitSha;
+  if (!SHA_PATTERN.test(liveSha ?? '')) {
+    return { ...base, reason: 'live-sha-unreadable' };
+  }
+  const githubHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const head = await readJson(
+    `${githubApiUrl}/repos/${repository}/commits/main`,
+    githubHeaders
+  );
+  const mainSha = head?.sha;
+  if (!SHA_PATTERN.test(mainSha ?? '')) {
+    return { ...base, liveSha, reason: 'main-sha-unreadable' };
+  }
+  if (mainSha === liveSha) {
+    return { ...base, liveSha, mainSha, reason: 'production-current' };
+  }
+  const compare = await readJson(
+    `${githubApiUrl}/repos/${repository}/compare/${liveSha}...${mainSha}`,
+    githubHeaders
+  );
+  const unshippedCommits = Number(compare?.ahead_by);
+  const oldestUnshippedAt = compare?.commits?.[0]?.commit?.committer?.date;
+  if (!Number.isInteger(unshippedCommits) || unshippedCommits < 0) {
+    return { ...base, liveSha, mainSha, reason: 'unshipped-range-unreadable' };
+  }
+  if (unshippedCommits === 0) {
+    return { ...base, liveSha, mainSha, reason: 'production-current' };
+  }
+  const oldestEpoch = Date.parse(oldestUnshippedAt ?? '');
+  if (!Number.isFinite(oldestEpoch)) {
+    return {
+      ...base,
+      liveSha,
+      mainSha,
+      unshippedCommits,
+      reason: 'unshipped-age-unreadable',
+    };
+  }
+  const unshippedAgeSeconds = Math.max(
+    0,
+    Math.floor((new Date(now).getTime() - oldestEpoch) / 1000)
+  );
+  const stale = unshippedAgeSeconds >= staleAfterSeconds;
+  return {
+    ...base,
+    healthy: !stale,
+    incidentClass: stale ? FRESHNESS_INCIDENT_CLASS : null,
+    reason: stale
+      ? `unshipped-for-${unshippedAgeSeconds}s`
+      : `unshipped-for-${unshippedAgeSeconds}s-within-${staleAfterSeconds}s`,
+    liveSha,
+    mainSha,
+    unshippedCommits,
+    oldestUnshippedAt,
+    unshippedAgeSeconds,
   };
 }
 
@@ -238,13 +362,24 @@ export async function observeTarget(
 
 export async function observeProductionContinuity({
   fetchImpl = fetch,
+  freshness = null,
   now = new Date(),
   targets = DEFAULT_TARGETS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
-  const observations = await Promise.all(
-    targets.map(target => observeTarget(target, { fetchImpl, timeoutMs }))
-  );
+  const observations = await Promise.all([
+    ...targets.map(target => observeTarget(target, { fetchImpl, timeoutMs })),
+    ...(freshness
+      ? [
+          observeProductionFreshness({
+            ...freshness,
+            fetchImpl,
+            now,
+            timeoutMs,
+          }),
+        ]
+      : []),
+  ]);
   return aggregateContinuity(observations, { now });
 }
 
@@ -386,14 +521,19 @@ export function parseCliArgs(argv) {
 export async function runCli({
   appendFileImpl = appendFile,
   argv = process.argv.slice(2),
+  env = process.env,
   fetchImpl = fetch,
   now = new Date(),
   stdout = process.stdout,
   writeFileImpl = writeFile,
 } = {}) {
   const args = parseCliArgs(argv);
+  const repository = env.GITHUB_REPOSITORY?.trim() ?? '';
   const result = await observeProductionContinuity({
     fetchImpl,
+    freshness: repository
+      ? { repository, token: env.GH_TOKEN?.trim() ?? '' }
+      : null,
     now,
     targets: parseTargets(args.targets),
   });
@@ -408,6 +548,7 @@ export async function runCli({
         `affected_targets=${result.affectedTargets.join(',')}`,
         `incident_classes=${result.incidentClasses.join(',')}`,
         `incident_key=${incidentKey}`,
+        `requires_agent_ingress=${result.requiresAgentIngress}`,
       ].join('\n') + '\n',
       'utf8'
     );

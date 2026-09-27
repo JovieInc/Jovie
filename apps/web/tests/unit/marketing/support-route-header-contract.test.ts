@@ -45,6 +45,16 @@ describe('support route header contract', () => {
     expect(headerSource).toContain("? 'sm'");
     expect(headerSource).toContain('marketing-header-growth-space');
     expect(headerSource).toContain('ResizeObserver');
+    // Icon-only brand comes from explicit per-page config, never DOM text.
+    expect(headerSource).toContain(
+      'resolveMarketingHeaderBrand(pathname, brand)'
+    );
+    expect(headerSource).toContain(
+      "logoReveal={resolvedLogoVariant === 'icon'}"
+    );
+    expect(headerSource).not.toMatch(
+      /textContent|innerText|querySelector\('h1/
+    );
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);

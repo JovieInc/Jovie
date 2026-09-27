@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "004d0cee425c2987da84ab1bf3fa5562cf59ca0f99a4292542fcf75d5612c876"
+    "bodySha256": "a276e906765da3c307c2525e9acfea510977aaf186dc853456a6f69427768d25"
   },
   {
     "file": ".claude/rules/security.md",
@@ -147,6 +147,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "1b9a4c8bf35485f87bdc4f6d7154be9da5996460e8144dcd74dc2eb21a10e51b"
+    "bodySha256": "f888b7c0a2f120391392b7f67bbd656e21bc32958d2515a24715b900e33784d6"
   }
 ]

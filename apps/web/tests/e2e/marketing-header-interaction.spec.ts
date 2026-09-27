@@ -212,3 +212,39 @@ test('marketing header contains growing controls without overlapping targets', a
     await enlargedBrowser.close();
   }
 });
+
+test('marketing header docks flush over the hero and fades its glass in on scroll', async ({
+  page,
+}) => {
+  await openHeader(page, 1440);
+  const header = page.getByTestId('header-nav');
+  const readDock = () =>
+    header.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        height: rect.height,
+        scrolled: element.getAttribute('data-scrolled'),
+        glassOpacity: Number.parseFloat(
+          getComputedStyle(element, '::before').opacity
+        ),
+      };
+    });
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => (await readDock()).glassOpacity).toBe(0);
+  const atTop = await readDock();
+  expect(atTop.top).toBe(0);
+  expect(atTop.scrolled).toBeNull();
+
+  await page.evaluate(() => window.scrollTo(0, 240));
+  await expect(header).toHaveAttribute('data-scrolled', 'true');
+  await expect.poll(async () => (await readDock()).glassOpacity).toBe(1);
+  const scrolled = await readDock();
+  // The glass fades in without moving or resizing the bar.
+  expect(scrolled.top).toBe(atTop.top);
+  expect(scrolled.height).toBe(atTop.height);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(header).not.toHaveAttribute('data-scrolled', 'true');
+});
