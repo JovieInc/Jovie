@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import {
   HUD_SOURCE_STALE_AFTER_MS,
   isSourceStale,
@@ -179,14 +180,47 @@ function survivalMetric(metrics: HudMetrics, now: number): CompanyCoreMetric {
   };
 }
 
-function primaryOutcomeMetric(): CompanyCoreMetric {
+function signedUsd(value: number): string {
+  return `${value < 0 ? '-' : '+'}${formatUsd(Math.abs(value))}`;
+}
+
+function primaryOutcomeMetric(
+  metrics: HudMetrics,
+  now: number
+): CompanyCoreMetric {
+  const stripe = metrics.sources.stripe;
+  const state = unavailableState(stripe, now);
+  const weekAgo = metrics.overview.weekAgo;
+  // Only a readable Stripe snapshot is a measurement; never show a guessed number.
+  if (weekAgo && (state === 'fresh' || state === 'stale')) {
+    const deltaUsd = metrics.overview.mrrUsd - weekAgo.mrrUsd;
+    const percent =
+      weekAgo.mrrUsd > 0
+        ? ` (${deltaUsd < 0 ? '' : '+'}${computeRatePercent(deltaUsd, weekAgo.mrrUsd).toFixed(1)}%)`
+        : '';
+    const subscriberDelta =
+      metrics.overview.activeSubscribers - weekAgo.activeSubscribers;
+    return {
+      id: 'primary-outcome',
+      label: 'Week Over Week',
+      value: `${signedUsd(deltaUsd)} MRR${percent}`,
+      detail: `${formatUsd(metrics.overview.mrrUsd)} MRR now vs ${formatUsd(weekAgo.mrrUsd)} 7 days ago, net of churn · ${metrics.overview.activeSubscribers} paying subscribers (${subscriberDelta < 0 ? '' : '+'}${subscriberDelta} WoW).`,
+      state,
+      authoritativeSource: 'Stripe subscriptions (net MRR, 7-day baseline)',
+      observedAt: metricObservedAt([stripe]),
+      freshnessDeadline: metricFreshnessDeadline([stripe]),
+      owner: 'Summer',
+      drillDownHref: stripe.dashboardUrl ?? APP_ROUTES.ADMIN_PEOPLE,
+      drillDownLabel: 'Inspect Stripe',
+    };
+  }
   return {
     id: 'primary-outcome',
     label: 'Week Over Week',
     value: 'Not Measured',
     detail:
       'No authoritative weekly revenue snapshot or weekly active-company-user series is connected. Current MRR and current subscriber counts are not a week-over-week measurement.',
-    state: 'disconnected',
+    state: state === 'fresh' || state === 'stale' ? 'disconnected' : state,
     authoritativeSource:
       'Stripe weekly revenue snapshot; product activity fallback',
     observedAt: NOT_OBSERVED,
@@ -229,7 +263,7 @@ export function deriveOvieCompanyOverview(
     generatedAtIso: metrics.generatedAtIso,
     metrics: [
       survivalMetric(metrics, now),
-      primaryOutcomeMetric(),
+      primaryOutcomeMetric(metrics, now),
       dogfoodReceiptsMetric(metrics),
     ],
   };
