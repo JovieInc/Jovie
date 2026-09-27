@@ -846,6 +846,31 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
+LOCKFILES = frozenset({"pnpm-lock.yaml"})
+
+
+def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
+    """JOV-6837: a PR that conflicts with main only in pnpm-lock.yaml needs no model. Merge
+    main, take its lockfile, regenerate it from the merged manifests, push (no force). Any
+    other conflict, or a failed regeneration, aborts and leaves the PR to the agent."""
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
+        if not conflicted or not conflicted <= LOCKFILES:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
+        regenerated = sh(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], cwd=worktree, timeout=900, log=log)
+        if regenerated.returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
@@ -858,16 +883,22 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "-B", pr["headRefName"], str(worktree),
                 f"origin/{pr['headRefName']}"], cwd=host.repo, log=log)
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            prompt = render_fix_prompt(pr, failure_excerpt(pr))
-            prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
-            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                              worktree, log, host.agent_timeout)
+            lockfile_only = pr.get("mergeStateStatus") == "DIRTY" \
+                and resolve_lockfile_conflict(worktree, pr["headRefName"], log)
+            agent = None
+            if lockfile_only:
+                receipt.update(resolution="lockfile-regenerated")
+            else:
+                sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                prompt_file = runs / f"{run_id}.prompt.md"
+                prompt_file.write_text(prompt)
+                agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                                                         "cwd": str(worktree)}), worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
-            receipt.update(agentExit=agent.returncode, headAfter=after,
+            receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.

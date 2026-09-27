@@ -804,6 +804,29 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.failure_excerpt = real, real_excerpt
         self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
 
+    def test_a_lockfile_only_conflict_skips_the_agent_and_re_arms(self):
+        real, real_resolve, real_agent = lane.sh, lane.resolve_lockfile_conflict, lane.run_agent
+        lane.resolve_lockfile_conflict = lambda worktree, branch, log: True
+        lane.run_agent = lambda *a, **k: self.fail("a lockfile-only conflict needs no model")
+        calls = []
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            calls.append(args)
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                                          {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+            finally:
+                lane.sh, lane.resolve_lockfile_conflict, lane.run_agent = real, real_resolve, real_agent
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "lockfile-regenerated"))
+        self.assertNotIn(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], calls)
+        self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+
     def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=(
@@ -1108,3 +1131,78 @@ class OnePrPerIssueTest(unittest.TestCase):
         self.assertEqual(closed, ["1", "3", "4"])
         self.assertIn("superseded by #2", next(a for a in calls if a[:3] == ["gh", "pr", "close"])[-1])
         self.assertEqual(linear.moves, [("JOV-8", "Todo")])
+
+
+class LockfileConflictTest(unittest.TestCase):
+    """JOV-6837: a lockfile-only conflict is resolved without a model; anything else is not."""
+
+    def git(self, *args, cwd):
+        return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
+                              check=True, capture_output=True, text=True).stdout.strip()
+
+    def repo(self, tmp: Path, pr_changes: dict):
+        origin, work = tmp / "origin.git", tmp / "work"
+        self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+        self.git("clone", "-q", str(origin), str(work), cwd=tmp)
+        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}.items():
+            (work / name).write_text(text)
+        self.git("add", "-A", cwd=work)
+        self.git("commit", "-qm", "base", cwd=work)
+        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
+        self.git("checkout", "-q", "-b", "devin/jov-1-20260927", cwd=work)
+        for name, text in pr_changes.items():
+            (work / name).write_text(text)
+        self.git("commit", "-qam", "pr", cwd=work)
+        self.git("push", "-q", "origin", "HEAD:devin/jov-1-20260927", cwd=work)
+        self.git("checkout", "-q", "main", cwd=work)
+        (work / "pnpm-lock.yaml").write_text("main\n")
+        (work / "a.ts").write_text("main\n")
+        self.git("commit", "-qam", "main moves", cwd=work)
+        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
+        self.git("checkout", "-q", "devin/jov-1-20260927", cwd=work)
+        self.git("fetch", "-q", "origin", cwd=work)
+        return origin, work
+
+    def run_resolve(self, work: Path):
+        real, calls = lane.sh, []
+
+        def sh(args, cwd=None, timeout=600, env=None, log=None, stream=False):
+            calls.append(args)
+            if args[:2] == ["pnpm", "install"]:
+                (Path(cwd) / "pnpm-lock.yaml").write_text("regenerated\n")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return real(args, cwd=cwd, timeout=timeout, env=env)
+        lane.sh = sh
+        try:
+            with open(os.devnull, "w") as log:
+                env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                       "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+                saved = dict(os.environ)
+                os.environ.update(env)
+                try:
+                    return lane.resolve_lockfile_conflict(work, "devin/jov-1-20260927", log), calls
+                finally:
+                    os.environ.clear()
+                    os.environ.update(saved)
+        finally:
+            lane.sh = real
+
+    def test_lockfile_only_conflict_is_regenerated_and_pushed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
+            pushed = self.git("show", "devin/jov-1-20260927:pnpm-lock.yaml", cwd=origin)
+            self.assertEqual(pushed, "regenerated")
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
+
+    def test_a_source_conflict_is_left_to_the_agent_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", "a.ts": "pr\n"})
+            before = self.git("rev-parse", "devin/jov-1-20260927", cwd=origin)
+            ok, calls = self.run_resolve(work)
+            self.assertFalse(ok)
+            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
+            self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
+            self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
