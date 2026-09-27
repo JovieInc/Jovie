@@ -32,9 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       # JOV-6832: read open fix PRs so a failing probe never launches a duplicate.
       pull-requests: read
+      statuses: write
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       GH_TOKEN: ${{ github.token }}

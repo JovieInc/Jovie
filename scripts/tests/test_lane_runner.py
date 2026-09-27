@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("lane_runner", ROOT / "scripts/lanes/lane_runner.py")
 lane = importlib.util.module_from_spec(SPEC)
@@ -935,8 +936,22 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.failure_excerpt = real, real_excerpt
             self.assertEqual((receipt["verdict"], receipt["headAfter"]), ("fix-pushed", "h2"))
             self.assertIn("fix-red", (host.state / "runs/ledger.jsonl").read_text())
-
-
+    def test_non_pushing_fix_runs_the_configured_second_attempt(self):
+        real, real_excerpt = lane.sh, lane.failure_excerpt
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh, lane.failure_excerpt = fake, lambda pr: "err"
+        self.addCleanup(lambda: (setattr(lane, "sh", real), setattr(lane, "failure_excerpt", real_excerpt)))
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            first = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+            second = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
+        self.assertEqual((first["execution"]["terminalState"], first["execution"]["retryDecision"],
+                          second["verdict"], second["execution"]["attempt"]), (None, "retry", "fix-no-change", 2))
 
 @unittest.skipIf(os.environ.get("LANES_SELFTEST") == "1", "running inside a release self-test")
 class UpdateTest(unittest.TestCase):

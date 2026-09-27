@@ -39,6 +39,15 @@ const EXECUTION_LEDGER =
   `/tmp/golden-path-lock-${process.pid}/execution-attempts.jsonl`;
 
 function executionAttempt(command, input) {
+  if (command !== 'identity') {
+    input.coordination = {
+      kind: 'github-status',
+      repository: process.env.GH_REPO,
+      sha: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+      tokenEnv: 'GH_TOKEN',
+      targetUrl: `${process.env.GITHUB_SERVER_URL || 'https://github.com'}/${process.env.GH_REPO}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+    };
+  }
   const result = spawnSync(
     'python3',
     [resolve('scripts/lanes/execution_attempt.py')],
@@ -535,6 +544,27 @@ async function runAutofix(args) {
     fence: execution.fencingToken,
     reservation: { spend: 1, mutations: 2 },
   });
+  const finishExecution = (
+    result,
+    failureClass,
+    failureFingerprint,
+    dependencies,
+    detail = {}
+  ) =>
+    executionAttempt('finish', {
+      path: EXECUTION_LEDGER,
+      ident: executionIdentity,
+      fence: execution.fencingToken,
+      result,
+      detail: {
+        failureClass,
+        failureFingerprint,
+        evidenceDigest: receipt.fingerprint,
+        costs: {},
+        dependencies,
+        ...detail,
+      },
+    });
 
   const prompt = buildAutofixPrompt({
     fingerprint: receipt.fingerprint,
@@ -549,19 +579,9 @@ async function runAutofix(args) {
     prompt,
   });
   if (!linear.ok) {
-    executionAttempt('finish', {
-      path: EXECUTION_LEDGER,
-      ident: executionIdentity,
-      fence: execution.fencingToken,
-      result: 'failed_unknown',
-      detail: {
-        failureClass: 'intake_unknown',
-        failureFingerprint: linear.reason,
-        evidenceDigest: receipt.fingerprint,
-        costs: {},
-        dependencies: ['linear'],
-      },
-    });
+    finishExecution('failed_unknown', 'intake_unknown', linear.reason, [
+      'linear',
+    ]);
     fail(
       `Linear intake failed closed: ${linear.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
       JSON.stringify(linear.body ?? null)
@@ -574,19 +594,12 @@ async function runAutofix(args) {
       body: JSON.stringify(plan.request),
     });
     if (!launched.ok) {
-      executionAttempt('finish', {
-        path: EXECUTION_LEDGER,
-        ident: executionIdentity,
-        fence: execution.fencingToken,
-        result: 'failed_unknown',
-        detail: {
-          failureClass: 'provider_unknown',
-          failureFingerprint: `cursor:${launched.status}`,
-          evidenceDigest: receipt.fingerprint,
-          costs: { apiCalls: 1 },
-          dependencies: ['cursor'],
-        },
-      });
+      finishExecution(
+        'failed_unknown',
+        'provider_unknown',
+        `cursor:${launched.status}`,
+        ['cursor']
+      );
       fail(
         `Cursor-direct launch failed (status ${launched.status}).`,
         JSON.stringify(launched.body)
@@ -595,18 +608,10 @@ async function runAutofix(args) {
     console.error(
       `Launched Cursor-direct autofix ${launched.body?.id ?? ''} fingerprint=${receipt.fingerprint}`
     );
-    executionAttempt('finish', {
-      path: EXECUTION_LEDGER,
-      ident: executionIdentity,
-      fence: execution.fencingToken,
-      result: 'succeeded',
-      detail: {
-        evidenceDigest: receipt.fingerprint,
-        costs: { apiCalls: 1 },
-        mutationsPerformed: ['linear_issue', 'cursor_agent'],
-        confidence: 'high',
-        dependencies: ['linear', 'cursor'],
-      },
+    finishExecution('succeeded', null, null, ['linear', 'cursor'], {
+      costs: { apiCalls: 1 },
+      mutationsPerformed: ['linear_issue', 'cursor_agent'],
+      confidence: 'high',
     });
   } else {
     console.error(

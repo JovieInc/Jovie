@@ -93,6 +93,12 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def execution_coordination(sha: str) -> dict:
+    if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test" or os.environ.get("LANES_SELFTEST") == "1":
+        return {"kind": "local-test"}
+    return {"kind": "github-status", "repository": REPO_SLUG, "sha": sha, "tokenEnv": "GH_TOKEN"}
+
+
 @dataclass
 class Host:
     """Everything host-specific; defaults suit both Gem and the Mac."""
@@ -469,6 +475,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                "issue": issue.identifier, "startedAt": now_iso()}
     ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
                                        {"title": issue.title, "description": issue.description})
+    coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
               "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"}
@@ -476,7 +483,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                       {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
                                        "model": spec.get("model"), "tool": "lane_runner", "accountPool": name},
                                       policy, {"triggerId": run_id, "correlationId": issue.identifier,
-                                               "causationId": issue.id})
+                                               "causationId": issue.id}, coordination=coordination)
     receipt["execution"] = claimed
     if not claimed["admitted"]:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
@@ -495,7 +502,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             prompt_file.write_text(prompt)
             started = time.time()
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                       {"spend": 1, "mutations": 1})
+                                       {"spend": 1, "mutations": 1}, coordination=coordination)
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
@@ -525,7 +532,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
          "failureFingerprint": None if result != "failed_unknown" else ":".join(receipt.get("reasons", [verdict])),
          "evidenceDigest": execution_attempt.digest(receipt.get("reasons", [])),
          "costs": {"apiCalls": 1}, "mutationsPerformed": receipt.get("pr") and ["pull_request"] or [],
-         "confidence": "high" if result == "succeeded" else "unknown", "dependencies": [name]})
+         "confidence": "high" if result == "succeeded" else "unknown", "dependencies": [name]},
+        coordination=coordination)
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -841,6 +849,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     ident = execution_attempt.identity("pr-remediation",
                                        {"repository": REPO_SLUG, "pr": pr["number"], "failure": failure},
                                        {"headSha": pr["headRefOid"]})
+    coordination = execution_coordination(pr["headRefOid"])
     claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
                                       {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
                                        "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
@@ -848,7 +857,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                                        "spend": MAX_FIX_ATTEMPTS, "mutations": MAX_FIX_ATTEMPTS,
                                        "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                       {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
-                                       "causationId": pr["headRefOid"]})
+                                       "causationId": pr["headRefOid"]}, coordination=coordination)
     receipt["execution"] = claimed
     if not claimed["admitted"]:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
@@ -864,7 +873,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                       {"spend": 1, "mutations": 1})
+                                       {"spend": 1, "mutations": 1}, coordination=coordination)
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
@@ -888,11 +897,11 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     pushed = receipt.get("verdict") == "fix-pushed"
     receipt["execution"] = execution_attempt.finish(
         runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], "succeeded" if pushed else "failed_known",
-        {"failureClass": None if pushed else "deterministic_code",
+        {"failureClass": None if pushed else "repair_incomplete",
          "failureFingerprint": None if pushed else execution_attempt.digest(receipt.get("reasons", ["no-head-change"])),
          "evidenceDigest": execution_attempt.digest({"before": pr["headRefOid"], "after": receipt.get("headAfter")}),
          "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
-         "confidence": "high", "dependencies": [name]})
+         "confidence": "high", "dependencies": [name]}, coordination=coordination)
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
