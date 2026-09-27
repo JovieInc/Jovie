@@ -15,8 +15,10 @@ import {
   APP_SCREEN_PEN_GEOMETRY,
   APP_SCREEN_PEN_PARITY_CHECKS,
   APP_SCREEN_PEN_PENDING_DECISIONS,
+  APP_SCREEN_PEN_REFERENCE_HOLDS,
   type AppScreenPenGeometryExport,
   type PenPendingDecision,
+  type PenReferenceHold,
 } from './penParity';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
@@ -93,6 +95,8 @@ export interface AppScreenValidationInput {
   readonly penGeometry?: AppScreenPenGeometryExport;
   /** Pending Pen-vs-code decisions; a root with any stays non-referenceable. */
   readonly penPendingDecisions?: readonly PenPendingDecision[];
+  /** Non-geometry decisions that also keep a root non-referenceable. */
+  readonly penReferenceHolds?: readonly PenReferenceHold[];
 }
 
 const duplicates = (values: readonly string[]): readonly string[] => {
@@ -132,6 +136,7 @@ export function validateAppScreenSystem({
   canvasExceptions = APP_SCREEN_CANVAS_EXCEPTIONS,
   penGeometry = APP_SCREEN_PEN_GEOMETRY,
   penPendingDecisions = APP_SCREEN_PEN_PENDING_DECISIONS,
+  penReferenceHolds = APP_SCREEN_PEN_REFERENCE_HOLDS,
 }: AppScreenValidationInput = {}): readonly AppScreenValidationIssue[] {
   const issues: AppScreenValidationIssue[] = [];
   const add = (code: AppScreenValidationCode, message: string) =>
@@ -193,11 +198,15 @@ export function validateAppScreenSystem({
         );
       }
       const penRootId = component.penRootId;
-      const pendingForRoot = penPendingDecisions.filter(decision =>
-        APP_SCREEN_PEN_PARITY_CHECKS.some(
-          check => check.id === decision.checkId && check.masterId === penRootId
-        )
-      );
+      const pendingForRoot = [
+        ...penPendingDecisions.filter(decision =>
+          APP_SCREEN_PEN_PARITY_CHECKS.some(
+            check =>
+              check.id === decision.checkId && check.masterId === penRootId
+          )
+        ),
+        ...penReferenceHolds.filter(hold => hold.masterId === penRootId),
+      ];
       if (component.penReferenceEligible && pendingForRoot.length > 0) {
         add(
           'reference-component-with-pending-pen-decision',
