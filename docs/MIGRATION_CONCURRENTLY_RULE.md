@@ -109,10 +109,14 @@ Detects CONCURRENTLY in migration files and **blocks the commit**.
 ```yaml
 # .github/workflows/ci.yml
 - name: Validate Migrations
-  run: pnpm migration:validate
+  run: |
+    pnpm migration:validate
+    pnpm exec tsx scripts/online-index-migrate.ts --validate-only
 ```
 
-CI will **fail** if CONCURRENTLY is detected.
+CI will **fail** if CONCURRENTLY is detected in a Drizzle migration or an
+online-index artifact is not certifiable. The online path rejects unique
+indexes because it is performance-only, not a correctness mechanism.
 
 ### 3. AGENTS.md Documentation ✅
 Section 5.2 now has the **correct** guidance (previously had wrong info).
@@ -156,7 +160,8 @@ If you need CONCURRENTLY for a specific reason:
 
 ## Related Files
 
-- **Validation script**: `scripts/validate-migrations.sh`
+- **Validation script**: `apps/web/scripts/validate-migrations.sh`
+- **Online-index runner**: `apps/web/scripts/online-index-migrate.ts`
 - **Agent guide**: `AGENTS.md` (Section 5.2)
 - **Pre-commit config**: `package.json` (lint-staged)
 - **CI workflow**: `.github/workflows/ci.yml`

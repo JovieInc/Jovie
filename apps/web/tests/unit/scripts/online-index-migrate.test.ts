@@ -35,7 +35,10 @@ class DatabaseHarness implements QueryClient {
     if (text.startsWith('DROP INDEX CONCURRENTLY')) this.index = null;
     if (text.startsWith('CREATE INDEX CONCURRENTLY')) {
       this.index = {
-        definition: artifact.expectedDefinition,
+        definition: text.replace(
+          /^CREATE INDEX CONCURRENTLY /,
+          'CREATE INDEX '
+        ),
         valid: !this.failNextBuild,
       };
       if (this.failNextBuild) {
@@ -48,6 +51,36 @@ class DatabaseHarness implements QueryClient {
 }
 
 describe('online index migrations', () => {
+  it('rejects unique indexes from the performance-only path', async () => {
+    const db = new DatabaseHarness();
+
+    await expect(
+      runOnlineIndexMigrations(db, [
+        {
+          ...artifact,
+          expectedDefinition:
+            'CREATE UNIQUE INDEX events_created_at_idx ON public.events USING btree (created_at)',
+        },
+      ])
+    ).rejects.toThrow('not a certifiable index definition');
+    expect(db.queries.some(query => query.startsWith('CREATE INDEX'))).toBe(
+      false
+    );
+  });
+
+  it('preserves whitespace inside SQL literals', async () => {
+    const db = new DatabaseHarness();
+    const spacedLiteralArtifact = {
+      ...artifact,
+      expectedDefinition:
+        "CREATE INDEX events_created_at_idx ON public.events USING btree (created_at) WHERE (slug = 'a  b'::text)",
+    };
+
+    await runOnlineIndexMigrations(db, [spacedLiteralArtifact]);
+
+    expect(db.index?.definition).toBe(spacedLiteralArtifact.expectedDefinition);
+  });
+
   it('fails before DDL when another runner owns the migration lock', async () => {
     const db = new DatabaseHarness(false);
 

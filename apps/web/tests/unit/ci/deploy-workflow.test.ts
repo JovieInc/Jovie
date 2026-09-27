@@ -964,6 +964,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
     const migrationJob = getJobBlock(workflow, 'migrate-production');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const stagingOnlineIndexStep = getStepBlock(
+      stagingJob,
+      'DB migrate (staging - online indexes)'
+    );
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const resultJob = getJobBlock(workflow, 'release-result');
     const credentialStep = getStepBlock(
@@ -1028,6 +1032,12 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(stagingJob.indexOf('staging - Drizzle')).toBeLessThan(
       stagingJob.indexOf('staging - online indexes')
     );
+    expect(stagingOnlineIndexStep).toContain('timeout-minutes: 12');
+    expect(stagingOnlineIndexStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}'
+    );
+    expect(stagingOnlineIndexStep).toContain('--config stg');
+    expect(stagingOnlineIndexStep).not.toContain('DOPPLER_TOKEN_PRD');
     expect(promotionJob).toContain('migrate-production');
     expect(promotionJob).toContain(
       "needs.migrate-production.result == 'success'"
@@ -1052,6 +1062,8 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrateStep).toContain('drizzle:migrate:ci');
     expect(onlineIndexStep).toContain("ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'");
     expect(onlineIndexStep).toContain('drizzle:migrate:online-indexes:ci');
+    expect(onlineIndexStep).toContain('timeout-minutes: 12');
+    expect(migrationJob).toContain('timeout-minutes: 30');
     expect(verifyStep).toContain('drizzle:verify:ci');
     expect(migrationJob.indexOf('production preflight')).toBeLessThan(
       migrationJob.indexOf('production - Drizzle')

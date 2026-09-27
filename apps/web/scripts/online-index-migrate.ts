@@ -38,7 +38,7 @@ export type QueryClient = {
 type IndexState = { definition: string; valid: boolean };
 
 function canonicalDefinition(value: string) {
-  return value.trim().replace(/;$/, '').replaceAll(/\s+/g, ' ');
+  return value.trim().replace(/;$/, '').trimEnd();
 }
 
 function validateArtifact(
@@ -75,7 +75,7 @@ function validateArtifact(
 
   const definition = canonicalDefinition(result.expectedDefinition);
   const prefix = new RegExp(
-    `^CREATE (?:UNIQUE )?INDEX ${result.index} ON ${result.schema}\\.`
+    `^CREATE INDEX ${result.index} ON ${result.schema}\\.`
   );
   if (
     !prefix.test(definition) ||
@@ -110,8 +110,8 @@ function checksum(artifact: OnlineIndexArtifact) {
 
 function concurrentDefinition(artifact: OnlineIndexArtifact) {
   return artifact.expectedDefinition.replace(
-    /^CREATE (UNIQUE )?INDEX /,
-    'CREATE $1INDEX CONCURRENTLY '
+    /^CREATE INDEX /,
+    'CREATE INDEX CONCURRENTLY '
   );
 }
 
@@ -122,7 +122,7 @@ function qualifiedIndex(artifact: OnlineIndexArtifact) {
 async function inspectIndex(
   client: QueryClient,
   artifact: OnlineIndexArtifact
-) {
+): Promise<IndexState | null> {
   const result = await client.query<IndexState>(
     `SELECT i.indisvalid AS valid, pg_get_indexdef(c.oid) AS definition
        FROM pg_class c
@@ -238,6 +238,11 @@ async function main() {
   const artifacts = loadOnlineIndexArtifacts(
     path.join(webRoot, 'drizzle', 'online-indexes')
   );
+  if (process.argv.includes('--validate-only')) {
+    return console.log(
+      `Validated ${artifacts.length} online index artifact(s).`
+    );
+  }
   if (artifacts.length === 0)
     return console.log('No online index artifacts to apply.');
   if (process.env.ALLOW_ONLINE_INDEX_MIGRATIONS !== 'true') {
