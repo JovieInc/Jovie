@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveProfileModeCardAccents } from '@/lib/profile/mode-card-accent';
 import type { NotificationContentType } from '@/types/notifications';
 import { ProfilePrimaryTabPanel } from './ProfilePrimaryTabPanel';
-import { PUBLIC_EVENTS_NO_UPCOMING_HEADING } from './profile-surface-state';
 
 // What the compact surface passes when the featured card shows artwork.
 const PEN_ACCENTS = resolveProfileModeCardAccents({
@@ -75,12 +74,12 @@ describe('ProfilePrimaryTabPanel', () => {
 
     expect(screen.getByTestId('profile-primary-tab-tour')).toBeInTheDocument();
     const card = screen.getByTestId('profile-primary-tab-events-empty');
+    // Shared nav contract (#18803): Events, never Shows.
     expect(card).toHaveAccessibleName('Events');
+    expect(screen.queryByText('Shows')).toBeNull();
     expect(card).toHaveAttribute('data-accent', 'pulse');
     expect(
-      within(card).getByRole('heading', {
-        name: PUBLIC_EVENTS_NO_UPCOMING_HEADING,
-      })
+      within(card).getByRole('heading', { name: 'No upcoming events' })
     ).toBeInTheDocument();
     expect(within(card).getByText('New dates will appear here.')).toBeVisible();
     // No invented CTA inside the empty state.

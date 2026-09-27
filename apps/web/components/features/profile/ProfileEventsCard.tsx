@@ -1,6 +1,5 @@
 // @coverage-via apps/web/components/features/profile/ProfilePrimaryTabPanel.test.tsx
 import type { ReactNode } from 'react';
-import { PUBLIC_EVENTS_NO_UPCOMING_HEADING } from '@/features/profile/profile-surface-state';
 import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
 import { ProfileModeCard } from './ProfileModeCard';
 
@@ -26,7 +25,7 @@ export function ProfileEventsCard({
       <ProfileModeCard
         accent={accent}
         eyebrow='Events'
-        title={PUBLIC_EVENTS_NO_UPCOMING_HEADING}
+        title='No upcoming events'
         description='New dates will appear here.'
         dataTestId='profile-primary-tab-events-empty'
       />

@@ -814,7 +814,7 @@ export function ProfilePacCard({
 
     case 'tickets':
     case 'rsvp': {
-      contextLabel = 'On Tour';
+      contextLabel = 'Upcoming Events';
       ContextIcon = Ticket;
       const showMeta = [nextShow?.venueName, nextShow?.city]
         .filter(Boolean)
