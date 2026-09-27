@@ -12,9 +12,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pr_events  # noqa: E402  (sibling module of the release)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -84,6 +88,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         github = json.loads(result.stdout)["resources"]["graphql"]["remaining"] if result.returncode == 0 else None
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         pass
+    held = read_json(state / "held.json", {})
+    failures = read_json(state / "failures.json", {})
     disk = shutil.disk_usage("/")
     hud_beat = None
     try:
@@ -99,7 +105,32 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "codex": accounts, "pool": pool, "linearError": linear_error, "githubRemaining": github,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
+        "heldByReason": pr_events.by_reason(held, open_pr_numbers()),
+        "failedByReason": failed_by_reason(failures),
     }
+
+
+def open_pr_numbers() -> set[int] | None:
+    """Open PR numbers, so held counts leave out merged and closed PRs; None counts every record."""
+    if os.environ.get("LANES_SELFTEST"):
+        return None
+    try:
+        result = subprocess.run(["gh", "pr", "list", "--repo", pr_events.REPO, "--state", "open", "--limit", "500",
+                                 "--json", "number", "--jq", ".[].number"], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return {int(line) for line in result.stdout.split() if line.isdigit()}
+
+
+def failed_by_reason(failures: dict) -> dict[str, int]:
+    """Issues whose last lane run failed, by reason code (records before reason codes: `legacy`)."""
+    counts: dict[str, int] = {}
+    for record in failures.values():
+        code = record.get("reason", "legacy") if isinstance(record, dict) else "legacy"
+        counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _locked(path: Path) -> bool:
@@ -252,7 +283,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
             "idle": sum(c["slots"] - c["running"] for c in counts.values()),
             "pool": obs.get("pool"), "lastLandingAgeS": obs.get("lastLandingAge"),
             "codexAvailable": len((obs.get("codex") or {}).get("available") or []),
-            "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining")}
+            "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
+            "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {}}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"

@@ -405,7 +405,10 @@ class WorkerTest(unittest.TestCase):
     def setUp(self):
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
-                      lane.fix_candidates, lane.escalate_exhausted)
+                      lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
+                      lane.pr_events.claim_event_pr)
+        lane.pr_events.queued_prs = lambda module, kinds: []
+        lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs: None
         lane.lane_prs = lambda name: []
@@ -423,7 +426,8 @@ class WorkerTest(unittest.TestCase):
     def tearDown(self):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
          lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
-         lane.fix_candidates, lane.escalate_exhausted) = self.saved
+         lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
+         lane.pr_events.claim_event_pr) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -465,6 +469,17 @@ class WorkerTest(unittest.TestCase):
         lane.worker(self.host, "devin")
         self.assertEqual((fixed, self.linear.moves), ([5], []))
         self.assertEqual(len(self.execs), 1)
+
+    def test_event_queued_prs_are_fixed_first_and_escalated_once(self):
+        fixed, escalated = [], []
+        lane.fix_candidates = lambda name: [{"number": 5}, {"number": 6}]
+        lane.pr_events.queued_prs = lambda module, kinds: [{"number": 6, "eventKinds": ["red"]}]
+        lane.pr_events.claim_event_pr = lambda host, module, name, prs: prs[0]
+        lane.claim_red_pr = lambda host, name, prs=None: self.fail("the event queue goes first")
+        lane.escalate_exhausted = lambda host, prs, linear: escalated.append(sorted(pr["number"] for pr in prs))
+        lane.fix_red_pr = lambda host, name, spec, pr: fixed.append(pr["number"])
+        lane.worker(self.host, "devin")
+        self.assertEqual((fixed, escalated), ([6], [[5, 6]]))
 
     def test_late_remote_drafts_are_adopted_and_gated(self):
         adopted = []
@@ -753,7 +768,11 @@ class FixRedTest(unittest.TestCase):
         stuck = {**self.pr(number=7), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
         attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}
         self.assertEqual([pr["number"] for pr in lane.exhausted_prs([stuck], attempts)], [7])
-        self.assertEqual(lane.exhausted_prs([{**stuck, "headRefOid": "h2"}], attempts), [], "a new head is not exhausted")
+        self.assertEqual([pr["number"] for pr in lane.exhausted_prs([{**stuck, "headRefOid": "h2"}], attempts)], [7],
+                         "the head the last fix pushed is still stuck: spent attempts escalate, never wait silently")
+        green = {**stuck, "headRefOid": "h2", "mergeStateStatus": "CLEAN",
+                 "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}]}
+        self.assertEqual(lane.exhausted_prs([green], attempts), [], "a head that went green is not escalated")
         self.assertEqual(lane.exhausted_prs([stuck], {"7": {**attempts["7"], "escalated": True}}), [])
         real = lane.sh
         posted = []
@@ -784,8 +803,9 @@ class FixRedTest(unittest.TestCase):
                 self.assertIsNone(lane.claim_red_pr(host, "devin"))
             finally:
                 lane.sh = real
-            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()),
-                             {"5": {"sha": "h1", "count": 1}})
+            record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
+            self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
+            self.assertAlmostEqual(record["at"], time.time(), delta=60)
 
     def test_unverified_drafts_are_adopted_once_per_head(self):
         draft = {**self.pr(), "isDraft": True, "headRefName": "hyperagent/jov-6438-20260925t213221"}

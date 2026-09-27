@@ -146,6 +146,30 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(feed["lanes"]["devin"], {"running": 1, "slots": 2})
         self.assertEqual(feed["alerts"], {"disk-low": "x"})
         self.assertNotIn("gate", feed["lanes"])
+        self.assertEqual((feed["held_by_reason"], feed["failed_by_reason"]), ({}, {}))
+
+    def test_feed_publishes_held_and_failed_records_by_reason(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "held.json").write_text(json.dumps({
+                "1": {"sha": "a", "evidence": ["gate-timeout:x3"]},
+                "2": {"sha": "b", "reason": "missing-test", "next_action": "fix-loop"}}))
+            (state / "failures.json").write_text(json.dumps({
+                "JOV-1": {"count": 1, "at": 0, "reason": "agent-timeout"}, "JOV-2": {"count": 2, "at": 0}, "JOV-3": 1}))
+            host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
+            lane = type("Lane", (), {"Linear": staticmethod(lambda env: (_ for _ in ()).throw(OSError("x"))),
+                                     "load_providers": staticmethod(lambda: {}),
+                                     "load_github_env": staticmethod(lambda: None), "HOST": "gem"})
+            codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
+            try:
+                observed = doctor.observe(host, lane, codex)
+            finally:
+                os.environ.pop("LANES_SELFTEST", None)
+            (state / "slots").mkdir()
+            feed = doctor.status_feed(host, lane, observed, {}, {})
+        self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
+        self.assertEqual(feed["failed_by_reason"], {"agent-timeout": 1, "legacy": 2})
 
 
 class PublishTest(unittest.TestCase):
