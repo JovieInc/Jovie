@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/admin';
 import {
-  getHelpCenterSignals,
   HelpCenterStoreUnavailableError,
   recordHelpCenterEvents,
 } from '@/lib/analytics/help-center.server';
@@ -109,29 +107,5 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
     return unavailableResponse(request);
-  }
-}
-
-/** Admin view: the four closed-loop signals plus remediation candidates. */
-export async function GET(): Promise<NextResponse> {
-  const authError = await requireAdmin();
-  if (authError) return authError;
-
-  try {
-    const signals = await getHelpCenterSignals();
-    return NextResponse.json(signals, {
-      headers: { 'Cache-Control': 'private, no-store' },
-    });
-  } catch (error) {
-    if (!(error instanceof HelpCenterStoreUnavailableError)) {
-      await captureError('Help Center analytics read failed', error, {
-        route: ROUTE,
-        method: 'GET',
-      });
-    }
-    return NextResponse.json(
-      { error: 'Help Center analytics unavailable' },
-      { status: 503 }
-    );
   }
 }

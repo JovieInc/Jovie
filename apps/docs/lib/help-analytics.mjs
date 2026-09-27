@@ -1,20 +1,14 @@
 /**
- * Help Center analytics contract and canonical tracking wrapper (JOV-5905).
- *
- * Privacy rules are enforced structurally:
- * - The payload is a strict allowlist; there is no field that can carry raw
- *   DOM text, arbitrary paths, auth state, payment data, or identity.
- * - Queries are never sent raw. Only a SHA-256 hash of the normalized query
- *   plus a coarse length bucket leave the browser.
- * - Events are fire-and-forget. A transport failure resolves silently so
- *   analytics can never break search, article rendering, or support paths.
+ * Help Center analytics contract and tracking wrapper (JOV-5905).
+ * Payload is a strict allowlist — no raw queries, DOM text, paths, or
+ * identity can leave the browser. Queries ship only as a truncated SHA-256
+ * hash plus a coarse length bucket. Fire-and-forget: analytics failures can
+ * never break search, article rendering, or support paths.
  */
 
 export const HELP_ANALYTICS_SCHEMA_VERSION = 1;
 export const HELP_ANALYTICS_ENDPOINT =
   'https://jov.ie/api/analytics/help-center';
-export const HELP_ANALYTICS_MAX_BATCH_SIZE = 8;
-
 export const HELP_ANALYTICS_EVENTS = Object.freeze([
   'help_center_viewed',
   'category_opened',
@@ -29,14 +23,6 @@ export const HELP_ANALYTICS_EVENTS = Object.freeze([
   'support_request_submitted',
   'support_request_failed',
   'support_escalation',
-]);
-
-export const HELP_CATEGORY_IDS = Object.freeze([
-  'jovie-essentials',
-  'build-your-presence',
-  'manage-jovie',
-  'developers',
-  'unknown',
 ]);
 
 /** Top-level docs section slug -> canonical category id. */
@@ -55,44 +41,11 @@ export function categoryIdForPathname(pathname) {
   return HELP_SECTION_CATEGORIES[section] ?? null;
 }
 
-export const HELP_SOURCE_SURFACES = Object.freeze([
-  'help_center_home',
-  'article',
-  'search_dialog',
-  'search_zero_results',
-  'search_error',
-  'related_guides',
-  'support_page',
-  'unknown',
-]);
-
-export const HELP_REFERRER_CLASSES = Object.freeze([
-  'internal',
-  'external',
-  'direct',
-  'unknown',
-]);
-
-export const HELP_VIEWPORT_CLASSES = Object.freeze(['sm', 'md', 'lg', 'xl']);
-export const HELP_SIGNED_IN_STATES = Object.freeze([
-  'signed_in',
-  'signed_out',
-  'unknown',
-]);
-export const HELP_FEEDBACK_VALUES = Object.freeze(['helpful', 'not_helpful']);
 export const HELP_FEEDBACK_REASONS = Object.freeze([
   'outdated',
   'missing_info',
   'did_not_answer',
   'confusing',
-]);
-
-export const HELP_QUERY_LENGTH_BUCKETS = Object.freeze([
-  'na',
-  'le_8',
-  'le_24',
-  'le_64',
-  'gt_64',
 ]);
 
 const HELP_QUERY_LENGTH_BUCKET_BOUNDS = Object.freeze([
@@ -103,11 +56,6 @@ const HELP_QUERY_LENGTH_BUCKET_BOUNDS = Object.freeze([
 
 const ARTICLE_ID_PATTERN = /^[a-z0-9][a-z0-9/_-]{0,119}$/;
 
-/**
- * Normalize a query for measurement only: lowercase, collapse whitespace,
- * strip control characters, cap length. The normalized value is hashed
- * before it leaves the browser; this function exists so the hash is stable.
- */
 export function normalizeQuery(query) {
   return String(query ?? '')
     .replace(/[\u0000-\u001f\s]+/g, ' ')
@@ -135,10 +83,7 @@ function fnv1a(input) {
   return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 
-/**
- * Privacy-safe query value: SHA-256 of the normalized query, truncated to
- * 16 hex chars. Irreversible at this cardinality; enough to deduplicate.
- */
+/** SHA-256 of the normalized query, truncated to 16 hex chars. */
 export async function hashQuery(query) {
   const normalized = normalizeQuery(query);
   if (!normalized) return '';
@@ -224,10 +169,7 @@ function sanitizeProperties(properties) {
     if (value === undefined || value === null || value === '') continue;
     clean[key] = value;
   }
-  if ('article_id' in clean && !ARTICLE_ID_PATTERN.test(clean.article_id)) {
-    delete clean.article_id;
-  }
-  for (const key of ['result_id', 'source_article_id']) {
+  for (const key of ['article_id', 'result_id', 'source_article_id']) {
     if (key in clean && !ARTICLE_ID_PATTERN.test(clean[key])) delete clean[key];
   }
   if (
@@ -239,10 +181,7 @@ function sanitizeProperties(properties) {
   return clean;
 }
 
-/**
- * Build a versioned, allowlisted payload. Returns null when the event is
- * unknown so callers can never emit an off-contract event name.
- */
+/** Returns null for off-contract event names so they can never be sent. */
 export function buildHelpAnalyticsEvent(event, properties = {}) {
   if (!HELP_ANALYTICS_EVENTS.includes(event)) return null;
   return {

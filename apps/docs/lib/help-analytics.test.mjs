@@ -50,8 +50,7 @@ test('query length buckets are coarse', () => {
 
 test('query hashing is deterministic, privacy-safe, and never raw', async () => {
   const first = await hashQuery('  Billing Question  ');
-  const second = await hashQuery('billing question');
-  assert.equal(first, second);
+  assert.equal(first, await hashQuery('billing question'));
   assert.match(first, /^[0-9a-f]{16}$/);
   assert.ok(!first.includes('billing'));
   assert.equal(await hashQuery(''), '');
@@ -78,9 +77,9 @@ test('payload builder enforces the allowlist and version', () => {
   assert.equal(event.event, 'search_result_selected');
   assert.ok(event.event_id.endsWith(':search_result_selected'));
   assert.equal(event.result_rank, 2);
-  assert.equal('raw_query' in event, false);
-  assert.equal('dom_text' in event, false);
-  assert.equal('user_email' in event, false);
+  for (const banned of ['raw_query', 'dom_text', 'user_email']) {
+    assert.equal(banned in event, false);
+  }
 });
 
 test('payload builder rejects unknown events and malformed ids', () => {
@@ -109,15 +108,12 @@ test('viewport classes match breakpoints', () => {
 });
 
 test('trackHelpCenterEvent never throws when transports fail', async () => {
+  const fail = {
+    beaconImpl: () => false,
+    fetchImpl: () => Promise.reject(new Error('offline')),
+  };
   assert.equal(
-    await trackHelpCenterEvent(
-      'article_viewed',
-      { article_id: 'index' },
-      {
-        beaconImpl: () => false,
-        fetchImpl: () => Promise.reject(new Error('offline')),
-      }
-    ),
+    await trackHelpCenterEvent('article_viewed', { article_id: 'index' }, fail),
     false
   );
   assert.equal(await trackHelpCenterEvent('not_real', {}, {}), false);
