@@ -2606,7 +2606,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: 100%;
   margin-top: clamp(var(--space-8), 4vw, var(--space-12));
   overflow: hidden;
-  aspect-ratio: 1902 / 827;
 }
 
 .homepage-connected-identity {
@@ -2648,13 +2647,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* JOV-6297: one editorial surface carrying the approved customer-zero
-   profile — real avatar + public facts beside the real product export. */
+   profile — real avatar + public facts beside the real product export.
+   The identity and the export sit together as one centered pair; the card
+   height follows the uncropped export (no fixed aspect ratio, no dead
+   column). Text on the warm-white artifact uses the inverse page ink. */
 .homepage-connected-profile {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto auto;
+  justify-content: center;
   align-items: center;
-  gap: clamp(var(--space-8), 5vw, var(--space-16));
-  height: 100%;
+  gap: clamp(var(--space-12), 7vw, var(--space-24));
   padding: clamp(var(--space-6), 4vw, var(--space-12));
 }
 
@@ -2666,14 +2668,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-connected-profile__avatar {
-  width: clamp(3rem, 4.5vw, 6rem);
+  width: clamp(4rem, 7vw, 7.5rem);
   height: auto;
   border-radius: 50%;
 }
 
 .homepage-connected-profile__name {
   margin: 0;
-  color: var(--color-text-primary-token);
+  color: var(--system-b-bg-page);
   font-size: clamp(1.25rem, 2vw, 1.75rem);
   font-weight: 590;
   letter-spacing: -0.01em;
@@ -2682,7 +2684,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-connected-profile__url {
   margin: 0;
-  color: var(--color-text-tertiary-token);
+  color: color-mix(in oklab, var(--system-b-bg-page) 64%, transparent);
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.875rem;
   line-height: 1.4;
@@ -2690,20 +2692,19 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-connected-artwork__image {
   display: block;
-  height: 100%;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
+  width: min(100%, 20rem);
+  height: auto;
 }
 
 @media (max-width: 767px) {
-  .homepage-connected-artwork {
-    aspect-ratio: auto;
-  }
-
   .homepage-connected-profile {
     grid-template-columns: minmax(0, 1fr);
-    height: auto;
+    justify-items: center;
+  }
+
+  .homepage-connected-profile__identity {
+    align-items: center;
+    text-align: center;
   }
 
   .homepage-connected-artwork__image {
@@ -2751,6 +2752,70 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: color-mix(in oklab, var(--system-b-bg-page) 72%, transparent);
   font-size: 1.125rem;
   line-height: 1.5;
+}
+
+/* JOV-6300 "You are not one thing." — bounded multi-hyphenate treatment
+   inside the relationships chapter. Carbon grade surface, warm-white
+   active artifact, at most three contextual lenses. */
+.homepage-identity {
+  margin-top: clamp(var(--space-9), 4vw, var(--space-12));
+  padding-top: clamp(var(--space-7), 3vw, var(--space-9));
+  border-top: 1px solid var(--noir-ion-border-subtle);
+}
+
+.homepage-identity__opening {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: clamp(1.375rem, 2vw, 1.625rem);
+  font-weight: 560;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.homepage-identity__figure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin: var(--space-6) 0 0;
+}
+
+.homepage-identity__portrait {
+  display: block;
+  width: 96px;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--noir-ion-border-subtle);
+  border-radius: 50%;
+  background: #020305;
+}
+
+.homepage-identity__portrait-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.homepage-identity__caption {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.homepage-identity__name {
+  color: var(--color-text-primary-token);
+  font-size: 1rem;
+  font-weight: 560;
+  line-height: 1.3;
+}
+
+.homepage-identity__handle {
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 @media (max-width: 767px) {
@@ -2847,6 +2912,77 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.75rem;
   line-height: 1.4;
+}
+
+.homepage-identity__emphasis {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary-token);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.homepage-identity__lenses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.homepage-identity__lens {
+  display: inline-flex;
+  min-height: var(--space-7);
+  align-items: center;
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--noir-ion-border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary-token);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.homepage-identity__lens[aria-pressed="true"] {
+  border-color: var(--color-text-primary-token);
+  background: var(--color-text-primary-token);
+  color: var(--color-bg-base);
+}
+
+.homepage-identity__lens:focus-visible {
+  outline: 2px solid var(--color-text-primary-token);
+  outline-offset: 2px;
+}
+
+.homepage-identity__payoff {
+  margin: var(--space-6) 0 0;
+  color: var(--color-text-tertiary-token);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-identity__lens,
+  .homepage-identity__emphasis {
+    transition:
+      color 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease;
+  }
+}
+
+@media (max-width: 640px) {
+  .homepage-identity__figure {
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .homepage-identity__portrait {
+    width: 72px;
+  }
 }
 
 @media (min-width: 768px) {

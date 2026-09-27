@@ -2,6 +2,12 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
+import {
+  SIGNUP_FUNNEL_ALL_STEPS,
+  SIGNUP_FUNNEL_IDS,
+  SIGNUP_FUNNEL_OUTCOMES,
+  SIGNUP_FUNNEL_SURFACES,
+} from '@/lib/analytics/signup-funnel';
 import { db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { withTimeout } from '@/lib/resilience/primitives';
@@ -28,7 +34,8 @@ interface ServerAnalyticsEventDefinition {
     | 'release'
     | 'tour'
     | 'notification'
-    | 'entitlement';
+    | 'entitlement'
+    | 'funnel';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -175,6 +182,12 @@ export const SERVER_ANALYTICS_EVENTS = {
     category: 'entitlement',
     properties: ['gate', 'source', 'toolName', 'code', 'planRequired'],
   },
+  // signup-funnel/v1: no source entity, so a step can never be joined back
+  // to a profile, user, or visitor.
+  funnel_step: {
+    category: 'funnel',
+    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason'],
+  },
 } as const satisfies Record<string, ServerAnalyticsEventDefinition>;
 
 export type ServerAnalyticsEventName = keyof typeof SERVER_ANALYTICS_EVENTS;
@@ -265,6 +278,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     invocations: 1,
     events: ['entitlement_denial'],
   },
+  {
+    path: 'lib/analytics/signup-funnel.server.ts',
+    invocations: 1,
+    events: ['funnel_step'],
+  },
 ] as const satisfies ReadonlyArray<{
   readonly path: string;
   readonly invocations: number;
@@ -296,6 +314,10 @@ const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   client: new Set(['web', 'ios', 'electron']),
   intent: new Set(['sign_in', 'sign_up']),
   method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
+  funnel_id: new Set(SIGNUP_FUNNEL_IDS),
+  step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
+  outcome: new Set(SIGNUP_FUNNEL_OUTCOMES),
+  surface: new Set(SIGNUP_FUNNEL_SURFACES),
 };
 const UTM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   utm_source: new Set([

@@ -47,7 +47,7 @@ describe('SupportPageContent', () => {
     expect(sectionHeadings).toEqual([
       "We're Here To Help.",
       'How Can We Help?',
-      'Frequently Asked Questions',
+      'FAQ',
       'Still Need Help?',
     ]);
     expect(screen.getAllByRole('article')).toHaveLength(3);
@@ -80,12 +80,12 @@ describe('SupportPageContent', () => {
       {
         question: 'How do I get started with Jovie?',
         answer:
-          'Start with Find yourself and follow the setup steps for your profile. Full walkthrough at https://docs.jov.ie/docs/jovie-essentials/start-here.',
+          'Start with Find yourself and follow the setup steps for your Jovie profile. Full walkthrough at https://docs.jov.ie/docs/jovie-essentials/start-here.',
       },
       {
-        question: 'How do music smart links work?',
+        question: 'How do smart links work?',
         answer:
-          'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
+          'Add destinations to your Jovie profile. Jovie makes a smart link that sends each visitor to the destination they choose.',
       },
       {
         question: 'How do I upgrade my plan?',
@@ -95,7 +95,7 @@ describe('SupportPageContent', () => {
       {
         question: 'How do I contact support?',
         answer:
-          'Email support@jov.ie \u2014 we typically respond within one business day.',
+          'Email support@jov.ie. We typically respond within one business day.',
       },
     ]);
 
