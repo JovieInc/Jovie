@@ -20,9 +20,9 @@ export const SUPPORT_FAQ_ITEMS = [
     answer: `Start with Find yourself and follow the setup steps for your Jovie profile. Full walkthrough at ${DOCS_URL}/getting-started.`,
   },
   {
-    question: 'How do smart links work?',
+    question: 'How do music smart links work?',
     answer:
-      'When you add a link, Jovie generates a smart link that detects each visitor\u2019s preferred platform and routes them there automatically.',
+      'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
   },
   {
     question: 'How do I upgrade my plan?',
