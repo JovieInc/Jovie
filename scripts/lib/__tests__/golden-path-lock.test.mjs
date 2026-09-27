@@ -123,6 +123,15 @@ describe('golden-path lock evaluators', () => {
     });
     expect(
       evaluateHomepageHtml(
+        '<a href="/start" data-primary-cta="true">Find yourself</a><a href="/signup">Request access</a>'
+      )
+    ).toMatchObject({
+      id: 'homepage-cta',
+      ok: false,
+      reason: expect.stringContaining('Search your name'),
+    });
+    expect(
+      evaluateHomepageHtml(
         '<a href="/start">Find yourself</a><button>Find me</button>'
       )
     ).toMatchObject({
