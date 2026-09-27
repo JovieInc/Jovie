@@ -311,7 +311,10 @@ chmod +x "$DL_BIN/curl" "$DL_BIN/tar"
 export CURL_COUNT="$TEST_ROOT/download.curl-count"
 : >"$CURL_COUNT"
 status=0
+# CI exports TRUFFLEHOG_BIN for the installed-binary regression run; the
+# download path must be exercised without either scanner env override.
 PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$DL_TMP" SCAN_SECRETS_RETRY_DELAY=0 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download.output" 2>&1 \
   || status=$?
 [[ $status -eq 0 ]] \
@@ -329,6 +332,7 @@ mkdir -p "$TEST_ROOT/dl-tmp2"
 status=0
 PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
   SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
   bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download-fail.output" 2>&1 \
   || status=$?
 [[ $status -ne 0 ]] || fail 'exhausted download retries must fail the scan'
