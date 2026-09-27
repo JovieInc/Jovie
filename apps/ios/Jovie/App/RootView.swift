@@ -19,10 +19,13 @@ private struct AppContentView: View {
   @State private var isLoadingInbox = false
   @State private var workspaceMode: MobileWorkspaceMode = .jovie
   @State private var showWhatsNew = false
+  @State private var changelogWhatsNew: WhatsNewUnseen?
 #if DEBUG
   @State private var didSendLiveChatProbe = false
 #endif
   @AppStorage("jovie.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion: String?
+  @AppStorage(WhatsNewFeedPolicy.lastSeenStorageKey) private var lastSeenChangelogWhatsNewID: String?
+  @Environment(\.scenePhase) private var scenePhase
 
   init(
     appState: AppState,
@@ -282,10 +285,17 @@ private struct AppContentView: View {
         items: WhatsNewCatalog.items(for: currentAppVersion)
       )
     }
+    .sheet(item: $changelogWhatsNew) { unseen in
+      JovieChangelogWhatsNewView(unseen: unseen)
+    }
+    // Launch and every return to the foreground: at most once per release.
+    .task(id: "\(appState.route)-\(scenePhase)") {
+      await checkChangelogWhatsNew()
+    }
     .task(id: "\(appState.route)-\(appState.launchMode)-\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)") {
       guard appState.route == .ready else { return }
-      // Live What’s New is FeatureIntro in chat. The versioned sheet is the
-      // UITest fixture so chat-first cases can name what to tap.
+      // Live What’s New is the changelog sheet above. The versioned sheet is
+      // the UITest fixture so chat-first cases can name what to tap.
       if appState.launchMode == .uiTestingWhatsNew {
         showWhatsNew = true
       }
@@ -361,6 +371,25 @@ private struct AppContentView: View {
 
   private func markWhatsNewPresented() {
     lastPresentedWhatsNewVersion = currentAppVersion
+  }
+
+  private func checkChangelogWhatsNew() async {
+    guard
+      appState.launchMode == .live,
+      appState.route == .ready,
+      scenePhase == .active,
+      changelogWhatsNew == nil,
+      !showWhatsNew
+    else { return }
+    let client = WhatsNewFeedClient(webBaseURL: appState.configuration.webBaseURL)
+    guard let feed = await client.fetch(), !Task.isCancelled else { return }
+    guard let unseen = WhatsNewFeedPolicy.resolve(
+      feed: feed,
+      lastSeenID: lastSeenChangelogWhatsNewID
+    ) else { return }
+    // Seen on presentation: once per release even if the app dies mid-sheet.
+    lastSeenChangelogWhatsNewID = unseen.entry.id
+    changelogWhatsNew = unseen
   }
 
   private func handleAutoSendMessage(_ text: String) {
@@ -878,6 +907,180 @@ struct JovieWhatsNewView: View {
     .presentationDragIndicator(.visible)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("What’s New, version \(version)")
+  }
+}
+
+// MARK: - Remote What's New (changelog feed)
+
+/// One release from `GET /changelog/whats-new.json` (contract version 1).
+/// `CHANGELOG.md` on the web is the only source; the id is the release version.
+struct WhatsNewFeedEntry: Decodable, Equatable, Sendable {
+  let id: String
+  let title: String
+  let date: String
+  let summary: String
+  let url: URL
+  let highlights: [String]
+  let dogfood: [String]
+}
+
+struct WhatsNewFeed: Decodable, Equatable, Sendable {
+  static let contractVersion = 1
+  static let path = "changelog/whats-new.json"
+
+  let version: Int
+  let changelogUrl: URL
+  let entries: [WhatsNewFeedEntry]
+}
+
+struct WhatsNewUnseen: Equatable, Identifiable, Sendable {
+  let entry: WhatsNewFeedEntry
+  let unseenCount: Int
+  /// The post for one unseen release, the changelog index for several.
+  let link: URL
+
+  var id: String { entry.id }
+}
+
+enum WhatsNewFeedPolicy {
+  static let lastSeenStorageKey = "jovie.whatsNew.lastSeenID"
+
+  /// Mirrors `resolveUnseenWhatsNew` in apps/web/lib/whats-new.ts.
+  /// No last-seen id (or one that aged out of the feed) counts only the
+  /// newest release, so a first launch never reads as a backlog.
+  static func resolve(feed: WhatsNewFeed, lastSeenID: String?) -> WhatsNewUnseen? {
+    guard let newest = feed.entries.first, newest.id != lastSeenID else {
+      return nil
+    }
+    let seenIndex = lastSeenID.flatMap { id in
+      feed.entries.firstIndex { $0.id == id }
+    } ?? 0
+    let unseenCount = max(seenIndex, 1)
+    return WhatsNewUnseen(
+      entry: newest,
+      unseenCount: unseenCount,
+      link: unseenCount > 1 ? feed.changelogUrl : newest.url
+    )
+  }
+
+  /// Decode an untrusted payload; any other contract version reads as "nothing new".
+  static func decode(_ data: Data) -> WhatsNewFeed? {
+    guard
+      let feed = try? JSONDecoder().decode(WhatsNewFeed.self, from: data),
+      feed.version == WhatsNewFeed.contractVersion
+    else {
+      return nil
+    }
+    return feed
+  }
+}
+
+struct WhatsNewFeedClient: Sendable {
+  let webBaseURL: URL
+  var session: URLSession = URLSession(configuration: .jovieMobile)
+
+  /// Returns nil on any network, status, or contract failure. The sheet stays silent.
+  func fetch() async -> WhatsNewFeed? {
+    var request = URLRequest(url: webBaseURL.appending(path: WhatsNewFeed.path))
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    guard
+      let result = try? await session.data(for: request),
+      let http = result.1 as? HTTPURLResponse,
+      (200..<300).contains(http.statusCode)
+    else {
+      return nil
+    }
+    return WhatsNewFeedPolicy.decode(result.0)
+  }
+}
+
+struct JovieChangelogWhatsNewView: View {
+  let unseen: WhatsNewUnseen
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.openURL) private var openURL
+
+  private var linkTitle: String {
+    unseen.unseenCount > 1 ? "See All Updates" : "Read the Post"
+  }
+
+  private var eyebrow: String {
+    unseen.unseenCount > 1 ? "What’s New · \(unseen.unseenCount) updates" : "What’s New"
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.large) {
+      HStack(alignment: .top) {
+        VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+          Text(eyebrow)
+            .font(JovieFont.body(size: 14))
+            .foregroundStyle(JovieColor.textTertiary)
+          Text(unseen.entry.title)
+            .font(JovieFont.display(size: 24))
+            .foregroundStyle(JovieColor.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+        }
+        Spacer(minLength: JovieSpacing.medium)
+        Image(systemName: "sparkles")
+          .font(.title2)
+          .foregroundStyle(JovieColor.accent)
+          .accessibilityHidden(true)
+      }
+
+      ScrollView {
+        VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+          Text(unseen.entry.summary)
+            .font(JovieFont.body(size: 16))
+            .foregroundStyle(JovieColor.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("whats-new-summary")
+
+          if !unseen.entry.dogfood.isEmpty {
+            VStack(alignment: .leading, spacing: JovieSpacing.small) {
+              Text("Try This")
+                .font(JovieFont.body(size: 14, weight: .semibold))
+                .foregroundStyle(JovieColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+              ForEach(Array(unseen.entry.dogfood.enumerated()), id: \.offset) { index, hint in
+                Label {
+                  Text(hint)
+                    .font(JovieFont.body(size: 15))
+                    .foregroundStyle(JovieColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                  Image(systemName: "checkmark.circle")
+                    .foregroundStyle(JovieColor.accent)
+                    .accessibilityHidden(true)
+                }
+                .accessibilityIdentifier("whats-new-dogfood-\(index)")
+              }
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+
+      VStack(spacing: JovieSpacing.small) {
+        Button(linkTitle) {
+          openURL(unseen.link)
+          dismiss()
+        }
+        .buttonStyle(JoviePillButtonStyle(filled: true))
+        .accessibilityIdentifier("whats-new-read-post")
+
+        Button("Got It") {
+          dismiss()
+        }
+        .buttonStyle(JoviePillButtonStyle(filled: false))
+        .accessibilityIdentifier("whats-new-got-it")
+      }
+    }
+    .padding(JovieSpacing.large)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(JovieColor.backgroundBase)
+    .presentationDetents([.medium, .large])
+    .presentationDragIndicator(.visible)
+    .accessibilityElement(children: .contain)
   }
 }
 

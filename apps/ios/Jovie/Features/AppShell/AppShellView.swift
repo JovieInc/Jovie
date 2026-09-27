@@ -1,7 +1,7 @@
 import AVKit
 import SwiftUI
 
-enum AppShellTab: Equatable, Hashable {
+enum AppShellTab: Equatable, Hashable, CaseIterable {
   case chat
   case library
   case calendar

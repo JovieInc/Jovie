@@ -2637,6 +2637,23 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
     );
 }
 
+/* Dark underlay for the generated-34 hero photo: keeps the docked header
+   and the hero copy legible everywhere in the section, while leaving the
+   image visible at low opacity (JOV marketing routes 2026-09-26). Darkest
+   at the very top edge (under the transparent-at-rest header) and never
+   drops below a mostly-opaque floor, so no band of the hero reads lighter
+   than the rest. */
+:where(.system-b-artist-notifications-hero-underlay) {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    var(--system-b-cinematic-black) 0%,
+    color-mix(in oklab, var(--system-b-cinematic-black) 86%, transparent) 18%,
+    color-mix(in oklab, var(--system-b-cinematic-black) 86%, transparent) 100%
+  );
+}
+
 :where(.system-b-artist-notifications-hero-grid) {
   display: grid;
   min-width: 0;

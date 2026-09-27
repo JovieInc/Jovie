@@ -1,6 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
 import {
   and,
+  asc,
+  desc,
   sql as drizzleSql,
   eq,
   inArray,
@@ -34,6 +36,15 @@ import { uuidSchema } from '@/lib/validation/schemas/base';
 import { collectOrderedPrimaryNames } from './release-credits';
 import { resolveTrackProviderLinks } from './track-provider-links';
 import type { PreviewVerification } from './types';
+
+/**
+ * Bound for the full per-profile release list (JOV-6272). The authenticated
+ * matrix is server-cached; this cap bounds serialisation cost the same way
+ * the public Lite projection is capped at 200. Profiles with more releases
+ * than this are not an observed state; the bound exists so a runaway catalog
+ * cannot produce an unbounded cache entry.
+ */
+const RELEASES_FOR_PROFILE_LIMIT = 500;
 
 /**
  * Release data source types
@@ -397,8 +408,9 @@ export async function getReleaseStatsByUsername(
 /**
  * Lightweight release list for public profile display.
  * Returns releases with artist names but skips provider links and track summaries.
- * Sorted newest-first (DESC NULLS LAST) so null dates appear at the end.
- * Capped at 200 releases to bound serialisation cost.
+ * Sorted newest-first (DESC NULLS LAST, id DESC tiebreaker so tied dates
+ * and null dates order deterministically with no duplicate/missing rows at
+ * the pagination boundary). Capped at 200 releases to bound cost.
  */
 export async function getReleasesForProfileLite(
   creatorProfileId: string
@@ -421,7 +433,10 @@ export async function getReleasesForProfileLite(
         publicReleaseEligibilitySqlPredicate()
       )
     )
-    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .orderBy(
+      drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+      desc(discogReleases.id)
+    )
     .limit(200);
 
   if (releases.length === 0) return [];
@@ -464,7 +479,12 @@ export async function getReleasesForProfile(
     .select()
     .from(discogReleases)
     .where(and(...filters))
-    .orderBy(discogReleases.releaseDate);
+    // Deterministic ordering (JOV-6272): releaseDate alone is not unique, so
+    // tied and null dates could interleave non-deterministically across
+    // reads. The id tiebreaker makes pagination stable, and the 500-row bound
+    // caps serialisation cost for the server-cached matrix.
+    .orderBy(asc(discogReleases.releaseDate), asc(discogReleases.id))
+    .limit(RELEASES_FOR_PROFILE_LIMIT);
 
   if (releases.length === 0) {
     return [];

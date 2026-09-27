@@ -5,6 +5,10 @@ import {
   getHelpCenterDestination,
   HELP_CENTER_DESTINATIONS,
 } from '@/lib/help-center-home.mjs';
+import {
+  buildDestinationJsonLd,
+  safeJsonLdStringify,
+} from '@/lib/help-center-seo.mjs';
 
 export const dynamicParams = false;
 
@@ -25,6 +29,12 @@ export async function generateMetadata({
   return {
     title: destination.title,
     description: destination.description,
+    alternates: { canonical: destination.route },
+    openGraph: {
+      title: destination.title,
+      description: destination.description,
+      url: destination.route,
+    },
   };
 }
 
@@ -36,5 +46,14 @@ export default async function HelpCenterDestinationPage({
   const { slug } = await params;
   const destination = getHelpCenterDestination(slug.join('/'));
   if (!destination) notFound();
-  return <HelpCenterDestination destination={destination} />;
+  return (
+    <>
+      {/* Structured data is generated from the same certified destination
+          metadata as the visible page. */}
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(buildDestinationJsonLd(destination))}
+      </script>
+      <HelpCenterDestination destination={destination} />
+    </>
+  );
 }
