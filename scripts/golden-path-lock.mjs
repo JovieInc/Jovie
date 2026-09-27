@@ -34,6 +34,34 @@ const FORBIDDEN_ENV = Object.freeze([
   'E2E_PROD_EMAIL',
   'E2E_CLERK_USER',
 ]);
+const EXECUTION_LEDGER =
+  process.env.EXECUTION_ATTEMPT_LEDGER ??
+  `/tmp/golden-path-lock-${process.pid}/execution-attempts.jsonl`;
+
+function executionAttempt(command, input) {
+  if (command !== 'identity') {
+    input.coordination = {
+      kind: 'github-status',
+      repository: process.env.GH_REPO,
+      sha: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+      tokenEnv: 'GH_TOKEN',
+      targetUrl: `${process.env.GITHUB_SERVER_URL || 'https://github.com'}/${process.env.GH_REPO}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+    };
+  }
+  const result = spawnSync(
+    'python3',
+    [resolve('scripts/lanes/execution_attempt.py')],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({ command, ...input }),
+    }
+  );
+  const output = JSON.parse(result.stdout || '{}');
+  if (result.status !== 0 || output.error) {
+    throw new Error(output.error || `execution-attempt-${command}-failed`);
+  }
+  return output;
+}
 
 function usage() {
   return [
@@ -468,6 +496,75 @@ async function runAutofix(args) {
       `Golden-path prod probe failed; open autofix PR #${plan.openPrNumber} owns ${receipt.fingerprint}. No new Cursor launch.`
     );
   }
+  if (plan.action === 'dedup') {
+    fail(
+      `Golden-path prod probe failed; active agents ${plan.existingAgentIds.join(',')} own ${receipt.fingerprint}.`
+    );
+  }
+
+  const executionIdentity = executionAttempt('identity', {
+    domain: 'production-verification-remediation',
+    work: { origin: receipt.origin, failureFingerprint: receipt.fingerprint },
+    generation: {
+      deployment: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+    },
+  });
+  const execution = executionAttempt('claim', {
+    path: EXECUTION_LEDGER,
+    ident: executionIdentity,
+    owner: {
+      owner: process.env.GITHUB_RUN_ID || 'local',
+      runtime: 'golden-path-prod-autofix',
+      provider: 'cursor',
+      model: null,
+      tool: 'cursor-agent-api',
+      accountPool: 'cursor',
+    },
+    policy: {
+      attempts: 1,
+      concurrency: 1,
+      wallSeconds: 900,
+      spend: 1,
+      mutations: 2,
+      leaseSeconds: 900,
+      version: 'golden-path-autofix-v1',
+    },
+    trigger: {
+      triggerId: process.env.GITHUB_RUN_ID || 'local',
+      correlationId: receipt.fingerprint,
+      causationId: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+    },
+  });
+  if (!execution.admitted) {
+    fail(`Golden-path autofix execution denied: ${execution.reason}.`);
+  }
+  executionAttempt('boundary', {
+    path: EXECUTION_LEDGER,
+    ident: executionIdentity,
+    fence: execution.fencingToken,
+    reservation: { spend: 1, mutations: 2 },
+  });
+  const finishExecution = (
+    result,
+    failureClass,
+    failureFingerprint,
+    dependencies,
+    detail = {}
+  ) =>
+    executionAttempt('finish', {
+      path: EXECUTION_LEDGER,
+      ident: executionIdentity,
+      fence: execution.fencingToken,
+      result,
+      detail: {
+        failureClass,
+        failureFingerprint,
+        evidenceDigest: receipt.fingerprint,
+        costs: {},
+        dependencies,
+        ...detail,
+      },
+    });
 
   const prompt = buildAutofixPrompt({
     fingerprint: receipt.fingerprint,
@@ -482,6 +579,9 @@ async function runAutofix(args) {
     prompt,
   });
   if (!linear.ok) {
+    finishExecution('failed_unknown', 'intake_unknown', linear.reason, [
+      'linear',
+    ]);
     fail(
       `Linear intake failed closed: ${linear.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
       JSON.stringify(linear.body ?? null)
@@ -494,6 +594,12 @@ async function runAutofix(args) {
       body: JSON.stringify(plan.request),
     });
     if (!launched.ok) {
+      finishExecution(
+        'failed_unknown',
+        'provider_unknown',
+        `cursor:${launched.status}`,
+        ['cursor']
+      );
       fail(
         `Cursor-direct launch failed (status ${launched.status}).`,
         JSON.stringify(launched.body)
@@ -502,6 +608,11 @@ async function runAutofix(args) {
     console.error(
       `Launched Cursor-direct autofix ${launched.body?.id ?? ''} fingerprint=${receipt.fingerprint}`
     );
+    finishExecution('succeeded', null, null, ['linear', 'cursor'], {
+      costs: { apiCalls: 1 },
+      mutationsPerformed: ['linear_issue', 'cursor_agent'],
+      confidence: 'high',
+    });
   } else {
     console.error(
       `Deduped Cursor-direct autofix fingerprint=${receipt.fingerprint} agents=${plan.existingAgentIds.join(',')}`
