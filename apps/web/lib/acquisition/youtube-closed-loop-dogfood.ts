@@ -26,8 +26,8 @@ import {
   type YouTubeLinkPlan,
 } from '../youtube-library/link-inspect';
 import {
-  type AcquisitionMachineCertification,
-  machineCertifyYouTubeGrowth,
+  type AcquisitionPreflightResult,
+  runYouTubeGrowthPreflight,
 } from './kernel';
 import {
   qualifyRegularlyUploadingChannel,
@@ -133,7 +133,7 @@ export interface YoutubeClosedLoopDogfoodReceipt {
   readonly qualification: ReturnType<
     typeof qualifyRegularlyUploadingChannel
   > | null;
-  readonly machineCertification: AcquisitionMachineCertification | null;
+  readonly preflightReadiness: AcquisitionPreflightResult | null;
   readonly guardrails: {
     readonly officialApiOnly: true;
     readonly thumbnailsSetCalled: false;
@@ -370,7 +370,7 @@ export async function runYoutubeClosedLoopDogfood(input: {
           results: [],
         },
         qualification: null,
-        machineCertification: null,
+        preflightReadiness: null,
         guardrails: {
           officialApiOnly: true,
           thumbnailsSetCalled: false,
@@ -440,7 +440,7 @@ export async function runYoutubeClosedLoopDogfood(input: {
       })
     : null;
 
-  const machineCertification = machineCertifyYouTubeGrowth({
+  const preflightReadiness = runYouTubeGrowthPreflight({
     channelId: preview.channel.id,
     channelTitle: preview.channel.title,
     videoCount: items.length,
@@ -477,7 +477,7 @@ export async function runYoutubeClosedLoopDogfood(input: {
         results: applyStage.results,
       },
       qualification,
-      machineCertification,
+      preflightReadiness,
       guardrails: {
         officialApiOnly: true,
         thumbnailsSetCalled: false,
