@@ -823,7 +823,7 @@ describe('merge_group workflow contract', () => {
       "github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')"
     );
     expect(databaseCertification).toMatch(
-      /continue-on-error: true[\s\S]*run test:integration[\s\S]*steps\.migration-upgrade\.outcome/
+      /continue-on-error: true[\s\S]*run test:integration[\s\S]*steps\.integration-tests\.outcome[\s\S]*steps\.migration-upgrade\.outcome/
     );
     expect(databaseCertification).toContain("DB_CERTIFICATION: 'true'");
     expect(databaseCertification).toContain(

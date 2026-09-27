@@ -181,7 +181,10 @@ describe('billing persistence concurrency (integration)', () => {
           source: 'integration-test',
           metadata: {},
         })
-      ).rejects.toThrow(/injected audit failure/i);
+      ).rejects.toHaveProperty(
+        'cause.message',
+        expect.stringMatching(/injected audit failure/i)
+      );
 
       const [persisted] = await db
         .select({ isPro: users.isPro, billingVersion: users.billingVersion })

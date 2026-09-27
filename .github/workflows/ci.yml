@@ -874,8 +874,7 @@ jobs:
             echo "run_drizzle=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Isolated DB certification: merge-group heads run this only when database,
-          # authz, migration, integration-harness, or DB dependency inputs changed.
+          # Isolated DB certification selects database, authz, migration, harness, and dependency inputs.
           # Jobs that create ephemeral Neon branches must check this flag before doing so.
           NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
@@ -2446,6 +2445,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run serialized database integration certification
+        id: integration-tests
+        continue-on-error: true
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
         env:
           DATABASE_URL: ${{ steps.resolve-certification-db-url.outputs.database_url }}
@@ -2472,7 +2473,7 @@ jobs:
           }
           console.log(`Database certification executed ${tests} tests with zero skips.`);
           NODE
-          test "${{ steps.migration-upgrade.outcome }}" = success || { echo "::error::Prior-release migration compatibility failed"; exit 1; }
+          test "${{ steps.integration-tests.outcome }} ${{ steps.migration-upgrade.outcome }}" = "success success" || { echo "::error::Database assertions or prior-release compatibility failed"; exit 1; }
 
       - name: Upload database certification evidence
         if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')) }}
@@ -6596,8 +6597,7 @@ jobs:
 
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
-    # DB-risk heads reuse the existing expiring Neon branch; browser preview
-    # lanes remain manual/post-merge.
+    # DB-risk heads reuse expiring Neon; browser preview lanes remain manual/post-merge.
     needs:
       [
         ci-path-changes,
