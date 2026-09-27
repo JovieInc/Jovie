@@ -77,7 +77,7 @@ const nextConfig = {
     ],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
-    // Gated investor deck: kept out of public/ so no CDN URL serves it.
+    // Gated investor deck PDF: kept out of public/ so no CDN URL serves it.
     '/investor-portal/deck/[...path]': ['assets/investor-deck/**/*'],
   },
   // Dynamic fs paths make NFT over-approximate and copy repo files no route

@@ -22,8 +22,8 @@ vi.mock('@/lib/investors/manifest', () => ({
     deck: { slides: [], downloadFilename: 'Jovie-Pitch-Deck.pdf' },
   }),
 }));
-vi.mock('./_components/InvestorNav', () => ({ InvestorNav: () => null }));
-vi.mock('./_components/InvestorStickyBar', () => ({
+vi.mock('../_components/InvestorNav', () => ({ InvestorNav: () => null }));
+vi.mock('../_components/InvestorStickyBar', () => ({
   InvestorStickyBar: () => null,
 }));
 vi.mock('@/components/features/pitch/InvestorBrief', () => ({

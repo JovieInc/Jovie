@@ -19,7 +19,6 @@
       "!!storybook-static",
       "!**/*.html",
       "!**/.next",
-      "!apps/web/assets/investor-deck/**",
       "!apps/web/styles/generated/**",
       "!apps/web/lib/design/generated/**",
       "!apps/web/design/oklch-palette.json",

@@ -13,26 +13,10 @@ export const dynamic = 'force-dynamic';
 /**
  * Exact deck files served from apps/web/assets/investor-deck. An allowlist,
  * not a filesystem lookup: nothing outside this table is reachable, so there
- * is no path to traverse. Relative asset URLs in the HTML deck resolve here.
+ * is no path to traverse.
  */
 const INVESTOR_DECK_FILES: Readonly<Record<string, string>> = {
   'Jovie-Pitch-Deck.pdf': 'application/pdf',
-  'index.html': 'text/html; charset=utf-8',
-  'compact.html': 'text/html; charset=utf-8',
-  'print.html': 'text/html; charset=utf-8',
-  'market-funnel-slide.html': 'text/html; charset=utf-8',
-  'deck-stage.js': 'text/javascript; charset=utf-8',
-  'colors_and_type.css': 'text/css; charset=utf-8',
-  'assets/album-all-noise.png': 'image/png',
-  'assets/album-deep-end.png': 'image/png',
-  'assets/album-never-say.png': 'image/png',
-  'assets/album-take-me-over.png': 'image/png',
-  'assets/product-releases.png': 'image/png',
-  'assets/tim-universal.png': 'image/png',
-  'assets/logo-icon-black-upload.svg': 'image/svg+xml',
-  'assets/logo-icon-white.svg': 'image/svg+xml',
-  'assets/logo-wordmark-black.svg': 'image/svg+xml',
-  'assets/logo-wordmark-white.svg': 'image/svg+xml',
 };
 
 interface RouteContext {
@@ -45,10 +29,9 @@ function notFound(): Response {
 
 /**
  * GET /investor-portal/deck/<file>
- * Same gate as the portal (investor link cookie or admin session). Most deck
- * URLs carry a static-file extension that proxy.ts skips, so this handler is
- * the only gate for them. The PDF is streamed: Vercel caps buffered function
- * responses at 4.5 MB.
+ * Same gate as the portal (investor link cookie or admin session), enforced
+ * here as well as in proxy.ts. The PDF is streamed: Vercel caps buffered
+ * function responses at 4.5 MB.
  */
 export async function GET(
   _request: Request,
@@ -69,16 +52,13 @@ export async function GET(
     return notFound();
   }
 
-  const headers: Record<string, string> = {
+  const headers = {
     ...INVESTOR_PRIVATE_HEADERS,
     'Content-Type': contentType,
     'Content-Length': String(size),
+    'Content-Disposition': `attachment; filename="${file}"`,
     'X-Content-Type-Options': 'nosniff',
   };
-  if (file.endsWith('.pdf')) {
-    headers['Content-Disposition'] = `attachment; filename="${file}"`;
-  }
-
   const body = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
   return new Response(body, { headers });
 }

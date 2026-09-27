@@ -33,7 +33,7 @@ describe('GET /investor-portal/deck/[...path]', () => {
     mocks.getInvestorPortalAccess.mockResolvedValue(null);
   });
 
-  it.each(['Jovie-Pitch-Deck.pdf', 'index.html', 'assets/tim-universal.png'])(
+  it.each(['Jovie-Pitch-Deck.pdf', 'index.html', 'assets/deck.png'])(
     '404s %s without investor or admin access',
     async path => {
       const res = await get(path);
@@ -63,18 +63,14 @@ describe('GET /investor-portal/deck/[...path]', () => {
     expect(bytes.byteLength).toBe(Number(res.headers.get('Content-Length')));
   });
 
-  it('serves the HTML deck and its relative assets to an admin', async () => {
+  it('serves the deck to an admin session', async () => {
     mocks.getInvestorPortalAccess.mockResolvedValue({ kind: 'admin' });
 
-    const html = await get('index.html');
-    const asset = await get('assets/logo-icon-white.svg');
+    const res = await get('Jovie-Pitch-Deck.pdf');
 
-    expect(html.status).toBe(200);
-    expect(html.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
-    expect(await html.text()).toContain('deck-stage.js');
-    expect(asset.status).toBe(200);
-    expect(asset.headers.get('Content-Type')).toBe('image/svg+xml');
-    expectPrivate(asset);
+    expect(res.status).toBe(200);
+    expectPrivate(res);
+    await res.body?.cancel();
   });
 
   it.each([

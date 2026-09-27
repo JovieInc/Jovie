@@ -32,10 +32,7 @@ describe('shared investor brief routing', () => {
 
   it('attributes both sticky investor actions through document delegation', () => {
     const stickyBar = readFileSync(
-      join(
-        appRoot,
-        'investor-portal/(portal)/_components/InvestorStickyBar.tsx'
-      ),
+      join(appRoot, 'investor-portal/_components/InvestorStickyBar.tsx'),
       'utf8'
     );
 

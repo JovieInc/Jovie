@@ -5,9 +5,8 @@ import { describe, expect, it } from 'vitest';
 /**
  * Investor brief System B source contract. Part of the founder-directed
  * System A -> System B marketing migration (DESIGN.md 2026-06-18). The brief
- * (now served only by the gated investor portal) and the gated pitch deck
- * stylesheet were converted off DM Sans (retired 2026-06-18) onto Inter body +
- * Satoshi display. See the /about guard for the shared contract: named
+ * (now served only by the gated investor portal) was converted off DM Sans
+ * (retired 2026-06-18) onto Inter body + Satoshi display. See the /about guard for the shared contract: named
  * System B token utilities only, no arbitrary values / hex / rgba /
  * gradients / raw color scales / inline styles in the route's own source.
  */
@@ -35,15 +34,5 @@ describe('pitch System B source contract', () => {
         expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
       }
     }
-  });
-
-  it('keeps the gated pitch deck stylesheet off DM Sans (retired)', () => {
-    const css = readFileSync(
-      resolve(process.cwd(), 'assets/investor-deck/colors_and_type.css'),
-      'utf8'
-    );
-    expect(css).not.toMatch(/--font-dm-sans/);
-    expect(css).not.toMatch(/DM\+Sans|"DM Sans"/);
-    expect(css).toContain('--marketing-font-body: var(--font-inter);');
   });
 });

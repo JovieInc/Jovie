@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { getInvestorManifest } from '@/lib/investors/manifest';
 import { getInvestorPortalAccess } from '@/lib/investors/portal-access';
-import { MemoContent } from '../_components/MemoContent';
+import { MemoContent } from '../../_components/MemoContent';
 
 interface PageProps {
   readonly params: Promise<{ slug: string }>;

@@ -3,8 +3,8 @@ import { db } from '@/lib/db';
 import { investorSettings } from '@/lib/db/schema/investors';
 import { getInvestorManifest } from '@/lib/investors/manifest';
 import { getInvestorPortalAccess } from '@/lib/investors/portal-access';
-import { InvestorNav } from './_components/InvestorNav';
-import { InvestorStickyBar } from './_components/InvestorStickyBar';
+import { InvestorNav } from '../_components/InvestorNav';
+import { InvestorStickyBar } from '../_components/InvestorStickyBar';
 
 /**
  * Investor portal layout.

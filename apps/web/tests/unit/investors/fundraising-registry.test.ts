@@ -159,7 +159,7 @@ describe('fundraising registry', () => {
     );
     expect(founderClaim).toBeDefined();
     (founderClaim?.provenance[0] as { href: string }).href =
-      '/investor-portal/deck/index.html';
+      '/investor-portal/deck/Jovie-Pitch-Deck.pdf';
     expect(validateFundraisingRegistry(registry)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
