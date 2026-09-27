@@ -109,6 +109,12 @@ interface ProfileDesktopSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  /**
+   * False while the per-user experiment assignment is still resolving.
+   * Variant-dependent fan-capture CTAs stay inert until this is true so the
+   * assigned control never morphs post-paint.
+   */
+  readonly visitorAssignmentResolved?: boolean;
   readonly allowFanCapture?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
@@ -258,6 +264,7 @@ export function ProfileDesktopSurface({
   latestRelease,
   profileSettings,
   alertOptInVariant = 'button',
+  visitorAssignmentResolved = true,
   allowFanCapture = true,
   genres,
   pressPhotos = [],
@@ -402,14 +409,28 @@ export function ProfileDesktopSurface({
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
     primaryActionElement = canGetUpdates ? (
-      <ProfileInlineNotificationsCTA
-        artist={artist}
-        portalContainer={notificationsPortalContainer}
-        variant='hero'
-        presentation='modal'
-        experimentVariant={alertOptInVariant}
-        onManageNotifications={() => onModeSelect('subscribe')}
-      />
+      visitorAssignmentResolved ? (
+        <ProfileInlineNotificationsCTA
+          artist={artist}
+          portalContainer={notificationsPortalContainer}
+          variant='hero'
+          presentation='modal'
+          experimentVariant={alertOptInVariant}
+          onManageNotifications={() => onModeSelect('subscribe')}
+        />
+      ) : (
+        <Button
+          type='button'
+          variant='primary'
+          size='marketing'
+          className='gap-2 px-4'
+          disabled
+          aria-busy='true'
+          data-testid='profile-desktop-subscribe-resolving'
+        >
+          {primaryAction.label}
+        </Button>
+      )
     ) : null;
   } else {
     const primaryActionContent = (
@@ -1031,6 +1052,7 @@ export function ProfileDesktopSurface({
         </div>
 
         {canGetUpdates &&
+        visitorAssignmentResolved &&
         activeMode === 'subscribe' &&
         !isSubscribed &&
         overlaysEnabled ? (
