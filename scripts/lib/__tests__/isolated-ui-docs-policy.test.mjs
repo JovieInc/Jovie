@@ -454,7 +454,7 @@ describe('isolated UI/docs promotion policy', () => {
       'utf8'
     );
     const evaluateFleetGate = readFileSync(
-      resolve(REPO_ROOT, 'scripts/symphony/evaluate-fleet-gate.sh'),
+      resolve(REPO_ROOT, 'scripts/fleet-gate/evaluate-fleet-gate.sh'),
       'utf8'
     );
 

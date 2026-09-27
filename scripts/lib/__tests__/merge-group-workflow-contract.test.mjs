@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
 import {
   ensureBaseHistory,
   runMergeGroupStorybookCertification,
@@ -547,8 +548,26 @@ describe('merge_group workflow contract', () => {
       units.indexOf('- name: Run quarantined unit tests (retries)'),
       units.indexOf('- name: Run Ovie route')
     );
-    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/10'\n/);
+    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/14'\n/);
     expect(step).not.toContain('--shard');
+  });
+
+  it('reserves sequencer capacity only on the shards that run pinned CI work', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1];
+    const shards = [...(matrix ?? '').matchAll(/'(\d+\/\d+)'/g)].map(m => m[1]);
+    expect(shards.length).toBeGreaterThan(1);
+    expect(new Set(shards).size).toBe(shards.length);
+    shards.forEach((shard, i) =>
+      expect(shard).toBe(`${i + 1}/${shards.length}`)
+    );
+    const pinned = [
+      ...new Set(
+        [...units.matchAll(/matrix\.shard == '(\d+\/\d+)'/g)].map(m => m[1])
+      ),
+    ].sort();
+    for (const shard of pinned) expect(shards).toContain(shard);
+    expect(Object.keys(CI_RESERVED_MS).sort()).toEqual(pinned);
   });
 
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
@@ -562,7 +581,7 @@ describe('merge_group workflow contract', () => {
       ),
       units.indexOf('      - name: Preserve Ovie coverage evidence')
     );
-    expect(ovieTests).toContain("matrix.shard == '1/10'");
+    expect(ovieTests).toContain("matrix.shard == '1/14'");
     expect(ovieTests).toContain('pnpm --filter @jovie/ovie test');
     expect(ovieTests).not.toContain('continue-on-error');
     const ovieBuild = build.slice(
@@ -823,7 +842,7 @@ describe('merge_group workflow contract', () => {
       expect(surfaces).toContain(`pnpm --filter ${check}`);
     }
     expect(unitTests).toContain(
-      "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
+      `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}]`
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
@@ -872,7 +891,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "run_full_ci == 'true' && matrix.shard == '4/10'\n        run: pnpm turbo test --filter=@jovie/ui"
+      "run_full_ci == 'true' && matrix.shard == '4/14'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
