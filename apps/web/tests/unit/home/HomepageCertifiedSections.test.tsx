@@ -81,13 +81,15 @@ describe('HomepageCertifiedSections', () => {
     expect(relationships).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
     );
-    expect(relationships.querySelectorAll('img')).toHaveLength(0);
-    expect(within(relationships).getByRole('list')).toHaveAttribute(
-      'aria-label',
-      'Relationships'
-    );
-
-    const outcomes = within(relationships).getAllByRole('listitem');
+    const identity = HOMEPAGE_LAUNCH_COPY.certified.identity;
+    const portraits = relationships.querySelectorAll('img');
+    expect(portraits).toHaveLength(1);
+    expect(portraits[0]).toHaveAttribute('src', identity.subject.portrait.src);
+    expect(portraits[0]).toHaveAttribute('alt', identity.subject.portrait.alt);
+    const outcomeList = within(relationships).getByRole('list', {
+      name: 'Relationships',
+    });
+    const outcomes = within(outcomeList).getAllByRole('listitem');
     expect(outcomes).toHaveLength(3);
     expect(outcomes.map(outcome => outcome.textContent)).toEqual([
       expect.stringContaining('Be found. Be understood.'),
@@ -98,8 +100,58 @@ describe('HomepageCertifiedSections', () => {
       outcomes.map(outcome => outcome.querySelector('span')?.textContent)
     ).toEqual(['01', '02', '03']);
 
+    const identityBlock = relationships.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-identity"]'
+    )!;
+    expect(identityBlock).toHaveAttribute(
+      'data-homepage-identity-for',
+      'built'
+    );
+    expect(identityBlock).toHaveTextContent('You are not one thing.');
+    expect(identityBlock).toHaveTextContent(identity.subject.name);
+    expect(identityBlock).toHaveTextContent(identity.subject.profileDisplay);
+    expect(identityBlock).toHaveTextContent('One identity. Every side of you.');
+
+    const lensGroup = within(identityBlock).getByRole('list', {
+      name: 'Perspectives',
+    });
+    const lenses = within(lensGroup).getAllByRole('button');
+    expect(lenses.map(lens => lens.textContent)).toEqual(
+      identity.lenses.map(lens => lens.label)
+    );
+
     expect(screen.queryAllByRole('link')).toHaveLength(0);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(
+      screen.getAllByRole('button').map(button => button.getAttribute('type'))
+    ).toEqual(['button', 'button', 'button']);
+  });
+
+  it('switches the caption emphasis across the three contextual lenses', () => {
+    render(<HomepageCertifiedSections />);
+    const identity = HOMEPAGE_LAUNCH_COPY.certified.identity;
+    const block = document.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-identity"]'
+    )!;
+    const emphasis = block.querySelector('.homepage-identity__emphasis')!;
+
+    const lensFor = (id: string) =>
+      block.querySelector<HTMLButtonElement>(
+        `[data-homepage-testid="homepage-identity-lens-${id}"]`
+      )!;
+
+    expect(lensFor('listener')).toHaveAttribute('aria-pressed', 'true');
+    expect(emphasis).toHaveTextContent('Artist. Releases. Shows.');
+
+    fireEvent.click(lensFor('collaborator'));
+    expect(lensFor('collaborator')).toHaveAttribute('aria-pressed', 'true');
+    expect(lensFor('listener')).toHaveAttribute('aria-pressed', 'false');
+    expect(emphasis).toHaveTextContent('Producer. Credits. Contact.');
+
+    fireEvent.click(lensFor('investor'));
+    expect(lensFor('investor')).toHaveAttribute('aria-pressed', 'true');
+    expect(emphasis).toHaveTextContent('Founder. Company. Work.');
+
+    expect(identity.lenses).toHaveLength(3);
   });
 });
 

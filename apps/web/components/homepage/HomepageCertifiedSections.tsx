@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { HomepageIdentityLenses } from '@/components/homepage/HomepageIdentityLenses';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
 
@@ -145,6 +146,9 @@ function RelationshipsSection({
         </div>
         <div className='homepage-certified-section__media'>
           <RelationshipOutcomes outcomes={section.outcomes} />
+          <HomepageIdentityLenses
+            identity={HOMEPAGE_LAUNCH_COPY.certified.identity}
+          />
         </div>
       </div>
     </EditorialSection>
