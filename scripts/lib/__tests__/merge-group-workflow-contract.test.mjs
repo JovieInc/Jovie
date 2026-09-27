@@ -1351,6 +1351,32 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('classifies the pull_request head diff when the merge result is tree-identical to base (JOV-6820)', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const pullRequestBranch = detectStep.slice(
+      detectStep.indexOf(
+        'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
+      )
+    );
+    const emptyCheckIdx = pullRequestBranch.indexOf(
+      'if [[ -z "${CHANGED_FILES//[$\'\\t\\r\\n\' ]/}" ]]; then'
+    );
+    const headFallbackIdx = pullRequestBranch.indexOf(
+      'origin/${{ github.base_ref }}...$PULL_REQUEST_HEAD_SHA'
+    );
+    const hardFailIdx = pullRequestBranch.indexOf(
+      'refusing a false docs-only classification'
+    );
+    expect(headFallbackIdx).toBeGreaterThan(emptyCheckIdx);
+    expect(hardFailIdx).toBeGreaterThan(headFallbackIdx);
+    expect(pullRequestBranch).toContain(
+      'git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"'
+    );
+  });
+
   it('materializes an empty path artifact for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(

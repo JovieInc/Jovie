@@ -707,6 +707,23 @@ jobs:
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
+              # The auto-merge result can be tree-identical to origin/<base>
+              # when the PR's changes already landed (e.g. an identical change
+              # squash-merged through the queue first). That is not a fetch
+              # failure: classify the PR head's own diff vs the merge-base so
+              # lanes still validate the exact head instead of hard-failing.
+              PULL_REQUEST_HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+              if [[ ! "$PULL_REQUEST_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+                echo "::error::pull_request head.sha is not a usable exact SHA"
+                exit 1
+              fi
+              if ! git cat-file -e "${PULL_REQUEST_HEAD_SHA}^{commit}" 2>/dev/null; then
+                git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"
+              fi
+              CHANGED_FILES=$(git diff --no-renames --name-only \
+                "origin/${{ github.base_ref }}...$PULL_REQUEST_HEAD_SHA")
+            fi
+            if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
               exit 1
             fi
