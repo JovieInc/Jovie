@@ -255,8 +255,15 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
             "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining")}
 
 
+PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
+
+
 def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> str | None:
-    """Keep one secret gist current with the status feed; create it once and announce its URL."""
+    """Keep one secret gist current with the status feed; create it once and announce its URL.
+    Only the primary host (flag file ~/.config/jovie-lanes/primary) publishes, so a second
+    host running the same release never creates a second feed."""
+    if not PRIMARY_FLAG.exists():
+        return None
     path = host.state / "status-gist.json"
     record = read_json(path, {})
     body = host.state / "lanes-status.json"
