@@ -77,10 +77,9 @@ describe('MarketingFooter', () => {
       'href',
       '/legal/terms'
     );
-    expect(screen.getByRole('link', { name: 'Investors' })).toHaveAttribute(
-      'href',
-      '/investors'
-    );
+    // Investor pages are private: the public footer never links them.
+    expect(screen.queryByRole('link', { name: 'Investors' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Pitch' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
       'line-clamp-2'
     );
