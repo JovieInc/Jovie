@@ -23,7 +23,24 @@ test('buildWorkflowRunsApiPath scopes flakiness analysis to main branch', () => 
 test('normalizeJobName strips matrix shard suffixes', () => {
   assert.equal(normalizeJobName('Unit Tests (1/3)'), 'Unit Tests');
   assert.equal(normalizeJobName('Unit Tests (2/3)'), 'Unit Tests');
+  assert.equal(normalizeJobName('Unit Tests (packages/ui)'), 'Unit Tests');
   assert.equal(normalizeJobName('E2E Tests'), 'E2E Tests');
+  assert.equal(normalizeJobName('Lint (other/pkg)'), 'Lint (other/pkg)');
+});
+
+test('extractTestExecutions keeps packages/ui step history under Unit Tests', () => {
+  const job = {
+    name: 'Unit Tests (packages/ui)',
+    conclusion: 'success',
+    steps: [
+      { name: 'Run unit tests', conclusion: 'skipped' },
+      { name: 'Run packages/ui unit tests', conclusion: 'success' },
+    ],
+  };
+
+  assert.deepEqual(extractTestExecutions(job), [
+    { name: 'Unit Tests › Run packages/ui unit tests', conclusion: 'success' },
+  ]);
 });
 
 test('extractTestExecutions normalizes matrix job names in step-level output', () => {

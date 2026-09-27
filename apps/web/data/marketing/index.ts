@@ -212,6 +212,28 @@ export {
   resolveJovieSceneColorRole,
 } from './imageColorPolicy';
 export type {
+  LandingPageCandidate,
+  LandingPageCertificationCode,
+  LandingPageCertificationFinding,
+  LandingPageFamilyId,
+  LandingPagePipelineStage,
+  LandingPageSectionCandidate,
+  LandingPageStageReceipt,
+} from './landingPageGrammar';
+export {
+  certifyLandingPageComposition,
+  getLandingPageRouteType,
+  getLandingPageSlots,
+  getLandingPageVariantIds,
+  LANDING_PAGE_FAMILIES,
+  LANDING_PAGE_FAMILY_IDS,
+  LANDING_PAGE_GRAMMAR_SCHEMA,
+  LANDING_PAGE_HOMEPAGE_LOCK,
+  LANDING_PAGE_PEN_WORKSPACE,
+  LANDING_PAGE_PIPELINE_STAGES,
+  LANDING_PAGE_ROUTE_TYPES,
+} from './landingPageGrammar';
+export type {
   MarketingMediaExportApprovalEvidence,
   MarketingMediaExportApprovalResult,
   MarketingMediaExportExecutionInput,

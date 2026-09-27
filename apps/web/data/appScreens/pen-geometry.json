@@ -1,0 +1,178 @@
+{
+  "schema": "app-screen-pen-geometry/v1",
+  "provenance": {
+    "lockProfile": "jovie-founder-design-studio",
+    "penFile": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen",
+    "readAt": "2026-09-27T16:12:53Z",
+    "readMethod": "pencil MCP execute: Get(id, visitor, {resolveVariables: true}); read-only, no save, no mutation",
+    "readSurface": "live_canvas",
+    "diskSha256": "a721297f904ce1ff8ab58ad76b3ec1b22d3615de4b80652c810b99fb65e0d5c4",
+    "diskMtime": "2026-09-27T09:07:27-07:00",
+    "diskSizeBytes": 16922334,
+    "note": "Values were read from the open editor. The disk hash and mtime were taken at read time and describe the saved file; unsaved canvas edits, if any, are not covered by the hash."
+  },
+  "masters": {
+    "JwsdW": {
+      "name": "Canonical / App Shell / Runtime",
+      "registryComponentId": "component.app-shell-frame",
+      "geometry": {
+        "width": 1348,
+        "height": 1776,
+        "padding": [8, 8, 8, 8],
+        "gap": 8
+      },
+      "slots": {
+        "NyegG": { "name": "Sidebar Slot", "width": 256 },
+        "Othc2": { "name": "Shell Content Column", "radius": 12 },
+        "r5bCh": { "name": "Header Slot", "height": 48 },
+        "xgrTg": { "name": "Main Route Slot" },
+        "WDpxx": { "name": "Mobile Bottom Nav Slot", "height": 0 },
+        "ZvHvC": {
+          "name": "Persistent audio slot / below main content",
+          "height": 0
+        }
+      }
+    },
+    "xLyVs": {
+      "name": "Canonical / App Header / Runtime",
+      "registryComponentId": null,
+      "geometry": { "width": 1100, "height": 48 },
+      "slots": {
+        "aTYKv": { "name": "div", "padding": [0, 20, 0, 20] }
+      }
+    },
+    "VgcZb": {
+      "name": "Canonical / App Sidebar / Runtime + Calm — ATOMIC",
+      "registryComponentId": null,
+      "geometry": { "width": 244, "height": 1760 },
+      "slots": {
+        "iULMX": {
+          "name": "Sidebar header",
+          "height": 44,
+          "padding": [0, 12, 0, 16]
+        },
+        "RduWD": {
+          "name": "Sidebar footer",
+          "height": 48,
+          "padding": [8, 8, 8, 8],
+          "gap": 10
+        }
+      }
+    },
+    "A3fqK": {
+      "name": "Canonical / Unified Table / Runtime",
+      "registryComponentId": "component.unified-table",
+      "geometry": { "width": 1100, "height": 740, "padding": [2, 10, 8, 10] },
+      "slots": {
+        "dqljs": { "name": "EVIDENCE / tbody", "width": 1080 }
+      }
+    },
+    "RosMb": {
+      "name": "Canonical / Entity Sidebar Shell / Runtime",
+      "registryComponentId": "component.entity-sidebar",
+      "geometry": {
+        "width": 360,
+        "height": 271,
+        "padding": [1, 1, 1, 1],
+        "radius": 16
+      },
+      "slots": {
+        "H7Q1o": {
+          "name": "Profile panel",
+          "padding": [16, 16, 16, 16],
+          "gap": 20
+        },
+        "L3UMfB": {
+          "name": "Entity header / artist profile (ref odpZ8)",
+          "height": 88
+        }
+      }
+    },
+    "odpZ8": {
+      "name": "Canonical / Entity Header — one IA for songs · releases · people · events",
+      "registryComponentId": null,
+      "geometry": { "width": 400, "height": 88, "padding": [16, 20, 16, 20] },
+      "slots": {
+        "wK8nE": {
+          "name": "Artwork thumb",
+          "width": 56,
+          "height": 56,
+          "radius": 10
+        },
+        "rNo8s": { "name": "Identity row", "gap": 12 }
+      }
+    },
+    "PoNUx": {
+      "name": "Canonical / Settings shell / Runtime — OWNER",
+      "registryComponentId": null,
+      "geometry": {
+        "width": 1440,
+        "height": 900,
+        "padding": [8, 8, 8, 8],
+        "gap": 8
+      },
+      "slots": {
+        "mpePT": {
+          "name": "Settings navigation instance (ref QA9C6)",
+          "width": 244
+        },
+        "KghJo": { "name": "Settings content area", "radius": 12 }
+      }
+    },
+    "QA9C6": {
+      "name": "Canonical / Settings navigation / Runtime — OWNER",
+      "registryComponentId": null,
+      "geometry": {
+        "width": 244,
+        "height": 900,
+        "padding": [20, 16, 20, 16],
+        "gap": 16
+      },
+      "slots": {
+        "zZ83q": {
+          "name": "Account route",
+          "height": 28,
+          "padding": [0, 12, 0, 12],
+          "radius": 8
+        }
+      }
+    },
+    "aWMQW": {
+      "name": "Canonical / Library State Panel / Runtime",
+      "registryComponentId": null,
+      "geometry": {
+        "width": 520,
+        "height": 280,
+        "padding": [32, 32, 32, 32],
+        "gap": 12,
+        "radius": 12
+      },
+      "slots": {}
+    },
+    "ftsrB": {
+      "name": "Canonical / Page Toolbar / Runtime",
+      "registryComponentId": null,
+      "geometry": {
+        "width": 1100,
+        "height": 40,
+        "padding": [6, 20, 6, 20],
+        "gap": 6
+      },
+      "slots": {}
+    },
+    "ki3Zp": {
+      "name": "Canonical / Sidebar Nav Item / Runtime — FOUNDER LOCKED",
+      "registryComponentId": null,
+      "geometry": { "width": 200, "height": 28 },
+      "slots": {
+        "yKBsh": {
+          "name": "Nav Visual",
+          "height": 28,
+          "padding": [0, 8, 0, 8],
+          "gap": 8,
+          "radius": 8
+        }
+      }
+    }
+  }
+}

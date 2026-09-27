@@ -53,6 +53,12 @@ export interface AuthStateRecord {
   readonly state: string;
   readonly codeChallenge: string | null;
   readonly desktopFlow: string | null;
+  /**
+   * The Mac app can redeem a typed return code when its deep link cannot
+   * reach it. Older app builds cannot, so the return page only shows a code
+   * when the app declared support at `/auth/start`.
+   */
+  readonly desktopReturnCode?: boolean;
   readonly createdAt: number;
   readonly expiresAt: number;
   readonly consumedAt?: number | null;
@@ -143,7 +149,6 @@ const NATIVE_EXTERNAL_PREFIXES = [
   '/demovideo',
   '/docs',
   '/download',
-  '/investors',
   '/launch',
   '/legal',
   '/new',
@@ -172,6 +177,7 @@ const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
   'hud',
   'hud-tv',
   'investor-portal',
+  'investors',
   'llms-full.txt',
   'llms.txt',
   'mobile-auth-return',
@@ -179,6 +185,7 @@ const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
   'onboarding',
   'openapi.json',
   'out',
+  'pitch',
   'r',
   's',
   'share',
@@ -318,6 +325,7 @@ export function createAuthStateRecord(input: {
   readonly state: string;
   readonly codeChallenge?: string | null;
   readonly desktopFlow?: string | null;
+  readonly desktopReturnCode?: boolean;
   readonly now: number;
 }): AuthStateRecord {
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
@@ -332,6 +340,10 @@ export function createAuthStateRecord(input: {
     state: input.state,
     codeChallenge: input.codeChallenge ?? null,
     desktopFlow: input.desktopFlow ?? null,
+    desktopReturnCode:
+      input.client === 'electron' &&
+      Boolean(input.desktopFlow) &&
+      input.desktopReturnCode === true,
     createdAt: input.now,
     expiresAt: input.now + AUTH_STATE_TTL_MS,
     consumedAt: null,
@@ -378,15 +390,23 @@ export function buildNativeHandbackBouncePath(input: {
   readonly code: string;
   readonly state: string;
   readonly desktopFlow?: string | null;
+  /** Electron only: shown when the deep link cannot reach the app. */
+  readonly returnCode?: string | null;
 }): string {
-  return buildUrlWithCodeAndState(
-    `https://jov.ie${NATIVE_HANDBACK_BOUNCE_PATHS[input.client]}`,
-    {
-      code: input.code,
-      state: input.state,
-      desktopFlow: input.client === 'electron' ? input.desktopFlow : null,
-    }
-  ).replace(/^https:\/\/jov\.ie/, '');
+  const url = new URL(
+    buildUrlWithCodeAndState(
+      `https://jov.ie${NATIVE_HANDBACK_BOUNCE_PATHS[input.client]}`,
+      {
+        code: input.code,
+        state: input.state,
+        desktopFlow: input.client === 'electron' ? input.desktopFlow : null,
+      }
+    )
+  );
+  if (input.client === 'electron' && input.desktopFlow && input.returnCode) {
+    url.searchParams.set('return_code', input.returnCode);
+  }
+  return `${url.pathname}${url.search}`;
 }
 
 function isLoopbackHandbackHost(hostname: string): boolean {

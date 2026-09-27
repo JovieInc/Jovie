@@ -7,12 +7,16 @@ import { useEffect } from 'react';
 import { MarketingContainer } from '@/components/marketing';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
 import { page, track } from '@/lib/analytics';
+import {
+  trackHelpCenterEscalationLanding,
+  trackHelpCenterEvent,
+} from '@/lib/tracking/help-center-client';
 
 const CHANNELS = [
   {
     title: 'Documentation',
     description: 'Guides, tutorials, and walkthroughs.',
-    href: DOCS_URL,
+    href: `${DOCS_URL}/docs`,
     external: true,
     event: 'Support Docs Clicked',
     cta: 'Visit',
@@ -30,7 +34,7 @@ const CHANNELS = [
   {
     title: 'Getting Started',
     description: 'New to Jovie? Start here.',
-    href: `${DOCS_URL}/getting-started`,
+    href: `${DOCS_URL}/docs/jovie-essentials/start-here`,
     external: true,
     event: 'Support Getting Started Clicked',
     cta: 'Visit',
@@ -51,6 +55,7 @@ export function SupportChannels() {
     page('Support Page', {
       path: '/support',
     });
+    trackHelpCenterEscalationLanding(window.location.search);
   }, []);
 
   return (
@@ -77,9 +82,14 @@ export function SupportChannels() {
                     variant='ghost'
                     size='marketing'
                     className='mt-3 gap-1.5'
-                    onClick={() =>
-                      track(channel.event, { source: 'support_page' })
-                    }
+                    onClick={() => {
+                      track(channel.event, { source: 'support_page' });
+                      if (channel.href.startsWith('mailto:')) {
+                        void trackHelpCenterEvent('support_request_submitted', {
+                          source_surface: 'support_page',
+                        });
+                      }
+                    }}
                   >
                     <a
                       href={channel.href}
@@ -117,12 +127,15 @@ export function SupportCta() {
           size='marketing'
           className='mt-6'
           aria-label={`Send email to support team at ${SUPPORT_EMAIL}`}
-          onClick={() =>
+          onClick={() => {
             track('Support Email Clicked', {
               email: SUPPORT_EMAIL,
               source: 'support_page_cta',
-            })
-          }
+            });
+            void trackHelpCenterEvent('support_request_submitted', {
+              source_surface: 'support_page',
+            });
+          }}
         >
           <a href={`mailto:${SUPPORT_EMAIL}`}>Contact Support</a>
         </Button>

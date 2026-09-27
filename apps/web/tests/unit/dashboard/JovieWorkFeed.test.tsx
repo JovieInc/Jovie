@@ -44,7 +44,10 @@ describe('JovieWorkFeed', () => {
     expect(screen.getByTestId('jovie-work-feed')).toBeInTheDocument();
     expect(screen.getByText('Jovie Did This')).toBeInTheDocument();
     expect(screen.getByText('Release autopilot')).toBeInTheDocument();
-    expect(screen.getByText('Done')).toBeInTheDocument();
+    const phaseBadge = screen.getByText('Done');
+    // Phase color comes from semantic status tokens, not the Tailwind palette.
+    expect(phaseBadge).toHaveClass('bg-success/10', 'text-success');
+    expect(phaseBadge.className).not.toMatch(/emerald|amber|blue-|red-/);
     expect(
       screen.getByText('Jovie ran release-to-revenue for Midnight Drive.')
     ).toBeInTheDocument();

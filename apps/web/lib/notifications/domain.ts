@@ -1,6 +1,7 @@
 import { and, sql as drizzleSql, eq, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { db } from '@/lib/db';
 import {
   type FanNotificationPreferences,
@@ -821,6 +822,10 @@ export const subscribeToNotificationsDomain = async (
       creator_is_pro: creatorIsPro,
       dynamic_enabled: dynamicEnabled,
     });
+    // Email OTP subscribers reach `subscribed` in verifyEmailOtpDomain().
+    if (!shouldVerifyEmail) {
+      await recordFunnelStep({ funnel: 'fan_subscribe', step: 'subscribed' });
+    }
 
     // Fire CAPI Subscribe event for immediately-confirmed subscriptions (SMS, or
     // email subscribers who are already verified from a previous subscription).
@@ -946,6 +951,8 @@ export const verifyEmailOtpDomain = async (
   await syncAudienceAlertState(parsed.data.artist_id, {
     email: normalizedEmail,
   });
+
+  await recordFunnelStep({ funnel: 'fan_subscribe', step: 'subscribed' });
 
   // Fire CAPI Subscribe event now that the email subscriber is confirmed
   void fireSubscribeCAPIEvent({
