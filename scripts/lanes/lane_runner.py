@@ -1499,6 +1499,19 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env")
         return
 
 
+def graphql_budget() -> tuple[int, str] | None:
+    """GraphQL points left and reset time, asked of GraphQL itself. REST `rate_limit` kept
+    reporting 4754 left while GraphQL was at 0/5000 (2026-09-27), so every lane listing
+    failed while the doctor saw a healthy budget. None when GitHub cannot be read."""
+    try:
+        result = subprocess.run(["gh", "api", "graphql", "-f", "query={rateLimit{remaining resetAt}}"],
+                                capture_output=True, text=True, timeout=30)
+        limit = json.loads(result.stdout)["data"]["rateLimit"]
+        return int(limit["remaining"]), str(limit["resetAt"])
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     load_github_env()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])

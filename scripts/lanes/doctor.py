@@ -84,8 +84,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     github = None
     try:
         lane.load_github_env()
-        result = subprocess.run(["gh", "api", "rate_limit"], capture_output=True, text=True, timeout=30)
-        github = json.loads(result.stdout)["resources"]["graphql"]["remaining"] if result.returncode == 0 else None
+        budget = lane.graphql_budget()
+        github = budget[0] if budget else None
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         pass
     held = read_json(state / "held.json", {})
