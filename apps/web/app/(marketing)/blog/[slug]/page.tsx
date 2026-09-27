@@ -10,6 +10,7 @@ import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import {
   buildArticleSchema,
   buildBreadcrumbSchema,
+  buildFaqSchema,
 } from '@/lib/constants/schemas';
 import type { ProfileData } from '@/lib/services/profile';
 import {
@@ -40,16 +41,17 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
 
   try {
     const post = await getBlogPost(slug);
+    const description = post.description ?? post.excerpt;
 
     return {
       title: post.title,
-      description: post.excerpt,
+      description,
       alternates: {
         canonical: `${BASE_URL}/blog/${post.slug}`,
       },
       openGraph: {
         title: post.title,
-        description: post.excerpt,
+        description,
         url: `${BASE_URL}/blog/${post.slug}`,
         type: 'article' as const,
         publishedTime: post.date,
@@ -61,7 +63,7 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
       twitter: {
         card: 'summary_large_image' as const,
         title: post.title,
-        description: post.excerpt,
+        description,
       },
     };
   } catch {
@@ -123,7 +125,7 @@ export default async function BlogPostRoute({
 
     const articleSchema = buildArticleSchema({
       headline: post.title,
-      description: post.excerpt,
+      description: post.description ?? post.excerpt,
       datePublished: post.date,
       dateModified: post.updatedDate ?? post.date,
       authorName: post.author,
@@ -144,6 +146,11 @@ export default async function BlogPostRoute({
       <>
         <script type='application/ld+json'>{articleSchema}</script>
         <script type='application/ld+json'>{breadcrumbSchema}</script>
+        {post.question && post.answer ? (
+          <script type='application/ld+json'>
+            {buildFaqSchema([{ question: post.question, answer: post.answer }])}
+          </script>
+        ) : null}
         <BlogPostPage
           post={post}
           author={author}

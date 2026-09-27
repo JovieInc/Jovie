@@ -20,6 +20,8 @@ const BLOG_DIRECTORY = resolveAppContentPath('blog');
 
 export interface BlogPost extends MarkdownDocument, BlogPostMetadata {
   slug: string;
+  /** Answer articles: the lead paragraph that answers `question`. */
+  answer?: string;
 }
 
 const DEFAULT_AUTHOR = 'Jovie';
@@ -68,7 +70,7 @@ export async function getRelatedPosts(
   return [...sameCategoryPosts, ...remainingPosts].slice(0, limit);
 }
 
-function createExcerpt(content: string): string {
+function createExcerpt(content: string, maxLength = 200): string {
   const safeContent = content.slice(0, 20000);
   const blocks = safeContent
     .split(/\n\s*\n/)
@@ -84,8 +86,11 @@ function createExcerpt(content: string): string {
     .replaceAll(/[*_`>]/g, '')
     .replaceAll(/\s+/g, ' ')
     .trim()
-    .slice(0, 200);
+    .slice(0, maxLength);
 }
+
+/** Longest direct answer an agent should quote: the full lead paragraph. */
+export const ANSWER_MAX_LENGTH = 1000;
 
 function formatTitleFromSlug(slug: string): string {
   return slug
@@ -119,6 +124,11 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
   return {
     slug,
     title: data.title ?? formatTitleFromSlug(slug),
+    description: data.description,
+    question: data.question,
+    answer: data.question
+      ? createExcerpt(content, ANSWER_MAX_LENGTH)
+      : undefined,
     date: data.date ?? new Date().toISOString().split('T')[0],
     updatedDate: data.updatedDate,
     author: data.author ?? DEFAULT_AUTHOR,

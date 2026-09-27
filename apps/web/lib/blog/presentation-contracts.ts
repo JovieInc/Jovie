@@ -1,5 +1,9 @@
 export interface BlogPostMetadata {
   title: string;
+  /** Meta description override; falls back to the excerpt. */
+  description?: string;
+  /** Answer articles: the question the post answers (FAQPage JSON-LD). */
+  question?: string;
   date: string;
   updatedDate?: string;
   author: string;
