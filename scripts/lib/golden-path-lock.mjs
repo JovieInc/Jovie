@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 /**
- * Fail-closed golden-path lock (JOV-5085): homepage name search
- * (Search your name → Find me, JOV-5864 certified homepage) → /start →
- * logged-out first message sends → waitlist write only after verified auth.
+ * Fail-closed golden-path lock (JOV-5085): the certified homepage front
+ * door → logged-out first message sends → waitlist write only after
+ * verified auth. The certified homepage has exactly two states
+ * (JOV-5864 / JOV-6794):
+ * - open (WAITLIST_ENABLED=false): name search
+ *   ("Search your name" → "Find me") with a /start handoff
+ * - waitlist-gated (WAITLIST_ENABLED=true, prelaunch): "Request access"
+ *   primary CTA → /signup. Waitlist gating is the only allowed gate.
  * Missing secrets fail closed. Merge gate never reads E2E_PROD.
  */
 
@@ -10,6 +15,8 @@ export const GOLDEN_PATH_LOCK_SCHEMA = 'jovie-golden-path-lock/v1';
 export const GOLDEN_PATH_PROD_ORIGIN = 'https://jov.ie';
 export const GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER = 'Search your name';
 export const GOLDEN_PATH_HERO_SEARCH_ACTION = 'Find me';
+export const GOLDEN_PATH_GATED_CTA_LABEL = 'Request access';
+export const GOLDEN_PATH_GATED_CTA_HREF = '/signup';
 export const GOLDEN_PATH_START_PATH = '/start';
 export const FAKE_RATE_LIMIT_COPY = 'Too many messages';
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
@@ -106,23 +113,40 @@ export function evaluateHomepageHtml(html) {
       reason: 'homepage HTML was empty',
     };
   }
-  // JOV-5864 certified homepage: the hero's only conversion control is the
-  // name search — placeholder "Search your name" + submit "Find me" — with a
-  // /start handoff still present for the onboarding route.
+  // JOV-5864 certified homepage, open state: the hero's only conversion
+  // control is the name search — placeholder "Search your name" + submit
+  // "Find me" — with a /start handoff still present for the onboarding route.
   const hasPlaceholder = html.includes(GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER);
   const hasAction = html.includes(GOLDEN_PATH_HERO_SEARCH_ACTION);
   const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
-  if (!hasPlaceholder || !hasAction || !hasStartHref) {
+  if (hasPlaceholder && hasAction && hasStartHref) {
     return {
       id: 'homepage-cta',
-      ok: false,
-      reason: `homepage conversion must be the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff`,
+      ok: true,
+      reason: `found name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" and ${GOLDEN_PATH_START_PATH} handoff`,
+    };
+  }
+  // Certified waitlist-gated state (prelaunch, WAITLIST_ENABLED=true): the
+  // hero's conversion control is "Request access" → /signup
+  // (PUBLIC_WAITLIST_URL). This is the only allowed gate — the search is
+  // intentionally hidden while gated (JOV-6794).
+  const gatedHrefPattern = new RegExp(
+    `href\\s*=\\s*["'][^"']*${GOLDEN_PATH_GATED_CTA_HREF.replace('/', '\\/')}(?:[?"']|\\/)`,
+    'i'
+  );
+  const hasGatedLabel = html.includes(GOLDEN_PATH_GATED_CTA_LABEL);
+  const hasGatedHref = gatedHrefPattern.test(html);
+  if (hasGatedLabel && hasGatedHref) {
+    return {
+      id: 'homepage-cta',
+      ok: true,
+      reason: `found waitlist-gated CTA "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (certified prelaunch gate)`,
     };
   }
   return {
     id: 'homepage-cta',
-    ok: true,
-    reason: `found name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" and ${GOLDEN_PATH_START_PATH} handoff`,
+    ok: false,
+    reason: `homepage conversion must be the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
   };
 }
 
@@ -524,7 +548,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     '',
     'Locked path (do not invent a new product flow):',
     '1. https://jov.ie homepage',
-    `2. Name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}", JOV-5864 certified homepage) → ${GOLDEN_PATH_START_PATH}`,
+    `2. Certified front door (JOV-5864 / JOV-6794): open state = name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") → ${GOLDEN_PATH_START_PATH}; waitlist-gated prelaunch state = "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (the only allowed gate)`,
     '3. Logged-out first message actually sends (not 401, not a fake rate-limit)',
     '4. Waitlist write only after verified auth',
     '',
@@ -546,7 +570,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
         ]
       : []),
     'Reproduce without signup secrets:',
-    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require the name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" plus a ${GOLDEN_PATH_START_PATH} handoff (JOV-5864 certified homepage; never revert to Get started or waitlist-first)`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require a certified front door: either the name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" plus a ${GOLDEN_PATH_START_PATH} handoff (open state) or "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (waitlist-gated prelaunch state, JOV-6794; never revert to Get started or an uncertified waitlist wall)`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with ${JSON.stringify(buildProdProbeChatPayload())} — must not 401 or say "Too many messages"; this probe supplies no Turnstile token, so TURNSTILE_REQUIRED leaves the post-challenge path untested`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,
