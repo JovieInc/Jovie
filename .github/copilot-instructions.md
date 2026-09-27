@@ -9,19 +9,19 @@ This repository uses GitHub Copilot (including the Coding Agent) to propose and 
 - **Stack**: Next.js 15 (App Router), TypeScript, Tailwind CSS v4
 - **Auth**: Better Auth (Clerk is retired)
 - **Database**: Neon PostgreSQL with Drizzle ORM (migrated from Supabase)
-- **Package Manager**: pnpm 9.15.4 (exact version required - NOT npm or yarn)
+- **Package Manager**: pnpm 9.15.9 (exact version required - NOT npm or yarn)
 - **Node.js**: 24.21.0 required (see `.nvmrc`)
 - **Env validation**: `lib/env.ts` (Zod-based validation)
 - **Branches**: `develop` (work) → `preview` (staging) → `production`
 - **CI gates**: `lint`, `typecheck`, `test`, `build`, and e2e
 
-> **IMPORTANT FOR AI AGENTS**: Verify `node --version` shows v24.21.0+ (24.x) and `pnpm --version` shows 9.15.4 BEFORE running any commands. Using older Node versions will cause failures.
+> **IMPORTANT FOR AI AGENTS**: Verify `node --version` shows v24.21.0+ (24.x) and `pnpm --version` shows 9.15.9 BEFORE running any commands. Using older Node versions will cause failures.
 
 ## Critical Setup Requirements
 
 ### Prerequisites
 - **Node.js 24.x**: Required version (check `.nvmrc`). Use `nvm use 24` or `nvm install 24`
-- **pnpm 9.15.4**: Exact version required (not npm or yarn)
+- **pnpm 9.15.9**: Exact version required (not npm or yarn)
 - **Environment Variables**: Copy `.env.example` to `.env.local` and configure
 
 ### Initial Setup Commands
@@ -36,7 +36,7 @@ node --version  # Expected: v24.21.0 or higher
 
 # 2. Ensure exact pnpm version via Corepack
 corepack enable pnpm
-corepack prepare pnpm@9.15.4 --activate
+corepack prepare pnpm@9.15.9 --activate
 
 # 3. Start development server
 doppler run -- pnpm --filter web dev:local
@@ -328,7 +328,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 
 ### Development Server Won't Start
 1. **Check Node version**: Must be 24.0.0+ (`node --version`)
-2. **Check pnpm version**: Must be exactly 9.15.4 (`pnpm --version`)
+2. **Check pnpm version**: Must be exactly 9.15.9 (`pnpm --version`)
 3. **Reinstall dependencies**: `rm -rf node_modules pnpm-lock.yaml && pnpm install --no-frozen-lockfile`
 4. **Check environment**: Verify `.env.local` has required variables
 

@@ -4,7 +4,7 @@ Jovie keeps the production runtime boring while continuously testing the next su
 
 ## Current state
 
-- Production/default: the exact Active LTS patch in `.nvmrc` (Node 24), with pnpm `9.15.4`.
+- Production/default: the exact Active LTS patch in `.nvmrc` (Node 24), with pnpm `9.15.9`.
 - Required compatibility candidate: latest Node 26 (Current until its planned October 2026 LTS transition). Promotion stays blocked until that line is Active LTS.
 - A candidate never changes `.nvmrc`, Vercel, or the baked runner image merely because a new release exists.
 
