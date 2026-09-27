@@ -1,5 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import {
+  expectCenteredPhoneColumn,
+  expectDesktopSurfaceBuildMatches,
+  PROFILE_DESKTOP_SURFACE_SHIPPED,
+} from '../utils/profile-desktop-surface';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
 import { waitForHydration } from '../utils/smoke-test-utils';
 
@@ -105,12 +110,19 @@ test.describe('Public profile CTA and identity evidence', () => {
       expect(response?.status()).toBe(200);
       await waitForHydration(page);
 
-      const desktop = viewport.width === 1440;
+      // 1440 only owns the wide surface when the build ships it; by default
+      // desktop keeps the mobile profile in a centered phone column.
+      const desktop =
+        viewport.width === 1440 && PROFILE_DESKTOP_SURFACE_SHIPPED;
       const layout = page.getByTestId('public-profile-layout-shell');
       await expect(layout).toHaveAttribute(
         'data-layout',
         desktop ? 'desktop' : 'compact'
       );
+      await expectDesktopSurfaceBuildMatches(page);
+      if (viewport.width === 1440 && !desktop) {
+        await expectCenteredPhoneColumn(page);
+      }
       if (desktop) {
         const surface = page.getByTestId('profile-desktop-surface');
         await expect(surface).toBeVisible();
