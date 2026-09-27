@@ -22,6 +22,14 @@ const meta: Meta<typeof WhatsNewBannerView> = {
     jovie: { uncoveredProps: ['enabled'] },
   },
   args: { onOpen: fn(), onDismiss: fn() },
+  // Rendered inside the sidebar dock, so stories use the sidebar width.
+  decorators: [
+    Story => (
+      <div className='w-(--app-shell-sidebar-width) bg-base py-4'>
+        <Story />
+      </div>
+    ),
+  ],
 };
 
 export default meta;

@@ -187,6 +187,20 @@ describe('WhatsNewBanner', () => {
     expect(screen.queryByTestId('whats-new-banner')).toBeNull();
   });
 
+  it('waits while the sidebar is collapsed to icons', async () => {
+    render(<WhatsNewBanner enabled collapsed />);
+    await settle();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+
+  it('renders in flow at dock width, not floating over content', async () => {
+    render(<WhatsNewBanner enabled />);
+    await settle();
+    const banner = screen.getByTestId('whats-new-banner');
+    expect(banner).toHaveClass('w-full');
+    expect(banner.className).not.toMatch(/\bfixed\b/);
+  });
+
   it('shows nothing when the request fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     render(<WhatsNewBanner enabled />);

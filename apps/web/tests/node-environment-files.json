@@ -38,7 +38,6 @@
   "components/jovie/chat-empty-state-contract.test.ts",
   "components/jovie/components/entity-mappers.test.ts",
   "components/jovie/components/slash-trigger.test.ts",
-  "components/jovie/feature-intro-changelog.test.ts",
   "components/jovie/feature-intro-contract.test.ts",
   "components/jovie/hooks/",
   "components/molecules/",

@@ -83,9 +83,9 @@ export function WhatsNewBannerView({
       aria-live='polite'
       data-testid='whats-new-banner'
       data-electron-no-drag='true'
-      className='fixed bottom-4 left-4 z-40 w-72 max-sm:hidden animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
+      className='w-full min-w-0 px-2 py-1 animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
     >
-      <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-4 pr-10 shadow-card'>
+      <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-3 pr-9 shadow-card'>
         <p className='flex items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
           <Sparkles aria-hidden='true' className='size-3' />
           {eyebrow}
@@ -122,13 +122,19 @@ export function WhatsNewBannerView({
 
 interface WhatsNewBannerProps {
   readonly enabled: boolean;
+  /** Icon-only sidebar: the card has no room, so it waits until expanded. */
+  readonly collapsed?: boolean;
 }
 
 /**
- * Bottom-left What's New banner for the Mac app and the operator shell.
- * Silent while loading, when nothing is unseen, and on any failure.
+ * What's New card for the sidebar dock (Mac app and web shells), sidebar
+ * width and in flow above now-playing. Silent while loading, when nothing is
+ * unseen, and on any failure.
  */
-export function WhatsNewBanner({ enabled }: WhatsNewBannerProps) {
+export function WhatsNewBanner({
+  enabled,
+  collapsed = false,
+}: WhatsNewBannerProps) {
   const [unseen, setUnseen] = useState<UnseenWhatsNew | null>(null);
 
   useEffect(() => {
@@ -145,7 +151,7 @@ export function WhatsNewBanner({ enabled }: WhatsNewBannerProps) {
     };
   }, [enabled]);
 
-  if (!enabled || !unseen) return null;
+  if (!enabled || collapsed || !unseen) return null;
 
   const dismiss = () => {
     writeWhatsNewLastSeen(unseen.entry.id);

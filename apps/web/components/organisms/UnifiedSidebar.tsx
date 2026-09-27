@@ -47,6 +47,7 @@ import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
@@ -57,6 +58,7 @@ import {
 } from './operator-navigation';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
+import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
 
 export interface UnifiedSidebarProps {
   readonly section: AppShellSection;
@@ -387,6 +389,14 @@ export function UnifiedSidebar({
   // waiting for the effect-backed runtime hook would miss a boot-time event.
 
   const { profileHref } = useProfileData(section !== 'ov');
+  const isSidebarCollapsed = sidebarState === 'closed';
+  // Dock order (JOV-6682): update, then What's New, then now-playing.
+  const whatsNewCard = (
+    <WhatsNewBanner
+      enabled={!env.IS_TEST && !env.IS_E2E}
+      collapsed={isSidebarCollapsed}
+    />
+  );
 
   return (
     <Sidebar
@@ -445,6 +455,7 @@ export function UnifiedSidebar({
 
       {section === 'ov' ? (
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
+          <SidebarDock>{whatsNewCard}</SidebarDock>
           <OperatorSessionControls />
         </SidebarFooter>
       ) : (
@@ -453,9 +464,8 @@ export function UnifiedSidebar({
         // absorbs free space so media and the protected account panel pin bottom.
         <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
           <SidebarDock>
-            <SidebarBottomNowPlayingBridge
-              collapsed={sidebarState === 'closed'}
-            />
+            {whatsNewCard}
+            <SidebarBottomNowPlayingBridge collapsed={isSidebarCollapsed} />
           </SidebarDock>
           <SidebarIdentityGroup
             calm={!isRouteSidebar}

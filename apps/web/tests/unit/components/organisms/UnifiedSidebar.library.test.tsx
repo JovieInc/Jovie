@@ -85,6 +85,19 @@ vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
   SidebarInstallBanner: () => <div data-testid='sidebar-install-banner' />,
 }));
 
+vi.mock('@/components/organisms/whats-new/WhatsNewBanner', () => ({
+  WhatsNewBanner: (props: {
+    readonly enabled: boolean;
+    readonly collapsed?: boolean;
+  }) => (
+    <div
+      data-testid='sidebar-whats-new'
+      data-enabled={String(props.enabled)}
+      data-collapsed={String(Boolean(props.collapsed))}
+    />
+  ),
+}));
+
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
   SidebarBottomNowPlayingBridge: (props: { readonly collapsed?: boolean }) => {
     nowPlayingBridgePropsMock(props);
@@ -411,6 +424,34 @@ describe('UnifiedSidebar library route', () => {
       screen.queryByRole('button', { name: 'Switch Workspace' })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
+  });
+
+  it("docks What's New above now-playing, off under automated tests", () => {
+    const { container } = renderUnifiedSidebar();
+
+    const dock = container.querySelector('[data-sidebar-dock="true"]');
+    const whatsNew = screen.getByTestId('sidebar-whats-new');
+    expect(dock).toContainElement(whatsNew);
+    expect(whatsNew).toHaveAttribute('data-enabled', 'false');
+    expect(whatsNew).toHaveAttribute('data-collapsed', 'false');
+    expect(
+      whatsNew.compareDocumentPosition(
+        screen.getByTestId('sidebar-now-playing-bridge')
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("docks What's New in the operator sidebar footer", () => {
+    const { container } = renderUnifiedSidebar({
+      pathname: APP_ROUTES.OV,
+      section: 'ov',
+      isAdmin: true,
+      variant: 'ov',
+    });
+
+    expect(
+      container.querySelector('[data-sidebar-dock="true"]')
+    ).toContainElement(screen.getByTestId('sidebar-whats-new'));
   });
 
   it('shows OV as the active admin workspace without changing header height', () => {
