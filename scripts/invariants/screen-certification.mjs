@@ -124,6 +124,7 @@ web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
 web.exp-right-rail-shotgun|web|exp-right-rail-shotgun|apps/web/app/exp/right-rail-shotgun/page.tsx|desktop,mobile
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx|desktop,mobile
+web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
