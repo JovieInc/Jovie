@@ -1286,8 +1286,10 @@ describe('ci-fast bounded parallel workflow', () => {
       const result = lane.run();
       expect(result.code).toBe(0);
       expect(result.skipped).not.toBe(true);
-      expect(result.output).toMatch(/Test Files\s+3 passed \(3\)/);
-      expect(result.output).toMatch(/Tests\s+40 passed \(40\)/);
+      // Suite counts drift as contract tests grow; the lane contract is
+      // a green exit with a vitest pass summary, not a frozen total.
+      expect(result.output).toMatch(/Test Files\s+\d+ passed/);
+      expect(result.output).toMatch(/Tests\s+\d+ passed/);
     } finally {
       if (previousEvent === undefined) {
         delete process.env.GITHUB_EVENT_NAME;
