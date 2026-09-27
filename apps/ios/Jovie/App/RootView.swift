@@ -254,7 +254,8 @@ private struct AppContentView: View {
             isOffline: appState.isOffline,
             workspaceMode: workspaceMode,
             onRetry: { await reloadActionLoops(for: appState.activeUserID) },
-            onAskJovie: askJovie
+            onAskJovie: askJovie,
+            onDecideSummerCard: decideSummerCard
           )
         } chatContent: { draft, voiceCaptureTrigger, onEntityTap, onRecordVideo in
           if let chatRepository {
@@ -503,6 +504,47 @@ private struct AppContentView: View {
       await cache.storeInbox(inbox, for: userID, workspace: workspaceMode)
     }
     isLoadingInbox = false
+  }
+
+  /// Posts a Summer card decision (final on the server). On success — or a
+  /// 409, meaning the card was already decided — the item is removed from the
+  /// local inbox snapshot so the pending count stays truthful.
+  @MainActor
+  private func decideSummerCard(
+    card: MobileSummerCard,
+    decision: SummerCardDecision,
+    comment: String?
+  ) async -> Bool {
+    let client = APIClient(
+      baseURL: appState.configuration.apiBaseURL,
+      tokenProvider: NativeSessionTokenProvider()
+    )
+    do {
+      _ = try await client.decideSummerCard(
+        cardID: card.id,
+        decision: decision,
+        comment: comment
+      )
+    } catch {
+      return false
+    }
+
+    if let inbox = inboxResponse {
+      let itemID = "summer-card:\(card.id)"
+      let items = inbox.items.filter { $0.id != itemID }
+      if items.count != inbox.items.count {
+        inboxResponse = MobileActionLoopInboxResponse(
+          pendingCount: max(0, inbox.pendingCount - 1),
+          items: items,
+          emptyActionCards: inbox.emptyActionCards,
+          chatPrompt: inbox.chatPrompt
+        )
+        if let userID = appState.activeUserID, let updated = inboxResponse {
+          await ActionLoopCache().storeInbox(updated, for: userID, workspace: workspaceMode)
+        }
+      }
+    }
+    return true
   }
 
   @MainActor

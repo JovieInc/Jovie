@@ -47,6 +47,18 @@ protocol APIClientProtocol: Sendable {
   func fetchAudienceHighlights() async throws -> MobileAudienceHighlightsResponse
   func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse
   func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse
+  func decideSummerCard(
+    cardID: String,
+    decision: SummerCardDecision,
+    comment: String?
+  ) async throws -> SummerCardDecisionResult
+}
+
+/// Result of POSTing a Summer card decision. `alreadyDecided` maps the
+/// server's 409 — the decision is final and the card should leave the inbox.
+enum SummerCardDecisionResult: Equatable, Sendable {
+  case decided
+  case alreadyDecided
 }
 
 struct APIClient: APIClientProtocol, Sendable {
@@ -160,6 +172,85 @@ struct APIClient: APIClientProtocol, Sendable {
 
   func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
     try await sendActionLoopCalendarRequest(forceRefresh: false)
+  }
+
+  func decideSummerCard(
+    cardID: String,
+    decision: SummerCardDecision,
+    comment: String?
+  ) async throws -> SummerCardDecisionResult {
+    try await sendSummerCardDecisionRequest(
+      cardID: cardID,
+      decision: decision,
+      comment: comment,
+      forceRefresh: false
+    )
+  }
+
+  private struct SummerCardDecisionRequest: Encodable {
+    let decision: String
+    let comment: String?
+  }
+
+  private func sendSummerCardDecisionRequest(
+    cardID: String,
+    decision: SummerCardDecision,
+    comment: String?,
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws -> SummerCardDecisionResult {
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
+    var request = URLRequest(
+      url: baseURL.appending(path: "/api/ovie/summer-cards/\(cardID)/decision")
+    )
+    request.httpMethod = "POST"
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(
+      SummerCardDecisionRequest(decision: decision.rawValue, comment: comment)
+    )
+
+    let response: URLResponse
+    do {
+      (_, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401, !forceRefresh {
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendSummerCardDecisionRequest(
+        cardID: cardID,
+        decision: decision,
+        comment: comment,
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
+    }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+      throw APIClientError.requestFailed(statusCode: 401)
+    }
+
+    if httpResponse.statusCode == 409 {
+      refreshStoredSessionFromResponse(response)
+      return .alreadyDecided
+    }
+
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw APIClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    refreshStoredSessionFromResponse(response)
+    return .decided
   }
 
   func completeProfile(displayName: String, username: String) async throws {

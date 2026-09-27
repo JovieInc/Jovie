@@ -117,4 +117,40 @@ describe('buildMobileTasteInbox', () => {
     });
     expect(inbox.items[1]).toMatchObject({ typeLabel: 'Card' });
   });
+
+  it('embeds the full card detail so clients can render and decide inline', async () => {
+    hoisted.listPendingDesignProposals.mockResolvedValue([]);
+    hoisted.listSummerCards.mockResolvedValue([
+      {
+        id: 'sc_0123456789abcdef0123456789abcdef',
+        idempotencyKey: 'spend-0001',
+        kind: 'spend',
+        product: 'jov',
+        title: 'Book Detroit venue',
+        body: 'Full deposit terms and date holds.',
+        recommendation: 'Approve the $400 deposit.',
+        defaultIfSilent: 'Hold expires Friday.',
+        recipient: 'Magic Stick',
+        amountUsd: 400,
+        evidence: ['https://example.com/quote'],
+        status: 'pending',
+        comment: null,
+        createdAt: '2026-09-06T10:00:00.000Z',
+        decidedAt: null,
+      },
+    ]);
+
+    const { buildMobileTasteInbox } = await import('@/lib/mobile/taste-inbox');
+    const inbox = await buildMobileTasteInbox();
+
+    expect(inbox.items[0].summerCard).toEqual({
+      id: 'sc_0123456789abcdef0123456789abcdef',
+      kind: 'spend',
+      body: 'Full deposit terms and date holds.',
+      defaultIfSilent: 'Hold expires Friday.',
+      recipient: 'Magic Stick',
+      amountUsd: 400,
+      evidence: ['https://example.com/quote'],
+    });
+  });
 });

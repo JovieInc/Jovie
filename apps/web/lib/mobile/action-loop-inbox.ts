@@ -1,6 +1,18 @@
 import { loadOpportunityInboxData } from '@/lib/connectors/opportunity-inbox-data';
 import type { OpportunityInboxEmptyActionCard } from '@/lib/connectors/opportunity-inbox-types';
 
+/** Summer approval-card detail carried inline so the client can render and
+ * decide the card without a second fetch. */
+export type MobileInboxSummerCard = {
+  readonly id: string;
+  readonly kind: 'outbound' | 'spend' | 'taste' | 'decision';
+  readonly body: string;
+  readonly defaultIfSilent: string | null;
+  readonly recipient: string | null;
+  readonly amountUsd: number | null;
+  readonly evidence: readonly string[];
+};
+
 export type MobileInboxActionItem = {
   readonly id: string;
   readonly typeLabel: string;
@@ -10,6 +22,7 @@ export type MobileInboxActionItem = {
   readonly primaryActionLabel: string;
   readonly status: 'pending';
   readonly imageUrl?: string | null;
+  readonly summerCard?: MobileInboxSummerCard;
 };
 
 export type MobileInboxEmptyActionCard = {
