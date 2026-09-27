@@ -1,3 +1,7 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import {
   CLI_VERSION_FALLBACK,
@@ -39,7 +43,8 @@ describe('jovie CLI', () => {
 
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
-    expect(stdout.read()).toContain('No login, API key');
+    expect(stdout.read()).toContain('profile create <url>');
+    expect(stdout.read()).toContain('No login or API key');
   });
 
   it('prints the source fallback version before command validation', async () => {
@@ -285,5 +290,77 @@ describe('jovie CLI', () => {
         message: 'body stream unavailable',
       },
     });
+  });
+
+  it('creates a profile and prints the claim URL as JSON', async () => {
+    const stdout = createOutput();
+    const fetch = createFetch(
+      '{"username":"demo","claimUrl":"https://jov.ie/demo/claim"}',
+      201
+    );
+    await expect(
+      runCli(
+        ['profile', 'create', 'https://open.spotify.com/artist/abc', '--json'],
+        { fetchImpl: fetch.fetchImpl, stdout: stdout.output }
+      )
+    ).resolves.toBe(0);
+    expect(fetch.urls).toEqual(['https://jov.ie/api/agents/profiles']);
+    expect(JSON.parse(stdout.read())).toEqual({
+      username: 'demo',
+      claimUrl: 'https://jov.ie/demo/claim',
+    });
+  });
+
+  it('exits 2 for a non-Spotify profile URL without a request', async () => {
+    const stdout = createOutput();
+    const fetch = createFetch('{}');
+    await expect(
+      runCli(['profile', 'create', 'https://instagram.com/x', '--json'], {
+        fetchImpl: fetch.fetchImpl,
+        stdout: stdout.output,
+      })
+    ).resolves.toBe(2);
+    expect(fetch.urls).toEqual([]);
+    expect(JSON.parse(stdout.read()).error.code).toBe('INVALID_INPUT');
+  });
+
+  it('prints the skill and serves MCP over stdin', async () => {
+    const skill = createOutput();
+    await expect(runCli(['skill'], { stdout: skill.output })).resolves.toBe(0);
+    expect(skill.read()).toContain('name: jovie');
+
+    const stdout = createOutput();
+    await expect(
+      runCli(['mcp'], {
+        stdin: Readable.from([
+          '{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n',
+        ]),
+        stdout: stdout.output,
+      })
+    ).resolves.toBe(0);
+    const tools = JSON.parse(stdout.read()).result.tools.map(
+      (tool: { name: string }) => tool.name
+    );
+    expect(tools).toContain('create_profile');
+  });
+
+  it('installs the skill with init and rejects a bad MCP base URL', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jovie-cli-init-'));
+    const stdout = createOutput();
+    await expect(
+      runCli(['init', '--dir', dir, '--json'], { stdout: stdout.output })
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read()).installed).toEqual([
+      join(dir, 'jovie/SKILL.md'),
+    ]);
+
+    const stderr = createOutput();
+    await expect(
+      runCli(['mcp', '--base-url', 'ftp://x'], {
+        stdin: Readable.from([]),
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toContain('Base URL must be');
   });
 });

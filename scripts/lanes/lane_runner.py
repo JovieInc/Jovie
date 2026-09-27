@@ -37,6 +37,7 @@ sys.path.insert(0, str(HERE))
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
+import reason_lane  # noqa: E402
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -48,8 +49,8 @@ SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked"})
-HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked"})
+EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked", "reasoning-job"})
+HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked", "reasoning-job"})
 SENSITIVE_PROVIDER = "codex"
 SENSITIVE_REVIEWABLE_LINES = 500
 SENSITIVE_RED_LINES = re.compile(
@@ -65,8 +66,12 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
-              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
+LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py",
+              "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
+              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
+              "scripts/tests/test_reason_lane.py"]
+# Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
+RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
@@ -465,6 +470,29 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int) -> subprocess.Comple
     return subprocess.CompletedProcess(cmd, code)
 
 
+PROVIDER_HANDOFFS = 2
+HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit {code}), most likely an "
+                "exhausted account or provider failure. Its partial work is in this worktree: check "
+                "`git status`, `git diff` and `git log origin/main..HEAD`, then finish the task. Do not "
+                "start over.\n\n")
+
+
+def cool_down(host: Host, name: str) -> None:
+    path = host.state / "cooldown" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+
+
+def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
+    """The cheapest enabled, healthy, non-cooling lane not yet tried on this run."""
+    for name, spec in (providers or load_providers()).items():
+        if name in exclude or not spec.get("enabled", True) or cooling(host, name):
+            continue
+        if provider_healthy(spec):
+            return name, spec
+    return None
+
+
 # ---------------------------------------------------------------- one run
 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
@@ -505,6 +533,28 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                        {"spend": 1, "mutations": 1}, coordination=coordination)
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
+            # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
+            # lane finishes it on the same worktree.
+            handoffs, current = [], name
+            while agent.returncode != 0 and len(handoffs) < PROVIDER_HANDOFFS:
+                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
+                if nxt is None:
+                    break
+                cool_down(host, current)
+                nxt_name, nxt_spec = nxt
+                handoff_prompt = HANDOFF_NOTE.format(prev=current, code=agent.returncode) + prompt
+                handoff_file = runs / f"{run_id}.handoff{len(handoffs) + 1}.prompt.md"
+                handoff_file.write_text(handoff_prompt)
+                log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
+                log.flush()
+                handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
+                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                           {"spend": 1, "mutations": 1}, coordination=coordination)
+                agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
+                                                             "cwd": str(worktree)}), worktree, log, host.agent_timeout)
+                current = nxt_name
+            if handoffs:
+                receipt.update(handoffs=handoffs, finishedBy=current)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
                                            sensitive=issue_is_sensitive(issue)))
@@ -520,7 +570,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         except Exception as error:  # a broken run must still leave a receipt and free its issue
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
             sh(["git", "branch", "-D", branch], cwd=host.repo)
     receipt["endedAt"] = now_iso()
     verdict = receipt.get("verdict")
@@ -837,6 +887,31 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
+LOCKFILES = frozenset({"pnpm-lock.yaml"})
+
+
+def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
+    """JOV-6837: a PR that conflicts with main only in pnpm-lock.yaml needs no model. Merge
+    main, take its lockfile, regenerate it from the merged manifests, push (no force). Any
+    other conflict, or a failed regeneration, aborts and leaves the PR to the agent."""
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
+        if not conflicted or not conflicted <= LOCKFILES:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
+        regenerated = sh(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], cwd=worktree, timeout=900, log=log)
+        if regenerated.returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
@@ -866,30 +941,41 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
-            sh(["git", "worktree", "add", "-q", "-B", pr["headRefName"], str(worktree),
-                f"origin/{pr['headRefName']}"], cwd=host.repo, log=log)
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            prompt = render_fix_prompt(pr, failure_excerpt(pr))
-            prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
-            execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                       {"spend": 1, "mutations": 1}, coordination=coordination)
-            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                              worktree, log, host.agent_timeout)
+            add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
+            lockfile_only = False
+            if pr.get("mergeStateStatus") == "DIRTY":
+                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                           {"spend": 0, "mutations": 1}, coordination=coordination)
+                lockfile_only = resolve_lockfile_conflict(worktree, pr["headRefName"], log)
+            agent = None
+            if lockfile_only:
+                receipt.update(resolution="lockfile-regenerated")
+            else:
+                sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                prompt_file = runs / f"{run_id}.prompt.md"
+                prompt_file.write_text(prompt)
+                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                           {"spend": 1, "mutations": 1}, coordination=coordination)
+                agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                                                         "cwd": str(worktree)}), worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
-            receipt.update(agentExit=agent.returncode, headAfter=after,
+            receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
                 sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
         except subprocess.TimeoutExpired:
             receipt.update(verdict="failed", reasons=["timeout"])
+        except WorktreeUnavailable as error:
+            # Usually the PR merged or closed between listing and this run: nothing to fix.
+            receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
             # The attempt is over: a head it did not move may be tried again by the next lane.
             update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
                 endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
@@ -941,15 +1027,17 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
-            sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
+            add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
             sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
             receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
+        except WorktreeUnavailable as error:
+            receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
-    if receipt.get("verdict") in ("gate-timeout", "failed"):
+            remove_worktree(host, worktree)
+    if receipt.get("verdict") in ("gate-timeout", "failed", "skipped"):
         # Not verified: forget the claim so the next adopt pass retries this head.
         update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
     receipt["endedAt"] = now_iso()
@@ -1254,12 +1342,14 @@ def dispatch(host: Host) -> int:
         ensure_full_history(host)
         prune_worktrees(host)
         for name, spec in load_providers().items():
-            if not spec.get("enabled", True) or cooling(host, name):
+            slots = host.slots(name, spec.get("slots", 1))
+            # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
+            if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
                 continue
             if not provider_healthy(spec):
                 tick["unhealthy"].append(name)
                 continue
-            for _ in range(host.slots(name, spec.get("slots", 1))):
+            for _ in range(slots):
                 subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  start_new_session=True)
@@ -1270,6 +1360,10 @@ def dispatch(host: Host) -> int:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
     except Exception as error:  # the ready/orphan queue never takes dispatch down
         tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
+    except Exception as error:  # Summer's reasoning jobs never take dispatch down
+        tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
@@ -1301,6 +1395,23 @@ def cooling(host: Host, name: str) -> bool:
         return False
 
 
+class WorktreeUnavailable(Exception):
+    """git could not create the run's worktree (branch merged/deleted, git lock contention)."""
+
+
+def add_worktree(host: Host, args: list[str], log) -> None:
+    added = sh(["git", "worktree", "add", "-q", *args], cwd=host.repo, log=log)
+    if added.returncode != 0:
+        raise WorktreeUnavailable((added.stderr or f"git exit {added.returncode}").strip()[:200])
+
+
+def remove_worktree(host: Host, worktree: Path) -> None:
+    """Kill whatever still runs from the worktree first: a normal agent exit leaves its
+    backgrounded children (storybook on :6006, esbuild) holding ports for later gates."""
+    sh(["pkill", "-f", str(worktree)])
+    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+
+
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
     """Garbage-collect worktrees a crashed worker left behind; never touch young ones."""
     root = host.state / "worktrees"
@@ -1312,7 +1423,7 @@ def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
         except FileNotFoundError:
             continue  # a worker removed it between listing and stat
         if stale:
-            sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo)
+            remove_worktree(host, path)
             shutil.rmtree(path, ignore_errors=True)
     sh(["git", "worktree", "prune"], cwd=host.repo)
 
@@ -1354,7 +1465,7 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *LANE_TESTS],
+        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.

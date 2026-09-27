@@ -11,6 +11,18 @@ const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
 // Fail closed at the checked-in native queue's max_entries_to_merge ceiling.
 const MAX_GROUP_MEMBERS = 5;
 const SIZE_BYPASS_LABELS = new Set(['big-pr', 'codemod']);
+// Mirrors scripts/lanes/pr_events.py HOLD_LABELS. Native auto-merge checks
+// labels only when it is armed, so a hold added later is enforced here, on the
+// merge group every landing passes through (JOV-6843).
+export const HOLD_LABELS = new Set([
+  'hold',
+  'gated',
+  'incident',
+  'do-not-merge',
+  'tim-hold',
+  'tim:hold',
+  'hold:tim',
+]);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
 const OPINIONATED_REVIEW_STATES = new Set([
   'APPROVED',
@@ -270,6 +282,16 @@ export function countSizeGuardFiles(files) {
     count += 1;
   }
   return { lines, files: count };
+}
+
+/** A held member fails every merge-group policy, whatever else it passes. */
+export function evaluateHoldMemberPolicy(pr) {
+  const held = labelsFor(pr).find(label =>
+    HOLD_LABELS.has(label.toLowerCase())
+  );
+  return held
+    ? { passed: false, policy: 'hold', reason: `carries the ${held} label` }
+    : null;
 }
 
 export function evaluateSizeMemberPolicy({ pr, files, maxLines, maxFiles }) {
@@ -692,6 +714,9 @@ export async function runPolicy({
     );
   }
 
+  results = results.map(
+    (result, index) => evaluateHoldMemberPolicy(pullRequests[index]) ?? result
+  );
   for (let index = 0; index < members.length; index += 1) {
     const result = results[index];
     log(
