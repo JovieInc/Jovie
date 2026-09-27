@@ -25,7 +25,7 @@ export default async function OperationsPage() {
       <OperationalTasksPanel />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>
-          <h2 className='text-app font-semibold text-primary-token'>
+          <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>
             Inspect The Operating System
           </h2>
           <div className='mt-2 flex flex-wrap gap-3 text-2xs font-medium'>
