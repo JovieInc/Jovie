@@ -680,7 +680,7 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
         record = attempts.get(str(pr["number"]), {})
-        if record.get("sha") == pr["headRefOid"] or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
+        if pr_events.in_flight(record, pr, time.time()) or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
             continue
         return pr
     return None
@@ -717,6 +717,7 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         except Exception:
             pass
         attempts[str(pr["number"])] = {**record, "escalated": True}
+        pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)  # held with a reason, visible on the PR
         update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
             pr["headRefOid"], ["fix-exhausted", *held.get(str(pr["number"]), {}).get("evidence", [])])}))
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
@@ -764,6 +765,7 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
                    "number, renumber yours after main's and regenerate its snapshot/journal entry.",
+                   "For a pnpm-lock.yaml conflict take main's lockfile and run `pnpm install --lockfile-only`.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -771,6 +773,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         problem += ["The merge queue removed this PR (its merge group failed) and will not take the same",
                     "head again. Merge origin/main into the branch, run",
                     "`bash scripts/hooks/pre-push-gate.sh affected`, fix what fails, and push.", ""]
+        if pr.get("queueFailure"):
+            problem += ["What failed in the merge group:", pr["queueFailure"], ""]
+    if "stale" in pr.get("eventKinds", ()):
+        problem += ["This lane draft has had no activity for 48 hours. Finish it: resolve what the gate",
+                    "held, make its checks green and push. If it cannot ship, end with NOT-SHIPPABLE.", ""]
     return "\n".join([
         f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
         "",
@@ -821,6 +828,9 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
             sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            # The attempt is over: a head it did not move may be tried again by the next lane.
+            update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
+                endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
     receipt["endedAt"] = now_iso()
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")

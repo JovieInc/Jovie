@@ -685,7 +685,11 @@ class FixRedTest(unittest.TestCase):
         green = self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
         self.assertIsNone(lane.red_pr([pending, green], {}))
         self.assertEqual(lane.red_pr([self.pr()], {})["number"], 5)
-        self.assertIsNone(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1}}))
+        self.assertIsNone(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1, "at": time.time()}}),
+                          "a fix still running on this head holds it")
+        self.assertEqual(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1, "at": time.time(),
+                                                         "endedAt": time.time()}})["number"], 5,
+                         "an attempt that ended without moving the head never parks the PR")
         self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
 
