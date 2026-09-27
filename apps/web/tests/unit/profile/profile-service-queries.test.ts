@@ -487,7 +487,7 @@ describe('Profile Service Queries', () => {
       mockRedisGet.mockResolvedValue(null);
       mockGetLatestRelease.mockResolvedValue(null);
 
-      let resolveProfileQuery: ((rows: unknown[]) => void) | null = null;
+      let resolveProfileQuery: (rows: unknown[]) => void = () => {};
       const profileQueryGate = new Promise<unknown[]>(resolve => {
         resolveProfileQuery = resolve;
       });
@@ -526,7 +526,7 @@ describe('Profile Service Queries', () => {
       await vi.waitFor(() => {
         expect(profileQueryCount).toBeGreaterThan(0);
       });
-      resolveProfileQuery?.([mockProfileWithUser]);
+      resolveProfileQuery([mockProfileWithUser]);
 
       const [firstResult, secondResult] = await Promise.all([first, second]);
 
