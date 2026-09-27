@@ -1,6 +1,7 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
@@ -16,7 +17,8 @@ function toAbsolutePublicUrl(href: string): string {
  * Copy comes from the existing launch document — this is not a redesign.
  */
 export function buildHomepageMarkdown(): string {
-  const { hero, workspace, productStatement, faq } = HOMEPAGE_LAUNCH_COPY;
+  const { hero } = HOMEPAGE_IDENTITY_COPY;
+  const { workspace, productStatement, faq } = HOMEPAGE_LAUNCH_COPY;
   const callouts = workspace.callouts
     .map(item => `### ${item.title}\n\n${item.body}`)
     .join('\n\n');
@@ -29,7 +31,6 @@ export function buildHomepageMarkdown(): string {
 ${hero.subhead}
 
 ${hero.search.placeholder} → ${hero.search.action}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
-${hero.secondaryCta.label}: ${toAbsolutePublicUrl(hero.secondaryCta.href)}
 
 ## ${workspace.kicker}
 

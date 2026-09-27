@@ -107,6 +107,15 @@ describe('deriveOvieCompanyOverview', () => {
     expect(decline.value).toBe('-$200 MRR (-3.7%)');
     expect(decline.detail).toContain('(-2 WoW)');
 
+    const single = deriveOvieCompanyOverview(
+      buildMetrics({
+        activeSubscribers: 1,
+        weekAgo: { mrrUsd: 5200, activeSubscribers: 1 },
+      }),
+      NOW
+    ).metrics[1];
+    expect(single.detail).toContain('1 paying subscriber (+0 WoW)');
+
     const fromZero = deriveOvieCompanyOverview(
       buildMetrics({
         mrrUsd: 0,

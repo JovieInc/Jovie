@@ -10,6 +10,7 @@ import {
   fetchSiteLlms,
   JovieInputError,
   normalizeBaseUrl,
+  reportIssue,
   validateUsername,
 } from './client.js';
 
@@ -266,5 +267,35 @@ describe('Jovie public resource client', () => {
       expect(error.retryAfterSeconds).toEqual(expected);
       expect(error.apiCode).toBeUndefined();
     }
+  });
+
+  it('posts a report with only the provided safe context', async () => {
+    const { calls, fetchImpl } = createFetch('{"reportId":"r-1"}', 201);
+    await expect(
+      reportIssue(
+        { kind: 'bug', title: ' broke ', details: ' details ' },
+        { cliVersion: '1.0.0', command: undefined, channel: 'cli' },
+        { fetchImpl }
+      )
+    ).resolves.toEqual({ reportId: 'r-1' });
+    expect(calls[0].input).toBe('https://jov.ie/api/agents/feedback');
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({
+      kind: 'bug',
+      title: 'broke',
+      details: 'details',
+      context: { cliVersion: '1.0.0', channel: 'cli' },
+    });
+  });
+
+  it('requires a title and details before any request', () => {
+    const { calls, fetchImpl } = createFetch('{}');
+    expect(() =>
+      reportIssue(
+        { kind: 'feedback', title: ' ', details: 'x' },
+        {},
+        { fetchImpl }
+      )
+    ).toThrow(JovieInputError);
+    expect(calls).toHaveLength(0);
   });
 });
