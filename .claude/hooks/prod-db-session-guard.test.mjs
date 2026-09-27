@@ -38,6 +38,7 @@ test('blocks the incident command and other session-scoped settings', () => {
     `psql "$DATABASE_URL" -c "ALTER ROLE neondb_owner SET default_transaction_read_only = on"`,
     `psql "$DATABASE_URL" <<'SQL'\nset search_path to public;\nselect 1;\nSQL`,
     `psql "$DATABASE_URL" -c "SET /* read only */ default_transaction_read_only=on"`,
+    `psql "$DATABASE_URL" -c "update t set x = 1" -c "set default_transaction_read_only = on"`,
     `psql "$DATABASE_URL" -c "select 1; -- note\nSET statement_timeout = 0"`,
   ]) {
     assert.ok(sessionScopeViolation(command), command);
@@ -59,6 +60,8 @@ test('allows transaction-scoped and unrelated commands', () => {
     'set -euo pipefail; pnpm test',
     'git config --global user.name x',
     `psql --no-psqlrc "$DB" -c "select 1"`,
+    `psql "$DB" -c "UPDATE leads\nSET status = 'x'\nWHERE id = 'y'"`,
+    `psql "$DB" -c "insert into t values (1) on conflict (id) do update\n  set v = 2"`,
   ]) {
     assert.equal(sessionScopeViolation(command), null, command);
     assert.equal(runHook(command).status, 0, command);

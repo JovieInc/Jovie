@@ -36,8 +36,15 @@ export function findTransactionControl(sql) {
 
 export function findSessionScopedSql(text) {
   const source = stripSqlComments(String(text ?? ''));
-  const set = source.match(SESSION_SET);
-  if (set) return set[0].trim();
+  // Statements end at `;`; shell quotes delimit separate `-c` arguments.
+  for (const statement of source.split(/[;"'`]/)) {
+    const set = statement.match(SESSION_SET);
+    // `UPDATE t\nSET col = 1` (and ON CONFLICT DO UPDATE) is a clause, not a
+    // statement, even when a newline precedes SET.
+    if (set && !/\bUPDATE\b/i.test(statement.slice(0, set.index))) {
+      return set[0].trim();
+    }
+  }
   const config = source.match(SESSION_SET_CONFIG);
   if (config) return config[0].trim();
   const persistent = source.match(PERSISTENT_SET);
