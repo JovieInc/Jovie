@@ -25,7 +25,10 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const SNAPSHOT_ROOT = join(REPO_ROOT, 'apps/web/tests/e2e/__snapshots__');
+export const SNAPSHOT_ROOT = join(
+  REPO_ROOT,
+  'apps/web/tests/e2e/__snapshots__'
+);
 const ACTUAL_SUFFIX = '-actual.png';
 
 /** Recursively list files under dir. */
@@ -79,7 +82,9 @@ function downloadArtifact(runId, artifactName) {
   );
   if (result.status !== 0) {
     rmSync(dir, { recursive: true, force: true });
-    throw new Error(`could not download artifact ${artifactName} from run ${runId}`);
+    throw new Error(
+      `could not download artifact ${artifactName} from run ${runId}`
+    );
   }
   return dir;
 }
@@ -110,12 +115,14 @@ function main() {
       args.runId,
       args.artifact ?? `homepage-visual-${args.runId}-${args.attempt}`
     );
-  if (!statSync(source).isDirectory()) throw new Error(`${source} is not a directory`);
+  if (!statSync(source).isDirectory())
+    throw new Error(`${source} is not a directory`);
 
   const { copies, problems } = planAdoption(walk(source), walk(SNAPSHOT_ROOT));
   for (const problem of problems) console.error(`::error::${problem}`);
   if (problems.length || copies.length === 0) {
-    if (copies.length === 0) console.error('::error::no -actual.png renders to adopt');
+    if (copies.length === 0)
+      console.error('::error::no -actual.png renders to adopt');
     process.exit(1);
   }
   for (const { from, to } of copies) {

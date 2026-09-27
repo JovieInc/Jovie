@@ -30,10 +30,7 @@ test('maps each -actual.png to its one committed baseline', () => {
 
 test('dedupes retries of the same shot', () => {
   const { copies } = planAdoption(
-    [
-      '/art/r1/homepage-375-actual.png',
-      '/art/r2/homepage-375-actual.png',
-    ],
+    ['/art/r1/homepage-375-actual.png', '/art/r2/homepage-375-actual.png'],
     baselines
   );
   assert.equal(copies.length, 1);
