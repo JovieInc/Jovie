@@ -109,10 +109,10 @@ describe('generatePrintGraphic', () => {
     const callArg = generateImage.mock.calls[0][0] as {
       model: { __model: string };
       prompt: string;
-      providerOptions?: { openai?: { background?: string } };
+      providerOptions?: Record<string, Record<string, string>>;
     };
     expect(callArg.model.__model).toBe(native.id);
-    expect(callArg.providerOptions?.openai?.background).toBe('transparent');
+    expect(callArg.providerOptions).toEqual(alphaProviderOptions(native));
     expect(callArg.prompt).toContain('transparent');
     expect(out.modelKey).toBe(native.key);
     expect(out.mediaType).toBe('image/png');
