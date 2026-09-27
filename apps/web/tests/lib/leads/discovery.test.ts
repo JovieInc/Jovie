@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { LeadPipelineSettings } from '@/lib/db/schema/leads';
+
 const {
   captureErrorMock,
   executeMock,
@@ -90,7 +92,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-const defaultSettings = {
+const defaultSettings: LeadPipelineSettings = {
   id: 1,
   enabled: true,
   discoveryEnabled: true,
@@ -103,6 +105,19 @@ const defaultSettings = {
   queriesUsedToday: 0,
   queryBudgetResetsAt: null,
   lastDiscoveryQueryIndex: 0,
+  dailySendCap: 10,
+  maxPerHour: 5,
+  rampMode: 'manual',
+  guardrailsEnabled: true,
+  guardrailThresholds: {
+    minimumSampleSize: 30,
+    increaseClaimClickRate: 0.06,
+    holdClaimClickRateFloor: 0.03,
+    pauseClaimClickRateFloor: 0.03,
+    maxBounceComplaintRate: 0.03,
+    maxUnsubscribeRate: 0.05,
+    maxProviderFailureRate: 0.1,
+  },
   dmTemplate: null,
   createdAt: new Date(),
   updatedAt: new Date(),
