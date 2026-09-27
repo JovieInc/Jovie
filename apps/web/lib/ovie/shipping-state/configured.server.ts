@@ -39,6 +39,19 @@ export function publishConfiguredShippingState(
 }
 
 /**
+ * Org merge counts through the shared configured reader, so the Mac door and
+ * the Delivery card share one 60s cache and one GitHub rate-limit backoff.
+ */
+export function readConfiguredMerges() {
+  return configuredReaders['github-merges']();
+}
+
+/** A warm instance has a projection to serve before reconciling. */
+export function hasCachedConfiguredShippingState(): boolean {
+  return getLastKnownShippingState() != null;
+}
+
+/**
  * Synchronous local-cache read for Ovie. The caller can start reconciliation
  * after taking this snapshot; UI latency never depends on Linear or another
  * remote provider. A cold process returns an honest syncing projection.

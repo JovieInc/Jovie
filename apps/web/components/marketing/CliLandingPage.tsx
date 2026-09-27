@@ -126,6 +126,11 @@ export function CliLandingPage() {
           href: APP_ROUTES.DEVELOPERS,
           testId: 'cli-hero-developers',
         }}
+        photo={{
+          src: '/images/marketing-hero/cli.webp',
+          width: 1600,
+          height: 901,
+        }}
         logos={false}
         align='center'
         testId='cli-hero'
