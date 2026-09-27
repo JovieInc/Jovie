@@ -6,6 +6,7 @@ import {
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditorialChangelog';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
@@ -17,6 +18,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { HOMEPAGE_V3_ENABLED } from '@/lib/flags/homepage-v3';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
@@ -141,6 +143,11 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 function HomepageHero() {
+  // Canonical Pen v3 dark launch; the live hero is unchanged while off.
+  if (HOMEPAGE_V3_ENABLED) {
+    return <HomepageIdentityHero headingId='home-hero-heading' />;
+  }
+
   return (
     <HomepageEditorialHero
       headingId='home-hero-heading'
