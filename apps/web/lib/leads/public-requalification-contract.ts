@@ -9,6 +9,7 @@ import type { Lead, LeadSignalSnapshot } from '@/lib/db/schema/leads';
 import {
   calculateFitScore,
   FIT_SCORE_VERSION,
+  projectObservedQualificationFitInput,
 } from '@/lib/fit-scoring/calculator';
 import type { QualificationResult } from '@/lib/leads/qualify';
 import type { SpotifyLeadEnrichment } from '@/lib/leads/spotify-enrich-lead';
@@ -22,7 +23,7 @@ export const PUBLIC_REQUALIFICATION_SCOPE =
 export const PUBLIC_REQUALIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Bump when derived public fit inputs change so old receipts stay immutable. */
 export const PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION =
-  'public-fit-inputs/v2' as const;
+  'public-fit-inputs/v3' as const;
 
 /**
  * Public DSP signals mirror the existing fit-scoring service's supported
@@ -356,20 +357,20 @@ export function buildPublicRun(input: {
   const dedupeKey = `${PUBLIC_REQUALIFICATION_SCOPE}:${input.candidateKey}:${sourceRevision}`;
   const attemptEventType = publicRequalificationEventType(sourceRevision);
   const fitResult = calculateFitScore({
-    ingestionSourcePlatform: 'linktree',
-    hasPaidTier: input.qualification.hasPaidTier ?? undefined,
-    socialLinkPlatforms: input.qualification.allLinks
-      .map(link => link.platformId)
-      .filter((platform): platform is string => Boolean(platform)),
-    hasSpotifyId: input.qualification.hasSpotifyLink,
+    ...projectObservedQualificationFitInput({
+      sourcePlatform: input.qualification.sourcePlatform,
+      hasPaidTier: input.qualification.hasPaidTier,
+      linkPlatforms: input.qualification.allLinks.map(link => link.platformId),
+      hasSpotifyArtist: input.qualification.hasSpotifyLink,
+      hasContactEmail: false,
+      hasTrackingPixels: input.qualification.hasTrackingPixels,
+    }),
     spotifyPopularity: input.spotify.spotifyPopularity,
     genres: input.spotify.spotifyGenres,
     latestReleaseDate: input.spotify.latestReleaseDate,
-    hasContactEmail: false,
     hasAppleMusicId: dspSignals.hasAppleMusicId,
     hasSoundCloudId: dspSignals.hasSoundCloudId,
     dspPlatformCount: dspSignals.dspPlatformCount,
-    hasTrackingPixels: input.qualification.hasTrackingPixels,
   });
   const evidence = machineCertifyPremadeProfile({
     displayName: input.qualification.displayName,

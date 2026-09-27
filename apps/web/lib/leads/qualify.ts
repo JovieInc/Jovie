@@ -1,6 +1,7 @@
 import {
   calculateFitScore,
   MUSIC_TOOL_PLATFORMS,
+  projectObservedQualificationFitInput,
 } from '@/lib/fit-scoring/calculator';
 import { extractScriptJson } from '@/lib/ingestion/strategies/base';
 import {
@@ -52,10 +53,10 @@ export interface QualifyLeadOptions {
  * Qualifies a Linktree URL by fetching, extracting, and evaluating signals.
  *
  * Rules:
- *  - No Spotify → disqualified ("no_spotify")
- *  - Paid tier + Spotify → qualified
- *  - Free tier + Spotify + music tool → qualified
- *  - Free tier + Spotify only → disqualified ("free_tier_no_music_tool")
+ * Legacy compatibility projection for the premade artist-profile job.
+ * Only an explicit Spotify artist URL satisfies the identity prerequisite.
+ * Public badges, branding, and tool links are observations, never proof of
+ * paid access or commercial intent.
  */
 export async function qualifyLead(
   linktreeUrl: string,
@@ -71,13 +72,13 @@ export async function qualifyLead(
   const isLinktreeVerified = detectLinktreeVerification(html, nextData);
 
   const platforms = extraction.links.map(l => l.platformId).filter(Boolean);
-  const hasSpotifyLink = platforms.includes('spotify');
   const spotifyLinks = extraction.links.filter(l => l.platformId === 'spotify');
-  // Linktrees often list an album before the artist profile. Prefer the
-  // artist URL so the existing Spotify enrichment path can resolve the
-  // canonical artist without guessing from an album or track.
-  const spotifyLink =
-    spotifyLinks.find(link => /\/artist\//i.test(link.url)) ?? spotifyLinks[0];
+  const spotifyLink = spotifyLinks.find(link =>
+    /^https:\/\/open\.spotify\.com\/artist\/[A-Za-z0-9]+\/?(?:\?.*)?$/i.test(
+      link.url
+    )
+  );
+  const hasSpotifyLink = Boolean(spotifyLink);
   const instagramLink = extraction.links.find(
     l => l.platformId === 'instagram'
   );
@@ -88,36 +89,30 @@ export async function qualifyLead(
     extraction.discoveredPixels ?? {}
   ).sort((left, right) => left.localeCompare(right));
 
-  const fitResult = calculateFitScore({
-    ingestionSourcePlatform: 'linktree',
-    hasPaidTier: hasPaidTier ?? undefined,
-    socialLinkPlatforms: platforms as string[],
-    hasSpotifyId: hasSpotifyLink,
-    hasContactEmail: includePrivateContact && !!extraction.contactEmail,
-    hasTrackingPixels: trackingPixelPlatforms.length > 0,
-  });
+  const fitResult = calculateFitScore(
+    projectObservedQualificationFitInput({
+      sourcePlatform: 'linktree',
+      hasPaidTier,
+      linkPlatforms: extraction.links.map(link => link.platformId),
+      hasSpotifyArtist: hasSpotifyLink,
+      hasContactEmail: includePrivateContact && !!extraction.contactEmail,
+      hasTrackingPixels: trackingPixelPlatforms.length > 0,
+    })
+  );
 
-  // Apply qualification rules
-  // Verified + Spotify → always qualified (strongest signal)
-  // Paid tier + Spotify → qualified
-  // Free tier + Spotify + music tool → qualified
-  // No Spotify → disqualified
-  // Free tier + Spotify only → disqualified
+  // Preserve the old binary return shape, but stop silently certifying
+  // unsupported commercial inferences. The job-aware v2 contract records the
+  // corresponding tri-state decisions and review reasons.
   let status: 'qualified' | 'disqualified';
   let disqualificationReason: string | null = null;
 
   if (!hasSpotifyLink) {
     status = 'disqualified';
-    disqualificationReason = 'no_spotify';
-  } else if (isLinktreeVerified) {
-    status = 'qualified';
-  } else if (hasPaidTier) {
-    status = 'qualified';
-  } else if (musicToolsDetected.length > 0) {
-    status = 'qualified';
+    disqualificationReason =
+      spotifyLinks.length > 0 ? 'spotify_artist_required' : 'no_spotify';
   } else {
     status = 'disqualified';
-    disqualificationReason = 'free_tier_no_music_tool';
+    disqualificationReason = 'commercial_fit_review_needed';
   }
 
   return {
