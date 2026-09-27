@@ -2665,6 +2665,10 @@ jobs:
           done
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+      - name: Enforce authed route initial JS budgets
+        # Deterministic gzip sizes from the build manifests; a few seconds.
+        # Ratchet lives in apps/web/scripts/route-js-budgets.json.
+        run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
       - name: Run deterministic layout behavior guard
         run: |
           set -euo pipefail
