@@ -172,7 +172,7 @@ export const APP_SCREEN_PEN_PARITY_CHECKS: readonly PenParityCheck[] = [
     property: 'radius',
     source: CSS('--app-shell-radius'),
   },
-  // Shell children that the frame instances.
+  // Shell masters AppShellFrame composes in code (see APP_SCREEN_PEN_COMPOSED_MASTERS).
   {
     id: 'app-header.height',
     masterId: 'xLyVs',
@@ -406,6 +406,30 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
     summary: 'ki3Zp pads 8px sideways; the row uses px-2.5.',
   },
 ];
+
+/**
+ * Masters whose pending decisions also block a bound root's reference
+ * eligibility, because the root's source component composes them in code
+ * (AppShellFrame hosts the app header and sidebar; EntitySidebarShell
+ * renders the entity header). This is a code-composition map, not a claim
+ * about Pen instancing.
+ */
+export const APP_SCREEN_PEN_COMPOSED_MASTERS: Readonly<
+  Record<string, readonly string[]>
+> = {
+  JwsdW: ['xLyVs', 'VgcZb'],
+  RosMb: ['odpZ8'],
+};
+
+/** The bound root plus every master it composes. */
+export function penRootEligibilityScope(
+  rootId: string,
+  composed: Readonly<
+    Record<string, readonly string[]>
+  > = APP_SCREEN_PEN_COMPOSED_MASTERS
+): ReadonlySet<string> {
+  return new Set([rootId, ...(composed[rootId] ?? [])]);
+}
 
 export interface PenReferenceHold {
   readonly decisionId: `D${number}`;

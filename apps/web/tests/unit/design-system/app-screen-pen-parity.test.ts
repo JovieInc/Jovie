@@ -8,6 +8,7 @@ import {
 import { getSidebarNavRowClassName } from '@/components/shell/SidebarNavItem';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
+  APP_SCREEN_PEN_COMPOSED_MASTERS,
   APP_SCREEN_PEN_GEOMETRY,
   APP_SCREEN_PEN_GEOMETRY_SCHEMA,
   APP_SCREEN_PEN_PARITY_CHECKS,
@@ -159,6 +160,19 @@ describe('app-screen Pen parity gate (JOV-6776)', () => {
         APP_SCREEN_PEN_PARITY_CHECKS.some(check => check.masterId === root),
         `${component.id} -> ${root}`
       ).toBe(true);
+    }
+  });
+
+  it('keeps composed-master scopes inside the committed readback', () => {
+    for (const [root, children] of Object.entries(
+      APP_SCREEN_PEN_COMPOSED_MASTERS
+    )) {
+      for (const id of [root, ...children]) {
+        expect(
+          APP_SCREEN_PEN_GEOMETRY.masters[id],
+          `${root} -> ${id}`
+        ).toBeDefined();
+      }
     }
   });
 
