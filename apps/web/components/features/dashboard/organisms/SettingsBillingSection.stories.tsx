@@ -37,7 +37,7 @@ function BillingStoryShell({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className='w-[36rem] max-w-[calc(100vw-2rem)] bg-base p-4 text-primary-token'>
+      <div className='w-xl max-w-full bg-base p-4 text-primary-token'>
         {children}
       </div>
     </QueryClientProvider>
