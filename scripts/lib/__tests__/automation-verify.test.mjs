@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -17,6 +17,28 @@ import {
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
+
+describe('affected-test selector inventory', () => {
+  it('references only existing scripts tests', () => {
+    const selector = readFileSync(
+      resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+      'utf8'
+    );
+    const referencedTests = [
+      ...selector.matchAll(
+        /['"](scripts\/[^'"]+\.test\.(?:mjs|cjs|js|ts|tsx))['"]/g
+      ),
+    ].map(match => match[1]);
+
+    expect(referencedTests.length).toBeGreaterThan(0);
+    expect(
+      [...new Set(referencedTests)].filter(
+        testFile =>
+          !existsSync(resolve(import.meta.dirname, '../../..', testFile))
+      )
+    ).toEqual([]);
+  });
+});
 
 describe('structural control stage execution', () => {
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
@@ -974,7 +996,6 @@ describe('automation-verify affected scope', () => {
       'scripts/fleet-gate/tests/gem-priority-gate.test.py',
       'scripts/lib/ownerless-recovery-policy.mjs',
       'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-      'scripts/lib/__tests__/queue-deferred-release.test.mjs',
       'scripts/invariants/registry.test.mjs',
       'scripts/tests/test_agent_workflow_hygiene.py',
       ...AFFECTED_TEST_SELECTOR_MANIFEST,
@@ -992,7 +1013,6 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-        'scripts/lib/__tests__/queue-deferred-release.test.mjs',
       ],
       nodeTests: [
         'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
