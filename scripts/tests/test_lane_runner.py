@@ -918,13 +918,52 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(lane.red_pr([human], {})["number"], 42)
         clean = {**human, "reviewDecision": "APPROVED"}
         self.assertIsNone(lane.red_pr([clean], {}))
-        real = lane.sh
-        lane.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([
-            {**human, "isCrossRepository": False}, {**human, "number": 43, "isCrossRepository": True}]))
+        real = lane.open_prs_summary
+        lane.open_prs_summary = lambda: [{**human, "isCrossRepository": False},
+                                         {**human, "number": 43, "isCrossRepository": True},
+                                         {**human, "number": 44, "isDraft": True}]
         try:
-            self.assertEqual([pr["number"] for pr in lane.repo_prs()], [42], "fork PRs cannot be pushed to")
+            self.assertEqual([pr["number"] for pr in lane.repo_prs()], [42], "fork and draft PRs are not candidates")
         finally:
-            lane.sh = real
+            lane.open_prs_summary = real
+
+    def test_summary_lists_red_prs_without_per_check_rollups(self):
+        """2026-09-27: per-check rollups for 45 devin PRs hit GitHub's secondary limit, so the
+        lane saw zero red PRs. The aggregate state alone must still mark PRs red or pending."""
+        saved = (lane.pr_events.open_prs_state, dict(lane._SUMMARY))
+        states = {1: "FAILURE", 2: "PENDING", 3: "SUCCESS", 4: None}
+        lane.pr_events.open_prs_state = lambda _lane: [
+            {**self.pr(number=n), "headRefName": f"devin/jov-{n}-20260927", "rollup": state} for n, state in states.items()]
+        lane._SUMMARY.update(at=0.0, prs=[])
+        try:
+            prs = lane.lane_prs("devin", providers={"devin": {}})
+            self.assertEqual([pr["number"] for pr in prs], [1, 2, 3, 4])
+            self.assertEqual(lane.red_pr(prs, {})["number"], 1)
+            self.assertIsNone(lane.red_pr([pr for pr in prs if pr["number"] != 1], {}),
+                              "pending, green and unchecked heads are not red")
+            lane.pr_events.open_prs_state = lambda _lane: self.fail("the summary is cached for a minute")
+            self.assertEqual(len(lane.open_prs_summary()), 4)
+        finally:
+            lane.pr_events.open_prs_state = saved[0]
+            lane._SUMMARY.clear()
+            lane._SUMMARY.update(saved[1])
+
+    def test_claimed_pr_gets_its_real_checks(self):
+        synthetic = {**self.pr(number=8), "statusCheckRollup": [{"name": "rollup", "synthetic": True,
+                                                                 "conclusion": "FAILURE"}]}
+        real_checks = [{"name": "ci-fast", "conclusion": "FAILURE", "detailsUrl": "https://x/job/9"}]
+        saved = lane.sh
+        calls = []
+        lane.sh = lambda args, **k: calls.append(args) or SimpleNamespace(
+            returncode=0, stderr="", stdout=json.dumps({"statusCheckRollup": real_checks}))
+        try:
+            self.assertEqual(lane.with_checks(synthetic)["statusCheckRollup"], real_checks)
+            already = {**synthetic, "statusCheckRollup": real_checks}
+            self.assertIs(lane.with_checks(already), already)
+        finally:
+            lane.sh = saved
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][:4], ["gh", "pr", "view", "8"])
 
     def test_exhausted_heads_escalate_once_to_triage(self):
         stuck = {**self.pr(number=7), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
@@ -953,18 +992,17 @@ class FixRedTest(unittest.TestCase):
             self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
 
     def test_claim_records_attempt_before_work(self):
-        real = lane.sh
-        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
-            [{**self.pr(number=4), "headRefName": "devin/jov-6525-auto-merge-default"},
-             {**self.pr(), "headRefName": "devin/jov-1-20260925204809"},
-             {**self.pr(number=6), "headRefName": "claude/x"}]))
+        real = lane.open_prs_summary
+        lane.open_prs_summary = lambda: [{**self.pr(number=4), "headRefName": "devin/jov-6525-auto-merge-default"},
+                                         {**self.pr(), "headRefName": "devin/jov-1-20260925204809"},
+                                         {**self.pr(number=6), "headRefName": "claude/x"}]
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             try:
                 self.assertEqual(lane.claim_red_pr(host, "devin")["number"], 5)
                 self.assertIsNone(lane.claim_red_pr(host, "devin"))
             finally:
-                lane.sh = real
+                lane.open_prs_summary = real
             record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
             self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
             self.assertAlmostEqual(record["at"], time.time(), delta=60)
