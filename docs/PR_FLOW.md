@@ -29,6 +29,12 @@ Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
 
+When a phase fails badly enough to hit a trigger in
+[post-mortems](postmortems/README.md#when-a-post-mortem-is-required) (for
+example a production freeze, red `main`, or a stalled lane), the agent that
+resolves it writes a post-mortem and files `postmortem-action` issues for the
+systemic controls.
+
 ## North star
 
 - **CI-green → auto-merge.** No human. Correctness is a machine job.
