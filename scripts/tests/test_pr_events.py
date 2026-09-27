@@ -15,6 +15,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
 
 
