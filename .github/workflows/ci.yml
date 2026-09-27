@@ -2414,6 +2414,8 @@ jobs:
           fallback_json_key: db_url
 
       - name: Apply branch migrations and verify prior-release upgrade
+        id: migration-upgrade
+        continue-on-error: true
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
         env:
           DATABASE_URL: ${{ steps.resolve-certification-db-url.outputs.database_url }}
@@ -2470,6 +2472,7 @@ jobs:
           }
           console.log(`Database certification executed ${tests} tests with zero skips.`);
           NODE
+          test "${{ steps.migration-upgrade.outcome }}" = success || { echo "::error::Prior-release migration compatibility failed"; exit 1; }
 
       - name: Upload database certification evidence
         if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')) }}

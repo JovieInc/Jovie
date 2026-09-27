@@ -822,7 +822,9 @@ describe('merge_group workflow contract', () => {
     expect(databaseCertification).toContain(
       "github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')"
     );
-    expect(databaseCertification).toContain('run test:integration');
+    expect(databaseCertification).toMatch(
+      /continue-on-error: true[\s\S]*run test:integration[\s\S]*steps\.migration-upgrade\.outcome/
+    );
     expect(databaseCertification).toContain("DB_CERTIFICATION: 'true'");
     expect(databaseCertification).toContain(
       'Reject inert database test evidence'
