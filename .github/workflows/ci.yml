@@ -1667,6 +1667,45 @@ jobs:
         # The required prevention receipt must exist for every source PR and
         # exact merge-group head, even when no contract file changed.
         run: pnpm ci:incident-contract:validate
+      - name: Resolve incident-labeled Linear issues for this PR
+        # JOV-6689: a PR closing an `incident` issue must ship or link a
+        # post-mortem. The label lookup is the only non-deterministic piece,
+        # so it stays in this step; the check below is pure file/text.
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          ids="$(printf '%s\n%s\n' "${PR_TITLE:-}" "${PR_BODY:-}" \
+            | grep -oE 'JOV-[0-9]+' | sort -u || true)"
+          incident=""
+          if [ -n "${LINEAR_API_KEY:-}" ]; then
+            while IFS= read -r id; do
+              [ -z "$id" ] && continue
+              labels="$(curl -sS --max-time 10 https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_API_KEY" \
+                -H 'Content-Type: application/json' \
+                -d "{\"query\":\"query { issues(filter: { team: { key: { eq: \\\"JOV\\\" } }, number: { eq: ${id#JOV-} } }, first: 1) { nodes { labels { nodes { name } } } } }\"}" \
+                | jq -r '.data.issues.nodes[0].labels.nodes[]?.name' 2>/dev/null || true)"
+              if printf '%s\n' "$labels" | grep -qx 'incident'; then
+                incident="${incident:+$incident,}$id"
+              fi
+            done <<< "$ids"
+          else
+            echo "::notice::LINEAR_API_KEY unavailable; incident label resolution skipped (frontmatter lint still runs)."
+          fi
+          echo "POSTMORTEM_INCIDENT_ISSUES=$incident" >> "$GITHUB_ENV"
+          echo "Incident-labeled references: ${incident:-none}"
+      - name: Post-mortem linkage and frontmatter check
+        # Same always-on placement as the incident contract above: every
+        # source PR and merge-group head, dependency-free (JOV-6689).
+        env:
+          POSTMORTEM_PR_TITLE: ${{ github.event.pull_request.title }}
+          POSTMORTEM_PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/postmortem-linkage-check.mjs
       - name: Verify Node and tsx seed-loader compatibility
         shell: bash
         run: |
