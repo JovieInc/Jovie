@@ -42,6 +42,7 @@ test('blocks the incident command and other session-scoped settings', () => {
     `psql "$DATABASE_URL" -c "SET TIME ZONE 'UTC'"`,
     `psql "$DATABASE_URL" -c "select '--'; set default_transaction_read_only = on"`,
     `psql "$DATABASE_URL" -c "select pg_catalog.set_config('default_transaction_read_only', concat('o','n'), false)"`,
+    `psql "$DATABASE_URL" -c "select set_config('default_transaction_read_only', 'on', false::boolean)"`,
     `psql "$DATABASE_URL" -c "set schema 'public'"`,
     `psql "$DATABASE_URL" -c "update t set x = 1" -c "set default_transaction_read_only = on"`,
     `psql "$DATABASE_URL" -c "select 1; -- note\nSET statement_timeout = 0"`,
@@ -72,6 +73,24 @@ test('allows transaction-scoped and unrelated commands', () => {
     assert.equal(sessionScopeViolation(command), null, command);
     assert.equal(runHook(command).status, 0, command);
   }
+});
+
+test('scans existing SQL files passed with -f or stdin redirection', () => {
+  const files = {
+    '/tmp/bad.sql': 'select 1;\nset default_transaction_read_only = on;\n',
+    '/tmp/ok.sql': 'begin read only;\nselect 1;\ncommit;\n',
+  };
+  const read = path => files[path] ?? null;
+  assert.match(
+    sessionScopeViolation('psql "$DATABASE_URL" -f /tmp/bad.sql', read),
+    /in \/tmp\/bad\.sql/
+  );
+  assert.ok(sessionScopeViolation('psql "$DATABASE_URL" < /tmp/bad.sql', read));
+  assert.ok(
+    sessionScopeViolation(`psql "$DATABASE_URL" --file='/tmp/bad.sql'`, read)
+  );
+  assert.equal(sessionScopeViolation('psql "$DATABASE_URL" -f /tmp/ok.sql', read), null);
+  assert.equal(sessionScopeViolation('psql "$DATABASE_URL" -f /tmp/missing.sql', read), null);
 });
 
 test('hook ignores malformed input', () => {
@@ -115,6 +134,8 @@ test('prod-read targets the direct endpoint inside a read-only transaction', () 
     'rollback; /* x */ delete from leads',
     'SET TRANSACTION READ WRITE; DELETE FROM creator_profiles',
     "SELECT '--'; COMMIT; SET default_transaction_read_only=off; DELETE FROM leads",
+    'SELECT pg_terminate_backend(pid) FROM pg_stat_activity',
+    "select pg_advisory_lock(1)",
     'DELETE FROM leads',
     '\\! echo hi',
   ]) {

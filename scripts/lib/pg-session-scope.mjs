@@ -8,6 +8,8 @@
 // Transaction-scoped forms (BEGIN READ ONLY, SET LOCAL, SET TRANSACTION,
 // set_config(..., true)) end with the transaction and are safe.
 
+import { readFileSync } from 'node:fs';
+
 const DB_COMMAND =
   /\b(psql|pgcli|pg_dump|pg_restore)\b|DATABASE_URL|postgres(ql)?:\/\/|\.neon\.tech\b|\bneon\(/i;
 
@@ -17,8 +19,10 @@ const DB_COMMAND =
 // `set -e` is a shell builtin.
 const SESSION_SET =
   /(?:^|[;\n]|["'`])\s*SET\s+(?!LOCAL\b|TRANSACTION\b|CONSTRAINTS\b|[-+])\S+/i;
-// Arguments may nest parentheses; stay within one statement.
-const SESSION_SET_CONFIG = /set_config\s*\([^;]*?,\s*false\s*\)/i;
+// Only a literal `true` third argument is transaction-local; anything else
+// (false, false::boolean, an expression) is treated as session-scoped.
+const SET_CONFIG_CALL = /set_config\s*\(/i;
+const LOCAL_SET_CONFIG = /set_config\s*\([^;]*?,\s*true\s*\)/gi;
 // Role/database defaults persist for every future session, pooled or not.
 const PERSISTENT_SET = /\bALTER\s+(?:ROLE|USER|DATABASE)\b[^;]*\bSET\b/i;
 
@@ -46,8 +50,11 @@ function scan(source) {
       return set[0].trim();
     }
   }
-  const config = source.match(SESSION_SET_CONFIG);
-  if (config) return config[0].trim();
+  for (const statement of source.split(';')) {
+    const calls = statement.match(/set_config\s*\(/gi)?.length ?? 0;
+    const local = statement.match(LOCAL_SET_CONFIG)?.length ?? 0;
+    if (calls > local) return statement.match(SET_CONFIG_CALL)[0].trim();
+  }
   const persistent = source.match(PERSISTENT_SET);
   if (persistent) return persistent[0].trim();
   return null;
@@ -61,6 +68,9 @@ export function findSessionScopedSql(text) {
 }
 
 const READ_STATEMENT = /^(?:SELECT|WITH|EXPLAIN|SHOW|TABLE|VALUES)\b/i;
+// Functions a read-only transaction still lets the owner role run.
+const SIDE_EFFECT_FUNCTIONS =
+  /\b(?:pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_promote|pg_switch_wal|pg_create_\w+|pg_drop_\w+|pg_advisory\w*|pg_notify|pg_sleep\w*|dblink\w*|lo_\w+|set_config)\s*\(/i;
 
 // prod-read accepts exactly one read statement, so caller SQL can never
 // end or reconfigure the wrapping read-only transaction.
@@ -71,6 +81,9 @@ export function readOnlyStatementError(sql) {
   if (body.includes(';')) return 'multiple statements';
   if (!READ_STATEMENT.test(body))
     return 'not a SELECT, WITH, EXPLAIN, SHOW, TABLE or VALUES statement';
+  const effect = body.match(SIDE_EFFECT_FUNCTIONS);
+  if (effect)
+    return `side-effecting function ${effect[0].replace(/\s*\($/, '')}`;
   return null;
 }
 
@@ -78,9 +91,36 @@ export function isDatabaseCommand(command) {
   return DB_COMMAND.test(String(command ?? ''));
 }
 
-export function sessionScopeViolation(command) {
+// SQL passed by file (`psql -f x.sql`, `psql < x.sql`) is scanned when the
+// file already exists; the guard cannot see files created by the same command.
+function referencedSqlFiles(command) {
+  const paths = [];
+  const pattern =
+    /(?:\s-f\s*|\s--file[=\s]|\s<(?!<)\s*)(?:"([^"]+)"|'([^']+)'|([^\s;|&<>]+))/g;
+  for (const match of command.matchAll(pattern)) {
+    paths.push(match[1] ?? match[2] ?? match[3]);
+  }
+  return paths;
+}
+
+export function sessionScopeViolation(command, readFile = defaultReadFile) {
   if (!isDatabaseCommand(command)) return null;
-  return findSessionScopedSql(command);
+  const inline = findSessionScopedSql(command);
+  if (inline) return inline;
+  for (const path of referencedSqlFiles(String(command))) {
+    const text = readFile(path);
+    const found = text == null ? null : findSessionScopedSql(text);
+    if (found) return `${found} (in ${path})`;
+  }
+  return null;
+}
+
+function defaultReadFile(path) {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 export const SAFE_READ_ONLY_GUIDANCE = [
