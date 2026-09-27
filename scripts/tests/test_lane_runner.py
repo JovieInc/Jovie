@@ -392,6 +392,8 @@ class LinearClientTest(unittest.TestCase):
 class RunIssueTest(unittest.TestCase):
     def setUp(self):
         self.real_sh, self.real_verify, self.real_pack = lane.sh, lane.verify_and_land, lane.context_pack
+        self.real_next = lane.next_provider
+        lane.next_provider = lambda *a, **k: None  # no live provider health checks in unit tests
         lane.context_pack = lambda issue: "ctx"
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
@@ -404,6 +406,7 @@ class RunIssueTest(unittest.TestCase):
 
     def tearDown(self):
         lane.sh, lane.verify_and_land, lane.context_pack = self.real_sh, self.real_verify, self.real_pack
+        lane.next_provider = self.real_next
         self.tmp.cleanup()
 
     def ledger(self):
@@ -422,6 +425,48 @@ class RunIssueTest(unittest.TestCase):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
         receipt = lane.run_issue(self.host, "hyperagent", {"cmd": ["false"]}, FakeLinear([]), issue())
         self.assertEqual((receipt["verdict"], receipt["reasons"]), ("provider-error", ["agent-exit:1"]))
+
+    def test_an_exhausted_provider_hands_off_to_the_next_lane_on_the_same_worktree(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
+        seen = []
+
+        def nxt(host, exclude, providers=None):
+            seen.append(set(exclude))
+            return ("devin", {"cmd": [sys.executable, "-c", "import os; open('done.txt','w').write(os.getcwd())"]}) \
+                if "devin" not in exclude else None
+        lane.next_provider = nxt
+        receipt = lane.run_issue(self.host, "codex", {"cmd": [sys.executable, "-c", "raise SystemExit(75)"]},
+                                 FakeLinear([]), issue("JOV-9"))
+        self.assertEqual(receipt["verdict"], "landing")
+        self.assertEqual(receipt["handoffs"], [{"from": "codex", "to": "devin", "exit": 75}])
+        self.assertEqual(receipt["finishedBy"], "devin")
+        self.assertEqual(receipt["agentExit"], 0)
+        self.assertEqual(seen[0], {"codex"})
+        self.assertTrue(lane.cooling(self.host, "codex"))
+        handoff = next((self.host.state / "runs").glob("*.handoff1.prompt.md")).read_text()
+        self.assertIn("Do not start over", handoff)
+        self.assertIn("ctx", handoff)
+
+    def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
+        providers = {
+            "devin": {"health": ["echo", "ok"], "healthy": "ok"},
+            "codex": {"health": ["echo", "ok"], "healthy": "ok"},
+            "claude": {"health": ["echo", "ok"], "healthy": "ok", "enabled": False},
+            "grok": {"health": ["false"], "healthy": "ok"},
+            "sakana": {"health": ["echo", "ok"], "healthy": "ok"},
+        }
+        lane.cool_down(self.host, "codex")
+        pick = self.real_next(self.host, {"devin"}, providers)
+        self.assertEqual(pick[0], "sakana")  # codex cooling, claude off, grok unhealthy
+        self.assertIsNone(self.real_next(self.host, {"devin", "sakana"}, providers))
+
+    def test_handoffs_are_capped_and_then_report_the_provider_error(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
+        order = iter(["devin", "claude", "hyperagent"])
+        lane.next_provider = lambda host, exclude, providers=None: (next(order), {"cmd": ["false"]})
+        receipt = lane.run_issue(self.host, "codex", {"cmd": ["false"]}, FakeLinear([]), issue())
+        self.assertEqual(len(receipt["handoffs"]), lane.PROVIDER_HANDOFFS)
+        self.assertEqual(receipt["verdict"], "provider-error")
 
     def test_explicit_decline_becomes_not_shippable(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
