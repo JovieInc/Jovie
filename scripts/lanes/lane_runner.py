@@ -43,11 +43,21 @@ REPO_SLUG = "JovieInc/Jovie"
 # `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
 # the rest stay with humans.
 SHARED_LABEL = "agent-ready"
-EXCLUDED_LABELS = frozenset({
-    "no-symphony", "billing", "blocked:payments", "stripe", "cost-monitoring",
-    "blocked:auth", "auth", "area:auth", "infra", "area:infra", "infrastructure", "vercel",
-    "type:epic", "codex-blocked",
+SENSITIVE_LABELS = frozenset({
+    "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
+    "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
+EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked"})
+HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked"})
+SENSITIVE_PROVIDER = "codex"
+SENSITIVE_REVIEWABLE_LINES = 500
+SENSITIVE_RED_LINES = re.compile(
+    r"\b(?:rotate|rotation|revoke|revocation)\b.{0,40}\b(?:secret|credential|token|key)s?\b|"
+    r"\b(?:secret|credential|token|key)s?\b.{0,40}\b(?:rotate|rotation|revoke|revocation)\b|"
+    r"\b(?:live|production|prod)\b.{0,40}\b(?:price|pricing)\b|"
+    r"\b(?:price|pricing)\b.{0,40}\b(?:live|production|prod)\b",
+    re.IGNORECASE,
+)
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
 MAX_GATE_TIMEOUTS = 3
@@ -122,8 +132,16 @@ def created_at_epoch(value: str) -> float | None:
         return None
 
 
+def issue_is_sensitive(issue: Issue) -> bool:
+    return bool(SENSITIVE_LABELS & {label.lower() for label in issue.labels})
+
+
+def issue_hits_red_line(issue: Issue) -> bool:
+    return SENSITIVE_RED_LINES.search(f"{issue.title}\n{issue.description}") is not None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
-               in_flight: frozenset[str] = frozenset()) -> Issue | None:
+               in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
     """Symphony orders by aged priority then age, while preserving urgent-first admission.
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
@@ -137,11 +155,15 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
         record = failure_record(failures.get(identifier))
         return record["count"] < MAX_FAILURES and now - record["at"] >= RETRY_BACKOFF_S
 
-    eligible = [
-        issue for issue in issues
-        if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
-        and issue.identifier.lower() not in in_flight
-    ]
+    def admitted(issue: Issue) -> bool:
+        labels = {label.lower() for label in issue.labels}
+        if HARD_EXCLUDED_LABELS & labels or issue_hits_red_line(issue):
+            return False
+        if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
+            return False
+        return retryable(issue.identifier) and issue.identifier.lower() not in in_flight
+
+    eligible = [issue for issue in issues if admitted(issue)]
 
     def admission_order(issue: Issue) -> tuple[int, float]:
         created_at = created_at_epoch(issue.created_at)
@@ -157,6 +179,14 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
 # ---------------------------------------------------------------- prompt
 
 def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
+    sensitive_contract = []
+    if issue_is_sensitive(issue):
+        sensitive_contract = [
+            "- Guarded sensitive-surface run: keep the reviewable diff at or below 500 lines and",
+            "  one issue. Do not rotate secrets/credentials or change live billing pricing.",
+            "- The lane will require the existing Migration Guard, security scan, affected boundary",
+            "  tests, and an independent `llm-review` before it permits merge enrollment.",
+        ]
     return "\n".join([
         f"# {issue.title} ({issue.identifier})",
         "",
@@ -182,6 +212,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
         "  non-interactive path. Do not run gstack or other skill workflows (ship, review, qa,",
         "  upgrade) and do not upgrade any tooling: commit with git and open the PR with",
         "  `gh pr create --draft`.",
+        *sensitive_contract,
         "- End with a handoff: what changed, what you verified, concerns and deviations.",
     ])
 
@@ -207,7 +238,7 @@ class Change:
     deleted: int
 
 
-def gate_rules(changes: list[Change]) -> list[str]:
+def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES) -> list[str]:
     """Deterministic checks on the diff itself; returns failure reasons (empty = pass)."""
     if not changes:
         return ["empty-diff"]
@@ -221,7 +252,7 @@ def gate_rules(changes: list[Change]) -> list[str]:
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
         failures.append("lockfile-without-manifest")
     reviewable = sum(c.added + c.deleted for c in changes if not GENERATED.search(c.path))
-    if reviewable > MAX_REVIEWABLE_LINES:
+    if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
     return failures
 
@@ -247,6 +278,7 @@ def parse_numstat(text: str) -> list[Change]:
 # typecheck, lint, tests, CI-harness and component contracts) — the same entry point humans'
 # hooks and the no-mistakes pipeline use. A product joins the lanes by providing it.
 CANONICAL_GATE = ["bash", "scripts/hooks/pre-push-gate.sh", "affected"]
+SENSITIVE_PR_LABEL = "sensitive-surface"
 
 
 def check_commands(paths: list[str]) -> list[list[str]]:
@@ -254,6 +286,33 @@ def check_commands(paths: list[str]) -> list[list[str]]:
     if any(not DOC_FILE.search(p) for p in paths):
         return [CANONICAL_GATE]
     return []
+
+
+def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, list[str]]:
+    """Run an independent max-effort Codex review; an ambiguous response fails closed."""
+    review_prompt = host.state / "runs" / f"PR{pr['number']}-{pr['headRefOid'][:12]}-llm-review.md"
+    review_prompt.parent.mkdir(parents=True, exist_ok=True)
+    review_prompt.write_text("\n".join([
+        f"Independently review sensitive-surface PR #{pr['number']} at {pr['headRefOid']}.",
+        "Review only; do not edit, commit, push, comment, or mutate external state.",
+        "Inspect `git diff origin/main...HEAD` for security, auth/billing/infra boundary failures,",
+        "migration safety, missing failure-path tests, and unintended scope. Existing deterministic",
+        "gates run separately. End with exactly `LLM-REVIEW: PASS` only if no blocking finding exists;",
+        "otherwise end with `LLM-REVIEW: FAIL — <concise blocking findings>`.",
+    ]))
+    last = worktree / ".codex-last-message.txt"
+    last.unlink(missing_ok=True)
+    command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),
+               "--cwd", str(worktree), "--reasoning-effort", "xhigh"]
+    try:
+        ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+    except subprocess.TimeoutExpired:
+        return False, ["llm-review-timeout"]
+    verdict = last.read_text(errors="replace").strip() if last.exists() else ""
+    if ran.returncode == 0 and verdict.endswith("LLM-REVIEW: PASS"):
+        return True, []
+    detail = verdict[-1000:] if verdict else f"reviewer-exit:{ran.returncode}"
+    return False, [f"llm-review-failed:{detail}"]
 
 
 # ---------------------------------------------------------------- plumbing
@@ -417,7 +476,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
-            receipt.update(verify_and_land(host, issue, branch, worktree, log, started))
+            receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
+                                           sensitive=issue_is_sensitive(issue)))
             log.flush()
             declined = not_shippable_reason((runs / f"{run_id}.log").read_text(errors="replace")[-20000:])
             if declined and receipt.get("verdict") == "no-change":
@@ -439,7 +499,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
 
 
 def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, started: float,
-                    opened: bool = False) -> dict:
+                    opened: bool = False, sensitive: bool = False) -> dict:
     """Independent of the agent's own claim: find its PR, re-derive the diff, run checks, then land."""
     listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"{issue.identifier} in:title",
                  "--json", "number,headRefName,headRefOid,createdAt,url,isDraft"], log=log)
@@ -455,8 +515,14 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
             "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
             "--body", f"Lane run for {issue.identifier}. Verification by the lane gate."], cwd=worktree, log=log)
-        return verify_and_land(host, issue, branch, worktree, log, started, opened=True)
-    return gate_pr(host, max(prs, key=lambda item: item["createdAt"]), worktree, log)
+        return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
+    pr = max(prs, key=lambda item: item["createdAt"])
+    if sensitive:
+        sh(["gh", "label", "create", SENSITIVE_PR_LABEL, "--repo", REPO_SLUG, "--force",
+            "--color", "B60205", "--description", "Guarded auth/billing/infra lane policy"], log=log)
+        sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
+            "--add-label", SENSITIVE_PR_LABEL], log=log)
+    return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
 def gate_slot(host: Host) -> Locked:
@@ -482,13 +548,13 @@ def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
     return count
 
 
-def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
+def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
     sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], cwd=worktree, log=log)
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
-    reasons = gate_rules(changes)
+    reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
     evidence = []
     result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
               "changedFiles": len(changes), "reasons": reasons}
@@ -513,6 +579,10 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
                     reasons.append(f"check-failed:{' '.join(command[:6])}")
                     evidence += [line for line in log_tail(log).splitlines()
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
+            if sensitive and not reasons:
+                passed, review_reasons = sensitive_review(host, pr, worktree, log)
+                if not passed:
+                    reasons.extend(review_reasons)
         finally:
             if seat is not None:
                 seat.release()
@@ -792,7 +862,8 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
             sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            receipt.update(gate_pr(host, pr, worktree, log))
+            labels = {label["name"].lower() for label in pr.get("labels", [])}
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
@@ -820,7 +891,7 @@ def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
     return prs
 
 
-PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository"
+PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
 
 
 def repo_prs() -> list[dict]:
@@ -919,7 +990,8 @@ def worker(host: Host, name: str) -> int:
         issue = None
         if red is None and adopt is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues())
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues(),
+                               provider=name)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
             if issue:

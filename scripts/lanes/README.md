@@ -32,6 +32,7 @@ The harness, not the model, owns:
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run, bank exhausted ones until their reset | `codex_lane.py` |
+| Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
@@ -75,6 +76,13 @@ in the worktree. Usage-limit, rate-limit and auth messages in codex's output ban
 account until the reset it reports (default 5h). `codex_lane.py status` is the JSON the
 HUD and doctor read; `health` exits non-zero when no account is available, which keeps
 the lane from dispatching at all.
+
+Auth, billing, payment, infrastructure, and Vercel labels are admitted only by this lane.
+Those runs use maximum reasoning effort, carry the `sensitive-surface` PR label across
+hosts, and stay draft until the normal Migration Guard/security/boundary checks plus a
+separate max-effort Codex review pass. `no-symphony`, secret/credential rotation, and
+live billing pricing remain excluded. Other providers retain their sensitive-label
+exclusions.
 
 ## Install on a host
 
