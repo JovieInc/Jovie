@@ -1,3 +1,4 @@
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { trackServerEvent } from '@/lib/server-analytics';
 import type { NotificationChannel } from '@/types/notifications';
 
@@ -83,6 +84,10 @@ export const trackSubscribeAttempt = async (
     email_length: props.email_length,
     phone_length: props.phone_length,
   });
+  await recordFunnelStep({
+    funnel: 'fan_subscribe',
+    step: 'contact_submitted',
+  });
 };
 
 /**
@@ -97,6 +102,12 @@ export const trackSubscribeError = async (
     validation_errors: props.validation_errors,
     source: props.source,
     source_context: props.source_context,
+  });
+  await recordFunnelStep({
+    funnel: 'fan_subscribe',
+    step: 'contact_submitted',
+    outcome: 'error',
+    reason: props.error_type,
   });
 };
 

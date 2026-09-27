@@ -115,8 +115,6 @@ export function useDspMatchesQuery({
     queryFn: ({ signal }) => fetchDspMatches(profileId, status, signal),
     enabled: enabled && !!profileId,
     ...STABLE_CACHE,
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 

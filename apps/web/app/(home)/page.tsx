@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SignupFunnelBeacon } from '@/components/features/tracking/SignupFunnelBeacon';
 import {
   type HomepageCertifiedPreviews,
   HomepageCertifiedSections,
@@ -10,6 +11,7 @@ import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptC
 import { HERO_COPY } from '@/components/homepage/intent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -17,18 +19,11 @@ import {
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
-// Real public-profile exports (jov.ie/timwhite) for the two sections that
-// show product. Every other section is type only.
 const CERTIFIED_PREVIEWS = {
-  connected: getMarketingExportImage('tim-white-profile-listen-mobile'),
-  relationships: [
-    getMarketingExportImage('tim-white-profile-subscribe-mobile'),
-    getMarketingExportImage('tim-white-profile-pay-mobile'),
-    getMarketingExportImage('tim-white-profile-tour-mobile'),
-  ],
+  connected: HOMEPAGE_MEDIA_MAP.connected.asset,
+  relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
 } as const satisfies HomepageCertifiedPreviews;
 
 export const revalidate = false;
@@ -181,6 +176,7 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+      <SignupFunnelBeacon surface='homepage' />
       {children}
       <HomepageNoScriptContent />
     </>

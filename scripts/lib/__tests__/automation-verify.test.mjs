@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -14,14 +14,37 @@ import {
   buildVerificationEnv,
   CONTROL_TEST_CONCURRENCY,
   controlCoverageReportsDirectory,
+  formatAffectedTestPlanDiagnostic,
   runCommandStatus,
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 
+describe('affected-test selector inventory', () => {
+  it('references only existing scripts tests', () => {
+    const selector = readFileSync(
+      resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+      'utf8'
+    );
+    const referencedTests = [
+      ...selector.matchAll(
+        /['"](scripts\/[^'"]+\.test\.(?:mjs|cjs|js|ts|tsx))['"]/g
+      ),
+    ].map(match => match[1]);
+
+    expect(referencedTests.length).toBeGreaterThan(0);
+    expect(
+      [...new Set(referencedTests)].filter(
+        testFile =>
+          !existsSync(resolve(import.meta.dirname, '../../..', testFile))
+      )
+    ).toEqual([]);
+  });
+});
+
 describe('structural control stage execution', () => {
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(16);
+    expect(stages).toHaveLength(17);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -98,6 +121,18 @@ describe('structural control stage execution', () => {
       [
         '--test',
         '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/vercel-output-validate.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=85',
+        '--test-coverage-functions=90',
+        '.github/scripts/vercel-output-validate.test.mjs',
+      ],
+    ]);
+    expect(stages[15]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
         '--test-coverage-include=.github/scripts/production-input-provenance.mjs',
         '--test-coverage-lines=85',
         '--test-coverage-branches=75',
@@ -105,7 +140,7 @@ describe('structural control stage execution', () => {
         '.github/scripts/production-input-provenance.test.mjs',
       ],
     ]);
-    expect(stages[15]).toEqual([
+    expect(stages[16]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);
@@ -974,7 +1009,6 @@ describe('automation-verify affected scope', () => {
       'scripts/fleet-gate/tests/gem-priority-gate.test.py',
       'scripts/lib/ownerless-recovery-policy.mjs',
       'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-      'scripts/lib/__tests__/queue-deferred-release.test.mjs',
       'scripts/invariants/registry.test.mjs',
       'scripts/tests/test_agent_workflow_hygiene.py',
       ...AFFECTED_TEST_SELECTOR_MANIFEST,
@@ -992,7 +1026,6 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-        'scripts/lib/__tests__/queue-deferred-release.test.mjs',
       ],
       nodeTests: [
         'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
@@ -2287,9 +2320,73 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  it('maps a unit-test-only diff to its focused Vitest command', () => {
+    const testFile =
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts';
+    const plan = buildAffectedTestPlan([testFile]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([testFile]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
+  it('maps a known fixture-only diff to its focused Vitest command', () => {
+    const fixture =
+      'apps/web/tests/unit/design-system/arbitrary-values.baseline.json';
+    const testFile =
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts';
+    const plan = buildAffectedTestPlan([fixture]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual([testFile]);
+    expect(plan.selectedTests).toEqual([testFile]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+    expect(
+      buildAffectedTestPlan([fixture], {
+        isFileAvailable: file => file !== testFile,
+      }).mode
+    ).toBe('full');
+  });
+
   it('fails closed when a web source has no test lane', () => {
-    expect(buildAffectedTestPlan(['apps/web/lib/unknown.ts']).mode).toBe(
-      'full'
+    const plan = buildAffectedTestPlan(['apps/web/lib/unknown.ts']);
+
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'uncovered source path(s): apps/web/lib/unknown.ts'
+    );
+    expect(formatAffectedTestPlanDiagnostic(plan)).toBe(
+      '[affected-tests] mode=full related=1 mandatory=0 fallbackReason="uncovered source path(s): apps/web/lib/unknown.ts"'
     );
   });
 

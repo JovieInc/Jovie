@@ -26,6 +26,7 @@ import {
 } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
@@ -61,6 +62,8 @@ interface ProfileHomeRailProps {
    * the LCP image, so it must load with priority instead of lazy.
    */
   readonly pacArtPriority?: boolean;
+  /** Rotating accent for the featured Listen card (mode-card-accent.ts). */
+  readonly featuredAccent?: ProfileCardAccentAssignment;
 }
 
 function getUpcomingTourDates(
@@ -186,6 +189,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   releases = [],
   hasTip = false,
   pacArtPriority = false,
+  featuredAccent,
 }: Readonly<ProfileHomeRailProps>) {
   // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
@@ -393,41 +397,44 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       />
     );
 
-  // One screen, one primary focus: the carousel IS the home surface. The PAC
-  // card is the featured first card; the alerts card is the last card. Both
-  // render inside the same fixed card geometry — no stacked sections.
+  // Pen parity (Tim, 2026-09-26): the PAC is the featured Listen mode card
+  // under the identity header. The rest of the highlights (back catalog,
+  // merch, shows, alerts) follow in the same carousel as before.
+  const hasCarouselContent = carouselItems.length > 0 || alertsCard !== null;
   return (
     <div
       ref={exposureRef}
-      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full'
+      className='flex min-h-0 min-w-0 flex-1 flex-col gap-4 md:mx-auto md:w-full'
       data-testid='profile-home-rail'
     >
       <h2 className='sr-only'>Profile Highlights From {artist.name}</h2>
-      <ReleaseCatalogCarousel
-        items={carouselItems}
-        artistHandle={artist.handle}
-        artistId={artist.id}
-        analyticsEnabled={renderMode !== 'preview'}
-        leading={
-          hasPacSubject ? (
-            <ProfilePacCard
-              artist={artist}
-              release={pacRelease}
-              merchCard={merchCards[0] ?? null}
-              nextShow={pacNextShow}
-              hasTip={hasTip}
-              assignment={profilePacAssignment}
-              isSubscribed={isSubscribed}
-              renderMode={renderMode}
-              layout='profile-landscape'
-              artPriority={pacArtPriority}
-              hasPlayableDestinations={hasPlayableDestinations}
-              captureEnabled={captureEnabled}
-            />
-          ) : null
-        }
-        trailing={alertsCard}
-      />
+      {hasPacSubject ? (
+        <ProfilePacCard
+          artist={artist}
+          release={pacRelease}
+          merchCard={merchCards[0] ?? null}
+          nextShow={pacNextShow}
+          hasTip={hasTip}
+          assignment={profilePacAssignment}
+          isSubscribed={isSubscribed}
+          renderMode={renderMode}
+          layout='profile-landscape'
+          presentation='featured'
+          accent={featuredAccent}
+          artPriority={pacArtPriority}
+          hasPlayableDestinations={hasPlayableDestinations}
+          captureEnabled={captureEnabled}
+        />
+      ) : null}
+      {hasCarouselContent ? (
+        <ReleaseCatalogCarousel
+          items={carouselItems}
+          artistHandle={artist.handle}
+          artistId={artist.id}
+          analyticsEnabled={renderMode !== 'preview'}
+          trailing={alertsCard}
+        />
+      ) : null}
     </div>
   );
 });

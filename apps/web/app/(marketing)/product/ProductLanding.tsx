@@ -1,11 +1,19 @@
 import {
   MarketingHero,
+  MarketingHeroPhoto,
   MarketingPageShell,
   MarketingSurfaceCard,
 } from '@/components/marketing';
-import { PRODUCT_COPY } from '@/data/productCopy';
+import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
+import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
 import { ProductClaimHandleForm } from './ProductClaimHandleForm';
 import './ProductLanding.css';
+
+const PRODUCT_HERO_PHOTO = {
+  src: '/images/marketing-hero/product.webp',
+  width: 1600,
+  height: 901,
+} as const;
 
 function ProductClaimCard() {
   const { claimCard } = PRODUCT_COPY;
@@ -43,7 +51,8 @@ export function ProductLanding() {
 
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
-      <div className='product-hero relative overflow-hidden'>
+      <div className='product-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
+        <MarketingHeroPhoto {...PRODUCT_HERO_PHOTO} />
         <div
           aria-hidden='true'
           className='marketing-hero-backdrop pointer-events-none absolute inset-0'
@@ -70,6 +79,15 @@ export function ProductLanding() {
           <ProductClaimCard />
         </MarketingHero>
       </div>
+      <MarketingFooterCta
+        title='See what shows up when people search for you.'
+        body='Claim your Jovie profile free and start turning attention into relationships today.'
+        ctaLabel='Claim your Jovie'
+        ctaHref={PRODUCT_CLAIM_HREF}
+        ctaAnalyticsEvent='product_footer_cta_claim'
+        ctaAnalyticsSource='product_page_footer'
+        prefetch={false}
+      />
     </MarketingPageShell>
   );
 }

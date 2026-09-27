@@ -512,7 +512,9 @@ export function ReleaseLandingPage({
 
         {/* Footer — always pinned at bottom */}
         <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
-          <SmartLinkPoweredByFooter />
+          <SmartLinkPoweredByFooter
+            reportHref={`${APP_ROUTES.REPORT}?type=smart_link${tracking?.smartLinkSlug ? `&target=${encodeURIComponent(tracking.smartLinkSlug)}` : ''}`}
+          />
         </div>
       </div>
 

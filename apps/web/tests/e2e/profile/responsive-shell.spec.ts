@@ -23,6 +23,10 @@ import { type Page, test } from '@playwright/test';
 import { expect } from '../setup';
 import { getOverflowingElements } from '../utils/mobile-overflow';
 import {
+  expectCenteredPhoneColumn,
+  PROFILE_DESKTOP_SURFACE_SHIPPED,
+} from '../utils/profile-desktop-surface';
+import {
   PROFILE_MATRIX_ROUTES,
   PROFILE_RESPONSIVE_VIEWPORTS,
   type ProfileMatrixRoute,
@@ -118,7 +122,7 @@ async function assertBottomTabBarState(
       const expectedLabelByMode: Record<string, string> = {
         profile: 'Home',
         listen: 'Music',
-        tour: 'Shows',
+        tour: 'Events',
         about: 'About',
       };
       const expectedLabel = expectedLabelByMode[route.expectedActiveTab];
@@ -129,6 +133,28 @@ async function assertBottomTabBarState(
         ).toHaveAttribute('aria-label', expectedLabel);
       }
     }
+  } else if (
+    route.showsBottomTabBar &&
+    viewport.width >= 1180 &&
+    !PROFILE_DESKTOP_SURFACE_SHIPPED
+  ) {
+    // Default build: desktop keeps the mobile profile in a centered phone
+    // column, and its dock stays inside that column.
+    await expect(
+      tabBar,
+      `${label} should keep the bottom tab bar in the desktop phone column`
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    await expectCenteredPhoneColumn(page);
+    const [column, dock] = await Promise.all([
+      page.locator('[data-testid="profile-compact-shell"]').boundingBox(),
+      tabBar.boundingBox(),
+    ]);
+    expect(column, `${label} compact column`).not.toBeNull();
+    expect(dock, `${label} dock`).not.toBeNull();
+    expect(dock!.x).toBeGreaterThanOrEqual(column!.x - 1);
+    expect(dock!.x + dock!.width).toBeLessThanOrEqual(
+      column!.x + column!.width + 1
+    );
   } else if (!route.showsBottomTabBar || viewport.width >= 1180) {
     if (viewport.width >= 1180 && route.showsBottomTabBar) {
       await expect(

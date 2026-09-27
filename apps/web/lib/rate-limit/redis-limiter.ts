@@ -11,6 +11,35 @@ import { env } from '@/lib/env-server';
 import { getRedis } from '@/lib/redis';
 import type { RateLimitConfig } from './types';
 
+const REDIS_FALLBACK_MESSAGE =
+  'Rate limiter falling back to in-memory store — Redis unconfigured';
+let hasWarnedRedisFallback = false;
+
+function warnRedisFallbackOnce(config: RateLimitConfig): void {
+  if (hasWarnedRedisFallback) return;
+  hasWarnedRedisFallback = true;
+
+  console.error(REDIS_FALLBACK_MESSAGE);
+  Sentry.captureMessage(REDIS_FALLBACK_MESSAGE, {
+    level: 'error',
+    tags: {
+      limiter: config.name,
+      'rate_limit.prefix': config.prefix,
+    },
+    extra: {
+      algorithm: config.algorithm,
+      analytics: config.analytics ?? false,
+      limit: config.limit,
+      window: config.window,
+    },
+  });
+}
+
+/** Test-only helper to reset the process-scoped fallback warning. */
+export function resetRedisFallbackWarningForTests(): void {
+  hasWarnedRedisFallback = false;
+}
+
 /**
  * Parse window string to Upstash duration format
  * Converts '1 m' to '1m', '1 h' to '1h', etc.
@@ -43,9 +72,7 @@ export function createRedisRateLimiter(
   const redisClient = getRedis();
   if (!redisClient) {
     if (env.NODE_ENV === 'production') {
-      const message = `[CRITICAL] Rate limiter "${config.name}" falling back to in-memory store — rate limits will NOT persist across deploys or instances. Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.`;
-      console.error(message);
-      Sentry.captureMessage(message, 'error');
+      warnRedisFallbackOnce(config);
     }
     return null;
   }

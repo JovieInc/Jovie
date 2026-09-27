@@ -81,6 +81,48 @@ export const HOMEPAGE_LAUNCH_COPY = {
         ],
       },
     ],
+    // JOV-6300 locked multi-hyphenate treatment. One approved subject
+    // (customer-zero Tim White) stays constant while emphasis shifts across
+    // three contextual lenses. Renders inside the relationships chapter as a
+    // bounded refinement of the "Built around who you are." outcome.
+    identity: {
+      opening: 'You are not one thing.',
+      payoff: 'One identity. Every side of you.',
+      subject: {
+        name: TIM_WHITE_PROFILE.name,
+        profileDisplay: TIM_WHITE_PROFILE.publicProfileDisplay,
+        portrait: {
+          src: TIM_WHITE_PROFILE.avatarSrc,
+          alt: 'Portrait of Tim White',
+          width: 640,
+          height: 640,
+          // Asset record: source public/images/avatars/tim-white.jpg;
+          // customer-zero founder consent and image rights on file;
+          // approved square crop 1:1; privacy-approved for homepage use;
+          // mobile fallback is the same asset at a smaller rendered size.
+          rights: 'customer-zero-founder-approved',
+          crop: 'square-1x1',
+          mobileFallback: 'same-asset-scaled',
+        },
+      },
+      lenses: [
+        {
+          id: 'listener',
+          label: 'Listener',
+          emphasis: 'Artist. Releases. Shows.',
+        },
+        {
+          id: 'collaborator',
+          label: 'Collaborator',
+          emphasis: 'Producer. Credits. Contact.',
+        },
+        {
+          id: 'investor',
+          label: 'Investor',
+          emphasis: 'Founder. Company. Work.',
+        },
+      ],
+    },
     close: {
       headline: 'Take control of your presence.',
       action: 'Find your profile',

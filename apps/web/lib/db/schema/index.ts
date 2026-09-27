@@ -5,6 +5,15 @@
  * using explicit named exports for deterministic tree-shaking.
  */
 
+// Pixel Tracking (Events, Creator Configs)
+export {
+  type AcquisitionFirstTouch,
+  type AcquisitionJourney,
+  acquisitionJourneys,
+  insertAcquisitionJourneySchema,
+  type NewAcquisitionJourney,
+  selectAcquisitionJourneySchema,
+} from './acquisition';
 // Admin
 export {
   type AdminAuditLog,
@@ -137,6 +146,7 @@ export {
   baOauthConsents,
   baOauthRefreshTokens,
   baOauthResources,
+  baPasskeys,
   baSessions,
   baUsers,
   baVerifications,
@@ -974,7 +984,6 @@ export {
   type OvieOperatingKvRow,
   ovieOperatingKv,
 } from './ovie';
-// Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
   creatorPixels,

@@ -56,6 +56,9 @@ export interface DiscoveredPixels {
   facebook?: DiscoveredPixelPlatform;
   tiktok?: DiscoveredPixelPlatform;
   google?: DiscoveredPixelPlatform;
+  twitter?: DiscoveredPixelPlatform;
+  snapchat?: DiscoveredPixelPlatform;
+  pinterest?: DiscoveredPixelPlatform;
 }
 
 export interface CreatorDistributionEventMetadata {
@@ -277,7 +280,9 @@ export const creatorProfiles = pgTable(
     ),
     // Webhook lookup by Stripe Connect account id (JOV-1767). Partial: only
     // creators that have linked a Connect account.
-    stripeAccountIdIndex: index('idx_creator_profiles_stripe_account_id')
+    stripeAccountIdUnique: uniqueIndex(
+      'creator_profiles_stripe_account_id_unique'
+    )
       .on(table.stripeAccountId)
       .where(drizzleSql`stripe_account_id IS NOT NULL`),
   })

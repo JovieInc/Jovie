@@ -248,6 +248,8 @@ export class ChargeHandler implements WebhookHandler {
         invoiceId: invoice.id,
         chargeId: charge.id,
         amountRefunded: charge.amount_refunded,
+        disputedAmountCents:
+          eventType === 'charge_disputed' ? charge.amount : 0,
         ...extraMetadata,
       },
     });
