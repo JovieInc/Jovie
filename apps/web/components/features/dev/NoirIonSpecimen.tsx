@@ -159,7 +159,7 @@ export function NoirIonSpecimen() {
                 />
                 <div className='text-xs font-medium'>{surface.name}</div>
                 <div
-                  className='text-[11px]'
+                  className='text-xs'
                   style={{ color: 'var(--noir-ion-text-tertiary)' }}
                 >
                   {surface.role}
@@ -222,7 +222,7 @@ export function NoirIonSpecimen() {
                   </span>
                 </div>
                 <p
-                  className='mt-1 text-[11px]'
+                  className='mt-1 text-xs'
                   style={{ color: 'var(--noir-ion-text-muted)' }}
                 >
                   {accent.role}
@@ -284,7 +284,7 @@ export function NoirIonSpecimen() {
                     </td>
                     <td className='px-3 py-2'>
                       <span
-                        className='inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium'
+                        className='inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium'
                         style={{
                           background: 'var(--noir-ion-mint-soft)',
                           color: 'var(--noir-ion-mint)',
@@ -315,7 +315,7 @@ export function NoirIonSpecimen() {
                   </td>
                   <td className='px-3 py-2'>
                     <span
-                      className='inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium'
+                      className='inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium'
                       style={{
                         background: 'var(--noir-ion-gold-soft)',
                         color: 'var(--noir-ion-gold)',
@@ -340,7 +340,7 @@ export function NoirIonSpecimen() {
                   </td>
                   <td className='px-3 py-2'>
                     <span
-                      className='inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium'
+                      className='inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium'
                       style={{
                         background: 'var(--noir-ion-flare-soft)',
                         color: 'var(--noir-ion-flare)',
@@ -359,7 +359,7 @@ export function NoirIonSpecimen() {
             </table>
           </div>
           <p
-            className='mt-2 text-[11px]'
+            className='mt-2 text-xs'
             style={{ color: 'var(--noir-ion-text-tertiary)' }}
           >
             Status uses color plus label and shape. Color alone never carries
