@@ -50,6 +50,22 @@ its label, so the PR shows why it is waiting. The dispatch tick handles `green` 
 merge intent) and `orphan`. Run the workflow manually once to label the backlog that predates
 the relay.
 
+Gaps closed after the first week (no PR may sit unowned):
+
+- A fix attempt that ends without moving the head no longer parks the PR. The same head goes
+  to the next lane in cost order; only a running attempt (3h lease) holds it.
+- `lane-fix-dequeued` is answered first without a model: the tick asks GitHub to merge main
+  into the branch (`update-branch`, exact head, no force), which gives the queue a new head.
+  Once per stuck episode; a second removal goes to a model with the merge group's failing log.
+- Every 30 minutes the tick reconciles all open PRs in a few GraphQL pages (missed events
+  only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
+  draft idle for 48h gets `stale` (or is closed when superseded or out of attempts, its issue
+  back to Todo), and a PR that went CLEAN or entered the queue starts a fresh episode.
+- Invariant: every open non-draft PR is in the merge queue, carries a `lane-fix-*` label the
+  lanes will still act on, or is held with a reason (a hold label, or `lane-fix-exhausted`
+  after bug intake). Anything else is listed in `reconcile.json` and raised by the doctor as
+  `orphan-prs`, which opens a Triage issue for Summer. Counts are published under `prs`.
+
 Held reason codes (`held.json`): `secret-file`, `fix-exhausted`, `empty-diff`, `diff-too-large`,
 `lockfile-without-manifest`, `missing-test`, `gate-check-failed`, `gate-timeout`, `unclassified`.
 Green CI overrides only `gate-check-failed` and `gate-timeout`, which are verdicts from the local
@@ -65,7 +81,7 @@ Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony d
 to Done; a key that fires again within six hours reopens the same issue. Keys:
 `tick-error`, `provider-down:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
 `pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `github-quota`,
-`hud-stale`.
+`hud-stale`, `orphan-prs`.
 
 ## Codex lane
 
