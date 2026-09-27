@@ -81,10 +81,10 @@ describe('HomepageNoScriptContent', () => {
     // The only conversion is the name search; the fallback links it to /start.
     const links = [...(section?.querySelectorAll('a') ?? [])];
     expect(links.map(link => link.textContent)).toEqual([
-      'Request access',
+      'Find me',
       'Contact support',
     ]);
-    expect(links[0]?.getAttribute('href')).toBe('/signup');
+    expect(links[0]?.getAttribute('href')).toBe('/start');
     expect(text).not.toMatch(/Get started|Drop more music|waitlist/i);
   });
 

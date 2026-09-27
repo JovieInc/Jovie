@@ -212,13 +212,13 @@ test.describe('Synthetic Monitoring - Legacy OTP Signup (JOV-2446 cutover)', () 
       await waitForHydration(page);
       await assertNoFrontDoorConfigErrors(page);
 
-      const primaryCta = page.getByTestId(HOMEPAGE_PRIMARY_CTA_TEST_ID);
-      await expect(primaryCta).toBeVisible({
+      await expect(page.getByTestId(HOMEPAGE_PRIMARY_CTA_TEST_ID)).toBeVisible({
         timeout: 15000,
       });
+      await expect(page.getByPlaceholder('Search your name')).toBeVisible();
 
       console.log('[Synthetic][legacy] Step 3: Sign up flow test');
-      await primaryCta.click();
+      await page.getByRole('link', { name: 'Request access' }).first().click();
       await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
         timeout: 20000,
       });

@@ -1,7 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 /**
  * Keep the homepage useful when JavaScript is unavailable.
@@ -16,9 +14,9 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
  */
 export function HomepageNoScriptContent() {
   const { hero, certified } = HOMEPAGE_LAUNCH_COPY;
-  const primary = FEATURE_FLAGS.WAITLIST_ENABLED
-    ? getHomepageFrontDoorCtaContract(true).primary
-    : { href: APP_ROUTES.START, label: certified.close.action };
+  // No-JS visitors cannot run the search widget. The same certified action
+  // still hands off to /start (JOV-5085). Waitlist does not replace it.
+  const primary = { href: APP_ROUTES.START, label: hero.search.action };
 
   return (
     <section
