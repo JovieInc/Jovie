@@ -100,7 +100,6 @@ import {
   PageToolbarTabButton,
   TableEmptyState,
   UnifiedTable,
-  UnifiedTableSkeleton,
 } from '@/components/organisms/table';
 import {
   type ContextMenuItemType,
@@ -153,6 +152,11 @@ import {
   restoreRelease,
 } from '../dashboard/releases/actions';
 import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
+import {
+  LIBRARY_TABLE_MIN_WIDTH,
+  LIBRARY_TABLE_ROW_HEIGHT,
+  LIBRARY_TABLE_SKELETON_CONFIG,
+} from './LibraryLoadingState';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   attachLibraryProductGraph,
@@ -196,8 +200,6 @@ import {
   YouTubeOptimizationPanel,
 } from './YouTubeAssetDrawerPanels';
 
-const LIBRARY_TABLE_ROW_HEIGHT = 56;
-const LIBRARY_TABLE_MIN_WIDTH = '0';
 const EMPTY_RELATIONSHIPS: readonly LibraryRelationshipView[] = [];
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)';
@@ -211,23 +213,6 @@ const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
   'w-8 min-w-8'
 );
-const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
-  readonly width?: string;
-  readonly variant?:
-    | 'text'
-    | 'avatar'
-    | 'badge'
-    | 'button'
-    | 'release'
-    | 'meta';
-}> = [
-  { variant: 'release', width: '100%' },
-  { variant: 'badge', width: '108px' },
-  { variant: 'badge', width: '92px' },
-  { variant: 'text', width: '88px' },
-  { variant: 'meta', width: '72px' },
-  { variant: 'text', width: '96px' },
-];
 
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
@@ -284,7 +269,7 @@ const SORT_LABELS: Record<LibrarySortKey, string> = {
   providers: 'Providers',
 };
 
-const PRESETS: readonly {
+export const PRESETS: readonly {
   readonly id: LibraryPresetId;
   readonly label: string;
   readonly description: string;
@@ -657,7 +642,7 @@ const LIBRARY_CATALOG_COLUMNS = [
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
-const LIBRARY_TABLE_COLUMNS = [
+export const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.accessor('title', {
     id: 'release',
     header: 'Item',
@@ -718,48 +703,6 @@ const LIBRARY_TABLE_COLUMNS = [
   }),
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
-
-const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
-
-export function LibraryLoadingState() {
-  return (
-    <PageShell
-      aria-busy='true'
-      aria-label='Loading Library'
-      frame='content-container'
-      contentPadding='none'
-      data-testid='library-surface-loading'
-      toolbar={
-        <PageToolbar
-          start={
-            <div
-              className='flex min-w-0 flex-wrap items-center gap-1'
-              data-testid='library-view-filter-chips'
-            >
-              {LIBRARY_VIEW_FILTER_CHIP_KEYS.map(key => (
-                <span
-                  key={key}
-                  className='inline-block h-8 w-16 rounded-full skeleton motion-reduce:animate-none'
-                  aria-hidden='true'
-                />
-              ))}
-            </div>
-          }
-        />
-      }
-    >
-      <UnifiedTableSkeleton<LibraryReleaseAsset>
-        columns={LIBRARY_TABLE_COLUMNS}
-        hideHeader
-        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
-        minWidth={LIBRARY_TABLE_MIN_WIDTH}
-        skeletonRows={SKELETON_ROW_COUNT.TABLE}
-        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-        containerClassName='h-full'
-      />
-    </PageShell>
-  );
-}
 
 function LibraryViewFilterChips({
   assets,

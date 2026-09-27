@@ -156,7 +156,7 @@ export const APP_SCREEN_CANVAS_EXCEPTIONS: Readonly<
   // Existing Library loading canvas remains source-bound while the active
   // Library PR stack is reconciled; this batch must not silently rewrite it.
   'apps/web/app/app/(shell)/library/page.tsx': screenOwned({
-    source: 'apps/web/app/app/(shell)/library/LibrarySurface.tsx',
+    source: 'apps/web/app/app/(shell)/library/LibraryLoadingState.tsx',
     component: 'PageShell',
     enclosingFunction: 'LibraryLoadingState',
   }),
