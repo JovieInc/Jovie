@@ -8,7 +8,10 @@ import {
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
 
-const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
+const { trackAction, mockPush } = vi.hoisted(() => ({
+  trackAction: vi.fn(),
+  mockPush: vi.fn(),
+}));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: trackAction,
 }));
@@ -17,10 +20,11 @@ const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
 beforeEach(() => {
   gate.WAITLIST_ENABLED = false;
+  mockPush.mockClear();
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -44,42 +48,47 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
-  it('attributes a standalone closing access action to its caller', () => {
+  it('keeps Search your name → Find me → /start when the waitlist gate is on', () => {
+    gate.WAITLIST_ENABLED = true;
+    renderHero();
+
+    const input = screen.getByRole('combobox');
+    expect(input).toHaveAttribute('placeholder', 'Search your name');
+    expect(screen.getByRole('button', { name: 'Find me' })).toBeEnabled();
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Get started')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'Ada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Find me' }));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const destination = String(mockPush.mock.calls[0]?.[0]);
+    expect(destination.startsWith('/start?')).toBe(true);
+    expect(
+      new URL(destination, 'https://jov.ie').searchParams.get('starter_prompt')
+    ).toContain('Ada');
+  });
+
+  it('keeps the standalone primary action on the name search when gated', () => {
     gate.WAITLIST_ENABLED = true;
     render(
       <HomepagePrimaryAction
-        submitTestId='closing-access'
-        submitAnalytics={{
-          eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-          properties: { placement: 'close' },
-        }}
+        appearance='editorial'
+        placeholder='Search your name'
+        submitLabel='Find me'
+        submitTestId='homepage-primary-cta'
       />
     );
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(action).toHaveAttribute('href', '/signup');
-    expect(action).toHaveAttribute('data-testid', 'closing-access');
-    expect(trackAction).toHaveBeenLastCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      { placement: 'close' }
+    expect(screen.getByPlaceholderText('Search your name')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+      'Find me'
     );
-  });
-  it('routes waitlist-on visitors to access with no name-search control', () => {
-    gate.WAITLIST_ENABLED = true;
-    renderHero();
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(trackAction).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      expect.objectContaining({ placement: 'hero' })
-    );
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(trackAction).not.toHaveBeenCalled();
   });
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();
