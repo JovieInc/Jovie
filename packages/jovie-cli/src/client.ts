@@ -1,5 +1,6 @@
 export const DEFAULT_BASE_URL = 'https://jov.ie';
-export const DEFAULT_TIMEOUT_MS = 10_000;
+export const DEFAULT_TIMEOUT_MS = 30_000;
+export const DEFAULT_USER_AGENT = 'jovie-cli';
 
 export type FetchImplementation = (
   input: string | URL,
@@ -11,6 +12,7 @@ export type ResourceOptions = {
   readonly fetchImpl?: FetchImplementation;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+  readonly userAgent?: string;
 };
 
 export class JovieInputError extends Error {
@@ -30,7 +32,9 @@ export class JovieRequestError extends Error {
     readonly url: string,
     readonly status?: number,
     readonly responseBody?: string,
-    readonly retryAfterSeconds?: number
+    readonly retryAfterSeconds?: number,
+    /** Stable server error code (e.g. RATE_LIMITED) when the API sent one. */
+    readonly apiCode?: string
   ) {
     super(message);
     this.name = 'JovieRequestError';
@@ -99,24 +103,43 @@ function parseRetryAfterSeconds(
   return Math.max(0, Math.ceil((retryAtMs - nowMs) / 1000));
 }
 
+function parseApiCode(body: string): string | undefined {
+  try {
+    const code = (JSON.parse(body) as { error?: { code?: unknown } }).error
+      ?.code;
+    return typeof code === 'string' ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function request(
   pathname: string,
   accept: string,
-  options: ResourceOptions
+  options: ResourceOptions,
+  jsonBody?: unknown
 ): Promise<{ readonly body: string; readonly url: string }> {
   const baseUrl = normalizeBaseUrl(options.baseUrl);
   const url = resourceUrl(baseUrl, pathname);
+  const method = jsonBody === undefined ? 'GET' : 'POST';
   let response: Response;
 
   try {
     response = await getFetch(options)(url, {
-      method: 'GET',
-      headers: { Accept: accept },
+      method,
+      headers: {
+        Accept: accept,
+        'User-Agent': options.userAgent ?? DEFAULT_USER_AGENT,
+        ...(jsonBody === undefined
+          ? {}
+          : { 'Content-Type': 'application/json' }),
+      },
+      ...(jsonBody === undefined ? {} : { body: JSON.stringify(jsonBody) }),
       signal: requestSignal(options),
     });
   } catch (error) {
     throw new JovieRequestError(
-      `GET ${url} failed: ${errorMessage(error)}`,
+      `${method} ${url} failed: ${errorMessage(error)}`,
       url
     );
   }
@@ -124,11 +147,12 @@ async function request(
   const body = await response.text();
   if (!response.ok) {
     throw new JovieRequestError(
-      `GET ${url} returned HTTP ${response.status}`,
+      `${method} ${url} returned HTTP ${response.status}`,
       url,
       response.status,
       body.slice(0, 1_000),
-      parseRetryAfterSeconds(response.headers.get('retry-after'))
+      parseRetryAfterSeconds(response.headers.get('retry-after')),
+      parseApiCode(body)
     );
   }
 
@@ -137,14 +161,20 @@ async function request(
 
 async function requestJson(
   pathname: string,
-  options: ResourceOptions
+  options: ResourceOptions,
+  jsonBody?: unknown
 ): Promise<unknown> {
-  const { body, url } = await request(pathname, 'application/json', options);
+  const { body, url } = await request(
+    pathname,
+    'application/json',
+    options,
+    jsonBody
+  );
   try {
     return JSON.parse(body) as unknown;
   } catch {
     throw new JovieRequestError(
-      `GET ${url} returned invalid JSON`,
+      `${jsonBody === undefined ? 'GET' : 'POST'} ${url} returned invalid JSON`,
       url,
       undefined,
       body.slice(0, 1_000)
@@ -203,4 +233,31 @@ export function fetchArtistLlms(
 ): Promise<string> {
   const normalized = validateUsername(username);
   return requestText(`/${encodeURIComponent(normalized)}/llms.txt`, options);
+}
+
+/**
+ * Create (or find) a Jovie profile for a Spotify artist. Returns the public
+ * profile URL and, when unclaimed, a claim URL the human opens to verify
+ * ownership. Anonymous and rate limited per IP.
+ */
+export function createProfile(
+  spotifyArtistUrl: string,
+  options: ResourceOptions = {}
+): Promise<unknown> {
+  let url: URL;
+  try {
+    url = new URL(spotifyArtistUrl.trim());
+  } catch {
+    throw new JovieInputError(`Invalid URL: ${spotifyArtistUrl}`);
+  }
+  if (
+    url.protocol !== 'https:' ||
+    !/(^|\.)spotify\.com$/.test(url.hostname) ||
+    !/^\/(intl-[a-z-]+\/)?artist\/[A-Za-z0-9]+\/?$/.test(url.pathname)
+  ) {
+    throw new JovieInputError(
+      'Expected a Spotify artist URL like https://open.spotify.com/artist/<id>.'
+    );
+  }
+  return requestJson('/api/agents/profiles', options, { url: url.toString() });
 }
