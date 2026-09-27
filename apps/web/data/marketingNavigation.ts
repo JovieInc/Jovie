@@ -28,39 +28,38 @@ export const MARKETING_CLI_LINK: MarketingFooterLink = {
   label: 'CLI',
 };
 
+export interface MarketingNavFlyoutMenu {
+  readonly id: string;
+  readonly label: string;
+  readonly heading: string;
+  readonly links: readonly MarketingNavLink[];
+}
+
+// Canonical Pen header (2026-09-26): Customers flyout, Product, Pricing.
 export const MARKETING_NAV_LINKS = [
-  { href: APP_ROUTES.ABOUT, label: 'About' },
-  { href: APP_ROUTES.PRODUCT, label: 'For Artists' },
+  { href: APP_ROUTES.PRODUCT, label: 'Product' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
 ] as const satisfies readonly MarketingNavLink[];
+
+/**
+ * Customers flyout (Pen vWrhR). Each audience routes to its own existing
+ * landing page. Audiences without one (Founders, Authors, Creators) are
+ * omitted until their page ships; never substitute an unrelated page.
+ */
+export const MARKETING_CUSTOMERS_FLYOUT = {
+  id: 'customers',
+  label: 'Customers',
+  heading: 'Customers',
+  links: [
+    { href: APP_ROUTES.INVESTORS, label: 'Investors' },
+    { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artists' },
+  ],
+} as const satisfies MarketingNavFlyoutMenu;
 
 export const MARKETING_NAV_UTILITIES = [
   { href: APP_ROUTES.SIGNIN, label: 'Log in' },
   { href: APP_ROUTES.START, label: 'Find yourself' },
 ] as const satisfies readonly MarketingNavLink[];
-
-export const MARKETING_FOR_FLYOUT_LINKS = [
-  {
-    href: APP_ROUTES.ARTIST_PROFILES,
-    label: 'Artists',
-    description: 'Release pages, audience capture, and fan reactivation.',
-  },
-  {
-    href: APP_ROUTES.PRODUCT,
-    label: 'Founders',
-    description: 'Show what you are building and give people a next step.',
-  },
-  {
-    href: APP_ROUTES.ARTIST_PROFILES,
-    label: 'Creators',
-    description: 'Turn profile traffic into durable audience ownership.',
-  },
-  {
-    href: APP_ROUTES.PRODUCT,
-    label: 'Authors',
-    description: 'A public page for the work, with a supported next step.',
-  },
-] as const satisfies readonly MarketingNavFlyoutLink[];
 
 export const MARKETING_TOOLS_FLYOUT_LINKS = [
   {
