@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 
 export const runtime = 'nodejs';
 
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest) {
       { error: 'Invalid acquisition evidence' },
       { status: 400 }
     );
+  }
+
+  // Secretless PR visual capture has no database. Keep the render probe
+  // deterministic without claiming that acquisition evidence was persisted.
+  if (isVisualCaptureSyntheticAuthEnabled()) {
+    return NextResponse.json({ recorded: false, linked: false });
   }
 
   if (parsed.data.action === 'revoke') {

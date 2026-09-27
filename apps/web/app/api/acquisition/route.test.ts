@@ -22,7 +22,19 @@ function request(acquisitionId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb') {
 describe('POST /api/acquisition', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     mockExecute.mockResolvedValue({ rows: [] });
+  });
+
+  it('stays database-free during secretless visual capture', async () => {
+    vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ recorded: false, linked: false });
+    expect(mockGetCachedAuth).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 
   it('records and links only the exact acquisition id for an authenticated user', async () => {
