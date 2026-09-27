@@ -169,6 +169,37 @@ describe('buildContentSecurityPolicy', () => {
     );
   });
 
+  // Hashes are taken from the production-minified next-themes script, one per
+  // ThemeProvider config CoreProviders emits. The forced-dark config was
+  // missing, so nonce-bearing routes like /waitlist blocked the FOUC script.
+  // Minifier or next-themes drift is caught by the Product Screenshots
+  // console gate (tests/product-screenshots/marketing-routes.spec.ts).
+  it.each([
+    [
+      'theme enabled, dark default',
+      '72V5U2XTMga8oD2MGpcgPdSLXnks+/+SSDhnTJpROjA=',
+    ],
+    [
+      'theme enabled, light default',
+      'zm0H100NPdOWVvvnI87sdTS9zsaC0K6AbychQyhdtE0=',
+    ],
+    [
+      'theme enabled, system default',
+      'U8qHNAYVONMkNDz+dKowqI4OkI0neY4A/sKEI0weOO8=',
+    ],
+    [
+      'theme disabled, forced dark',
+      'm28SzJyXJXbtlY+lqTklVWkSDAiE0+QMTXjTAQPO5zU=',
+    ],
+  ])('allows the next-themes script hash for %s', (_config, hash) => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+
+    expect(findDirective(csp, 'script-src')).toContain(`'sha256-${hash}'`);
+  });
+
   it('does not include report directives in enforcing CSP', () => {
     const csp = buildContentSecurityPolicy({ nonce: 'test-nonce' });
 
