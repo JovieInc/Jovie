@@ -62,6 +62,24 @@ describe('buildContentSecurityPolicy', () => {
     expect(frameSrc).not.toContain('https://vercel.live');
   });
 
+  it('allows native auth protocols in frame-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+      enableToolbar: false,
+    });
+    const frameSrc = findDirective(csp, 'frame-src');
+
+    expect(frameSrc?.split(' ')).toEqual(
+      expect.arrayContaining([
+        'jovie:',
+        'jovie-staging:',
+        'jovie-local:',
+        'ie.jov.jovie:',
+      ])
+    );
+  });
+
   it('includes vercel.com in connect-src from canonical registry', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',

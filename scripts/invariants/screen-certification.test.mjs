@@ -177,6 +177,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'registered'
     );
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
+    assert.equal(
+      kindOf('apps/web/app/(auth)/auth/native-return/page.tsx'),
+      'excluded'
+    );
+    assert.equal(kindOf('apps/web/app/auth-return/page.tsx'), 'excluded');
+    assert.equal(
+      kindOf('apps/web/app/mobile-auth-return/page.tsx'),
+      'excluded'
+    );
     assert.equal(kindOf('apps/web/app/error.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
     assert.equal(
