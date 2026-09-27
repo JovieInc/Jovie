@@ -84,10 +84,20 @@ describe('filterSettingsGroups', () => {
     ).toEqual([]);
   });
 
-  it('never surfaces operator controls via search', () => {
+  it('never surfaces operator controls via search, even for admins', () => {
     for (const query of ['admin', 'ops', 'ovie']) {
       expect(filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, query)).toEqual([]);
+      expect(
+        filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, query, { isAdmin: true })
+      ).toEqual([]);
     }
+  });
+
+  it('shows admins the same 11 items as creators', () => {
+    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '', {
+      isAdmin: true,
+    });
+    expect(groups.flatMap(group => group.items)).toHaveLength(11);
   });
 });
 

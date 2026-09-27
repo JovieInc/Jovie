@@ -25,6 +25,10 @@ export interface SettingsSidebarItem {
   readonly label: string;
   readonly href: string;
   readonly icon: LucideIcon;
+  /** Only rendered when the current user is an admin. */
+  readonly adminOnly?: boolean;
+  /** Optional native tooltip for rows whose purpose is not obvious. */
+  readonly title?: string;
 }
 
 export interface SettingsSidebarGroup {
@@ -132,13 +136,19 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
  * Customer settings carry no admin rows: operator controls live in Ovie
  * (JOV-6771), so admins and creators see the same settings IA.
  *
+ * - Admin-only items are dropped unless `isAdmin` is true.
  * - A query matches an item when it appears in the item label or the group
  *   label (case-insensitive substring).
  * - Groups with no visible items are dropped entirely.
  */
+export interface FilterSettingsGroupsOptions {
+  readonly isAdmin?: boolean;
+}
+
 export function filterSettingsGroups(
   groups: readonly SettingsSidebarGroup[],
-  query: string
+  query: string,
+  options: FilterSettingsGroupsOptions = {}
 ): SettingsSidebarGroup[] {
   const normalized = query.trim().toLowerCase();
 
@@ -146,6 +156,9 @@ export function filterSettingsGroups(
     .map(group => {
       const groupMatches = group.label.toLowerCase().includes(normalized);
       const items = group.items.filter(item => {
+        if (item.adminOnly && !options.isAdmin) {
+          return false;
+        }
         if (!normalized) {
           return true;
         }

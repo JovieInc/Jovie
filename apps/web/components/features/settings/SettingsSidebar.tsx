@@ -4,6 +4,7 @@ import { Input } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
@@ -27,11 +28,12 @@ export interface SettingsSidebarProps {
 
 export function SettingsSidebar({ className }: SettingsSidebarProps) {
   const pathname = usePathname();
+  const { isAdmin } = useDashboardData();
   const [query, setQuery] = useState('');
 
   const groups = useMemo(
-    () => filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, query),
-    [query]
+    () => filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, query, { isAdmin }),
+    [query, isAdmin]
   );
 
   return (
@@ -73,6 +75,7 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
                       <li key={item.id}>
                         <Link
                           href={item.href}
+                          title={item.title}
                           aria-current={active ? 'page' : undefined}
                           className={getSidebarNavRowClassName({
                             active,
