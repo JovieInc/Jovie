@@ -165,13 +165,24 @@ function pickCount(
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const start =
-    sources['github-native-merge-queue'].sourceTimestamp ??
-    sources['fleet-receipt'].sourceTimestamp;
-  const end =
-    sources['live-build-info'].sourceTimestamp ??
-    sources['production-controller'].sourceTimestamp;
+  const startObservation = sources['github-native-merge-queue'].sourceTimestamp
+    ? sources['github-native-merge-queue']
+    : sources['fleet-receipt'];
+  const endObservation = sources['live-build-info'].sourceTimestamp
+    ? sources['live-build-info']
+    : sources['production-controller'];
+  const start = startObservation.sourceTimestamp;
+  const end = endObservation.sourceTimestamp;
   if (start == null || end == null) return NOT_MEASURED_DURATION;
+  // Subtracting unrelated producer clocks without shared work/build identity
+  // fabricates a duration; only a matched exact SHA or work id ships this.
+  const startSha = startObservation.correlation.sha;
+  const endSha = endObservation.correlation.sha;
+  const sharedSha = isExactSha(startSha) && startSha === endSha;
+  const sharedWork =
+    startObservation.correlation.workId != null &&
+    startObservation.correlation.workId === endObservation.correlation.workId;
+  if (!sharedSha && !sharedWork) return NOT_MEASURED_DURATION;
   const startMs = Date.parse(start);
   const endMs = Date.parse(end);
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
@@ -367,7 +378,7 @@ export function projectShippingState(input: {
     meanings: projectMeanings(input.sources),
     timeToShipSeconds: timeToShip(input.sources),
     retrying: pickCount(input.sources, 'retrying'),
-    terminalFailures: pickCount(input.sources, 'blocked'),
+    terminalFailures: pickCount(input.sources, 'terminalFailures'),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
     operationalTasks: projectOperationalTasks(input),
   };

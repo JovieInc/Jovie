@@ -5,8 +5,11 @@ Owner: JOV-5899
 Implementation: `apps/docs/lib/article-metadata.mjs`
 
 Every `apps/docs/app/**/page.mdx` file is loaded into one registry during the
-docs build. Navigation, Pagefind search eligibility, sitemap generation, and
-related-guide lookup use the same registry and publication policy.
+docs build. Navigation, Pagefind search eligibility, sitemap generation,
+canonical URLs, structured data, permanent redirects, `llms.txt`, the
+`docs-index.json` machine-readable index, and related-guide lookup all use the
+same registry and publication policy (`apps/docs/lib/help-center-seo.mjs`).
+Non-primary pages emit `noindex`; every primary page emits one canonical URL.
 
 ## Frontmatter
 
@@ -70,8 +73,11 @@ silently reinterpreted.
 - A `reference` or `landing` document may use `status: published` without
   claiming that a customer feature is available.
 - `draft`, `uncertified`, `stale`, `retired`, and every `legacy` document are
-  excluded from all four primary consumers. Their MDX must also set
+  excluded from every primary consumer. Their MDX must also set
   `searchable: false`; the build fails if Pagefind disagrees with the registry.
+- Permanent redirects follow `docs/help-center/MIGRATION_MAP.md`. A redirect is
+  emitted only while its canonical destination is a live route, so no redirect
+  ever lands on a 404 or chains through another redirect.
 - Existing title-only product pages were migrated as `legacy` + `retired`.
   Their content was not certified by the migration.
 - A missing feature ID fails the build. A missing route fails the build instead

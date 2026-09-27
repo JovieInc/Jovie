@@ -24,6 +24,10 @@ describe('universal floor blocks in every register', () => {
     ['secret-material', 'Use key sk-live_abcdefghijklmnop1234 to connect.'],
     ['model-residue', 'Certainly! Here is your bio.'],
     ['model-residue', 'I hope this email finds you well.'],
+    ['ai-alibi', 'The model wrote this.'],
+    ['ai-alibi', 'GPT-6 Astra wrote this launch post.'],
+    ['ai-alibi', 'Blame Grok for how the launch landed.'],
+    ['ai-alibi', 'AI helped with the narrative.'],
     ['template-residue', 'Hey [insert name], your release is live.'],
     ['contempt-for-people', 'Most fans are sheep anyway.'],
     ['em-dash', 'Your music — everywhere.'],
@@ -115,6 +119,26 @@ describe('brand frame protects Tim and Jovie', () => {
 
   it('does not police a customer telling their own story', () => {
     expect(blocks('been there, still grinding', 'customer-voice')).toEqual([]);
+  });
+});
+
+describe('public narrative stays human-owned', () => {
+  it.each([
+    'Astra handled the comms for this launch.',
+    'Credit Fable for the community reception.',
+    'GPT-6 went over so well with the community.',
+    'The model drafted the release notes.',
+  ])('%s', text => {
+    expect(blocks(text, 'founder-tim')).toContain('ai-alibi');
+  });
+
+  it.each([
+    'Tim wrote the launch post and linked the receipts.',
+    'The launch reached 412 artists in its first week.',
+    'Astra benchmark accuracy improved by 12 percent.',
+    'Jovie uses AI to organize campaign tasks.',
+  ])('allows factual model or product references: %s', text => {
+    expect(blocks(text, 'founder-tim')).not.toContain('ai-alibi');
   });
 });
 

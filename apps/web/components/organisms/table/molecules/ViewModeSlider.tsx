@@ -60,7 +60,7 @@ const OPTION_ACTIVE_CLASS = 'text-primary-token';
 // a "has, focus-visible descendant" style arbitrary variant on the label.
 const OPTION_INPUT_CLASS = cn(
   'absolute inset-0 h-full w-full cursor-pointer appearance-none rounded-full border-0 bg-transparent p-0',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
 );
 
 /**

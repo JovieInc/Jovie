@@ -1,5 +1,5 @@
 .product-hero {
-  min-height: calc(100svh - var(--public-shell-header-offset));
+  min-height: 100svh;
 }
 
 .product-hero-glow {
@@ -7,7 +7,8 @@
 }
 
 .product-claim-card {
-  --product-claim-unclaimed: #ff8a3d;
+  /* Blue/purple/pink accent discipline (DESIGN.md) — never orange. */
+  --product-claim-unclaimed: var(--color-accent-pink);
 }
 
 .product-claim-card__status {

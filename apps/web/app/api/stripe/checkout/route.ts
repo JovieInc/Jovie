@@ -18,6 +18,7 @@ import {
 import {
   CheckoutCorrelationValidationError,
   hasCheckoutCorrelation,
+  mergeCheckoutCorrelation,
   parseCheckoutCorrelation,
 } from '@/lib/stripe/checkout-correlation';
 import { checkoutCorrelationIdempotencyPart } from '@/lib/stripe/checkout-correlation.server';
@@ -38,6 +39,7 @@ import {
   StripeRetryExhaustedError,
   withStripeRetry,
 } from '@/lib/stripe/retry';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -171,7 +173,12 @@ export async function POST(request: NextRequest) {
 
     let correlation;
     try {
-      correlation = parseCheckoutCorrelation(parsedBody.data);
+      correlation = mergeCheckoutCorrelation(
+        parseCheckoutCorrelation(parsedBody.data),
+        parseCheckoutCorrelation({
+          acquisitionId: request.cookies.get(ACQUISITION_COOKIE_NAME)?.value,
+        })
+      );
     } catch (error) {
       if (error instanceof CheckoutCorrelationValidationError) {
         return jsonError(error.message, 400);

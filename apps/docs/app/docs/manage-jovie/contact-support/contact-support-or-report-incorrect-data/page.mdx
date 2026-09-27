@@ -1,0 +1,96 @@
+---
+id: contact-support-or-report-incorrect-data
+title: Contact support or report incorrect data
+description: Escalate from Help Center context, report a profile or catalog mismatch, and send useful evidence without leaking sensitive information.
+documentType: guide
+category: manage-jovie
+productBacked: true
+featureId: support-and-incorrect-data-reporting
+productRoute: /support
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - contact support
+  - wrong data
+  - report incorrect data
+  - catalog mismatch
+redirectAliases: []
+visualProofRefs:
+  - proof/wrong-artist-support.png
+uiLabels:
+  - Contact support
+  - Email Support
+  - Send email
+  - Contact support with this search
+productSourceRefs:
+  - apps/docs/components/ArticleFeedback.tsx
+  - apps/docs/components/Search.tsx
+  - apps/web/app/(marketing)/support/SupportContent.tsx
+  - apps/web/data/supportCopy.ts
+launchPath: true
+---
+
+<HelpArticle id="contact-support-or-report-incorrect-data">
+
+# Contact support or report incorrect data
+
+<HelpOutcome>Give support enough reproducible context to investigate while keeping credentials, payment data, and other people's private information out of the report.</HelpOutcome>
+
+<HelpSteps>
+
+<HelpStep title="Escalate from the closest Help Center context">
+On an article, choose **No** under the helpfulness question, select the closest reason, then choose **Contact support**. From empty search results, choose **Contact support with this search**. Starting there preserves which public article or search led to the handoff.
+</HelpStep>
+
+<HelpStep title="Use the direct fallback when needed">
+If the contextual link does not open, visit [jov.ie/support](https://jov.ie/support) and choose **Email Support**, or email [support@jov.ie](mailto:support@jov.ie) directly.
+
+<HelpScreenshot src="/proof/wrong-artist-support.png" alt="Jovie support page with Documentation, Email Support, and Getting Started options" caption="The public support page is the direct fallback." />
+</HelpStep>
+
+<HelpStep title="State expected versus actual">
+Begin with one sentence for each: what you expected, what Jovie showed, and the last action you took. Include the affected public Jovie URL and the page or control where the problem appears.
+</HelpStep>
+
+<HelpStep title="Add evidence for incorrect profile or catalog data">
+Include the correct provider artist URL, the affected release title, and a screenshot with the wrong field visible. Add a public UPC or ISRC only when it is already visible and relevant. For analytics, include the selected date range and labels—not a list of private visitors.
+</HelpStep>
+
+<HelpStep title="Know what the handoff carries">
+The contextual URL can include a public article ID and source, or the exact Help Center search phrase. It does not automatically attach your dashboard, browser logs, screenshots, account export, payment details, or a copy of the article feedback reason. Put only the necessary evidence in your email.
+</HelpStep>
+
+<HelpStep title="Remove sensitive material before sending">
+Do not send passwords, sign-in codes, API keys, access tokens, full card or bank numbers, account exports, or another user's private data. Redact unrelated names, emails, phone numbers, and transaction details from screenshots.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Support can use the public URLs, expected-versus-actual description, and redacted visual evidence to reproduce or route the issue. Submission does not guarantee a resolution time, a provider correction, or a specific outcome.
+
+<HelpTroubleshooting>
+
+### The contextual submission fails
+
+Use the direct support page or email address above. Copy the Help Center article URL or your search phrase into the message so the lost context is restored.
+
+### The report is too large or contains private data
+
+Send the smallest screenshot that shows the issue. Replace private values with redaction and describe the omitted material; do not send a full account export as evidence.
+
+### The provider and Jovie disagree
+
+Link both public pages, name the exact field, and say which provider page you believe is authoritative. Do not claim ownership of a different artist or send that artist's private information.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="contact-support-or-report-incorrect-data" ids={['understand-audience-data', 'manage-your-subscription', 'manage-privacy-and-account-data']} />
+
+<HelpContactPanel />
+
+<HelpFeedback articleId="contact-support-or-report-incorrect-data" />
+
+</HelpArticle>

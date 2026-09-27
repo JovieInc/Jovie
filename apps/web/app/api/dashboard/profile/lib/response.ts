@@ -9,6 +9,7 @@ import {
   invalidateProfileCache,
   invalidateUsernameChange,
 } from '@/lib/cache/profile';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import type { creatorProfiles } from '@/lib/db/schema/profiles';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { logger } from '@/lib/utils/logger';
@@ -67,6 +68,13 @@ export async function finalizeProfileResponse({
     await invalidateProfileCache(updatedProfile.usernameNormalized);
     await invalidateHomepageCache();
   }
+
+  // Release caches (JOV-6272): the unified release key family is keyed by
+  // (userId, profileId) only — the handle never participates — so a rename
+  // no longer self-heals through a handle-keyed fork. Invalidate the family
+  // explicitly on every profile mutation, rename or not, so the matrix and
+  // entity caches never serve rows built from the stale handle.
+  invalidateReleaseCaches(clerkUserId, updatedProfile.id);
 
   const delivery = await trackServerEvent(
     'dashboard_profile_updated',

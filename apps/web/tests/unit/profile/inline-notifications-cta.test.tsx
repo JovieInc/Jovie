@@ -372,10 +372,10 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
   // JOV-1986: alert mode consistency across all three entry points.
   // The preference labels in ProfileMobileNotificationsFlow map as:
-  //   newMusic → 'New Music', tourDates → 'Shows', merch → 'Merch'
+  //   newMusic → 'New Music', tourDates → 'Events', merch → 'Merch'
   describe('alert mode consistency (JOV-1986)', () => {
     it('initializes alertPrefs from server contentPreferences when already subscribed (overlay entry)', async () => {
-      // Subscriber has tourDates disabled on the server (rendered as 'Shows' label)
+      // Subscriber has tourDates disabled on the server (rendered as 'Events' label)
       mockUseProfileNotifications.mockReturnValue(
         buildProfileNotifications({
           contentPreferences: {
@@ -399,7 +399,9 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       // Preferences step must show the saved server value, not the all-true default
       await waitFor(() => {
-        expect(screen.getByRole('switch', { name: 'Shows' })).not.toBeChecked();
+        expect(
+          screen.getByRole('switch', { name: 'Events' })
+        ).not.toBeChecked();
       });
       // Other preferences remain as saved
       expect(screen.getByRole('switch', { name: 'New Music' })).toBeChecked();
@@ -488,7 +490,9 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       // Must transition to preferences with saved server prefs (tourDates/Shows = off)
       await waitFor(() => {
-        expect(screen.getByRole('switch', { name: 'Shows' })).not.toBeChecked();
+        expect(
+          screen.getByRole('switch', { name: 'Events' })
+        ).not.toBeChecked();
       });
       expect(screen.getByRole('switch', { name: 'New Music' })).toBeChecked();
     });

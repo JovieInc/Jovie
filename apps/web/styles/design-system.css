@@ -43,7 +43,6 @@
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
   --profile-notification-icon-size: 17px;
-  --profile-hero-identity-min-height: calc(var(--space-24) + var(--space-2));
   --app-dialog-radius: var(--profile-inner-radius);
   --app-shell-sidebar-floating-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
@@ -329,6 +328,15 @@
   --profile-dock-inactive-fg: rgba(255, 255, 255, 0.58);
   --profile-dock-solid-bg: rgb(24, 26, 32);
   --profile-dock-solid-border: rgba(255, 255, 255, 0.28);
+  --profile-dock-sheen: rgba(255, 255, 255, 0.08);
+  --profile-dock-glow: rgba(255, 255, 255, 0.05);
+  --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
+  --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
+  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
+  --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
+  --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
+  --profile-dock-lens-shadow: rgba(0, 0, 0, 0.26);
   color-scheme: dark;
 }
 
@@ -482,43 +490,6 @@
   }
 }
 
-:where(.profile-hero-identity-scrim) {
-  min-height: var(--profile-hero-identity-min-height);
-  background: var(--profile-stage-bg);
-}
-
-/* Single hero legibility gradient, limited to the bottom ~55% of the cover so
-   the artist photo stays clearly visible in the upper zone. Replaces the old
-   stacked full-height scrims (profile-cover-home-gradient +
-   profile-cover-home-fade) that darkened the whole photo. */
-:where(.profile-cover-home-gradient) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 55%;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(3, 4, 6, 0.42) 52%,
-    rgba(5, 6, 8, 0.9) 86%,
-    var(--profile-stage-bg) 100%
-  );
-}
-
-/* The public compact hero reserves identity outside the image, so it needs
-   only a shallow media-edge transition. This modifier preserves the shared
-   legacy class contract while ensuring the live surface never lays a tall
-   scrim across the subject. */
-:where(.profile-cover-home-gradient--face-safe) {
-  height: var(--space-8);
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in oklab, var(--profile-stage-bg) 44%, transparent) 54%,
-    var(--profile-stage-bg) 100%
-  );
-}
-
 /* Profile home carousel card geometry: one 3:4 shape that fills the remaining
    viewport height. Width derives from height via aspect-ratio; the max-height
    cap keeps width at or under ~78vw (width = 0.75 × height). Cards center
@@ -546,6 +517,17 @@
   max-height: none;
   align-self: flex-start;
   container-type: inline-size;
+}
+
+/* A short viewport or enlarged identity must scroll the card, never compress
+   the horizontal track and clip its action below an overflow-hidden edge.
+   The landscape card height is content-driven (aspect-ratio is only a
+   preferred ratio), so the floor is the card's own content height, not a
+   fixed pixel value. */
+.profile-horizontal-rail[data-layout="profile-landscape"] {
+  height: auto;
+  min-height: max-content;
+  flex-shrink: 0;
 }
 
 /* Unified card anatomy: the art zone is a full-width square, so the text
@@ -835,49 +817,6 @@
   }
 }
 
-/* Compact mobile home hero: one definite token-driven height on every
-   viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
-   shrink-wraps; media crops via object-cover and the carousel below owns the
-   remaining viewport height. */
-/* The fixed token remains the minimum crop-safe media height. On the home
-   surface, the shell gives every additional vertical pixel to the real hero
-   instead of leaving an ownerless flex region below the primary card. The
-   content column stays intrinsic, so the card and dock never stretch and no
-   fake spacer participates in the layout. */
-:where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    > .profile-home-fluid-hero
-) {
-  flex: 1 1 auto;
-  min-height: var(--cover-height);
-  height: auto;
-  /* The base declaration preserves the established media floor; this
-     supported calc also reserves the non-overlay identity band. */
-  min-height: calc(
-    var(--cover-height) +
-    var(--profile-hero-identity-min-height)
-  );
-}
-
-/* Profiles without real hero media keep the identity chrome compact instead
-   of stretching a decorative gradient through most of the first viewport. */
-:where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    > .profile-home-fluid-hero--no-media
-) {
-  flex: 0 0 auto;
-  height: calc(
-    max(env(safe-area-inset-top), 16px) +
-    5rem +
-    var(--profile-hero-identity-min-height)
-  );
-  min-height: calc(
-    max(env(safe-area-inset-top), 16px) +
-    5rem +
-    var(--profile-hero-identity-min-height)
-  );
-}
-
 :where(
   [data-testid="profile-compact-surface"][data-mode="profile"]
     > .profile-home-content-column,
@@ -889,31 +828,10 @@
   flex: 0 0 auto;
 }
 
-/* The public mobile contract gives the media slot the tokenized 34svh height;
-   the in-flow identity band is additive and remains directly attached to the
-   media. Keep the rail at the top of its remaining region so the primary card
-   follows the identity without introducing an ownerless spacer. */
+/* Mobile home: the identity header and the rail share one scroll region.
+   Keep the rail at the top of its remaining region so the featured card
+   follows the identity header without an ownerless spacer. */
 @media (max-width: 767px) {
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      > .profile-home-fluid-hero:not(.profile-home-fluid-hero--no-media)
-  ) {
-    flex: 0 0 auto;
-    height: auto;
-    min-height: calc(
-      var(--cover-height) +
-      var(--profile-hero-identity-min-height)
-    );
-  }
-
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      .profile-cover-home-media
-  ) {
-    flex: 0 0 var(--cover-height);
-    height: var(--cover-height);
-  }
-
   :where(
     [data-testid="profile-compact-surface"][data-mode="profile"]
       > .profile-home-content-column,
@@ -1073,45 +991,6 @@
   }
 }
 
-/* Query-mode profile URLs are served from the ISR home shell, then hydrate into
-   the requested mode from window.location. Match the mode header on first paint
-   so hydration does not move the compact profile frame. */
-html[data-profile-initial-mode]
-[data-testid="profile-compact-surface"][data-mode="profile"] {
-  --cover-height: calc(3.5rem + max(env(safe-area-inset-top), 0px));
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  [data-testid="profile-cover"] {
-  height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
-  max-height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-chrome {
-  padding-top: max(env(safe-area-inset-top), 10px) !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-media,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-gradient,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  [data-testid="profile-hero-identity-block"] {
-  display: none !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-mode-title {
-  display: block !important;
-}
-
 @media (min-width: 768px) {
   .public-profile-compact-shell {
     /* Proportional hero: on short desktop windows the shell shrinks below
@@ -1123,11 +1002,16 @@ html[data-profile-initial-mode]
 }
 
 @media (min-width: 1180px) {
-  /* Public desktop owns a deliberate wide composition. CSS hides the compact
+  /* Public desktop owns a deliberate wide composition only when the build
+     ships the desktop surface (NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE,
+     rendered as .profile-viewport--desktop-surface). CSS hides the compact
      surface visually before hydration so the phone card never flashes.
      Compact stays in the accessibility tree until JS marks the desktop
-     surface ready (JOV-6434). Embedded editor/demo previews remain compact. */
-  .profile-viewport:not(.profile-viewport--embedded)
+     surface ready (JOV-6434). Embedded editor/demo previews remain compact.
+     Without the flag (the default, Tim 2026-09-26) none of this applies and
+     the compact shell keeps its base 430px phone-column width, centered on
+     the profile stage like the md card. */
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
   .public-profile-layout-frame {
     max-width: min(100%, var(--ds-public-content-max));
     padding-left: max(var(--page-pad), env(safe-area-inset-left));
@@ -1135,7 +1019,7 @@ html[data-profile-initial-mode]
     padding-block: clamp(16px, 2vw, 24px);
   }
 
-  .profile-viewport:not(.profile-viewport--embedded)
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-compact-slot {
     position: absolute;
     width: 1px;
@@ -1148,12 +1032,14 @@ html[data-profile-initial-mode]
     border-width: 0;
   }
 
-  .profile-viewport:not(.profile-viewport--embedded)[data-desktop-ready="true"]
+  .profile-viewport--desktop-surface:not(
+      .profile-viewport--embedded
+    )[data-desktop-ready="true"]
     .public-profile-layout-compact-slot {
     display: none;
   }
 
-  .profile-viewport:not(.profile-viewport--embedded)
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-desktop-shell {
     display: flex;
   }
@@ -1419,6 +1305,15 @@ html[data-profile-initial-mode]
   --profile-dock-inactive-fg: rgba(12, 12, 15, 0.56);
   --profile-dock-solid-bg: rgb(247, 247, 249);
   --profile-dock-solid-border: rgba(12, 12, 15, 0.24);
+  --profile-dock-sheen: rgba(255, 255, 255, 0.5);
+  --profile-dock-glow: rgba(255, 255, 255, 0.32);
+  --profile-dock-rim-top: rgba(255, 255, 255, 0.96);
+  --profile-dock-rim-bottom: rgba(15, 17, 24, 0.08);
+  --profile-dock-lens-bg: rgba(255, 255, 255, 0.58);
+  --profile-dock-lens-sheen: rgba(255, 255, 255, 0.72);
+  --profile-dock-lens-rim: rgba(255, 255, 255, 0.98);
+  --profile-dock-lens-rim-bottom: rgba(15, 17, 24, 0.06);
+  --profile-dock-lens-shadow: rgba(15, 17, 24, 0.12);
 
   /* Skeleton/loading states — base fill matches surface-1 */
   --color-skeleton-base: var(--color-bg-surface-1);
@@ -1725,6 +1620,15 @@ html[data-profile-initial-mode]
   --profile-dock-inactive-fg: rgba(255, 255, 255, 0.58);
   --profile-dock-solid-bg: rgb(24, 26, 32);
   --profile-dock-solid-border: rgba(255, 255, 255, 0.28);
+  --profile-dock-sheen: rgba(255, 255, 255, 0.08);
+  --profile-dock-glow: rgba(255, 255, 255, 0.05);
+  --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
+  --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
+  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
+  --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
+  --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
+  --profile-dock-lens-shadow: rgba(0, 0, 0, 0.26);
 
   /* Skeleton/loading states — base fill matches surface-1 */
   --color-skeleton-base: var(--color-bg-surface-1);
@@ -1778,50 +1682,123 @@ html[data-profile-initial-mode]
 }
 
 :where(.profile-liquid-glass-nav) {
+  position: relative;
+  isolation: isolate;
   height: var(--space-8);
   overflow: visible;
   pointer-events: auto;
   border-color: var(--profile-dock-border);
   border-radius: var(--radius-full);
-  background: var(--liquid-glass-highlight), var(--profile-dock-bg);
-  box-shadow: var(--profile-dock-shadow);
+  /* Linear-style recipe: blur base + structural gradient + specular rim. No
+     refraction in the base: it needs a size-matched displacement map and
+     only renders in Chromium, while the audience here is mostly iOS Safari. */
+  background:
+    linear-gradient(180deg, var(--profile-dock-sheen) 0%, transparent 52%),
+    var(--liquid-glass-highlight), var(--profile-dock-bg);
+  box-shadow:
+    inset 0 calc(var(--space-px) * -1) 0 var(--profile-dock-rim-bottom),
+    inset 0 0 var(--space-3) var(--profile-dock-glow),
+    var(--profile-dock-shadow);
+  -webkit-backdrop-filter: blur(var(--liquid-glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--liquid-glass-blur)) saturate(180%);
+}
+
+/* Specular rim derived from the shape: a 1px ring over the border, bright at
+   the top edge and fading down the sides. Masked ring, so it costs one paint
+   and no extra backdrop-filter. */
+:where(.profile-liquid-glass-nav)::after {
+  position: absolute;
+  z-index: 2;
+  inset: calc(var(--space-px) * -1);
+  padding: var(--space-px);
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    var(--profile-dock-rim-top) 0%,
+    transparent 42%,
+    transparent 72%,
+    var(--profile-dock-glow) 100%
+  );
+  content: "";
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(black 0 0) content-box,
+    linear-gradient(black 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(black 0 0) content-box exclude,
+    linear-gradient(black 0 0);
 }
 
 :where(.profile-liquid-glass-nav__grid) {
   height: var(--space-11);
-  margin-block: calc(var(--space-1-5) * -1);
+  /* Center the 44px hit row on the bar's 30px content box (32px minus the
+     1px border on each side) so glyphs and lens share one optical center. */
+  margin-block: calc(
+    (var(--space-8) - var(--space-px) * 2 - var(--space-11)) /
+    2
+  );
 }
 
 :where(.profile-liquid-glass-nav__item) {
+  z-index: 1;
   flex-direction: column;
   gap: var(--space-0-5);
   border-radius: var(--radius-full);
   color: var(--profile-dock-inactive-fg);
-}
-
-:where(.profile-liquid-glass-nav__item)::before {
-  position: absolute;
-  inset-inline: 0;
-  top: 50%;
-  height: var(--space-8);
-  transform: translateY(-50%);
-  border: var(--space-px) solid transparent;
-  border-radius: var(--radius-full);
-  content: "";
-  transition:
-    background-color var(--duration-subtle) var(--ease-subtle),
-    border-color var(--duration-subtle) var(--ease-subtle),
-    box-shadow var(--duration-subtle) var(--ease-subtle);
+  -webkit-tap-highlight-color: transparent;
 }
 
 :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
   color: var(--profile-dock-active-fg);
 }
 
-:where(.profile-liquid-glass-nav__item[aria-current="page"])::before {
-  border-color: var(--profile-dock-active-border);
-  background: var(--profile-dock-active-bg);
-  box-shadow: var(--profile-dock-active-shadow);
+/* One shared lens for the active destination. BottomTabBar drives its
+   translateX/scale with a spring; CSS owns only material and visibility. */
+:where(.profile-liquid-glass-nav__lens) {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 0;
+  height: var(--space-7);
+  margin-top: calc(var(--space-7) / -2);
+  border-radius: var(--radius-full);
+  background:
+    linear-gradient(180deg, var(--profile-dock-lens-sheen) 0%, transparent 62%),
+    var(--profile-dock-lens-bg);
+  box-shadow:
+    inset 0 var(--space-px) 0 var(--profile-dock-lens-rim),
+    inset 0 calc(var(--space-px) * -1) 0 var(--profile-dock-lens-rim-bottom),
+    0 var(--space-px) var(--space-1) var(--profile-dock-lens-shadow);
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  transition: opacity var(--duration-subtle) var(--ease-subtle);
+}
+
+:where(.profile-liquid-glass-nav__lens[data-visible="false"]) {
+  opacity: 0;
+}
+
+:where(.profile-liquid-glass-nav__glyph) {
+  display: inline-flex;
+  position: relative;
+  z-index: 1;
+  align-items: center;
+  justify-content: center;
+  /* Release: underdamped spring (zeta 0.5) so the glyph springs back with a
+     hint of overshoot. Only the glyph scales; the hit cell never moves. */
+  transition: transform var(--duration-cinematic)
+    var(--profile-dock-press-release-easing);
+}
+
+/* Press: the whole 44px cell is the trigger (touch or pointer). React's root
+   touch listeners make :active fire on iOS Safari. */
+:where(
+  .profile-liquid-glass-nav__item:active .profile-liquid-glass-nav__glyph
+) {
+  transform: scale(var(--profile-dock-press-scale));
+  transition: transform var(--duration-fast) var(--ease-subtle);
 }
 
 :where(.profile-liquid-glass-nav__icon) {
@@ -1836,14 +1813,139 @@ html[data-profile-initial-mode]
   }
 }
 
+:where(.profile-glass-pill) {
+  /* Flat glass action (PAC listen slot): the tab bar lens material, no drop
+     shadow and no blur layer of its own (it already sits on the card's
+     glass). Hairline and top rim are inset shadows, so geometry is unchanged. */
+  background:
+    linear-gradient(180deg, var(--profile-dock-lens-sheen) 0%, transparent 62%),
+    var(--profile-dock-lens-bg);
+  box-shadow:
+    inset 0 var(--space-px) 0 var(--profile-dock-lens-rim),
+    inset 0 0 0 var(--space-px) var(--profile-dock-border);
+  color: var(--profile-dock-active-fg);
+}
+
+:where(.profile-glass-pill--flat) {
+  /* Flat frosted variant (profile identity Listen action): the same dock
+     lens fill and hairline rim, minus the sheen and top-rim bevel, with its
+     own 16px blur because it sits directly on the page, not on a card. */
+  border-radius: 10px;
+  background: var(--profile-dock-lens-bg);
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-border);
+  backdrop-filter: blur(var(--space-4));
+  -webkit-backdrop-filter: blur(var(--space-4));
+}
+
+/* Public-profile mode cards (Pen D14lo6 / NdEbB / GTSIc / QZvG7). One accent
+   per card, set by lib/profile/mode-card-accent.ts through data-accent. The
+   gradient centers on the exact accent token; the only contrast lever is
+   OKLCH chroma (lightness and hue stay), lowered strongly for art cards.
+   Text, glyphs, and CTAs inside stay neutral. */
+:where(.profile-mode-card) {
+  --profile-mode-card-bg: rgb(5, 6, 8);
+  --profile-mode-card-fg: rgba(255, 255, 255, 0.98);
+  --profile-mode-card-muted: rgba(255, 255, 255, 0.58);
+  --profile-mode-card-hairline: rgba(255, 255, 255, 0.1);
+  --profile-mode-card-well: rgba(255, 255, 255, 0.04);
+  --profile-mode-card-well-active: rgba(255, 255, 255, 0.1);
+  --profile-mode-card-cta-bg: rgba(246, 247, 251, 0.98);
+  --profile-mode-card-cta-fg: rgba(8, 9, 10, 0.96);
+  --profile-mode-card-min-height: 17rem;
+  --profile-mode-card-accent: var(--noir-ion-ion);
+  --profile-mode-card-chroma: 0.72;
+  --profile-mode-card-accent-center: oklch(
+    from var(--profile-mode-card-accent) l
+      calc(c * var(--profile-mode-card-chroma)) h
+  );
+  --profile-mode-card-accent-shade: oklch(
+    from var(--profile-mode-card-accent) calc(l * 0.5)
+      calc(c * var(--profile-mode-card-chroma) * 0.6) h /
+    0.4
+  );
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: var(--profile-mode-card-min-height);
+  border-radius: var(--profile-card-radius);
+  background: var(--profile-mode-card-bg);
+  color: var(--profile-mode-card-fg);
+}
+
+:where(.profile-mode-card)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      80% 42% at 100% 0%,
+      var(--profile-mode-card-accent-center) 0%,
+      var(--profile-mode-card-accent-shade) 42%,
+      transparent 100%
+    ),
+    radial-gradient(
+      42% 16% at 0% 100%,
+      var(--profile-mode-card-accent-shade) 0%,
+      transparent 100%
+    );
+}
+
+.profile-mode-card[data-accent="ultra"] {
+  --profile-mode-card-accent: var(--noir-ion-ultra);
+}
+
+.profile-mode-card[data-accent="pulse"] {
+  --profile-mode-card-accent: var(--noir-ion-pulse);
+}
+
+.profile-mode-card[data-accent="orange"] {
+  --profile-mode-card-accent: var(--noir-ion-orange);
+}
+
+.profile-mode-card[data-accent-strength="art"] {
+  --profile-mode-card-chroma: 0.38;
+}
+
+@media (forced-colors: active) {
+  :where(.profile-mode-card) {
+    border: var(--space-px) solid CanvasText;
+  }
+
+  :where(.profile-mode-card)::before {
+    display: none;
+  }
+}
+
 /* Safari/Media Queries 5 plus a deterministic manual hook for testability and
    clients that expose the OS preference outside CSS. */
 @media (prefers-reduced-transparency: reduce) {
   :where(.profile-liquid-glass-nav) {
     border-color: var(--profile-dock-solid-border);
     background: var(--profile-dock-solid-bg);
+    box-shadow: var(--profile-dock-shadow);
     --tw-backdrop-blur: initial;
     --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  :where(.profile-liquid-glass-nav)::after {
+    display: none;
+  }
+
+  :where(.profile-liquid-glass-nav__lens, .profile-glass-pill) {
+    background: var(--profile-dock-active-bg);
+    box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-solid-border);
+  }
+
+  :where(.profile-glass-pill) {
+    background: var(--profile-dock-solid-bg);
+  }
+
+  :where(.profile-glass-pill--flat) {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -1855,8 +1957,32 @@ html[data-profile-initial-mode]
 :root.high-contrast .profile-liquid-glass-nav {
   border-color: var(--profile-dock-solid-border);
   background: var(--profile-dock-solid-bg);
+  box-shadow: var(--profile-dock-shadow);
   --tw-backdrop-blur: initial;
   --tw-backdrop-saturate: initial;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-reduced-transparency="true"] .profile-liquid-glass-nav::after,
+:root.high-contrast .profile-liquid-glass-nav::after {
+  display: none;
+}
+
+:root[data-reduced-transparency="true"] .profile-liquid-glass-nav__lens,
+:root.high-contrast .profile-liquid-glass-nav__lens {
+  background: var(--profile-dock-active-bg);
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-solid-border);
+}
+
+:root[data-reduced-transparency="true"] .profile-glass-pill,
+:root.high-contrast .profile-glass-pill {
+  background: var(--profile-dock-solid-bg);
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-solid-border);
+}
+
+:root[data-reduced-transparency="true"] .profile-glass-pill--flat,
+:root.high-contrast .profile-glass-pill--flat {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -1865,8 +1991,27 @@ html[data-profile-initial-mode]
   :where(.profile-liquid-glass-nav) {
     border-color: var(--profile-dock-solid-border);
     background: var(--profile-dock-solid-bg);
+    box-shadow: var(--profile-dock-shadow);
     --tw-backdrop-blur: initial;
     --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  :where(.profile-liquid-glass-nav)::after {
+    display: none;
+  }
+
+  :where(.profile-liquid-glass-nav__lens, .profile-glass-pill) {
+    background: var(--profile-dock-active-bg);
+    box-shadow: inset 0 0 0 var(--space-px) var(--profile-dock-solid-border);
+  }
+
+  :where(.profile-glass-pill) {
+    background: var(--profile-dock-solid-bg);
+  }
+
+  :where(.profile-glass-pill--flat) {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -1883,9 +2028,19 @@ html[data-profile-initial-mode]
     -webkit-backdrop-filter: none;
   }
 
+  :where(.profile-liquid-glass-nav)::after,
+  :where(.profile-liquid-glass-nav__lens) {
+    display: none;
+  }
+
   :where(.profile-liquid-glass-nav__item) {
     color: CanvasText;
     forced-color-adjust: auto;
+  }
+
+  :where(.profile-glass-pill) {
+    outline: var(--space-px) solid ButtonText;
+    outline-offset: calc(var(--space-px) * -1);
   }
 
   :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
@@ -1893,9 +2048,18 @@ html[data-profile-initial-mode]
     box-shadow: none;
   }
 
+  /* System colors cannot tint a moving lens, so the active cell paints its
+     own Highlight pill in forced-colors mode. */
   :where(.profile-liquid-glass-nav__item[aria-current="page"])::before {
-    border-color: Highlight;
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: var(--space-7);
+    transform: translateY(-50%);
+    border: var(--space-px) solid Highlight;
+    border-radius: var(--radius-full);
     background: Highlight;
+    content: "";
   }
 }
 
@@ -1903,10 +2067,17 @@ html[data-profile-initial-mode]
   :where(
     .profile-liquid-glass-nav,
     .profile-liquid-glass-nav__item,
-    .profile-liquid-glass-nav__icon
-  ),
-  :where(.profile-liquid-glass-nav__item)::before {
+    .profile-liquid-glass-nav__icon,
+    .profile-liquid-glass-nav__lens,
+    .profile-liquid-glass-nav__glyph
+  ) {
     transition: none;
+  }
+
+  :where(
+    .profile-liquid-glass-nav__item:active .profile-liquid-glass-nav__glyph
+  ) {
+    transform: none;
   }
 }
 
@@ -2568,6 +2739,38 @@ html[data-profile-initial-mode]
   /* Blur values */
   --liquid-glass-blur: 24px;
   --liquid-glass-blur-intense: 40px;
+
+  /* Profile dock press: glyph compression and an underdamped spring release
+     (zeta 0.5, ~16% overshoot of the 7% press depth), played over the
+     cinematic duration so reduced motion zeroes it with every other token. */
+  --profile-dock-press-scale: 0.93;
+  --profile-dock-press-release-easing: linear(
+    0,
+    0.1044,
+    0.3403,
+    0.6105,
+    0.8494,
+    1.0234,
+    1.1244,
+    1.1616,
+    1.1531,
+    1.1184,
+    1.0746,
+    1.0336,
+    1.0023,
+    0.9828,
+    0.9744,
+    0.9742,
+    0.979,
+    0.986,
+    0.9929,
+    0.9985,
+    1.0022,
+    1.004,
+    1.0043,
+    1.0026,
+    1
+  );
 }
 
 :root.dark {
