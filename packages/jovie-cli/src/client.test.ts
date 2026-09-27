@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createProfile,
   DEFAULT_BASE_URL,
   type FetchImplementation,
   fetchArtist,
@@ -89,7 +90,10 @@ describe('Jovie public resource client', () => {
       openapi: '3.1.0',
     });
     expect(calls[0].input).toBe('https://jov.ie/api/v1/openapi.json');
-    expect(calls[0].init?.headers).toEqual({ Accept: 'application/json' });
+    expect(calls[0].init?.headers).toEqual({
+      Accept: 'application/json',
+      'User-Agent': 'jovie-cli',
+    });
   });
 
   it('fetches site and per-artist llms resources as text', async () => {
@@ -98,7 +102,10 @@ describe('Jovie public resource client', () => {
       fetchSiteLlms(false, { fetchImpl: site.fetchImpl })
     ).resolves.toBe('# site guide');
     expect(site.calls[0].input).toBe('https://jov.ie/llms.txt');
-    expect(site.calls[0].init?.headers).toEqual({ Accept: 'text/plain' });
+    expect(site.calls[0].init?.headers).toEqual({
+      Accept: 'text/plain',
+      'User-Agent': 'jovie-cli',
+    });
 
     const full = createFetch('# full guide');
     await expect(
@@ -185,5 +192,64 @@ describe('Jovie public resource client', () => {
     ).resolves.toBe('# guide');
     expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
     expect(calls[0].init?.signal).not.toBe(controller.signal);
+  });
+
+  it('posts a Spotify artist URL to create a profile', async () => {
+    const { calls, fetchImpl } = createFetch(
+      '{"username":"demo","claimUrl":"https://jov.ie/demo/claim"}',
+      201
+    );
+    await expect(
+      createProfile('https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb', {
+        fetchImpl,
+        userAgent: 'jovie-cli/1.0.0',
+      })
+    ).resolves.toEqual({
+      username: 'demo',
+      claimUrl: 'https://jov.ie/demo/claim',
+    });
+    expect(calls[0]).toMatchObject({
+      input: 'https://jov.ie/api/agents/profiles',
+      init: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'jovie-cli/1.0.0',
+        },
+        body: '{"url":"https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb"}',
+      },
+    });
+  });
+
+  it('rejects non-Spotify-artist URLs before any request', () => {
+    const { calls, fetchImpl } = createFetch('{}');
+    for (const value of [
+      'not a url',
+      'http://open.spotify.com/artist/abc',
+      'https://open.spotify.com/track/abc',
+      'https://evilspotify.com/artist/abc',
+      'https://instagram.com/artist',
+    ]) {
+      expect(() => createProfile(value, { fetchImpl })).toThrow(
+        JovieInputError
+      );
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it('reports POST failures with the method and status', async () => {
+    const { fetchImpl } = createFetch(
+      '{"error":{"code":"RATE_LIMITED"}}',
+      429,
+      { 'Retry-After': '120' }
+    );
+    await expect(
+      createProfile('https://open.spotify.com/artist/abc', { fetchImpl })
+    ).rejects.toMatchObject({
+      message: 'POST https://jov.ie/api/agents/profiles returned HTTP 429',
+      apiCode: 'RATE_LIMITED',
+      status: 429,
+      retryAfterSeconds: 120,
+    });
   });
 });

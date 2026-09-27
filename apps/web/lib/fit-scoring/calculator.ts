@@ -172,6 +172,26 @@ export interface FitScoreInput {
   hasTrackingPixels?: boolean;
 }
 
+export function projectObservedQualificationFitInput(input: {
+  readonly sourcePlatform: string;
+  readonly hasPaidTier: boolean | null;
+  readonly linkPlatforms: readonly (string | undefined)[];
+  readonly hasSpotifyArtist: boolean;
+  readonly hasContactEmail: boolean;
+  readonly hasTrackingPixels: boolean;
+}): FitScoreInput {
+  return {
+    ingestionSourcePlatform: input.sourcePlatform,
+    hasPaidTier: input.hasPaidTier ?? undefined,
+    socialLinkPlatforms: input.linkPlatforms.filter(
+      (platform): platform is string => Boolean(platform)
+    ),
+    hasSpotifyId: input.hasSpotifyArtist,
+    hasContactEmail: input.hasContactEmail,
+    hasTrackingPixels: input.hasTrackingPixels,
+  };
+}
+
 /**
  * Result of a fit score calculation
  */

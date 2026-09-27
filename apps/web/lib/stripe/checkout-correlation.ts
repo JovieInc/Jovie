@@ -13,6 +13,7 @@
  */
 
 export const CHECKOUT_CORRELATION_FIELDS = [
+  'acquisitionId',
   'claimId',
   'runId',
   'candidateId',
@@ -28,6 +29,7 @@ export type CheckoutCorrelation = {
 };
 
 export const CHECKOUT_CORRELATION_STRIPE_KEYS = {
+  acquisitionId: 'acquisition_id',
   claimId: 'claim_id',
   runId: 'run_id',
   candidateId: 'candidate_id',
@@ -36,6 +38,7 @@ export const CHECKOUT_CORRELATION_STRIPE_KEYS = {
 } as const satisfies Record<CheckoutCorrelationField, string>;
 
 export const CHECKOUT_CORRELATION_BODY_ALIASES = {
+  acquisitionId: ['acquisitionId', 'acquisition_id'],
   claimId: ['claimId', 'claim_id'],
   runId: ['runId', 'run_id'],
   candidateId: ['candidateId', 'candidate_id'],

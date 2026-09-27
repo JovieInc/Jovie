@@ -37,7 +37,13 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
   it('keeps the editorial body on the shared page background with stable spacing', () => {
     const certifiedCss = readCertifiedCss();
 
-    expect(certifiedCss).toContain('aspect-ratio: 1902 / 827');
+    // The connected export reserves its box from its intrinsic width/height
+    // (height: auto), not from the retired 1902/827 artwork frame, which
+    // cropped the phone export and forced a dead column.
+    expect(certifiedCss).not.toContain('aspect-ratio: 1902 / 827');
+    expect(certifiedCss).toMatch(
+      /\.homepage-connected-artwork__image\s*\{[^}]*height:\s*auto;/
+    );
     expect(certifiedCss).toContain('homepage-relationship-outcomes');
     expect(certifiedCss).toContain(
       'gap: clamp(var(--space-8), 3vw, var(--space-11))'

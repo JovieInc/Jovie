@@ -33,8 +33,12 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      # JOV-6832: read open fix PRs so a failing probe never launches a duplicate.
+      pull-requests: read
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
       LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
