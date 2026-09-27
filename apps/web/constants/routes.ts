@@ -127,6 +127,8 @@ export const APP_ROUTES = {
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
   ADMIN_SYSTEM: '/app/ov/system',
   ADMIN_FEATURES: '/app/ov/features',
+  /** Jovie's own pages: index, SEO/agentic cert, copy gate, Lighthouse (JOV-6770). */
+  ADMIN_PRESENCE: '/app/ov/presence',
   /** Legacy feature-flags route. Redirect-only; use ADMIN_FEATURES. */
   LEGACY_FEATURE_FLAGS: '/app/feature-flags',
 

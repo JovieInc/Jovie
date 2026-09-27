@@ -243,6 +243,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/people/page.tsx',
   'apps/web/app/app/(shell)/admin/platform-connections/page.tsx',
   'apps/web/app/app/(shell)/admin/playlists/page.tsx',
+  'apps/web/app/app/(shell)/admin/presence/page.tsx',
   'apps/web/app/app/(shell)/admin/releases/page.tsx',
   'apps/web/app/app/(shell)/admin/revenue-lift/page.tsx',
   'apps/web/app/app/(shell)/admin/screenshots/page.tsx',
