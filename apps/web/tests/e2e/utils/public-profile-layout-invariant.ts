@@ -10,6 +10,7 @@ type PublicProfileLayoutViolationCode =
   | 'desktop_compact_shell'
   | 'desktop_empty_side_rail'
   | 'desktop_geometry_token'
+  | 'desktop_phone_column'
   | 'horizontal_overflow'
   | 'layout_surface_count'
   | 'target_under_44'
@@ -45,6 +46,17 @@ export async function auditPublicProfileLayout(page: Page) {
     const layout = root?.dataset.layout ?? null;
     const isDesktopViewport = window.innerWidth >= desktopBreakpoint;
     const ownsDesktop = isDesktopViewport && layout === 'desktop';
+    // Builds without NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE (the default,
+    // Tim 2026-09-26) keep desktop widths on the compact profile, centered in
+    // a phone-width column. That column is the admitted desktop presentation
+    // only while the layout honestly reports `compact`; a shell that claims
+    // desktop ownership while showing the compact card is still a hybrid.
+    const desktopSurfaceShipped =
+      root?.classList.contains('profile-viewport--desktop-surface') ?? false;
+    const isPhoneColumn = (compact: HTMLElement) =>
+      !desktopSurfaceShipped &&
+      layout === 'compact' &&
+      compact.closest('[data-profile-preview="true"]') === null;
 
     if (ownsDesktop && bottomNavs.length > 0) {
       violations.push({
@@ -55,6 +67,27 @@ export async function auditPublicProfileLayout(page: Page) {
 
     if (isDesktopViewport && compactSurfaces.length > 0) {
       for (const compact of compactSurfaces) {
+        if (isPhoneColumn(compact)) {
+          const rect = compact.getBoundingClientRect();
+          const maxWidth = Number.parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue(
+              '--profile-shell-max-width'
+            )
+          );
+          const viewportWidth = document.documentElement.clientWidth;
+          const sideDelta = Math.abs(rect.left - (viewportWidth - rect.right));
+          if (
+            !Number.isFinite(maxWidth) ||
+            rect.width > maxWidth + 1 ||
+            sideDelta > 2
+          ) {
+            violations.push({
+              code: 'desktop_phone_column',
+              detail: `compact column is ${rect.width.toFixed(1)}px wide (max ${maxWidth}px) with a ${sideDelta.toFixed(1)}px centering delta`,
+            });
+          }
+          continue;
+        }
         const preview = compact.closest<HTMLElement>(
           '[data-profile-preview="true"]'
         );

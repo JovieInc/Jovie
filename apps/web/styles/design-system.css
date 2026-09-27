@@ -1123,11 +1123,16 @@ html[data-profile-initial-mode]
 }
 
 @media (min-width: 1180px) {
-  /* Public desktop owns a deliberate wide composition. CSS hides the compact
+  /* Public desktop owns a deliberate wide composition only when the build
+     ships the desktop surface (NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE,
+     rendered as .profile-viewport--desktop-surface). CSS hides the compact
      surface visually before hydration so the phone card never flashes.
      Compact stays in the accessibility tree until JS marks the desktop
-     surface ready (JOV-6434). Embedded editor/demo previews remain compact. */
-  .profile-viewport:not(.profile-viewport--embedded)
+     surface ready (JOV-6434). Embedded editor/demo previews remain compact.
+     Without the flag (the default, Tim 2026-09-26) none of this applies and
+     the compact shell keeps its base 430px phone-column width, centered on
+     the profile stage like the md card. */
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
   .public-profile-layout-frame {
     max-width: min(100%, var(--ds-public-content-max));
     padding-left: max(var(--page-pad), env(safe-area-inset-left));
@@ -1135,7 +1140,7 @@ html[data-profile-initial-mode]
     padding-block: clamp(16px, 2vw, 24px);
   }
 
-  .profile-viewport:not(.profile-viewport--embedded)
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-compact-slot {
     position: absolute;
     width: 1px;
@@ -1148,12 +1153,14 @@ html[data-profile-initial-mode]
     border-width: 0;
   }
 
-  .profile-viewport:not(.profile-viewport--embedded)[data-desktop-ready="true"]
+  .profile-viewport--desktop-surface:not(
+      .profile-viewport--embedded
+    )[data-desktop-ready="true"]
     .public-profile-layout-compact-slot {
     display: none;
   }
 
-  .profile-viewport:not(.profile-viewport--embedded)
+  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-desktop-shell {
     display: flex;
   }
