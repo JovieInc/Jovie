@@ -4,7 +4,7 @@ This document outlines the testing strategy to enable safe, frequent deployments
 
 ## Testing Pyramid
 
-Following the pyramid approach defined in `AGENTS.md`:
+Following the pyramid approach defined in [`.claude/rules/testing.md`](../.claude/rules/testing.md):
 
 ```
         /\
