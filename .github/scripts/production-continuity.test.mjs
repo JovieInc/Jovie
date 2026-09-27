@@ -334,7 +334,9 @@ describe('production freshness', () => {
           status: aheadBy > 0 ? 'ahead' : 'identical',
           ahead_by: aheadBy,
           commits:
-            aheadBy > 0 ? [{ commit: { committer: { date: oldestAt } } }] : [],
+            aheadBy > 0
+              ? [{ commit: { committer: oldestAt ? { date: oldestAt } : {} } }]
+              : [],
         });
       }
       return json({}, 404);
@@ -394,6 +396,31 @@ describe('production freshness', () => {
       [unconfigured.healthy, unconfigured.reason],
       [true, 'repository-not-configured']
     );
+  });
+
+  it('treats a hung upstream as unreadable once the freshness timeout aborts it', async () => {
+    const hung = await observeProductionFreshness({
+      fetchImpl: (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () =>
+            reject(new Error('aborted'))
+          );
+        }),
+      now: NOW,
+      repository: 'JovieInc/Jovie',
+      timeoutMs: 5,
+    });
+    assert.deepEqual(
+      [hung.healthy, hung.reason],
+      [true, 'live-sha-unreadable']
+    );
+  });
+
+  it('fails open when the unshipped range has no commit date', async () => {
+    const result = await observe({ oldestAt: null });
+    assert.equal(result.healthy, true);
+    assert.equal(result.reason, 'unshipped-age-unreadable');
+    assert.equal(result.unshippedCommits, 4);
   });
 
   it('sends the GitHub token only to GitHub and never to production', async () => {
