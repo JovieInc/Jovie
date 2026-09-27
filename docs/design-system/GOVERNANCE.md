@@ -82,6 +82,17 @@ permanent check:
     floors, executable checks, and gap reasons. The audit delegates to
     `scripts/design-system-authority-map.mjs` and remains local/weekly-only,
     excluded from merge-gated design-conformance audit tests.
+12. **Authed-route drift ledger** — `scripts/design-drift-ledger.mjs` walks
+    the import graph of every page under `apps/web/app/app/(shell)/` and
+    counts raw palette colours, arbitrary values, raw `<button>` tags,
+    `--linear-*` tokens, visible 44/48px controls, and danger-alias
+    utilities. It adds registry `penRootId: null` entries and parallel
+    status, entity-header, and rail component families. Aggregate counts may
+    only shrink against `docs/design-system/drift-ledger.json`, and the table
+    in [DRIFT_LEDGER.md](./DRIFT_LEDGER.md) must render from that JSON.
+    Growth is WARN for the first release; unreadable inputs FAIL. Regenerate
+    with `pnpm design:drift-ledger`; check with
+    `pnpm design:drift-ledger:check`.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.
