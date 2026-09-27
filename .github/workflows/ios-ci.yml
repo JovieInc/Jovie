@@ -37,6 +37,34 @@ concurrency:
   cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
 
 jobs:
+  mac-native:
+    # Swift-native Mac spike (docs/macos/ADR-swift-native-mac.md). Electron
+    # stays the shipped Mac app; this keeps the shared SwiftUI sources honest
+    # on macOS so the native target never silently rots.
+    name: Swift-native Mac build + unit tests
+    if: ${{ !inputs.full-regression }}
+    runs-on: macos-26
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Mac best-practices lint
+        run: bash scripts/ios-best-practices-lint.sh apps/ios/JovieMac
+
+      - name: Build and test JovieMac
+        timeout-minutes: 10
+        run: |
+          xcodebuild test \
+            -project apps/ios/JovieMac.xcodeproj \
+            -scheme JovieMac \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build/mac-ci \
+            CODE_SIGNING_ALLOWED=NO
+
   test:
     name: ${{ inputs.full-regression && 'Full Simulator Regression' || 'Fast Unit + Coverage' }}
     runs-on: macos-26

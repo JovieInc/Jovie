@@ -1,7 +1,7 @@
 /**
  * Shared chat transcript window (JOV-5874 recertifies JOV-5044).
  *
- * Web `/app/chat` and Mac Electron host this same renderer (JOV-INV-013).
+ * Web `/app/chat` and Mac Electron host this same renderer (Electron until the Swift-native Mac app reaches parity).
  * iOS mirrors these numbers in `ChatTranscriptWindow`. Do not copy a Grok Bot
  * dispatcher and do not add a Swift Mac chat shell.
  *

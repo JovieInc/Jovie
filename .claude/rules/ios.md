@@ -4,7 +4,7 @@ paths: ["apps/ios/**", "**/*.swift"]
 
 # iOS (Native SwiftUI App)
 
-Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-auth, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. Mac product work is Electron, not an iOS Swift rewrite — [`.claude/rules/macos.md`](macos.md).
+Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-auth, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. The Mac app is going Swift-native as the `JovieMac` target, which shares these sources. Keep shared files free of UIKit. See [`.claude/rules/macos.md`](macos.md).
 
 The north star: **rock solid and blazing fast — 0 jank.** Every change should make the existing surface faster or more reliable, never add main-thread work, flicker, or layout shift.
 

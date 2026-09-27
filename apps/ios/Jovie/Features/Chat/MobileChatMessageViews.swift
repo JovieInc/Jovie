@@ -592,3 +592,17 @@ struct MobileChatProseText: View {
     MobileChatBubbleText.attributedText(from: tokens)
   }
 }
+
+/// Chat entity kinds map onto the design-system accents here, beside the chat
+/// views, so `JovieTheme` stays free of chat-model types and compiles alone
+/// in the Mac target.
+extension JovieColor.EntityAccent {
+  static func color(for kind: MobileChatEntityKind) -> Color {
+    switch kind {
+    case .release: return release
+    case .artist: return artist
+    case .track: return track
+    case .event: return event
+    }
+  }
+}
