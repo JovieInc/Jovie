@@ -20,6 +20,13 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 // Jovie" button. It never continues into the web dashboard/profile/library.
 
 const DESKTOP_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+// Matches the server's RFC 8628 style alphabet (consonants, no look-alikes).
+const RETURN_CODE_PATTERN = /^[BCDFGHJKLMNPQRSTVWXZ]{8}$/;
+
+function formatReturnCode(value: string | null): string | null {
+  if (!value || !RETURN_CODE_PATTERN.test(value)) return null;
+  return `${value.slice(0, 4)}-${value.slice(4)}`;
+}
 
 function sanitizeExchangeCode(value: string | null): string | null {
   return value && /^[a-f0-9]{16,64}$/i.test(value) ? value : null;
@@ -74,6 +81,13 @@ function NativeReturnContent() {
     return { code, state, desktopFlow };
   }, [searchParams]);
 
+  // Fallback when the deep link cannot reach the app: the user types this
+  // into the Mac app, which redeems it with its own PKCE verifier.
+  const returnCode =
+    client === 'electron' && nativeReturnParams?.desktopFlow
+      ? formatReturnCode(searchParams.get('return_code'))
+      : null;
+
   const deepLink = useMemo(() => {
     if (!nativeReturnParams || !client) return null;
     if (client === 'ios') {
@@ -110,6 +124,19 @@ function NativeReturnContent() {
           >
             Return to Jovie
           </Link>
+        ) : null}
+        {deepLink && returnCode ? (
+          <div
+            className='mt-6 border-t border-subtle pt-5'
+            data-testid='desktop-return-code'
+          >
+            <p className='text-xs leading-5 text-secondary-token'>
+              Jovie did not open? Enter this code in the app.
+            </p>
+            <p className='mt-2 select-all font-mono text-lg font-semibold tracking-[0.2em] text-primary-token'>
+              {returnCode}
+            </p>
+          </div>
         ) : null}
       </section>
     </main>
