@@ -11,7 +11,6 @@ import {
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const WORKSPACE_RECEIPT_SCHEMA = 'jovie-ci-dependency-workspace/v1';
 export const WORKSPACE_RECEIPT_PATH =
   'node_modules/.cache/jovie-ci/dependency-workspace.json';
 
@@ -103,11 +102,11 @@ function workspaceReceipt(
     arch = process.arch,
     nodeVersion = process.version.slice(1),
     platform = process.platform,
-    pnpmVersion,
+    pnpmVersion = expectedPnpmVersion(root),
   } = {}
 ) {
   return {
-    schema: WORKSPACE_RECEIPT_SCHEMA,
+    schema: 'jovie-ci-dependency-workspace/v1',
     dependencyInputDigest: dependencyInputDigest(root),
     nodeVersion,
     pnpmVersion,

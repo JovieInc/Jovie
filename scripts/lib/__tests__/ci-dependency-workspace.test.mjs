@@ -19,7 +19,6 @@ afterEach(() => {
   for (const root of roots.splice(0))
     rmSync(root, { recursive: true, force: true });
 });
-
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'jovie-ci-workspace-'));
   roots.push(root);
@@ -54,10 +53,8 @@ describe('merge-group dependency workspace', () => {
   it('accepts an installed tree bound to the exact dependency inputs', () => {
     const root = fixture();
     prepareDependencyWorkspace(root, runtime);
-
     expect(validateDependencyWorkspace(root, runtime)).toMatchObject(runtime);
   });
-
   it('rejects changed inputs and an installed lockfile mismatch', () => {
     const root = fixture();
     prepareDependencyWorkspace(root, runtime);
@@ -65,7 +62,6 @@ describe('merge-group dependency workspace', () => {
     expect(() => validateDependencyWorkspace(root, runtime)).toThrow(
       'dependency workspace receipt mismatch: dependencyInputDigest'
     );
-
     prepareDependencyWorkspace(root, runtime);
     writeFileSync(join(root, 'node_modules/.pnpm/lock.yaml'), 'changed\n');
     expect(() => validateDependencyWorkspace(root, runtime)).toThrow(
