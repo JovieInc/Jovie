@@ -76,7 +76,10 @@ const STATIC_CSP_PARTS = {
   // for the woff2 files) are loaded by /pitch/index.html (Manrope + JetBrains
   // Mono — not in the self-hosted font set). The marketing app otherwise uses
   // next/font and self-hosted Geist/DM Sans/Satoshi.
-  styleSrc: "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  // Google Identity Services loads its One Tap/button stylesheet from
+  // accounts.google.com/gsi/style on /signin and /signup (JOV-4369).
+  styleSrc:
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
   fontSrc:
     "font-src 'self' data: https://fonts.gstatic.com https://vercel.live https://assets.vercel.com",
   // Pre-computed media-src from canonical media domain registry

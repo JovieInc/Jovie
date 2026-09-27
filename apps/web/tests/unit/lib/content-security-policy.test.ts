@@ -319,4 +319,14 @@ describe('Google Identity Services allowlist (JOV-4369)', () => {
 
     expect(frameSrc).toContain('https://accounts.google.com');
   });
+
+  it('allows the GIS stylesheet in style-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const styleSrc = findDirective(csp, 'style-src');
+
+    expect(styleSrc).toContain('https://accounts.google.com/gsi/style');
+  });
 });
