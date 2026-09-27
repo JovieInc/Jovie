@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const invalidateHomepageCache = vi.hoisted(() => vi.fn());
 const invalidateProfileCache = vi.hoisted(() => vi.fn());
+const invalidateReleaseCaches = vi.hoisted(() => vi.fn());
 const invalidateUsernameChange = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/cache/profile', () => ({
   invalidateHomepageCache,
   invalidateProfileCache,
   invalidateUsernameChange,
+}));
+
+vi.mock('@/lib/cache/releases', () => ({
+  invalidateReleaseCaches,
 }));
 
 vi.mock('@/lib/server-analytics', () => ({
@@ -46,6 +51,10 @@ describe('finalizeProfileResponse cache invalidation', () => {
       'oldartist'
     );
     expect(invalidateProfileCache).not.toHaveBeenCalled();
+    expect(invalidateReleaseCaches).toHaveBeenCalledExactlyOnceWith(
+      '11111111-1111-4111-8111-111111111111',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    );
   });
 
   it('uses regular profile invalidation when the handle is unchanged', async () => {
@@ -60,5 +69,9 @@ describe('finalizeProfileResponse cache invalidation', () => {
     );
     expect(invalidateHomepageCache).toHaveBeenCalledOnce();
     expect(invalidateUsernameChange).not.toHaveBeenCalled();
+    expect(invalidateReleaseCaches).toHaveBeenCalledExactlyOnceWith(
+      '11111111-1111-4111-8111-111111111111',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    );
   });
 });

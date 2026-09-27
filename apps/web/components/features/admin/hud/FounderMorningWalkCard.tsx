@@ -5,6 +5,7 @@ import { Circle, Square } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { useAuthSafe } from '@/hooks/useJovieAuth';
 import {
   canRecordScreen,
   type ScreenRecordingSession,
@@ -18,36 +19,43 @@ type WalkPhase = 'idle' | 'recording' | 'uploading';
 export function FounderMorningWalkCard(props: {
   readonly defaultStatus: string;
 }) {
+  const { userId } = useAuthSafe();
   const [phase, setPhase] = useState<WalkPhase>('idle');
   const [lastUrl, setLastUrl] = useState<string | null>(null);
   const sessionRef = useRef<ScreenRecordingSession | null>(null);
 
-  const finishUpload = useCallback(async (session: ScreenRecordingSession) => {
-    setPhase('uploading');
-    try {
-      const recording = await session.stop();
-      const uploaded = await uploadAccountVideo(recording.file);
-      const confirm = await fetch(FOUNDER_WALK_CONFIRM_PATH, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          blobUrl: uploaded.url,
-          durationMs: recording.durationMs,
-          byteSize: recording.byteSize,
-        }),
-      });
-      if (!confirm.ok) {
-        throw new Error('Walk confirm failed');
+  const finishUpload = useCallback(
+    async (session: ScreenRecordingSession) => {
+      setPhase('uploading');
+      try {
+        const recording = await session.stop();
+        const uploaded = await uploadAccountVideo(
+          recording.file,
+          userId ?? 'unknown'
+        );
+        const confirm = await fetch(FOUNDER_WALK_CONFIRM_PATH, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            blobUrl: uploaded.url,
+            durationMs: recording.durationMs,
+            byteSize: recording.byteSize,
+          }),
+        });
+        if (!confirm.ok) {
+          throw new Error('Walk confirm failed');
+        }
+        setLastUrl(uploaded.url);
+        toast.success('Walk stored. Nothing admitted until it is classified.');
+      } catch {
+        toast.error('Could not store the walk. Try again.');
+      } finally {
+        sessionRef.current = null;
+        setPhase('idle');
       }
-      setLastUrl(uploaded.url);
-      toast.success('Walk stored. Nothing admitted until it is classified.');
-    } catch {
-      toast.error('Could not store the walk. Try again.');
-    } finally {
-      sessionRef.current = null;
-      setPhase('idle');
-    }
-  }, []);
+    },
+    [userId]
+  );
 
   const startRecording = useCallback(async () => {
     if (!canRecordScreen()) {
