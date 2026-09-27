@@ -15,7 +15,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { materializeStatic } from './materialize-vercel-static.mjs';
+import {
+  dereferenceFunctionFileLinks,
+  materializeStatic,
+} from './materialize-vercel-static.mjs';
 import { artifactSnapshot } from './production-input-provenance.mjs';
 
 const repo = fileURLToPath(new URL('../..', import.meta.url));
@@ -255,4 +258,237 @@ test('CLI materializes the build before artifact hashing in both release targets
         workflow.indexOf(hash, start) > materialize
     );
   }
+});
+
+function withFunctionConfig(f, name, filePathMap) {
+  const path = f.put(
+    `.vercel/output/functions/${name}.func/.vc-config.json`,
+    JSON.stringify({ runtime: 'nodejs22.x', filePathMap })
+  );
+  return {
+    path,
+    read: () => JSON.parse(readFileSync(path, 'utf8')).filePathMap,
+  };
+}
+
+test('dereferences file-symlink trace targets that break Vercel tgz extraction', t => {
+  const f = fixture(t);
+  // Real shape from JOV-6576: outputFileTracingIncludes pulls the public
+  // screenshot export links into the admin screenshot functions.
+  f.put(
+    'apps/web/screenshot-catalog/current/public-profile-desktop.png',
+    'png'
+  );
+  const exportLink = 'apps/web/public/product-screenshots/profile-desktop.png';
+  f.link(
+    exportLink,
+    '../../screenshot-catalog/current/public-profile-desktop.png'
+  );
+  f.put('node_modules/.pnpm/next@16/node_modules/next/package.json', '{}');
+  f.link(
+    'apps/web/node_modules/next',
+    '../../../node_modules/.pnpm/next@16/node_modules/next'
+  );
+  f.put('CHANGELOG.md', '# log');
+  const nextPackage =
+    'node_modules/.pnpm/next@16/node_modules/next/package.json';
+  const admin = withFunctionConfig(f, 'admin/screenshots', {
+    [exportLink]: exportLink,
+    'apps/web/node_modules/next': 'apps/web/node_modules/next',
+    [nextPackage]: nextPackage,
+    'CHANGELOG.md': 'CHANGELOG.md',
+  });
+  // Next writes aliases such as page.rsc.func as links to the real function.
+  f.link(
+    '.vercel/output/functions/admin/screenshots.rsc.func',
+    'screenshots.func'
+  );
+
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  assert.deepEqual(admin.read(), {
+    [exportLink]:
+      'apps/web/screenshot-catalog/current/public-profile-desktop.png',
+    'apps/web/node_modules/next': 'apps/web/node_modules/next',
+    [nextPackage]: nextPackage,
+    'CHANGELOG.md': 'CHANGELOG.md',
+  });
+  // The source export link is untouched; only the upload map changes.
+  assert.equal(lstatSync(resolve(f.root, exportLink)).isSymbolicLink(), true);
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
+
+test('dereferences every checked-in public export link a trace can include', t => {
+  const f = fixture(t);
+  const names = execFileSync('git', ['ls-files', '-s', 'apps/web/public'], {
+    cwd: repo,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(line => line.startsWith('120000 '))
+    .map(line => line.split('\t')[1]);
+  assert.ok(names.length >= 6);
+  const map = {};
+  for (const name of names) {
+    const source = resolve(repo, name);
+    f.put(join(dirname(name), readlinkSync(source)), readFileSync(source));
+    f.link(name, readlinkSync(source));
+    map[name] = name;
+  }
+  const config = withFunctionConfig(f, 'api/admin/screenshots', map);
+  assert.equal(dereferenceFunctionFileLinks(f.root), names.length);
+  for (const [key, value] of Object.entries(config.read())) {
+    assert.equal(lstatSync(resolve(f.root, value)).isFile(), true, key);
+    assert.deepEqual(
+      readFileSync(resolve(f.root, value)),
+      readFileSync(resolve(repo, key))
+    );
+  }
+});
+
+for (const kind of ['dangling', 'escape', 'outside-root']) {
+  test(`refuses ${kind} function trace link before rewriting any config`, t => {
+    const f = fixture(t);
+    f.put('real.txt', 'bytes');
+    f.link('good-link.txt', 'real.txt');
+    const good = withFunctionConfig(f, 'a-good', {
+      'good-link.txt': 'good-link.txt',
+    });
+    const before = readFileSync(good.path, 'utf8');
+    if (kind === 'dangling') {
+      f.link('bad-link.txt', 'absent.txt');
+      withFunctionConfig(f, 'z-bad', { 'bad-link.txt': 'bad-link.txt' });
+    } else if (kind === 'escape') {
+      f.link('bad-link.txt', resolve(tmpdir()));
+      withFunctionConfig(f, 'z-bad', { 'bad-link.txt': 'bad-link.txt' });
+    } else {
+      withFunctionConfig(f, 'z-bad', { outside: '../outside.txt' });
+    }
+    assert.throws(() => dereferenceFunctionFileLinks(f.root));
+    assert.equal(readFileSync(good.path, 'utf8'), before);
+  });
+}
+
+test('function dereference is a no-op without prebuilt functions', t => {
+  const f = fixture(t);
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
+
+test('CLI reports dereferenced function trace links', t => {
+  const f = fixture(t);
+  f.put('real.txt', 'bytes');
+  f.link('link.txt', 'real.txt');
+  const config = withFunctionConfig(f, 'index', { 'link.txt': 'link.txt' });
+  const stdout = execFileSync(
+    process.execPath,
+    [resolve(repo, '.github/scripts/materialize-vercel-static.mjs')],
+    { cwd: f.root, encoding: 'utf8' }
+  );
+  assert.match(stdout, /Dereferenced 1 function trace file symlinks/);
+  assert.deepEqual(config.read(), { 'link.txt': 'real.txt' });
+});
+
+test('re-points files traced through a hoisted pnpm directory link at their real path', t => {
+  const f = fixture(t);
+  const store =
+    'node_modules/.pnpm/import-in-the-middle@3.5.1/node_modules/import-in-the-middle';
+  f.put(`${store}/index.js`, 'hook');
+  f.link(
+    'node_modules/.pnpm/node_modules/import-in-the-middle',
+    '../import-in-the-middle@3.5.1/node_modules/import-in-the-middle'
+  );
+  f.link(
+    'apps/web/node_modules/next',
+    '../../../node_modules/.pnpm/import-in-the-middle@3.5.1'
+  );
+  const hoisted =
+    'node_modules/.pnpm/node_modules/import-in-the-middle/index.js';
+  const config = resolve(
+    f.root,
+    '.vercel/output/functions/api.func/.vc-config.json'
+  );
+  mkdirSync(dirname(config), { recursive: true });
+  writeFileSync(
+    config,
+    JSON.stringify({
+      filePathMap: {
+        [hoisted]: hoisted,
+        'apps/web/node_modules/next': 'apps/web/node_modules/next',
+      },
+    })
+  );
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  const map = JSON.parse(readFileSync(config, 'utf8')).filePathMap;
+  // Same destination key, real source file; the directory link itself is untouched.
+  assert.equal(map[hoisted], `${store}/index.js`);
+  assert.equal(map['apps/web/node_modules/next'], 'apps/web/node_modules/next');
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
+
+test('drops directory links whose target uploads nothing, judged across all functions', t => {
+  const f = fixture(t);
+  f.put(
+    'node_modules/.pnpm/supports-color@5.5.0/node_modules/supports-color/index.js',
+    'x'
+  );
+  f.link(
+    'node_modules/.pnpm/node_modules/supports-color',
+    '../supports-color@5.5.0/node_modules/supports-color'
+  );
+  f.put('node_modules/.pnpm/debug@4/node_modules/debug/index.js', 'x');
+  f.link(
+    'node_modules/.pnpm/node_modules/debug',
+    '../debug@4/node_modules/debug'
+  );
+  const write = (name, filePathMap) => {
+    const path = resolve(
+      f.root,
+      `.vercel/output/functions/${name}.func/.vc-config.json`
+    );
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify({ filePathMap }));
+    return () => JSON.parse(readFileSync(path, 'utf8')).filePathMap;
+  };
+  const colorLink = 'node_modules/.pnpm/node_modules/supports-color';
+  const debugLink = 'node_modules/.pnpm/node_modules/debug';
+  const debugFile = 'node_modules/.pnpm/debug@4/node_modules/debug/index.js';
+  // `a` maps both links; only `b` traces a file inside debug's target.
+  const a = write('a', { [colorLink]: colorLink, [debugLink]: debugLink });
+  const b = write('b', { [debugFile]: debugFile });
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  assert.deepEqual(a(), { [debugLink]: debugLink });
+  assert.deepEqual(b(), { [debugFile]: debugFile });
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
+});
+
+test('moves file keys that sit beneath a linked directory key to their real path', t => {
+  const f = fixture(t);
+  const store =
+    'node_modules/.pnpm/import-in-the-middle@3.5.1/node_modules/import-in-the-middle';
+  f.put(`${store}/CHANGELOG.md`, 'log');
+  const hoisted = 'node_modules/.pnpm/node_modules/import-in-the-middle';
+  f.link(
+    hoisted,
+    '../import-in-the-middle@3.5.1/node_modules/import-in-the-middle'
+  );
+  const config = resolve(
+    f.root,
+    '.vercel/output/functions/flow.func/.vc-config.json'
+  );
+  mkdirSync(dirname(config), { recursive: true });
+  writeFileSync(
+    config,
+    JSON.stringify({
+      filePathMap: {
+        [hoisted]: hoisted,
+        [`${hoisted}/CHANGELOG.md`]: `${store}/CHANGELOG.md`,
+      },
+    })
+  );
+  assert.equal(dereferenceFunctionFileLinks(f.root), 1);
+  // The link stays; the file lands at the real path the link resolves to.
+  assert.deepEqual(JSON.parse(readFileSync(config, 'utf8')).filePathMap, {
+    [hoisted]: hoisted,
+    [`${store}/CHANGELOG.md`]: `${store}/CHANGELOG.md`,
+  });
+  assert.equal(dereferenceFunctionFileLinks(f.root), 0);
 });

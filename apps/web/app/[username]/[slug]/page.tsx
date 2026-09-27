@@ -17,7 +17,10 @@ import {
   type FeaturedArtist,
   ReleaseLandingPage,
 } from '@/app/r/[slug]/ReleaseLandingPage';
-import { UnpublishedEntityAlerts } from '@/components/features/alerts/UnpublishedEntityAlerts';
+import {
+  UnpublishedEntityAlerts,
+  UnpublishedEntityAlertsFallback,
+} from '@/components/features/alerts/UnpublishedEntityAlerts';
 import { BASE_URL } from '@/constants/app';
 import {
   MysteryReleasePage,
@@ -139,7 +142,7 @@ export default async function ContentSmartLinkPage({
       notFound();
     }
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<UnpublishedEntityAlertsFallback />}>
         <UnpublishedEntityAlerts
           artist={creatorToArtist(creator)}
           entityTitle={unpublished.title}

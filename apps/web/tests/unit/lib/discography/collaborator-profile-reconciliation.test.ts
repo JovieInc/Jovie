@@ -9,7 +9,14 @@ const hoisted = vi.hoisted(() => {
 
   function query(result: unknown[]) {
     const builder: Record<string, unknown> = {};
-    for (const method of ['from', 'innerJoin', 'where', 'for', 'orderBy']) {
+    for (const method of [
+      'from',
+      'innerJoin',
+      'leftJoin',
+      'where',
+      'for',
+      'orderBy',
+    ]) {
       builder[method] = vi.fn(() => builder);
     }
     builder.limit = vi.fn().mockResolvedValue(result);
@@ -84,6 +91,7 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'artists.creatorProfileId',
     id: 'artists.id',
     imageUrl: 'artists.imageUrl',
+    musicbrainzId: 'artists.musicbrainzId',
     metadata: 'artists.metadata',
     name: 'artists.name',
     spotifyId: 'artists.spotifyId',
@@ -433,7 +441,9 @@ describe('credited artist profile reconciliation', () => {
           id: candidate.artistId,
         },
       ],
-      [{ id: 'claimed-profile', usernameNormalized: 'austinleeds' }]
+      [{ id: 'claimed-profile', usernameNormalized: 'austinleeds' }],
+      // JOV-6529 enrichment backfill: settings read for the reused profile.
+      []
     );
 
     const result = await reconcileCreditedArtistProfiles(
@@ -506,13 +516,17 @@ describe('credited artist profile reconciliation', () => {
     );
     hoisted.txSelectResults.push([], []);
     for (const creditedArtist of candidates.slice(0, 24)) {
-      hoisted.txSelectResults.push([
-        {
-          ...creditedArtist,
-          creatorProfileId: 'existing-profile',
-          id: creditedArtist.artistId,
-        },
-      ]);
+      hoisted.txSelectResults.push(
+        [
+          {
+            ...creditedArtist,
+            creatorProfileId: 'existing-profile',
+            id: creditedArtist.artistId,
+          },
+        ],
+        // JOV-6529 enrichment backfill: settings read for the reused profile.
+        []
+      );
     }
 
     const result = await reconcileCreditedArtistProfiles(

@@ -19,8 +19,20 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-
+import {
+  ALLOWLIST_PATH,
+  DESKTOP_ENTRY_POINTS,
+  ESLINT_CONFIG_PATH,
+  RUNTIME_ROOTS,
+} from './latency-sensitive-execution-paths.mjs';
 import { readInvariantRegistry } from './registry.mjs';
+
+export {
+  ALLOWLIST_PATH,
+  DESKTOP_ENTRY_POINTS,
+  ESLINT_CONFIG_PATH,
+  RUNTIME_ROOTS,
+};
 
 export const LATENCY_SENSITIVE_INVARIANT_ID = 'JOV-INV-031';
 export const LATENCY_SENSITIVE_SCHEMA = 'jovie-latency-sensitive-execution/v1';
@@ -30,33 +42,10 @@ export const LATENCY_SENSITIVE_CHECK_CLASS = 'thread-blocking';
 export const ROUTE_LATENCY_CHECK_CLASS = 'route-response-latency';
 export const ROUTE_LATENCY_CONTRACT =
   'docs/performance/performance-invariants-v1.md';
-export const ALLOWLIST_PATH =
-  'scripts/invariants/latency-sensitive-execution-allowlist.json';
 export const ALLOWLIST_SCHEMA =
   'jovie-latency-sensitive-execution-allowlist/v1';
-export const ESLINT_CONFIG_PATH = 'apps/web/eslint.config.js';
 
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-
-export const RUNTIME_ROOTS = Object.freeze([
-  'apps/web/app',
-  'apps/web/lib',
-  'apps/web/components',
-  'apps/web/hooks',
-  'apps/web/middleware.ts',
-  'apps/web/proxy.ts',
-  'apps/desktop/src',
-  'packages/ui',
-  'packages/auth-routing',
-  'packages/audio-contracts',
-  'packages/extension-contracts',
-  'packages/agent-transport-contracts',
-]);
-
-export const DESKTOP_ENTRY_POINTS = Object.freeze([
-  'apps/desktop/src/main.ts',
-  'apps/desktop/src/preload.ts',
-]);
 
 export const WORKER_ALLOWLIST_PREFIXES = Object.freeze(['workers/']);
 
@@ -220,14 +209,32 @@ export function isReachableRuntimeSourcePath(relPath) {
   return SOURCE_EXT.has(extname(posix));
 }
 
-function collectRelativeImportSpecifiers(sourceText, relPath) {
-  const script = ts.createSourceFile(
+function parseSource(relPath, sourceText) {
+  return ts.createSourceFile(
     relPath,
     sourceText,
     ts.ScriptTarget.Latest,
     true,
     sourceKind(relPath)
   );
+}
+
+/** One parse per file per process: import edges and findings come from the same AST. */
+const analysisCache = new Map();
+function analyzeSource(relPath, text) {
+  const hit = analysisCache.get(relPath);
+  if (hit?.text === text) return hit;
+  const script = parseSource(relPath, text);
+  const entry = {
+    text,
+    specifiers: collectRelativeImportSpecifiers(script),
+    findings: scanScript(relPath, script),
+  };
+  analysisCache.set(relPath, entry);
+  return entry;
+}
+
+function collectRelativeImportSpecifiers(script) {
   /** @type {string[]} */
   const specifiers = [];
 
@@ -317,7 +324,7 @@ export function collectReachableRuntimeFiles(
     if (!current) continue;
     const source = readSourceText(current, repoRoot, files);
     if (source == null) continue;
-    for (const spec of collectRelativeImportSpecifiers(source, current)) {
+    for (const spec of analyzeSource(current, source).specifiers) {
       const resolved = resolveRelativeImport(current, spec, repoRoot, files);
       if (!resolved || !isReachableRuntimeSourcePath(resolved)) continue;
       if (reachable.has(resolved)) continue;
@@ -402,14 +409,10 @@ function importCallSpecifier(node) {
  * a call inside a function in runtime code is a violation.
  */
 export function scanSource(relPath, sourceText) {
-  const script = ts.createSourceFile(
-    relPath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    sourceKind(relPath)
-  );
+  return scanScript(relPath, parseSource(relPath, sourceText));
+}
 
+function scanScript(relPath, script) {
   /** @type {Map<string, string>} name -> tracked callee */
   const aliases = new Map();
   /** @type {Set<string>} */
@@ -606,7 +609,7 @@ export function scanRuntime(repoRoot = DEFAULT_ROOT, files = {}) {
         ? readFileSync(resolve(repoRoot, relPath), 'utf8')
         : null);
     if (source == null) continue;
-    findings.push(...scanSource(relPath, source));
+    findings.push(...analyzeSource(relPath, source).findings);
   }
   return findings;
 }

@@ -340,9 +340,41 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
   assert.match(splashFn, /data-desktop-splash="cinematic"/);
   assert.match(splashFn, /aria-label="Jovie for Mac is loading"/);
-  assert.match(splashFn, /data:image\/svg\+xml;base64/);
-  assert.match(splashFn, /app\.isPackaged/);
-  assert.match(splashFn, /process\.resourcesPath/);
+  const wordmarkPathFn = mainSource.match(
+    /function resolveDesktopBootSplashWordmarkPath\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+  const preloadFn = mainSource.match(
+    /async function preloadDesktopBootSplashWordmark\(\): Promise<void> \{[\s\S]*?\n\}/
+  )?.[0];
+  const whenReadyBody = mainSource.slice(
+    mainSource.indexOf('app.whenReady().then(async () => {')
+  );
+  assert.ok(wordmarkPathFn, 'resolveDesktopBootSplashWordmarkPath must exist');
+  assert.ok(preloadFn, 'preloadDesktopBootSplashWordmark must exist');
+  // The splash builder reads only the cached data URL; the wordmark load is
+  // async and awaited before the first window paints (JOV-INV-031 ratchet).
+  assert.match(
+    splashFn,
+    /const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;/
+  );
+  assert.doesNotMatch(splashFn, /readFileSync|fs\.|readFile\(/);
+  assert.match(preloadFn, /await fs\.promises\.readFile\(/);
+  assert.doesNotMatch(preloadFn, /readFileSync/);
+  assert.match(preloadFn, /resolveDesktopBootSplashWordmarkPath\(\)/);
+  assert.match(preloadFn, /data:image\/svg\+xml;base64/);
+  assert.match(wordmarkPathFn, /app\.isPackaged/);
+  assert.match(wordmarkPathFn, /process\.resourcesPath/);
+  assert.match(
+    whenReadyBody,
+    /const bootSplashWordmarkReady = preloadDesktopBootSplashWordmark\(\);/
+  );
+  const preloadAwait = whenReadyBody.indexOf('await bootSplashWordmarkReady;');
+  const firstCreateWindow = whenReadyBody.indexOf('createWindow(');
+  assert.ok(preloadAwait >= 0, 'wordmark preload must be awaited in whenReady');
+  assert.ok(
+    firstCreateWindow > preloadAwait,
+    'wordmark preload must resolve before the first createWindow'
+  );
   assert.doesNotMatch(splashFn, /@keyframes|animation:|translateX\(/);
   assert.doesNotMatch(splashFn, /180px/);
   assert.doesNotMatch(splashFn, /<h1>/);
@@ -358,13 +390,33 @@ test('Mac cinematic splash renders the static final lockup', async () => {
   const splashFn = mainSource.match(
     /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
   )?.[0];
+  const wordmarkPathFn = mainSource.match(
+    /function resolveDesktopBootSplashWordmarkPath\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+  const preloadFn = mainSource.match(
+    /async function preloadDesktopBootSplashWordmark\(\): Promise<void> \{[\s\S]*?\n\}/
+  )?.[0];
+  const cacheDecl = mainSource.match(
+    /let desktopBootSplashWordmarkDataUrl: string \| null = null;/
+  )?.[0];
   const markPath = mainSource.match(
     /const JOVIE_MARK_SVG_PATH =\s*('[^']+');/
   )?.[1];
-  assert.ok(splashFn && markPath);
+  assert.ok(splashFn && wordmarkPathFn && preloadFn && cacheDecl && markPath);
 
   const compiled = ts.transpileModule(
-    `${splashFn}\nconst JOVIE_MARK_SVG_PATH = ${markPath};\nbuildDesktopBootSplashHtml();`,
+    [
+      cacheDecl,
+      wordmarkPathFn,
+      preloadFn,
+      splashFn,
+      `const JOVIE_MARK_SVG_PATH = ${markPath};`,
+      '(async () => {',
+      '  const before = buildDesktopBootSplashHtml();',
+      '  await preloadDesktopBootSplashWordmark();',
+      '  return { before, html: buildDesktopBootSplashHtml() };',
+      '})();',
+    ].join('\n'),
     { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
   ).outputText;
   const tokens = {
@@ -380,29 +432,45 @@ test('Mac cinematic splash renders the static final lockup', async () => {
     process: { resourcesPath: '/app/resources' },
     SYSTEM_B_DESKTOP_TOKENS: tokens,
   };
+  const noSyncRead = () => {
+    throw new Error('splash must not read the wordmark synchronously');
+  };
+  const wordmarkSvg = Buffer.from('<svg>canonical wordmark</svg>');
   let loadedPath;
-  const html = runInNewContext(compiled, {
+  const { before, html } = await runInNewContext(compiled, {
     ...context,
     fs: {
-      readFileSync: path => {
-        loadedPath = path;
-        return Buffer.from('<svg>canonical wordmark</svg>');
+      readFileSync: noSyncRead,
+      promises: {
+        readFile: async path => {
+          loadedPath = path;
+          return wordmarkSvg;
+        },
       },
     },
   });
   assert.equal(loadedPath, '/app/resources/Jovie-Wordmark-Cream.svg');
+  assert.match(before, /class="fallback-mark"/);
   assert.match(html, /data-desktop-splash="cinematic"/);
   assert.match(html, /opacity: 0\.35/);
   assert.match(html, /width: min\(40px, 1\.786vw\)/);
   assert.doesNotMatch(html, /@keyframes|animation:|translateX\(/);
   assert.match(html, /class="suffix">for Mac<\/span>/);
   assert.match(html, /data:image\/svg\+xml;base64/);
+  assert.ok(
+    html.includes(
+      `src="data:image/svg+xml;base64,${wordmarkSvg.toString('base64')}"`
+    )
+  );
 
-  const fallback = runInNewContext(compiled, {
+  const { html: fallback } = await runInNewContext(compiled, {
     ...context,
     fs: {
-      readFileSync: () => {
-        throw new Error('wordmark unavailable');
+      readFileSync: noSyncRead,
+      promises: {
+        readFile: async () => {
+          throw new Error('wordmark unavailable');
+        },
       },
     },
   });
@@ -434,6 +502,38 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
       assert.doesNotMatch(entitlements, new RegExp(`<key>${forbidden}</key>`));
     }
   }
+});
+
+test('macOS disables Skia Graphite and only the main window opts out of throttling (JOV-5289)', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  const workaround = mainSource.match(
+    /function applyMacGraphiteCompositorWorkaround\(\): void \{([\s\S]*?)\n\}/
+  );
+  assert.ok(workaround, 'Graphite workaround function must exist');
+  assert.match(workaround[1], /if \(process\.platform !== 'darwin'\) return;/);
+  assert.match(
+    workaround[1],
+    /app\.commandLine\.appendSwitch\('disable-skia-graphite'\);/
+  );
+  const invocation = mainSource.indexOf(
+    'applyMacGraphiteCompositorWorkaround();'
+  );
+  assert.ok(invocation > 0, 'Graphite workaround must be invoked');
+  assert.ok(
+    invocation < mainSource.indexOf('app.whenReady()'),
+    'Graphite workaround must run before whenReady'
+  );
+  assert.doesNotMatch(mainSource, /disable-background-timer-throttling/);
+  assert.doesNotMatch(mainSource, /disable-backgrounding-occluded-windows/);
+
+  assert.equal(mainSource.match(/backgroundThrottling: false/g)?.length, 1);
+  const mainWindowStart = mainSource.indexOf('function createWindow(');
+  const throttlingIndex = mainSource.indexOf('backgroundThrottling: false');
+  assert.ok(
+    throttlingIndex > mainWindowStart,
+    'only the main window may keep backgroundThrottling: false'
+  );
 });
 
 test('desktop public profile previews are isolated, phone-sized, and closable', async () => {

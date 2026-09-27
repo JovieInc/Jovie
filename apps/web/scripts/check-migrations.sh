@@ -61,7 +61,15 @@ fi
 log_info "Checking migrations against base: $BASE_BRANCH"
 
 # Get list of changed files in migrations directory
-CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH"...HEAD -- "$MIGRATIONS_DIR" 2>/dev/null || echo "")
+if git rev-parse -q --verify MERGE_HEAD > /dev/null 2>&1; then
+    # A merge commit is being created: HEAD is still the pre-merge tip, so
+    # BASE...HEAD replays this branch's own history (including renumbered
+    # migrations). Diff the base against the staged merge result instead.
+    STAGED_TREE=$(git write-tree)
+    CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH" "$STAGED_TREE" -- "$MIGRATIONS_DIR" 2>/dev/null || echo "")
+else
+    CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH"...HEAD -- "$MIGRATIONS_DIR" 2>/dev/null || echo "")
+fi
 
 if [ -z "$CHANGED_FILES" ]; then
     log_success "No migration changes detected"

@@ -83,20 +83,21 @@ describe('ExpLayout', () => {
         hasAdminRole: false,
       },
     },
-  ])('returns not-found before prototype data is rendered for $label', async ({
-    access,
-  }) => {
-    getCurrentAdminPageAccessMock.mockResolvedValue(access);
+  ])(
+    'returns not-found before prototype data is rendered for $label',
+    async ({ access }) => {
+      getCurrentAdminPageAccessMock.mockResolvedValue(access);
 
-    await expect(
-      ExpLayout({
-        children: (
-          <div data-testid='prototype'>UNIQUE_PROTOTYPE_PAYLOAD_SECRET</div>
-        ),
-      })
-    ).rejects.toThrow('NEXT_NOT_FOUND');
+      await expect(
+        ExpLayout({
+          children: (
+            <div data-testid='prototype'>UNIQUE_PROTOTYPE_PAYLOAD_SECRET</div>
+          ),
+        })
+      ).rejects.toThrow('NEXT_NOT_FOUND');
 
-    expect(notFoundMock).toHaveBeenCalledOnce();
-    expect(screen.queryByText('UNIQUE_PROTOTYPE_PAYLOAD_SECRET')).toBeNull();
-  });
+      expect(notFoundMock).toHaveBeenCalledOnce();
+      expect(screen.queryByText('UNIQUE_PROTOTYPE_PAYLOAD_SECRET')).toBeNull();
+    }
+  );
 });

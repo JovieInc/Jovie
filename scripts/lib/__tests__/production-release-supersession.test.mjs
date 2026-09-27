@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import {
   chmodSync,
   existsSync,
@@ -11,13 +12,20 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { selectLanes } from '../../ci-fast-lanes.mjs';
+import {
+  STRUCTURAL_DEFAULT_CONCURRENCY,
+  selectLanes,
+} from '../../ci-fast-lanes.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
     await importOriginal()
   );
-  return { ...actual, spawnSync: vi.fn(actual.spawnSync) };
+  return {
+    ...actual,
+    spawn: vi.fn(actual.spawn),
+    spawnSync: vi.fn(actual.spawnSync),
+  };
 });
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -37,6 +45,7 @@ const tempRoots = [];
 
 afterEach(() => {
   vi.mocked(spawnSync).mockRestore();
+  vi.mocked(spawn).mockRestore();
   vi.unstubAllEnvs();
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -638,34 +647,192 @@ describe('production release supersession execution', () => {
 });
 
 describe('required structural release regression dispatch', () => {
-  it.each([0, 23])('propagates operational selector exit %s', exitCode => {
+  it.each([0, 23])('propagates operational exit %s', async exitCode => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     const commands = [];
-    vi.mocked(spawnSync).mockImplementation(command => {
+    const target = 'production-release-supersession.test.mjs';
+    vi.mocked(spawn).mockImplementation(command => {
       commands.push(command);
-      return {
-        status: command.includes('production-release-supersession.test.mjs')
-          ? exitCode
-          : 0,
-        stdout: '',
-        stderr: '',
-        pid: 0,
-        signal: null,
-        output: [null, '', ''],
-      };
+      // A minimal ChildProcess stand-in: only close/stdout/stderr are used.
+      const child = /** @type {any} */ (new EventEmitter());
+      child.stdout = child.stderr = new EventEmitter();
+      const code = command.includes(target) ? exitCode : 0;
+      setImmediate(() => child.emit('close', code));
+      return child;
     });
     const lane = selectLanes('remaining').find(
       item => item.id === 'structural'
     );
-    const result = lane.run();
-    const index = commands.findIndex(command =>
-      command.includes('production-release-supersession.test.mjs')
-    );
+    const result = await lane.run();
+    const index = commands.findIndex(command => command.includes(target));
     expect(index).toBeGreaterThanOrEqual(0);
     expect(commands[index]).toContain('pnpm exec vitest --root scripts');
     expect(result.code).toBe(exitCode);
-    if (exitCode) expect(index).toBe(commands.length - 1);
+    // Fail fast: only commands already in flight may follow the failure.
+    if (exitCode) {
+      expect(commands.length - 1 - index).toBeLessThan(
+        STRUCTURAL_DEFAULT_CONCURRENCY
+      );
+    }
+  });
+});
+
+describe('forward-only release lineage', () => {
+  const RECHECK_STEPS = [
+    ['release-head', 'Resolve current main HEAD'],
+    ['staging-head', 'Resolve current main HEAD'],
+    ['alias-staging', 'Recheck main immediately before staging alias'],
+    ['production-head', 'Resolve current main HEAD'],
+    [
+      'promote-production',
+      'Recheck main immediately before production mutation',
+    ],
+    [
+      'promote-production',
+      'Recheck main immediately before production promotion',
+    ],
+  ];
+
+  function stubLineageGh(bin) {
+    stubCommand(
+      bin,
+      'gh',
+      `#!/bin/sh
+case "$*" in
+  *compare/*) printf '%s\\n' "$STUB_COMPARE_STATUS" ;;
+  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+esac
+`
+    );
+  }
+
+  function runRecheck(jobKey, stepName, mainSha, compareStatus) {
+    const fixture = makeFixture('lineage-recheck-');
+    stubLineageGh(fixture.bin);
+    const script = materialize(
+      getStepRunScript(getJobBlock(RELEASE_WORKFLOW, jobKey), stepName),
+      { 'github.repository': 'JovieInc/Jovie' }
+    );
+    const result = runScript(script, fixture, {
+      EXPECTED_SHA,
+      EXPECTED_MAIN_SHA: EXPECTED_SHA,
+      STUB_COMPARE_STATUS: compareStatus,
+      STUB_MAIN_SHA: mainSha,
+    });
+    return { result, outputs: parseOutputs(fixture.output) };
+  }
+
+  it.each(RECHECK_STEPS)(
+    '%s "%s" proceeds for exact and ancestor SHAs and yields on divergence',
+    (jobKey, stepName) => {
+      const exact = runRecheck(jobKey, stepName, EXPECTED_SHA, 'identical');
+      expect(exact.result.status, exact.result.stderr).toBe(0);
+      expect(exact.outputs.is_current).toBe('true');
+
+      const ancestor = runRecheck(jobKey, stepName, NEWER_SHA, 'ahead');
+      expect(ancestor.result.status, ancestor.result.stderr).toBe(0);
+      expect(ancestor.outputs.is_current).toBe('true');
+
+      for (const status of ['diverged', 'behind', '']) {
+        const off = runRecheck(jobKey, stepName, NEWER_SHA, status);
+        expect(off.result.status, off.result.stderr).toBe(0);
+        expect(off.outputs.is_current).toBe('false');
+      }
+    },
+    30_000
+  );
+
+  function runPromote(mainSha, compareStatus) {
+    const fixture = makeFixture('lineage-promote-');
+    stubLineageGh(fixture.bin);
+    const promoted = join(fixture.root, 'promoted');
+    const vercel = join(fixture.root, 'vercel');
+    writeFileSync(
+      vercel,
+      `#!/bin/sh
+case "$1" in
+  inspect)
+    id="$2"
+    if [ "$2" = "jov.ie" ]; then
+      if [ -f "$STUB_PROMOTED" ]; then id="$STUB_DEPLOY_ID"; else id="dpl_previous_generation"; fi
+    fi
+    printf '{"id":"%s","readyState":"READY","target":"production","url":"https://jovie-%s-jovie.vercel.app"}\\n' "$id" "$id" ;;
+  rolling-release) printf 'null\\n' ;;
+  promote) printf '%s\\n' "$*" > "$STUB_PROMOTED" ;;
+esac
+`
+    );
+    chmodSync(vercel, 0o755);
+    const result = spawnSync(
+      'bash',
+      [resolve(REPO_ROOT, '.github/scripts/promote-production-deployment.sh')],
+      {
+        cwd: fixture.root,
+        encoding: 'utf8',
+        timeout: 20_000,
+        env: {
+          ...process.env,
+          EXPECTED_MAIN_SHA: EXPECTED_SHA,
+          GH_TOKEN: 'stub',
+          GITHUB_OUTPUT: fixture.output,
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          PATH: `${fixture.bin}${delimiter}${process.env.PATH || ''}`,
+          PRODUCTION_DEPLOYMENT_ID: DEPLOYMENT_ID,
+          PRODUCTION_PROMOTION_POLL_SECONDS: '0',
+          STUB_COMPARE_STATUS: compareStatus,
+          STUB_DEPLOY_ID: DEPLOYMENT_ID,
+          STUB_MAIN_SHA: mainSha,
+          STUB_PROMOTED: promoted,
+          VERCEL_CLI: vercel,
+          VERCEL_ORG_ID: 'team_stub',
+          VERCEL_PROJECT_ID: 'prj_stub',
+          VERCEL_TOKEN: 'stub',
+        },
+      }
+    );
+    return {
+      promoted: existsSync(promoted),
+      result,
+      outputs: parseOutputs(fixture.output),
+    };
+  }
+
+  it('promotes an exact or ancestor generation and reports the promoted SHA', () => {
+    const exact = runPromote(EXPECTED_SHA, 'identical');
+    expect(exact.result.status, exact.result.stderr).toBe(0);
+    expect(exact.promoted).toBe(true);
+    expect(exact.outputs.promotion_sha).toBe(EXPECTED_SHA);
+
+    const ancestor = runPromote(NEWER_SHA, 'ahead');
+    expect(ancestor.result.status, ancestor.result.stderr).toBe(0);
+    expect(ancestor.promoted).toBe(true);
+    expect(ancestor.outputs.promotion_sha).toBe(EXPECTED_SHA);
+  });
+
+  it('yields without mutation when the generation left main lineage', () => {
+    const diverged = runPromote(NEWER_SHA, 'diverged');
+    expect(diverged.result.status, diverged.result.stderr).toBe(0);
+    expect(diverged.promoted).toBe(false);
+    expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
+  });
+});
+
+describe('controller starvation bound', () => {
+  it('routes every post-coalesce main recheck through the lineage gate', () => {
+    const coalesce = getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production');
+    const authorize = getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production');
+    expect(coalesce).toContain("PRODUCTION_STARVATION_SECONDS: '5400'");
+    expect(coalesce).toContain(
+      'sparse-checkout: .github/scripts/release-lineage-gate.sh'
+    );
+    expect(
+      coalesce.match(/release-lineage-gate\.sh/g)?.length ?? 0
+    ).toBeGreaterThanOrEqual(3);
+    expect(authorize.match(/release-lineage-gate\.sh/g)?.length ?? 0).toBe(2);
+    expect(coalesce).not.toContain(
+      'if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then\n            record_receipt "superseded"'
+    );
   });
 });

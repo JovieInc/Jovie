@@ -19,7 +19,6 @@ concurrency:
 
 jobs:
   actionlint:
-    # rhysd/actionlint is a Docker action, so it needs a Docker-capable hosted runner.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -27,7 +26,8 @@ jobs:
         --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+      - name: Run actionlint (checksum-pinned toolchain)
+        run: bash .github/scripts/run-actionlint.sh
       - name: Verify agent workflow hygiene
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

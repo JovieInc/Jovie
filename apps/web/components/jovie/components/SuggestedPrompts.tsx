@@ -3,10 +3,10 @@
 import { Button } from '@jovie/ui';
 import {
   Camera,
-  Disc3,
   DollarSign,
   Eye,
   Image as ImageIcon,
+  Layers,
   Link,
   Link2,
   Link2Off,
@@ -46,10 +46,10 @@ interface PromptCapability {
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Camera,
-  Disc3,
   DollarSign,
   Eye,
   Image: ImageIcon,
+  Layers,
   Link,
   Link2,
   Link2Off,

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { EntityCardModel } from '@/components/organisms/entity-card';
 import {
@@ -332,6 +332,31 @@ describe('ProfileHomeRail', () => {
     );
     expect(screen.getByRole('link', { name: 'Shop' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
+  });
+
+  it('passes the venue timezone to the mobile show date pill', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        featuredPlaylistFallback={null}
+        tourDates={[
+          {
+            ...makeTourDate('https://tickets.example.com/radius'),
+            startDate: '2030-09-24T03:00:00Z',
+            timezone: 'America/Chicago',
+          },
+        ]}
+        hasPlayableDestinations={false}
+        renderMode='preview'
+        resolveNearbyTour={false}
+        showAlertsCard={false}
+      />
+    );
+    const show = within(screen.getByTestId('entity-card-show'));
+    expect(show.getByText('Sep')).toBeVisible();
+    expect(show.getByText('23')).toBeVisible();
+    expect(show.queryByText('24')).toBeNull();
   });
 
   it('renders show-only inventory as a ticket PAC instead of a blank Listen card', () => {

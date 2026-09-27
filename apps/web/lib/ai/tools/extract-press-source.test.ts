@@ -70,16 +70,17 @@ describe('inspectPressSourceHtml', () => {
     expect(isUntrustedSourceFenced(inspection.bodyEvidence ?? '')).toBe(true);
   });
 
-  it.each(
-    Object.values(DELIBERATE_RED_PRESS_SOURCE_FIXTURES)
-  )('classifies $id as $expectedFreshness and unverified', fixture => {
-    const inspection = inspectPressSourceHtml(fixture.html, fixture.url, NOW);
-    expect(inspection.freshness).toBe(fixture.expectedFreshness);
-    expect(inspection.factualVerification).toBe(false);
-    if (fixture.expectedFreshness === 'missing_date') {
-      expect(inspection.publishedAt).toBeNull();
+  it.each(Object.values(DELIBERATE_RED_PRESS_SOURCE_FIXTURES))(
+    'classifies $id as $expectedFreshness and unverified',
+    fixture => {
+      const inspection = inspectPressSourceHtml(fixture.html, fixture.url, NOW);
+      expect(inspection.freshness).toBe(fixture.expectedFreshness);
+      expect(inspection.factualVerification).toBe(false);
+      if (fixture.expectedFreshness === 'missing_date') {
+        expect(inspection.publishedAt).toBeNull();
+      }
     }
-  });
+  );
 
   it('fences prompt-injection copy and strips attacker URLs', () => {
     const fixture = DELIBERATE_RED_PRESS_SOURCE_FIXTURES.promptInjection;

@@ -1,0 +1,131 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-9.0.3, pluggy-1.6.0 -- /usr/local/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/runner/work/Jovie/Jovie
+collecting ... collected 416 items
+
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_product_failure_tombstone_never_dequeues_queue_follower PASSED [  0%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_newer_active_group_protects_head_before_failure_tombstone PASSED [  0%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_trusted_product_failure_creator_null_skips_scan_post_dequeue_and_enroll PASSED [  0%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_second_pass_over_trusted_product_failure_receipt_makes_zero_writes PASSED [  0%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_untrusted_product_failure_creator_null_fails_closed[<lambda>-avatar] PASSED [  1%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_untrusted_product_failure_creator_null_fails_closed[<lambda>-run] PASSED [  1%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_untrusted_product_failure_creator_null_fails_closed[<lambda>-path] PASSED [  1%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_untrusted_product_failure_creator_null_fails_closed[<lambda>-repository] PASSED [  1%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_untrusted_product_failure_creator_null_fails_closed[<lambda>-head] PASSED [  2%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_trusted_queue_reentry_creator_null_recovers_without_duplicate_status PASSED [  2%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_reentry_writes_fresh_receipt_for_the_latest_admission_run PASSED [  2%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_wrong_workflow_receipt_is_replaced_by_canonical_admission_without_dequeue PASSED [  2%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_reentry_rejects_a_receipt_written_by_another_bot PASSED [  3%]
+scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_trusted_unmergeable_eject_creator_null_blocks_enroll_without_rewrite PASSED [  3%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_starved_awaiting_checks_entry_is_dequeued PASSED [  3%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_existing_in_flight_group_ci_run_leaves_entry_queued PASSED [  3%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_matching_run_on_second_page_after_100_runs_leaves_entry_queued PASSED [  4%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_unknown_or_incomplete_run_inventory_never_dequeues[api-failure] PASSED [  4%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_unknown_or_incomplete_run_inventory_never_dequeues[api-cap] PASSED [  4%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_unknown_or_incomplete_run_inventory_never_dequeues[incomplete-page] PASSED [  4%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_unknown_or_incomplete_run_inventory_never_dequeues[malformed] PASSED [  5%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_unknown_or_incomplete_run_inventory_never_dequeues[unknown-status] PASSED [  5%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_replacement_queue_entry_during_inventory_is_left_queued PASSED [  5%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_fresh_entry_below_threshold_is_left_alone PASSED [  5%]
+scripts/tests/test_gh_retry.py::TestStarvedGroupDequeue::test_timeline_read_failure_never_dequeues PASSED [  6%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_pre_land_changelog_exact_target_fails_without_native_receipt PASSED [  6%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_durable_product_failure_receipt_blocks_when_actions_history_aged_out PASSED [  6%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_new_source_head_does_not_inherit_old_product_failure_tombstone PASSED [  6%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_classified_product_failure_persists_exact_head_tombstone_before_return PASSED [  6%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_queued_product_failure_records_tombstone_before_dequeue PASSED [  7%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_delayed_native_receipt_reconciles_without_enrolling PASSED [  7%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_selector_noop_fails_with_the_exact_reason PASSED [  7%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_missing_receipt_does_not_treat_auto_merge_as_membership PASSED [  7%]
+scripts/tests/test_gh_retry.py::TestExactHeadQueueReceipt::test_delayed_receipt_fails_when_a_hard_hold_is_live PASSED [  8%]
+scripts/tests/test_gh_retry.py::TestGhRetryHelper::test_retries_transient_504_then_succeeds PASSED [  8%]
+scripts/tests/test_gh_retry.py::TestGhRetryHelper::test_retries_github_transport_truncation_then_succeeds[stream error: stream ID 1; CANCEL; received from peer] PASSED [  8%]
+scripts/tests/test_gh_retry.py::TestGhRetryHelper::test_retries_github_transport_truncation_then_succeeds[unexpected end of JSON input] PASSED [  8%]
+scripts/tests/test_gh_retry.py::TestGhRetryHelper::test_does_not_retry_permanent_errors PASSED [  9%]
+scripts/tests/test_gh_retry.py::TestGhRetryHelper::test_does_not_retry_exhausted_installation_quota PASSED [  9%]
+scripts/tests/test_gh_retry.py::TestReleaseWaveAdmissionHold::test_active_release_wave_native_backend_keeps_healthy_entry_and_dequeues_hold PASSED [  9%]
+scripts/tests/test_brand_scrub.py::test_blocked_path_docs_plans PASSED   [ 67%]
+scripts/tests/test_brand_scrub.py::test_blocked_path_docs_ideation PASSED [ 67%]
+scripts/tests/test_brand_scrub.py::test_blocked_path_docs_idea_radar PASSED [ 68%]
+scripts/tests/test_brand_scrub.py::test_unblocked_path_passes PASSED     [ 68%]
+scripts/tests/test_brand_scrub.py::test_competitor_brand_rp_hypertrophy PASSED [ 68%]
+scripts/tests/test_brand_scrub.py::test_competitor_brand_hevy PASSED     [ 68%]
+scripts/tests/test_brand_scrub.py::test_competitor_brand_case_insensitive PASSED [ 68%]
+scripts/tests/test_brand_scrub.py::test_competitor_brand_liftosaur PASSED [ 69%]
+scripts/tests/test_brand_scrub.py::test_clean_content_passes PASSED      [ 69%]
+scripts/tests/test_brand_scrub.py::test_brand_requires_word_boundary PASSED [ 69%]
+scripts/tests/test_brand_scrub.py::test_brand_still_matches_standalone_word PASSED [ 69%]
+scripts/tests/test_brand_scrub.py::test_blocked_path_and_brand_both_flagged PASSED [ 70%]
+scripts/tests/test_brand_scrub.py::test_actual_leaked_doc_would_be_caught PASSED [ 70%]
+scripts/tests/test_brand_scrub.py::test_main_no_violations PASSED        [ 70%]
+scripts/tests/test_brand_scrub.py::test_main_with_violation PASSED       [ 70%]
+scripts/tests/test_brand_scrub.py::test_main_no_files PASSED             [ 71%]
+scripts/tests/test_agent_workflow_hygiene.py::test_pr_preparation_canary_contract PASSED [ 71%]
+scripts/tests/test_agent_workflow_hygiene.py::test_pr_preparation_canary_workflow_is_manual_bounded_and_queue_inert PASSED [ 71%]
+scripts/tests/test_agent_workflow_hygiene.py::test_agent_hot_paths_do_not_run_repo_tests PASSED [ 71%]
+scripts/tests/test_agent_workflow_hygiene.py::test_stuck_draft_autoclose_is_manual_and_hosted_only PASSED [ 72%]
+scripts/tests/test_agent_workflow_hygiene.py::test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready FAILED [ 72%]
+scripts/tests/test_agent_workflow_hygiene.py::test_slop_gate_is_post_merge_informational PASSED [ 72%]
+scripts/tests/test_agent_workflow_hygiene.py::test_agent_pipeline_retires_dead_qc_wires PASSED [ 72%]
+scripts/tests/test_agent_workflow_hygiene.py::test_node_only_agent_jobs_do_not_write_to_system_corepack_dir PASSED [ 73%]
+scripts/tests/test_agent_workflow_hygiene.py::test_workflow_test_tooling_is_hash_pinned PASSED [ 73%]
+scripts/tests/test_agent_workflow_hygiene.py::test_autofix_uses_corepack_for_pnpm_distribution PASSED [ 73%]
+scripts/tests/test_agent_workflow_hygiene.py::test_repair_controllers_use_causal_events_instead_of_polling PASSED [ 73%]
+scripts/tests/test_agent_workflow_hygiene.py::test_sha_bound_nightlies_skip_only_repeated_scheduled_heads PASSED [ 74%]
+scripts/tests/test_agent_workflow_hygiene.py::test_event_complete_workflows_do_not_retain_fallback_clocks PASSED [ 74%]
+scripts/tests/test_agent_workflow_hygiene.py::test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate PASSED [ 74%]
+scripts/tests/test_agent_workflow_hygiene.py::test_retired_human_hold_labels_are_removed_at_the_pr_boundary PASSED [ 74%]
+scripts/tests/test_agent_workflow_hygiene.py::test_claude_mention_requires_write_capable_association PASSED [ 75%]
+scripts/tests/test_agent_workflow_hygiene.py::test_trigger_guard_materializes_systemic_detector_import_closure PASSED [ 75%]
+scripts/tests/test_agent_workflow_hygiene.py::test_self_hosted_gate_jobs_materialize_full_checkout PASSED [ 75%]
+scripts/tests/test_agent_workflow_hygiene.py::test_trufflehog_job_does_not_require_docker PASSED [ 75%]
+scripts/tests/test_agent_workflow_hygiene.py::test_merge_gated_secret_scans_use_clean_hosted_runners PASSED [ 75%]
+scripts/tests/test_agent_workflow_hygiene.py::test_gated_secret_scan_fetches_only_the_exact_event_range PASSED [ 76%]
+scripts/tests/test_agent_workflow_hygiene.py::test_fleet_controllers_checkout_main_policy_code PASSED [ 76%]
+scripts/tests/test_agent_workflow_hygiene.py::test_gh_fleet_controllers_use_hosted_cli_contract PASSED [ 76%]
+scripts/tests/test_agent_workflow_hygiene.py::test_conflict_handler_uses_shared_non_cancelling_canary_queue PASSED [ 76%]
+scripts/tests/test_symphony_reconciler_runtime.py::test_repaired_generation_rejects_partial_or_cross_issue_routing_receipt PASSED [ 99%]
+scripts/tests/test_symphony_reconciler_runtime.py::test_reconciler_consumes_materialized_receipt_once_for_repaired_generation PASSED [100%]
+
+=================================== FAILURES ===================================
+__________ test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready ___________
+
+    def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
+        """Live ruleset parity must run; it must not become a source PR gate."""
+        workflow = (WORKFLOWS / "merge-queue-ruleset-verify.yml").read_text(
+            encoding="utf-8"
+        )
+        trigger_block = workflow.split("\non:\n", 1)[1].split(
+            "\npermissions:", 1
+        )[0]
+        assert "schedule:" in trigger_block
+        assert "workflow_dispatch:" in trigger_block
+        assert "pull_request" not in trigger_block
+>       assert "node scripts/ci-merge-queue-check.mjs verify --drift" in workflow
+E       assert 'node scripts/ci-merge-queue-check.mjs verify --drift' in '# Live GitHub ruleset parity for native merge queue (ruleset 10512119).\n#\n# `pnpm ci:merge-queue:check` (validate, no live API) already runs in ci-fast.\n# `pnpm ci:merge-queue:verify` reads the live ruleset via `gh api` and is the\n# only check that would catch a GitHub-UI edit weakening the merge gate.\n# It is a scheduled/main-push observer, not a source PR Ready context.\nname: Merge Queue Ruleset Verify\n# clock-class: upstream-advisory\n\non:\n  schedule:\n    - cron: \'17 6 * * *\'\n  push:\n    branches: [main]\n    paths:\n      - \'.github/rulesets/branch-protection.yml\'\n      - \'.github/workflows/merge-queue-ruleset-verify.yml\'\n      - \'scripts/ci-merge-queue-check.mjs\'\n      - \'scripts/lib/merge-queue-guard.mjs\'\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: merge-queue-ruleset-verify\n  cancel-in-progress: true\n\njobs:\n  verify:\n    name: Live ruleset parity\n    runs-on: ubuntu-latest\n    timeout-minutes: 3\n    env:\n      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: f...set editors), so bypass-actor parity is reported as an\n        # explicit warning; every other ruleset field is still enforced.\n        run: node scripts/ci-merge-queue-check.mjs verify --allow-unavailable-bypass-actors\n\n ...
+
+scripts/tests/test_agent_workflow_hygiene.py:367: AssertionError
+============================= slowest 20 durations =============================
+17.52s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_controller_repair_native_cli_enrolls_and_writes_durable_receipts
+10.60s call     scripts/tests/test_symphony_ui_pilot_runtime.py::test_installer_check_fails_closed_for_each_missing_reconciler_artifact
+9.12s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_enqueued_continuation_recovers_next_eligible_head_without_duplicate_mutations[True]
+7.36s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_enqueued_continuation_recovers_next_eligible_head_without_duplicate_mutations[False]
+6.12s call     scripts/tests/test_symphony_ui_pilot_runtime.py::test_installer_accepts_only_canonical_positive_runtime_concurrency_overlay
+3.09s call     scripts/tests/test_gh_retry.py::test_exact_target_failure_isolation_recovers_independent_heads[success-True-0-0-expected_enrolls0]
+2.64s call     scripts/tests/test_gh_retry.py::test_exact_target_failure_isolation_recovers_independent_heads[failure-True-0-1-expected_enrolls1]
+2.26s call     scripts/tests/test_vercel_prebuilt_deploy.py::test_timed_out_source_with_accepted_url_hands_off_to_health_gate
+2.19s call     scripts/tests/test_gh_retry.py::test_exact_target_failure_isolation_recovers_independent_heads[source-red-True-0-3-expected_enrolls3]
+2.17s call     scripts/tests/test_vercel_prebuilt_deploy.py::test_timed_out_prebuilt_without_accepted_url_falls_back_to_source
+2.16s call     scripts/tests/test_vercel_prebuilt_deploy.py::test_timed_out_prebuilt_with_accepted_url_hands_off_to_health_gate
+1.86s call     scripts/tests/test_gh_retry.py::test_exact_target_failure_isolation_recovers_independent_heads[success-True-15-0-expected_enrolls4]
+1.82s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_composite_ci_reentry_recovers_only_bounded_exact_bot_receipts
+1.71s call     scripts/tests/test_gh_retry.py::TestNullCreatorQueueReceiptProvenance::test_second_pass_over_trusted_product_failure_receipt_makes_zero_writes
+1.55s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_controller_repair_mode_admits_only_trusted_exact_candidate[trusted-reviewer-MEMBER-False-False--False-1]
+1.53s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_hard_gated_prs_dequeue_and_do_not_enqueue
+1.52s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_controller_repair_mode_admits_only_trusted_exact_candidate[trusted-reviewer-reapproved-MEMBER-False-False-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-True-0]
+1.52s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_hold_intake_dequeues_deterministic_failing_member_and_keeps_green_sibling
+1.45s call     scripts/tests/test_gh_retry.py::TestDrainPrQueueWiring::test_controller_repair_mode_admits_only_trusted_exact_candidate[trusted-reviewer-MEMBER-False-False-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-False-0]
+1.44s call     scripts/tests/test_gh_retry.py::TestReleaseWaveAdmissionHold::test_expired_release_wave_resumes_exact_target_enrollment
+=========================== short test summary info ============================
+FAILED scripts/tests/test_agent_workflow_hygiene.py::test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready
+================== 1 failed, 415 passed in 242.34s (0:04:02) ===================

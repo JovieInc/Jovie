@@ -81,6 +81,12 @@ interface MetricsChartProps {
   readonly points: AdminUsagePoint[];
 }
 
+function usageDeltaDirection(deltaPct: number): 'up' | 'down' | 'flat' {
+  if (deltaPct > 0) return 'up';
+  if (deltaPct < 0) return 'down';
+  return 'flat';
+}
+
 export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
   const chartData = useMemo(
     () =>
@@ -111,9 +117,7 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
         <MetricsChartHeader />
         {stats ? (
           <ContentMetricDelta
-            direction={
-              stats.deltaPct > 0 ? 'up' : stats.deltaPct < 0 ? 'down' : 'flat'
-            }
+            direction={usageDeltaDirection(stats.deltaPct)}
             value={`${stats.deltaPct >= 0 ? '+' : ''}${stats.deltaPct.toFixed(1)}%`}
             aria-label={`Daily active users changed by ${stats.deltaPct.toFixed(1)}%`}
           />

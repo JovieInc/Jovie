@@ -11,13 +11,12 @@ describe('getOnboardingDashboardInitialQuery', () => {
     );
   });
 
-  it.each<SpotifyImportStatus>([
-    'idle',
-    'importing',
-    'error',
-  ])('returns a connect spotify prompt when status is %s', status => {
-    expect(getOnboardingDashboardInitialQuery(status)).toBe(
-      'Connect my Spotify'
-    );
-  });
+  it.each<SpotifyImportStatus>(['idle', 'importing', 'error'])(
+    'returns a connect spotify prompt when status is %s',
+    status => {
+      expect(getOnboardingDashboardInitialQuery(status)).toBe(
+        'Connect my Spotify'
+      );
+    }
+  );
 });

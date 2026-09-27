@@ -267,13 +267,17 @@ if (!validation.ok) {
 }
 
 /**
- * The protected pull_request_target workflow runs this checked-out script from
- * the PR head, while its YAML remains sourced from the base branch. Keep the
+ * The unprivileged pull_request workflow (read-only token, no secrets) runs
+ * this checked-out script from the exact PR head. Keep the
  * public footer interaction proof here so it shares this job's exact build and
  * production server rather than creating a second browser lane.
  */
 async function runFooterInteractionProof() {
   if (!routes.includes('/')) return;
+  // The footer theme control ships only when theme switching is enabled at
+  // build time (#18820 forces dark by default); the Playwright dev-server
+  // suite keeps covering it with the flag on.
+  if (!isThemeSwitchingBuild(process.env)) return;
 
   const child = spawn(
     'pnpm',
@@ -327,3 +331,8 @@ async function runFooterInteractionProof() {
 }
 
 await runFooterInteractionProof();
+
+function isThemeSwitchingBuild(env) {
+  const flag = env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING;
+  return flag === '1' || flag === 'true';
+}

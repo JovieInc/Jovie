@@ -78,22 +78,20 @@ describe('persisted Summer commercial observation', () => {
   const readback = () =>
     createSummerCommercialReadback({ authenticate, read, now: () => NOW });
 
-  it.each([
-    'sessionId',
-    'receiptPath',
-    'authority',
-    'schema',
-  ])('does not attest malformed terminal %s', async field => {
-    await handler()(event());
-    const path = `summer-shadow/terminal/${summerShadowKey('event-0001')}.json`;
-    const terminal = await read(path);
-    await writeFile(
-      join(root, path),
-      JSON.stringify({ ...terminal, [field]: 'wrong' })
-    );
-    const body = await (await readback()(request(), 'event-0001')).json();
-    expect(body.consumption).toBe('UNKNOWN');
-  });
+  it.each(['sessionId', 'receiptPath', 'authority', 'schema'])(
+    'does not attest malformed terminal %s',
+    async field => {
+      await handler()(event());
+      const path = `summer-shadow/terminal/${summerShadowKey('event-0001')}.json`;
+      const terminal = await read(path);
+      await writeFile(
+        join(root, path),
+        JSON.stringify({ ...terminal, [field]: 'wrong' })
+      );
+      const body = await (await readback()(request(), 'event-0001')).json();
+      expect(body.consumption).toBe('UNKNOWN');
+    }
+  );
 
   it('persists before session dispatch, survives fresh handlers, and reevaluates changed evidence', async () => {
     dispatch.mockImplementationOnce(async input => {

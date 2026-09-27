@@ -1,5 +1,6 @@
 import {
-  Disc3,
+  AudioLines,
+  Layers,
   Library,
   MessageSquare,
   Mic2,
@@ -69,7 +70,7 @@ const COMMAND_ROWS = [
     meta: 'Track · Deep End',
   },
   {
-    icon: Disc3,
+    icon: Layers,
     title: 'Deep End',
     meta: 'Release · Scheduled Apr 30',
   },
@@ -108,7 +109,7 @@ function StudioFrame({
   return (
     <div
       className={cn(
-        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-background text-white dark:text-white shadow-2xl',
+        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-base text-white dark:text-white shadow-2xl',
         className
       )}
     >
@@ -146,7 +147,7 @@ function PublicProfileIphonePreview() {
   ] as const;
 
   return (
-    <StudioFrame className='bg-background p-4'>
+    <StudioFrame className='bg-base p-4'>
       <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
         {states.map(state => (
           <div key={state.id} className='min-w-0'>
@@ -175,7 +176,7 @@ function PublicProfileIphonePreview() {
 
 function PublicProfileMerchFixturePreview() {
   return (
-    <StudioFrame className='flex items-center justify-center bg-background p-6'>
+    <StudioFrame className='flex items-center justify-center bg-base p-6'>
       <div className='w-full max-w-[390px] rounded-[28px] border border-white/10 bg-black dark:bg-black p-4'>
         <div className='relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.035]'>
           <div className='grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-3 p-3'>
@@ -217,7 +218,7 @@ function MusicAiCommandPreview() {
           {[
             ['Chat', MessageSquare],
             ['Library', Library],
-            ['Releases', Disc3],
+            ['Releases', Layers],
             ['Lyrics', Mic2],
           ].map(([label, Icon]) => (
             <div
@@ -345,7 +346,7 @@ function TrackViewPreview() {
       <div className='flex flex-col justify-between p-4'>
         <div>
           <div className='mb-4 flex items-center gap-2 text-[12px] text-white/45'>
-            <Disc3 className='h-3.5 w-3.5' />
+            <AudioLines className='h-3.5 w-3.5' />
             <span>Track View</span>
           </div>
           <div className='space-y-2'>
@@ -476,7 +477,6 @@ function AudioBarPreview() {
         onToggleWaveform={() => undefined}
         lyricsActive
         onOpenLyrics={() => undefined}
-        onCollapse={() => undefined}
         track={{
           id: 'deep-end',
           title: 'Deep End',

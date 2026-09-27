@@ -570,11 +570,13 @@ describe('@critical ChargeHandler', () => {
 
     it('skips unhandled event types', async () => {
       const result = await handler.handle({
+        // Deliberately mismatched payload: the handler must ignore the type.
         event: {
           id: 'evt_other',
           type: 'invoice.payment_succeeded',
+          created: Math.floor(Date.now() / 1000),
           data: { object: refundedCharge() },
-        } as Stripe.Event,
+        } as unknown as Stripe.Event,
         stripeEventId: 'evt_other',
         stripeEventTimestamp: new Date(),
       });

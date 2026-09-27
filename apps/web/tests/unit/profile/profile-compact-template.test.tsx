@@ -16,6 +16,20 @@ import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
 import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
 
+// The desktop surface ships behind a build-time flag (default off). Most of
+// this suite pins it ON to keep covering the flagged desktop surface; the
+// flag-off describe below stubs it back to the shipped default.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE = '1';
+});
+
+vi.mock('@/lib/profile/desktop-surface-flag', () => ({
+  get PROFILE_DESKTOP_SURFACE_ENABLED() {
+    const value = process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE;
+    return value === '1' || value === 'true';
+  },
+}));
+
 const {
   mockCanonicalProfileDSPs,
   mockUseProfileShell,
@@ -44,7 +58,7 @@ const {
         { 'aria-label': 'Profile Navigation' },
         React.createElement('button', { type: 'button' }, 'Home'),
         React.createElement('button', { type: 'button' }, 'Music'),
-        React.createElement('button', { type: 'button' }, 'Shows'),
+        React.createElement('button', { type: 'button' }, 'Events'),
         React.createElement('button', { type: 'button' }, 'About')
       )
     );
@@ -672,6 +686,55 @@ describe('ProfileCompactTemplate', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the release credits drawer from the profile credits trigger', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releaseCredits={[
+          { role: 'producer', label: 'Producer', entries: [] },
+          {
+            role: 'main_artist',
+            label: 'Main artist',
+            entries: [
+              {
+                artistId: 'artist-1',
+                name: 'Test Artist',
+                handle: null,
+                role: 'main_artist',
+                position: 0,
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+
+    const drawer = await screen.findByRole('dialog', { name: 'Credits' });
+    expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
+    expect(within(drawer).queryByText('Producer')).toBeNull();
+  });
+
+  it('hides the release credits trigger when every credit group is empty', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releaseCredits={[{ role: 'producer', label: 'Producer', entries: [] }]}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+  });
+
   it('uses the compact no-media hero geometry when a profile has no real image', () => {
     render(
       <ProfileCompactTemplate
@@ -819,7 +882,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Shows', 'About']) {
+    for (const label of ['Home', 'Music', 'Events', 'About']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
@@ -875,7 +938,9 @@ describe('ProfileCompactTemplate', () => {
     const surfaceSlot = banner.nextElementSibling;
 
     expect(shell).toContainElement(banner);
-    expect(banner).toContainElement(screen.getByTestId('test-profile-banner'));
+    expect(banner).toContainElement(
+      within(banner).getByTestId('test-profile-banner')
+    );
     expect(surfaceSlot).toHaveClass('min-h-0', 'flex-1');
   });
 
@@ -1563,7 +1628,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Music' }));
+    fireEvent.click(
+      within(screen.getByTestId('profile-compact-surface')).getByRole(
+        'button',
+        { name: 'Music' }
+      )
+    );
 
     await waitFor(() => {
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
@@ -1861,10 +1931,12 @@ describe('ProfileCompactTemplate', () => {
 
     expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    // The desktop surface is SSR'd alongside the compact surface; CSS picks
+    // the visible one per breakpoint so no loading interstitial exists.
+    expect(
+      screen.getByTestId('mock-profile-desktop-surface')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
   });
 
   it('switches the public profile to the desktop surface at 1180px+', async () => {
@@ -1954,8 +2026,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
     expect(html).not.toContain('data-interactive-ready="true"');
-    expect(html).toContain('data-testid="profile-desktop-loading"');
-    expect(html).toContain('aria-hidden="true"');
+    // JOV-6452: cold desktop loads must paint the real desktop surface straight
+    // from server markup — no "Loading profile…" interstitial between skeleton
+    // and usable profile, and no mobile-shell-only first paint.
+    expect(html).toContain('data-testid="mock-profile-desktop-surface"');
+    expect(html).not.toContain('data-testid="profile-desktop-loading"');
+    expect(html).not.toContain('Loading profile');
     expect(html).not.toContain('aria-busy="true"');
     expect(html).toContain('data-testid="profile-compact-shell"');
     const view = render(
@@ -2095,9 +2171,13 @@ describe('ProfileCompactTemplate', () => {
     }
 
     function drawerOpenHistory(): boolean[] {
-      return mockProfileUnifiedDrawer.mock.calls.map(
+      const history = mockProfileUnifiedDrawer.mock.calls.map(
         call => (call[0] as { readonly open: boolean }).open
       );
+      // The compact drawer stays closed until hydration resolves the layout
+      // (JOV-6452); the invariant is that it never closes again once open.
+      const firstOpen = history.indexOf(true);
+      return firstOpen === -1 ? history : history.slice(firstOpen);
     }
 
     it('keeps the drawer open across a refetch that transiently empties data', async () => {
@@ -2177,7 +2257,7 @@ describe('ProfileCompactTemplate', () => {
         />
       );
 
-      expect(mockProfileUnifiedDrawer.mock.calls[0]?.[0]).toEqual(
+      expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
         expect.objectContaining({ open: true, view: 'pay' })
       );
       expect(mockUseProfileShell.mock.calls[0]?.[0]).toEqual(
@@ -2268,6 +2348,112 @@ describe('ProfileCompactTemplate', () => {
           screen.getByRole('button', { name: 'Music' })
         ).toBeInTheDocument();
       });
+
+      restoreViewport();
+    });
+  });
+
+  describe('with the desktop surface flag off (shipped default)', () => {
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('server-renders only the compact surface, with no desktop hand-off class', () => {
+      const html = renderToString(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+          profileBanner={<div data-testid='mock-banner'>Banner</div>}
+        />
+      );
+
+      expect(html).toContain('data-testid="profile-compact-shell"');
+      expect(html).not.toContain('mock-profile-desktop-surface');
+      expect(html).not.toContain('data-testid="profile-desktop-shell"');
+      expect(html).not.toContain('data-testid="profile-desktop-banner"');
+      expect(html).not.toContain('profile-viewport--desktop-surface');
+      expect(html).toContain('data-layout="compact"');
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+    });
+
+    it('keeps desktop widths on the compact surface in the centered phone column', async () => {
+      const restoreViewport = mockViewport('desktop');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+          profileBanner={<div data-testid='mock-banner'>Banner</div>}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+          'data-interactive-ready',
+          'true'
+        );
+      });
+
+      const viewport = screen.getByTestId('public-profile-layout-shell');
+      expect(viewport).toHaveAttribute('data-layout', 'compact');
+      expect(viewport).not.toHaveAttribute('data-desktop-ready');
+      expect(viewport).not.toHaveClass('profile-viewport--desktop-surface');
+      // The compact shell keeps the centered phone-column contract
+      // (max-width: --profile-shell-max-width, md:mx-auto card framing).
+      const compactShell = screen.getByTestId('profile-compact-shell');
+      expect(compactShell).toHaveClass('public-profile-compact-shell');
+      expect(compactShell).toHaveClass('md:mx-auto');
+      expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+      // The banner stays inside the column instead of the desktop shell.
+      expect(
+        within(compactShell).getByTestId('profile-shell-banner')
+      ).toHaveTextContent('Banner');
+      // Drawers and sheets stay inside the column (embedded presentation),
+      // never the viewport-wide desktop modal.
+      const lastDrawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+        | { presentation?: string }
+        | undefined;
+      expect(lastDrawerCall?.presentation).toBe('embedded');
+      expect(
+        screen.getByRole('navigation', { name: 'Profile Navigation' })
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+
+      restoreViewport();
+    });
+
+    it('keeps mobile widths on the standalone compact presentation', async () => {
+      const restoreViewport = mockViewport('mobile');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+          'data-interactive-ready',
+          'true'
+        );
+      });
+      const lastDrawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+        | { presentation?: string }
+        | undefined;
+      expect(lastDrawerCall?.presentation).toBe('standalone');
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
 
       restoreViewport();
     });

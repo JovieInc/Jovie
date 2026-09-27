@@ -1514,7 +1514,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
 
     const clickedNext = await page.evaluate(() => {
       const button = document.querySelector<HTMLButtonElement>(
-        'button[aria-label="Next Item"]'
+        'button[aria-label="Next Card"]'
       );
       button?.click();
       return Boolean(button);
@@ -1686,7 +1686,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await page.keyboard.press(focusNextKey);
       focusedEvents = await page.evaluate(
-        () => document.activeElement?.getAttribute('aria-label') === 'Shows'
+        () => document.activeElement?.getAttribute('aria-label') === 'Events'
       );
       if (focusedEvents) break;
     }
@@ -1694,7 +1694,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/calvin-demo\?mode=tour$/);
     await expect(
-      page.getByRole('heading', { name: 'Shows', exact: true })
+      page.getByRole('heading', { name: 'Events', exact: true })
     ).toBeVisible();
   });
 });

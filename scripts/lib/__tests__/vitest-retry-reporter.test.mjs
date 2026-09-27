@@ -1,10 +1,10 @@
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import RetryVisibilityReporter, {
   formatAnnotation,
   toFlakyEntry,
@@ -30,16 +30,14 @@ afterEach(() => {
   }
 });
 
-function runFixture(include) {
-  const dir = tempDir();
+function runFixture(include, dir) {
   const outputFile = path.join(dir, 'test-report.1-10.flaky.json');
   const summaryFile = path.join(dir, 'summary.md');
-  const child = spawnSync(
+  const child = spawn(
     process.execPath,
     [vitestBin, 'run', '--config', 'vitest.fixture.config.mjs'],
     {
       cwd: fixtureDir,
-      encoding: 'utf8',
       env: {
         ...process.env,
         CI: '',
@@ -49,28 +47,67 @@ function runFixture(include) {
         RETRY_FIXTURE_INCLUDE: include,
         RETRY_FIXTURE_OUTPUT: outputFile,
       },
+      stdio: ['ignore', 'pipe', 'inherit'],
     }
   );
-  return {
-    child,
-    dir,
-    report: JSON.parse(fs.readFileSync(outputFile, 'utf8')),
-    summary: fs.existsSync(summaryFile)
-      ? fs.readFileSync(summaryFile, 'utf8')
-      : '',
-    warnings: `${child.stdout}`
-      .split('\n')
-      .filter(line => line.startsWith('::warning ')),
-  };
+  let stdout = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', chunk => {
+    stdout += chunk;
+  });
+  return new Promise((resolveRun, rejectRun) => {
+    child.once('error', rejectRun);
+    child.once('close', status => {
+      try {
+        resolveRun({
+          status,
+          dir,
+          report: JSON.parse(fs.readFileSync(outputFile, 'utf8')),
+          summary: fs.existsSync(summaryFile)
+            ? fs.readFileSync(summaryFile, 'utf8')
+            : '',
+          warnings: stdout
+            .split('\n')
+            .filter(line => line.startsWith('::warning ')),
+        });
+      } catch (error) {
+        rejectRun(error);
+      }
+    });
+  });
 }
 
 describe('vitest retry visibility reporter (real Vitest run)', () => {
+  // Each real Vitest child costs ~1s idle and 2-4s under ci-fast CPU
+  // contention. The assertions below only read the runs' outputs, so run each
+  // fixture once, concurrently, and share the results across the tests.
+  const runDirs = [];
+  let flakyRun;
+  let cleanRun;
+
+  beforeAll(async () => {
+    const runDir = () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'retry-reporter-'));
+      runDirs.push(dir);
+      return dir;
+    };
+    [flakyRun, cleanRun] = await Promise.all([
+      runFixture('flaky.fixture.mjs', runDir()),
+      runFixture('clean.fixture.mjs', runDir()),
+    ]);
+  }, 60_000);
+
+  afterAll(() => {
+    for (const dir of runDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('records exactly one flaky entry for a test that fails once then passes', () => {
-    const { child, report, summary, warnings } =
-      runFixture('flaky.fixture.mjs');
+    const { status, report, summary, warnings } = flakyRun;
 
     // The run stays green: retried-then-passed is reported, never failed.
-    expect(child.status).toBe(0);
+    expect(status).toBe(0);
     expect(report.flaky).toEqual([
       {
         file: 'scripts/lib/__tests__/fixtures/vitest-retry/flaky.fixture.mjs',
@@ -83,21 +120,20 @@ describe('vitest retry visibility reporter (real Vitest run)', () => {
     ]);
     expect(summary).toContain('Flaky unit tests (fixture): 1');
     expect(summary).toContain('fails once then passes');
-  }, 60_000);
+  });
 
   it('records no flaky entries, warnings or summary for a clean run', () => {
-    const { child, report, summary, warnings } =
-      runFixture('clean.fixture.mjs');
+    const { status, report, summary, warnings } = cleanRun;
 
-    expect(child.status).toBe(0);
+    expect(status).toBe(0);
     expect(report.flaky).toEqual([]);
     expect(warnings).toEqual([]);
     expect(summary).toBe('');
-  }, 60_000);
+  });
 
   it('feeds the nightly flakiness report, which counts the flake', () => {
-    const { dir } = runFixture('flaky.fixture.mjs');
-    const clean = runFixture('clean.fixture.mjs');
+    const { dir } = flakyRun;
+    const clean = cleanRun;
 
     const unitStats = flakiness.collectUnitRetryFlakes(
       [{ id: 101 }, { id: 102 }],
@@ -125,7 +161,7 @@ describe('vitest retry visibility reporter (real Vitest run)', () => {
       runs: 1,
       retryRate: '50.0',
     });
-  }, 60_000);
+  });
 });
 
 describe('vitest retry visibility reporter (unit)', () => {

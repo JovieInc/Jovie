@@ -306,6 +306,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
           venueName: show.venueName,
           city: show.city,
           startDate: show.startDate,
+          timezone: show.timezone,
           ticketUrl: show.ticketUrl,
           ticketStatus: show.ticketStatus,
         })

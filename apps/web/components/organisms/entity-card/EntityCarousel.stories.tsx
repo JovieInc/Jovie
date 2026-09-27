@@ -61,7 +61,7 @@ export const ProfileLandscape: Story = {
   },
   play: async ({ canvasElement }) => {
     const first = canvasElement.querySelector<HTMLButtonElement>(
-      'button[aria-label="Go to item 1"]'
+      'button[aria-label="Go to card 1"]'
     );
     if (first?.getAttribute('aria-current') !== 'true') {
       throw new Error('First carousel dot must be selected at rest');

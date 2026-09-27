@@ -47,6 +47,7 @@ describe('PublicPageShell', () => {
     expect(main).toBeInTheDocument();
     expect(main).toHaveTextContent('route content');
     expect(main?.className).toContain('pt-(--public-shell-header-offset)');
+    expect(main).toHaveClass('public-shell-main--docked');
 
     const homepageContract = MARKETING_PAGE_CONTRACTS['(home)/page.tsx'];
     const marker = main?.querySelector('[data-page-job]');
@@ -87,6 +88,7 @@ describe('PublicPageShell', () => {
 
     const main = document.getElementById('main-content');
     expect(main?.className).not.toContain('pt-(--public-shell-header-offset)');
+    expect(main).not.toHaveClass('public-shell-main--docked');
   });
 
   it('passes footer variant and className through to MarketingFooter', () => {

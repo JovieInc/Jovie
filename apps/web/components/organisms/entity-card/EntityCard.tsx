@@ -300,6 +300,14 @@ export function EntityCard({
       : model.meta;
   const preserveLandscapeMedia =
     isProfileLandscape && (model.kind === 'video' || model.kind === 'merch');
+  let shellLayoutClass = 'gap-3 p-3';
+  if (isProfileLandscape && isLandscapeNonMedia) {
+    shellLayoutClass = 'gap-0 overflow-hidden p-0';
+  } else if (isProfileLandscape) {
+    shellLayoutClass = 'gap-0 overflow-hidden p-1.5';
+  } else if (treatment === 'big' || isUnified) {
+    shellLayoutClass = 'gap-0 overflow-hidden p-0';
+  }
 
   return (
     <CardShell
@@ -310,11 +318,7 @@ export function EntityCard({
       className={cn(
         'group flex min-w-0 text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
         isProfileLandscape ? 'flex-row' : 'flex-col',
-        isProfileLandscape
-          ? cn('gap-0 overflow-hidden', isLandscapeNonMedia ? 'p-0' : 'p-1.5')
-          : treatment === 'big' || isUnified
-            ? 'gap-0 overflow-hidden p-0'
-            : 'gap-3 p-3',
+        shellLayoutClass,
         isPearl
           ? 'rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl hover:bg-(--profile-pearl-bg-hover)'
           : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',

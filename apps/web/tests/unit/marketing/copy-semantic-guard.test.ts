@@ -137,10 +137,10 @@ describe('meaning-first marketing copy guard', () => {
   });
 
   it.each([
-    ['marketing-slop', 'Seamlessly unlock a world-class profile ecosystem.'],
+    ['corporate-verb', 'Seamlessly unlock a world-class profile ecosystem.'],
     ['formulaic-contrast', 'More than just a profile.'],
-    ['chat-residue', 'Here is a revised option A: your profile.'],
-    ['dash-habit', 'One profile — every fan.'],
+    ['model-residue', 'Here is a revised option A: your profile.'],
+    ['em-dash', 'One profile — every fan.'],
   ] as const)('flags %s in the anti-slop audit', (code, headline) => {
     const issues = auditMarketingCopyPage(brief, draft(headline));
     expect(issues.some(issue => issue.code === code)).toBe(true);
@@ -171,6 +171,6 @@ describe('meaning-first marketing copy guard', () => {
         ],
       }).some(issue => issue.code === 'redundant-support')
     ).toBe(true);
-    expect(issues.some(issue => issue.code === 'marketing-slop')).toBe(false);
+    expect(issues.some(issue => issue.code === 'corporate-verb')).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import {
   getWaitlistAccess,
   resolveUserState,
 } from '@/lib/auth/gate';
+import { captureWarning } from '@/lib/error-tracking';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
@@ -46,17 +47,28 @@ async function resolveStartPageRedirect(
   // JOV-6449: with the launch gate off, waitlist table reads are irrelevant
   // and must not 500 /start. Canonical WAITLIST_PENDING still goes to the
   // receipt so already-waitlisted accounts stay gated.
-  const waitlistGateEnabled = await isWaitlistGateEnabled();
-  if (!waitlistGateEnabled) {
-    return getStartRouteRedirect(authResult.state);
-  }
+  // JOV-5225: the gate check and entry lookup are advisory refinement on top
+  // of the canonical state — if either read fails, fall back to the canonical
+  // redirect instead of 500-ing the signup golden path.
+  try {
+    const waitlistGateEnabled = await isWaitlistGateEnabled();
+    if (!waitlistGateEnabled) {
+      return getStartRouteRedirect(authResult.state);
+    }
 
-  const email = authResult.context.email;
-  if (!email) return null;
+    const email = authResult.context.email;
+    if (!email) return null;
 
-  const access = await getWaitlistAccess(email);
-  if (!access.entryId || !isWaitlistPendingStatus(access.status)) {
-    return null;
+    const access = await getWaitlistAccess(email);
+    if (!access.entryId || !isWaitlistPendingStatus(access.status)) {
+      return null;
+    }
+  } catch (error) {
+    await captureWarning(
+      '[start] waitlist gate/entry read failed; falling back to canonical redirect',
+      error,
+      { operation: 'resolveStartPageRedirect' }
+    );
   }
 
   return getStartRouteRedirect(authResult.state);

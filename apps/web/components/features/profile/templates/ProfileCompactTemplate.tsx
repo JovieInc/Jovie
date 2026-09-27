@@ -1,7 +1,6 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
-import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   type ReactNode,
@@ -11,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { AnonCookieBootstrap } from '@/components/features/profile/AnonCookieBootstrap';
 import {
   ProfileNotificationsContext,
@@ -34,6 +34,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -43,6 +44,7 @@ import {
 } from '@/lib/flags/profile-pac';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import { PROFILE_DESKTOP_SURFACE_ENABLED } from '@/lib/profile/desktop-surface-flag';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
   buildProfileAccentCssVars,
@@ -62,21 +64,8 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import {
-  ProfileDesktopLoadingPlaceholder,
-  PublicProfileLayoutShell,
-} from './PublicProfileLayoutShell';
-
-const ProfileDesktopSurface = dynamic(
-  () =>
-    import('./ProfileDesktopSurface').then(
-      module => module.ProfileDesktopSurface
-    ),
-  {
-    ssr: false,
-    loading: () => <ProfileDesktopLoadingPlaceholder />,
-  }
-);
+import { ProfileDesktopSurface } from './ProfileDesktopSurface';
+import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -121,6 +110,8 @@ interface ProfileCompactTemplateProps {
   readonly claimFooterHref?: string | null;
   readonly claimFooterLabel?: string;
   readonly proofClaim?: boolean;
+  /** Credits for the profile's latest release. Opens the shared credits drawer. */
+  readonly releaseCredits?: readonly SmartLinkCreditGroup[];
   /** True when this template is embedded in another page (marketing/demo
    *  preview) rather than serving as the outer profile document. Forwarded
    *  to the layout shell so the global viewport scroll lock skips embedded
@@ -272,8 +263,13 @@ export function ProfileCompactTemplate({
   claimFooterHref = null,
   claimFooterLabel,
   proofClaim = false,
+  releaseCredits,
   embeddedPreview = false,
 }: ProfileCompactTemplateProps) {
+  const visibleReleaseCredits = (releaseCredits ?? []).filter(
+    group => group.entries.length > 0
+  );
+  const [creditsOpen, setCreditsOpen] = useState(false);
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
@@ -361,11 +357,14 @@ export function ProfileCompactTemplate({
     const embeddedQuery = globalThis.matchMedia('(min-width: 768px)');
     const desktopQuery = globalThis.matchMedia('(min-width: 1180px)');
     const syncPresentation = () => {
-      const ownsDesktopLayout = desktopQuery.matches && !embeddedPreview;
+      // With the desktop surface flagged off (the default), desktop widths
+      // keep the compact surface in its centered phone column, so drawers use
+      // the same embedded presentation as tablet widths.
+      const ownsDesktopLayout =
+        PROFILE_DESKTOP_SURFACE_ENABLED &&
+        desktopQuery.matches &&
+        !embeddedPreview;
       setIsDesktopLayout(ownsDesktopLayout);
-      if (!ownsDesktopLayout) {
-        setDesktopSurfaceReady(false);
-      }
       setDrawerPresentation(
         ownsDesktopLayout
           ? 'modal'
@@ -863,6 +862,11 @@ export function ProfileCompactTemplate({
         onVariantResolved={setResolvedAlertOptInVariant}
         onProfilePacResolved={setResolvedProfilePacAssignment}
       />
+      <ReleaseCreditsDrawer
+        open={creditsOpen}
+        onOpenChange={setCreditsOpen}
+        credits={visibleReleaseCredits}
+      />
       <PublicProfileLayoutShell
         artistName={artist.name}
         heroImageUrl={heroImageUrl}
@@ -885,6 +889,11 @@ export function ProfileCompactTemplate({
             data-interactive-ready={isHydrated ? 'true' : undefined}
             data-public-profile-nav={publicProfileNavIds}
           >
+            {visibleReleaseCredits.length > 0 ? (
+              <button type='button' onClick={() => setCreditsOpen(true)}>
+                Release credits
+              </button>
+            ) : null}
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
@@ -924,7 +933,7 @@ export function ProfileCompactTemplate({
                 allowSignedInEscape={!embeddedPreview}
                 renderInteractiveOverlays
                 renderSemanticHeading={!isDesktopLayout}
-                drawerOpen={drawerOpen}
+                drawerOpen={drawerOpen && isHydrated && !isDesktopLayout}
                 drawerView={drawerView}
                 activeMode={requestedMode}
                 onModeSelect={nextMode => {
@@ -960,47 +969,59 @@ export function ProfileCompactTemplate({
             </div>
           </div>
         }
-        desktopBanner={isDesktopLayout ? profileBanner : null}
+        desktopBanner={
+          embeddedPreview || !PROFILE_DESKTOP_SURFACE_ENABLED
+            ? null
+            : profileBanner
+        }
         desktopSurface={
-          <ProfileDesktopSurface
-            presentation='modal'
-            onReady={handleDesktopSurfaceReady}
-            artist={artist}
-            socialLinks={socialLinks}
-            contacts={contacts}
-            showPayButton={showPayButton}
-            latestRelease={latestRelease}
-            profileSettings={profileSettings}
-            alertOptInVariant={resolvedAlertOptInVariant}
-            allowFanCapture={allowFanCapture}
-            genres={genres}
-            pressPhotos={pressPhotos}
-            allowPhotoDownloads={allowPhotoDownloads}
-            photoDownloadSizes={photoDownloadSizes}
-            tourDates={tourDates}
-            viewerCountryCode={viewerCountryCode}
-            releases={releases}
-            catalogLoadFailed={catalogLoadFailed}
-            drawerOpen={drawerOpen}
-            drawerView={drawerView}
-            activeMode={requestedMode}
-            onModeSelect={nextMode => {
-              clearCloseResetTimer();
-              setRequestedMode(nextMode);
-            }}
-            onAlertsModalClose={() => setRequestedMode('profile')}
-            onDrawerOpenChange={handleDrawerOpenChange}
-            onDrawerViewChange={handleDrawerViewChange}
-            onOpenMenu={() => openDrawerMode('menu')}
-            onPlayClick={handlePlayClick}
-            onBack={handleBack}
-            profileHref={profileHref}
-            isSubscribed={isSubscribed}
-            contentPrefs={contentPrefs}
-            onTogglePref={handleTogglePref}
-            onUnsubscribe={handleUnsubscribe}
-            isUnsubscribing={unsubMutation.isPending}
-          />
+          PROFILE_DESKTOP_SURFACE_ENABLED ? (
+            <ProfileDesktopSurface
+              presentation='modal'
+              overlaysEnabled={isDesktopLayout}
+              onReady={handleDesktopSurfaceReady}
+              artist={artist}
+              socialLinks={socialLinks}
+              contacts={contacts}
+              showPayButton={showPayButton}
+              latestRelease={latestRelease}
+              profileSettings={profileSettings}
+              alertOptInVariant={resolvedAlertOptInVariant}
+              allowFanCapture={allowFanCapture}
+              genres={genres}
+              pressPhotos={pressPhotos}
+              allowPhotoDownloads={allowPhotoDownloads}
+              photoDownloadSizes={photoDownloadSizes}
+              tourDates={tourDates}
+              viewerCountryCode={viewerCountryCode}
+              releases={releases}
+              catalogLoadFailed={catalogLoadFailed}
+              drawerOpen={drawerOpen}
+              drawerView={drawerView}
+              activeMode={requestedMode}
+              onModeSelect={nextMode => {
+                clearCloseResetTimer();
+                setRequestedMode(nextMode);
+              }}
+              onAlertsModalClose={() => setRequestedMode('profile')}
+              onDrawerOpenChange={handleDrawerOpenChange}
+              onDrawerViewChange={handleDrawerViewChange}
+              onOpenMenu={() => openDrawerMode('menu')}
+              onPlayClick={handlePlayClick}
+              onBack={handleBack}
+              profileHref={profileHref}
+              isSubscribed={isSubscribed}
+              contentPrefs={contentPrefs}
+              onTogglePref={handleTogglePref}
+              onUnsubscribe={handleUnsubscribe}
+              isUnsubscribing={unsubMutation.isPending}
+              onOpenReleaseCredits={
+                visibleReleaseCredits.length > 0
+                  ? () => setCreditsOpen(true)
+                  : undefined
+              }
+            />
+          ) : null
         }
       />
     </ProfileNotificationsContext.Provider>

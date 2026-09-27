@@ -6,11 +6,11 @@
   },
   "conservative": {
     "armed": true,
-    "count": 739,
+    "count": 737,
     "perFamily": {
       "marketing": 113,
-      "web-shell": 296,
-      "web-other": 319,
+      "web-shell": 295,
+      "web-other": 318,
       "packages/ui": 11
     },
     "perUtility": {
@@ -24,14 +24,14 @@
       "my-2.5": 1,
       "p-2.5": 34,
       "p-3.5": 32,
-      "pb-2.5": 13,
+      "pb-2.5": 12,
       "pb-3.5": 1,
       "pl-2.5": 2,
       "pl-3.5": 2,
       "pr-2.5": 3,
       "pr-3.5": 2,
       "pt-2.5": 9,
-      "px-2.5": 246,
+      "px-2.5": 245,
       "px-3.5": 47,
       "py-2.5": 131,
       "py-3.5": 34,
@@ -41,11 +41,11 @@
   },
   "strict": {
     "armed": false,
-    "count": 2380,
+    "count": 2379,
     "perFamily": {
-      "marketing": 301,
+      "marketing": 313,
       "web-shell": 919,
-      "web-other": 1101,
+      "web-other": 1088,
       "packages/ui": 59
     }
   }

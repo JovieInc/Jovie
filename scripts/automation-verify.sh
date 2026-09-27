@@ -32,6 +32,10 @@ case "$SCOPE" in
       --max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}" \
       --shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
     pnpm ci:harness:check
+    # Same component contract CI's structural lane enforces (tests + stories for shipped
+    # UI components), so every pusher — human, Symphony or lane — fails here, not in CI.
+    # Server-backed Storybook and rendered certification stay in CI.
+    pnpm component-ship-gate --diff-base="$BASE_REF" --skip-live-storybook --skip-rendered-cert
     ;;
   full)
     echo "[automation-verify] Running full verify bundle"

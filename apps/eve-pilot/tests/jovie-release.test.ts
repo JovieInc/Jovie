@@ -50,63 +50,63 @@ describe('independent release and rollback', () => {
       validateReleaseTarget(deployment, { ...binding, teamId: '' })
     ).toThrow();
   });
-  it.each([
-    'preview',
-    'candidate',
-  ])('builds a %s without assigning domains', async operation => {
-    const cwd = process.cwd();
-    const directory = mkdtempSync(join(tmpdir(), 'jovie-release-'));
-    try {
-      process.chdir(directory);
-      const environment = {
-        OPERATION: operation,
-        EXPECTED_SHA: binding.sha,
-        JOVIE_AGENT_VERCEL_TOKEN: 'synthetic',
-        JOVIE_AGENT_VERCEL_PROJECT_ID: binding.projectId,
-        JOVIE_AGENT_VERCEL_TEAM_ID: binding.teamId,
-      };
-      const run = vi
-        .fn()
-        .mockReturnValue('https://jovie-agent-synthetic.vercel.app');
-      expect((await release(environment, run)).status).toBe(
-        'deployed-uncommissioned'
-      );
-      expect(run.mock.calls[0][1].includes('--skip-domain')).toBe(
-        operation === 'candidate'
-      );
-      expect(run.mock.calls[0][1]).not.toContain('promote');
-      await expect(
-        release(environment, vi.fn().mockReturnValue('https://other.example'))
-      ).rejects.toThrow('URL unavailable');
-    } finally {
-      process.chdir(cwd);
-      rmSync(directory, { recursive: true, force: true });
+  it.each(['preview', 'candidate'])(
+    'builds a %s without assigning domains',
+    async operation => {
+      const cwd = process.cwd();
+      const directory = mkdtempSync(join(tmpdir(), 'jovie-release-'));
+      try {
+        process.chdir(directory);
+        const environment = {
+          OPERATION: operation,
+          EXPECTED_SHA: binding.sha,
+          JOVIE_AGENT_VERCEL_TOKEN: 'synthetic',
+          JOVIE_AGENT_VERCEL_PROJECT_ID: binding.projectId,
+          JOVIE_AGENT_VERCEL_TEAM_ID: binding.teamId,
+        };
+        const run = vi
+          .fn()
+          .mockReturnValue('https://jovie-agent-synthetic.vercel.app');
+        expect((await release(environment, run)).status).toBe(
+          'deployed-uncommissioned'
+        );
+        expect(run.mock.calls[0][1].includes('--skip-domain')).toBe(
+          operation === 'candidate'
+        );
+        expect(run.mock.calls[0][1]).not.toContain('promote');
+        await expect(
+          release(environment, vi.fn().mockReturnValue('https://other.example'))
+        ).rejects.toThrow('URL unavailable');
+      } finally {
+        process.chdir(cwd);
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-  });
-  it.each([
-    'promote',
-    'rollback',
-  ])('uses the same exact revision gate for %s', async operation => {
-    const run = vi.fn().mockReturnValue('');
-    const fetcher = vi.fn().mockResolvedValue(Response.json(deployment));
-    const receipt = await release(
-      {
-        OPERATION: operation,
-        EXPECTED_SHA: binding.sha,
-        DEPLOYMENT_ID: binding.deploymentId,
-        JOVIE_AGENT_VERCEL_TOKEN: 'synthetic',
-        JOVIE_AGENT_VERCEL_PROJECT_ID: binding.projectId,
-        JOVIE_AGENT_VERCEL_TEAM_ID: binding.teamId,
-      },
-      run,
-      fetcher
-    );
-    expect(receipt.status).toBe(
-      'promotion-requested-requires-runtime-readback'
-    );
-    expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0][1]).toContain(binding.deploymentId);
-  });
+  );
+  it.each(['promote', 'rollback'])(
+    'uses the same exact revision gate for %s',
+    async operation => {
+      const run = vi.fn().mockReturnValue('');
+      const fetcher = vi.fn().mockResolvedValue(Response.json(deployment));
+      const receipt = await release(
+        {
+          OPERATION: operation,
+          EXPECTED_SHA: binding.sha,
+          DEPLOYMENT_ID: binding.deploymentId,
+          JOVIE_AGENT_VERCEL_TOKEN: 'synthetic',
+          JOVIE_AGENT_VERCEL_PROJECT_ID: binding.projectId,
+          JOVIE_AGENT_VERCEL_TEAM_ID: binding.teamId,
+        },
+        run,
+        fetcher
+      );
+      expect(receipt.status).toBe(
+        'promotion-requested-requires-runtime-readback'
+      );
+      expect(run).toHaveBeenCalledOnce();
+      expect(run.mock.calls[0][1]).toContain(binding.deploymentId);
+    }
+  );
   it('fails before invoking a provider without scoped credentials', async () => {
     const run = vi.fn();
     await expect(release({}, run)).rejects.toThrow('binding unavailable');

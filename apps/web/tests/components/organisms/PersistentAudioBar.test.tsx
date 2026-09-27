@@ -13,7 +13,6 @@ import {
   getAudioChromeSnapshot,
   resetAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
-import { writeAudioBarDismissed } from '@/components/shell/audio-bar-dismissal';
 import {
   APP_ROUTES,
   buildLyricsRoute,
@@ -29,6 +28,7 @@ const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
+const prefetch = vi.fn();
 let pathname = '/app';
 let searchParams = new URLSearchParams();
 
@@ -48,6 +48,8 @@ const basePlaybackState = {
   artistName: null as string | null,
   artworkUrl: null as string | null,
   hasLyrics: false,
+  bpm: null as number | null,
+  musicalKey: null as string | null,
   queueLength: 0,
   queueIndex: -1,
   hasNext: false,
@@ -72,7 +74,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useSearchParams: () => searchParams,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, prefetch }),
 }));
 
 let mockPrefersReducedMotion = false;
@@ -131,10 +133,12 @@ function setPlaying(overrides: Partial<MockPlaybackState> = {}) {
   };
 }
 
-function getExpandedShellMinimizeButton() {
-  return within(screen.getByTestId('audio-surface-expanded-shell')).getByTestId(
-    'audio-bar-minimize'
-  );
+function getExpandedShell() {
+  return screen.getByTestId('audio-surface-expanded-shell');
+}
+
+function getPlayerVisibilityToggle() {
+  return screen.getByTestId('player-visibility-toggle');
 }
 
 describe('PersistentAudioBar', () => {
@@ -146,6 +150,7 @@ describe('PersistentAudioBar', () => {
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
+    prefetch.mockClear();
     pathname = '/app';
     searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };
@@ -162,31 +167,11 @@ describe('PersistentAudioBar', () => {
     });
   }
 
-  it('keeps a closed, zero-height idle playback slot when no track is active', () => {
-    render(<PersistentAudioBar />);
-
-    const idleSurfaces = [
-      screen.getByTestId('audio-surface-idle-shell-desktop'),
-      screen.getByTestId('audio-surface-idle-shell-mobile'),
-    ];
-    expect(idleSurfaces).toHaveLength(2);
-    for (const surface of idleSurfaces) {
-      expect(surface).toHaveAttribute('aria-hidden', 'true');
-      expect(surface).toHaveAttribute('inert');
-      expect(surface.style.maxHeight).toBe('0');
-      expect(surface.style.pointerEvents).toBe('none');
-    }
-    // The idle tray stays in document flow so opening it reserves shell space
-    // instead of covering the main canvas or right rail.
-    expect(idleSurfaces[0]).not.toHaveClass('absolute');
-    expect(idleSurfaces[0]).toHaveClass('shrink-0');
-    expect(idleSurfaces[1]).toHaveAttribute(
-      'data-mobile-audio-surface',
-      'true'
-    );
-    expect(idleSurfaces[1]).not.toHaveClass(
-      'max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
-    );
+  it('renders nothing (zero reserved space) when no track is active', () => {
+    const { container } = render(<PersistentAudioBar />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'Audio Player' })).toBeNull();
+    expect(screen.queryByTestId('player-visibility-toggle')).toBeNull();
   });
 
   it('keeps compact playback artwork contained instead of cropping it', async () => {
@@ -199,54 +184,20 @@ describe('PersistentAudioBar', () => {
     expect(artwork).not.toHaveClass('object-cover');
   });
 
-  it('opens and closes the idle playback tray with the global toggle shortcuts', () => {
-    render(<PersistentAudioBar />);
-
-    fireEvent.keyDown(globalThis, { key: '`' });
-
-    const idleSurface = screen.getByTestId('audio-surface-idle-shell-desktop');
-    expect(idleSurface).toHaveAttribute('aria-hidden', 'false');
-    expect(idleSurface).not.toHaveAttribute('inert');
-    expect(idleSurface).toHaveTextContent('Nothing playing');
-    expect(idleSurface).toHaveTextContent(
-      'Choose a track from Library to start playback.'
-    );
-    const mobileSurface = screen.getByTestId('audio-surface-idle-shell-mobile');
-    expect(
-      within(mobileSurface).getByText(
-        'Choose a track from Library to start playback.'
-      )
-    ).toHaveClass('text-pretty', 'leading-4');
-    expect(
-      within(mobileSurface).getByText(
-        'Choose a track from Library to start playback.'
-      )
-    ).not.toHaveClass('truncate');
-    expect(
-      screen.getAllByRole('button', { name: 'Open Library' })
-    ).toHaveLength(2);
-
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
-    expect(idleSurface).toHaveAttribute('aria-hidden', 'true');
-
-    fireEvent.keyDown(globalThis, { key: '\\', metaKey: true });
-    expect(idleSurface).toHaveAttribute('aria-hidden', 'false');
-  });
-
-  it('does not toggle the idle tray while typing in a form control', () => {
+  it('does not toggle the player from a form control keydown', () => {
+    setPlaying();
     render(<PersistentAudioBar />);
     const input = document.createElement('input');
     document.body.append(input);
 
     fireEvent.keyDown(input, { key: '`' });
 
-    expect(
-      screen.getByTestId('audio-surface-idle-shell-desktop')
-    ).toHaveAttribute('aria-hidden', 'true');
+    expect(getExpandedShell()).toHaveAttribute('aria-hidden', 'false');
     input.remove();
   });
 
-  it('does not toggle the idle tray from contenteditable text', () => {
+  it('does not toggle the player from contenteditable text', () => {
+    setPlaying();
     render(<PersistentAudioBar />);
     const editor = document.createElement('div');
     editor.contentEditable = 'true';
@@ -254,34 +205,8 @@ describe('PersistentAudioBar', () => {
 
     fireEvent.keyDown(editor, { key: '\\', metaKey: true });
 
-    expect(
-      screen.getByTestId('audio-surface-idle-shell-desktop')
-    ).toHaveAttribute('aria-hidden', 'true');
+    expect(getExpandedShell()).toHaveAttribute('aria-hidden', 'false');
     editor.remove();
-  });
-
-  it('does not repeat the Library destination when the tray opens on Library', () => {
-    pathname = APP_ROUTES.LIBRARY;
-    render(<PersistentAudioBar />);
-
-    fireEvent.keyDown(globalThis, { key: '`' });
-
-    const idleSurface = screen.getByTestId('audio-surface-idle-shell-desktop');
-    expect(idleSurface).toHaveTextContent('Choose a track to start playback.');
-    expect(
-      screen.queryByRole('button', { name: 'Open Library' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('snaps the idle tray without translation or transition under reduced motion', () => {
-    mockPrefersReducedMotion = true;
-    render(<PersistentAudioBar />);
-
-    fireEvent.keyDown(globalThis, { key: '`' });
-
-    const idleSurface = screen.getByTestId('audio-surface-idle-shell-desktop');
-    expect(idleSurface.style.transform).toBe('translateY(0)');
-    expect(idleSurface.style.transition).toBe('none');
   });
 
   it('renders bar with track info when a track is active', () => {
@@ -304,12 +229,35 @@ describe('PersistentAudioBar', () => {
     for (const artwork of screen.getAllByTestId('artwork-img')) {
       expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/art.jpg');
     }
+  });
+
+  it('never renders a collapse/minimize or dismiss control', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+    render(<PersistentAudioBar />);
+
+    expect(screen.queryByTestId('audio-bar-minimize')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dismiss Player' })).toBeNull();
     expect(
-      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
-        'button',
-        { name: 'Dismiss Player' }
-      )
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: /minimize/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders exactly one subtle visibility toggle that opens/closes the player', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+    render(<PersistentAudioBar />);
+
+    const toggle = getPlayerVisibilityToggle();
+    expect(toggle).toHaveAttribute('aria-label', 'Hide Player');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(toggle);
+
+    expect(getPlayerVisibilityToggle()).toHaveAttribute(
+      'aria-label',
+      'Show Player'
+    );
+    expect(getExpandedShell()).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('shows play button when paused', () => {
@@ -334,70 +282,6 @@ describe('PersistentAudioBar', () => {
       id: 'track-1',
       title: 'Midnight Drive',
     });
-  });
-
-  it('calls stop when dismiss button is clicked', async () => {
-    const user = userEvent.setup();
-    setPlaying();
-
-    render(<PersistentAudioBar />);
-
-    await user.click(
-      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
-        'button',
-        { name: 'Dismiss Player' }
-      )
-    );
-
-    expect(stop).toHaveBeenCalled();
-  });
-
-  it('keeps a dismissed bar hidden after remount even if a track is still active', async () => {
-    const user = userEvent.setup();
-    setPlaying();
-    const { unmount } = render(<PersistentAudioBar />);
-
-    await user.click(
-      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
-        'button',
-        { name: 'Dismiss Player' }
-      )
-    );
-    unmount();
-
-    setPlaying();
-    render(<PersistentAudioBar />);
-
-    expect(
-      screen.queryByTestId('audio-surface-expanded-shell')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByTestId('audio-surface-idle-shell-desktop')
-    ).toBeInTheDocument();
-  });
-
-  it('reopens the bar when explicit play clears dismissal', async () => {
-    const user = userEvent.setup();
-    setPlaying();
-    render(<PersistentAudioBar />);
-
-    await user.click(
-      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
-        'button',
-        { name: 'Dismiss Player' }
-      )
-    );
-    expect(
-      screen.queryByTestId('audio-surface-expanded-shell')
-    ).not.toBeInTheDocument();
-
-    act(() => {
-      writeAudioBarDismissed(false);
-    });
-
-    expect(
-      screen.getByTestId('audio-surface-expanded-shell')
-    ).toBeInTheDocument();
   });
 
   it('shows loading state with disabled seek bar', () => {
@@ -482,21 +366,24 @@ describe('PersistentAudioBar', () => {
     );
   });
 
-  it('renders the extracted canonical audio bar when requested', () => {
+  it('is compact by default: no waveform, no BPM · key facts', () => {
     setPlaying({
       artistName: 'DJ Cool',
       artworkUrl: 'https://cdn.example.com/art.jpg',
+      bpm: 118,
+      musicalKey: '8A',
     });
 
     render(<PersistentAudioBar />);
 
-    expect(getExpandedShellMinimizeButton()).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Loop: off' })).toBeNull();
     expect(screen.getAllByText('Midnight Drive').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('DJ Cool').length).toBeGreaterThan(0);
     expect(
-      screen.getByRole('button', { name: 'Hide waveform' })
+      screen.getByRole('button', { name: 'Show waveform' })
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('slider', { name: 'Seek Track Waveform' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('118 BPM · 8A')).not.toBeInTheDocument();
     expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
       'aria-hidden',
       'false'
@@ -507,31 +394,32 @@ describe('PersistentAudioBar', () => {
     );
   });
 
-  it('wires the canonical expanded dismiss control to stop exactly once', async () => {
+  it('expands to show the waveform and BPM · key facts only when known', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool', bpm: 118, musicalKey: '8A' });
+
+    render(<PersistentAudioBar />);
+
+    await user.click(screen.getByRole('button', { name: 'Show waveform' }));
+
+    expect(
+      screen.getByRole('button', { name: 'Hide waveform' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('slider', { name: 'Seek Track Waveform' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('118 BPM · 8A')).toBeInTheDocument();
+  });
+
+  it('never fabricates BPM · key facts — hides the row when unknown', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
     render(<PersistentAudioBar />);
 
-    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    await user.click(
-      within(expandedSurface).getByRole('button', { name: 'Dismiss Player' })
-    );
+    await user.click(screen.getByRole('button', { name: 'Show waveform' }));
 
-    expect(stop).toHaveBeenCalledOnce();
-  });
-
-  it('keeps the canonical expanded height stable from idle to playing', () => {
-    setPlaying({ isPlaying: false, playbackStatus: 'idle' });
-    const { rerender } = render(<PersistentAudioBar />);
-    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    const reservedHeight = 'var(--app-shell-audio-bar-max-height)';
-    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
-
-    setPlaying();
-    rerender(<PersistentAudioBar />);
-
-    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
+    expect(screen.queryByText(/BPM/)).not.toBeInTheDocument();
   });
 
   it('wires canonical queue transport to the shared audio player', async () => {
@@ -568,7 +456,8 @@ describe('PersistentAudioBar', () => {
     expect(screen.queryByRole('button', { name: 'Previous' })).toBeNull();
   });
 
-  it('wires canonical waveform seeking to the shared audio player', () => {
+  it('wires canonical waveform seeking to the shared audio player', async () => {
+    const user = userEvent.setup();
     setPlaying({
       artistName: 'DJ Cool',
       currentTime: 10,
@@ -576,6 +465,7 @@ describe('PersistentAudioBar', () => {
     });
 
     render(<PersistentAudioBar />);
+    await user.click(screen.getByRole('button', { name: 'Show waveform' }));
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
     const waveformSeek = within(expandedSurface).getByRole('slider', {
@@ -660,6 +550,58 @@ describe('PersistentAudioBar', () => {
     expect(push).toHaveBeenCalledWith('/app/releases?tab=scheduled');
   });
 
+  it('prefetches the lyrics route once when a track with lyrics activates', () => {
+    setPlaying({ hasLyrics: true });
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    expect(prefetch).toHaveBeenCalledTimes(1);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    // Re-rendering with the same track must not re-prefetch.
+    rerender(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).toHaveBeenCalledTimes(1);
+
+    // A new active track is a new intent — prefetch its lyrics route.
+    setPlaying({ hasLyrics: true, activeTrackId: 'track-2' });
+    rerender(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).toHaveBeenCalledTimes(2);
+    expect(prefetch).toHaveBeenLastCalledWith(buildLyricsRoute('track-2'));
+  });
+
+  it('does not prefetch the lyrics route for tracks without lyrics or with none active', () => {
+    setPlaying({ hasLyrics: false });
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).not.toHaveBeenCalled();
+  });
+
+  it('does not prefetch the lyrics route while already on it', () => {
+    setPlaying({ hasLyrics: true });
+    pathname = buildLyricsRoute('track-1');
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).not.toHaveBeenCalled();
+  });
+
   it('keeps the canonical lyrics button hidden when the active track has no lyrics', () => {
     setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
 
@@ -672,13 +614,13 @@ describe('PersistentAudioBar', () => {
     expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
   });
 
-  it('hides the full docked player after minimizing (mini lives in the sidebar)', async () => {
+  it('hides the full docked player after closing it (mini lives in the sidebar)', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
     render(<PersistentAudioBar />);
 
-    await user.click(getExpandedShellMinimizeButton());
+    await user.click(getPlayerVisibilityToggle());
 
     expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
       'aria-hidden',
@@ -697,7 +639,7 @@ describe('PersistentAudioBar', () => {
     ).toBeNull();
   });
 
-  it('swaps shell audio surfaces when the player is minimized', async () => {
+  it('swaps shell audio surfaces when the player is closed', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
@@ -709,23 +651,24 @@ describe('PersistentAudioBar', () => {
     expect(expandedSurface).toHaveAttribute('aria-hidden', 'false');
     expect(compactSurface).toHaveAttribute('aria-hidden', 'true');
 
-    await user.click(getExpandedShellMinimizeButton());
+    await user.click(getPlayerVisibilityToggle());
 
     expect(expandedSurface).toHaveAttribute('aria-hidden', 'true');
     expect(compactSurface).toHaveAttribute('aria-hidden', 'false');
   });
 
-  it('docks the expanded shell without elevated card shadow chrome', () => {
+  it('docks the expanded shell flat — no card border, radius, or shadow', () => {
     setPlaying({ artistName: 'DJ Cool' });
 
     render(<PersistentAudioBar />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    expect(expandedSurface.className).toContain('border-t');
+    expect(expandedSurface.className).not.toMatch(/\bborder\b/);
+    expect(expandedSurface.className).not.toMatch(/\brounded\b/);
     expect(expandedSurface.className).not.toMatch(/shadow-\[/);
   });
 
-  it('publishes compact canonical chrome state while minimized and clears on unmount', async () => {
+  it('publishes compact canonical chrome state while closed and clears on unmount', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
@@ -737,7 +680,7 @@ describe('PersistentAudioBar', () => {
       fullPlayerVisible: true,
     });
 
-    await user.click(getExpandedShellMinimizeButton());
+    await user.click(getPlayerVisibilityToggle());
 
     await waitFor(() => {
       expect(getAudioChromeSnapshot()).toEqual({
@@ -774,7 +717,7 @@ describe('PersistentAudioBar', () => {
 
     fireEvent.keyDown(globalThis, { key: 'w' });
     expect(
-      screen.getByRole('button', { name: 'Show waveform' })
+      screen.getByRole('button', { name: 'Hide waveform' })
     ).toBeInTheDocument();
 
     toggleTrack.mockClear();
@@ -785,7 +728,7 @@ describe('PersistentAudioBar', () => {
     expect(toggleTrack).not.toHaveBeenCalled();
 
     fireEvent.keyDown(globalThis, { key: '`' });
-    // Minimize collapses the full docked bar; mini chrome lives in the sidebar.
+    // Backtick toggles the player closed; mini chrome lives in the sidebar.
     expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
       'aria-hidden',
       'true'

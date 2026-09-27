@@ -12,12 +12,56 @@ import {
   PERFORMANCE_SUITE_FILES,
   PERFORMANCE_SUITE_TIMEOUT_MS,
   type ProfilerDependencies,
+  parsePhaseTimings,
   TEST_PERFORMANCE_TARGETS,
   TestPerformanceProfiler,
   TestRunError,
 } from './test-performance-profiler';
 
 const workspaces: string[] = [];
+
+const PHASE_TIMINGS_FILE = '.cache/vitest-phase-timings.json';
+
+// Vitest 5 summary: absolute wall time, phase breakdown as percentages only.
+const VITEST_5_SUMMARY =
+  ' Test Files  10 passed (10)\n      Tests  2 passed (2)\n   Duration  2.18s (environment 49%, setup 20%, transform 15%, tests 9%, import 8%)';
+
+function writePhaseTimings(
+  cwd: string,
+  overrides: Record<string, unknown> = {}
+): void {
+  writeFileSync(
+    join(cwd, PHASE_TIMINGS_FILE),
+    JSON.stringify({
+      source: 'vitest-phase-timing-reporter',
+      moduleCount: 1,
+      setup: 250,
+      tests: 400,
+      environment: 500,
+      transform: 120,
+      collect: 300,
+      prepare: 10,
+      ...overrides,
+    })
+  );
+}
+
+function writeTwoPassingAssertions(cwd: string): void {
+  writeFileSync(
+    join(cwd, '.cache/vitest-performance-results.json'),
+    JSON.stringify({
+      numTotalTests: 2,
+      testResults: [
+        {
+          assertionResults: [
+            { title: 'first', duration: 12, status: 'passed' },
+            { title: 'second', duration: 30, status: 'passed' },
+          ],
+        },
+      ],
+    })
+  );
+}
 
 function commandResult(
   overrides: Partial<ReturnType<ProfilerDependencies['runCommand']>> = {}
@@ -105,6 +149,7 @@ describe('TestPerformanceProfiler fail-closed behavior', () => {
         '--reporter=default',
         '--reporter=json',
         '--outputFile=.cache/vitest-performance-results.json',
+        '--reporter=./scripts/vitest-phase-timing-reporter.ts',
       ],
       timeout: PERFORMANCE_SUITE_TIMEOUT_MS,
     });
@@ -338,25 +383,143 @@ describe('TestPerformanceProfiler fail-closed behavior', () => {
         ),
       expected: 'vitestJsonDuration(nonSkippedMissingOrInvalid=1)',
     },
-  ])('rejects $name even when console timings look complete', async scenario => {
+  ])(
+    'rejects $name even when console timings look complete',
+    async scenario => {
+      const cwd = createWorkspace();
+      seedBaseline(cwd);
+      let invocation = 0;
+      const profiler = createProfiler(cwd, () => {
+        invocation += 1;
+        if (invocation === 1) {
+          return commandResult({ stdout: 'Duration 1.0s (setup 0.2s)' });
+        }
+        scenario.writeJson(cwd);
+        return commandResult({
+          stdout:
+            '✓ tests/unit/example.test.ts (1 test) 20ms\nDuration 2.0s (transform 100ms, tests 400ms, environment 500ms)',
+        });
+      });
+
+      await expect(profiler.runPerformanceAnalysis()).rejects.toMatchObject({
+        details: expect.stringContaining(scenario.expected),
+      });
+      expectBaselinePreserved(cwd);
+    }
+  );
+});
+
+describe('TestPerformanceProfiler Vitest 5 phase timings', () => {
+  it('uses reporter phase timings when the summary only has percentages', async () => {
+    const cwd = createWorkspace();
+    seedBaseline(cwd);
+    const invocations: string[][] = [];
+    const profiler = createProfiler(cwd, args => {
+      invocations.push(args);
+      if (invocations.length === 1) {
+        writePhaseTimings(cwd, { setup: 180 });
+        return commandResult({
+          stdout:
+            'Duration  1.86s (environment 34%, transform 21%, setup 17%, tests 15%, import 12%)',
+        });
+      }
+      writeTwoPassingAssertions(cwd);
+      writePhaseTimings(cwd, { moduleCount: 10, setup: 9_999 });
+      return commandResult({ stdout: VITEST_5_SUMMARY });
+    });
+
+    const metrics = await profiler.runPerformanceAnalysis();
+
+    expect(invocations[0]).toContain(
+      '--reporter=./scripts/vitest-phase-timing-reporter.ts'
+    );
+    expect(metrics).toMatchObject({
+      totalDuration: 2180,
+      // Per-file probe setup, not the aggregate suite setup.
+      setupTime: 180,
+      testExecutionTime: 400,
+      environmentTime: 500,
+      transformTime: 120,
+      collectTime: 300,
+      prepareTime: 10,
+    });
+    const baseline = JSON.parse(
+      readFileSync(join(cwd, 'test-performance-baseline.json'), 'utf8')
+    );
+    expect(baseline.metrics.setupTime).toBe(180);
+    expect(baseline.targets.setupTime).toBe(TEST_PERFORMANCE_TARGETS.setupTime);
+  });
+
+  it('fails closed on Vitest 5 percentage output without reporter evidence', async () => {
     const cwd = createWorkspace();
     seedBaseline(cwd);
     let invocation = 0;
     const profiler = createProfiler(cwd, () => {
       invocation += 1;
       if (invocation === 1) {
-        return commandResult({ stdout: 'Duration 1.0s (setup 0.2s)' });
+        return commandResult({
+          stdout:
+            'Duration  1.86s (environment 34%, transform 21%, setup 17%, tests 15%, import 12%)',
+        });
       }
-      scenario.writeJson(cwd);
-      return commandResult({
-        stdout:
-          '✓ tests/unit/example.test.ts (1 test) 20ms\nDuration 2.0s (transform 100ms, tests 400ms, environment 500ms)',
-      });
+      writeTwoPassingAssertions(cwd);
+      return commandResult({ stdout: VITEST_5_SUMMARY });
     });
 
     await expect(profiler.runPerformanceAnalysis()).rejects.toMatchObject({
-      details: expect.stringContaining(scenario.expected),
+      details: expect.stringContaining(
+        'invalid or empty fields: setupTime, testExecutionTime, environmentTime, transformTime'
+      ),
     });
     expectBaselinePreserved(cwd);
+  });
+
+  it('does not reuse a stale phase-timings file from an earlier run', async () => {
+    const cwd = createWorkspace();
+    seedBaseline(cwd);
+    writePhaseTimings(cwd);
+    let invocation = 0;
+    const profiler = createProfiler(cwd, () => {
+      invocation += 1;
+      if (invocation === 1) {
+        return commandResult({ stdout: 'Duration  1.86s (setup 17%)' });
+      }
+      writeTwoPassingAssertions(cwd);
+      return commandResult({ stdout: VITEST_5_SUMMARY });
+    });
+
+    await expect(profiler.runPerformanceAnalysis()).rejects.toMatchObject({
+      details: expect.stringContaining('setupTime'),
+    });
+    expectBaselinePreserved(cwd);
+  });
+});
+
+describe('parsePhaseTimings', () => {
+  const valid = {
+    source: 'vitest-phase-timing-reporter',
+    moduleCount: 2,
+    setup: 1,
+    tests: 2,
+    environment: 3,
+    transform: 4,
+    collect: 5,
+    prepare: 0,
+  };
+
+  it('accepts complete reporter output', () => {
+    expect(parsePhaseTimings(JSON.stringify(valid))).toEqual(valid);
+  });
+
+  it.each([
+    ['empty content', ''],
+    ['malformed JSON', '{"source":'],
+    ['foreign JSON', JSON.stringify({ ...valid, source: 'other' })],
+    ['zero modules', JSON.stringify({ ...valid, moduleCount: 0 })],
+    ['negative phase', JSON.stringify({ ...valid, tests: -1 })],
+    ['missing phase', JSON.stringify({ ...valid, transform: undefined })],
+    ['non-numeric phase', JSON.stringify({ ...valid, setup: '1s' })],
+  ])('rejects %s', (_name, content) => {
+    expect(parsePhaseTimings(content)).toBeUndefined();
   });
 });
