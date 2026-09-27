@@ -8,6 +8,9 @@ const meta = {
   component: BottomTabBar,
   parameters: {
     layout: 'fullscreen',
+    // Internal LiquidGlassLens props, derived from activeTab/isMenuOpen and
+    // the reduced-motion preference; not part of the BottomTabBar API.
+    jovie: { uncoveredProps: ['activeIndex', 'columnCount', 'reducedMotion'] },
   },
   decorators: [
     Story => (
