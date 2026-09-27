@@ -133,7 +133,7 @@ function NativeReturnContent() {
             <p className='text-xs leading-5 text-secondary-token'>
               Jovie did not open? Enter this code in the app.
             </p>
-            <p className='mt-2 select-all font-mono text-lg font-semibold tracking-[0.2em] text-primary-token'>
+            <p className='mt-2 select-all font-mono text-lg font-semibold tracking-widest text-primary-token'>
               {returnCode}
             </p>
           </div>
