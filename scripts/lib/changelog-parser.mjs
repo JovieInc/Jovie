@@ -64,10 +64,14 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
       if (version.toLowerCase() === 'unreleased') {
         currentBlock = 'unreleased';
       } else {
+        // A `## [YYYY-MM-DD]` heading is a JOV-5762 daily digest, not a
+        // CalVer release: it carries its date in the key.
+        const daily = /^\d{4}-\d{2}-\d{2}$/.test(version);
         currentBlock = releases.length;
         releases.push({
           version,
-          date: date || '',
+          date: daily ? version : date || '',
+          kind: daily ? 'daily' : 'release',
           raw: '',
           summary: '',
           sections: {},

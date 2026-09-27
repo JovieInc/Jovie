@@ -35,13 +35,38 @@ export interface ChangelogSection {
 
 type ParsedSection = keyof ChangelogSection | 'dogfood';
 
+export type ChangelogReleaseKind = 'release' | 'daily';
+
 export interface ChangelogRelease {
   version: string;
   date: string;
+  /**
+   * `daily` marks a JOV-5762 date-keyed digest (`## [YYYY-MM-DD]`). These are
+   * curated public digests, not CalVer releases: they get stable date
+   * permalinks and never render a fake `v` prefix.
+   */
+  kind: ChangelogReleaseKind;
   summary: string;
   sections: ChangelogSection;
   /** Optional `### Dogfood` bullets; absent when the release has none. */
   dogfood?: string[];
+}
+
+const DAILY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True when a version slot is a date-keyed daily digest, not a CalVer. */
+export function isDailyChangelogKey(version: string): boolean {
+  return DAILY_KEY_RE.test(version);
+}
+
+/** Display label: `v26.9.0` for releases, `2026-09-27` for daily digests. */
+export function changelogVersionLabel(version: string): string {
+  return isDailyChangelogKey(version) ? version : `v${version}`;
+}
+
+/** Anchor id shared by the index timeline and the Atom entry ids. */
+export function changelogAnchorId(version: string): string {
+  return changelogVersionLabel(version);
 }
 
 export interface ChangelogParseResult {
@@ -195,9 +220,12 @@ function parseVersionHeading(
   if (!match) return null;
   const [, version, date] = match;
   if (version.toLowerCase() === 'unreleased') return 'unreleased';
+  const daily = isDailyChangelogKey(version);
   return {
     version,
-    date: date && isValidDate(date) ? date : '',
+    // A daily heading carries its date in the key; a CalVer heading in `- date`.
+    date: daily ? version : date && isValidDate(date) ? date : '',
+    kind: daily ? 'daily' : 'release',
     summary: '',
     sections: {
       featured: [],
