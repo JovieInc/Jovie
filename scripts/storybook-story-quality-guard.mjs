@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 /**
  * Storybook story quality guard.
  *
@@ -67,8 +68,7 @@ const SOURCE_SHA_PROPERTY_PATTERN =
 // and `merge-base --is-ancestor`. Anything else (spawn failure, signal, exit 128
 // from an unreadable object) is an execution error, not a verdict: retry it,
 // then fail closed with the stderr instead of reporting a false "not an
-// ancestor" (seen once on a hosted structural lane for a receipt 1,345
-// commits deep in a fully unshallowed checkout).
+// ancestor".
 const GIT_ATTEMPTS = 3;
 
 /** @returns {{ value: boolean, error: string }} Non-empty error = no verdict. */
@@ -88,6 +88,39 @@ function gitVerdict(args) {
       `exit ${result.status ?? 'null'} signal ${result.signal ?? 'none'}`;
   }
   return { value: false, error: `git ${args.join(' ')}: ${error}` };
+}
+
+function gitOutput(args) {
+  const result = spawnSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return result.status === 0 ? result.stdout.trim() : '';
+}
+
+// A shallow boundary hides every commit below it, so in a shallow checkout a
+// missing commit or a failed ancestry walk proves nothing about the receipt.
+// A hosted structural lane reported a receipt ~1,345 commits deep as "not an
+// ancestor" after the job had verified the checkout was unshallowed; the
+// context below tells the next occurrence whether HEAD was cut off.
+function checkoutContext() {
+  const shallowFile = gitOutput(['rev-parse', '--git-path', 'shallow']);
+  const boundaries =
+    shallowFile && existsSync(path.resolve(root, shallowFile))
+      ? readFileSync(path.resolve(root, shallowFile), 'utf8')
+          .split('\n')
+          .filter(Boolean).length
+      : 0;
+  const shallow =
+    gitOutput(['rev-parse', '--is-shallow-repository']) === 'true' ||
+    boundaries > 0;
+  const head = gitOutput(['rev-parse', '--short', 'HEAD']) || 'unknown';
+  const reachable = gitOutput(['rev-list', '--count', 'HEAD']) || 'unknown';
+  return {
+    shallow,
+    summary: `HEAD ${head}, ${reachable} commits reachable, ${boundaries} shallow boundaries`,
+  };
 }
 
 function stringConstants(text) {
@@ -145,6 +178,14 @@ async function checkStoryProvenance(files, texts) {
       continue;
     }
     if (!exists.value) {
+      const context = checkoutContext();
+      if (context.shallow) {
+        reportAll(
+          'story-provenance-shallow',
+          `sourceSha ${sha} is not in this shallow checkout (${context.summary}); fetch full history before checking provenance.`
+        );
+        continue;
+      }
       reportAll(
         'story-provenance-commit',
         `sourceSha ${sha} does not resolve to a commit in this checkout.`
@@ -158,9 +199,17 @@ async function checkStoryProvenance(files, texts) {
       continue;
     }
     if (!ancestor.value) {
+      const context = checkoutContext();
+      if (context.shallow) {
+        reportAll(
+          'story-provenance-shallow',
+          `sourceSha ${sha} is below the shallow boundary of this checkout (${context.summary}); fetch full history before checking provenance.`
+        );
+        continue;
+      }
       reportAll(
         'story-provenance-ancestor',
-        `sourceSha ${sha} is not an ancestor of HEAD; update the receipt to a commit containing this story.`
+        `sourceSha ${sha} is not an ancestor of HEAD (${context.summary}); update the receipt to a commit containing this story.`
       );
       continue;
     }
