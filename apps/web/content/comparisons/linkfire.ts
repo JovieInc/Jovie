@@ -9,6 +9,10 @@ export const linkfireComparison: ComparisonData = {
   heroHeadline: 'Jovie vs Linkfire',
   heroSubheadline:
     'Linkfire is built for labels. Jovie is built for independent artists. Here\u2019s how they compare.',
+  heroImage: {
+    src: '/images/hero/compare-linkfire.webp',
+    alt: 'Interlocking glass chain links lit in blue and violet.',
+  },
   features: [
     {
       name: 'Smart links for releases',

@@ -30,9 +30,13 @@ import { MarketingFooterCta } from './MarketingFooterCta';
  * - Keep production nav from `marketingNavigation`. Do not invent columns.
  */
 
+// JOV marketing routes 2026-09-26: every marketing page gets the FULL footer
+// (all link columns, never compact) — /artist-profiles opted out of that
+// previously; it now shares the same full-footer treatment as every other
+// route. Its own ArtistProfileFinalCta still owns the page's single footer
+// CTA (see PAGE_OWNS_FINAL_CTA_PATHS below).
 const MINIMAL_FOOTER_PATHS = new Set<string>([
   APP_ROUTES.PRICING,
-  APP_ROUTES.ARTIST_PROFILES,
   APP_ROUTES.ARTIST_PROFILE_LEGACY,
   APP_ROUTES.LEGAL_PRIVACY,
   APP_ROUTES.LEGAL_TERMS,

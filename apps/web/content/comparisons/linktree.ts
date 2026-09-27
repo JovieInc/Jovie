@@ -3,36 +3,40 @@ import type { ComparisonData } from './types';
 export const linktreeComparison: ComparisonData = {
   slug: 'linktree',
   competitor: 'Linktree',
-  title: 'Jovie vs Linktree for Musicians',
+  title: 'Jovie vs Linktree',
   metaDescription:
-    'Compare Jovie and Linktree for musicians. See why independent artists choose Jovie for smart links, fan notifications, audience intelligence, and release automation.',
+    'Compare Jovie and Linktree. See why people choose Jovie for a profile that captures visitors, sends automatic updates, and adapts to what they came for.',
   heroHeadline: 'Jovie vs Linktree',
   heroSubheadline:
-    'Linktree is a link-in-bio tool. Jovie is a release platform built for musicians. Here\u2019s how they compare.',
+    'Linktree gives you a static list of links. Jovie gives you a profile that captures visitors and keeps working after they leave. Here’s how they compare.',
+  heroImage: {
+    src: '/images/hero/compare-linktree.webp',
+    alt: 'A dark sphere with a glowing blue rim, lit from the edge.',
+  },
   features: [
     {
-      name: 'Smart links for music releases',
+      name: 'Links that adapt automatically',
       jovie: true,
       competitor: false,
-      note: 'Jovie auto-generates smart links for every release with platform routing',
+      note: 'Jovie leads with your most current update instead of a fixed list',
     },
     {
-      name: 'Fan notifications on new releases',
+      name: 'Automatic update notifications',
       jovie: true,
       competitor: false,
-      note: 'Jovie notifies fans automatically when you drop new music',
+      note: 'Jovie notifies your audience automatically when you publish something new',
     },
     {
-      name: 'Fan CRM & contact collection',
+      name: 'Contact collection & CRM',
       jovie: true,
       competitor: false,
-      note: 'Jovie collects and manages fan emails and phone numbers',
+      note: 'Jovie collects and manages visitor emails and phone numbers',
     },
     {
-      name: 'Streaming platform detection',
+      name: 'Destination-aware routing',
       jovie: true,
       competitor: false,
-      note: 'Jovie routes fans to their preferred streaming service',
+      note: 'Jovie routes visitors to the right destination based on context',
     },
     {
       name: 'Link-in-bio page',
@@ -43,7 +47,7 @@ export const linktreeComparison: ComparisonData = {
       name: 'Trusted profile destination',
       jovie: true,
       competitor: false,
-      note: 'Jovie keeps profiles consistent and recognizable for fans',
+      note: 'Jovie keeps profiles consistent and recognizable for visitors',
     },
     {
       name: 'Analytics',
@@ -52,55 +56,51 @@ export const linktreeComparison: ComparisonData = {
       note: 'Jovie adds audience intelligence and source attribution',
     },
     {
-      name: 'AI tools (press releases, strategy)',
+      name: 'AI tools built on your real data',
       jovie: true,
       competitor: false,
-      note: 'Jovie AI knows your actual career data — streams, tours, collabs',
+      note: 'Jovie AI uses your actual profile data, not a blank prompt',
     },
     {
-      name: 'Release task management',
-      jovie: true,
-      competitor: false,
-    },
-    {
-      name: 'Tour date display',
+      name: 'Task management for updates',
       jovie: true,
       competitor: false,
     },
     {
-      name: 'Pre-save links',
+      name: 'Events & dates display',
       jovie: true,
       competitor: false,
+      note: 'Show upcoming events directly on your profile',
     },
     {
-      name: 'Built for any industry',
+      name: 'General-purpose for any use case',
       jovie: false,
       competitor: true,
-      note: 'Linktree is general-purpose; Jovie is music-specific',
+      note: 'Linktree stays the same for every visitor; Jovie adapts to what you share',
     },
   ],
   faq: [
     {
-      question: 'Is Jovie better than Linktree for musicians?',
+      question: 'Is Jovie better than Linktree?',
       answer:
-        'Yes. Linktree is a general-purpose link tool. Jovie is built specifically for musicians — it auto-generates smart links for releases, routes fans to streaming platforms, collects fan contacts, sends automatic release notifications, and includes AI tools that understand your career data. If you\u2019re a musician, Jovie does what Linktree does plus everything else you need.',
+        'For most people, yes. Linktree is a static list of links. Jovie is a profile that adapts to what you share, captures visitor contacts, sends automatic update notifications, and includes AI tools that understand your actual data. Jovie does what Linktree does, plus everything else you need to grow an audience.',
     },
     {
       question: 'Can I switch from Linktree to Jovie?',
       answer:
-        'Yes. Create a Jovie profile, add your releases, and update your bio link. Your Jovie profile at jov.ie/username replaces your Linktree — but with smart links, fan collection, and release automation built in.',
+        'Yes. Create a Jovie profile, add your links, and update your bio link. Your Jovie profile at jov.ie/username replaces your Linktree, with contact capture and automatic update notifications built in.',
     },
     {
       question: 'Is Jovie free like Linktree?',
       answer:
-        'Yes, Jovie has a free tier. Create a profile, add releases, and collect fans at no cost. Paid plans unlock advanced analytics, release notifications, and contact export.',
+        'Yes, Jovie has a free tier. Create a profile, add links, and collect contacts at no cost. Paid plans unlock advanced analytics, automatic update notifications, and contact export.',
     },
     {
-      question: 'Does Jovie work with Spotify, Apple Music, and YouTube?',
+      question: 'Can I add links to any platform?',
       answer:
-        'Yes. Jovie automatically generates smart links that route fans to Spotify, Apple Music, YouTube Music, Amazon Music, SoundCloud, Tidal, Deezer, and more.',
+        'Yes. Add links to any website, social profile, or destination. Jovie routes visitors to the right one automatically based on context.',
     },
   ],
   bottomLine:
-    'Linktree is a great general-purpose link tool. But if you\u2019re a musician, you need more than links — you need smart links, fan data, release notifications, and AI that knows your career. That\u2019s Jovie.',
+    'Linktree is a fine static link list. But if you want a profile that captures visitors, notifies them automatically, and adapts to what you share, that’s Jovie.',
 };

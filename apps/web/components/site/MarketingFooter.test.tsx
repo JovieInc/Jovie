@@ -131,21 +131,42 @@ describe('MarketingFooter', () => {
     );
   });
 
-  it.each(['/artist-profiles', '/artist-profile'])(
-    'keeps %s on the minimal homepage footer treatment',
-    pathname => {
-      mockUsePathname.mockReturnValue(pathname);
+  it('keeps the legacy /artist-profile route on the minimal homepage footer treatment', () => {
+    mockUsePathname.mockReturnValue('/artist-profile');
 
-      render(<MarketingFooter />);
+    render(<MarketingFooter />);
 
-      expect(screen.getByTestId('marketing-footer')).toHaveClass(
-        'system-b-mounted-home-footer'
-      );
-      expect(
-        screen.queryByTestId('marketing-footer-cta')
-      ).not.toBeInTheDocument();
-    }
-  );
+    expect(screen.getByTestId('marketing-footer')).toHaveClass(
+      'system-b-mounted-home-footer'
+    );
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  // JOV marketing routes 2026-09-26: every marketing page gets the FULL
+  // footer (all link columns, never compact) — /artist-profiles no longer
+  // opts into the minimal homepage treatment. It still omits the shared
+  // footer CTA because ArtistProfileFinalCta already owns the page's single
+  // final CTA.
+  it('gives /artist-profiles the full footer without a duplicate final CTA', () => {
+    mockUsePathname.mockReturnValue('/artist-profiles');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer')).not.toHaveClass(
+      'system-b-mounted-home-footer'
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Product' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Connect' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
 
   it('omits the terminal CTA on the support route', () => {
     mockUsePathname.mockReturnValue('/support');
