@@ -265,6 +265,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
+  'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
