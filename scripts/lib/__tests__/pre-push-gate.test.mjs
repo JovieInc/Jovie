@@ -381,7 +381,14 @@ it('discovers publication behavior tests in CI for source-only guard edits', () 
     resolve(repoRoot, '.github/workflows/ci.yml'),
     'utf8'
   );
-  const pattern = workflow.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+  const pattern = readFileSync(
+    resolve(repoRoot, '.github/ci-harness/structural-control-paths.ere'),
+    'utf8'
+  )
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+    .join('|');
   expect(pattern).toBeTruthy();
   for (const file of [
     'scripts/hooks/pre-push-gate.sh',
