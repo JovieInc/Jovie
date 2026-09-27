@@ -363,7 +363,7 @@ jobs:
 
           Run: $RUN_URL
 
-          Reproduce locally: \`pnpm --filter @jovie/web exec playwright test tests/e2e/visual-regression.spec.ts\`
+          Spec: \`apps/web/tests/e2e/visual-regression.spec.ts\` (Playwright report is attached to the run).
           EOF
           )
           EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
