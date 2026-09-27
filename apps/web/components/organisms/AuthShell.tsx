@@ -43,6 +43,19 @@ export interface AuthShellProps {
   readonly children: ReactNode;
 }
 
+/** Mac app everywhere; on the web only the operator shell (dogfood). */
+export function isWhatsNewBannerEnabled({
+  section,
+  isElectron,
+  isAutomatedTest,
+}: {
+  readonly section: AppShellSection;
+  readonly isElectron: boolean;
+  readonly isAutomatedTest: boolean;
+}): boolean {
+  return !isAutomatedTest && (isElectron || section === 'ov');
+}
+
 function getContentClassName(showMobileTabs: boolean, isTableRoute: boolean) {
   if (!showMobileTabs) return undefined;
   return isTableRoute ? undefined : 'lg:pb-6';
@@ -66,9 +79,11 @@ function AuthShellInner({
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
   const isElectron = useIsElectronRuntime();
-  // Mac app everywhere; on the web only the operator shell (dogfood).
-  const showWhatsNew =
-    (isElectron || section === 'ov') && !env.IS_TEST && !env.IS_E2E;
+  const showWhatsNew = isWhatsNewBannerEnabled({
+    section,
+    isElectron,
+    isAutomatedTest: env.IS_TEST || env.IS_E2E,
+  });
   const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
     <SidebarCollapseButton />
   ) : null;

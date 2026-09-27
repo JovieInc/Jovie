@@ -16,7 +16,11 @@ const ENTRY = {
 const meta: Meta<typeof WhatsNewBannerView> = {
   title: 'Organisms/WhatsNewBanner',
   component: WhatsNewBannerView,
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    // The fetching container is covered by WhatsNewBanner.test.tsx.
+    jovie: { uncoveredProps: ['enabled'] },
+  },
   args: { onOpen: fn(), onDismiss: fn() },
 };
 
