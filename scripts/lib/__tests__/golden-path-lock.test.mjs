@@ -136,6 +136,29 @@ describe('golden-path lock evaluators', () => {
     expect(evaluateHomepageHtml('')).toMatchObject({ ok: false });
   });
 
+  it('accepts the certified waitlist-gated front door (JOV-6794)', () => {
+    const gated = `<a href="/signup">Request access</a>`;
+    expect(evaluateHomepageHtml(gated)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+      reason: expect.stringContaining('waitlist-gated'),
+    });
+    // Gated label without the /signup handoff is still a drift failure.
+    expect(
+      evaluateHomepageHtml('<button>Request access</button>')
+    ).toMatchObject({
+      ok: false,
+    });
+    // A bare /signup link without the certified CTA label is also a failure.
+    expect(
+      evaluateHomepageHtml('<a href="/signup">Get started</a>')
+    ).toMatchObject({ ok: false });
+    // An uncertified waitlist wall remains forbidden.
+    expect(
+      evaluateHomepageHtml('<a href="/waitlist">Request access</a>')
+    ).toMatchObject({ ok: false });
+  });
+
   it('fails 401 and fake rate-limit copy on logged-out first message', () => {
     expect(
       evaluateChatFirstMessage({ status: 401, body: { error: 'Unauthorized' } })
