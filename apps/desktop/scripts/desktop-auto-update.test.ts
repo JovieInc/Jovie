@@ -8,6 +8,7 @@ import {
   NIGHTLY_UPDATE_FLAG,
   nightlyUpdateLaunchAgentLabel,
   nightlyUpdateMinute,
+  reduceDesktopUpdateState,
   renderNightlyUpdateLaunchAgentPlist,
   shouldInstallDownloadedUpdateNow,
   shouldInstallDownloadedUpdateWhileRunning,
@@ -238,4 +239,118 @@ test('wake and unlock re-check for updates at most once per window', () => {
       lastCheckMs: 0,
     })
   ).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Renderer-facing update state machine (JOV-6683)
+// ---------------------------------------------------------------------------
+
+const NOTES_URL = 'https://jov.ie/changelog';
+
+test('mapper emits checking when a check starts', () => {
+  expect(
+    reduceDesktopUpdateState({ type: 'checking-for-update' }, NOTES_URL)
+  ).toEqual({ state: 'checking' });
+});
+
+test('mapper emits not-available when no update exists', () => {
+  expect(
+    reduceDesktopUpdateState({ type: 'update-not-available' }, NOTES_URL)
+  ).toEqual({ state: 'not-available' });
+});
+
+test('mapper emits available with version, date, and notes url', () => {
+  expect(
+    reduceDesktopUpdateState(
+      {
+        type: 'update-available',
+        version: '26.9.16',
+        releaseDate: '2026-09-27T00:00:00.000Z',
+      },
+      NOTES_URL
+    )
+  ).toEqual({
+    state: 'available',
+    version: '26.9.16',
+    releaseDate: '2026-09-27T00:00:00.000Z',
+    notesUrl: NOTES_URL,
+  });
+});
+
+test('mapper emits downloading with progress payload', () => {
+  expect(
+    reduceDesktopUpdateState(
+      {
+        type: 'download-progress',
+        percent: 42.4,
+        transferredBytes: 1024,
+        totalBytes: 4096,
+        bytesPerSecond: 512,
+      },
+      NOTES_URL
+    )
+  ).toEqual({
+    state: 'downloading',
+    percent: 42.4,
+    transferredBytes: 1024,
+    totalBytes: 4096,
+    bytesPerSecond: 512,
+  });
+});
+
+test('mapper emits ready with the downloaded version', () => {
+  expect(
+    reduceDesktopUpdateState(
+      { type: 'update-downloaded', version: '26.9.16' },
+      NOTES_URL
+    )
+  ).toEqual({ state: 'ready', version: '26.9.16' });
+});
+
+test('mapper emits a retryable error with the message', () => {
+  expect(
+    reduceDesktopUpdateState(
+      { type: 'error', message: 'net::ERR_CONNECTION_REFUSED' },
+      NOTES_URL
+    )
+  ).toEqual({
+    state: 'error',
+    message: 'net::ERR_CONNECTION_REFUSED',
+    retryable: true,
+  });
+});
+
+test('error to retry to downloading sequence stays well-typed', () => {
+  const states = [
+    { type: 'error', message: 'offline' },
+    { type: 'checking-for-update' },
+    { type: 'update-available', version: '26.9.16' },
+    {
+      type: 'download-progress',
+      percent: 10,
+      transferredBytes: 1,
+      totalBytes: 10,
+      bytesPerSecond: 1,
+    },
+  ] as const;
+
+  expect(
+    states.map(event => reduceDesktopUpdateState(event, NOTES_URL))
+  ).toEqual([
+    { state: 'error', message: 'offline', retryable: true },
+    { state: 'checking' },
+    {
+      state: 'available',
+      version: '26.9.16',
+      releaseDate: null,
+      notesUrl: NOTES_URL,
+    },
+    {
+      state: 'downloading',
+      percent: 10,
+      transferredBytes: 1,
+      totalBytes: 10,
+      bytesPerSecond: 1,
+    },
+  ]);
 });

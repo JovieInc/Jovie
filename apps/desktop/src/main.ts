@@ -58,8 +58,11 @@ import {
 import {
   buildDesktopUpdateMenuItem,
   buildManualUpdateCheckFeedback,
+  DESKTOP_UPDATE_INITIAL_STATE,
+  type DesktopUpdatePhase,
   hasNightlyUpdateFlag,
   NIGHTLY_UPDATE_TIMEOUT_MS,
+  reduceDesktopUpdateState,
   shouldInstallDownloadedUpdateNow,
   shouldInstallDownloadedUpdateWhileRunning,
   shouldRunWakeUpdateCheck,
@@ -222,6 +225,12 @@ const MACOS_TRAFFIC_LIGHT_POSITION = {
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
+const DESKTOP_UPDATE_STATE_CHANNEL = 'desktop-update-state';
+const DESKTOP_UPDATE_GET_STATE_CHANNEL = 'desktop-update-get-state';
+const DESKTOP_UPDATE_CHECK_CHANNEL = 'desktop-update-check';
+const DESKTOP_UPDATE_DOWNLOAD_CHANNEL = 'desktop-update-download';
+const DESKTOP_UPDATE_INSTALL_CHANNEL = 'desktop-update-install';
+const DESKTOP_UPDATE_NOTES_URL = `${APP_ORIGIN}/changelog`;
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
@@ -305,6 +314,8 @@ const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
+// Typed updater phase mirrored to the renderer via desktop-update-state IPC.
+let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // Set only for a menu-initiated "Check for updates…" click so its result
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
@@ -2675,28 +2686,75 @@ function handleTrayAction(action: TrayAction): void {
   }
 }
 
-function sendToAppWindows(channel: UpdateChannel): void {
+function sendToAppWindows(channel: string, payload?: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     const parsed = parseUrl(win.webContents.getURL());
     if (parsed?.origin === APP_ORIGIN) {
-      win.webContents.send(channel);
+      win.webContents.send(channel, payload);
     }
   }
 }
 
-// Wire auto-updater events to renderer IPC so the web UI can show the update pill.
-autoUpdater.on('update-available', () => {
+/** Record the typed updater phase and push it to every trusted app window. */
+function emitDesktopUpdatePhase(phase: DesktopUpdatePhase): void {
+  desktopUpdatePhase = phase;
+  sendToAppWindows(DESKTOP_UPDATE_STATE_CHANNEL, phase);
+}
+
+// Wire auto-updater events to renderer IPC so the web UI can show the update
+// pill (legacy boolean channels) and the typed update surfaces (JOV-6683).
+autoUpdater.on('checking-for-update', () => {
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(
+      { type: 'checking-for-update' },
+      DESKTOP_UPDATE_NOTES_URL
+    )
+  );
+});
+
+autoUpdater.on('update-available', info => {
   updateReadyToInstall = false;
   pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_AVAILABLE_CHANNEL);
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(
+      {
+        type: 'update-available',
+        version: info.version,
+        releaseDate: info.releaseDate ?? null,
+      },
+      DESKTOP_UPDATE_NOTES_URL
+    )
+  );
 });
 
-autoUpdater.on('update-downloaded', () => {
+autoUpdater.on('download-progress', progress => {
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(
+      {
+        type: 'download-progress',
+        percent: progress.percent,
+        transferredBytes: progress.transferred,
+        totalBytes: progress.total,
+        bytesPerSecond: progress.bytesPerSecond,
+      },
+      DESKTOP_UPDATE_NOTES_URL
+    )
+  );
+});
+
+autoUpdater.on('update-downloaded', info => {
   updateReadyToInstall = true;
   pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(
+      { type: 'update-downloaded', version: info.version },
+      DESKTOP_UPDATE_NOTES_URL
+    )
+  );
 
   const hasVisibleWindow = BrowserWindow.getAllWindows().some(
     win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
@@ -2714,13 +2772,28 @@ autoUpdater.on('update-downloaded', () => {
 });
 
 autoUpdater.on('update-not-available', () => {
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(
+      { type: 'update-not-available' },
+      DESKTOP_UPDATE_NOTES_URL
+    )
+  );
   showManualUpdateCheckFeedback('not-available');
   if (nightlyUpdateLaunch) {
     app.quit();
   }
 });
 
-autoUpdater.on('error', () => {
+autoUpdater.on('error', error => {
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(
+      {
+        type: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      },
+      DESKTOP_UPDATE_NOTES_URL
+    )
+  );
   showManualUpdateCheckFeedback('error');
   if (nightlyUpdateLaunch) {
     app.quit();
@@ -2755,6 +2828,56 @@ ipcMain.handle(
     return { ok: true };
   }
 );
+
+// Typed update surface (JOV-6683): the renderer's jovieDesktop.updates bridge.
+ipcMain.handle(DESKTOP_UPDATE_GET_STATE_CHANNEL, event => {
+  if (!isTrustedIpcSender(event)) return null;
+  return desktopUpdatePhase;
+});
+
+ipcMain.handle(DESKTOP_UPDATE_CHECK_CHANNEL, event => {
+  if (!isTrustedIpcSender(event)) return { ok: false, reason: 'invalid-request' };
+  if (!desktopUpdatesSupported()) return { ok: false, reason: 'unsupported' };
+  runDesktopUpdateCheck('silent');
+  return { ok: true };
+});
+
+ipcMain.handle(DESKTOP_UPDATE_DOWNLOAD_CHANNEL, event => {
+  if (!isTrustedIpcSender(event)) return { ok: false, reason: 'invalid-request' };
+  // autoDownload normally starts the download as soon as an update is found;
+  // treat an in-flight or completed download as success and only kick a
+  // manual download when the update is still waiting.
+  if (
+    desktopUpdatePhase.state === 'downloading' ||
+    desktopUpdatePhase.state === 'ready'
+  ) {
+    return { ok: true };
+  }
+  if (desktopUpdatePhase.state !== 'available') {
+    return { ok: false, reason: 'no-update-available' };
+  }
+  void autoUpdater.downloadUpdate().catch(error => {
+    emitDesktopUpdatePhase(
+      reduceDesktopUpdateState(
+        {
+          type: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        },
+        DESKTOP_UPDATE_NOTES_URL
+      )
+    );
+  });
+  return { ok: true };
+});
+
+ipcMain.handle(DESKTOP_UPDATE_INSTALL_CHANNEL, event => {
+  if (!isTrustedIpcSender(event)) return { ok: false, reason: 'invalid-request' };
+  if (!updateReadyToInstall) {
+    return { ok: false, reason: 'update-not-downloaded' };
+  }
+  autoUpdater.quitAndInstall();
+  return { ok: true };
+});
 
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
 // missing main handler on a stale binary cannot reject the renderer promise.
