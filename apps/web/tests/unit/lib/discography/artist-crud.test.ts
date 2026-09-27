@@ -22,7 +22,7 @@ describe('artist identity CRUD', () => {
     const tx = { select: vi.fn().mockReturnValue(query) };
 
     const found = await findArtist(
-      { spotifyId: 'spotify-alex-two', name: 'Alex Lee' },
+      { spotifyId: '3TVXtAsWU1IfumKqIcMftp', name: 'Alex Lee' },
       tx as never
     );
 
@@ -47,7 +47,7 @@ describe('artist identity CRUD', () => {
     const created = {
       id: 'artist-alex-two',
       name: 'Alex Lee',
-      spotifyId: 'spotify-alex-two',
+      spotifyId: '3TVXtAsWU1IfumKqIcMftp',
     };
     const returning = vi.fn().mockResolvedValue([created]);
     const insertQuery = {
@@ -63,7 +63,7 @@ describe('artist identity CRUD', () => {
     };
 
     const result = await findOrCreateArtist(
-      { name: 'Alex Lee', spotifyId: 'spotify-alex-two' },
+      { name: 'Alex Lee', spotifyId: '3TVXtAsWU1IfumKqIcMftp' },
       tx as never
     );
 
@@ -76,7 +76,7 @@ describe('artist identity CRUD', () => {
     const winner = {
       id: 'artist-alex-two',
       name: 'Alex Lee',
-      spotifyId: 'spotify-alex-two',
+      spotifyId: '3TVXtAsWU1IfumKqIcMftp',
     };
     const firstLookup = makeQuery([]);
     const secondLookup = makeQuery([winner]);
@@ -97,7 +97,7 @@ describe('artist identity CRUD', () => {
     };
 
     const result = await findOrCreateArtist(
-      { name: 'Alex Lee', spotifyId: 'spotify-alex-two' },
+      { name: 'Alex Lee', spotifyId: '3TVXtAsWU1IfumKqIcMftp' },
       tx as never
     );
 
