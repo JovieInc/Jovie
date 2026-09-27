@@ -30,6 +30,7 @@ The harness, not the model, owns:
 | Disabled-lane drafts: closed when superseded or done, else adopted; closed and the issue returned to Todo once their fix attempts run out | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
+| Disk-pressure guard on the tick and each worker spawn: under 15% free it sweeps idle DerivedData (>5h), clean idle worktrees (>12h, branches kept), `.next`/`test-results`, dead simulators and the pnpm store; under 5% the doctor pages Summer | `disk_guard.py`, `dispatch()`, `worker()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run, bank exhausted ones until their reset | `codex_lane.py` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
@@ -64,8 +65,8 @@ Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony d
 <key>") so Summer routes it; when the condition clears the issue is commented and moved
 to Done; a key that fires again within six hours reopens the same issue. Keys:
 `tick-error`, `provider-down:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
-`pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `github-quota`,
-`hud-stale`.
+`pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `disk-critical`,
+`github-quota`, `hud-stale`.
 
 ## Codex lane
 
@@ -102,7 +103,8 @@ State and receipts live under `~/.local/state/jovie-lanes`.
 
 ```sh
 python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
-  scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py
+  scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py \
+  scripts/tests/test_disk_guard.py
 ```
 
 The same files run inside `update()` before a release is installed anywhere.

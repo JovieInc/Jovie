@@ -48,10 +48,16 @@ class JudgeTest(unittest.TestCase):
             gateTimeouts24h=5, failed24h=10, diskFreePct=4.0, githubRemaining=100, hudBeatAge=500,
             lastLandingAge=8 * 3600))
         self.assertEqual(set(alerts), {"tick-error", "provider-down:devin", "codex-all-banked", "no-landing",
-                                       "gate-timeouts", "failed-runs", "disk-low", "github-quota", "hud-stale"})
+                                       "gate-timeouts", "failed-runs", "disk-critical", "github-quota", "hud-stale"})
         self.assertIn("earliest reset in 10m", alerts["codex-all-banked"])
         self.assertIn("8h ago", alerts["no-landing"])
         self.assertIn("Boom", alerts["tick-error"])
+
+    def test_disk_tiers_page_summer_only_below_critical(self):
+        self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
+        alerts = doctor.judge(obs(diskFreePct=4.9))
+        self.assertEqual(set(alerts), {"disk-critical"})
+        self.assertIn("Summer", alerts["disk-critical"])
 
     def test_pool_empty_needs_thirty_sustained_minutes(self):
         self.assertEqual(doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0}), {})

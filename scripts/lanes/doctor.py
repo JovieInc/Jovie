@@ -27,6 +27,7 @@ HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
 FAILED_RUN_ALERT = 10
 DISK_MIN_PCT = 10
+DISK_CRIT_PCT = 5
 GITHUB_MIN_REMAINING = 300
 
 
@@ -174,7 +175,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
-    if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
+    if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
+        alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
+                                 f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
+    elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
