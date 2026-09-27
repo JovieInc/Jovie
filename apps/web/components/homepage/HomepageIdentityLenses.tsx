@@ -3,6 +3,7 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
+import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import type { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 type HomepageIdentity = (typeof HOMEPAGE_LAUNCH_COPY.certified)['identity'];
@@ -55,15 +56,14 @@ export function HomepageIdentityLenses({
       <ul aria-label='Perspectives' className='homepage-identity__lenses'>
         {identity.lenses.map(lens => (
           <li key={lens.id}>
-            <button
-              aria-pressed={lens.id === active.id}
+            <FilterChip
               className='homepage-identity__lens'
               data-homepage-testid={`homepage-identity-lens-${lens.id}`}
               onClick={() => setActiveId(lens.id)}
-              type='button'
+              pressed={lens.id === active.id}
             >
               {lens.label}
-            </button>
+            </FilterChip>
           </li>
         ))}
       </ul>
