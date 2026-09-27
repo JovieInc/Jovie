@@ -2,10 +2,13 @@
 
 ## TL;DR
 
-**NEVER use `CREATE INDEX CONCURRENTLY` in Drizzle migration files.**
+**Never use `CREATE INDEX CONCURRENTLY` in Drizzle migration files.** Use the
+certified online-index artifact path in `docs/DB_MIGRATIONS.md` when JOV-6273
+workload evidence requires a nontransactional build.
 
 - ❌ `CREATE INDEX CONCURRENTLY` → **BREAKS** migrations
-- ✅ `CREATE INDEX IF NOT EXISTS` → **WORKS** correctly
+- ✅ `CREATE INDEX IF NOT EXISTS` → valid only for the transactional path; it
+  does not prove that a same-name index has the intended definition
 
 ## The Problem
 
@@ -42,9 +45,10 @@ This error:
 The confusion stems from conflicting advice:
 
 ### General PostgreSQL Best Practice (TRUE)
-✅ For **manual** index creation on live databases, `CONCURRENTLY` is better:
+✅ For an **approved nontransactional** index build, `CONCURRENTLY` can avoid
+blocking writes:
 - Doesn't block writes during index build
-- Production-safe for zero-downtime deployments
+- Still adds CPU/I/O load and transaction waits that must be measured
 - Recommended by PostgreSQL docs
 
 ### Drizzle Migration Reality (OVERRIDES)
@@ -84,18 +88,12 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_name ON table_name (column_name);
 
 **"But won't indexes block production writes?"**
 
-In practice, this is rarely an issue for our use case:
-
-1. **Deployment timing**: Migrations run during deployment, before new traffic hits
-2. **Index size**: Our tables are small-to-medium; indexes build in <1 second
-3. **IF NOT EXISTS**: Makes re-running migrations safe (idempotent)
-4. **Main staging**: We test on main.jov.ie before production
-
-**For large tables (>10M rows):**
-- Test index creation time on staging first
-- Consider deploying during low-traffic windows
-- Use partial indexes (`WHERE` clause) to reduce size
-- Monitor database load during migration
+PostgreSQL's current contract is narrower than the historical blanket claim:
+plain `CREATE INDEX` blocks writes but not reads. `CONCURRENTLY` permits writes,
+does more work, waits for relevant transactions/snapshots, cannot run in a
+transaction block, and may leave an invalid index after failure. Never infer
+impact from migration counts or table names; recheck the current query plan,
+table size, write rate, long transactions, and staging build time first.
 
 ## Safeguards in Place
 
@@ -141,9 +139,10 @@ Permanent reminder of the rule and why it exists.
 |----------|------------------|---------|
 | Drizzle migration file | ❌ NO | Runs in transaction, will fail |
 | Drizzle schema.ts file | ❌ NO | Generates migration SQL |
-| Manual psql command | ✅ YES | Outside transaction, zero-downtime |
-| Database GUI (pgAdmin) | ✅ YES | Outside transaction |
-| Neon SQL Editor | ✅ YES | Outside transaction |
+| Certified online-index artifact | ✅ WHEN APPROVED | Dedicated nontransactional runner verifies the result |
+| Manual psql command | ⚠️ ONLY WITH APPROVAL | Outside transaction but bypasses the durable runner |
+| Database GUI (pgAdmin) | ⚠️ ONLY WITH APPROVAL | Outside transaction but bypasses the durable runner |
+| Neon SQL Editor | ⚠️ ONLY WITH APPROVAL | Outside transaction but bypasses the durable runner |
 
 ## When in Doubt
 
@@ -152,8 +151,8 @@ Permanent reminder of the rule and why it exists.
 If you need CONCURRENTLY for a specific reason:
 1. Stop and ask yourself: "Is this a Drizzle migration?"
 2. If yes → DON'T use CONCURRENTLY
-3. If you must → Create index manually outside migration system
-4. Document why you're going off-script
+3. If JOV-6273 evidence approves it → add an append-only online-index artifact
+4. Let the certified runner verify validity, definition, and durable checksum
 
 ## Related Files
 

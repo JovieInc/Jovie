@@ -146,6 +146,14 @@ jobs:
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
         continue-on-error: false
+      - name: DB migrate (staging - online indexes)
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (post-migration schema check)
         id: verify
         env:
@@ -768,6 +776,14 @@ jobs:
           doppler run --project jovie-web --config prd
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
+      - name: DB migrate (production - online indexes)
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (production schema check)
         id: verify-production-schema
         env:
