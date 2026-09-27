@@ -1040,7 +1040,6 @@
   "tests/unit/marketing/generation-pipeline.test.ts",
   "tests/unit/marketing/homepage-redesign-jov-5159.test.ts",
   "tests/unit/marketing/homepage-v2-system-b-style-guard.test.ts",
-  "tests/unit/marketing/investors-system-b-style-guard.test.ts",
   "tests/unit/marketing/landing-pipeline.test.ts",
   "tests/unit/marketing/launch-system-b-style-guard.test.ts",
   "tests/unit/marketing/legal-system-b-style-guard.test.ts",

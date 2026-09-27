@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { getInvestorManifest } from '@/lib/investors/manifest';
-import { MemoContent } from '../_components/MemoContent';
+import { getInvestorPortalAccess } from '@/lib/investors/portal-access';
+import { MemoContent } from '../../_components/MemoContent';
 
 interface PageProps {
   readonly params: Promise<{ slug: string }>;
@@ -33,14 +33,11 @@ function stripHtmlTags(input: string): string {
 }
 
 /**
- * Defense-in-depth: verify investor token cookie exists.
- * Primary auth is handled by middleware (proxy.ts).
+ * Defense-in-depth: the portal layout is the primary gate; the page re-checks
+ * the same request-cached access before reading any memo content.
  */
 async function requireInvestorAccess(): Promise<void> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('__investor_token')?.value;
-
-  if (!token) {
+  if (!(await getInvestorPortalAccess())) {
     notFound();
   }
 }
@@ -55,7 +52,10 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const manifest = await getInvestorManifest();
-  const page = manifest.pages.find(p => p.slug === slug);
+  // Never name a memo in the head of a response the visitor can't open.
+  const page = (await getInvestorPortalAccess())
+    ? manifest.pages.find(p => p.slug === slug)
+    : undefined;
 
   return {
     title: page ? `${page.title} — Jovie Investors` : 'Not Found',
