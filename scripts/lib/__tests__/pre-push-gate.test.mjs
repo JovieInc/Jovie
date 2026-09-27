@@ -99,7 +99,10 @@ describe('resolve-repo-node.sh', () => {
 
   it('rejects an older same-major ambient Node in favor of the pinned install', () => {
     const [major, minor, patch] = pinnedVersion.split('.').map(Number);
-    const older = `v${major}.${minor}.${Math.max(patch - 1, 0)}`;
+    const older =
+      patch > 0
+        ? `v${major}.${minor}.${patch - 1}`
+        : `v${major}.${Math.max(minor - 1, 0)}.99`;
     const { nvmRoot, result } = runResolver(older, true);
 
     expect(result.status).toBe(0);
@@ -120,7 +123,10 @@ describe('resolve-repo-node.sh', () => {
 
   it('fails fast with an actionable message when no conforming Node exists', () => {
     const [major, minor, patch] = pinnedVersion.split('.').map(Number);
-    const older = `v${major}.${minor}.${Math.max(patch - 1, 0)}`;
+    const older =
+      patch > 0
+        ? `v${major}.${minor}.${patch - 1}`
+        : `v${major}.${Math.max(minor - 1, 0)}.99`;
     const { result } = runResolver(older, false);
 
     expect(result.status).toBe(1);
