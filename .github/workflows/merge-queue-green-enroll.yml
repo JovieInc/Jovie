@@ -14,7 +14,6 @@ name: Merge Queue Green Enroll
 # on a PR, or a PR loses a hold label.
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# ponytail: scans 100 open PRs per event; page if open non-draft PRs routinely exceed it.
 
 on:
   workflow_run:
@@ -63,11 +62,17 @@ jobs:
           script: |
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge']);
             const { owner, repo } = context.repo;
-            const { repository } = await github.graphql(`
-              query($owner: String!, $repo: String!) {
+            // Page through every open PR: with >100 open, a single ASC page
+            // silently skipped the newest (freshly green) PRs and enqueued none.
+            const prs = [];
+            let cursor = null;
+            do {
+              const { repository } = await github.graphql(`
+              query($owner: String!, $repo: String!, $cursor: String) {
                 repository(owner: $owner, name: $repo) {
-                  pullRequests(states: OPEN, baseRefName: "main", first: 100,
+                  pullRequests(states: OPEN, baseRefName: "main", first: 100, after: $cursor,
                                orderBy: { field: UPDATED_AT, direction: ASC }) {
+                    pageInfo { hasNextPage endCursor }
                     nodes {
                       id number isDraft headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
@@ -79,9 +84,14 @@ jobs:
                     }
                   }
                 }
-              }`, { owner, repo });
+              }`, { owner, repo, cursor });
+              prs.push(...repository.pullRequests.nodes);
+              cursor = repository.pullRequests.pageInfo.hasNextPage
+                ? repository.pullRequests.pageInfo.endCursor
+                : null;
+            } while (cursor);
             let enqueued = 0;
-            for (const pr of repository.pullRequests.nodes) {
+            for (const pr of prs) {
               if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) continue;
               if (pr.mergeStateStatus !== 'CLEAN') continue;
               const labels = pr.labels.nodes.map(l => l.name.toLowerCase());
