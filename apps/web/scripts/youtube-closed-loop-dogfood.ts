@@ -34,7 +34,7 @@ import { buildExpectedJovieUrl } from '@/lib/youtube-library/link-inspect';
 const DEFAULT_BASE_URL = 'https://jov.ie';
 const TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
 
-function argValue(args: readonly string[], name: string): string | undefined {
+function argValue(args: readonly string[], name: string): string {
   const index = args.indexOf(name);
   const value = index >= 0 ? args[index + 1] : undefined;
   if (!value || value.startsWith('--')) {
@@ -118,35 +118,37 @@ export async function dogfoodYoutubeClosedLoop(args: string[]) {
     args.includes('--base-url')
       ? argValue(args, '--base-url')
       : DEFAULT_BASE_URL
-  )!.replace(/\/+$/, '');
+  ).replace(/\/+$/, '');
   const jovieOrigin = (
     args.includes('--jovie-origin')
       ? argValue(args, '--jovie-origin')
       : DEFAULT_BASE_URL
-  )!.replace(/\/+$/, '');
+  ).replace(/\/+$/, '');
   const jovieHandle = args.includes('--jovie-handle')
     ? argValue(args, '--jovie-handle')
     : TIM_WHITE_PROFILE.publicProfileHandle;
   const expectedUrl = buildExpectedJovieUrl({
     origin: jovieOrigin,
-    handle: jovieHandle!,
+    handle: jovieHandle,
   });
   if (!expectedUrl) throw new Error('could not build the expected Jovie URL');
 
   const pasteOnly = previewFromHttp(baseUrl);
+
+  const accessToken = process.env.YOUTUBE_ACCESS_TOKEN?.trim();
+  const auth: YoutubeClosedLoopDogfoodDeps['auth'] = accessToken
+    ? { state: 'ok', scopes: await grantedScopes(accessToken) }
+    : { state: 'missing' };
+  const writer = accessToken
+    ? createYouTubeSnippetWriter({ accessToken })
+    : undefined;
+
   const deps: YoutubeClosedLoopDogfoodDeps = {
     pasteChannelPreview: channel =>
       pasteOnly(channel).then(preview => enrichPublishedAt(preview, channel)),
+    auth,
+    ...(writer ? { writer } : {}),
   };
-
-  const accessToken = process.env.YOUTUBE_ACCESS_TOKEN?.trim();
-  if (accessToken) {
-    const scopes = await grantedScopes(accessToken);
-    deps.auth = { state: 'ok', scopes };
-    deps.writer = createYouTubeSnippetWriter({ accessToken });
-  } else {
-    deps.auth = { state: 'missing' };
-  }
 
   const receipt = await runYoutubeClosedLoopDogfood({
     channelInput,

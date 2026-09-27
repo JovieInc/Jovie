@@ -4,7 +4,10 @@ import {
   YOUTUBE_CLOSED_LOOP_DOGFOOD_SCHEMA,
   type YoutubeDogfoodPastePreview,
 } from '@/lib/acquisition/youtube-closed-loop-dogfood';
-import type { YouTubeSnippetWriter } from '@/lib/youtube-library/link-apply';
+import type {
+  YouTubeSnippetWriter,
+  YouTubeVideoSnippetRecord,
+} from '@/lib/youtube-library/link-apply';
 import { YOUTUBE_LINK_WRITE_SCOPE } from '@/lib/youtube-library/link-apply';
 
 const EXPECTED_URL = 'https://jov.ie/tim';
@@ -16,7 +19,10 @@ const CHANNEL = {
   handle: 'timwhitemusic',
 };
 
-function video(videoId: string, description = 'New track out now.') {
+function video(
+  videoId: string,
+  description = 'New track out now.'
+): YouTubeVideoSnippetRecord {
   return {
     id: videoId,
     etag: `etag-${videoId}`,
