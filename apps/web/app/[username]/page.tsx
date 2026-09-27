@@ -34,7 +34,6 @@ import {
   getCreditedArtistsWithProfiles,
   getStructuredReleaseCollaborators,
 } from '@/lib/discography/artist-queries';
-import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { env } from '@/lib/env-server';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
@@ -64,6 +63,7 @@ import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-inter
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
+import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
 import { generateProfileStructuredData } from '@/lib/seo/structured-data';
 import { resolveSpotifyArtistIdentity } from '@/lib/spotify/artist-id';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
@@ -155,12 +155,14 @@ async function getPublicTourDates(
 }
 
 async function getPublicReleases(profileId: string): Promise<{
-  readonly releases: Awaited<ReturnType<typeof getReleasesForProfileLite>>;
+  readonly releases: Awaited<
+    ReturnType<typeof getCachedPublicReleasesForProfile>
+  >;
   readonly failed: boolean;
 }> {
   try {
     return {
-      releases: await getReleasesForProfileLite(profileId),
+      releases: await getCachedPublicReleasesForProfile(profileId),
       failed: false,
     };
   } catch (error) {

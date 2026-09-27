@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  MARKETING_CUSTOMERS_FLYOUT,
   MARKETING_FOOTER_COLUMNS,
-  MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_NAV_LINKS,
   MARKETING_TOOLS_FLYOUT_LINKS,
 } from '@/data/marketingNavigation';
@@ -132,7 +132,7 @@ describe('marketing language context', () => {
   });
 
   it('does not substitute company, editorial, or directory pages', () => {
-    for (const link of MARKETING_FOR_FLYOUT_LINKS) {
+    for (const link of MARKETING_CUSTOMERS_FLYOUT.links) {
       expect([
         APP_ROUTES.ABOUT,
         APP_ROUTES.BLOG,

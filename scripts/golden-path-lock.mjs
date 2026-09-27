@@ -19,6 +19,7 @@ import {
   classifyChangedPaths,
   cursorAuthHeader,
   evaluateProdProbe,
+  findOpenAutofixPr,
   findOwnedAgents,
   GOLDEN_PATH_LOCK_SELF_TEST_FILES,
   GOLDEN_PATH_PROD_ORIGIN,
@@ -360,6 +361,32 @@ async function cursorRequest(apiKey, url, init = {}) {
   };
 }
 
+function gh(args) {
+  const result = spawnSync('gh', args, { encoding: 'utf8' });
+  if (result.status !== 0) {
+    fail(
+      `gh ${args[0]} ${args[1]} failed; refusing to launch a possible duplicate autofix.`,
+      result.stderr
+    );
+  }
+  return result.stdout;
+}
+
+function listOpenPrs() {
+  return JSON.parse(
+    gh([
+      'pr',
+      'list',
+      '--state',
+      'open',
+      '--limit',
+      '300',
+      '--json',
+      'number,headRefName,title,body',
+    ])
+  );
+}
+
 async function runAutofix(args) {
   if (!args.receipt) fail('autofix requires --receipt <path>');
   const receipt = JSON.parse(readFileSync(resolve(args.receipt), 'utf8'));
@@ -400,17 +427,30 @@ async function runAutofix(args) {
 
   const apiKey = process.env.CURSOR_API_KEY ?? '';
   let existingAgentIds = [];
+  let openPrNumber = null;
   if (apiKey) {
-    const listed = await cursorRequest(apiKey, CURSOR_AGENTS_URL);
-    if (listed.ok) {
-      const agents = listed.body?.agents ?? listed.body ?? [];
-      existingAgentIds = findOwnedAgents(agents, receipt.fingerprint);
+    // JOV-6832: an unreadable owner list is not permission to launch another
+    // agent; 28 duplicate PRs in 5 h came from launching blind.
+    openPrNumber = findOpenAutofixPr(listOpenPrs(), receipt.fingerprint);
+  }
+  if (apiKey && !openPrNumber) {
+    const listed = await cursorRequest(
+      apiKey,
+      `${CURSOR_AGENTS_URL}?limit=100`
+    );
+    if (!listed.ok) {
+      fail(
+        `Cursor agent list failed (status ${listed.status}); refusing to launch a possible duplicate.`
+      );
     }
+    const agents = listed.body?.agents ?? listed.body ?? [];
+    existingAgentIds = findOwnedAgents(agents, receipt.fingerprint);
   }
 
   const plan = planAutofix({
     cursorApiKey: apiKey,
     existingAgentIds,
+    openPrNumber,
     fingerprint: receipt.fingerprint,
     checks: receipt.checks,
     origin: receipt.origin,
@@ -420,6 +460,12 @@ async function runAutofix(args) {
   if (plan.action === 'fail_closed') {
     fail(
       'Golden-path prod break cannot autofix: CURSOR_API_KEY is missing. Detect without a ship lock is a hole.'
+    );
+  }
+  if (plan.openPrNumber) {
+    // The open PR already carries the Linear intake; this run's log is the new evidence.
+    fail(
+      `Golden-path prod probe failed; open autofix PR #${plan.openPrNumber} owns ${receipt.fingerprint}. No new Cursor launch.`
     );
   }
 

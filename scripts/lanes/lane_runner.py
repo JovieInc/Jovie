@@ -43,11 +43,21 @@ REPO_SLUG = "JovieInc/Jovie"
 # `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
 # the rest stay with humans.
 SHARED_LABEL = "agent-ready"
-EXCLUDED_LABELS = frozenset({
-    "no-symphony", "billing", "blocked:payments", "stripe", "cost-monitoring",
-    "blocked:auth", "auth", "area:auth", "infra", "area:infra", "infrastructure", "vercel",
-    "type:epic", "codex-blocked",
+SENSITIVE_LABELS = frozenset({
+    "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
+    "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
+EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked"})
+HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked"})
+SENSITIVE_PROVIDER = "codex"
+SENSITIVE_REVIEWABLE_LINES = 500
+SENSITIVE_RED_LINES = re.compile(
+    r"\b(?:rotate|rotation|revoke|revocation)\b.{0,40}\b(?:secret|credential|token|key)s?\b|"
+    r"\b(?:secret|credential|token|key)s?\b.{0,40}\b(?:rotate|rotation|revoke|revocation)\b|"
+    r"\b(?:live|production|prod)\b.{0,40}\b(?:price|pricing)\b|"
+    r"\b(?:price|pricing)\b.{0,40}\b(?:live|production|prod)\b",
+    re.IGNORECASE,
+)
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
 MAX_GATE_TIMEOUTS = 3
@@ -59,6 +69,11 @@ LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lan
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
+# JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
+# new issues and only fixes/adopts what it already opened.
+OPEN_PRS_PER_SLOT = 2
+STALE_DRAFT_S = 24 * 3600
+SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
 # Waiting work gains one priority level per day, capped at urgent. This preserves
 # urgent-first admission while guaranteeing that a sustained P1 stream cannot
@@ -68,7 +83,7 @@ PRIORITY_AGING_S = 24 * 3600
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
 TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
-DOC_FILE = re.compile(r"(\.mdx?$|^docs/|^canon/|\.txt$)")
+DOC_FILE = re.compile(r"(\.mdx?c?$|^docs/|^canon/|\.txt$)")
 SECRET_FILE = re.compile(r"(^|/)\.env(\.|$)|\.pem$|credentials|id_rsa")
 MAX_REVIEWABLE_LINES = 1500
 
@@ -122,8 +137,16 @@ def created_at_epoch(value: str) -> float | None:
         return None
 
 
+def issue_is_sensitive(issue: Issue) -> bool:
+    return bool(SENSITIVE_LABELS & {label.lower() for label in issue.labels})
+
+
+def issue_hits_red_line(issue: Issue) -> bool:
+    return SENSITIVE_RED_LINES.search(f"{issue.title}\n{issue.description}") is not None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
-               in_flight: frozenset[str] = frozenset()) -> Issue | None:
+               in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
     """Symphony orders by aged priority then age, while preserving urgent-first admission.
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
@@ -137,11 +160,15 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
         record = failure_record(failures.get(identifier))
         return record["count"] < MAX_FAILURES and now - record["at"] >= RETRY_BACKOFF_S
 
-    eligible = [
-        issue for issue in issues
-        if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
-        and issue.identifier.lower() not in in_flight
-    ]
+    def admitted(issue: Issue) -> bool:
+        labels = {label.lower() for label in issue.labels}
+        if HARD_EXCLUDED_LABELS & labels or issue_hits_red_line(issue):
+            return False
+        if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
+            return False
+        return retryable(issue.identifier) and issue.identifier.lower() not in in_flight
+
+    eligible = [issue for issue in issues if admitted(issue)]
 
     def admission_order(issue: Issue) -> tuple[int, float]:
         created_at = created_at_epoch(issue.created_at)
@@ -157,6 +184,14 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
 # ---------------------------------------------------------------- prompt
 
 def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
+    sensitive_contract = []
+    if issue_is_sensitive(issue):
+        sensitive_contract = [
+            "- Guarded sensitive-surface run: keep the reviewable diff at or below 500 lines and",
+            "  one issue. Do not rotate secrets/credentials or change live billing pricing.",
+            "- The lane will require the existing Migration Guard, security scan, affected boundary",
+            "  tests, and an independent `llm-review` before it permits merge enrollment.",
+        ]
     return "\n".join([
         f"# {issue.title} ({issue.identifier})",
         "",
@@ -182,6 +217,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
         "  non-interactive path. Do not run gstack or other skill workflows (ship, review, qa,",
         "  upgrade) and do not upgrade any tooling: commit with git and open the PR with",
         "  `gh pr create --draft`.",
+        *sensitive_contract,
         "- End with a handoff: what changed, what you verified, concerns and deviations.",
     ])
 
@@ -207,7 +243,7 @@ class Change:
     deleted: int
 
 
-def gate_rules(changes: list[Change]) -> list[str]:
+def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES) -> list[str]:
     """Deterministic checks on the diff itself; returns failure reasons (empty = pass)."""
     if not changes:
         return ["empty-diff"]
@@ -221,7 +257,7 @@ def gate_rules(changes: list[Change]) -> list[str]:
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
         failures.append("lockfile-without-manifest")
     reviewable = sum(c.added + c.deleted for c in changes if not GENERATED.search(c.path))
-    if reviewable > MAX_REVIEWABLE_LINES:
+    if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
     return failures
 
@@ -247,6 +283,7 @@ def parse_numstat(text: str) -> list[Change]:
 # typecheck, lint, tests, CI-harness and component contracts) — the same entry point humans'
 # hooks and the no-mistakes pipeline use. A product joins the lanes by providing it.
 CANONICAL_GATE = ["bash", "scripts/hooks/pre-push-gate.sh", "affected"]
+SENSITIVE_PR_LABEL = "sensitive-surface"
 
 
 def check_commands(paths: list[str]) -> list[list[str]]:
@@ -254,6 +291,33 @@ def check_commands(paths: list[str]) -> list[list[str]]:
     if any(not DOC_FILE.search(p) for p in paths):
         return [CANONICAL_GATE]
     return []
+
+
+def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, list[str]]:
+    """Run an independent max-effort Codex review; an ambiguous response fails closed."""
+    review_prompt = host.state / "runs" / f"PR{pr['number']}-{pr['headRefOid'][:12]}-llm-review.md"
+    review_prompt.parent.mkdir(parents=True, exist_ok=True)
+    review_prompt.write_text("\n".join([
+        f"Independently review sensitive-surface PR #{pr['number']} at {pr['headRefOid']}.",
+        "Review only; do not edit, commit, push, comment, or mutate external state.",
+        "Inspect `git diff origin/main...HEAD` for security, auth/billing/infra boundary failures,",
+        "migration safety, missing failure-path tests, and unintended scope. Existing deterministic",
+        "gates run separately. End with exactly `LLM-REVIEW: PASS` only if no blocking finding exists;",
+        "otherwise end with `LLM-REVIEW: FAIL — <concise blocking findings>`.",
+    ]))
+    last = worktree / ".codex-last-message.txt"
+    last.unlink(missing_ok=True)
+    command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),
+               "--cwd", str(worktree), "--reasoning-effort", "xhigh"]
+    try:
+        ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+    except subprocess.TimeoutExpired:
+        return False, ["llm-review-timeout"]
+    verdict = last.read_text(errors="replace").strip() if last.exists() else ""
+    if ran.returncode == 0 and verdict.endswith("LLM-REVIEW: PASS"):
+        return True, []
+    detail = verdict[-1000:] if verdict else f"reviewer-exit:{ran.returncode}"
+    return False, [f"llm-review-failed:{detail}"]
 
 
 # ---------------------------------------------------------------- plumbing
@@ -417,7 +481,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
-            receipt.update(verify_and_land(host, issue, branch, worktree, log, started))
+            receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
+                                           sensitive=issue_is_sensitive(issue)))
             log.flush()
             declined = not_shippable_reason((runs / f"{run_id}.log").read_text(errors="replace")[-20000:])
             if declined and receipt.get("verdict") == "no-change":
@@ -439,7 +504,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
 
 
 def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, started: float,
-                    opened: bool = False) -> dict:
+                    opened: bool = False, sensitive: bool = False) -> dict:
     """Independent of the agent's own claim: find its PR, re-derive the diff, run checks, then land."""
     listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"{issue.identifier} in:title",
                  "--json", "number,headRefName,headRefOid,createdAt,url,isDraft"], log=log)
@@ -455,8 +520,14 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
             "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
             "--body", f"Lane run for {issue.identifier}. Verification by the lane gate."], cwd=worktree, log=log)
-        return verify_and_land(host, issue, branch, worktree, log, started, opened=True)
-    return gate_pr(host, max(prs, key=lambda item: item["createdAt"]), worktree, log)
+        return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
+    pr = max(prs, key=lambda item: item["createdAt"])
+    if sensitive:
+        sh(["gh", "label", "create", SENSITIVE_PR_LABEL, "--repo", REPO_SLUG, "--force",
+            "--color", "B60205", "--description", "Guarded auth/billing/infra lane policy"], log=log)
+        sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
+            "--add-label", SENSITIVE_PR_LABEL], log=log)
+    return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
 def gate_slot(host: Host) -> Locked:
@@ -482,13 +553,13 @@ def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
     return count
 
 
-def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
+def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
     sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], cwd=worktree, log=log)
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
-    reasons = gate_rules(changes)
+    reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
     evidence = []
     result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
               "changedFiles": len(changes), "reasons": reasons}
@@ -513,6 +584,10 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
                     reasons.append(f"check-failed:{' '.join(command[:6])}")
                     evidence += [line for line in log_tail(log).splitlines()
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
+            if sensitive and not reasons:
+                passed, review_reasons = sensitive_review(host, pr, worktree, log)
+                if not passed:
+                    reasons.extend(review_reasons)
         finally:
             if seat is not None:
                 seat.release()
@@ -610,7 +685,7 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
         record = attempts.get(str(pr["number"]), {})
-        if record.get("sha") == pr["headRefOid"] or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
+        if pr_events.in_flight(record, pr, time.time()) or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
             continue
         return pr
     return None
@@ -647,6 +722,7 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         except Exception:
             pass
         attempts[str(pr["number"])] = {**record, "escalated": True}
+        pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)  # held with a reason, visible on the PR
         update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
             pr["headRefOid"], ["fix-exhausted", *held.get(str(pr["number"]), {}).get("evidence", [])])}))
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
@@ -694,6 +770,7 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
                    "number, renumber yours after main's and regenerate its snapshot/journal entry.",
+                   "For a pnpm-lock.yaml conflict take main's lockfile and run `pnpm install --lockfile-only`.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -701,6 +778,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         problem += ["The merge queue removed this PR (its merge group failed) and will not take the same",
                     "head again. Merge origin/main into the branch, run",
                     "`bash scripts/hooks/pre-push-gate.sh affected`, fix what fails, and push.", ""]
+        if pr.get("queueFailure"):
+            problem += ["What failed in the merge group:", pr["queueFailure"], ""]
+    if "stale" in pr.get("eventKinds", ()):
+        problem += ["This lane draft has had no activity for 48 hours. Finish it: resolve what the gate",
+                    "held, make its checks green and push. If it cannot ship, end with NOT-SHIPPABLE.", ""]
     return "\n".join([
         f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
         "",
@@ -751,6 +833,9 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
             sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            # The attempt is over: a head it did not move may be tried again by the next lane.
+            update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
+                endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
     receipt["endedAt"] = now_iso()
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
@@ -760,7 +845,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
 def best_per_issue(prs: list[dict]) -> list[dict]:
     """One PR per issue, retroactively: when the old runner left several open PRs for one
     issue, the lanes spend effort only on the one furthest along (ready over draft, clean over
-    conflicted, then newest). The others stay open for a human to close; nothing is deleted."""
+    conflicted, then newest). sweep_lane_prs closes the others as superseded."""
     by_issue: dict[str, list[dict]] = {}
     rest = []
     for pr in prs:
@@ -768,7 +853,8 @@ def best_per_issue(prs: list[dict]) -> list[dict]:
         (by_issue.setdefault(found.group("issue"), []) if found else rest).append(pr)
     keep = list(rest)
     for group in by_issue.values():
-        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
+        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), is_green(pr),
+                                               pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
     return sorted(keep, key=lambda pr: pr["number"])
 
 
@@ -792,7 +878,8 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
             sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            receipt.update(gate_pr(host, pr, worktree, log))
+            labels = {label["name"].lower() for label in pr.get("labels", [])}
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
@@ -806,7 +893,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     return receipt
 
 
-def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
+def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list[dict]:
     """This lane's open PRs (its dated run branches), plus the orphaned PRs of disabled lanes:
     nobody else will fix or gate those, and any enabled lane can."""
     providers = load_providers() if providers is None else providers
@@ -814,13 +901,16 @@ def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
     prs = []
     for owner in names:
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
-                     "--json", PR_FIELDS])
+                     *(["--limit", "200", "--json", fields] if fields else ["--json", PR_FIELDS])])
         own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
         prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
     return prs
 
 
-PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository"
+PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
+# Every lane PR without check rollups: rollups over ~90 PRs time out (HTTP 504), so the full
+# field set stays at gh's default page of 30 and the budget/sweep read this light set.
+LIGHT_PR_FIELDS = "number,url,isDraft,headRefName,mergeStateStatus"
 
 
 def repo_prs() -> list[dict]:
@@ -841,13 +931,96 @@ def fix_candidates(name: str) -> list[dict]:
     return merged
 
 
-def in_flight_issues() -> frozenset[str]:
-    """Issues that already have an open lane PR from any lane on any host (GitHub is the
-    shared truth, so two hosts cannot both open a PR for one issue)."""
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "300",
-                 "--json", "headRefName"])
-    found = (LANE_BRANCH.match(pr["headRefName"]) for pr in json.loads(listed.stdout or "[]"))
-    return frozenset(match.group("issue").upper() for match in found if match)
+ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
+
+
+def in_flight_issues() -> frozenset[str] | None:
+    """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
+    lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
+    unknown in-flight set is not permission to open a duplicate PR (JOV-6833)."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "500",
+                 "--json", "headRefName,body"])
+    if listed.returncode != 0:
+        return None
+    keys = set()
+    for pr in json.loads(listed.stdout or "[]"):
+        branch = LANE_BRANCH.match(pr.get("headRefName") or "")
+        marker = ISSUE_MARKER.search(pr.get("body") or "")
+        keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
+    return frozenset(keys)
+
+
+def is_green(pr: dict) -> bool:
+    return not pr.get("isDraft") and pr.get("mergeStateStatus") in ("CLEAN", "HAS_HOOKS")
+
+
+def over_budget(name: str, prs: list[dict], slots: int) -> bool:
+    """Slots bound worktrees, not open PRs; without this a lane keeps opening while its earlier
+    PRs rot (84 devin PRs, 0 green drafts on 2026-09-27). Over budget = fix/adopt only."""
+    own = [pr for pr in prs if (pr.get("headRefName") or "").startswith(f"{name}/")]
+    return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
+
+
+def last_pushes() -> dict[int, float]:
+    """Open PR number -> head commit time, in one paginated query (`gh pr list --json commits`
+    over 200 PRs exceeds GitHub's GraphQL node limit). Empty when GitHub cannot be read."""
+    owner, name = REPO_SLUG.split("/")
+    listed = sh(["gh", "api", "graphql", "--paginate", "-f", f"owner={owner}", "-f", f"name={name}", "-f",
+                 "query=query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){"
+                 "pullRequests(states:OPEN,first:100,after:$endCursor){pageInfo{hasNextPage endCursor}"
+                 "nodes{number commits(last:1){nodes{commit{committedDate}}}}}}}",
+                 "--jq", ".data.repository.pullRequests.nodes[] | "
+                         "\"\\(.number) \\(.commits.nodes[0].commit.committedDate)\""])
+    pushes = {}
+    for line in (listed.stdout or "").splitlines() if listed.returncode == 0 else []:
+        number, _, date = line.partition(" ")
+        if number.isdigit() and created_at_epoch(date) is not None:
+            pushes[int(number)] = created_at_epoch(date)
+    return pushes
+
+
+def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[list[tuple[dict, int]], list[dict]]:
+    """(duplicates to close as superseded by the kept PR, stale drafts to close).
+    Only lane-branch PRs; the kept PR per issue is best_per_issue's pick."""
+    kept = {LANE_BRANCH.match(pr["headRefName"]).group("issue"): pr
+            for pr in best_per_issue(prs) if LANE_BRANCH.match(pr.get("headRefName") or "")}
+    superseded, stale = [], []
+    for pr in prs:
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        if not found:
+            continue
+        keep = kept[found.group("issue")]
+        if keep["number"] != pr["number"]:
+            superseded.append((pr, keep["number"]))
+            continue
+        pushed = pushes.get(pr["number"])
+        if pr.get("isDraft") and not is_green(pr) and pushed is not None and now - pushed >= STALE_DRAFT_S:
+            stale.append(pr)
+    return superseded, stale
+
+
+def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
+    """On the existing lane tick (at most every SWEEP_EVERY_S per host): leave one open PR per
+    issue and close drafts with no green run and no push for a day, returning their issue to Todo."""
+    now = time.time() if now is None else now
+    marker = host.state / f"sweep-{name}.json"
+    if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
+        return
+    marker.write_text(json.dumps({"at": now}))
+    superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
+    for pr, keep in superseded:
+        sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
+            f"🤖 lane sweep: superseded by #{keep} (one open PR per Linear issue, JOV-6833)."])
+    for pr in stale:
+        issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
+        closed = sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
+                     "🤖 lane sweep: closing this draft; no green run and no push for 24 h (JOV-6833). "
+                     f"{issue} goes back to Todo for a fresh attempt."])
+        # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
+        if closed.returncode == 0 and linear.state_of(issue) == "In Progress":
+            linear.move(issue, "Todo")
+            linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
+                                  "no push for 24 h); back to Todo.")
 
 
 def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
@@ -917,9 +1090,14 @@ def worker(host: Host, name: str) -> int:
         red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
-        if red is None and adopt is None:
+        sweep_lane_prs(host, name, linear)
+        in_flight = None if red or adopt or over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
+                                                        host.slots(name, spec.get("slots", 1))) \
+            else in_flight_issues()
+        if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues())
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
+                               provider=name)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
             if issue:
