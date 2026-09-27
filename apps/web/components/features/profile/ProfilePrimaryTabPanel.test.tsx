@@ -31,7 +31,20 @@ vi.mock(
 );
 
 vi.mock('@/features/profile/AboutSection', () => ({
-  AboutSection: () => <div data-testid='mock-about-section' />,
+  AboutSection: (props: {
+    readonly creditSegments?: readonly { readonly type: string }[];
+    readonly contacts?: readonly { readonly id: string }[];
+  }) => (
+    <div
+      data-testid='mock-about-section'
+      data-credit-segments={(props.creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
+      data-contacts={(props.contacts ?? [])
+        .map(contact => contact.id)
+        .join('|')}
+    />
+  ),
 }));
 
 vi.mock('@/features/profile/views/ReleasesView', () => ({
@@ -99,6 +112,35 @@ describe('ProfilePrimaryTabPanel', () => {
     expect(releases.className).toContain('-mx-(--page-pad)');
     expect(releases.className).not.toContain('-mx-4');
     expect(screen.getByRole('heading', { name: 'Music' })).toBeInTheDocument();
+  });
+
+  it('routes selected credits and contacts into the About destination (JOV-6199)', () => {
+    renderPanel({
+      mode: 'about',
+      creditSegments: [
+        { type: 'text', text: 'Credited on "' },
+        {
+          type: 'release',
+          text: 'Neon Circuit',
+          href: '/timwhite/neon-circuit',
+        },
+        { type: 'text', text: '".' },
+      ],
+      contacts: [
+        {
+          id: 'contact-1',
+          role: 'bookings',
+          roleLabel: 'Booking',
+          territorySummary: 'Worldwide',
+          territoryCount: 1,
+          channels: [{ type: 'email', encoded: 'bW9va0BleGFtcGxlLmNvbQ==' }],
+        },
+      ],
+    });
+
+    const about = screen.getByTestId('mock-about-section');
+    expect(about).toHaveAttribute('data-credit-segments', 'text|release|text');
+    expect(about).toHaveAttribute('data-contacts', 'contact-1');
   });
 
   it('keeps the subscribe panel mounted as the subscribe destination', () => {

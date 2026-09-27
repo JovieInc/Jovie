@@ -76,13 +76,21 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
   ProfilePrimaryTabPanel: ({
     mode,
     catalogLoadFailed,
+    creditSegments,
+    contacts,
   }: {
     readonly mode: string;
     readonly catalogLoadFailed?: boolean;
+    readonly creditSegments?: readonly { readonly type: string }[];
+    readonly contacts?: readonly { readonly id: string }[];
   }) => (
     <div
       data-testid={`mock-primary-tab-panel-${mode}`}
       data-catalog-load-failed={catalogLoadFailed ? 'true' : 'false'}
+      data-credit-segments={(creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
+      data-contacts={(contacts ?? []).map(contact => contact.id).join('|')}
     />
   ),
 }));
@@ -231,6 +239,24 @@ describe('ProfileCompactSurface', () => {
       'data-catalog-load-failed',
       'true'
     );
+  });
+
+  it('routes selected credits into the About panel (JOV-6199)', () => {
+    renderSurface({
+      activeMode: 'about',
+      creditSegments: [
+        { type: 'text', text: 'Credited on "' },
+        {
+          type: 'release',
+          text: 'Neon Circuit',
+          href: '/timwhite/neon-circuit',
+        },
+        { type: 'text', text: '".' },
+      ],
+    });
+
+    const panel = screen.getByTestId('mock-primary-tab-panel-about');
+    expect(panel).toHaveAttribute('data-credit-segments', 'text|release|text');
   });
 
   it('renders registry-cased hero social aria labels for TikTok', () => {
