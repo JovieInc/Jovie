@@ -155,13 +155,16 @@ export function buildDocsRedirects(registry) {
   const live = liveCanonicalRoutes(registry);
   const emitted = [];
   const held = [];
-  const seenSources = new Set();
+  const seenSources = new Map();
 
   const push = (source, destination) => {
     if (seenSources.has(source)) {
-      throw new Error(`duplicate redirect source: ${source}`);
+      if (seenSources.get(source) !== destination) {
+        throw new Error(`conflicting redirect source: ${source}`);
+      }
+      return;
     }
-    seenSources.add(source);
+    seenSources.set(source, destination);
     const row = { source, destination, permanent: true };
     (live.has(destination) ? emitted : held).push(row);
   };
