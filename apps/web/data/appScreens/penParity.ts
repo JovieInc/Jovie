@@ -79,6 +79,17 @@ export type PenParitySource =
       readonly exportRef: string;
       readonly utility: string;
     }
+  /**
+   * Rendered height of a flex container holding one child: the larger of
+   * the container's `min-h` and the child's `h` plus the container's
+   * vertical padding (`py`). Both refs resolve like `class-export`.
+   */
+  | {
+      readonly kind: 'rendered-height';
+      readonly file: string;
+      readonly containerRef: string;
+      readonly childRef: string;
+    }
   /** A numeric `export const NAME = <n>` in `file`. */
   | {
       readonly kind: 'numeric-export';
@@ -241,7 +252,12 @@ export const APP_SCREEN_PEN_PARITY_CHECKS: readonly PenParityCheck[] = [
     masterId: 'ftsrB',
     slotId: null,
     property: 'height',
-    source: pageToolbar('PAGE_TOOLBAR_CONTAINER_CLASS', 'min-h'),
+    source: {
+      kind: 'rendered-height',
+      file: PAGE_TOOLBAR,
+      containerRef: 'PAGE_TOOLBAR_CONTAINER_CLASS',
+      childRef: 'PAGE_TOOLBAR_TAB_BUTTON_CLASS',
+    },
   },
   {
     id: 'page-toolbar.table-shell-height',
@@ -370,6 +386,15 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
     penValue: 10,
     sourceValue: 0,
     summary: 'A3fqK 10px side inset vs edge-to-edge tables.',
+  },
+  {
+    decisionId: 'D3',
+    checkId: 'page-toolbar.height',
+    recordedOn: '2026-09-27',
+    penValue: 40,
+    sourceValue: 42,
+    summary:
+      'ftsrB is 40; a PageToolbar holding a 30px tab button (h-7.5) plus py-1.5 renders at 42 despite min-h-10.',
   },
   {
     decisionId: 'D3',

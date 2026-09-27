@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   PAGE_TOOLBAR_CONTAINER_CLASS,
+  PAGE_TOOLBAR_TAB_BUTTON_CLASS,
   TABLE_TOOLBAR_SHELL_CLASS,
 } from '@/components/organisms/table/molecules/PageToolbar';
 import { getSidebarNavRowClassName } from '@/components/shell/SidebarNavItem';
@@ -34,6 +35,10 @@ const CLASS_EXPORTS: Readonly<
   PAGE_TOOLBAR_CONTAINER_CLASS: {
     file: 'apps/web/components/organisms/table/molecules/PageToolbar.tsx',
     value: PAGE_TOOLBAR_CONTAINER_CLASS,
+  },
+  PAGE_TOOLBAR_TAB_BUTTON_CLASS: {
+    file: 'apps/web/components/organisms/table/molecules/PageToolbar.tsx',
+    value: PAGE_TOOLBAR_TAB_BUTTON_CLASS,
   },
   TABLE_TOOLBAR_SHELL_CLASS: {
     file: 'apps/web/components/organisms/table/molecules/PageToolbar.tsx',
@@ -97,6 +102,23 @@ function resolveSource(source: PenParitySource, label: string): number {
         throw new Error(`${label}: ${source.exportRef} lives in ${entry.file}`);
       }
       return utilityValue(entry.value, source.utility, label);
+    }
+    case 'rendered-height': {
+      const classesOf = (ref: string) => {
+        const entry = CLASS_EXPORTS[ref];
+        if (!entry) throw new Error(`${label}: unknown export ${ref}`);
+        if (entry.file !== source.file) {
+          throw new Error(`${label}: ${ref} lives in ${entry.file}`);
+        }
+        return entry.value;
+      };
+      const container = classesOf(source.containerRef);
+      const child = classesOf(source.childRef);
+      return Math.max(
+        utilityValue(container, 'min-h', label),
+        utilityValue(child, 'h', label) +
+          2 * utilityValue(container, 'py', label)
+      );
     }
     case 'numeric-export': {
       const match = new RegExp(
