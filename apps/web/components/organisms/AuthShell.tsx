@@ -14,11 +14,14 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { env } from '@/lib/env-client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { OperatorMobileNavigation } from './OperatorMobileNavigation';
 import { PersistentAudioBar } from './PersistentAudioBar';
+import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
 export interface AuthShellProps {
   readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
@@ -62,6 +65,10 @@ function AuthShellInner({
   const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
+  const isElectron = useIsElectronRuntime();
+  // Mac app everywhere; on the web only the operator shell (dogfood).
+  const showWhatsNew =
+    (isElectron || section === 'ov') && !env.IS_TEST && !env.IS_E2E;
   const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
     <SidebarCollapseButton />
   ) : null;
@@ -128,6 +135,7 @@ function AuthShellInner({
         contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
         composerFocusActive={isComposerFocused && !isMobile}
       />
+      <WhatsNewBanner enabled={showWhatsNew} />
     </RuntimeUpdateProvider>
   );
 }
