@@ -427,40 +427,27 @@ export function DashboardNav({
               {searchSurface}
               <span aria-hidden='true' className='h-4 w-px bg-subtle' />
               {headerOwnsInbox ? null : (
-              <Link
-                href={APP_ROUTES.DASHBOARD}
-                onClick={event => handleCommandClick(event, inboxNavItem)}
-                prefetch={!isDemo}
-                aria-label={
-                  hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
-                }
-                data-inbox-attention={
-                  hasRuntimeUpdate
-                    ? 'available'
-                    : (inboxNavigation?.state ?? 'unknown')
-                }
-                aria-current={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
-                    ? 'page'
-                    : undefined
-                }
-                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
-              >
-                <Bell
-                  className='size-(--app-shell-sidebar-icon-size)'
-                  aria-hidden='true'
-                />
-                {inboxNavigation?.state === 'available' &&
-                (inboxNavigation.pendingCount ?? 0) > 0 ? (
-                  <span
-                    role='status'
-                    aria-label={`${inboxNavigation.pendingCount} pending items`}
-                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
-                  >
-                    {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
-                  </span>
-                ) : hasRuntimeUpdate ? (
-                  <span
+                <Link
+                  href={APP_ROUTES.DASHBOARD}
+                  onClick={event => handleCommandClick(event, inboxNavItem)}
+                  prefetch={!isDemo}
+                  aria-label={
+                    hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
+                  }
+                  data-inbox-attention={
+                    hasRuntimeUpdate
+                      ? 'available'
+                      : (inboxNavigation?.state ?? 'unknown')
+                  }
+                  aria-current={
+                    normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
+                      ? 'page'
+                      : undefined
+                  }
+                  className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
+                >
+                  <Bell
+                    className='size-(--app-shell-sidebar-icon-size)'
                     aria-hidden='true'
                   />
                   {inboxNavigation?.state === 'available' &&
@@ -468,7 +455,7 @@ export function DashboardNav({
                     <span
                       role='status'
                       aria-label={`${inboxNavigation.pendingCount} pending items`}
-                      className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-background'
+                      className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
                     >
                       {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
                     </span>
