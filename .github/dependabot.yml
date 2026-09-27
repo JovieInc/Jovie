@@ -8,9 +8,10 @@ updates:
       interval: 'daily'
       time: '09:00'
       timezone: 'Etc/UTC'
-    # Ship now: preserve shallow PRs while removing the observed ten-slot
-    # starvation. Re-evaluate when 20+ npm update PRs remain open across two
-    # weekday runs; then group only low-risk development patches (JOV-5465).
+    # JOV-6837: the JOV-5465 re-evaluate trigger fired (12 open npm PRs, 5
+    # DIRTY on pnpm-lock.yaml, 2026-09-27). Each lockfile bump conflicts with
+    # every other one, so move-together families and low-risk dev patches
+    # land as one PR each. Majors and runtime deps stay one PR per package.
     open-pull-requests-limit: 25
     cooldown:
       default-days: 3
@@ -32,6 +33,18 @@ updates:
           - 'electron'
         update-types:
           - 'major'
+      # vitest and @vitest/* must share one version; split PRs broke each other.
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      dev-patch:
+        dependency-type: 'development'
+        update-types:
+          - 'patch'
     ignore:
       # Temporary workaround: these packages do not publish 10.3.2.
       # Dependabot currently attempts that version and fails the update job.
@@ -82,7 +95,8 @@ updates:
       # init/analyze load one shared bundle and must move in the same PR.
       codeql-action:
         patterns:
-          - 'github/codeql-action'
+          # Sub-actions (analyze, upload-sarif, init) are distinct names.
+          - 'github/codeql-action*'
 
   # Enable version updates for Docker (if needed)
   - package-ecosystem: 'docker'

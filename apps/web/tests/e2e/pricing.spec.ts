@@ -132,7 +132,7 @@ test.describe('Pricing Page', () => {
       );
     expect(pricingCardCtasAreCentered).toEqual([true, true, true]);
     await expect(
-      page.getByRole('link', { name: 'Explore Artist Profiles' }).first()
+      page.getByRole('link', { name: 'Explore Jovie Profiles' }).first()
     ).toBeVisible();
 
     await expect(page.getByText('Compare all features').first()).toBeVisible();

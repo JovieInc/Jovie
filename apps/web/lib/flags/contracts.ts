@@ -68,6 +68,11 @@ export const APP_FLAG_DEFAULTS = {
    * quarantine when enabled.
    */
   MERCH_QA_GATE: false,
+  /**
+   * Anonymous agent profile creation (POST /api/agents/profiles). Kill switch
+   * for the public CLI/MCP write path; default on.
+   */
+  AGENT_PROFILE_CREATE: true,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -97,6 +102,7 @@ export const APP_FLAG_KEYS = {
   ONBOARDING_WOW_TASK_QUEUE: 'onboarding_wow_task_queue',
   PAID_WELCOME_EMAIL: 'paid_welcome_email',
   MERCH_QA_GATE: 'merch_qa_gate',
+  AGENT_PROFILE_CREATE: 'agent_profile_create',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -121,6 +127,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   ONBOARDING_WOW_TASK_QUEUE: 'code:ONBOARDING_WOW_TASK_QUEUE',
   PAID_WELCOME_EMAIL: 'code:PAID_WELCOME_EMAIL',
   MERCH_QA_GATE: 'code:MERCH_QA_GATE',
+  AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -173,6 +180,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Send one idempotent paid-welcome email after verified subscription entitlement. Default off — Tim publishes prod override and approves the first live send (JOV-6445).',
   MERCH_QA_GATE:
     'Merch pre-publish visual QA gate: persisted receipts, quarantine queue, fail-closed publish evidence (JOV-4739). Default off until a real visual reviewer replaces the stub.',
+  AGENT_PROFILE_CREATE:
+    'Anonymous agent profile creation via POST /api/agents/profiles (public CLI/MCP write path).',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -221,6 +230,8 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Retain while external-recipient delivery requires a founder-controlled stop.',
   MERCH_QA_GATE:
     'Remove when the real visual reviewer is mandatory and the stub path is deleted.',
+  AGENT_PROFILE_CREATE:
+    'Retain while the anonymous public write path needs an abuse stop control.',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_AUDIT_OWNER = '@itstimwhite' as const;
@@ -286,4 +297,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
   'MERCH_QA_GATE', // JOV-4739 publish gate; default off until a real visual reviewer replaces the stub — no Statsig gate
+  'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
 ]);
