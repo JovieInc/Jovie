@@ -49,13 +49,37 @@ export const DESIGN_SURFACES_SLUG =
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Copy-bearing marketing surfaces scanned for scaffolding leaks. */
-export const DESIGN_SURFACE_ROOTS = Object.freeze([
+export const MARKETING_COPY_ROOTS = Object.freeze([
   'apps/web/data',
   'apps/web/app/(marketing)',
   'apps/web/app/(home)',
   'apps/web/components/marketing',
   'apps/web/components/homepage',
   'apps/web/components/site',
+]);
+
+/**
+ * Copy-bearing product UI surfaces. JOV-INV-038 scopes `app-ui`, so the
+ * scaffolding scan covers the signed-in app, onboarding, billing, public
+ * profiles, and the shared feature/shell components that render their copy.
+ */
+export const APP_UI_COPY_ROOTS = Object.freeze([
+  'apps/web/app/app',
+  'apps/web/app/onboarding',
+  'apps/web/app/account',
+  'apps/web/app/billing',
+  'apps/web/app/[username]',
+  'apps/web/components/features',
+  'apps/web/components/onboarding',
+  'apps/web/components/shell',
+  'apps/web/components/organisms',
+  'apps/web/components/molecules',
+  'apps/web/components/jovie',
+]);
+
+export const DESIGN_SURFACE_ROOTS = Object.freeze([
+  ...MARKETING_COPY_ROOTS,
+  ...APP_UI_COPY_ROOTS,
 ]);
 
 export const NAVIGATION_SOURCE = 'apps/web/data/marketingNavigation.ts';
@@ -82,7 +106,12 @@ const EXCLUDED_DIR_NAMES = new Set([
 ]);
 
 function isExcludedSource(relPath) {
-  return /\.(test|spec|stories)\.(ts|tsx|js|jsx)$/.test(relPath);
+  // Fixture data files (e.g. demo-fixtures.ts) are excluded like fixtures/
+  // directories: they hold sample records, not authored product copy.
+  return (
+    /\.(test|spec|stories)\.(ts|tsx|js|jsx)$/.test(relPath) ||
+    /(?:^|[/._-])fixtures\.(ts|tsx|js|jsx)$/.test(relPath)
+  );
 }
 
 function posixRel(repoRoot, abs) {
@@ -211,8 +240,10 @@ const SCAFFOLDING_ANYWHERE = Object.freeze([
   },
 ]);
 
-const BARE_SCAFFOLDING_STRING =
-  /['"`](?:TBD|TODO|FIXME|placeholder|lorem ipsum)['"`]/i;
+// TBD/TODO/FIXME are matched case-sensitively: product UI legitimately uses
+// the lowercase 'todo' task status and the 'Todo' status label.
+const BARE_SCAFFOLDING_MARKER = /['"`](?:TBD|TODO|FIXME)['"`]/;
+const BARE_PLACEHOLDER_STRING = /['"`](?:placeholder|lorem ipsum)['"`]/i;
 
 const PLACEHOLDER_LANGUAGE = /\bplaceholder\s+(?:text|copy|image|content)\b/i;
 
@@ -228,7 +259,10 @@ export function scanScaffoldingCopy(relPath, sourceText) {
       });
     }
   }
-  if (BARE_SCAFFOLDING_STRING.test(source)) {
+  if (
+    BARE_SCAFFOLDING_MARKER.test(source) ||
+    BARE_PLACEHOLDER_STRING.test(source)
+  ) {
     findings.push({
       path: relPath,
       rule: 'internal-scaffolding-copy',
@@ -245,8 +279,25 @@ export function scanScaffoldingCopy(relPath, sourceText) {
   return findings;
 }
 
-const NAV_PAIR_RE =
-  /href:\s*APP_ROUTES\.([A-Z_]+)[\s\S]{0,200}?label:\s*'([^']+)'|label:\s*'([^']+)'[\s\S]{0,200}?href:\s*APP_ROUTES\.([A-Z_]+)/g;
+// Every MarketingNavLink literal form: a direct `APP_ROUTES.X` href or a
+// template `${APP_ROUTES.X}...` href, and a label in single, double, or
+// backtick quotes, in either key order. The gap between keys may not cross
+// an object brace, so one link's label never pairs with the next link's href.
+const NAV_HREF_FIRST_RE =
+  /href:\s*(?:`\$\{\s*APP_ROUTES\.([A-Z_]+)\s*\}[^`]*`|APP_ROUTES\.([A-Z_]+))[^{}]{0,200}?label:\s*(['"`])((?:(?!\3).)+)\3/g;
+const NAV_LABEL_FIRST_RE =
+  /label:\s*(['"`])((?:(?!\1).)+)\1[^{}]{0,200}?href:\s*(?:`\$\{\s*APP_ROUTES\.([A-Z_]+)\s*\}[^`]*`|APP_ROUTES\.([A-Z_]+))/g;
+
+function navPairs(source) {
+  const pairs = [];
+  for (const match of source.matchAll(NAV_HREF_FIRST_RE)) {
+    pairs.push({ route: match[1] ?? match[2], label: match[4] });
+  }
+  for (const match of source.matchAll(NAV_LABEL_FIRST_RE)) {
+    pairs.push({ route: match[3] ?? match[4], label: match[2] });
+  }
+  return pairs;
+}
 
 const PERSONA_LABELS = new Set([
   'founders',
@@ -268,11 +319,7 @@ const TOOL_LABEL_ROUTE = Object.freeze({
 export function scanNavSemantics(relPath, sourceText) {
   const source = stripComments(sourceText);
   const findings = [];
-  NAV_PAIR_RE.lastIndex = 0;
-  let match = NAV_PAIR_RE.exec(source);
-  while (match) {
-    const route = match[1] ?? match[4];
-    const label = match[2] ?? match[3];
+  for (const { route, label } of navPairs(source)) {
     const key = label.trim().toLowerCase();
     if (PERSONA_LABELS.has(key) && TOOLING_ROUTES.has(route)) {
       findings.push({
@@ -289,7 +336,6 @@ export function scanNavSemantics(relPath, sourceText) {
         detail: `tool label "${label}" must route to APP_ROUTES.${expected}, got APP_ROUTES.${route}`,
       });
     }
-    match = NAV_PAIR_RE.exec(source);
   }
   return findings;
 }
@@ -317,7 +363,11 @@ export function scanRouteIntent(repoRoot = DEFAULT_ROOT, sources = {}) {
   );
   const recipeCount = (recipeBlock.match(/^\s+id: '/gm) ?? []).length;
   const audienceCount = (recipeBlock.match(/audience: '/g) ?? []).length;
-  const sectionOrderCount = (recipeBlock.match(/sectionOrder:/g) ?? []).length;
+  // A declared-but-empty job array carries no job, so only non-empty arrays
+  // count toward the per-recipe and per-family totals.
+  const sectionOrderCount = (
+    recipeBlock.match(/sectionOrder:\s*\[\s*[^\]\s]/g) ?? []
+  ).length;
   if (recipeCount === 0 || audienceCount !== recipeCount) {
     findings.push({
       path: RECIPES_SOURCE,
@@ -329,7 +379,7 @@ export function scanRouteIntent(repoRoot = DEFAULT_ROOT, sources = {}) {
     findings.push({
       path: RECIPES_SOURCE,
       rule: 'section-job-missing',
-      detail: `section-earns-place: ${sectionOrderCount}/${recipeCount} recipes declare named section jobs`,
+      detail: `section-earns-place: ${sectionOrderCount}/${recipeCount} recipes declare a non-empty sectionOrder of named section jobs`,
     });
   }
   if (!/audience:\s*recipe\.audience/.test(grammar)) {
@@ -344,9 +394,12 @@ export function scanRouteIntent(repoRoot = DEFAULT_ROOT, sources = {}) {
     grammar.indexOf('export const LANDING_PAGE_FAMILIES')
   );
   const familyCount = (familyBlock.match(/^\s+id: '/gm) ?? []).length;
-  const contentSlotCount = (familyBlock.match(/contentSlots: \[/g) ?? [])
-    .length;
-  const invariantCount = (familyBlock.match(/invariantIds: \[/g) ?? []).length;
+  const contentSlotCount = (
+    familyBlock.match(/contentSlots:\s*\[\s*[^\]\s]/g) ?? []
+  ).length;
+  const invariantCount = (
+    familyBlock.match(/invariantIds:\s*\[\s*[^\]\s]/g) ?? []
+  ).length;
   if (
     familyCount === 0 ||
     contentSlotCount !== familyCount ||
@@ -355,7 +408,7 @@ export function scanRouteIntent(repoRoot = DEFAULT_ROOT, sources = {}) {
     findings.push({
       path: LANDING_GRAMMAR_SOURCE,
       rule: 'section-job-missing',
-      detail: `section-earns-place: ${contentSlotCount} contentSlots / ${invariantCount} invariantIds across ${familyCount} families — every family must carry a user-facing job`,
+      detail: `section-earns-place: ${contentSlotCount} non-empty contentSlots / ${invariantCount} non-empty invariantIds across ${familyCount} families — every family must carry a user-facing job`,
     });
   }
   return findings;
