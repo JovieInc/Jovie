@@ -672,8 +672,8 @@
       "failureMode": "GBrain readiness returns a misleading pool-saturation message for wedged or DNS-broken DB sessions.",
       "regression": {
         "kind": "test",
-        "command": "pnpm ci:control:test",
-        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+        "command": "pytest scripts/tests/test_lane_runner.py -q -k reports_missing_gbrain_instead_of_inventing_context",
+        "path": "scripts/tests/test_lane_runner.py"
       },
       "ciStageOwner": {
         "stage": "scheduled-control-plane",
@@ -894,8 +894,8 @@
       "failureMode": "GBrain administrative credentials enter persistent service logs instead of redacted diagnostics.",
       "regression": {
         "kind": "test",
-        "command": "pnpm ci:control:test",
-        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+        "command": "pytest scripts/tests/test_lane_runner.py -q -k \"secrets_lockfile_and_size_guards or missing_key_is_a_clear_error\"",
+        "path": "scripts/tests/test_lane_runner.py"
       },
       "ciStageOwner": {
         "stage": "operator-bootstrap",

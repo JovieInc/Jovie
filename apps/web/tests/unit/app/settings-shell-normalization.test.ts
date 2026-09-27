@@ -11,6 +11,20 @@ const SETTINGS_LAYOUT = findSourceFile(
   resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/layout.tsx')
 );
 
+const REQUIRED_SHARED_SETTINGS_ROUTES = [
+  'account',
+  'connectors',
+  'usage',
+  'billing',
+  'payments',
+  'data-privacy',
+  'artist-profile',
+  'contacts',
+  'touring',
+  'analytics',
+  'audience',
+] as const;
+
 const UNIFIED_SIDEBAR = findSourceFile(
   resolve(process.cwd(), 'components/organisms/UnifiedSidebar.tsx'),
   resolve(process.cwd(), 'apps/web/components/organisms/UnifiedSidebar.tsx')
@@ -186,6 +200,40 @@ describe('settings shell normalization', () => {
     const layoutSource = readFileSync(SETTINGS_LAYOUT, 'utf8');
     expect(layoutSource).toContain('<PageShell');
     expect(layoutSource).toContain("data-testid='settings-shell-content'");
+  });
+
+  it('centers every required settings route in the post-sidebar main pane', () => {
+    expect(SETTINGS_LAYOUT).toBeDefined();
+
+    if (!SETTINGS_LAYOUT) {
+      throw new Error('Could not find settings layout source');
+    }
+
+    const layoutSource = readFileSync(SETTINGS_LAYOUT, 'utf8');
+    expect(layoutSource).toContain(
+      "className='mx-auto min-w-0 w-full max-w-(--app-shell-content-max-form) space-y-6'"
+    );
+
+    for (const route of REQUIRED_SHARED_SETTINGS_ROUTES) {
+      const page = findSourceFile(
+        resolve(process.cwd(), `app/app/(shell)/settings/${route}/page.tsx`),
+        resolve(
+          process.cwd(),
+          `apps/web/app/app/(shell)/settings/${route}/page.tsx`
+        )
+      );
+      expect(
+        page,
+        `${route} must remain under the shared settings layout`
+      ).toBeDefined();
+      if (!page) continue;
+
+      const pageSource = readFileSync(page, 'utf8');
+      expect(
+        pageSource,
+        `${route} must not create a route-local PageShell`
+      ).not.toMatch(/<PageShell\b/);
+    }
   });
 
   it('uses the global shell settings navigation instead of mounting a second in-content sidebar', () => {

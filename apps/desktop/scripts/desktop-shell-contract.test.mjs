@@ -54,7 +54,7 @@ test('desktop window enters the authenticated chat shell instead of the web root
   );
 });
 
-test('desktop polls build-info and reloads only hud windows on deploy drift', async () => {
+test('desktop polls build-info and reloads idle app windows on deploy drift', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   for (const symbol of [
@@ -62,8 +62,11 @@ test('desktop polls build-info and reloads only hud windows on deploy drift', as
     'fetchHudBuildFingerprint',
     'getHudBuildFingerprint',
     'decideHudBuildReload',
-    'isHudRoutePath',
     'isHudWindow',
+    'isWebBuildReloadWindow',
+    'isWebBuildReloadPath',
+    'shouldReloadWindowForWebBuild',
+    'UNSENT_INPUT_PROBE',
     'scheduleHudBuildAutoReload',
   ]) {
     assert.match(mainSource, new RegExp(`\\b${symbol}\\b`));
@@ -73,10 +76,25 @@ test('desktop polls build-info and reloads only hud windows on deploy drift', as
   assert.match(mainSource, /60 \* 1000/);
   assert.match(
     mainSource,
-    /BrowserWindow\.getAllWindows\(\)\.some\(isHudWindow\)/
+    /BrowserWindow\.getAllWindows\(\)\.filter\(\s*isWebBuildReloadWindow\s*\)/
   );
+  assert.match(mainSource, /powerMonitor\.getSystemIdleTime\(\)/);
   assert.match(mainSource, /win\.webContents\.reload\(\)/);
   assert.doesNotMatch(mainSource, /commitSha.*deployedAt/);
+});
+
+test('desktop update checks run on launch, interval, and wake, and restart only when idle', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  assert.match(mainSource, /autoUpdater\.autoDownload = true/);
+  assert.match(mainSource, /autoUpdater\.autoInstallOnAppQuit = true/);
+  assert.match(mainSource, /powerMonitor\.on\('resume', checkAfterWake\)/);
+  assert.match(
+    mainSource,
+    /powerMonitor\.on\('unlock-screen', checkAfterWake\)/
+  );
+  assert.match(mainSource, /shouldInstallDownloadedUpdateWhileRunning\(/);
+  assert.match(mainSource, /autoUpdater\.quitAndInstall\(true, true\)/);
 });
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {

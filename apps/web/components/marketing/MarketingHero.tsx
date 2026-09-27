@@ -277,7 +277,11 @@ function MarketingHeroContent({
 
   return (
     <MarketingHeroFrame
-      className={cn('marketing-hero', `marketing-hero--${layout}`, className)}
+      className={cn(
+        'marketing-hero marketing-hero-dock',
+        `marketing-hero--${layout}`,
+        className
+      )}
       headingId={headingId}
       testId={testId}
       sectionVariant={sectionVariant}
@@ -351,7 +355,7 @@ function MarketingHeroLanding({
 }: MarketingHeroLandingProps) {
   return (
     <MarketingHeroFrame
-      className='relative overflow-hidden pb-12 pt-[5.75rem] md:pb-16 md:pt-[6.25rem] lg:pb-20'
+      className='marketing-hero-landing marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden pb-12 md:pb-16 lg:pb-20'
       headingId={headingId}
       testId={testId ?? sectionTestId}
     >

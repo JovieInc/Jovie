@@ -2766,6 +2766,45 @@ describe('exact-head queue receipt proof', () => {
     expect(invokedNativeMutation(runner)).toBe(false);
     expect(invokedMutationActorCheck(runner)).toBe(false);
   });
+
+  it('keeps every bounded receipt read when fixtures zero the CLI poll delay', async () => {
+    const runner = createNativeRunner({
+      states: Array.from({ length: 6 }, () => prState()),
+    });
+    const startedAt = performance.now();
+    await expect(
+      runCli(['prove-receipt', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_POSTCONDITION_DELAY_MS: '0',
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({ ok: false, attempts: 6 });
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it.each(['-1', '1.5', 'soon'])(
+    'rejects malformed MERGE_QUEUE_POSTCONDITION_DELAY_MS=%s before reading state',
+    async delay => {
+      const runner = createNativeRunner({ states: [prState()] });
+      await expect(
+        runCli(['prove-receipt', '14359', HEAD], {
+          env: {
+            MERGE_QUEUE_BACKEND: 'native',
+            GITHUB_REPOSITORY: REPOSITORY,
+            MERGE_QUEUE_POSTCONDITION_DELAY_MS: delay,
+          },
+          runner,
+          write: vi.fn(),
+        })
+      ).rejects.toMatchObject({ code: 'invalid_postcondition_delay' });
+      expect(runner).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('authoritative native state listing', () => {

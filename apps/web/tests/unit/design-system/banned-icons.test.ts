@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { type Dirent, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -49,7 +49,7 @@ const BANNED_ICON_PATTERN = new RegExp(
 
 function walk(dir: string, exts: readonly string[]): string[] {
   const out: string[] = [];
-  let entries: ReturnType<typeof readdirSync>;
+  let entries: Dirent[];
   try {
     entries = readdirSync(dir, { withFileTypes: true });
   } catch {

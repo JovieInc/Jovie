@@ -39,7 +39,8 @@ export interface FriendlyArtistHandleCandidate {
   readonly source:
     | 'registry_artist_name'
     | 'provider_display_name'
-    | 'primary_name_token';
+    | 'primary_name_token'
+    | 'artist_controlled_destination';
 }
 
 /** Why a proposed candidate was rejected by the deterministic policy. */
@@ -87,6 +88,13 @@ export function normalizeArtistNameToHandleBase(name: string): string {
 export function composeFriendlyArtistHandleCandidates(input: {
   readonly registryName: string | null | undefined;
   readonly providerArtist: SpotifyArtistProfileData | undefined;
+  /**
+   * Handles recovered from artist-controlled destinations by the JOV-6529
+   * identity-enrichment pass. These are evidence (exact-entity, provider-ID
+   * backed), never model output, and they still pass the deterministic
+   * username contract before ranking.
+   */
+  readonly evidenceHandles?: readonly string[];
 }): ComposedFriendlyArtistHandles {
   const accepted: FriendlyArtistHandleCandidate[] = [];
   const rejected: RejectedFriendlyHandleCandidate[] = [];
@@ -97,6 +105,17 @@ export function composeFriendlyArtistHandleCandidates(input: {
   }> = [
     { source: 'registry_artist_name', name: input.registryName },
     { source: 'provider_display_name', name: input.providerArtist?.name },
+    // Verified artist-controlled handles rank above the provider display
+    // name: a destination the artist controls is stronger evidence for the
+    // friendly handle than a display name. `enrich` order keeps them after
+    // the registry name at equal specificity.
+    ...(input.evidenceHandles ?? []).map(
+      handle =>
+        ({
+          source: 'artist_controlled_destination',
+          name: handle,
+        }) as const
+    ),
   ];
 
   const seen = new Set<string>();
@@ -152,6 +171,14 @@ export function composeFriendlyArtistHandleCandidates(input: {
 }
 
 function rankOf(candidate: FriendlyArtistHandleCandidate): number {
-  // Registry name outranks provider display name at equal specificity.
-  return candidate.source === 'registry_artist_name' ? 0 : 1;
+  // Canonical registry name first; verified artist-controlled handles outrank
+  // the provider display name at equal specificity.
+  switch (candidate.source) {
+    case 'registry_artist_name':
+      return 0;
+    case 'artist_controlled_destination':
+      return 1;
+    default:
+      return 2;
+  }
 }

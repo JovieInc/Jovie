@@ -11,7 +11,7 @@ import {
 import { ArrowLeft, Copy, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { type PropsWithChildren, useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { toast } from '@/components/feedback';
@@ -27,6 +27,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
@@ -350,6 +351,18 @@ function OperatorSessionControls() {
   );
 }
 
+/** Bottom-owned shell slot for transient entity cards and status banners. */
+export function SidebarDock({ children }: PropsWithChildren) {
+  return (
+    <div
+      data-sidebar-dock='true'
+      className='flex shrink-0 flex-col gap-1 overflow-visible'
+    >
+      {children}
+    </div>
+  );
+}
+
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
@@ -362,6 +375,7 @@ export function UnifiedSidebar({
 }: UnifiedSidebarProps) {
   const { creatorProfiles, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
+  const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
@@ -378,7 +392,7 @@ export function UnifiedSidebar({
     <Sidebar
       variant='sidebar'
       data-shell-rail-motion='left'
-      collapsible='offcanvas'
+      collapsible='icon'
       className={cn(
         'bg-base',
         '[--sidebar-width:var(--app-shell-sidebar-width)]',
@@ -395,7 +409,7 @@ export function UnifiedSidebar({
         className={cn(
           'relative justify-center gap-0 px-(--space-2-5)',
           isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height-compact) py-0.5'
+            ? 'h-(--app-shell-header-height) py-0.5'
             : 'h-16 pl-4 pr-3 pt-5 pb-4'
         )}
       >
@@ -438,7 +452,11 @@ export function UnifiedSidebar({
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so media and the protected account panel pin bottom.
         <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
-          <SidebarBottomNowPlayingBridge />
+          <SidebarDock>
+            <SidebarBottomNowPlayingBridge
+              collapsed={sidebarState === 'closed'}
+            />
+          </SidebarDock>
           <SidebarIdentityGroup
             calm={!isRouteSidebar}
             profileHref={profileHref}

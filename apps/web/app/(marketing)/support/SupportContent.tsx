@@ -12,7 +12,7 @@ const CHANNELS = [
   {
     title: 'Documentation',
     description: 'Guides, tutorials, and walkthroughs.',
-    href: DOCS_URL,
+    href: `${DOCS_URL}/docs`,
     external: true,
     event: 'Support Docs Clicked',
     cta: 'Visit',
@@ -30,7 +30,7 @@ const CHANNELS = [
   {
     title: 'Getting Started',
     description: 'New to Jovie? Start here.',
-    href: `${DOCS_URL}/getting-started`,
+    href: `${DOCS_URL}/docs/jovie-essentials/start-here`,
     external: true,
     event: 'Support Getting Started Clicked',
     cta: 'Visit',

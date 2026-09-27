@@ -9,7 +9,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "tsx ./cli.ts check",
+    "judge": "tsx ./cli.ts judge"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

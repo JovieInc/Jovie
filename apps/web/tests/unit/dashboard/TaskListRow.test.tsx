@@ -1,9 +1,10 @@
 import { fireEvent, render, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
+import type { TaskView } from '@/lib/tasks/types';
 import { fastRender } from '@/tests/utils/fast-render';
 
-const mockTask = {
+const mockTask: TaskView = {
   id: 'task-1',
   taskNumber: 12,
   creatorProfileId: 'profile-1',
@@ -15,7 +16,7 @@ const mockTask = {
   assigneeKind: 'human',
   assigneeUserId: null,
   agentType: null,
-  agentStatus: 'processing',
+  agentStatus: 'drafting',
   agentInput: null,
   agentOutput: null,
   agentError: null,
@@ -30,9 +31,9 @@ const mockTask = {
   position: 0,
   sourceTemplateId: null,
   metadata: null,
-  createdAt: '2026-04-01T00:00:00.000Z',
-  updatedAt: '2026-04-01T00:00:00.000Z',
-} as const;
+  createdAt: new Date('2026-04-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+};
 
 describe('TaskListRow', () => {
   afterEach(() => {

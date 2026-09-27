@@ -12,6 +12,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
+# GNU timeout accepts fractional budgets. The fake CLI prints its URL within
+# milliseconds and ignores TERM, so these still exercise TERM -> KILL (exit 137)
+# without spending whole seconds of wall clock per timed-out attempt.
+FAST_TIMEOUT_SECONDS = "0.5"
+FAST_KILL_GRACE_SECONDS = "0.2"
 PRODUCTION_PROMOTION_SCRIPT = (
     REPO_ROOT / ".github/scripts/promote-production-deployment.sh"
 )
@@ -109,9 +114,9 @@ echo "https://jovie-timeout-test.vercel.app"
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
         }
     )
@@ -171,9 +176,9 @@ echo "https://jovie-source-fallback.vercel.app"
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
             "VERCEL_GIT_COMMIT_SHA": "0123456789abcdef",
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
             "VERCEL_ENV_LOG": str(tmp_path / "vercel-env"),
@@ -362,9 +367,9 @@ sleep 5
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
-            "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "1",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
+            "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
         }
     )
 

@@ -223,6 +223,58 @@ export {
   resolveJovieSceneColorRole,
 } from './imageColorPolicy';
 export type {
+  LandingPageCandidate,
+  LandingPageCertificationCode,
+  LandingPageCertificationFinding,
+  LandingPageFamilyId,
+  LandingPagePipelineStage,
+  LandingPageSectionCandidate,
+  LandingPageStageReceipt,
+} from './landingPageGrammar';
+export {
+  certifyLandingPageComposition,
+  getLandingPageRouteType,
+  getLandingPageSlots,
+  getLandingPageVariantIds,
+  LANDING_PAGE_FAMILIES,
+  LANDING_PAGE_FAMILY_IDS,
+  LANDING_PAGE_GRAMMAR_SCHEMA,
+  LANDING_PAGE_HOMEPAGE_LOCK,
+  LANDING_PAGE_PEN_WORKSPACE,
+  LANDING_PAGE_PIPELINE_STAGES,
+  LANDING_PAGE_ROUTE_TYPES,
+} from './landingPageGrammar';
+export type {
+  MarketingMediaExportApprovalEvidence,
+  MarketingMediaExportApprovalResult,
+  MarketingMediaExportExecutionInput,
+  MarketingMediaExportExecutionResult,
+  MarketingMediaExportFallbackPolicy,
+  MarketingMediaExportFinding,
+  MarketingMediaExportFindingCode,
+  MarketingMediaExportFixture,
+  MarketingMediaExportOutputProfile,
+  MarketingMediaExportOutputReceipt,
+  MarketingMediaExportOutputResult,
+  MarketingMediaExportReceipt,
+  MarketingMediaExportRequest,
+} from './mediaExport';
+export {
+  approveMarketingMediaExportReceipt,
+  computeMarketingMediaExportCacheKey,
+  executeMarketingMediaExportRequest,
+  formatMarketingMediaExportRequestForPrompt,
+  getMarketingMediaExportFixture,
+  isMarketingMediaExportFallbackPolicy,
+  isMarketingMediaExportOutputProfile,
+  MARKETING_MEDIA_EXPORT_FALLBACK_POLICIES,
+  MARKETING_MEDIA_EXPORT_FIXTURES,
+  MARKETING_MEDIA_EXPORT_NEGATIVE_CONSTRAINTS,
+  MARKETING_MEDIA_EXPORT_OUTPUT_PROFILES,
+  MARKETING_MEDIA_EXPORT_SCHEMA,
+  validateMarketingMediaExportRequest,
+} from './mediaExport';
+export type {
   MarketingMediaRecipeDecision,
   MarketingMediaRecipeFinding,
   MarketingMediaRecipeFindingCode,

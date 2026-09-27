@@ -145,6 +145,15 @@ describe('JOV-INV-031 latency-sensitive-execution-v1', () => {
     assert.equal(hits[0].path, 'workers/hidden-spawn.ts');
   });
 
+  it('re-analyzes a cached path when its source text changes', () => {
+    const scan = body =>
+      scanRuntime('/tmp/jovie-inv-031-cache', {
+        'apps/web/lib/cached.ts': `import { readFileSync } from 'node:fs';\n${body}\n`,
+      }).length;
+    assert.equal(scan("export const a = () => readFileSync('x');"), 1);
+    assert.equal(scan('export const a = 1;'), 0);
+  });
+
   it('treats a count increase as a new violation and a decrease as stale allowlist', () => {
     const observed = {
       entries: { 'apps/web/lib/example.ts': { readFileSync: 2 } },

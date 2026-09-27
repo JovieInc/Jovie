@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 const jsonDigest = value => digest(JSON.stringify(value));
+const certificationContract = 'jovie.certification/v1';
 const check = (value, message) => {
   if (!value) throw new Error(message);
 };
@@ -47,6 +48,171 @@ function fileDigest(path) {
     closeSync(fd);
   }
   return hash.digest('hex');
+}
+
+const requiredSupplyChainFiles = [
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'package.json',
+  '.npmrc',
+  '.nvmrc',
+  'apps/web/package.json',
+  'apps/web/next.config.js',
+  'apps/web/vercel.json',
+];
+
+function npmPurl(name, version) {
+  const packageName = name.startsWith('@')
+    ? `${encodeURIComponent(name.split('/')[0])}/${name.split('/').slice(1).join('/')}`
+    : name;
+  return `pkg:npm/${packageName}@${encodeURIComponent(version)}`;
+}
+
+export function buildSbom(licenses, sourceSha) {
+  check(/^[0-9a-f]{40}$/.test(sourceSha), 'Invalid SBOM source SHA');
+  check(
+    licenses && typeof licenses === 'object',
+    'Invalid pnpm license report'
+  );
+  const components = new Map();
+  for (const [licenseGroup, packages] of Object.entries(licenses)) {
+    check(Array.isArray(packages), 'Invalid pnpm license group');
+    for (const item of packages) {
+      check(
+        typeof item?.name === 'string' && Array.isArray(item.versions),
+        'Invalid pnpm license package'
+      );
+      for (const version of item.versions) {
+        check(
+          typeof version === 'string' && version.length > 0,
+          'Invalid package version'
+        );
+        const ref = npmPurl(item.name, version);
+        const license = String(item.license ?? licenseGroup ?? 'unknown');
+        const previous = components.get(ref);
+        const licenses = new Set(
+          previous?.licenses?.map(x => x.license.name) ?? []
+        );
+        licenses.add(license);
+        components.set(ref, {
+          type: 'library',
+          'bom-ref': ref,
+          name: item.name,
+          version,
+          purl: ref,
+          licenses: [...licenses].sort().map(name => ({ license: { name } })),
+        });
+      }
+    }
+  }
+  check(components.size > 0, 'SBOM contains no production dependencies');
+  return {
+    bomFormat: 'CycloneDX',
+    specVersion: '1.6',
+    version: 1,
+    metadata: {
+      component: {
+        type: 'application',
+        'bom-ref': `git:${sourceSha}`,
+        name: 'jovie-web-production',
+        version: sourceSha,
+      },
+      properties: [
+        { name: 'jovie:source-sha', value: sourceSha },
+        { name: 'jovie:dependency-scope', value: 'pnpm-workspace-production' },
+        { name: 'jovie:certification-contract', value: certificationContract },
+      ],
+    },
+    components: [...components.values()].sort((left, right) =>
+      left['bom-ref'].localeCompare(right['bom-ref'])
+    ),
+  };
+}
+
+// pnpm licenses reads each package's index file from the pnpm store, not from
+// node_modules. A node_modules tree restored without its store (the
+// setup-node-pnpm exact-cache hit) fails every package with
+// ERR_PNPM_MISSING_PACKAGE_INDEX_FILE, reported as JSON on stdout (JOV-6726).
+function pnpmLicenseReport(root, { pnpm = 'pnpm', env = process.env } = {}) {
+  let stdout;
+  try {
+    stdout = execFileSync(pnpm, ['licenses', 'list', '--prod', '--json'], {
+      cwd: root,
+      env,
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    let reported;
+    try {
+      reported = JSON.parse(String(error.stdout ?? '')).error;
+    } catch {}
+    const detail = reported?.code
+      ? `${reported.code}: ${reported.message}`
+      : String(error.stderr || error.message).trim();
+    if (reported?.code === 'ERR_PNPM_MISSING_PACKAGE_INDEX_FILE') {
+      throw new Error(
+        'SBOM generation needs a pnpm store populated by the same install as ' +
+          'node_modules, but the store has no package index for an installed ' +
+          'package. The installed tree was likely restored from a cache ' +
+          'without its store. Install with `pnpm install --frozen-lockfile` ' +
+          "against a warm store (setup-node-pnpm package_cache: 'false'). " +
+          detail
+      );
+    }
+    throw new Error('pnpm licenses list failed: ' + detail);
+  }
+  return JSON.parse(stdout);
+}
+
+export function generateSbom(root, expectedSha, output, options) {
+  const report = pnpmLicenseReport(root, options);
+  const sbom = buildSbom(report, expectedSha);
+  writeFileSync(output, JSON.stringify(sbom, null, 2) + '\n', {
+    flag: 'wx',
+    mode: 0o600,
+  });
+  return sbom;
+}
+
+export function supplyChainSnapshot(root, sbomPath, runner = {}) {
+  const files = requiredSupplyChainFiles.map(path => entry(root, path));
+  check(
+    files.every(file => file.kind === 'file'),
+    'Missing build input file'
+  );
+  const sbom = JSON.parse(readFileSync(sbomPath, 'utf8'));
+  check(
+    sbom.bomFormat === 'CycloneDX' &&
+      sbom.specVersion === '1.6' &&
+      Array.isArray(sbom.components) &&
+      sbom.components.length > 0,
+    'Invalid production SBOM'
+  );
+  return {
+    lockfile: files.find(file => file.path === 'pnpm-lock.yaml'),
+    buildInputs: files,
+    buildInputDigest: jsonDigest(files),
+    sbom: {
+      format: 'CycloneDX',
+      specVersion: sbom.specVersion,
+      components: sbom.components.length,
+      sha256: fileDigest(sbomPath),
+    },
+    toolchain: {
+      node: process.version,
+      packageManager: JSON.parse(readFileSync(resolve(root, 'package.json')))
+        .packageManager,
+    },
+    runner: {
+      os: String(runner.os ?? ''),
+      arch: String(runner.arch ?? ''),
+      name: String(runner.name ?? ''),
+      environment: String(runner.environment ?? ''),
+      image: String(runner.image ?? ''),
+    },
+  };
 }
 
 function entry(root, name) {
@@ -198,28 +364,49 @@ function writeReceipt(path, payload) {
   return value;
 }
 
-export function captureInputs(root, expectedSha, output) {
+export function captureInputs(root, expectedSha, output, sbomPath, runner) {
   const source = sourceSnapshot(root, expectedSha);
   return writeReceipt(output, {
     schema: 'jovie.production-inputs/v1',
+    contract: certificationContract,
     phase: 'before-build',
     source,
+    supplyChain: supplyChainSnapshot(root, sbomPath, runner),
   });
 }
 
-export function captureArtifact(root, expectedSha, beforePath, output) {
+export function captureArtifact(
+  root,
+  expectedSha,
+  beforePath,
+  output,
+  sbomPath
+) {
   const before = readReceipt(beforePath);
   check(
     before.phase === 'before-build' && before.source.head === expectedSha,
     'Input receipt source mismatch'
   );
   const source = sourceSnapshot(root, expectedSha);
+  const currentBuildInputs = requiredSupplyChainFiles.map(path =>
+    entry(root, path)
+  );
+  check(
+    jsonDigest(currentBuildInputs) === before.supplyChain?.buildInputDigest,
+    'Supply-chain build inputs changed after capture'
+  );
+  check(
+    fileDigest(sbomPath) === before.supplyChain?.sbom?.sha256,
+    'Production SBOM changed after capture'
+  );
   const artifact = artifactSnapshot(root);
   return writeReceipt(output, {
     schema: 'jovie.production-inputs/v1',
+    contract: certificationContract,
     phase: 'before-deploy',
     source,
     artifact,
+    supplyChain: before.supplyChain,
     inputReceiptDigest: before.digest,
     changesDuringBuild: compareSources(before.source, source),
     sourceClaim:
@@ -268,11 +455,13 @@ export function bindDeployment(
   );
   return writeReceipt(output, {
     schema: 'jovie.production-inputs/v1',
+    contract: certificationContract,
     phase: 'deployment-bound',
     sourceSha: expectedSha,
     inputReceiptDigest: receipt.inputReceiptDigest,
     artifactReceiptDigest: receipt.digest,
     artifactDigest: receipt.artifact.digest,
+    supplyChain: receipt.supplyChain,
     deployment: {
       id: deployment.id,
       url: 'https://' + url,
@@ -292,9 +481,17 @@ if (
   const [phase, output, prior] = process.argv.slice(2);
   const root = process.cwd(),
     sha = process.env.EXPECTED_SHA;
-  if (phase === 'inputs') captureInputs(root, sha, output);
+  if (phase === 'sbom') generateSbom(root, sha, output);
+  else if (phase === 'inputs')
+    captureInputs(root, sha, output, prior, {
+      os: process.env.RUNNER_OS,
+      arch: process.env.RUNNER_ARCH,
+      name: process.env.RUNNER_NAME,
+      environment: process.env.RUNNER_ENVIRONMENT,
+      image: process.env.RUNNER_IMAGE ?? process.env.ImageOS,
+    });
   else if (phase === 'artifact') {
-    const receipt = captureArtifact(root, sha, prior, output);
+    const receipt = captureArtifact(root, sha, prior, output, process.argv[5]);
     process.stdout.write(receipt.digest + ' ' + receipt.artifact.digest + '\n');
   } else if (phase === 'bind')
     bindDeployment(
@@ -304,5 +501,5 @@ if (
       JSON.parse(readFileSync(0, 'utf8')),
       output
     );
-  else throw new Error('Expected inputs, artifact or bind phase');
+  else throw new Error('Expected sbom, inputs, artifact or bind phase');
 }

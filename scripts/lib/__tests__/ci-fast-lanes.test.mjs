@@ -5,22 +5,28 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  BILLING_PROVENANCE_COVERAGE_COMMAND,
   BIOME_TOOLCHAIN_FILES,
   biomeNeedsFullTree,
   CERTIFICATION_KERNEL_COMMAND,
+  earlierLaneFailed,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
   extractDiagnosticLines,
+  extractFailureIdentities,
+  FAN_SEND_SAFETY_COVERAGE_COMMAND,
   failureAnnotationMessage,
   formatStructuralTimings,
   LANE_COMMANDS,
+  LANE_GROUPS,
   laneFailureExcerpt,
   MARKETING_CERTIFICATION_COMMAND,
-  ROUTE_PREP_COVERAGE_COMMAND,
   runCommandPool,
   runDesignConformance,
   runStructural,
   STRUCTURAL_DEFAULT_CONCURRENCY,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+  STRUCTURAL_WEB_JOB_PREFIXES,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
@@ -82,10 +88,20 @@ describe('CI control selector', () => {
       expect(result.status, result.stderr).toBe(0);
       const scriptCommand = readFileSync(capture, 'utf8')
         .split('\n')
-        .find(command => command.startsWith('exec vitest --root scripts '));
+        .find(
+          command =>
+            command.startsWith('exec vitest --root scripts ') &&
+            command.includes(
+              'lib/__tests__/native-queue-group-evidence.test.mjs'
+            )
+        );
       expect(scriptCommand).toBeDefined();
       expect(scriptCommand.split(' ')).toContain(
         'lib/__tests__/ci-fast-lanes.test.mjs'
+      );
+      // The structural lane relies on this run instead of repeating it.
+      expect(scriptCommand.split(' ')).toContain(
+        'lib/__tests__/merge-group-workflow-contract.test.mjs'
       );
       expect(scriptCommand).toContain('--coverage');
     } finally {
@@ -189,7 +205,9 @@ describe('runStructural screenshot contract discovery', () => {
     await runStructural({ execute });
     const commands = execute.mock.calls.map(([command]) => String(command));
     const directoryRuns = commands.filter(command =>
-      /vitest\.config\.mts tests\/unit\/ci( |$)/.test(command)
+      // Any web Vitest config: a second directory run under another config
+      // would still execute every contract twice.
+      /vitest\.config(\.[\w-]+)?\.mts tests\/unit\/ci( |$)/.test(command)
     );
     expect(directoryRuns).toHaveLength(1);
     const explicitCiFiles = commands
@@ -261,6 +279,11 @@ describe('runStructural screenshot contract discovery', () => {
         String(command).endsWith('tests/unit/ci/deploy-workflow.test.ts')
       );
       expect(byName).toHaveLength(expected);
+      for (const [command] of byName) {
+        expect(command).toBe(
+          'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/deploy-workflow.test.ts'
+        );
+      }
     }
   );
 
@@ -309,6 +332,29 @@ describe('runStructural screenshot contract discovery', () => {
     }
   );
 
+  // #18718: web merge groups keep the receipt in Unit Tests only.
+  it.each([
+    ['pull_request', 'operations', '.github/workflows/ci.yml', 1],
+    ['pull_request', 'web', 'apps/web/app/page.tsx', 0],
+    ['merge_group', 'operations', '.github/workflows/ci.yml', 1],
+    ['merge_group', 'web,operations', '.github/workflows/ci.yml', 0],
+  ])(
+    'runs the Playwright receipt on %s (%s) for %s: %i',
+    async (event, lanes, path, expected) => {
+      process.env.GITHUB_EVENT_NAME = event;
+      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ changedFileList: [path], execute });
+      const receipt = execute.mock.calls.filter(([command]) =>
+        command.endsWith(
+          'ci-contracts.mts tests/unit/ci/playwright-artifact-secrets.test.ts'
+        )
+      );
+      expect(receipt).toHaveLength(expected);
+    }
+  );
+
   it('stops before later structural commands when the screenshot contract fails', async () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'operations';
@@ -349,18 +395,62 @@ describe('runStructural screenshot contract discovery', () => {
     ]);
   });
 
-  it('runs route-prep behavior coverage for the operations structural lane', async () => {
-    process.env.GITHUB_EVENT_NAME = 'merge_group';
-    process.env.CI_PRODUCT_LANES = 'operations';
-    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
-    const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
+  it('splits the structural python job parts between two hosted jobs', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    const run = async mode => {
+      vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', mode);
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ execute });
+      return execute.mock.calls.map(([command]) => command);
+    };
+    const [all, only] = [await run(''), await run('only')];
+    expect(only.sort()).toEqual(
+      [
+        'pnpm ci:control:test',
+        'pnpm invariants:check',
+        ...STRUCTURAL_PYTHON_REGRESSION_COMMANDS.slice(1),
+      ].sort()
+    );
+    expect([...only, ...(await run('skip'))].sort()).toEqual(all.sort());
+    // Consumed, so nested lane suites see the unsplit pool.
+    expect(process.env.CI_FAST_STRUCTURAL_PYTEST).toBeUndefined();
+  });
 
-    expect((await runStructural({ execute })).code).toBe(0);
-    expect(
-      execute.mock.calls.some(
-        ([command]) => command === ROUTE_PREP_COVERAGE_COMMAND
-      )
-    ).toBe(true);
+  it('partitions structural commands across remaining, python and web jobs exactly once', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    const run = async env => {
+      vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', env.pytest ?? '');
+      vi.stubEnv('CI_FAST_STRUCTURAL_WEB', env.web ?? '');
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ execute });
+      return execute.mock.calls.map(([command]) => command);
+    };
+    const all = await run({});
+    const remaining = await run({ pytest: 'skip', web: 'skip' });
+    const python = await run({ pytest: 'only' });
+    const web = await run({ web: 'only' });
+    expect([...remaining, ...python, ...web].sort()).toEqual([...all].sort());
+    expect(new Set(all).size).toBe(all.length);
+    expect(web).toContain('pnpm component-ship-gate');
+    expect(web).toContain(
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
+    );
+    expect(web.every(command => !python.includes(command))).toBe(true);
+    // Every @jovie/web Vitest run (shared apps/web coverage lock) is web's.
+    for (const command of all) {
+      if (
+        STRUCTURAL_WEB_JOB_PREFIXES.some(prefix => command.startsWith(prefix))
+      ) {
+        expect(web).toContain(command);
+      }
+    }
+    expect(remaining.some(command => command.includes('@jovie/web'))).toBe(
+      false
+    );
+    // Consumed, so nested lane suites see the unsplit pool.
+    expect(process.env.CI_FAST_STRUCTURAL_WEB).toBeUndefined();
   });
 
   it('uses the default executor on the structural skip path', async () => {
@@ -388,7 +478,7 @@ describe('Summer bridge structural coverage selection', () => {
   it.each([
     ['web', 'apps/web/app/api/internal/ovie/summer-bottleneck/route.ts'],
     ['web', 'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts'],
-    ['operations', 'scripts/symphony/summer_bottleneck_producer.py'],
+    ['operations', 'scripts/fleet-gate/gem-priority-gate.py'],
     [
       'web,operations',
       'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts',
@@ -721,7 +811,8 @@ exit 0
         expect(result.status, result.stderr).toBe(1);
         const report = JSON.parse(readFileSync(output, 'utf8'));
         expect(report.setupError).toBeNull();
-        expect(report.lanes).toHaveLength(1);
+        // The typecheck group also runs the web tests ratchet after typecheck.
+        expect(report.lanes).toHaveLength(scenario === 'other-lane' ? 2 : 1);
         expect(report.lanes[0].status).toBe('failure');
         const diagnostic = report.lanes[0].logExcerpt;
         expect(diagnostic.length).toBeLessThanOrEqual(1200);
@@ -866,11 +957,114 @@ describe('structural command pool', () => {
     const parallel = await startOrder(3);
     const head = parallel.slice(0, 3).join('\n');
     expect(head).toContain('pnpm invariants:check');
-    expect(head).toContain('run-governor-bounded-codex-selector.sh');
     expect(head).toContain('python3 -m pytest ');
+    // Both complementary pytest shards are long poles.
+    expect(
+      parallel
+        .slice(0, 4)
+        .filter(command => command.includes('python3 -m pytest '))
+    ).toHaveLength(2);
     const serial = await startOrder(1);
     expect(serial[0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
     expect([...serial].sort()).toEqual([...parallel].sort());
+  });
+
+  it('starts the slowest web commands first', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const started = [];
+    await runStructural({
+      concurrency: 3,
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(started.slice(0, 3).join('\n')).toContain(
+      'lib/__tests__/component-live-storybook-certification.test.mjs'
+    );
+    // The marketing pole still waits for the earlier apps/web coverage run.
+    expect(started.indexOf(MARKETING_CERTIFICATION_COMMAND)).toBeLessThan(
+      started.indexOf('pnpm next:proxy-guard')
+    );
+  });
+
+  describe('background cheap-lane fail-fast', () => {
+    let dir;
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), 'ci-fast-abort-'));
+      vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+      vi.stubEnv('CI_PRODUCT_LANES', 'web');
+      vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+      vi.stubEnv('CI_FAST_STRUCTURAL_ABORT_STATUS_FILE', join(dir, 'status'));
+    });
+    afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+    const runWithStatusAfterFirst = async status => {
+      const started = [];
+      const result = await runStructural({
+        concurrency: 1,
+        execute: command => {
+          if (started.length === 0 && status !== undefined) {
+            writeFileSync(join(dir, 'status'), status);
+          }
+          started.push(command);
+          return { code: 0, output: `${command}\n` };
+        },
+      });
+      return { result, started };
+    };
+
+    it('reads only a present non-zero status as an earlier failure', () => {
+      const status = join(dir, 'status');
+      expect(earlierLaneFailed(status)).toBe(false);
+      expect(earlierLaneFailed(undefined)).toBe(false);
+      writeFileSync(status, '0\n');
+      expect(earlierLaneFailed(status)).toBe(false);
+      writeFileSync(status, '1\n');
+      expect(earlierLaneFailed(status)).toBe(true);
+      vi.stubEnv('CI_FAST_FAIL_FAST', 'false');
+      expect(earlierLaneFailed(status)).toBe(false);
+    });
+
+    it('stops starting structural commands and reports skipped on a red status', async () => {
+      const { result, started } = await runWithStatusAfterFirst('2\n');
+      expect(started).toHaveLength(1);
+      expect(result).toMatchObject({ code: 0, skipped: true });
+      expect(result.output).toContain('earlier lane failed (fail-fast');
+      expect(result.timings).toHaveLength(1);
+      // Consumed, so nested runner suites never inherit this job's status.
+      expect(process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE).toBeUndefined();
+    });
+
+    it('runs every structural command on a green or missing status', async () => {
+      const green = await runWithStatusAfterFirst('0\n');
+      const missing = await runWithStatusAfterFirst(undefined);
+      expect(green.result).toMatchObject({ code: 0 });
+      expect(green.result.skipped).toBeUndefined();
+      expect(green.started.length).toBeGreaterThan(1);
+      expect(missing.started).toEqual(green.started);
+    });
+
+    it('keeps a structural failure ahead of the fail-fast skip', async () => {
+      const result = await runStructural({
+        concurrency: 1,
+        execute: () => {
+          writeFileSync(join(dir, 'status'), '1\n');
+          return { code: 7, output: 'boom\n' };
+        },
+      });
+      expect(result.code).toBe(7);
+      expect(result.skipped).toBeUndefined();
+    });
+
+    it('runs every command with CI_FAST_FAIL_FAST=false despite a red status', async () => {
+      vi.stubEnv('CI_FAST_FAIL_FAST', 'false');
+      const off = await runWithStatusAfterFirst('1\n');
+      expect(off.result).toMatchObject({ code: 0 });
+      expect(off.started.length).toBeGreaterThan(1);
+    });
   });
 
   it('starts nothing new after a failure but lets in-flight commands finish', async () => {
@@ -889,6 +1083,41 @@ describe('structural command pool', () => {
     expect(results[0]).toMatchObject({ code: 9, output: 'boom\n' });
     expect(results[1]).toMatchObject({ code: 0, output: 'late pass\n' });
     expect(results.slice(2)).toEqual([undefined, undefined]);
+  });
+
+  it('starts nothing new once stop fires but lets in-flight commands finish', async () => {
+    const { calls, execute, settle } = deferredExecutor();
+    let stop = false;
+    const stopCheck = vi.fn(() => stop);
+    const done = runCommandPool(['c0', 'c1', 'c2', 'c3'], {
+      execute,
+      concurrency: 2,
+      stop: stopCheck,
+    });
+    await flush();
+    expect(calls.map(call => call.command)).toEqual(['c0', 'c1']);
+    stop = true;
+    settle('c0');
+    await flush();
+    expect(calls.map(call => call.command)).toEqual(['c0', 'c1']);
+    settle('c1', 0, 'late pass\n');
+    const results = await done;
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(results[1]).toMatchObject({ code: 0, output: 'late pass\n' });
+    expect(results.slice(2)).toEqual([undefined, undefined]);
+  });
+
+  it('never consults stop once every command has started', async () => {
+    const { execute, settle } = deferredExecutor();
+    const stop = vi.fn(() => false);
+    const done = runCommandPool(['only'], { concurrency: 2, execute, stop });
+    await flush();
+    expect(stop).toHaveBeenCalledTimes(1);
+    // Turning stop on with nothing pending cannot drop the in-flight result.
+    stop.mockReturnValue(true);
+    settle('only', 0, 'ok\n');
+    expect(await done).toMatchObject([{ code: 0, output: 'ok\n' }]);
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 
   it('turns thrown and rejected executions into failures', async () => {
@@ -998,6 +1227,52 @@ describe('structural command pool', () => {
     );
   });
 
+  it('shares no writable state with the background cheap lanes it overlaps', async () => {
+    // ci-fast (remaining) runs the structural lane while its cheap lanes still
+    // run, so no cheap-lane command may share a structural lock (a default
+    // apps/web coverage run would wipe a nested cheap-lane reportsDirectory).
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    const structuralLockSet = new Set();
+    await runStructural({
+      execute: command => {
+        for (const lock of structuralLocks(command))
+          structuralLockSet.add(lock);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(structuralLockSet).toContain('coverage:apps/web');
+    const cheapCommands = [
+      ...LANE_GROUPS.remaining
+        .filter(id => id !== 'structural')
+        .map(id => LANE_COMMANDS[id]),
+      BILLING_PROVENANCE_COVERAGE_COMMAND,
+      FAN_SEND_SAFETY_COVERAGE_COMMAND,
+    ];
+    const shared = cheapCommands.flatMap(command =>
+      structuralLocks(command).filter(lock => structuralLockSet.has(lock))
+    );
+    expect(shared).toEqual([]);
+    expect(structuralLocks(LANE_COMMANDS['profile-admission'])).toEqual([
+      'coverage:${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage',
+    ]);
+  });
+
+  it('serializes the Playwright receipt walk with apps/web coverage runs', () => {
+    // The receipt lstat()s every apps/web file it lists; a concurrent coverage
+    // run deleted apps/web/coverage/block-navigation.js mid-walk (ENOENT,
+    // merge_group job 108496163540).
+    expect(
+      structuralLocks(
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/playwright-artifact-secrets.test.ts'
+      )
+    ).toContain('coverage:apps/web');
+    expect(structuralLocks(MARKETING_CERTIFICATION_COMMAND)).toContain(
+      'coverage:apps/web'
+    );
+  });
+
   it('derives locks for coverage dirs, package aliases, coverage.py, and pytest', () => {
     // Relative reportsDirectory nests inside the cleaned default directory.
     expect(structuralLocks(ACQUISITION_CERTIFICATION_COMMAND)).toEqual([
@@ -1025,6 +1300,16 @@ describe('structural command pool', () => {
         'COVERAGE_FILE="/t/a.coverage" python3 -m coverage run x.py && python3 -m pytest y.py'
       )
     ).toEqual(['pycoverage:/t/a.coverage', 'pytest-cache']);
+    // coverage.py driving pytest still writes the shared cache.
+    expect(
+      structuralLocks(
+        'COVERAGE_FILE="/t/l.coverage" python3 -m coverage run --branch -m pytest z.py -q'
+      )
+    ).toEqual(['pycoverage:/t/l.coverage', 'pytest-cache']);
+    // A cache-less pytest invocation holds no shared pytest state.
+    expect(
+      structuralLocks('python3 -m pytest -p no:cacheprovider -k "a" y.py')
+    ).toEqual([]);
     expect(structuralLocks('node --test a.test.mjs')).toEqual([]);
     expect(structuralLocks('pnpm no-such-script-alias')).toEqual([]);
   });
@@ -1096,7 +1381,7 @@ describe('webCiContractTestsCommand', () => {
       expect(command).not.toContain('webhook-handler');
       expect(command).not.toContain('not-a-unit');
       expect(webCiContractTestsCommand(join(dir, 'missing.json'))).toBe(
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci --exclude=tests/unit/ci/playwright-artifact-secrets.test.ts --exclude=tests/unit/ci/production-marker-state.test.ts'
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -1254,5 +1539,163 @@ describe('failure annotation helpers', () => {
     expect(failureAnnotationMessage({ id: 'structural' }, excerpt)).toBe(
       'Structural command 2/9 failed (exit 1). Command: pnpm x | ERROR: 50%25'
     );
+  });
+});
+
+/**
+ * Real runner output, captured locally with Node 22.23.2 / pytest 9.0.3 /
+ * Vitest 5 by running the exact structural commands with an injected failure
+ * (paths normalised to the hosted runner, long pytest lines trimmed). Hosted
+ * runs 36126382616 (node:test) and 35918510808 (pytest) only kept the tail
+ * excerpt, which lost the failing test names behind coverage tables and
+ * passing-test noise such as `ok 8 - ... rejects failed ... streams`.
+ */
+describe('failing test identities in lane excerpts', () => {
+  const fixture = name =>
+    readFileSync(
+      join(import.meta.dirname, 'fixtures', 'ci-fast-excerpts', name),
+      'utf8'
+    );
+  const NODE_FAILURE = fixture('node-test-structural-failure.tap.txt');
+  const PYTEST_FAILURE = fixture('pytest-structural-failure.txt');
+  const VITEST_FAILURE = fixture('vitest-structural-failure.txt');
+  const NODE_FIRST =
+    'not ok - verifies the new signed contract without inheriting repair authority';
+  const NODE_NESTED =
+    'not ok - Summer outbox record authority > accepts the current signed wire record';
+  const PYTEST_NODE =
+    'scripts/tests/test_agent_workflow_hygiene.py::test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready';
+  const VITEST_FAIL =
+    'FAIL  |workspace-scripts| lib/__tests__/design-exception-registry.test.mjs > design exception-registry contract (JOV-5447) > fails closed for every required rejection';
+
+  beforeEach(() => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations,web');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_CONCURRENCY', '1');
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  /** Fail only the structural command containing `marker`. */
+  async function structuralFailure(marker, output) {
+    const result = await runStructural({
+      execute: command =>
+        command.includes(marker)
+          ? { code: 1, output }
+          : { code: 0, output: 'passed\n' },
+    });
+    expect(result.code).toBe(1);
+    expect(result.output.length).toBeLessThanOrEqual(1200);
+    const annotation = failureAnnotationMessage(
+      { id: 'structural' },
+      laneFailureExcerpt('structural', result.output)
+    );
+    expect(annotation.length).toBeLessThanOrEqual(400);
+    return {
+      header: result.output.split('\n\n')[0].split('\n'),
+      annotation,
+    };
+  }
+
+  it('names node:test failures with Subtest ancestry and assertion fields', async () => {
+    const { header, annotation } = await structuralFailure(
+      'summer-shipping-lead-contract.test.mjs',
+      NODE_FAILURE
+    );
+    expect(header.slice(1)).toEqual([
+      NODE_FIRST,
+      "error: 'shipping-lead-task-invalid'",
+      NODE_NESTED,
+      'error: Expected values to be strictly equal:',
+      `expected: '${'a'.repeat(64)}-drift'`,
+      `actual: '${'a'.repeat(64)}'`,
+    ]);
+    expect(annotation).toContain(
+      `| ${NODE_FIRST} | error: 'shipping-lead-task-invalid' | ${NODE_NESTED}`
+    );
+    // Passing tests whose names contain "failed" are noise, not causes.
+    expect(annotation).not.toContain('ok 8 - bounds controller');
+    expect(annotation).not.toContain('1 subtest failed');
+  });
+
+  it('names the Vitest FAIL identity and its AssertionError', async () => {
+    const { header, annotation } = await structuralFailure(
+      'lib/__tests__/design-exception-registry.test.mjs',
+      VITEST_FAILURE
+    );
+    expect(header.slice(1)).toEqual([
+      VITEST_FAIL,
+      "AssertionError: expected [ 'biome', …(12) ] to include 'design-exception-registry-drift'",
+    ]);
+    expect(annotation).toContain(`| ${VITEST_FAIL} | AssertionError:`);
+  });
+
+  it('keeps the registered pytest identity from the summary or progress line', async () => {
+    const full = await structuralFailure('python3 -m pytest ', PYTEST_FAILURE);
+    expect(full.header.slice(1)).toEqual([`FAILED ${PYTEST_NODE}`]);
+    expect(full.annotation).toContain(`FAILED ${PYTEST_NODE}`);
+
+    // A run killed before its short test summary still names the test.
+    const killed = PYTEST_FAILURE.split('=== FAILURES ===')[0];
+    const progress = await structuralFailure('python3 -m pytest ', killed);
+    expect(progress.header.slice(1)).toEqual([`FAILED ${PYTEST_NODE}`]);
+
+    const setupError = await structuralFailure(
+      'python3 -m pytest ',
+      `ERROR ${PYTEST_NODE} - fixture 'x' not found\n1 error in 0.1s\n`
+    );
+    expect(setupError.header.slice(1)).toEqual([`ERROR ${PYTEST_NODE}`]);
+  });
+
+  it('leads non-structural lane excerpts with test identities', () => {
+    const excerpt = laneFailureExcerpt('unit', NODE_FAILURE);
+    expect(excerpt.length).toBeLessThanOrEqual(1200);
+    expect(excerpt.startsWith(`Diagnostics:\n${NODE_FIRST}\n`)).toBe(true);
+    expect(excerpt).not.toContain('ok 8 - bounds controller');
+    const annotation = failureAnnotationMessage({ id: 'unit' }, excerpt);
+    expect(annotation.startsWith(`Diagnostics: | ${NODE_FIRST} | `)).toBe(true);
+    expect(annotation).toContain(NODE_NESTED);
+
+    const vitest = laneFailureExcerpt('unit', VITEST_FAILURE);
+    expect(vitest.split('\n').slice(1, 3)).toEqual([
+      VITEST_FAIL,
+      expect.stringMatching(/^AssertionError: /u),
+    ]);
+  });
+
+  it('bounds identities and skips suites that only report a failing child', () => {
+    const suite = [
+      '# Subtest: outer',
+      '    # Subtest: inner',
+      '    not ok 1 - inner',
+      '      ---',
+      "      failureType: 'testCodeFailure'",
+      '      error: |-',
+      '        boom',
+      '      ...',
+      '    1..1',
+      'not ok 1 - outer',
+      '  ---',
+      "  failureType: 'subtestsFailed'",
+      "  error: '1 subtest failed'",
+      '  ...',
+      ...Array.from({ length: 5 }, (_, index) => [
+        `# Subtest: case ${index} ${'x'.repeat(300)}`,
+        `not ok ${index + 2} - case ${index} ${'x'.repeat(300)}`,
+        '  ---',
+        `  error: 'bad ${index}'`,
+        '  ...',
+      ]).flat(),
+    ].join('\n');
+    const lines = extractFailureIdentities(suite);
+    expect(lines.slice(0, 2)).toEqual([
+      'not ok - outer > inner',
+      'error: boom',
+    ]);
+    expect(lines).not.toContain("error: '1 subtest failed'");
+    expect(lines.filter(line => line.startsWith('not ok - '))).toHaveLength(3);
+    expect(lines.every(line => line.length <= 200)).toBe(true);
+    expect(extractFailureIdentities('all good\n')).toEqual([]);
+    expect(extractFailureIdentities(undefined)).toEqual([]);
   });
 });

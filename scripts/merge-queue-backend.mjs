@@ -211,6 +211,27 @@ function errorSummary(error) {
 const sleep = milliseconds =>
   new Promise(resolve => setTimeout(resolve, milliseconds));
 
+/**
+ * Postcondition poll spacing for CLI callers. Hermetic fixtures (whose fake
+ * `gh` answers instantly) set MERGE_QUEUE_POSTCONDITION_DELAY_MS=0 so the
+ * same bounded read sequence runs without real wall-clock waits; production
+ * leaves it unset and keeps the eventual-consistency default.
+ * @param {NodeJS.ProcessEnv} env
+ */
+function postconditionDelayFromEnv(env) {
+  const raw = env.MERGE_QUEUE_POSTCONDITION_DELAY_MS;
+  if (raw === undefined || raw === '') {
+    return DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS;
+  }
+  if (!/^\d{1,6}$/.test(raw)) {
+    throw backendError(
+      'invalid_postcondition_delay',
+      'MERGE_QUEUE_POSTCONDITION_DELAY_MS must be a non-negative integer'
+    );
+  }
+  return Number(raw);
+}
+
 export function createGhRunner({ env = process.env, spawn = spawnSync } = {}) {
   return async args => {
     const result = spawn('gh', args, {
@@ -1652,6 +1673,7 @@ export async function runCli(
         ...options,
         number: args[0],
         expectedHeadOid: args[1],
+        postconditionDelayMs: postconditionDelayFromEnv(env),
       }),
     enroll: () =>
       enrollPullRequest({
@@ -1660,6 +1682,7 @@ export async function runCli(
         expectedHeadOid: args[1],
         flakeRerunReceipt: args[2] ?? '',
         mutationRunner: resolvedMutationRunner,
+        postconditionDelayMs: postconditionDelayFromEnv(env),
       }),
     // Read-only; agents run it before `gh pr merge --auto` (JOV-6620).
     'check-reenroll': async () => {

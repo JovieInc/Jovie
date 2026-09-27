@@ -13,7 +13,7 @@ const SOURCE_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const CHANGED_SHA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 function receipt(
   tier: CertificationEvidenceReceipt['tier'],
-  id = tier,
+  id: string = tier,
   sourceSha: string | null = SOURCE_SHA
 ): CertificationEvidenceReceipt {
   return {

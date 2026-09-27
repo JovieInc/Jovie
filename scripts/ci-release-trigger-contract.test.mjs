@@ -42,7 +42,7 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   );
   assert.match(
     ciFastAggregateBlock,
-    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*\]/s
+    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*\]/s
   );
   assert.match(
     ciFastAggregateBlock,
@@ -58,7 +58,7 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   );
   assert.match(
     ciFastAggregateBlock,
-    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \]\]/
+    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \]\]/
   );
   assert.match(ciFastAggregateBlock, /exit 1/);
   assert.doesNotMatch(

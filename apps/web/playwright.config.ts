@@ -184,6 +184,8 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',
+            // Light mode stays under test while production forces dark.
+            NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1',
             E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_FAST_ONBOARDING: '1',

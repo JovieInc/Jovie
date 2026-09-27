@@ -1,5 +1,7 @@
 # Cron Job Registry
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 > **Question this answers:** "What scheduled jobs already run? Can I add my logic to an existing one?"
 >
 > Before creating a new cron job, read [AGENTS.md — Infrastructure & Scheduling Guardrails](../AGENTS.md#infrastructure--scheduling-guardrails-critical).
@@ -31,6 +33,7 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `Neon Scheduled Branch Cleanup` | `43 3 * * *` UTC | Daily heartbeat reconciliation for missed ephemeral-Neon cleanup events: reaps orphaned/past-TTL branches once (fail-closed ownership proof) and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/neon-scheduled-cleanup.yml` |
 | `Vercel Preview Cleanup` | (see workflow) | Terminal-event cleanup: cancels/deletes preview deployments for a closed PR's ref and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/vercel-preview-cleanup.yml` |
 | `Actions Cache GC` | `19 4 * * *` UTC | Evicts closed-ref, exact-key duplicate, and surplus `Linux-turbo-*` Actions caches. Keeps live pnpm/node/playwright caches on `main` and open PR refs unless unused and over budget. | `.github/workflows/actions-cache-gc.yml` |
+| `Actions Cache Supersede` | `11,41 * * * *` UTC | Deletes superseded `main` caches: keeps the newest per allowlisted family, drops `pnpm-node-modules-v1-*` and `-v2-*`. | `.github/workflows/actions-cache-supersede.yml` |
 | `M2 Revenue-Path Canary` | `37 6 * * *` UTC + Production Controller `workflow_run` + manual / `workflow_call` | Daily + deploy-hook money-path probe: signed-out → claim → $199 Pro checkout → activation. Timestamped receipt; Slack + Linear with repro on red. Distinct from Canary Health Gate uptime. | `.github/workflows/m2-revenue-path-canary.yml` |
 | `Summer Eve identity check` | `*/30 * * * *` UTC + `workflow_dispatch` + every pull request | Rejects a Summer per-deployment URL or deployment-id pin in source. On schedule, manual dispatch, and pull requests that touch the Summer bridge, confirms `https://summer.jov.ie/runtime/v1/identity` is source-bound production project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`. A Vercel readback runs only when `SUMMER_PIN_CHECK_VERCEL_TOKEN` is present. | `.github/workflows/summer-eve-pin.yml` |
 
@@ -40,8 +43,8 @@ These are machine-local Hermes jobs, not Vercel production crons. They run from 
 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
-| `co.jovie.hermes.cron-pipeline-scoreboard` | retired | Hard-exits with `retired_linear_only` before reading or publishing historical GitHub-Issue funnel counts. The Linear-primary Gem HUD retains PR/Actions delivery reporting and fails closed when Linear backlog data is unavailable. | `scripts/symphony/jobs/pipeline-scoreboard.ts` |
-| `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `scripts/symphony/jobs/gbrain-health-summary.ts` |
+| `co.jovie.hermes.cron-pipeline-scoreboard` | retired | Hard-exits with `retired_linear_only` before reading or publishing historical GitHub-Issue funnel counts. The Linear-primary Gem HUD retains PR/Actions delivery reporting and fails closed when Linear backlog data is unavailable. | `symphony-control/jobs/pipeline-scoreboard.ts` |
+| `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `symphony-control/jobs/gbrain-health-summary.ts` |
 
 ## Production Schedule
 

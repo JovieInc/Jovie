@@ -15,6 +15,7 @@ import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHe
 import { HERO_COPY } from '@/components/homepage/intent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
 vi.mock('@/lib/flags/marketing-static', async importOriginal => {
@@ -90,7 +91,12 @@ function LockedHomepageBody() {
         search={HERO_COPY.search}
       />
       <div data-testid='homepage-story-stack'>
-        <HomepageCertifiedSections />
+        <HomepageCertifiedSections
+          previews={{
+            connected: HOMEPAGE_MEDIA_MAP.connected.asset,
+            relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+          }}
+        />
         <HomepageEditorialChangelog />
         <HomepageClose />
       </div>
@@ -196,9 +202,7 @@ describe('JOV-5864 locked homepage baseline', () => {
     expect(searches).toHaveLength(1);
     expect(document.getElementById('homepage-name-search')).toBe(searches[0]);
 
-    expect(
-      screen.getAllByRole('button', { name: 'Find me', exact: true })
-    ).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Find me' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Search' })).toBeNull();
     expect(screen.queryByText('Get started')).toBeNull();
 
@@ -248,7 +252,12 @@ describe('JOV-5864 locked homepage baseline', () => {
 
     const { container } = render(
       <div data-testid='homepage-story-stack'>
-        <HomepageCertifiedSections />
+        <HomepageCertifiedSections
+          previews={{
+            connected: HOMEPAGE_MEDIA_MAP.connected.asset,
+            relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+          }}
+        />
         <HomepageEditorialChangelog />
         <HomepageClose />
       </div>

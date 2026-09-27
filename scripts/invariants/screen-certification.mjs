@@ -90,12 +90,13 @@ export const SCREEN_REGISTRY = Object.freeze(
 web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
 web.root-document|web|root-document-shell|apps/web/app/layout.tsx|desktop,mobile
 web.artists|web|marketing-artists|apps/web/app/artists/page.tsx|desktop,mobile
-web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx|desktop,mobile
+web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx,apps/web/app/waitlist/error.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/|desktop,mobile
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
+web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
@@ -105,10 +106,12 @@ web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investo
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
-web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx|desktop,mobile
+web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
+web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
+web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
 web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
@@ -120,6 +123,8 @@ web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
+web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
+web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
@@ -136,6 +141,8 @@ web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settin
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
+web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
+web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
 web.root-layout|web|screen.root|apps/web/app/layout.tsx|desktop,mobile
 macos-electron.hud|macos-electron|desktop-hud|apps/desktop/src/main.ts,apps/desktop/src/navigation.ts|desktop

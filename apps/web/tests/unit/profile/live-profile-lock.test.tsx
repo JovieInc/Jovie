@@ -15,6 +15,13 @@ import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+// This lock covers the flagged desktop surface journey too; the shipped
+// default (flag off) keeps desktop on the compact column and is covered in
+// profile-compact-template.test.tsx.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE = '1';
+});
+
 vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: vi.fn().mockResolvedValue(undefined),
 }));
@@ -121,24 +128,25 @@ vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
 
 const artist = {
   id: 'artist-1',
+  owner_user_id: 'user-1',
   name: 'Tim White',
   handle: 'timwhite',
-  image_url: null,
-  tagline: null,
+  spotify_id: '',
   location: null,
   hometown: null,
   career_highlights: null,
-  is_public: true,
   is_verified: false,
   active_since_year: null,
   published: true,
-  is_verified_flag: false,
+  is_featured: false,
+  marketing_opt_out: false,
+  created_at: '2026-01-01T00:00:00.000Z',
 } satisfies Artist;
 
 const contacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,
@@ -226,7 +234,7 @@ describe('live public profile lock', () => {
         .getByTestId('public-profile-layout-shell')
         .querySelector('.public-profile-layout-compact-slot') as HTMLElement
     );
-    for (const label of ['Home', 'Music', 'Shows', 'About', 'Menu']) {
+    for (const label of ['Home', 'Music', 'Events', 'About', 'Menu']) {
       expect(compact.getByRole('button', { name: label })).toBeInTheDocument();
     }
 
@@ -296,7 +304,7 @@ describe('live public profile lock', () => {
         'desktop'
       );
       expect(screen.getAllByText('Get updates').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Shows').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
       expect(screen.getAllByText('About').length).toBeGreaterThan(0);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
