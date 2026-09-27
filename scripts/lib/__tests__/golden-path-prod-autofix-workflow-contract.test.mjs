@@ -121,6 +121,15 @@ describe('Golden Path prod autofix workflow contract', () => {
     );
   });
 
+  it('passes a GitHub token so autofix can dedupe on fingerprint-marked PRs (JOV-6827)', () => {
+    expect(WORKFLOW).toContain('GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+    expect(WORKFLOW).toContain('pull-requests: read');
+    expect(WORKFLOW).toContain('issues: write');
+    expect(LOCK_HELPER).toContain('AUTOFIX_PR_MARKER');
+    expect(LOCK_HELPER).toContain('AUTOFIX_LAUNCH_MARKER');
+    expect(LOCK_HELPER).toContain("'escalate'");
+  });
+
   it('does not live inside the read-only post-deploy probe workflow', () => {
     const postdeploy = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/postdeploy-probes.yml'),

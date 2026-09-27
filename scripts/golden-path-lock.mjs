@@ -9,21 +9,16 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
-import { createGoldenPathLinearIssue } from './lib/golden-path-intake.mjs';
 import {
-  buildAutofixPrompt,
   buildMergeGateReceipt,
   buildProdProbeChatPayload,
   buildProdProbeReceipt,
-  CURSOR_AGENTS_URL,
   classifyChangedPaths,
-  cursorAuthHeader,
   evaluateProdProbe,
-  findOwnedAgents,
+  executeAutofix,
   GOLDEN_PATH_LOCK_SELF_TEST_FILES,
   GOLDEN_PATH_PROD_ORIGIN,
   MERGE_GATE_TEST_FILES,
-  planAutofix,
   validateReceipt,
 } from './lib/golden-path-lock.mjs';
 
@@ -343,23 +338,6 @@ async function runProdProbe(args) {
   }
 }
 
-async function cursorRequest(apiKey, url, init = {}) {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: cursorAuthHeader(apiKey),
-      'Content-Type': 'application/json',
-      ...(init.headers ?? {}),
-    },
-  });
-  const parsed = await fetchJsonSafe(response);
-  return {
-    ok: response.ok,
-    status: response.status,
-    body: parsed.json ?? parsed.text,
-  };
-}
-
 async function runAutofix(args) {
   if (!args.receipt) fail('autofix requires --receipt <path>');
   const receipt = JSON.parse(readFileSync(resolve(args.receipt), 'utf8'));
@@ -399,71 +377,57 @@ async function runAutofix(args) {
   }
 
   const apiKey = process.env.CURSOR_API_KEY ?? '';
-  let existingAgentIds = [];
-  if (apiKey) {
-    const listed = await cursorRequest(apiKey, CURSOR_AGENTS_URL);
-    if (listed.ok) {
-      const agents = listed.body?.agents ?? listed.body ?? [];
-      existingAgentIds = findOwnedAgents(agents, receipt.fingerprint);
-    }
-  }
-
-  const plan = planAutofix({
-    cursorApiKey: apiKey,
-    existingAgentIds,
-    fingerprint: receipt.fingerprint,
-    checks: receipt.checks,
-    origin: receipt.origin,
-    receipt,
-  });
-
-  if (plan.action === 'fail_closed') {
+  if (!apiKey) {
     fail(
       'Golden-path prod break cannot autofix: CURSOR_API_KEY is missing. Detect without a ship lock is a hole.'
     );
   }
 
-  const prompt = buildAutofixPrompt({
-    fingerprint: receipt.fingerprint,
-    checks: receipt.checks,
-    origin: receipt.origin,
+  // JOV-6827: dedupe on the probe fingerprint (open PR / running agent /
+  // durable launch marker), cap one launch per fingerprint per 24h, and
+  // escalate to Summer after repeated failed attempts instead of relaunching.
+  const result = await executeAutofix({
     receipt,
+    cursorApiKey: apiKey,
   });
-  // JOV-5966: the intake itself dedupes by fingerprint (fail-closed) and
-  // files P0s straight into Todo, skipping the Triage queue.
-  const linear = await createGoldenPathLinearIssue({
-    fingerprint: receipt.fingerprint,
-    prompt,
-  });
-  if (!linear.ok) {
-    fail(
-      `Linear intake failed closed: ${linear.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
-      JSON.stringify(linear.body ?? null)
-    );
-  }
 
-  if (plan.action === 'launch') {
-    const launched = await cursorRequest(apiKey, CURSOR_AGENTS_URL, {
-      method: 'POST',
-      body: JSON.stringify(plan.request),
-    });
-    if (!launched.ok) {
+  if (!result.ok) {
+    if (result.stage === 'linear_intake') {
       fail(
-        `Cursor-direct launch failed (status ${launched.status}).`,
-        JSON.stringify(launched.body)
+        `Linear intake failed closed: ${result.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
+        JSON.stringify(result.body ?? null)
       );
     }
+    if (result.stage === 'cursor_launch') {
+      fail(
+        `Cursor-direct launch failed (${result.reason}).`,
+        JSON.stringify(result.body ?? null)
+      );
+    }
+    if (result.reason === 'missing_cursor_api_key') {
+      fail(
+        'Golden-path prod break cannot autofix: CURSOR_API_KEY is missing. Detect without a ship lock is a hole.'
+      );
+    }
+    fail(`Golden-path autofix failed closed: ${result.reason}`);
+  }
+
+  if (result.action === 'launch') {
     console.error(
-      `Launched Cursor-direct autofix ${launched.body?.id ?? ''} fingerprint=${receipt.fingerprint}`
+      `Launched Cursor-direct autofix ${result.agentId ?? ''} fingerprint=${receipt.fingerprint}`
     );
-  } else {
+  } else if (result.action === 'dedup') {
     console.error(
-      `Deduped Cursor-direct autofix fingerprint=${receipt.fingerprint} agents=${plan.existingAgentIds.join(',')}`
+      `Deduped Cursor-direct autofix fingerprint=${receipt.fingerprint} reason=${result.reason} pr=${result.openPr?.number ?? ''} agents=${(result.existingAgentIds ?? []).join(',')}`
+    );
+  } else if (result.action === 'escalate') {
+    console.error(
+      `Escalated golden-path autofix fingerprint=${receipt.fingerprint} priorAttempts=${result.priorAttemptCount ?? 0}`
     );
   }
 
   fail(
-    `Golden-path prod probe failed; Cursor-direct ${plan.action} for ${receipt.fingerprint}. Gem missed this.`
+    `Golden-path prod probe failed; Cursor-direct ${result.action} for ${receipt.fingerprint}. Gem missed this.`
   );
 }
 

@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Production Controller completion has no native downstream autofix hop; this workflow runs the read-only jov.ie probe and launches a fingerprint-deduped Cursor agent with no Vercel mutation credentials.
+# removal-trigger: Remove when production remediation is owned natively by the canonical controller loop, or when the golden-path probe proves 30 consecutive days without an actionable failure.
 name: Golden Path Prod Autofix
 
 # JOV-5085: event-driven live-path probe + Cursor-direct autofix.
@@ -33,9 +37,14 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      # JOV-6827: fingerprint dedupe searches open PRs and comments on the
+      # existing PR instead of launching a duplicate Cursor agent.
+      pull-requests: read
+      issues: write
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
