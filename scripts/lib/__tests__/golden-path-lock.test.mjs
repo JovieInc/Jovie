@@ -60,6 +60,7 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
+      'apps/web/components/homepage/HomepagePrimaryAction.tsx',
       'README.md',
     ]);
     expect(classified.touchesGoldenPath).toBe(true);
@@ -68,6 +69,7 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
+      'apps/web/components/homepage/HomepagePrimaryAction.tsx',
     ]);
   });
 

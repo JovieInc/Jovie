@@ -167,13 +167,15 @@ describe('HomepageCertifiedSections', () => {
 });
 
 describe('HomepageClose', () => {
-  it('requests access instead of focusing absent search when gated', () => {
+  it('returns focus to the name search when the waitlist gate is on', () => {
     gate.WAITLIST_ENABLED = true;
     render(<HomepageClose />);
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Find your profile' })
+    ).toHaveAttribute('type', 'button');
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
   });
   it('renders the saved closing headline and a single focus-only action', () => {
     render(<HomepageClose />);
