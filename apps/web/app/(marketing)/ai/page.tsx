@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   robots: NOINDEX_ROBOTS,
 };
 
+const AI_HERO_INNER_CLASS = 'relative z-3 py-16 sm:py-20 lg:py-24';
+
 const AI_HERO_PHOTO = {
   src: '/images/marketing-hero/ai.webp',
   width: 1600,
@@ -29,10 +31,7 @@ export default function AiPage() {
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'
         />
-        <MarketingContainer
-          width='page'
-          className='relative z-3 py-16 sm:py-20 lg:py-24'
-        >
+        <MarketingContainer width='page' className={AI_HERO_INNER_CLASS}>
           <div className='max-w-3xl space-y-5'>
             <p className='text-sm font-medium tracking-tight text-muted-token'>
               Public Brief

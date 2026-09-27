@@ -75,7 +75,7 @@ export function PricingRecipeBody({
             href: freeClaim.ctaHref,
           }}
           secondaryCta={{
-            label: 'Explore Artist Profiles',
+            label: 'Explore Jovie Profiles',
             href: APP_ROUTES.ARTIST_PROFILES,
           }}
           photo={{
