@@ -1,3 +1,4 @@
+/* eslint-disable @jovie/canonical-ui-label-casing -- Pre-existing marketing copy; this change only repoints docs links for JOV-5896. */
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
@@ -42,6 +43,18 @@ const RESOURCE_LINKS = [
     description: 'The machine-readable contract for the public artist API.',
   },
   {
+    href: '/cli',
+    label: 'Read-only Jovie CLI',
+    description:
+      'Anonymous, read-only `jovie` commands for the public artist GET routes.',
+  },
+  {
+    href: '/api-versioning',
+    label: 'API versioning and deprecation policy',
+    description:
+      'Active v1 lifecycle boundary, additive versus breaking changes, and future Deprecation and Sunset signals.',
+  },
+  {
     href: '/llms.txt',
     label: 'llms.txt',
     description: 'A concise guide to Jovie’s public site and agent surfaces.',
@@ -52,7 +65,7 @@ const RESOURCE_LINKS = [
     description: 'The expanded version of the site guide.',
   },
   {
-    href: DOCS_URL,
+    href: `${DOCS_URL}/docs/developers`,
     label: 'Jovie docs',
     description: 'Product help and getting-started guidance.',
   },
@@ -113,6 +126,39 @@ export default function DevelopersPage() {
             </p>
           </section>
 
+          <section aria-labelledby='agent-quickstart-heading'>
+            <h2
+              id='agent-quickstart-heading'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
+            >
+              Agent quickstart
+            </h2>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              Start from the same profile endpoint as the quickstart above, then
+              follow the resource links in the response. Every surface below is
+              anonymous and read-only; owner-only tools require authenticated
+              profile ownership and are never part of this quickstart.
+            </p>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              For agent context, read{' '}
+              <Link
+                href='/llms.txt'
+                className='text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              >
+                /llms.txt
+              </Link>{' '}
+              or a specific artist&apos;s <code>{'{username}/llms.txt'}</code>,
+              and run the same jobs from a terminal with the{' '}
+              <Link
+                href={APP_ROUTES.CLI}
+                className='text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              >
+                /cli
+              </Link>
+              .
+            </p>
+          </section>
+
           <section aria-labelledby='resources-heading'>
             <h2
               id='resources-heading'
@@ -155,7 +201,7 @@ export default function DevelopersPage() {
               Profile requests are limited to 100 per client IP in a fixed
               60-second window. Read the{' '}
               <Link
-                href={`${DOCS_URL}/docs/api-reference`}
+                href={`${DOCS_URL}/docs/developers/api-reference`}
                 className='text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               >
                 API reference

@@ -11,6 +11,7 @@ export default defineConfig({
         'agent/channels/summer-shadow.ts',
         'agent/tools/jovie_capability_manifest.ts',
         'agent/instructions/summer-shadow.ts',
+        'agent/instructions/channel-identity.ts',
         'agent/lib/summer-bottleneck-loop.ts',
         'agent/lib/summer-commercial-projection.ts',
         'agent/lib/summer-commercial-readback.ts',

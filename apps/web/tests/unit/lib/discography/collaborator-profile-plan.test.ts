@@ -9,6 +9,7 @@ const austin: CreditedArtistCandidate = {
   name: 'Austin Leeds',
   spotifyId: 'spotify-austin',
   imageUrl: null,
+  musicbrainzId: null,
 };
 
 describe('credited artist reconciliation plan', () => {
@@ -42,6 +43,7 @@ describe('credited artist reconciliation plan', () => {
       name: 'Alex Lee',
       spotifyId: 'spotify-alex-two',
       imageUrl: null,
+      musicbrainzId: null,
     };
     const firstAlex: CreditedArtistCandidate = {
       ...austin,

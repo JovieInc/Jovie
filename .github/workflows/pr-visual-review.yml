@@ -145,6 +145,9 @@ jobs:
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: user_test
+          # Footer proof exercises the theme controls; keep light mode under
+          # test in this lane while production forces dark (route-policy.ts).
+          NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1'
 
       - name: Start production server
         id: server

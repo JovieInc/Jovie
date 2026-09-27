@@ -12,6 +12,18 @@
         "node_ids": [],
         "root_ids": []
       }
+    },
+    "jovie-landing-page-composer": {
+      "canonical_path": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Marketing Workspace.pen",
+      "read_only_paths": [
+        "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen"
+      ],
+      "native_semantic_manifest_authority": {
+        "status": "unavailable",
+        "expected_source_path": "/Users/timwhite/Documents/Jovie/Jovie Marketing Workspace/Jovie Marketing Workspace.pen",
+        "node_ids": [],
+        "root_ids": []
+      }
     }
   }
 }

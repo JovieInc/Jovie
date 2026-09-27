@@ -326,6 +326,33 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     aliasOf: '/artist-profiles',
   },
   {
+    glob: '(marketing)/solutions/artists/page.tsx',
+    recipeId: 'artist-lp',
+    renderedSections: approvedBindings(
+      'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
+      'hero',
+      'logo-cloud',
+      'feature-split',
+      'feature-grid',
+      'capture',
+      'comparison',
+      'spec-wall',
+      'how-it-works',
+      'feature-grid',
+      'faq',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-09-26 (JOV-5861)',
+      notes:
+        'Real artist solution route; renders the same artist-lp component and chrome as /artist-profiles. /artists remains the directory. Release-cycle gallery is product evidence, not social proof.',
+    },
+    status: 'active',
+    specVersion: '1.3.0',
+    url: '/solutions/artists',
+  },
+  {
     glob: '(marketing)/artist-notifications/page.tsx',
     recipeId: 'feature',
     renderedSections: approvedBindings(
