@@ -205,7 +205,7 @@ test('the hosted design lane executes the semantic-canvas guard', () => {
 test('Ubuntu operation paths remain disjoint from design selection', () => {
   const selected = selectDesignConformanceChecks([
     'scripts/backlog-orchestrator/admitter.mjs',
-    'scripts/symphony/systemd/symphony-ui-pilot.service',
+    'scripts/fleet-gate/gem-priority-gate.py',
   ]);
 
   assert.equal(selected.applicable, false);

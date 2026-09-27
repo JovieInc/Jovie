@@ -67,7 +67,6 @@ const nextConfig = {
     '/*': [
       'runtime-data/CHANGELOG.md',
       'runtime-data/docs/FEATURE_REGISTRY.md',
-      'runtime-data/scripts/symphony/symphony-codex-account-control.py',
       'runtime-data/apps/eve-pilot/identities/jovie/instructions.md',
       'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',

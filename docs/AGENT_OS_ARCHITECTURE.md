@@ -1,5 +1,7 @@
 # AgentOS Architecture
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 > **Retirement notice (2026-09-02):** Hermes and Trigger.dev are retired Jovie tooling. The v1 design below is historical and is not an active deployment or fallback plan. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md).
 
 > Issue: JOV-1922
@@ -146,7 +148,7 @@ A dedicated 16 GB MacBook Air runs the Hermes gateway service 24/7 as the always
 
 - Operating contract: [`.claude/rules/hermes-air.md`](../.claude/rules/hermes-air.md)
 - Operator runbook: [`docs/HERMES_AIR.md`](./HERMES_AIR.md)
-- Bootstrap: `scripts/symphony/bootstrap-air.sh`
+- Bootstrap: `symphony-control/bootstrap-air.sh`
 - Cost target: $0/mo via OpenRouter free-model rotation + local Ollama Qwen 3 4B fallback. Sentinel kill switch trips on any paid spend.
 - `HermesAiOpsSource` includes the value `'hermes-air'` so the HUD attributes dispatches that originate from the Air separately from product/CI sources.
 
