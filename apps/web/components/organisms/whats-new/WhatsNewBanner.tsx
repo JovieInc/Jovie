@@ -85,7 +85,7 @@ export function WhatsNewBannerView({
       data-electron-no-drag='true'
       className='fixed bottom-4 left-4 z-40 w-72 max-sm:hidden animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
     >
-      <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-3.5 pr-10 shadow-card'>
+      <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-4 pr-10 shadow-card'>
         <p className='flex items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
           <Sparkles aria-hidden='true' className='size-3' />
           {eyebrow}
