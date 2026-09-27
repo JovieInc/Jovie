@@ -6,10 +6,10 @@
       {
         "type": "repository",
         "state": "partial",
-        "reason": "Summer declaration only. Existing Gem repository policy is a separate source, not proof of current upstream Symphony eligibility.",
+        "reason": "Summer declaration only. The shipping lanes harness owns repository eligibility; the Gem repository policy is retired with the Symphony Elixir control plane (history in JovieInc/symphony-control).",
         "sourceRefs": [
-          "scripts/symphony/config/gem-repo-registry.json",
-          "scripts/symphony/gem_repo_registry.py"
+          "scripts/lanes/README.md",
+          "scripts/lanes/providers.json"
         ]
       },
       {

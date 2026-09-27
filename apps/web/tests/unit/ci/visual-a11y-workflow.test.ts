@@ -140,7 +140,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     const buildLayoutJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(prReadyJob).not.toMatch(
-      /ci-a11y|ci-layout-guard|ci-build-layout|ci-build-ovie|ci-storybook-surfaces/
+      /ci-a11y|ci-layout-guard|ci-build-layout|ci-build-ovie|ci-typecheck-ovie|ci-storybook-surfaces/
     );
     expect(mergeReadyJob).toContain('ci-build-layout');
     expect(mergeReadyJob).toContain(
@@ -148,6 +148,9 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     );
     expect(mergeReadyJob).toContain(
       'OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"'
+    );
+    expect(mergeReadyJob).toContain(
+      'OVIE_TYPECHECK_RESULT="${{ needs.ci-typecheck-ovie.result }}"'
     );
     expect(mergeReadyJob).toContain(
       'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
@@ -179,6 +182,49 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(storybookConfig).toContain('fullyParallel: true');
     expect(storybookConfig).toContain('retries: isCI ? 2 : 0');
     expect(storybookConfig).toContain('workers: isCI ? 1 : undefined');
+  });
+
+  it('boots the combined Storybook server ahead of independent setup and still gates on it', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const storybookJob = getJobBlock(workflow, 'ci-storybook-surfaces');
+    const startAt = storybookJob.indexOf('- name: Start Storybook dev server');
+    const checksAt = storybookJob.indexOf(
+      '- name: Check extension and observability ingest'
+    );
+    const playwrightAt = storybookJob.indexOf(
+      '- name: Setup Playwright (Chromium)'
+    );
+    const matrixAt = storybookJob.indexOf(
+      '- name: Run surface elevation matrix (Storybook)'
+    );
+    const start = storybookJob.slice(startAt, checksAt);
+    const matrix = storybookJob.slice(matrixAt);
+
+    // The server boots first so its startup and Vite dependency bundling
+    // overlap the independent checks and browser setup.
+    expect(startAt).toBeGreaterThanOrEqual(0);
+    expect(startAt).toBeLessThan(checksAt);
+    expect(checksAt).toBeLessThan(playwrightAt);
+    expect(playwrightAt).toBeLessThan(matrixAt);
+    // Same server config as before the move: the manual axe suite drops the
+    // automatic a11y addon server-side, so the start step must carry it.
+    expect(start).toContain("JOVIE_STORYBOOK_MANUAL_AXE: '1'");
+    expect(start).toContain('pnpm exec storybook dev -p 6006 --no-open');
+    // Detached output goes to a file, never the finished step's stdout.
+    expect(start).toContain('> "$RUNNER_TEMP/storybook-dev.log" 2>&1 &');
+    expect(start).toContain('echo "STORYBOOK_PID=$!" >> "$GITHUB_ENV"');
+    // The matrix fails closed without the server, on its death, and on a
+    // readiness timeout, then prints its log and stops it.
+    expect(matrix).not.toContain('storybook dev');
+    expect(matrix).toContain(
+      ': "${STORYBOOK_PID:?Storybook dev server was not started}"'
+    );
+    expect(matrix).toContain('kill -0 "$STORYBOOK_PID"');
+    expect(matrix).toContain('echo "::error::Storybook dev server died"');
+    expect(matrix).toContain(
+      'echo "::error::Storybook dev server failed to start within 300s"'
+    );
+    expect(matrix).toContain('cat "$RUNNER_TEMP/storybook-dev.log"');
   });
 
   it('keeps refresh self-healing and makes missing-baseline compare fail-closed', () => {

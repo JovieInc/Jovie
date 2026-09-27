@@ -640,6 +640,58 @@ struct ChatRepositoryTests {
     #expect(repository.lastErrorMessage == nil)
   }
 
+  /// JOV-5144: the persisted snapshot must stay bounded. Load-earlier pages
+  /// accumulate into the timeline; persisting the whole thing grows resident
+  /// RAM without limit (watchdog kills). The cache must keep only the newest
+  /// `ChatTranscriptWindow.maxPersistedMessagesPerConversation` rows.
+  @Test func persistCacheBoundsPersistedHistoryToThePersistedWindow() async {
+    let suiteName = "ie.jov.Jovie.tests.chat-repo-persist-bound"
+    let cache = ChatCache(defaults: UserDefaults(suiteName: suiteName)!)
+    let client = ScriptedChatClient(
+      sendTurnResult: .success([]),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .success(
+        MobileConversationDetailResponse(
+          conversation: MobileConversationRecord(
+            id: "conv_bound",
+            title: "Bounded",
+            createdAt: "2026-06-01T00:00:00.000Z",
+            updatedAt: "2026-06-01T00:00:00.000Z"
+          ),
+          messages: (1...250).map { index in
+            MobileConversationMessage(
+              id: "msg_bound_\(index)",
+              role: index.isMultiple(of: 2) ? "assistant" : "user",
+              content: "Bounded \(index)",
+              clientMessageId: "client_bound_\(index)",
+              turnId: "turn_bound_\(index)",
+              turnStatus: "completed",
+              createdAt: "2026-06-01T00:00:\(String(format: "%02d", index % 60)).000Z",
+              requiresWebHandoff: false
+            )
+          },
+          hasMore: true
+        )
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: cache,
+      userID: "user_repo_persist_bound",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    // Fetch window persist path (openConversation persists detail.messages).
+    await repository.openConversation("conv_bound")
+
+    let fetchedSnapshot = await cache.load(for: "user_repo_persist_bound")
+    let fetchedRows = fetchedSnapshot?.messagesByConversationID["conv_bound"] ?? []
+    #expect(fetchedRows.count == ChatTranscriptWindow.maxPersistedMessagesPerConversation)
+    // Newest rows survive the bound; oldest rows drop.
+    #expect(fetchedRows.first?.content == "Bounded 51")
+    #expect(fetchedRows.last?.content == "Bounded 250")
+  }
+
   @Test func openConversationPaintsCachedTailThenFetchesWindow() async {
     let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-cache-first")!)
     let cachedMessages = (1...45).map { index in
@@ -774,6 +826,59 @@ struct ChatRepositoryTests {
     #expect(client.lastFetchBefore == "2026-06-01T00:00:00.000Z")
     #expect(repository.timeline.map(\.content) == ["Older", "Newer"])
     #expect(repository.hasMoreOlder == false)
+  }
+
+  // MARK: - JOV-6210 restart pagination
+
+  @Test func loadOlderMessagesUsesOldestMessageInMultiMessageWindowAsCursor() async {
+    let conversation = MobileConversationRecord(
+      id: "conv_paged",
+      title: "Paged",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z"
+    )
+    func message(_ id: String, _ createdAt: String) -> MobileConversationMessage {
+      MobileConversationMessage(
+        id: id,
+        role: "assistant",
+        content: id,
+        clientMessageId: "client_\(id)",
+        turnId: "turn_\(id)",
+        turnStatus: "completed",
+        createdAt: createdAt,
+        requiresWebHandoff: false
+      )
+    }
+    let client = ScriptedPagedChatClient(
+      pages: [
+        nil: MobileConversationDetailResponse(
+          conversation: conversation,
+          messages: [
+            message("msg_oldest", "2026-05-01T00:00:00.000Z"),
+            message("msg_newest", "2026-06-01T00:00:00.000Z"),
+          ],
+          hasMore: true
+        ),
+        "2026-05-01T00:00:00.000Z": MobileConversationDetailResponse(
+          conversation: conversation,
+          messages: [],
+          hasMore: false
+        ),
+      ]
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-cursor-oldest")!),
+      userID: "user_repo_cursor_oldest",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.openConversation("conv_paged")
+    await repository.loadOlderMessages()
+
+    // The `before` cursor must be the oldest message in the window, not the
+    // newest -- otherwise the next page overlaps the visible window.
+    #expect(client.lastFetchBefore == "2026-05-01T00:00:00.000Z")
   }
 
   /// Restart pagination (JOV-6210): the relaunched repository hydrates only
@@ -944,6 +1049,90 @@ struct ChatRepositoryTests {
     #expect(restartClient.lastFetchBefore == oldestWindowCreatedAt)
   }
 
+  @Test func persistCachePreservesServerTimestampsForRestartPagination() async {
+    // The timeline -> MobileConversationMessage round-trip in persistCache must
+    // keep the server createdAt. If it rewrites timestamps to Date(), a
+    // post-restart paintCachedWindow derives an olderCursor of ~now and
+    // load-earlier refetches the current window instead of older history.
+    let suite = "ie.jov.Jovie.tests.chat-repo-restart-cursor"
+    let cache = ChatCache(defaults: UserDefaults(suiteName: suite)!)
+    let userID = "user_repo_restart_cursor"
+    let url = URL(string: "https://preview.example")!
+    let conversation = MobileConversationRecord(
+      id: "conv_restart",
+      title: "Restart",
+      createdAt: "2026-05-01T00:00:00.000Z",
+      updatedAt: "2026-05-01T00:00:00.000Z"
+    )
+    func message(id: String, createdAt: String) -> MobileConversationMessage {
+      MobileConversationMessage(
+        id: id,
+        role: "assistant",
+        content: id,
+        clientMessageId: "client_\(id)",
+        turnId: "turn_\(id)",
+        turnStatus: "completed",
+        createdAt: createdAt,
+        requiresWebHandoff: false
+      )
+    }
+    let window = (1...ChatTranscriptWindow.initialMessageLimit).map { index in
+      message(
+        id: "msg_\(index)",
+        createdAt: "2026-05-01T00:00:\(String(format: "%02d", index)).000Z"
+      )
+    }
+    let older = (1...5).map { index in
+      message(
+        id: "msg_old_\(index)",
+        createdAt: "2026-04-30T00:00:0\(index).000Z"
+      )
+    }
+    let firstClient = ScriptedPagedChatClient(
+      pages: [
+        nil: MobileConversationDetailResponse(
+          conversation: conversation, messages: window, hasMore: true
+        ),
+        "2026-05-01T00:00:01.000Z": MobileConversationDetailResponse(
+          conversation: conversation, messages: older, hasMore: false
+        ),
+      ]
+    )
+    let repository = ChatRepository(
+      client: firstClient, cache: cache, userID: userID, webBaseURL: url
+    )
+
+    await repository.openConversation("conv_restart")
+    await repository.loadOlderMessages()
+
+    // The merged 45-message timeline was persisted via the timeline
+    // round-trip; server timestamps must survive unchanged.
+    let snapshot = await cache.load(for: userID)
+    let cached = snapshot?.messagesByConversationID["conv_restart"] ?? []
+    #expect(cached.count == 45)
+    #expect(cached.first?.createdAt == "2026-04-30T00:00:01.000Z")
+    #expect(cached.last?.createdAt == "2026-05-01T00:00:40.000Z")
+
+    // Simulate an app restart: a fresh repository hydrates from the same
+    // cache suite. The visible tail is the 40 newest cached messages, so the
+    // load-earlier cursor must be the oldest of those -- a timestamp from
+    // the original server window, not the moment the cache was rewritten.
+    let relaunchClient = ScriptedPagedChatClient(
+      pages: [
+        "2026-05-01T00:00:01.000Z": MobileConversationDetailResponse(
+          conversation: conversation, messages: [], hasMore: false
+        ),
+      ]
+    )
+    let relaunched = ChatRepository(
+      client: relaunchClient, cache: cache, userID: userID, webBaseURL: url
+    )
+    await relaunched.bootstrap()
+
+    #expect(relaunched.hasMoreOlder)
+    await relaunched.loadOlderMessages()
+    #expect(relaunchClient.lastFetchBefore == "2026-05-01T00:00:01.000Z")
+  }
 
   // JOV-6210: persistCache round-trips the timeline through
   // MobileConversationMessage; createdAt must survive that round-trip so a
