@@ -334,7 +334,8 @@ describe('BottomTabBar — liquid glass lens', () => {
     // Springing, not snapping: the lens has not landed synchronously.
     expect(moved.style.transform).not.toContain('translateX(200%)');
     expect(moved).toHaveAttribute('data-active-index', '2');
-    expect(screen.getByRole('button', { name: 'Shows' })).toHaveAttribute(
+    // Label-agnostic: the third destination (tour) is the active cell.
+    expect(screen.getAllByRole('button')[2]).toHaveAttribute(
       'aria-current',
       'page'
     );
