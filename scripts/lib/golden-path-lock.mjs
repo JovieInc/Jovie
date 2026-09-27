@@ -78,7 +78,7 @@ const FORBIDDEN_SKIP_REASONS = Object.freeze([
 /** @typedef {{ changed: string[], matched: string[], touchesGoldenPath: boolean }} GoldenPathPathClassification */
 /** @typedef {{ schema: string, mode: 'merge-gate'|'prod-probe'|'autofix', ok: boolean, skipped?: boolean, stub?: boolean, alwaysRan?: boolean, inconclusive?: boolean, origin?: string, fingerprint?: string, testFiles?: string[], classification?: GoldenPathPathClassification, checks?: GoldenPathCheck[] }} GoldenPathReceipt */
 /** @typedef {{ schema: string, mode: 'prod-probe', ok: boolean, inconclusive: boolean, skipped: boolean, origin: string, fingerprint: string, checks: GoldenPathCheck[] }} GoldenPathProdProbeReceipt */
-/** @typedef {{ action: 'fail_closed'|'dedup'|'launch', reason: string, fingerprint?: string, existingAgentIds?: string[], openIssueUrl?: string|null, request?: { prompt: { text: string }, source: { repository: string, ref: string }, target: { autoCreatePr: boolean } } }} GoldenPathAutofixPlan */
+/** @typedef {{ action: 'fail_closed'|'dedup'|'launch', reason: string, fingerprint?: string, existingAgentIds?: string[], openPrNumber?: number|null, openIssueUrl?: string|null, request?: { prompt: { text: string }, source: { repository: string, ref: string }, target: { autoCreatePr: boolean, branchName: string } } }} GoldenPathAutofixPlan */
 
 /** @param {string[]} [files] @returns {GoldenPathPathClassification} */
 export function classifyChangedPaths(files = []) {
@@ -562,7 +562,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     .join('\n');
 }
 
-/** @param {{ cursorApiKey?: string | null, existingAgentIds?: string[], openIssueUrl?: string, fingerprint?: string, checks?: GoldenPathCheck[], origin?: string, receipt?: GoldenPathReceipt | null }} [input] @returns {GoldenPathAutofixPlan} */
+/** @param {{ cursorApiKey?: string | null, existingAgentIds?: string[], openPrNumber?: number | null, openIssueUrl?: string, fingerprint?: string, checks?: GoldenPathCheck[], origin?: string, receipt?: GoldenPathReceipt | null, now?: number }} [input] @returns {GoldenPathAutofixPlan} */
 export function planAutofix({
   cursorApiKey,
   existingAgentIds = [],
