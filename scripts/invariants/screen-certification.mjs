@@ -110,6 +110,7 @@ web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|deskto
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
+web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
 web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
