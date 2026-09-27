@@ -626,6 +626,96 @@ test.describe('Homepage', () => {
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
+  test('connected identity card keeps the profile export uncropped, legible, and paired', async ({
+    page,
+  }) => {
+    for (const [width, height] of [
+      [1440, 900],
+      [390, 844],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      await gotoHomepage(page);
+      const card = page.locator('[data-homepage-visual="connected"]');
+      await card.scrollIntoViewIfNeeded();
+      const exportImage = card.locator('img[alt="Tim White Profile — Listen"]');
+      await expect(exportImage).toBeVisible();
+      await page.waitForFunction(
+        el => el instanceof HTMLImageElement && el.complete,
+        await exportImage.elementHandle()
+      );
+
+      const layout = await card.evaluate(el => {
+        const probe = document
+          .createElement('canvas')
+          .getContext('2d', { willReadFrequently: true })!;
+        const rgba = (value: string) => {
+          probe.clearRect(0, 0, 1, 1);
+          probe.fillStyle = value;
+          probe.fillRect(0, 0, 1, 1);
+          return Array.from(probe.getImageData(0, 0, 1, 1).data);
+        };
+        const luminance = ([r, g, b]: number[]) => {
+          const channel = (c: number) => {
+            const v = c / 255;
+            return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+          };
+          return (
+            0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+          );
+        };
+        const box = (node: Element) => node.getBoundingClientRect();
+        const cardBox = box(el);
+        const identity = el.querySelector(
+          '.homepage-connected-profile__identity'
+        )!;
+        const name = el.querySelector('.homepage-connected-profile__name')!;
+        const image = el.querySelector('.homepage-connected-artwork__image')!;
+        const bg = rgba(getComputedStyle(el).backgroundColor);
+        const [r, g, b, a] = rgba(getComputedStyle(name).color);
+        const alpha = a / 255;
+        const ink = [r, g, b].map((c, i) => c * alpha + bg[i] * (1 - alpha));
+        const [hi, lo] = [luminance(ink), luminance(bg)].sort((x, y) => y - x);
+        const identityBox = box(identity);
+        const imageBox = box(image);
+        return {
+          contrast: (hi + 0.05) / (lo + 0.05),
+          card: {
+            left: cardBox.left,
+            right: cardBox.right,
+            top: cardBox.top,
+            bottom: cardBox.bottom,
+          },
+          identity: { left: identityBox.left, right: identityBox.right },
+          image: {
+            left: imageBox.left,
+            right: imageBox.right,
+            top: imageBox.top,
+            bottom: imageBox.bottom,
+          },
+        };
+      });
+
+      // The name sits on the warm-white artifact; it must read, not vanish.
+      expect(layout.contrast).toBeGreaterThanOrEqual(4.5);
+      // Never crop the product export: it stays wholly inside the card.
+      expect(layout.image.top).toBeGreaterThanOrEqual(layout.card.top - 1);
+      expect(layout.image.bottom).toBeLessThanOrEqual(layout.card.bottom + 1);
+      expect(layout.image.left).toBeGreaterThanOrEqual(layout.card.left - 1);
+      expect(layout.image.right).toBeLessThanOrEqual(layout.card.right + 1);
+
+      if (width >= 1024) {
+        // Identity and export read as one centered pair: no dead column.
+        const leftSpace = layout.identity.left - layout.card.left;
+        const rightSpace = layout.card.right - layout.image.right;
+        expect(Math.abs(leftSpace - rightSpace)).toBeLessThanOrEqual(24);
+        const pairGap = layout.image.left - layout.identity.right;
+        expect(pairGap).toBeLessThanOrEqual(
+          (layout.card.right - layout.card.left) * 0.12
+        );
+      }
+    }
+  });
+
   test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
     page,
   }) => {
