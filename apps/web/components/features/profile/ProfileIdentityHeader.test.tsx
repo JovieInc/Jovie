@@ -90,6 +90,71 @@ describe('ProfileIdentityHeader', () => {
     );
   });
 
+  describe('with fan updates enabled', () => {
+    it('makes Get Updates the only primary action, with no Listen', () => {
+      const onGetUpdatesClick = vi.fn();
+      renderHeader({ onGetUpdatesClick });
+
+      const primary = screen.getByRole('button', { name: 'Get Updates' });
+      expect(primary).toHaveClass('h-11', 'flex-1');
+      expect(primary.firstElementChild).toHaveClass(
+        'profile-glass-pill',
+        'profile-glass-pill--flat',
+        'h-7'
+      );
+      expect(screen.queryByTestId('profile-identity-listen')).toBeNull();
+
+      fireEvent.click(primary);
+      expect(onGetUpdatesClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads Updates On when the viewer already gets updates, same geometry', () => {
+      const { rerender } = renderHeader({ onGetUpdatesClick: vi.fn() });
+      const before = screen.getByTestId('profile-identity-get-updates');
+      const beforeClass = before.className;
+
+      rerender(
+        <ProfileIdentityHeader
+          name='Tim White'
+          handle='tim'
+          imageUrl='https://example.com/tim.jpg'
+          profileHref='/tim'
+          listenHref='/tim/listen'
+          onGetUpdatesClick={vi.fn()}
+          isSubscribed
+        />
+      );
+      const after = screen.getByTestId('profile-identity-get-updates');
+      expect(after).toHaveAccessibleName('Updates On');
+      expect(after).toHaveAttribute('data-subscribed', 'true');
+      expect(after.className).toBe(beforeClass);
+    });
+
+    it('keeps Get Updates and its row height when there is nowhere to listen', () => {
+      renderHeader({
+        onGetUpdatesClick: vi.fn(),
+        hasListenDestination: false,
+      });
+      expect(
+        screen.getByRole('button', { name: 'Get Updates' })
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('profile-identity-listen')).toBeNull();
+      expect(screen.getByTestId('profile-identity-actions')).toHaveClass(
+        'min-h-11'
+      );
+    });
+  });
+
+  it('keeps Listen primary and hides it without destinations when fans cannot subscribe', () => {
+    const { unmount } = renderHeader();
+    expect(screen.queryByTestId('profile-identity-get-updates')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Listen' })).toHaveClass('flex-1');
+    unmount();
+
+    renderHeader({ hasListenDestination: false });
+    expect(screen.queryByTestId('profile-identity-listen')).toBeNull();
+  });
+
   it('renders safe social links with brand labels and reports clicks', () => {
     const onSocialClick = vi.fn();
     renderHeader({

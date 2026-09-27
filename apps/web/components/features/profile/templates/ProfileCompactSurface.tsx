@@ -571,11 +571,17 @@ export function ProfileCompactSurface({
     },
     [handleTabSelect, renderMode]
   );
+  const handleGetUpdatesClick = useCallback(() => {
+    if (renderMode !== 'interactive') return;
+    openNotifications();
+  }, [openNotifications, renderMode]);
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
     renderMode === 'interactive' && renderInteractiveOverlays && canGetUpdates;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
+  const hasListenDestination =
+    mergedDSPs.length > 0 || Boolean(homeLatestRelease) || releases.length > 0;
   const homeProfileSettings = homeLatestRelease
     ? { ...profileSettings, showOldReleases: true }
     : profileSettings;
@@ -721,6 +727,11 @@ export function ProfileCompactSurface({
               listenHref={`/${artist.handle}/listen`}
               isListenActive={isMusicMode}
               onListenClick={handleListenClick}
+              onGetUpdatesClick={
+                canGetUpdates ? handleGetUpdatesClick : undefined
+              }
+              isSubscribed={homeAlertsSubscribed}
+              hasListenDestination={hasListenDestination}
               socialLinks={visibleSocialLinks}
               onSocialClick={handleSocialClick}
               headingAs={IdentityHeading}
