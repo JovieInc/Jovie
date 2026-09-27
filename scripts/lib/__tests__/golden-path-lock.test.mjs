@@ -60,6 +60,7 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
+      'apps/web/components/homepage/HomepagePrimaryAction.tsx',
       'README.md',
     ]);
     expect(classified.touchesGoldenPath).toBe(true);
@@ -68,6 +69,7 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
+      'apps/web/components/homepage/HomepagePrimaryAction.tsx',
     ]);
   });
 
@@ -132,6 +134,15 @@ describe('golden-path lock evaluators', () => {
       evaluateHomepageHtml('<a href="https://jov.ie/waitlist">Find me</a>')
     ).toMatchObject({
       ok: false,
+    });
+    expect(
+      evaluateHomepageHtml(
+        '<a href="/signup">Request access</a><a href="/start">Find yourself</a>'
+      )
+    ).toMatchObject({
+      id: 'homepage-cta',
+      ok: false,
+      reason: expect.stringContaining('Search your name'),
     });
     expect(evaluateHomepageHtml('')).toMatchObject({ ok: false });
   });

@@ -56,6 +56,8 @@ export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'apps/web/app/sign-in/',
   'apps/web/app/sign-up/',
   'apps/web/data/homepageFrontDoorCta.ts',
+  'apps/web/components/homepage/',
+  'apps/web/components/features/home/HeroSpotifySearch.tsx',
   'apps/web/data/marketingCtaIntents.ts',
   'apps/web/lib/flags/marketing-static.ts',
   'apps/web/components/features/onboarding/',

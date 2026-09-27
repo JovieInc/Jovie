@@ -3,8 +3,9 @@ import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
-// Prelaunch front-door label. JOV-5085 locks Get started → /start.
-// Server-side waitlist gate handles post-/start routing, not the homepage href.
+// Header and other marketing doors. The homepage hero is the name search
+// (Search your name → Find me → /start). JOV-5085 locks that handoff.
+// Server-side waitlist gate handles post-/start routing, not the hero.
 export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract(
   FEATURE_FLAGS.WAITLIST_ENABLED
 );

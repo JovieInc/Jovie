@@ -8,19 +8,28 @@ import {
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
 
-const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
+const { trackAction, push } = vi.hoisted(() => ({
+  trackAction: vi.fn(),
+  push: vi.fn(),
+}));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: trackAction,
+}));
+vi.mock('@/lib/analytics', () => ({
+  track: trackAction,
+  page: vi.fn(),
 }));
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
 beforeEach(() => {
   gate.WAITLIST_ENABLED = false;
+  push.mockClear();
+  trackAction.mockClear();
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -44,42 +53,43 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
-  it('attributes a standalone closing access action to its caller', () => {
+  it('keeps a caller-supplied name search on /start when the waitlist gate is on', () => {
     gate.WAITLIST_ENABLED = true;
     render(
       <HomepagePrimaryAction
+        appearance='editorial'
+        placeholder='Search your name'
+        submitLabel='Find me'
         submitTestId='closing-access'
         submitAnalytics={{
           eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-          properties: { placement: 'close' },
+          properties: { placement: 'hero' },
         }}
       />
     );
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(action).toHaveAttribute('href', '/signup');
-    expect(action).toHaveAttribute('data-testid', 'closing-access');
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'Tim White' },
+    });
+    fireEvent.click(screen.getByTestId('closing-access'));
+    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/start\?/));
+    expect(screen.queryByRole('link', { name: 'Request access' })).toBeNull();
     expect(trackAction).toHaveBeenLastCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      { placement: 'close' }
+      HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
+      expect.objectContaining({ placement: 'hero', freeText: true })
     );
   });
-  it('routes waitlist-on visitors to access with no name-search control', () => {
+  it('keeps Search your name → Find me → /start when the waitlist gate is on', () => {
     gate.WAITLIST_ENABLED = true;
     renderHero();
-    expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(trackAction).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      expect.objectContaining({ placement: 'hero' })
+    const input = screen.getByPlaceholderText('Search your name');
+    expect(screen.queryByRole('link', { name: 'Request access' })).toBeNull();
+    expect(screen.queryByText('Get started')).toBeNull();
+    fireEvent.change(input, { target: { value: 'Tim White' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Find me' }));
+    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/start\?/));
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+      'Find me'
     );
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();
