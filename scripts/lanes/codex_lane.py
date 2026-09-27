@@ -162,6 +162,8 @@ def run(args) -> int:
            "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
     if args.model:
         cmd += ["-m", args.model]
+    if args.reasoning_effort:
+        cmd += ["-c", f'model_reasoning_effort="{args.reasoning_effort}"']
     if args.cwd:
         cmd += ["-C", args.cwd]
     cmd.append("-")
@@ -236,6 +238,7 @@ def main(argv=None) -> int:
     go.add_argument("--prompt-file", required=True)
     go.add_argument("--cwd")
     go.add_argument("--model", default=os.environ.get("CODEX_LANE_MODEL"))
+    go.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh"))
     sub.add_parser("status")
     sub.add_parser("health")
     args = parser.parse_args(argv)

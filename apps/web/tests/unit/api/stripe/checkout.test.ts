@@ -251,6 +251,31 @@ describe('POST /api/stripe/checkout', () => {
     expect(correlatedCall.idempotencyKey.split(':')).toHaveLength(6);
   });
 
+  it('adds the consented browser acquisition id from the server cookie', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_organic',
+      url: 'https://checkout.stripe.com/pay/cs_organic',
+    });
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'jv_acquisition_id=7f5bb735-8e88-4d78-ae32-5228cc12a8bb',
+      },
+      body: JSON.stringify({ priceId: 'price_123' }),
+    });
+
+    expect((await POST(request)).status).toBe(200);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlation: {
+          acquisitionId: '7f5bb735-8e88-4d78-ae32-5228cc12a8bb',
+        },
+      })
+    );
+  });
+
   it('keeps legacy checkout callers working when correlation fields are omitted', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({

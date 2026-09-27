@@ -260,6 +260,13 @@ struct AppShellIntentNavigationTests {
 
   @Test func signedInSettingsURLOpensSettingsAndStartStaysOnChat() {
     #expect(
+      MobileSignedInLinkRoute.resolve(URL(string: "ie.jov.jovie://settings")!) == .settings
+    )
+    #expect(
+      MobileSignedInLinkRoute.resolve(URL(string: "ie.jov.jovie://settings/account")!)
+        == .settings
+    )
+    #expect(
       MobileSignedInLinkRoute.resolve(URL(string: "https://jov.ie/settings")!) == .settings
     )
     #expect(

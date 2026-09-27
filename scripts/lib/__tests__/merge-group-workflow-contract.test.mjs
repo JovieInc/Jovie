@@ -838,7 +838,7 @@ describe('merge_group workflow contract', () => {
     expect(migrationGuard).toMatch(
       /- uses: actions\/checkout@[^\n]+\n\s+if: needs\.ci-path-changes\.outputs\.run_drizzle == 'true'\n\s+with:\n\s+fetch-depth: 0/
     );
-    expect(migrationGuard).toContain('timeout-minutes: 3');
+    expect(migrationGuard).toContain('timeout-minutes: 6');
     expect(migrationGuard).toContain(
       'run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}'
     );
@@ -850,6 +850,9 @@ describe('merge_group workflow contract', () => {
     );
     expect(migrationGuard).toContain('./scripts/check-migrations.sh');
     expect(migrationGuard).toContain('./scripts/validate-migrations.sh');
+    expect(migrationGuard).toContain(
+      'pnpm exec tsx scripts/online-index-migrate.ts --validate-only'
+    );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     expect(buildLayout).toContain('runs-on: ubuntu-latest');
     expect(buildLayout).toContain('Build exact combined head');

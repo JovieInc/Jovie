@@ -67,8 +67,19 @@ const MAC_ICONSET_ENTRIES = [
 const INK = DESIGN_TOKENS.brand.ink;
 const CREAM = DESIGN_TOKENS.brand.cream;
 const APP_ICON_PADDING = 0.14;
-const DESKTOP_APP_ICON_PADDING = 0.2;
+// macOS icon grid: the visible squircle sits inside the canvas, not full
+// bleed. Apple's grid reserves ~824/1024 for the tile; a full-bleed tile
+// renders oversized in the Dock and app switcher next to grid-conforming
+// icons. 0.8 keeps the footprint optically balanced.
+const DESKTOP_TILE_RATIO = 0.8;
+const DESKTOP_APP_ICON_PADDING = 0.22;
 const DESKTOP_APP_ICON_RADIUS = 0.22;
+// Small sizes (≤64px, Dock/Spotlight scale) need proportionally larger
+// artwork to stay legible — more tile bleed and a bigger mark, per the
+// standard macOS icon practice of weighting small sizes heavier.
+const DESKTOP_SMALL_TILE_RATIO = 0.85;
+const DESKTOP_SMALL_ICON_PADDING = 0.16;
+const DESKTOP_SMALL_ICON_MAX = 64;
 const MARK_PADDING = 0;
 
 function markSvg(color: string): string {
@@ -231,16 +242,26 @@ async function renderAppIcon(output: string, size: number): Promise<void> {
   });
 }
 
-async function renderDesktopAppIcon(
+export async function renderDesktopAppIcon(
   output: string,
   size: number
 ): Promise<void> {
   await mkdir(dirname(output), { recursive: true });
-  const radius = Math.round(size * DESKTOP_APP_ICON_RADIUS);
-  const backgroundSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" rx="${radius}" fill="${INK}"/></svg>`;
-  const mark = await renderPngBuffer(markSvg(CREAM), size, {
-    padding: DESKTOP_APP_ICON_PADDING,
+  const small = size <= DESKTOP_SMALL_ICON_MAX;
+  const tile = Math.round(
+    size * (small ? DESKTOP_SMALL_TILE_RATIO : DESKTOP_TILE_RATIO)
+  );
+  const radius = Math.round(tile * DESKTOP_APP_ICON_RADIUS);
+  // Subtle inner rim separates the near-black tile from dark Dock/menu-bar
+  // surfaces without adding a gradient or changing the cream-on-ink identity.
+  const rimWidth = Math.max(1, Math.round(tile * 0.006));
+  const rimInset = Math.round(rimWidth / 2);
+  const rimSize = tile - rimInset * 2;
+  const backgroundSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${tile}" height="${tile}" viewBox="0 0 ${tile} ${tile}"><rect x="${rimInset}" y="${rimInset}" width="${rimSize}" height="${rimSize}" rx="${radius}" fill="${INK}" stroke="${CREAM}" stroke-opacity="0.08" stroke-width="${rimWidth}"/></svg>`;
+  const mark = await renderPngBuffer(markSvg(CREAM), tile, {
+    padding: small ? DESKTOP_SMALL_ICON_PADDING : DESKTOP_APP_ICON_PADDING,
   });
+  const tileOffset = Math.round((size - tile) / 2);
 
   await sharp({
     create: {
@@ -250,7 +271,12 @@ async function renderDesktopAppIcon(
       background: { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
-    .composite([{ input: Buffer.from(backgroundSvg) }, { input: mark }])
+    // Default gravity centres the mark; the tile is already centred on the
+    // canvas, so centring both keeps the O optically centred.
+    .composite([
+      { input: Buffer.from(backgroundSvg), left: tileOffset, top: tileOffset },
+      { input: mark },
+    ])
     .png({ compressionLevel: 9 })
     .toFile(output);
   console.log(`wrote ${output} (${size}×${size})`);
@@ -280,6 +306,12 @@ async function generateMacIcns(
   iconsetDir: string,
   renderIcon: IconRenderer = renderAppIcon
 ): Promise<void> {
+  // iconutil only exists on macOS; .icns files are gitignored build artifacts
+  // produced by `pnpm run prepare:assets` on the signing machine.
+  if (process.platform !== 'darwin') {
+    console.log(`skipped ${output} (iconutil is macOS-only)`);
+    return;
+  }
   try {
     for (const [fileName, size] of MAC_ICONSET_ENTRIES) {
       await renderIcon(resolve(iconsetDir, fileName), size);

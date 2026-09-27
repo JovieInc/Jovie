@@ -37,6 +37,7 @@ const electronRuntimeMock = vi.hoisted(() => ({
 
 const signOutMock = vi.hoisted(() => vi.fn());
 const userButtonPropsMock = vi.hoisted(() => vi.fn());
+const nowPlayingBridgePropsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   isElectronRuntime: () =>
@@ -85,7 +86,10 @@ vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
 }));
 
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
-  SidebarBottomNowPlayingBridge: () => null,
+  SidebarBottomNowPlayingBridge: (props: { readonly collapsed?: boolean }) => {
+    nowPlayingBridgePropsMock(props);
+    return <div data-testid='sidebar-now-playing-bridge' />;
+  },
 }));
 
 const dashboardData: DashboardData = {
@@ -194,6 +198,7 @@ describe('UnifiedSidebar library route', () => {
     document.documentElement.removeAttribute('data-desktop-runtime');
     signOutMock.mockReset();
     userButtonPropsMock.mockReset();
+    nowPlayingBridgePropsMock.mockReset();
     resetDashboardNavTestMocks();
     unifiedPathnameMock.mockReset();
     unifiedPathnameMock.mockReturnValue(APP_ROUTES.CHAT);
@@ -229,6 +234,14 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
+    const dock = document.querySelector('[data-sidebar-dock="true"]');
+    expect(dock).toHaveClass('shrink-0');
+    expect(dock).toContainElement(
+      screen.getByTestId('sidebar-now-playing-bridge')
+    );
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
+      collapsed: false,
+    });
   });
 
   it('keeps pending Inbox work reachable without a sidebar notifications region', () => {

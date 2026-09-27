@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   isExactSha,
   SHIPPING_SOURCE_SCHEMAS,
@@ -22,12 +22,24 @@ export const NAMED_AUTHORITY_PATHS = {
   'fleet-receipt': '~/gem-workspace/state/gem-priority-gate/latest.json',
 } as const;
 
+/**
+ * Durable `symphony-issue-dead-letter/v1` terminal receipts written once per
+ * issue by the official Symphony runtime wrapper. These receipts — not the
+ * transient `blocked` list — are the terminal-failure authority.
+ */
+export const NAMED_AUTHORITY_DIRS = {
+  'symphony-runtime': '~/.local/state/symphony-elixir/dead-letters',
+} as const;
+
+const DEAD_LETTER_SCHEMA = 'symphony-issue-dead-letter/v1';
+
 export const NAMED_AUTHORITY_URLS = {
   'symphony-runtime': 'http://127.0.0.1:4041/api/v1/state',
   'live-build-info': 'https://jov.ie/api/health/build-info',
 } as const;
 
 const ALLOWED_PATHS = new Set<string>(Object.values(NAMED_AUTHORITY_PATHS));
+const ALLOWED_DIRS = new Set<string>(Object.values(NAMED_AUTHORITY_DIRS));
 const MERGE_QUEUE_QUERY =
   'query ShippingStateMergeQueue($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:1){totalCount}mergeQueue(branch:"main"){entries(first:20){pageInfo{hasNextPage}nodes{id position state pullRequest{number headRefOid}}}}}}';
 const PRODUCTION_VERIFIED_JOB_NAME = 'Production Verified';
@@ -36,6 +48,7 @@ const GITHUB_RATE_LIMIT_MAX_BACKOFF_MS = 60 * 60_000;
 
 export type LiveIo = {
   readonly readFile: (path: string) => Promise<string>;
+  readonly readDir?: (dir: string) => Promise<readonly string[]>;
   readonly fetch: (url: string, init?: RequestInit) => Promise<Response>;
   readonly githubToken?: string;
   readonly githubOwner?: string;
@@ -72,10 +85,31 @@ export function resolveNamedAuthorityPath(
   );
 }
 
+export function resolveNamedAuthorityDir(
+  sourceId: ShippingSourceId
+): string | null {
+  if (!(sourceId in NAMED_AUTHORITY_DIRS)) return null;
+  return expandHome(
+    NAMED_AUTHORITY_DIRS[sourceId as keyof typeof NAMED_AUTHORITY_DIRS]
+  );
+}
+
+export function isAllowlistedAuthorityDir(dir: string): boolean {
+  const expanded = expandHome(dir);
+  for (const named of ALLOWED_DIRS) {
+    if (expanded === expandHome(named) || dir === named) return true;
+  }
+  return false;
+}
+
 export function isAllowlistedAuthorityPath(path: string): boolean {
   const expanded = expandHome(path);
   for (const named of ALLOWED_PATHS) {
     if (expanded === expandHome(named) || path === named) return true;
+  }
+  for (const named of ALLOWED_DIRS) {
+    const dir = expandHome(named);
+    if (expanded.startsWith(`${dir}/`)) return true;
   }
   return false;
 }
@@ -655,11 +689,61 @@ export async function readWorkflow(
   }
 }
 
+/**
+ * Count durable `symphony-issue-dead-letter/v1` receipts under the named
+ * authority directory. A missing directory is a real zero — no terminal
+ * receipts exist. An unreadable or malformed receipt leaves the count
+ * unmeasured and flags the read as partial rather than guessing.
+ */
+async function deadLetterMeasurement(
+  io: LiveIo,
+  sourceId: ShippingSourceId
+): Promise<{ readonly count: number; readonly partial: boolean } | null> {
+  const dir = resolveNamedAuthorityDir(sourceId);
+  if (dir == null || io.readDir == null) return null;
+  let entries: readonly string[];
+  try {
+    entries = await io.readDir(dir);
+  } catch (error) {
+    if (isRecord(error) && error.code === 'ENOENT') {
+      return { count: 0, partial: false };
+    }
+    return null;
+  }
+  let count = 0;
+  let partial = false;
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    try {
+      const receipt: unknown = JSON.parse(await io.readFile(join(dir, entry)));
+      if (
+        isRecord(receipt) &&
+        receipt.schema === DEAD_LETTER_SCHEMA &&
+        receipt.status === 'dead-lettered'
+      ) {
+        count += 1;
+      } else {
+        partial = true;
+      }
+    } catch {
+      partial = true;
+    }
+  }
+  return { count, partial };
+}
+
 async function defaultReadFile(path: string): Promise<string> {
   if (!isAllowlistedAuthorityPath(path)) {
     throw new Error('refused-arbitrary-path');
   }
   return readFile(path, 'utf8');
+}
+
+async function defaultReadDir(dir: string): Promise<readonly string[]> {
+  if (!isAllowlistedAuthorityDir(dir)) {
+    throw new Error('refused-arbitrary-path');
+  }
+  return readdir(dir);
 }
 
 export function createLiveShippingStateReaders(
@@ -688,7 +772,17 @@ export function createLiveShippingStateReaders(
           { errorCode: 'malformed' }
         );
       }
-      return { ...live, schema: 'symphony-runtime-state/v1' };
+      const deadLetters = await deadLetterMeasurement(io, 'symphony-runtime');
+      const payload =
+        deadLetters == null || deadLetters.partial
+          ? live.payload
+          : { ...live.payload, deadLetterCount: deadLetters.count };
+      return {
+        ...live,
+        payload,
+        truncated: live.truncated || deadLetters?.partial === true,
+        schema: 'symphony-runtime-state/v1',
+      };
     },
     'symphony-task': async () => {
       return failedRead(
@@ -774,6 +868,7 @@ export function createLiveShippingStateReaders(
 export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
   return {
     readFile: overrides.readFile ?? defaultReadFile,
+    readDir: overrides.readDir ?? defaultReadDir,
     fetch: overrides.fetch ?? fetch,
     githubToken: overrides.githubToken,
     githubOwner: overrides.githubOwner,

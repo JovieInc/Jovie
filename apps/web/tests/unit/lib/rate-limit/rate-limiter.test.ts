@@ -180,13 +180,11 @@ describe('rate-limiter.ts', () => {
       expect(limiter.isRedisActive()).toBe(false);
     });
 
-    it('logs a warning when Redis is unavailable and warnOnFallback is true', () => {
+    it('does not emit a second fallback warning after the Redis factory', () => {
       mockCreateRedisRateLimiter.mockReturnValue(null);
       const logger = vi.fn();
       new RateLimiter(baseConfig, { warnOnFallback: true, logger });
-      expect(logger).toHaveBeenCalledWith(
-        expect.stringContaining('Redis unavailable')
-      );
+      expect(logger).not.toHaveBeenCalled();
     });
 
     it('does not log when warnOnFallback is false', () => {

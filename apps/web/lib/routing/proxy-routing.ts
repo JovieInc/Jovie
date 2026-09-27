@@ -70,6 +70,10 @@ const SYSTEM_RESERVED_SEGMENTS = new Set([
   'sentry-example-page',
   'sentry-example-api',
   'investor-portal',
+  // Retired public investor pages (now 404 in lib/auth/investor-portal.ts);
+  // reserved so no profile handle can claim the old URLs.
+  'investors',
+  'pitch',
   'llms.txt',
   'llms-full.txt',
   'openapi.json',
