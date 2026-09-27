@@ -102,4 +102,20 @@ describe('public profile Liquid Glass navigation', () => {
     expect(pill).not.toMatch(/box-shadow:[^;]*\b0 \d+px \d+px/);
     expect(CSS).toContain(':root.high-contrast .profile-glass-pill');
   });
+
+  it('renders the identity Listen action as the flat frosted variant of the same glass', () => {
+    const flat =
+      CSS.match(/:where\(\.profile-glass-pill--flat\) \{[^}]*\}/)?.[0] ?? '';
+    // Same dock tokens as the lens, no second glass recipe.
+    expect(flat).toContain('var(--profile-dock-lens-bg)');
+    expect(flat).toContain('var(--profile-dock-border)');
+    expect(flat).toContain('border-radius: 10px');
+    expect(flat).toContain('backdrop-filter: blur(var(--space-4))');
+    // Flat: no sheen gradient, no top-rim bevel, no drop shadow.
+    expect(flat).not.toContain('linear-gradient');
+    expect(flat).not.toContain('--profile-dock-lens-rim');
+    expect(flat).not.toMatch(/box-shadow:[^;]*\b0 \d+px \d+px/);
+    // Reduced transparency and high contrast drop the blur.
+    expect(CSS).toContain(':root.high-contrast .profile-glass-pill--flat');
+  });
 });
