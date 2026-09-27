@@ -119,4 +119,24 @@ describe('SidebarBottomNowPlaying', () => {
     expect(playingRow).toBe(pausedRow);
     expect(playingRow).toHaveClass('h-12');
   });
+
+  it('renders the collapsed 28px artwork control with a playing glyph', () => {
+    const { container } = render(
+      <SidebarBottomNowPlaying
+        track={fullTrack}
+        isPlaying
+        onPlay={() => {}}
+        collapsed
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Pause Lost in the Light' })
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-artwork-frame="thumbnail"]')
+    ).toHaveClass('size-7');
+    expect(container.querySelector('.lucide-audio-lines')).toBeInTheDocument();
+    expect(screen.queryByText('Bahamas')).not.toBeInTheDocument();
+  });
 });

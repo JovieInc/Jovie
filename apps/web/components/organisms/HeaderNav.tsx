@@ -3,7 +3,7 @@
 
 import './HeaderNav.css';
 import { Button } from '@jovie/ui';
-import { ChevronDown } from 'lucide-react';
+import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
@@ -107,7 +107,8 @@ export interface HeaderFlyoutMenu {
   readonly links: ReadonlyArray<{
     readonly href: string;
     readonly label: string;
-    readonly description: string;
+    /** Omit for a compact list menu (label + arrow), e.g. Customers. */
+    readonly description?: string;
   }>;
 }
 
@@ -262,11 +263,14 @@ function MarketingGlassFlyout({
     return null;
   }
 
+  const compact = menu.links.every(link => !link.description);
+
   return (
     <div
       id={`marketing-header-flyout-${menu.id}`}
       className={cn(
         'marketing-glass-header__flyout',
+        compact && 'marketing-glass-header__flyout--compact',
         animateOpen && 'marketing-glass-header__flyout--open'
       )}
     >
@@ -279,20 +283,32 @@ function MarketingGlassFlyout({
               key={`${menu.id}-${link.label}`}
               className='marketing-glass-header__flyout-link focus-ring-themed'
             >
-              <span
-                className='marketing-glass-header__flyout-number'
-                aria-hidden='true'
-              >
-                {(index + 1).toString().padStart(2, '0')}
-              </span>
+              {compact ? null : (
+                <span
+                  className='marketing-glass-header__flyout-number'
+                  aria-hidden='true'
+                >
+                  {(index + 1).toString().padStart(2, '0')}
+                </span>
+              )}
               <span className='min-w-0'>
                 <span className='marketing-glass-header__flyout-label'>
                   {link.label}
                 </span>
-                <span className='marketing-glass-header__flyout-description'>
-                  {link.description}
-                </span>
+                {link.description ? (
+                  <span className='marketing-glass-header__flyout-description'>
+                    {link.description}
+                  </span>
+                ) : null}
               </span>
+              {compact ? (
+                <ArrowUpRight
+                  aria-hidden='true'
+                  className='marketing-glass-header__flyout-arrow'
+                  size={16}
+                  strokeWidth={1.8}
+                />
+              ) : null}
             </Link>
           ))}
         </div>

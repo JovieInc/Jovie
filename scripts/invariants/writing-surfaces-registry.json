@@ -2,7 +2,7 @@
   "schema": "jovie.writing-surfaces/v1",
   "issue": "JOV-6475",
   "parentEpic": "JOV-3720",
-  "version": "2026-09-26.1",
+  "version": "2026-09-26.2",
   "sourceInspectedAt": "2026-09-26",
   "sourceSha": "172eb361a7",
   "notes": [
@@ -10,11 +10,12 @@
     "Advisory transport is the artifact-bound Jev Gateway integration from JOV-6465 (scripts/invariants/jev-gateway.mjs, modality 'text'). No alternative HTTP adapter is created.",
     "Whole-message generation that streams to a reader before any review is recorded as 'post-generation-advisory' review, never as gated.",
     "The weekly advisory Slop Gate is retired: @jovie/copy owns copy rules (canon/VOICE.md) and the deterministic copy-gate ci-fast lane blocks new violations on changed customer-facing lines. This registry adds no recurring automation and no fleet dispatch.",
-    "Coverage reports a denominator and a reviewed version. There is no blanket 'everywhere' claim."
+    "Coverage reports a denominator and a reviewed version. There is no blanket 'everywhere' claim.",
+    "JOV-6478 adds rendered-output verification: apps/web/lib/copy/rendered-surface.ts certifies rendered route/state text against certified lines, offer-truth literals, and recovery actions. First surfaces: marketing-pricing, product-ui-errors-onboarding."
   ],
   "coverage": {
     "denominator": 10,
-    "reviewedVersion": "2026-09-26.1",
+    "reviewedVersion": "2026-09-26.2",
     "claim": "10 named delivery surfaces inventoried; per-surface review mode recorded, uncovered paths keep explicit owner-routed rollout slices under JOV-3720."
   },
   "reviewModes": ["gated", "advisory", "manual", "uncovered"],
@@ -54,17 +55,18 @@
         "apps/web/data/marketing/routeManifest.ts",
         "docs/marketing/LANGUAGE.md",
         "canon/VOICE.md",
-        "canon/MARKETING.md"
+        "canon/MARKETING.md",
+        "apps/web/lib/copy/rendered-surface.ts"
       ],
       "deliveryAdapter": "static-render:apps/web marketing routeManifest",
       "policyVersion": "MARKETING_COPY_SPEC_VERSION 1.1.0; canon/VOICE.md 2026-07-17",
       "reviewMode": "gated",
       "reviewPoint": "pre-publish",
-      "proofLink": "apps/web/tests/unit/marketing/copy-semantic-guard.test.ts",
+      "proofLink": "apps/web/tests/unit/marketing/copy-rendered-surface.test.ts",
       "checks": {
         "truth": {
           "enforcement": "enforced",
-          "source": "semantic guard + meaning-first briefs require claim evidence"
+          "source": "semantic guard + meaning-first briefs require claim evidence; rendered surface audit validates price/availability literals against offer truth"
         },
         "usefulness": {
           "enforcement": "advisory",
@@ -104,7 +106,9 @@
         "apps/web/lib/chat/voice-lint.ts",
         "apps/web/tests/unit/lib/chat/voice-lint.test.ts",
         "canon/VOICE.md",
-        "docs/marketing/LANGUAGE.md"
+        "docs/marketing/LANGUAGE.md",
+        "apps/web/lib/copy/rendered-surface.ts",
+        "apps/web/components/features/feedback/recovery-contract.ts"
       ],
       "deliveryAdapter": "react-ui:apps/web components + onboarding-script engine",
       "policyVersion": "canon/VOICE.md 2026-07-17; onboarding copy contract JOV-3806",
@@ -118,7 +122,7 @@
         },
         "usefulness": {
           "enforcement": "advisory",
-          "source": "scripted bank contract requires action per turn"
+          "source": "scripted bank contract requires action per turn; rendered surface audit requires a concrete recovery action in error states"
         },
         "repetition": { "enforcement": "none", "source": "no automated check" },
         "puffery": {

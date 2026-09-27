@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
@@ -294,14 +294,21 @@ describe('ProfileCompactSurface', () => {
     expect(scrollRegion.className).toContain('overflow-y-auto');
   });
 
-  it('keeps the home hero and content regions in the responsive layout contract', () => {
+  it('keeps the chrome, identity header, and content regions in the responsive layout contract', () => {
     renderSurface();
 
+    // Floating chrome over the identity header; the header scrolls with
+    // the content instead of occupying a fixed hero band.
     expect(screen.getByTestId('profile-cover')).toHaveClass(
-      'profile-home-fluid-hero',
-      'profile-home-fluid-hero--no-media',
-      'shrink-0'
+      'pointer-events-none',
+      'absolute',
+      'inset-x-0',
+      'top-0'
     );
+    const scroll = screen.getByTestId('profile-content-scroll');
+    expect(
+      within(scroll).getByTestId('profile-identity-header')
+    ).toBeInTheDocument();
     expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
       'profile-home-content-scroll',
       'min-h-0',

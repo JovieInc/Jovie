@@ -82,6 +82,30 @@ describe('NativeReturnPage (native auth bounce)', () => {
     expect(screen.queryByText('Jovie Desktop')).toBeNull();
   });
 
+  it('shows the desktop return code for when the deep link cannot reach the app', () => {
+    setSearchParams(
+      `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=BCDFGHJK`
+    );
+    render(<NativeReturnPage />);
+
+    expect(
+      screen.getByText('Jovie did not open? Enter this code in the app.')
+    ).toBeVisible();
+    expect(screen.getByText('BCDF-GHJK')).toBeVisible();
+  });
+
+  it.each([
+    [`code=${CODE}&state=${STATE}&return_code=BCDFGHJK`],
+    [`code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=AEIOU123`],
+    [
+      `client=ios&code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=BCDFGHJK`,
+    ],
+  ])('hides the return code when it cannot be redeemed (%s)', query => {
+    setSearchParams(query);
+    render(<NativeReturnPage />);
+    expect(screen.queryByTestId('desktop-return-code')).toBeNull();
+  });
+
   it('preserves the deep link without desktop_flow when absent', () => {
     setSearchParams(`code=${CODE}&state=${STATE}`);
     render(<NativeReturnPage />);

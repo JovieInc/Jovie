@@ -148,6 +148,9 @@ export function interpretCounts(
       running: countFromList(payload.running, 'running' in payload),
       retrying: countFromList(payload.retrying, 'retrying' in payload),
       blocked: countFromList(payload.blocked, 'blocked' in payload),
+      terminalFailures: Array.isArray(payload.deadLetters)
+        ? countFromList(payload.deadLetters, true)
+        : countFromNumber(payload.deadLetterCount),
       queued: NOT_MEASURED_COUNT,
       openPullRequests: NOT_MEASURED_COUNT,
       capacityAvailable: NOT_MEASURED_COUNT,

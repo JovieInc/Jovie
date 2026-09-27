@@ -35,15 +35,29 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import doctor  # noqa: E402  (sibling module of the release)
+import pr_events  # noqa: E402
+# This module as imported: the event hooks take it as `lane`. Bound once, because other
+# loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
+THIS = sys.modules[__name__]
 REPO_SLUG = "JovieInc/Jovie"
 # `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
 # the rest stay with humans.
 SHARED_LABEL = "agent-ready"
-EXCLUDED_LABELS = frozenset({
-    "no-symphony", "billing", "blocked:payments", "stripe", "cost-monitoring",
-    "blocked:auth", "auth", "area:auth", "infra", "area:infra", "infrastructure", "vercel",
-    "type:epic", "codex-blocked",
+SENSITIVE_LABELS = frozenset({
+    "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
+    "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
+EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked"})
+HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked"})
+SENSITIVE_PROVIDER = "codex"
+SENSITIVE_REVIEWABLE_LINES = 500
+SENSITIVE_RED_LINES = re.compile(
+    r"\b(?:rotate|rotation|revoke|revocation)\b.{0,40}\b(?:secret|credential|token|key)s?\b|"
+    r"\b(?:secret|credential|token|key)s?\b.{0,40}\b(?:rotate|rotation|revoke|revocation)\b|"
+    r"\b(?:live|production|prod)\b.{0,40}\b(?:price|pricing)\b|"
+    r"\b(?:price|pricing)\b.{0,40}\b(?:live|production|prod)\b",
+    re.IGNORECASE,
+)
 MAX_FAILURES = 3
 MAX_FIX_ATTEMPTS = 2
 MAX_GATE_TIMEOUTS = 3
@@ -51,11 +65,15 @@ CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
-              "scripts/tests/test_doctor.py"]
+              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
 PROVIDER_COOLDOWN_S = 900
+# Waiting work gains one priority level per day, capped at urgent. This preserves
+# urgent-first admission while guaranteeing that a sustained P1 stream cannot
+# starve older work forever.
+PRIORITY_AGING_S = 24 * 3600
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
@@ -106,11 +124,30 @@ def failure_record(value) -> dict:
     return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
 
 
+def created_at_epoch(value: str) -> float | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.timestamp() if parsed.tzinfo is not None else None
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def issue_is_sensitive(issue: Issue) -> bool:
+    return bool(SENSITIVE_LABELS & {label.lower() for label in issue.labels})
+
+
+def issue_hits_red_line(issue: Issue) -> bool:
+    return SENSITIVE_RED_LINES.search(f"{issue.title}\n{issue.description}") is not None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
-               in_flight: frozenset[str] = frozenset()) -> Issue | None:
-    """Symphony's order: priority 1..4 then none, oldest first; skip excluded work,
-    3x failures, issues still inside their retry backoff, and issues that already have an
-    open lane PR anywhere (one PR per issue: the fix/adopt loop owns those)."""
+               in_flight: frozenset[str] = frozenset(), provider: str | None = None) -> Issue | None:
+    """Symphony orders by aged priority then age, while preserving urgent-first admission.
+
+    Waiting work gains one priority level per day until it reaches P1, preventing a
+    sustained stream of newer urgent work from starving older work. Excluded work,
+    3x failures, retry backoff, and issues with an open lane PR remain ineligible.
+    """
     now = time.time() if now is None else now
     in_flight = {identifier.lower() for identifier in in_flight}
 
@@ -118,18 +155,38 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
         record = failure_record(failures.get(identifier))
         return record["count"] < MAX_FAILURES and now - record["at"] >= RETRY_BACKOFF_S
 
-    eligible = [
-        issue for issue in issues
-        if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
-        and issue.identifier.lower() not in in_flight
-    ]
-    eligible.sort(key=lambda issue: (issue.priority or 5, issue.created_at))
+    def admitted(issue: Issue) -> bool:
+        labels = {label.lower() for label in issue.labels}
+        if HARD_EXCLUDED_LABELS & labels or issue_hits_red_line(issue):
+            return False
+        if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
+            return False
+        return retryable(issue.identifier) and issue.identifier.lower() not in in_flight
+
+    eligible = [issue for issue in issues if admitted(issue)]
+
+    def admission_order(issue: Issue) -> tuple[int, float]:
+        created_at = created_at_epoch(issue.created_at)
+        base_priority = issue.priority or 5
+        waited = max(0, now - created_at) if created_at is not None else 0
+        effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
+        return effective_priority, created_at if created_at is not None else float("inf")
+
+    eligible.sort(key=admission_order)
     return eligible[0] if eligible else None
 
 
 # ---------------------------------------------------------------- prompt
 
 def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
+    sensitive_contract = []
+    if issue_is_sensitive(issue):
+        sensitive_contract = [
+            "- Guarded sensitive-surface run: keep the reviewable diff at or below 500 lines and",
+            "  one issue. Do not rotate secrets/credentials or change live billing pricing.",
+            "- The lane will require the existing Migration Guard, security scan, affected boundary",
+            "  tests, and an independent `llm-review` before it permits merge enrollment.",
+        ]
     return "\n".join([
         f"# {issue.title} ({issue.identifier})",
         "",
@@ -155,6 +212,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
         "  non-interactive path. Do not run gstack or other skill workflows (ship, review, qa,",
         "  upgrade) and do not upgrade any tooling: commit with git and open the PR with",
         "  `gh pr create --draft`.",
+        *sensitive_contract,
         "- End with a handoff: what changed, what you verified, concerns and deviations.",
     ])
 
@@ -180,7 +238,7 @@ class Change:
     deleted: int
 
 
-def gate_rules(changes: list[Change]) -> list[str]:
+def gate_rules(changes: list[Change], max_reviewable_lines: int = MAX_REVIEWABLE_LINES) -> list[str]:
     """Deterministic checks on the diff itself; returns failure reasons (empty = pass)."""
     if not changes:
         return ["empty-diff"]
@@ -194,7 +252,7 @@ def gate_rules(changes: list[Change]) -> list[str]:
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
         failures.append("lockfile-without-manifest")
     reviewable = sum(c.added + c.deleted for c in changes if not GENERATED.search(c.path))
-    if reviewable > MAX_REVIEWABLE_LINES:
+    if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
     return failures
 
@@ -220,6 +278,7 @@ def parse_numstat(text: str) -> list[Change]:
 # typecheck, lint, tests, CI-harness and component contracts) — the same entry point humans'
 # hooks and the no-mistakes pipeline use. A product joins the lanes by providing it.
 CANONICAL_GATE = ["bash", "scripts/hooks/pre-push-gate.sh", "affected"]
+SENSITIVE_PR_LABEL = "sensitive-surface"
 
 
 def check_commands(paths: list[str]) -> list[list[str]]:
@@ -227,6 +286,33 @@ def check_commands(paths: list[str]) -> list[list[str]]:
     if any(not DOC_FILE.search(p) for p in paths):
         return [CANONICAL_GATE]
     return []
+
+
+def sensitive_review(host: Host, pr: dict, worktree: Path, log) -> tuple[bool, list[str]]:
+    """Run an independent max-effort Codex review; an ambiguous response fails closed."""
+    review_prompt = host.state / "runs" / f"PR{pr['number']}-{pr['headRefOid'][:12]}-llm-review.md"
+    review_prompt.parent.mkdir(parents=True, exist_ok=True)
+    review_prompt.write_text("\n".join([
+        f"Independently review sensitive-surface PR #{pr['number']} at {pr['headRefOid']}.",
+        "Review only; do not edit, commit, push, comment, or mutate external state.",
+        "Inspect `git diff origin/main...HEAD` for security, auth/billing/infra boundary failures,",
+        "migration safety, missing failure-path tests, and unintended scope. Existing deterministic",
+        "gates run separately. End with exactly `LLM-REVIEW: PASS` only if no blocking finding exists;",
+        "otherwise end with `LLM-REVIEW: FAIL — <concise blocking findings>`.",
+    ]))
+    last = worktree / ".codex-last-message.txt"
+    last.unlink(missing_ok=True)
+    command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),
+               "--cwd", str(worktree), "--reasoning-effort", "xhigh"]
+    try:
+        ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True)
+    except subprocess.TimeoutExpired:
+        return False, ["llm-review-timeout"]
+    verdict = last.read_text(errors="replace").strip() if last.exists() else ""
+    if ran.returncode == 0 and verdict.endswith("LLM-REVIEW: PASS"):
+        return True, []
+    detail = verdict[-1000:] if verdict else f"reviewer-exit:{ran.returncode}"
+    return False, [f"llm-review-failed:{detail}"]
 
 
 # ---------------------------------------------------------------- plumbing
@@ -390,7 +476,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
-            receipt.update(verify_and_land(host, issue, branch, worktree, log, started))
+            receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
+                                           sensitive=issue_is_sensitive(issue)))
             log.flush()
             declined = not_shippable_reason((runs / f"{run_id}.log").read_text(errors="replace")[-20000:])
             if declined and receipt.get("verdict") == "no-change":
@@ -412,7 +499,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
 
 
 def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, started: float,
-                    opened: bool = False) -> dict:
+                    opened: bool = False, sensitive: bool = False) -> dict:
     """Independent of the agent's own claim: find its PR, re-derive the diff, run checks, then land."""
     listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"{issue.identifier} in:title",
                  "--json", "number,headRefName,headRefOid,createdAt,url,isDraft"], log=log)
@@ -428,8 +515,14 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
             "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
             "--body", f"Lane run for {issue.identifier}. Verification by the lane gate."], cwd=worktree, log=log)
-        return verify_and_land(host, issue, branch, worktree, log, started, opened=True)
-    return gate_pr(host, max(prs, key=lambda item: item["createdAt"]), worktree, log)
+        return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
+    pr = max(prs, key=lambda item: item["createdAt"])
+    if sensitive:
+        sh(["gh", "label", "create", SENSITIVE_PR_LABEL, "--repo", REPO_SLUG, "--force",
+            "--color", "B60205", "--description", "Guarded auth/billing/infra lane policy"], log=log)
+        sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
+            "--add-label", SENSITIVE_PR_LABEL], log=log)
+    return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
 def gate_slot(host: Host) -> Locked:
@@ -455,13 +548,13 @@ def gate_timeouts(host: Host, pr: dict, change: int = 0) -> int:
     return count
 
 
-def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
+def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     sh(["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log)
     sh(["git", "checkout", "-q", "--detach", pr["headRefOid"]], cwd=worktree, log=log)
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
-    reasons = gate_rules(changes)
+    reasons = gate_rules(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES)
     evidence = []
     result = {"pr": pr["number"], "prUrl": pr.get("url"), "headSha": pr["headRefOid"],
               "changedFiles": len(changes), "reasons": reasons}
@@ -486,6 +579,10 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log) -> dict:
                     reasons.append(f"check-failed:{' '.join(command[:6])}")
                     evidence += [line for line in log_tail(log).splitlines()
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
+            if sensitive and not reasons:
+                passed, review_reasons = sensitive_review(host, pr, worktree, log)
+                if not passed:
+                    reasons.extend(review_reasons)
         finally:
             if seat is not None:
                 seat.release()
@@ -565,7 +662,7 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
     path = held_path(host)
     path.parent.mkdir(parents=True, exist_ok=True)
     held = json.loads(path.read_text()) if path.exists() else {}
-    held[str(number)] = {"sha": head, "evidence": evidence[-60:]}
+    held[str(number)] = pr_events.held_record(head, evidence)
     path.write_text(json.dumps(held))
 
 
@@ -583,7 +680,7 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
         record = attempts.get(str(pr["number"]), {})
-        if record.get("sha") == pr["headRefOid"] or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
+        if pr_events.in_flight(record, pr, time.time()) or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
             continue
         return pr
     return None
@@ -594,8 +691,9 @@ def exhausted_prs(prs: list[dict], attempts: dict) -> list[dict]:
     stuck = []
     for pr in prs:
         record = attempts.get(str(pr["number"]), {})
-        if record.get("sha") == pr["headRefOid"] and record.get("count", 0) >= MAX_FIX_ATTEMPTS \
-                and not record.get("escalated"):
+        # Spent attempts are terminal for the PR (red_pr never retries it), so a head the last
+        # fix pushed that is still stuck escalates too instead of waiting silently.
+        if record.get("count", 0) >= MAX_FIX_ATTEMPTS and not record.get("escalated"):
             checks = pr.get("statusCheckRollup") or []
             if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED" \
                     or any(check.get("conclusion") in RED for check in checks):
@@ -610,14 +708,21 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
     for pr in exhausted_prs(prs, attempts):
         body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
                 f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
-                "Filed for triage; the lane retries when the head moves.")
+                "Filed through bug intake (Linear Triage); the lanes stop here.")
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+        record = attempts.get(str(pr["number"]), {})
         try:
             linear.create_triage(f"Fix loop exhausted: PR #{pr['number']} {pr.get('title', '')[:80]}",
-                                 f"{pr.get('url')}\n\n{body}\n\nHost `{HOST}`, {now_iso()}.")
+                                 pr_events.bug_report(pr, f"{body}\n\nHost `{HOST}`, {now_iso()}.", HOST, record))
         except Exception:
             pass
-        attempts[str(pr["number"])] = {**attempts.get(str(pr["number"]), {}), "escalated": True}
+        attempts[str(pr["number"])] = {**record, "escalated": True}
+        pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)  # held with a reason, visible on the PR
+        update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
+            pr["headRefOid"], ["fix-exhausted", *held.get(str(pr["number"]), {}).get("evidence", [])])}))
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        if found and found.group("lane") in pr_events.disabled_lanes(load_providers()):
+            pr_events.return_to_pool(THIS, linear, pr, "orphaned lane PR after its fix attempts ran out")
     path.write_text(json.dumps(attempts))
 
 
@@ -637,18 +742,20 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
 
 def review_excerpt(pr: dict, limit: int = 4000) -> str:
     """The reviewers' own words, so the fixer addresses what was asked, not what it guesses."""
-    if pr.get("reviewDecision") != "CHANGES_REQUESTED":
+    if pr.get("reviewDecision") != "CHANGES_REQUESTED" and "review" not in pr.get("eventKinds", ()):
         return ""
     listed = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/comments?per_page=50", "--jq",
                  '.[] | "- \\(.path):\\(.line // .original_line // 0) \\(.body | gsub("\\n"; " "))"'])
     reviews = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/reviews?per_page=20", "--jq",
-                  '.[] | select(.state == "CHANGES_REQUESTED") | "- review: \\(.body | gsub("\\n"; " "))"'])
+                  '.[] | select(.state == "CHANGES_REQUESTED" or (.state == "COMMENTED" and (.body | length) > 0)) '
+                  '| "- review: \\(.body | gsub("\\n"; " "))"'])
     text = "\n".join(part for part in ((reviews.stdout or "").strip(), (listed.stdout or "").strip()) if part)
     return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no comment text readable)."
 
 
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
-    review = review_excerpt(pr) if pr.get("reviewDecision") == "CHANGES_REQUESTED" else ""
+    review = review_excerpt(pr) if pr.get("reviewDecision") == "CHANGES_REQUESTED" \
+        or "review" in pr.get("eventKinds", ()) else ""
     if review:
         excerpt = review + ("\n\n" + excerpt if excerpt else "")
     if pr.get("gateEvidence"):
@@ -658,9 +765,19 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
                    "number, renumber yours after main's and regenerate its snapshot/journal entry.",
+                   "For a pnpm-lock.yaml conflict take main's lockfile and run `pnpm install --lockfile-only`.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
+    if "dequeued" in pr.get("eventKinds", ()):
+        problem += ["The merge queue removed this PR (its merge group failed) and will not take the same",
+                    "head again. Merge origin/main into the branch, run",
+                    "`bash scripts/hooks/pre-push-gate.sh affected`, fix what fails, and push.", ""]
+        if pr.get("queueFailure"):
+            problem += ["What failed in the merge group:", pr["queueFailure"], ""]
+    if "stale" in pr.get("eventKinds", ()):
+        problem += ["This lane draft has had no activity for 48 hours. Finish it: resolve what the gate",
+                    "held, make its checks green and push. If it cannot ship, end with NOT-SHIPPABLE.", ""]
     return "\n".join([
         f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
         "",
@@ -711,6 +828,9 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
             sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            # The attempt is over: a head it did not move may be tried again by the next lane.
+            update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
+                endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
     receipt["endedAt"] = now_iso()
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
@@ -752,7 +872,8 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
             sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            receipt.update(gate_pr(host, pr, worktree, log))
+            labels = {label["name"].lower() for label in pr.get("labels", [])}
+            receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
@@ -780,7 +901,7 @@ def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
     return prs
 
 
-PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository"
+PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
 
 
 def repo_prs() -> list[dict]:
@@ -829,6 +950,8 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    order, now = pr_events.cost_order(load_providers()), time.time()
+    prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
     if pr:
         entry = held.get(str(pr["number"]), {})
@@ -837,7 +960,8 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             return None  # another host is already fixing this head; no attempt is charged
         record = attempts.get(str(pr["number"]), {})
-        attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1}
+        attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1,
+                                       "lane": name, "at": now}
         path.write_text(json.dumps(attempts))
         post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
@@ -864,18 +988,20 @@ def worker(host: Host, name: str) -> int:
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
-        # Finish before starting: red PRs (any open PR in the repo), then ungated lane drafts,
-        # then new issues.
+        # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
+        # then ungated lane drafts, then new issues.
         prs = lane_prs(name)
         candidates = fix_candidates(name)
+        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
         requeue_verified(host, prs)
-        escalate_exhausted(host, candidates, linear)
-        red = claim_red_pr(host, name, candidates)
+        escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+        red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
         if red is None and adopt is None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues())
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues(),
+                               provider=name)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
             if issue:
@@ -922,8 +1048,9 @@ def worker(host: Host, name: str) -> int:
         claim = Locked(host.state / "claim.lock", blocking=True)
         try:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            record = failure_record(failures.get(issue.identifier))
-            failures[issue.identifier] = {"count": record["count"] + 1, "at": time.time()}
+            count = failure_record(failures.get(issue.identifier))["count"] + 1
+            failures[issue.identifier] = {"count": count, "at": time.time(),
+                                          **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
             failures_path(host).write_text(json.dumps(failures))
         finally:
             claim.release()
@@ -968,6 +1095,10 @@ def dispatch(host: Host) -> int:
                 tick["spawned"].append(name)
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
+    try:
+        tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
+    except Exception as error:  # the ready/orphan queue never takes dispatch down
+        tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())

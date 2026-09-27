@@ -13,6 +13,7 @@ import { validateLatencySensitiveExecution } from './latency-sensitive-execution
 import { validatePerformanceFactory } from './performance-factory.mjs';
 import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
 import { validateQualityRatchet } from './quality-ratchet.mjs';
+import { validateSonarRepairContract } from './sonar-repair-contract.mjs';
 import {
   readWritingSurfacesRegistry,
   validateWritingSurfaces,
@@ -25,7 +26,8 @@ import {
 // representative defects block certification and promotion.
 // JOV-INV-035 is composed here so every invariant run checks the
 // outcome-first delivery-model contract.
-// JOV-INV-036 is composed here so the canonical assurance matrix stays bound
+// JOV-INV-036 is composed here so Sonar repairs retain executable prevention.
+// JOV-INV-037 is composed here so the canonical assurance matrix stays bound
 // to its exact revision and reports uncovered objects and missing layers.
 
 import {
@@ -64,6 +66,7 @@ const doneSprintErrors = await validateDoneSprintInvariants({
 const gateIntegrityErrors = validateGateIntegrityPolicy(registry);
 const assuranceErrors = validateAssuranceMatrixPolicy(registry);
 const deliveryModelErrors = validateDeliveryModelPolicy(registry);
+const sonarRepairErrors = validateSonarRepairContract(registry);
 // JOV-6475 composes the writing-surface coverage registry the same way: it
 // validates that every named delivery surface maps to a contract and owner.
 const writingErrors = validateWritingSurfaces(readWritingSurfacesRegistry());
@@ -79,6 +82,7 @@ const errors = [
   ...gateIntegrityErrors.map(error => `gate-integrity: ${error}`),
   ...assuranceErrors.map(error => `assurance-matrix: ${error}`),
   ...deliveryModelErrors.map(error => `delivery-model: ${error}`),
+  ...sonarRepairErrors.map(error => `sonar-repair: ${error}`),
   ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
 

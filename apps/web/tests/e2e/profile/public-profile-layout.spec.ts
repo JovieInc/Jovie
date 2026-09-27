@@ -277,7 +277,7 @@ async function collectLayoutMetrics(page: Page) {
       document.querySelectorAll<HTMLElement>(
         [
           '[data-testid="profile-header"]',
-          '[data-testid="profile-hero-identity-block"]',
+          '[data-testid="profile-identity-header"]',
           '[data-testid$="-title"]',
         ].join(', ')
       )
@@ -301,11 +301,13 @@ async function collectLayoutMetrics(page: Page) {
       shell: box(activeShell),
       cover: box(cover),
       media: box(
-        document.querySelector<HTMLElement>('.profile-cover-home-media')
+        document.querySelector<HTMLElement>(
+          '[data-testid="profile-identity-portrait"]'
+        )
       ),
       identity: box(
         document.querySelector<HTMLElement>(
-          '[data-testid="profile-hero-identity-block"]'
+          '[data-testid="profile-identity-header"]'
         )
       ),
       homeRail: box(homeRail),
@@ -371,24 +373,21 @@ test.describe('Public profile /tim layout hardening @regression', () => {
     }
   });
 
-  test('long identity and wrapped location grow the cover without clipping the card', async ({
+  test('long identity stays bounded and keeps the featured card attached', async ({
     page,
   }, testInfo) => {
     const viewport = { width: 320, height: 568 };
     await prepareProfileAdmissionFixture(page, viewport, true);
 
-    const location = page
-      .getByTestId('profile-hero-metadata-row')
-      .locator('span')
-      .last();
-    await expect(location).toBeVisible();
-    await location.evaluate(element => {
-      element.textContent = 'Northwest Territories and the Pacific Northwest';
+    const name = page.getByTestId('profile-identity-link').locator('span');
+    await expect(name).toBeVisible();
+    await name.evaluate(element => {
+      element.textContent =
+        'Northwest Territories and the Pacific Northwest Collective';
     });
 
     const metrics = await collectLayoutMetrics(page);
-    expect(metrics.cover, 'edge fixture cover is required').not.toBeNull();
-    expect(metrics.media, 'edge fixture media is required').not.toBeNull();
+    expect(metrics.media, 'edge fixture portrait is required').not.toBeNull();
     expect(
       metrics.identity,
       'edge fixture identity is required'
@@ -398,77 +397,40 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       'edge fixture home rail is required'
     ).not.toBeNull();
 
-    const cover = metrics.cover;
     const media = metrics.media;
     const identity = metrics.identity;
     const homeRail = metrics.homeRail;
-    if (!cover || !media || !identity || !homeRail) {
+    if (!media || !identity || !homeRail) {
       throw new Error('edge fixture lost a required mobile geometry node');
     }
 
-    const edgeGeometry = await page.evaluate(() => {
-      const read = (selector: string) => {
-        const element = document.querySelector<HTMLElement>(selector);
-        if (!element) return null;
+    const nameGeometry = await page
+      .getByTestId('profile-identity-link')
+      .evaluate(element => {
         const rect = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return {
-          top: rect.top,
-          right: rect.right,
-          bottom: rect.bottom,
-          height: rect.height,
-          width: rect.width,
-          lineHeight: Number.parseFloat(style.lineHeight),
-          scrollWidth: element.scrollWidth,
-          clientWidth: element.clientWidth,
-          scrollHeight: element.scrollHeight,
-          clientHeight: element.clientHeight,
-        };
-      };
+        return { left: rect.left, right: rect.right, height: rect.height };
+      });
 
-      return {
-        name: read('[data-testid="profile-identity-link"]'),
-        identity: read('[data-testid="profile-hero-identity-block"]'),
-        metadata: read('[data-testid="profile-hero-metadata-row"]'),
-        location: read(
-          '[data-testid="profile-hero-metadata-row"] span:last-child'
-        ),
-      };
-    });
-
-    expect(edgeGeometry.name).not.toBeNull();
-    expect(edgeGeometry.location).not.toBeNull();
-    expect(edgeGeometry.name!.right).toBeLessThanOrEqual(identity.right + 1);
-    expect(edgeGeometry.location!.right).toBeLessThanOrEqual(
-      identity.right + 1
-    );
-    expect(edgeGeometry.location!.height).toBeGreaterThan(
-      edgeGeometry.location!.lineHeight + 1
-    );
-    expect(
-      edgeGeometry.location!.scrollWidth - edgeGeometry.location!.clientWidth
-    ).toBeLessThanOrEqual(2);
-    expect(
-      edgeGeometry.location!.scrollHeight - edgeGeometry.location!.clientHeight
-    ).toBeLessThanOrEqual(2);
     expect(metrics.horizontalOverflow).toBeLessThanOrEqual(1);
-    expect(media.height).toBeCloseTo(220, 0);
-    expect(identity.bottom).toBeLessThanOrEqual(cover.bottom + 1);
-    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom);
-    expect(homeRail.top - cover.bottom).toBeLessThanOrEqual(8);
-    expect(cover.height - (media.height + identity.height)).toBeCloseTo(0, 0);
+    expect(nameGeometry.left).toBeGreaterThanOrEqual(identity.left - 1);
+    expect(nameGeometry.right).toBeLessThanOrEqual(identity.right + 1);
+    expect(nameGeometry.height).toBeGreaterThanOrEqual(44);
+    expect(media.width).toBeCloseTo(80, 0);
+    expect(media.height).toBeCloseTo(80, 0);
+    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
+    expect(homeRail.top - identity.bottom).toBeLessThanOrEqual(8);
 
     const screenshotPath = testInfo.outputPath(
-      'jov6254-long-name-wrapped-location-320x568.png'
+      'profile-long-identity-320x568.png'
     );
     await page.screenshot({ path: screenshotPath, fullPage: false });
-    await testInfo.attach('long-name-wrapped-location-320x568', {
+    await testInfo.attach('long-identity-320x568', {
       path: screenshotPath,
       contentType: 'image/png',
     });
   });
 
-  test('200% text zoom keeps the media token and card ordering at narrow mobile', async ({
+  test('200% text zoom keeps the portrait square and card ordering at narrow mobile', async ({
     page,
   }, testInfo) => {
     const viewport = { width: 320, height: 568 };
@@ -487,8 +449,7 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       .toBe('scroll');
 
     const metrics = await collectLayoutMetrics(page);
-    expect(metrics.cover, '200% fixture cover is required').not.toBeNull();
-    expect(metrics.media, '200% fixture media is required').not.toBeNull();
+    expect(metrics.media, '200% fixture portrait is required').not.toBeNull();
     expect(
       metrics.identity,
       '200% fixture identity is required'
@@ -498,20 +459,19 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       '200% fixture home rail is required'
     ).not.toBeNull();
 
-    const cover = metrics.cover;
     const media = metrics.media;
     const identity = metrics.identity;
     const homeRail = metrics.homeRail;
-    if (!cover || !media || !identity || !homeRail) {
+    if (!media || !identity || !homeRail) {
       throw new Error('200% fixture lost a required mobile geometry node');
     }
 
     expect(metrics.horizontalOverflow).toBeLessThanOrEqual(1);
-    expect(media.height).toBeCloseTo(220, 0);
-    expect(identity.bottom).toBeLessThanOrEqual(cover.bottom + 1);
-    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom);
-    expect(homeRail.top - cover.bottom).toBeLessThanOrEqual(8);
-    expect(cover.height - (media.height + identity.height)).toBeCloseTo(0, 0);
+    // The portrait scales with text and stays a circle, never squashed.
+    expect(Math.abs(media.width - media.height)).toBeLessThanOrEqual(1);
+    expect(media.width).toBeGreaterThanOrEqual(80);
+    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
+    expect(homeRail.top - identity.bottom).toBeLessThanOrEqual(8);
 
     const screenshotPath = testInfo.outputPath(
       'jov6254-text-zoom-200-320x568.png'
@@ -734,69 +694,49 @@ test.describe('Public profile /tim layout hardening @regression', () => {
     );
   });
 
-  test('long wrapped location remains bounded in the compact desktop layout', async ({
+  test('long identity remains bounded in the compact desktop layout', async ({
     page,
   }) => {
     const viewport = { width: 1024, height: 768 };
     await prepareProfileAdmissionFixture(page, viewport, true);
 
-    const location = page
-      .getByTestId('profile-hero-metadata-row')
-      .locator('span')
-      .last();
-    await expect(location).toBeVisible();
-    await location.evaluate(element => {
-      element.textContent = 'Northwest Territories and the Pacific Northwest';
+    const name = page.getByTestId('profile-identity-link').locator('span');
+    await expect(name).toBeVisible();
+    await name.evaluate(element => {
+      element.textContent =
+        'Northwest Territories and the Pacific Northwest Collective';
     });
 
     const metrics = await collectLayoutMetrics(page);
-    expect(metrics.cover, 'compact desktop cover is required').not.toBeNull();
-    expect(metrics.media, 'compact desktop media is required').not.toBeNull();
     expect(
       metrics.identity,
       'compact desktop identity is required'
     ).not.toBeNull();
     expect(metrics.homeRail, 'compact desktop rail is required').not.toBeNull();
 
-    const cover = metrics.cover;
     const identity = metrics.identity;
     const homeRail = metrics.homeRail;
-    if (!cover || !identity || !homeRail) {
+    if (!identity || !homeRail) {
       throw new Error('compact desktop fixture lost a required geometry node');
     }
 
-    const locationGeometry = await location.evaluate(element => {
-      const rect = element.getBoundingClientRect();
-      return {
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        height: rect.height,
-        lineHeight: Number.parseFloat(
-          window.getComputedStyle(element).lineHeight
-        ),
-        scrollWidth: element.scrollWidth,
-        clientWidth: element.clientWidth,
-        scrollHeight: element.scrollHeight,
-        clientHeight: element.clientHeight,
-      };
-    });
+    const nameGeometry = await page
+      .getByTestId('profile-identity-link')
+      .evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          right: rect.right,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+        };
+      });
 
     expect(metrics.horizontalOverflow).toBeLessThanOrEqual(1);
-    expect(locationGeometry.right).toBeLessThanOrEqual(identity.right + 1);
-    if (Number.isFinite(locationGeometry.lineHeight)) {
-      expect(locationGeometry.height).toBeLessThanOrEqual(
-        locationGeometry.lineHeight + 1
-      );
-    }
+    expect(nameGeometry.right).toBeLessThanOrEqual(identity.right + 1);
     expect(
-      locationGeometry.scrollWidth - locationGeometry.clientWidth
+      nameGeometry.scrollWidth - nameGeometry.clientWidth
     ).toBeLessThanOrEqual(2);
-    expect(
-      locationGeometry.scrollHeight - locationGeometry.clientHeight
-    ).toBeLessThanOrEqual(2);
-    expect(identity.bottom).toBeLessThanOrEqual(cover.bottom + 1);
-    expect(homeRail.top).toBeGreaterThanOrEqual(cover.bottom);
+    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
   });
 
   for (const viewport of VIEWPORTS) {
@@ -823,21 +763,17 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       ).not.toBeNull();
       expect(metrics.shell?.left ?? 0).toBeGreaterThanOrEqual(-1);
       expect(metrics.shell?.right ?? 0).toBeLessThanOrEqual(viewport.width + 1);
-      // The iOS-grade compact profile owns a stable token-driven hero
-      // (clamp(220px, 34svh, 400px)); media crops rather than squashing. The
-      // desktop shell keeps its independent 240px composition floor here.
-      expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(
-        viewport.isMobile ? 220 : 240
-      );
+      // The compact profile leads with the 80px identity portrait; the
+      // desktop shell (when shipped) keeps its independent 240px composition
+      // floor.
+      if (!viewport.isMobile && metrics.desktopCover) {
+        expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(240);
+      }
 
       if (viewport.isMobile) {
         expect(
-          metrics.cover,
-          `${viewport.id} cover is required`
-        ).not.toBeNull();
-        expect(
           metrics.media,
-          `${viewport.id} media is required`
+          `${viewport.id} portrait is required`
         ).not.toBeNull();
         expect(
           metrics.identity,
@@ -848,43 +784,30 @@ test.describe('Public profile /tim layout hardening @regression', () => {
           `${viewport.id} home rail is required`
         ).not.toBeNull();
 
-        const cover = metrics.cover;
         const media = metrics.media;
         const identity = metrics.identity;
         const homeRail = metrics.homeRail;
-        if (!cover || !media || !identity || !homeRail) {
+        if (!media || !identity || !homeRail) {
           throw new Error(
             `${viewport.id} mobile layout is missing a required geometry node`
           );
         }
 
-        const expectedMediaHeight = Math.min(
-          400,
-          Math.max(220, viewport.height * 0.34)
-        );
         expect(
-          Math.abs(media.height - expectedMediaHeight),
-          `${viewport.id} media should follow the tokenized 34svh composition`
+          Math.abs(media.width - 80),
+          `${viewport.id} portrait should be 80px`
         ).toBeLessThanOrEqual(1);
         expect(
-          cover.height - (media.height + identity.height),
-          `${viewport.id} cover should include the tokenized media and identity band`
+          Math.abs(media.height - 80),
+          `${viewport.id} portrait should be 80px`
+        ).toBeLessThanOrEqual(1);
+        expect(
+          homeRail.top - identity.bottom,
+          `${viewport.id} featured card should follow the identity without a spacer`
         ).toBeGreaterThanOrEqual(-1);
         expect(
-          cover.height - (media.height + identity.height),
-          `${viewport.id} cover should include the tokenized media and identity band`
-        ).toBeLessThanOrEqual(1);
-        expect(
-          identity.bottom,
-          `${viewport.id} identity should stay inside the cover`
-        ).toBeLessThanOrEqual(cover.bottom + 1);
-        expect(
-          homeRail.top - cover.bottom,
-          `${viewport.id} primary card should follow the identity without a spacer`
-        ).toBeGreaterThanOrEqual(0);
-        expect(
-          homeRail.top - cover.bottom,
-          `${viewport.id} primary card should stay close to the identity`
+          homeRail.top - identity.bottom,
+          `${viewport.id} featured card should stay close to the identity`
         ).toBeLessThanOrEqual(8);
         if (viewport.height >= 800 && metrics.nav && metrics.homeRail) {
           const deadSpaceBelowCards = metrics.nav.top - metrics.homeRail.bottom;

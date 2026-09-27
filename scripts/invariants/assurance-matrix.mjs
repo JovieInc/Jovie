@@ -1,4 +1,4 @@
-// JOV-INV-036: canonical assurance matrix — coverage-of-coverage for every
+// JOV-INV-037: canonical assurance matrix — coverage-of-coverage for every
 // critical failure class (JOV-6064). Extends the JOV-5853 commissioning
 // handoff; composes with jovie.certification/v1, JOV-6042 gate integrity and
 // the JOV-6043..6063 domain audits. It is not a second certification registry:
@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const ASSURANCE_MATRIX_INVARIANT_ID = 'JOV-INV-036';
+export const ASSURANCE_MATRIX_INVARIANT_ID = 'JOV-INV-037';
 export const ASSURANCE_MATRIX_SCHEMA = 'jovie.assurance-matrix/v1';
 export const CERTIFICATION_CONTRACT = 'jovie.certification/v1';
 export const ASSURANCE_MATRIX_PATH = 'scripts/invariants/assurance-matrix.json';
@@ -374,7 +374,7 @@ function matrixPolicy(registry) {
   )?.policy?.value;
 }
 
-/** Binds JOV-INV-036's policy to the exact checked-in matrix revision. */
+/** Binds JOV-INV-037's policy to the exact checked-in matrix revision. */
 export function validateAssuranceMatrixPolicy(
   registry,
   { repoRoot = REPO_ROOT } = {}
