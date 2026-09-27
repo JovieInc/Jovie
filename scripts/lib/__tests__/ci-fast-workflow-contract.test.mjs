@@ -404,6 +404,7 @@ describe('ci-fast bounded parallel workflow', () => {
         spotify: 'false',
         kbd: 'false',
         crawler: 'true',
+        overlay: 'false',
       });
 
       const runner = remaining
@@ -423,6 +424,7 @@ describe('ci-fast bounded parallel workflow', () => {
             RUN_SPOTIFY: 'false',
             RUN_KBD: 'false',
             RUN_CRAWLER: 'true',
+            RUN_OVERLAY: 'false',
           },
         }
       );
@@ -433,6 +435,63 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('selects the overlay collision proof when overlay primitives change (JOV-INV-036)', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/OVERLAY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'packages/ui/atoms/dialog.tsx',
+      'packages/ui/atoms/dropdown-menu.tsx',
+      'packages/ui/lib/overlay-styles.ts',
+      'apps/web/styles/tailwind-foundation.css',
+      'apps/web/.storybook/stories/overlay-collisions.stories.tsx',
+      'apps/web/tests/e2e/storybook-overlay-collisions.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'packages/ui/atoms/badge.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const runner = remaining
+      .split('id: storybook-browser-test')[1]
+      .split('      - name: Upload Storybook browser evidence')[0];
+    const selection = runner.slice(
+      runner.indexOf('          specs=()'),
+      runner.indexOf('          pnpm exec storybook dev')
+    );
+    const chosen = spawnSync(
+      'bash',
+      ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUN_SPOTIFY: 'false',
+          RUN_KBD: 'false',
+          RUN_CRAWLER: 'false',
+          RUN_OVERLAY: 'true',
+        },
+      }
+    );
+    expect(chosen.status, chosen.stderr).toBe(0);
+    expect(chosen.stdout.trim().split('\n')).toEqual([
+      'tests/e2e/storybook-overlay-collisions.spec.ts',
+    ]);
   });
 
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {

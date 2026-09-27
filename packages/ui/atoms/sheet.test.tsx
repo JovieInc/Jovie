@@ -371,3 +371,21 @@ describe('Sheet', () => {
     });
   });
 });
+
+describe('Sheet overlay layer contract (JOV-INV-036)', () => {
+  it('keeps its scrim and surface on the sheet layer, below modal dialogs', () => {
+    render(
+      <Sheet open>
+        <SheetContent>
+          <SheetTitle>Rules</SheetTitle>
+          <SheetDescription>Pick a rule.</SheetDescription>
+        </SheetContent>
+      </Sheet>
+    );
+    const content = screen.getByTestId('sheet-content');
+    expect(content.className).toContain('z-sheet');
+    const scrim = document.querySelector('[data-state="open"].fixed.inset-0');
+    expect(scrim?.className).toContain('z-sheet');
+    expect(scrim?.className).not.toContain('z-modal');
+  });
+});

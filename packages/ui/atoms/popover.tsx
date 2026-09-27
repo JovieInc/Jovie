@@ -10,9 +10,93 @@ import {
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
-const Popover = PopoverPrimitive.Root;
-const PopoverTrigger = PopoverPrimitive.Trigger;
-const PopoverAnchor = PopoverPrimitive.Anchor;
+interface PopoverAnchorRegistry {
+  readonly register: () => () => void;
+}
+
+const PopoverAnchorRegistryContext =
+  React.createContext<PopoverAnchorRegistry | null>(null);
+
+/**
+ * Popover root. Closes itself when every trigger/anchor it is positioned
+ * against unmounts, so content never floats detached at a stale position
+ * after its row, card, or button disappears (JOV-INV-036).
+ */
+function Popover({
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Root>) {
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
+  const openRef = React.useRef(open);
+  openRef.current = open;
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (!isControlled) setUncontrolledOpen(next);
+      onOpenChangeRef.current?.(next);
+    },
+    [isControlled]
+  );
+
+  const anchorCount = React.useRef(0);
+  const registry = React.useMemo<PopoverAnchorRegistry>(
+    () => ({
+      register: () => {
+        anchorCount.current += 1;
+        return () => {
+          anchorCount.current -= 1;
+          // Defer so a remount in the same commit (StrictMode, keyed
+          // re-render) re-registers before the popover decides to close.
+          queueMicrotask(() => {
+            if (anchorCount.current === 0 && openRef.current) {
+              handleOpenChange(false);
+            }
+          });
+        };
+      },
+    }),
+    [handleOpenChange]
+  );
+
+  return (
+    <PopoverAnchorRegistryContext.Provider value={registry}>
+      <PopoverPrimitive.Root
+        open={open}
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+    </PopoverAnchorRegistryContext.Provider>
+  );
+}
+
+function useRegisterPopoverAnchor() {
+  const registry = React.useContext(PopoverAnchorRegistryContext);
+  React.useEffect(() => registry?.register(), [registry]);
+}
+
+const PopoverTrigger = React.forwardRef<
+  React.ComponentRef<typeof PopoverPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Trigger>
+>((props, ref) => {
+  useRegisterPopoverAnchor();
+  return <PopoverPrimitive.Trigger ref={ref} {...props} />;
+});
+PopoverTrigger.displayName = PopoverPrimitive.Trigger.displayName;
+
+const PopoverAnchor = React.forwardRef<
+  React.ComponentRef<typeof PopoverPrimitive.Anchor>,
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Anchor>
+>((props, ref) => {
+  useRegisterPopoverAnchor();
+  return <PopoverPrimitive.Anchor ref={ref} {...props} />;
+});
+PopoverAnchor.displayName = PopoverPrimitive.Anchor.displayName;
 
 interface PopoverContentProps
   extends React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> {
