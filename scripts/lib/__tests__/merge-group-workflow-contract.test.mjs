@@ -820,7 +820,7 @@ describe('merge_group workflow contract', () => {
 
     const databaseCertification = getJobBlock(CI_WORKFLOW, 'neon-db');
     expect(databaseCertification).toContain(
-      "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true'"
+      "github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')"
     );
     expect(databaseCertification).toContain('run test:integration');
     expect(databaseCertification).toContain("DB_CERTIFICATION: 'true'");

@@ -2406,7 +2406,7 @@ jobs:
 
       - name: Resolve certification DATABASE_URL
         id: resolve-certification-db-url
-        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: ${{ steps.create-branch.outputs.connection_file }}
@@ -2414,7 +2414,7 @@ jobs:
           fallback_json_key: db_url
 
       - name: Apply branch migrations and verify prior-release upgrade
-        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
         env:
           DATABASE_URL: ${{ steps.resolve-certification-db-url.outputs.database_url }}
           NODE_ENV: test
@@ -2427,7 +2427,7 @@ jobs:
           pnpm --filter=@jovie/web exec tsx scripts/verify-db-migrations.ts
 
       - name: Measure Drizzle tooling frontier
-        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -2444,7 +2444,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run serialized database integration certification
-        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
         env:
           DATABASE_URL: ${{ steps.resolve-certification-db-url.outputs.database_url }}
           DB_CERTIFICATION: 'true'
@@ -2456,7 +2456,7 @@ jobs:
           pnpm --filter=@jovie/web run test:integration
 
       - name: Reject inert database test evidence
-        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
         working-directory: apps/web
         run: |
           node - <<'NODE'
@@ -2472,7 +2472,7 @@ jobs:
           NODE
 
       - name: Upload database certification evidence
-        if: ${{ always() && github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')) }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: database-certification-${{ github.run_id }}-${{ github.run_attempt }}
