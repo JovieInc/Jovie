@@ -1,4 +1,6 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
@@ -265,5 +267,41 @@ describe('HomepageClose', () => {
     expect(screen.getByLabelText('Name')).toHaveFocus();
     expect(screen.getByLabelText('Name')).toHaveValue('Beyoncé');
     expect(submit).not.toHaveBeenCalled();
+  });
+});
+
+describe('HomepageCertifiedSections connected card CSS', () => {
+  it('keeps the connected identity card free of the retired artwork geometry', () => {
+    const css = readFileSync(
+      path.resolve(__dirname, '../../../app/(home)/home.css'),
+      'utf8'
+    );
+    const rule = (selector: string) => {
+      const match = css.match(
+        new RegExp(`\\n${selector.replaceAll('.', '\\.')} \\{([^}]*)\\}`)
+      );
+      expect(match, selector).not.toBeNull();
+      return match![1];
+    };
+
+    // The 1902/827 frame belonged to the removed conceptual artwork; with
+    // the phone export it cropped the image and forced a dead column.
+    expect(rule('.homepage-connected-artwork')).not.toContain('aspect-ratio');
+    expect(css).not.toMatch(/aspect-ratio:\s*1902\s*\/\s*827/);
+    const profile = rule('.homepage-connected-profile');
+    expect(profile).toContain('grid-template-columns: auto auto;');
+    expect(profile).toContain('justify-content: center;');
+    expect(profile).not.toContain('minmax(0, 1fr) auto');
+    // Text on the warm-white artifact uses the inverse page ink, never the
+    // page text token (which is near-white under the forced dark theme).
+    expect(rule('.homepage-connected-profile__name')).toContain(
+      'color: var(--system-b-bg-page);'
+    );
+    expect(rule('.homepage-connected-profile__url')).toContain(
+      'var(--system-b-bg-page)'
+    );
+    expect(rule('.homepage-connected-artwork__image')).toContain(
+      'height: auto;'
+    );
   });
 });
