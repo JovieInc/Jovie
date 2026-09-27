@@ -234,7 +234,7 @@ describe('live public profile lock', () => {
         .getByTestId('public-profile-layout-shell')
         .querySelector('.public-profile-layout-compact-slot') as HTMLElement
     );
-    for (const label of ['Home', 'Music', 'Shows', 'About', 'Menu']) {
+    for (const label of ['Home', 'Music', 'Events', 'About', 'Menu']) {
       expect(compact.getByRole('button', { name: label })).toBeInTheDocument();
     }
 
@@ -304,7 +304,7 @@ describe('live public profile lock', () => {
         'desktop'
       );
       expect(screen.getAllByText('Get updates').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Shows').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
       expect(screen.getAllByText('About').length).toBeGreaterThan(0);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));

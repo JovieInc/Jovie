@@ -71,7 +71,7 @@ describe('AlertsSettingsView', () => {
         name === 'New Music'
           ? 'Singles, albums, and videos.'
           : name === 'Events'
-            ? 'Tour dates and ticket updates.'
+            ? 'Upcoming events and tickets.'
             : name === 'Merch'
               ? 'Drops, restocks, and low-stock updates.'
               : 'Occasional artist updates.'
