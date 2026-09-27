@@ -48,7 +48,7 @@ export default async function AdminGrowthPage({
       <FounderFunnelBand initialFunnel={funnel} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>
-          <h2 className='text-app font-semibold text-primary-token'>
+          <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>
             Lifecycle Coverage
           </h2>
           <p className='mt-1 text-app text-secondary-token'>

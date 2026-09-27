@@ -54,7 +54,7 @@ export default async function ProductPage() {
       <ContentSurfaceCard surface='details'>
         <div className='space-y-3 p-3'>
           <div>
-            <h2 className='text-app font-semibold text-primary-token'>
+            <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>
               Evidence Gaps
             </h2>
             <p className='text-2xs text-tertiary-token'>
