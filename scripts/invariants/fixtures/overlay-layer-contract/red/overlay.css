@@ -1,0 +1,5 @@
+/* Deliberate-red fixture for JOV-INV-036. */
+.banner {
+  position: fixed;
+  z-index: 200;
+}

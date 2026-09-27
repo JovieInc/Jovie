@@ -1810,6 +1810,8 @@ export async function runStructural(opts = {}) {
     'pnpm --filter=@jovie/web run lint:seo',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     'pnpm design:shared-ui-visual-arbitrary:check',
+    // JOV-INV-036: no new raw global-layer z-index values in web source.
+    'pnpm design:overlay-layers:check',
     // JOV-6103: execute the certification kernel and its negative-path tests.
     // A missing selector or dependency must fail, never count as proof.
     CERTIFICATION_KERNEL_COMMAND,

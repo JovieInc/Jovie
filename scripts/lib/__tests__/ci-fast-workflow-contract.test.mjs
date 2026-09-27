@@ -1184,6 +1184,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
     );
+    expect(CI_FAST_SOURCE).toContain("'pnpm design:overlay-layers:check'");
   });
 
   it('keeps the iOS design gate independent from Ubuntu operations', () => {

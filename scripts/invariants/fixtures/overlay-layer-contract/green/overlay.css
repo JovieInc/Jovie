@@ -1,0 +1,8 @@
+/* Green fixture for JOV-INV-036: local stacking and token references. */
+.card-badge {
+  position: relative;
+  z-index: 2;
+}
+.menu {
+  z-index: var(--z-index-popover);
+}
