@@ -141,4 +141,14 @@ describe('SettingsBillingSection', () => {
     expect(staleReason.parentElement).toHaveClass('text-warning');
     expect(staleReason.parentElement?.className).not.toMatch(/amber/);
   });
+
+  it('shows a canonical secondary Syncing badge while billing loads', () => {
+    billingQueryState.isLoading = true;
+
+    render(<SettingsBillingSection />);
+
+    const syncingBadge = screen.getByText('Syncing');
+    expect(syncingBadge).toHaveAttribute('data-variant', 'secondary');
+    expect(syncingBadge.className).not.toMatch(/surface-0|rounded-md/);
+  });
 });

@@ -21,7 +21,7 @@ function BillingStoryShell({
   billing,
   children,
 }: {
-  readonly billing: BillingStatusData;
+  readonly billing: BillingStatusData | null;
   readonly children: ReactNode;
 }) {
   const queryClient = new QueryClient({
@@ -33,7 +33,15 @@ function BillingStoryShell({
       },
     },
   });
-  queryClient.setQueryData(queryKeys.billing.status(), billing);
+  if (billing) {
+    queryClient.setQueryData(queryKeys.billing.status(), billing);
+  } else {
+    // A never-settling in-flight fetch keeps the query's isLoading true.
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.billing.status(),
+      queryFn: () => new Promise<BillingStatusData>(() => {}),
+    });
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -91,6 +99,17 @@ export const Free: Story = {
           stripeSubscriptionId: null,
         }}
       >
+        <Story />
+      </BillingStoryShell>
+    ),
+  ],
+};
+
+/** Billing status query in flight: isLoading renders the "Syncing" badge. */
+export const Loading: Story = {
+  decorators: [
+    Story => (
+      <BillingStoryShell billing={null}>
         <Story />
       </BillingStoryShell>
     ),
