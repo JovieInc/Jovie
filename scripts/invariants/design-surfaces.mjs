@@ -44,10 +44,9 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import ts from 'typescript';
 
 import { readInvariantRegistry } from './registry.mjs';
 
@@ -289,7 +288,15 @@ export function scanScaffoldingCopy(relPath, sourceText) {
   return findings;
 }
 
+// `typescript` loads on first parse, not at import: scanned-paths.mjs pulls
+// this module's root constants into sparse CI checkouts (e.g. the rolling-ci
+// FX finisher) that ship no node_modules.
+const requireFromHere = createRequire(import.meta.url);
+/** @type {typeof import('typescript')} */
+let ts;
+
 function parseTs(relPath, sourceText) {
+  ts ??= requireFromHere('typescript');
   return ts.createSourceFile(
     relPath,
     sourceText,
