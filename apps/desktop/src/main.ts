@@ -12,6 +12,7 @@ import {
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  powerMonitor,
   type Session,
   screen,
   session,
@@ -55,6 +56,8 @@ import {
   hasNightlyUpdateFlag,
   NIGHTLY_UPDATE_TIMEOUT_MS,
   shouldInstallDownloadedUpdateNow,
+  shouldInstallDownloadedUpdateWhileRunning,
+  shouldRunWakeUpdateCheck,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
@@ -71,6 +74,9 @@ import {
   decideHudBuildReload,
   getHudBuildFingerprint,
   isHudRoutePath,
+  isWebBuildReloadPath,
+  shouldReloadWindowForWebBuild,
+  UNSENT_INPUT_PROBE,
 } from './hud-build-reload';
 import { resolveIpcSenderUrl } from './ipc-sender';
 import {
@@ -306,6 +312,9 @@ let pendingLegacyAuthReturnRoute: string | null = null;
 let desktopBrowserAuthRouteState = emptyDesktopBrowserAuthRouteState();
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
+// webContents ids still showing the web build that preceded the current one.
+const webBuildReloadPending = new Set<number>();
+let lastDesktopUpdateCheckMs: number | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
 
@@ -1538,16 +1547,74 @@ async function fetchHudBuildFingerprint(): Promise<string | null> {
   }
 }
 
-function reloadAppWindowsForHudBuildChange(): void {
+function isWebBuildReloadWindow(win: BrowserWindow): boolean {
+  if (win.isDestroyed()) return false;
+  const parsed = parseUrl(win.webContents.getURL());
+  return (
+    parsed?.origin === APP_ORIGIN && isWebBuildReloadPath(parsed.pathname)
+  );
+}
+
+/** Unreadable renderers count as holding input: never drop text on a guess. */
+async function windowHasUnsentInput(win: BrowserWindow): Promise<boolean> {
+  try {
+    return (
+      (await win.webContents.executeJavaScript(UNSENT_INPUT_PROBE)) === true
+    );
+  } catch {
+    return true;
+  }
+}
+
+async function anyWindowHasUnsentInput(): Promise<boolean> {
+  const results = await Promise.all(
+    BrowserWindow.getAllWindows()
+      .filter(isWebBuildReloadWindow)
+      .map(windowHasUnsentInput)
+  );
+  return results.some(Boolean);
+}
+
+function anyWindowAudible(): boolean {
+  return BrowserWindow.getAllWindows().some(
+    win => !win.isDestroyed() && win.webContents.isCurrentlyAudible()
+  );
+}
+
+async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
+  const systemIdleSeconds = powerMonitor.getSystemIdleTime();
+  const liveIds = new Set<number>();
   for (const win of BrowserWindow.getAllWindows()) {
-    if (isHudWindow(win)) {
+    if (!isWebBuildReloadWindow(win)) continue;
+    const id = win.webContents.id;
+    liveIds.add(id);
+    if (!webBuildReloadPending.has(id)) continue;
+
+    const isHud = isHudWindow(win);
+    const reload = shouldReloadWindowForWebBuild({
+      isHud,
+      visible: win.isVisible() && !win.isMinimized(),
+      focused: win.isFocused(),
+      audible: win.webContents.isCurrentlyAudible(),
+      hasUnsentInput: isHud ? false : await windowHasUnsentInput(win),
+      systemIdleSeconds,
+    });
+    if (reload && !win.isDestroyed()) {
+      webBuildReloadPending.delete(id);
       win.webContents.reload();
     }
+  }
+  for (const id of webBuildReloadPending) {
+    if (!liveIds.has(id)) webBuildReloadPending.delete(id);
   }
 }
 
 async function checkHudBuildAndReload(): Promise<void> {
-  if (!BrowserWindow.getAllWindows().some(isHudWindow)) {
+  const reloadable = BrowserWindow.getAllWindows().filter(
+    isWebBuildReloadWindow
+  );
+  if (reloadable.length === 0) {
+    webBuildReloadPending.clear();
     return;
   }
 
@@ -1559,7 +1626,12 @@ async function checkHudBuildAndReload(): Promise<void> {
   currentHudBuildFingerprint = decision.nextFingerprint;
 
   if (decision.shouldReload) {
-    reloadAppWindowsForHudBuildChange();
+    for (const win of reloadable) {
+      if (!win.isDestroyed()) webBuildReloadPending.add(win.webContents.id);
+    }
+  }
+  if (webBuildReloadPending.size > 0) {
+    await reloadIdleWindowsForWebBuildChange();
   }
 }
 
@@ -2351,6 +2423,7 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
     pendingManualUpdateCheck = true;
   }
 
+  lastDesktopUpdateCheckMs = Date.now();
   const pending =
     mode === 'notify'
       ? autoUpdater.checkForUpdatesAndNotify()
@@ -2369,9 +2442,51 @@ function scheduleDesktopAutoUpdate(): void {
 
   const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
   const interval = setInterval(() => {
+    void installDownloadedUpdateIfIdle();
     runDesktopUpdateCheck('silent');
   }, UPDATE_INTERVAL_MS);
   interval.unref?.();
+
+  // A laptop that slept through the interval checks as soon as it is back.
+  const checkAfterWake = () => {
+    if (
+      shouldRunWakeUpdateCheck({
+        nowMs: Date.now(),
+        lastCheckMs: lastDesktopUpdateCheckMs,
+      })
+    ) {
+      runDesktopUpdateCheck('silent');
+    }
+  };
+  powerMonitor.on('resume', checkAfterWake);
+  powerMonitor.on('unlock-screen', checkAfterWake);
+}
+
+/** Restart into a downloaded update only overnight, idle, and with no work at risk. */
+async function installDownloadedUpdateIfIdle(): Promise<void> {
+  if (!updateReadyToInstall || nightlyUpdateLaunch) return;
+  const baseline = {
+    updateReadyToInstall,
+    localHour: new Date().getHours(),
+    systemIdleSeconds: powerMonitor.getSystemIdleTime(),
+    audible: anyWindowAudible(),
+  };
+  if (
+    !shouldInstallDownloadedUpdateWhileRunning({
+      ...baseline,
+      hasUnsentInput: false,
+    })
+  ) {
+    return;
+  }
+  if (
+    shouldInstallDownloadedUpdateWhileRunning({
+      ...baseline,
+      hasUnsentInput: await anyWindowHasUnsentInput(),
+    })
+  ) {
+    autoUpdater.quitAndInstall(true, true);
+  }
 }
 
 function scheduleNightlyUpdateLaunchAgent(): void {
@@ -2399,6 +2514,9 @@ function scheduleHudBuildAutoReload(): void {
   }, HUD_BUILD_INFO_POLL_INTERVAL_MS);
 
   interval.unref?.();
+  powerMonitor.on('resume', () => {
+    void checkHudBuildAndReload();
+  });
 }
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
@@ -2562,7 +2680,9 @@ autoUpdater.on('update-downloaded', () => {
     })
   ) {
     autoUpdater.quitAndInstall(true, false);
+    return;
   }
+  void installDownloadedUpdateIfIdle();
 });
 
 autoUpdater.on('update-not-available', () => {

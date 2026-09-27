@@ -212,7 +212,7 @@
     "qa:releases:loop": "tsx scripts/releases-dashboard-qa-loop.ts"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^4.0.92",
+    "@ai-sdk/gateway": "^4.0.94",
     "@ai-sdk/react": "^4.0.119",
     "@better-auth/oauth-provider": "1.7.6",
     "@better-auth/passkey": "1.7.6",
@@ -331,7 +331,7 @@
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@tailwindcss/postcss": "^4.3.3",
-    "@tanstack/react-query-devtools": "^5.103.2",
+    "@tanstack/react-query-devtools": "^5.103.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

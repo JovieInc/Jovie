@@ -110,6 +110,7 @@ web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|deskto
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
+web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
 web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
@@ -121,6 +122,8 @@ web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
+web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
+web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile

@@ -1,6 +1,6 @@
 import nextra from 'nextra';
 import { loadArticleRegistry } from './lib/article-registry.mjs';
-import { buildRedirects } from './lib/redirects.mjs';
+import { buildDocsRedirects } from './lib/help-center-seo.mjs';
 
 const withNextra = nextra({});
 
@@ -12,7 +12,6 @@ export default withNextra({
     },
   },
   async redirects() {
-    const { articles } = loadArticleRegistry();
-    return buildRedirects(articles);
+    return buildDocsRedirects(loadArticleRegistry()).redirects;
   },
 });
