@@ -37,6 +37,13 @@ describe('support route header contract', () => {
     );
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
+    // Canonical Pen header: the Customers flyout is the only glass flyout.
+    expect(headerSource).toContain(
+      'const MARKETING_GLASS_FLYOUT_MENUS: readonly HeaderFlyoutMenu[] = [\n  MARKETING_CUSTOMERS_FLYOUT,\n];'
+    );
+    expect(headerSource).toContain(
+      'flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,'
+    );
     expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
     expect(headerSource).toContain('showContactLink={false}');

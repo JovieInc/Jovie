@@ -23,6 +23,7 @@ import {
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import {
+  MARKETING_CUSTOMERS_FLYOUT,
   MARKETING_NAV_LINKS,
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
@@ -37,12 +38,14 @@ export type MarketingHeaderCta = HeaderNavCta;
 
 // Display copy is never a lookup key. Keep desktop and mobile destinations in
 // the same declared order; only the desktop shell adds visual treatment.
+// The Customers flyout renders between the wordmark and these links, so the
+// desktop order is Customers, Product, Pricing (Pen header, 2026-09-26).
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-  ...MARKETING_NAV_LINKS.map(
-    (link, index): MarketingHeaderNavLink =>
-      index === 0 ? { ...link, treatment: 'leading' } : link
-  ),
+  ...MARKETING_NAV_LINKS.map((link): MarketingHeaderNavLink => ({ ...link })),
+];
+const MARKETING_GLASS_FLYOUT_MENUS: readonly HeaderFlyoutMenu[] = [
+  MARKETING_CUSTOMERS_FLYOUT,
 ];
 // Icon-only pages drop the desktop wordmark; the logo reveals it on hover.
 const MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY: readonly MarketingHeaderNavLink[] =
@@ -97,7 +100,7 @@ function resolveNavConfig(
     return { flyoutMenus: undefined, mobileNavLinks: [], desktopNavLinks: [] };
   }
   return {
-    flyoutMenus: undefined,
+    flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
     desktopNavLinks: iconOnly
       ? MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY

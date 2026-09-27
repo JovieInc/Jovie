@@ -162,8 +162,6 @@ export const APP_ROUTES = {
   CLI: '/cli',
   API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',
-  INVESTORS: '/investors',
-  PITCH: '/pitch',
   PLAYLISTS: '/playlists',
   LANDING_NEW: '/new',
   PRICING: '/pricing',

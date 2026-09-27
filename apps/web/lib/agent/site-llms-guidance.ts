@@ -72,7 +72,7 @@ Do not use ${APP_NAME} for:
 - **Founder-only Ovie control**: ${BASE_URL}${OVIE_MCP_RESOURCE_PATH} — OAuth 2.1 MCP with scopes \`${OVIE_OAUTH_SCOPES.join(', ')}\`; not public artist API access
 - **Ovie protected-resource metadata**: ${BASE_URL}${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH}
 - **Ovie authorization-server metadata**: ${BASE_URL}${OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH} — issuer ${BASE_URL}${OVIE_OAUTH_ISSUER_PATH}
-- **Docs**: ${DOCS_URL}
+- **Docs**: ${DOCS_URL}/docs
 - **Sitemap**: ${BASE_URL}/sitemap.xml
 - **Full site guide**: ${BASE_URL}/llms-full.txt
 ${buildFeatureAvailabilityLines()}`;
