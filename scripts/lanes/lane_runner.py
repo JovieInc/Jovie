@@ -881,8 +881,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
-            sh(["git", "worktree", "add", "-q", "-B", pr["headRefName"], str(worktree),
-                f"origin/{pr['headRefName']}"], cwd=host.repo, log=log)
+            add_worktree(host, ["-B", pr["headRefName"], str(worktree), f"origin/{pr['headRefName']}"], log)
             lockfile_only = pr.get("mergeStateStatus") == "DIRTY" \
                 and resolve_lockfile_conflict(worktree, pr["headRefName"], log)
             agent = None
@@ -905,6 +904,9 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                 sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
         except subprocess.TimeoutExpired:
             receipt.update(verdict="failed", reasons=["timeout"])
+        except WorktreeUnavailable as error:
+            # Usually the PR merged or closed between listing and this run: nothing to fix.
+            receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
@@ -952,15 +954,17 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
-            sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
+            add_worktree(host, ["--detach", str(worktree), "origin/main"], log)
             sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
             labels = {label["name"].lower() for label in pr.get("labels", [])}
             receipt.update(gate_pr(host, pr, worktree, log, sensitive=SENSITIVE_PR_LABEL in labels))
+        except WorktreeUnavailable as error:
+            receipt.update(verdict="skipped", reasons=[f"worktree-unavailable:{error}"[:300]])
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
             remove_worktree(host, worktree)
-    if receipt.get("verdict") in ("gate-timeout", "failed"):
+    if receipt.get("verdict") in ("gate-timeout", "failed", "skipped"):
         # Not verified: forget the claim so the next adopt pass retries this head.
         update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
     receipt["endedAt"] = now_iso()
@@ -1302,6 +1306,16 @@ def cooling(host: Host, name: str) -> bool:
         return float(path.read_text()) > time.time()
     except (OSError, ValueError):
         return False
+
+
+class WorktreeUnavailable(Exception):
+    """git could not create the run's worktree (branch merged/deleted, git lock contention)."""
+
+
+def add_worktree(host: Host, args: list[str], log) -> None:
+    added = sh(["git", "worktree", "add", "-q", *args], cwd=host.repo, log=log)
+    if added.returncode != 0:
+        raise WorktreeUnavailable((added.stderr or f"git exit {added.returncode}").strip()[:200])
 
 
 def remove_worktree(host: Host, worktree: Path) -> None:
