@@ -1,5 +1,6 @@
 import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -63,7 +64,21 @@ export default async function AlternativesPage({
       <script type='application/ld+json'>{faqSchema}</script>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <MarketingHero variant='left'>
+      <MarketingHero
+        variant='left'
+        className='marketing-hero-dock relative overflow-hidden'
+      >
+        <div className='absolute inset-0 -z-10' aria-hidden='true'>
+          <Image
+            fill
+            priority
+            sizes='100vw'
+            src={data.heroImage.src}
+            alt={data.heroImage.alt}
+            className='object-cover opacity-25'
+          />
+          <div className='absolute inset-0 bg-gradient-to-b from-base via-base/70 to-base' />
+        </div>
         <p className='text-sm font-medium text-tertiary-token'>Alternative</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl line-clamp-2'>
           {data.heroHeadline}
