@@ -187,7 +187,7 @@ async function markSpotifyImportFailed(profileId: string): Promise<void> {
   }
 }
 
-async function getOwnedProfile(profileId: string, clerkUserId: string) {
+async function getOwnedProfile(profileId: string, appUserId: string) {
   const [profile] = await db
     .select({
       dbUserId: users.id,
@@ -199,9 +199,7 @@ async function getOwnedProfile(profileId: string, clerkUserId: string) {
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(
-      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-    )
+    .where(and(eq(creatorProfiles.id, profileId), eq(users.id, appUserId)))
     .limit(1);
 
   if (!profile) {
