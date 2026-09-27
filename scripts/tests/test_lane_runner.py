@@ -30,12 +30,38 @@ def issue(identifier="JOV-1", priority=2, created="2026-09-01T00:00:00Z", labels
 
 class SelectionTest(unittest.TestCase):
     def test_orders_like_symphony_priority_then_age_with_none_last(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
             issue("JOV-3", priority=0),
             issue("JOV-2", priority=1, created="2026-09-03T00:00:00Z"),
             issue("JOV-1", priority=1, created="2026-09-02T00:00:00Z"),
-        ], {})
+        ], {}, now=now)
         self.assertEqual(picked.identifier, "JOV-1")
+
+    def test_newer_urgent_work_stays_ahead_of_work_inside_aging_window(self):
+        now = datetime(2026, 9, 3, 12, tzinfo=timezone.utc).timestamp()
+        picked = lane.pick_issue([
+            issue("JOV-1", priority=1, created="2026-09-03T11:00:00Z"),
+            issue("JOV-2", priority=2, created="2026-09-02T13:00:00Z"),
+        ], {}, now=now)
+        self.assertEqual(picked.identifier, "JOV-1")
+
+    def test_aged_work_eventually_precedes_a_sustained_urgent_stream(self):
+        now = datetime(2026, 9, 5, tzinfo=timezone.utc).timestamp()
+        picked = lane.pick_issue([
+            issue("JOV-1", priority=1, created="2026-09-04T23:00:00Z"),
+            issue("JOV-4", priority=4, created="2026-09-01T00:00:00Z"),
+        ], {}, now=now)
+        self.assertEqual(picked.identifier, "JOV-4")
+
+    def test_unprioritized_work_ages_without_malformed_dates_jumping_the_queue(self):
+        now = datetime(2026, 9, 6, tzinfo=timezone.utc).timestamp()
+        picked = lane.pick_issue([
+            issue("JOV-1", priority=1, created="2026-09-05T23:00:00Z"),
+            issue("JOV-0", priority=0, created="2026-09-01T00:00:00Z"),
+            issue("JOV-BAD", priority=0, created="not-a-date"),
+        ], {}, now=now)
+        self.assertEqual(picked.identifier, "JOV-0")
 
     def test_skips_excluded_and_exhausted_work_but_drains_the_shared_pool(self):
         picked = lane.pick_issue([

@@ -56,6 +56,10 @@ LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
 PROVIDER_COOLDOWN_S = 900
+# Waiting work gains one priority level per day, capped at urgent. This preserves
+# urgent-first admission while guaranteeing that a sustained P1 stream cannot
+# starve older work forever.
+PRIORITY_AGING_S = 24 * 3600
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
@@ -106,11 +110,22 @@ def failure_record(value) -> dict:
     return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
 
 
+def created_at_epoch(value: str) -> float | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.timestamp() if parsed.tzinfo is not None else None
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset()) -> Issue | None:
-    """Symphony's order: priority 1..4 then none, oldest first; skip excluded work,
-    3x failures, issues still inside their retry backoff, and issues that already have an
-    open lane PR anywhere (one PR per issue: the fix/adopt loop owns those)."""
+    """Symphony orders by aged priority then age, while preserving urgent-first admission.
+
+    Waiting work gains one priority level per day until it reaches P1, preventing a
+    sustained stream of newer urgent work from starving older work. Excluded work,
+    3x failures, retry backoff, and issues with an open lane PR remain ineligible.
+    """
     now = time.time() if now is None else now
     in_flight = {identifier.lower() for identifier in in_flight}
 
@@ -123,7 +138,15 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
         if not EXCLUDED_LABELS & {label.lower() for label in issue.labels} and retryable(issue.identifier)
         and issue.identifier.lower() not in in_flight
     ]
-    eligible.sort(key=lambda issue: (issue.priority or 5, issue.created_at))
+
+    def admission_order(issue: Issue) -> tuple[int, float]:
+        created_at = created_at_epoch(issue.created_at)
+        base_priority = issue.priority or 5
+        waited = max(0, now - created_at) if created_at is not None else 0
+        effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
+        return effective_priority, created_at if created_at is not None else float("inf")
+
+    eligible.sort(key=admission_order)
     return eligible[0] if eligible else None
 
 

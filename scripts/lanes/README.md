@@ -13,7 +13,7 @@ The harness, not the model, owns:
 
 | Concern | Where |
 |---|---|
-| Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth) | `worker()`, `pick_issue()`, `in_flight_issues()` |
+| Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | Slot locks that die with their holder | `Locked` |
 | Fresh worktree from `origin/main`, `pnpm install --prefer-offline`, removal after | `run_issue()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |

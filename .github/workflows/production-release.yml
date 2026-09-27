@@ -869,6 +869,7 @@ jobs:
           PRODUCTION_NEXT_CACHE_RESTORE_HIT: ${{ steps.production-next-cache-restore.outputs.cache-hit }}
           PRODUCTION_NEXT_CACHE_SAVE_ENABLED: ${{ vars.JOVIE_PRODUCTION_NEXT_CACHE_SAVE || 'false' }}
           PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           production_stage() {
             set -euo pipefail
@@ -949,8 +950,10 @@ jobs:
 
           provenance_dir="$RUNNER_TEMP/production-input-provenance"
           mkdir "$provenance_dir"
+          node .github/scripts/production-input-provenance.mjs sbom \
+            "$provenance_dir/sbom.cdx.json"
           node .github/scripts/production-input-provenance.mjs inputs \
-            "$provenance_dir/inputs.json"
+            "$provenance_dir/inputs.json" "$provenance_dir/sbom.cdx.json"
 
           if ! env -u TURBO_REMOTE_ONLY \
             VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
@@ -1007,7 +1010,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           provenance_digests="$(node .github/scripts/production-input-provenance.mjs artifact \
-            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json")"
+            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json" \
+            "$provenance_dir/sbom.cdx.json")"
           read -r input_receipt_digest artifact_digest <<< "$provenance_digests"
           [[ "$input_receipt_digest" =~ ^[0-9a-f]{64}$ && "$artifact_digest" =~ ^[0-9a-f]{64}$ ]] || \
             fail_stage "Production input receipt digest is invalid." production_artifact_failed
