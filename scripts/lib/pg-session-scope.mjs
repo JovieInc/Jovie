@@ -19,8 +19,23 @@ const SESSION_SET_CONFIG = /set_config\s*\([^()]*,\s*false\s*\)/i;
 // Role/database defaults persist for every future session, pooled or not.
 const PERSISTENT_SET = /\bALTER\s+(?:ROLE|USER|DATABASE)\b[^;]*\bSET\b/i;
 
+// SQL comments can sit between keywords (`SET /* x */ foo = on`). Strip block
+// comments and `-- ` line comments; shell flags (`--no-psqlrc`) have no space.
+function stripSqlComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--\s[^\n]*/g, ' ');
+}
+
+// Statement-leading transaction control would end a read-only wrapper.
+const TRANSACTION_CONTROL =
+  /(?:^|[;\n])\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE|PREPARE\s+TRANSACTION)\b/i;
+
+export function findTransactionControl(sql) {
+  const match = stripSqlComments(String(sql ?? '')).match(TRANSACTION_CONTROL);
+  return match ? match[0].trim() : null;
+}
+
 export function findSessionScopedSql(text) {
-  const source = String(text ?? '');
+  const source = stripSqlComments(String(text ?? ''));
   const set = source.match(SESSION_SET);
   if (set) return set[0].trim();
   const config = source.match(SESSION_SET_CONFIG);

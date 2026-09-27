@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
-import { buildPsqlArgs } from '../../scripts/db/prod-read.mjs';
+import {
+  buildPsqlArgs,
+  READ_ONLY_PGOPTIONS,
+} from '../../scripts/db/prod-read.mjs';
 import {
   directNeonUrl,
   sessionScopeViolation,
@@ -34,6 +37,8 @@ test('blocks the incident command and other session-scoped settings', () => {
     `psql "$DATABASE_URL" -c "select set_config('default_transaction_read_only', 'on', false)"`,
     `psql "$DATABASE_URL" -c "ALTER ROLE neondb_owner SET default_transaction_read_only = on"`,
     `psql "$DATABASE_URL" <<'SQL'\nset search_path to public;\nselect 1;\nSQL`,
+    `psql "$DATABASE_URL" -c "SET /* read only */ default_transaction_read_only=on"`,
+    `psql "$DATABASE_URL" -c "select 1; -- note\nSET statement_timeout = 0"`,
   ]) {
     assert.ok(sessionScopeViolation(command), command);
     const result = runHook(command);
@@ -53,6 +58,7 @@ test('allows transaction-scoped and unrelated commands', () => {
     `psql "$DB" -c "select set_config('app.clerk_user_id', 'u', true)"`,
     'set -euo pipefail; pnpm test',
     'git config --global user.name x',
+    `psql --no-psqlrc "$DB" -c "select 1"`,
   ]) {
     assert.equal(sessionScopeViolation(command), null, command);
     assert.equal(runHook(command).status, 0, command);
@@ -87,4 +93,13 @@ test('prod-read targets the direct endpoint inside a read-only transaction', () 
     () => buildPsqlArgs(POOLER, 'set default_transaction_read_only=on; select 1'),
     /Refusing session-scoped SQL/
   );
+  for (const query of [
+    'COMMIT; DELETE FROM creator_profiles',
+    'select 1; begin read write; delete from leads',
+    'rollback; /* x */ delete from leads',
+    '\\! echo hi',
+  ]) {
+    assert.throws(() => buildPsqlArgs(POOLER, query), /Refusing transaction control/, query);
+  }
+  assert.equal(READ_ONLY_PGOPTIONS, '-c default_transaction_read_only=on');
 });
