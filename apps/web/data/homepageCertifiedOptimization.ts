@@ -34,9 +34,7 @@ export const HOMEPAGE_CERTIFIED_CONTEXT = {
 export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
   variantIdentity: HOMEPAGE_CERTIFIED_VARIANT_ID,
   exposure: HOMEPAGE_CERTIFIED_EVENTS.EXPOSURE,
-  outcome: FEATURE_FLAGS.WAITLIST_ENABLED
-    ? HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED
-    : HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
+  outcome: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
   attribution: {
     surfaces: [
       'analytics',
@@ -59,13 +57,12 @@ export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
     'content-variant',
   ],
   hypothesis:
-    'A broad company homepage converts qualified visitors through Request access while gated, and a name-search hero when open.',
-  primaryMetric: FEATURE_FLAGS.WAITLIST_ENABLED
-    ? 'homepage_certified_access_requested / homepage_certified_exposed'
-    : 'homepage_certified_search_submitted / homepage_certified_exposed',
+    'A broad company homepage converts qualified visitors through the name-search hero into /start.',
+  primaryMetric:
+    'homepage_certified_search_submitted / homepage_certified_exposed',
   guardrails: [
     'No implied customers or borrowed logos on `/`.',
-    'No competing hero CTA: Request access while gated, Search your name → Find me when open.',
+    'No competing hero CTA: Search your name → Find me hands off to /start.',
     'Broad company-level copy; do not narrow the homepage to one ICP.',
     'Do not persist search query text in analytics properties.',
   ],

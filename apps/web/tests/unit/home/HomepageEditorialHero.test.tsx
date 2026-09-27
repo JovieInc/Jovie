@@ -65,21 +65,22 @@ describe('HomepageEditorialHero', () => {
       { placement: 'close' }
     );
   });
-  it('routes waitlist-on visitors to access with no name-search control', () => {
+  it('keeps the name search and /start handoff when the waitlist gate is on', () => {
     gate.WAITLIST_ENABLED = true;
-    renderHero();
-    expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(trackAction).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      expect.objectContaining({ placement: 'hero' })
+    const { container } = renderHero();
+    expect(screen.getByRole('combobox')).toHaveAttribute(
+      'placeholder',
+      'Search your name'
     );
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+      'Find me'
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Get started')).not.toBeInTheDocument();
+    expect(container.innerHTML).toContain('Search your name');
+    expect(container.innerHTML).toContain('Find me');
   });
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();

@@ -9,7 +9,10 @@ import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { HomepageTrackedLink } from './HomepageTrackedLink';
 
-/** Both Bloom actions use the same build-time gate; auth still owns access. */
+/**
+ * Closing action only. The hero always mounts the name search; this gate
+ * must not replace that conversion with a waitlist link.
+ */
 export function HomepagePrimaryAction(props: HeroSpotifySearchProps) {
   if (!FEATURE_FLAGS.WAITLIST_ENABLED) {
     return <HeroSpotifySearch {...props} />;
