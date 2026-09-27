@@ -13,7 +13,7 @@ afterEach(async () => {
   );
 });
 
-async function renderIcon(size: number): Promise<sharp.Sharp> {
+async function renderIcon(size: number): Promise<ReturnType<typeof sharp>> {
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-icon-'));
   fixtureRoots.push(root);
   const output = join(root, `icon-${size}.png`);
@@ -21,7 +21,7 @@ async function renderIcon(size: number): Promise<sharp.Sharp> {
   return sharp(output);
 }
 
-async function alphaBounds(icon: sharp.Sharp): Promise<{
+async function alphaBounds(icon: ReturnType<typeof sharp>): Promise<{
   minX: number;
   maxX: number;
   minY: number;
