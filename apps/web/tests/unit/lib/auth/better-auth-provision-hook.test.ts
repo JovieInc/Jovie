@@ -48,6 +48,7 @@ vi.mock('@/lib/db/schema/better-auth', () => ({
   baOauthConsents: {},
   baOauthRefreshTokens: {},
   baOauthResources: {},
+  baPasskeys: {},
   baSessions: {},
   baUsers: {},
   baVerifications: {},

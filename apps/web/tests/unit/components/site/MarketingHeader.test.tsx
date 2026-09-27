@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
@@ -226,28 +226,103 @@ describe('MarketingHeader', () => {
     ).toHaveAttribute('href', '/signup');
   });
 
-  it('applies and cleans up homepage-style scroll treatment', () => {
+  it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {
     mockUsePathname.mockReturnValue('/artist-profiles');
-    const removeEventListener = vi.spyOn(window, 'removeEventListener');
-    const { unmount } = render(<MarketingHeader />);
-    const header = screen.getByTestId('header-nav');
-
-    expect(header).not.toHaveAttribute('data-scrolled');
-
-    Object.defineProperty(window, 'scrollY', {
-      configurable: true,
-      value: 24,
-    });
-    fireEvent.scroll(window);
-
-    expect(header).toHaveAttribute('data-scrolled', 'true');
-
-    unmount();
-    expect(removeEventListener).toHaveBeenCalledWith(
-      'scroll',
-      expect.any(Function)
+    const observers: {
+      callback: IntersectionObserverCallback;
+      observed: Element[];
+      disconnect: ReturnType<typeof vi.fn>;
+    }[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observed: Element[] = [];
+        disconnect = vi.fn();
+        constructor(public callback: IntersectionObserverCallback) {
+          observers.push(this);
+        }
+        observe(element: Element) {
+          this.observed.push(element);
+        }
+        unobserve() {}
+        takeRecords() {
+          return [];
+        }
+      }
     );
-    removeEventListener.mockRestore();
+    try {
+      const { unmount } = render(<MarketingHeader />);
+      const header = screen.getByTestId('header-nav');
+      const sentinel = screen.getByTestId('header-nav-scroll-sentinel');
+
+      expect(header).toHaveClass('header-nav--docked');
+      expect(header).not.toHaveAttribute('data-scrolled');
+      expect(sentinel).toHaveAttribute('aria-hidden', 'true');
+
+      const observer = observers.find(item => item.observed.includes(sentinel));
+      if (!observer) throw new Error('Sentinel must be observed');
+      const fire = (isIntersecting: boolean) =>
+        act(() => {
+          observer.callback(
+            [{ isIntersecting } as IntersectionObserverEntry],
+            {} as IntersectionObserver
+          );
+        });
+
+      fire(false);
+      expect(header).toHaveAttribute('data-scrolled', 'true');
+      fire(true);
+      expect(header).not.toHaveAttribute('data-scrolled');
+
+      unmount();
+      expect(observer.disconnect).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps the desktop wordmark lockup by default and marks it for the reveal guard', () => {
+    render(<MarketingHeader />);
+
+    expect(screen.getByTestId('header-nav')).toHaveAttribute(
+      'data-brand-lockup',
+      'desktop'
+    );
+    expect(screen.getByTestId('site-logo-link')).toHaveAttribute(
+      'data-logo-reveal',
+      'true'
+    );
+  });
+
+  it('goes icon-only when the page hero already names Jovie', () => {
+    mockUsePathname.mockReturnValue('/download');
+
+    render(<MarketingHeader />);
+
+    const header = screen.getByTestId('header-nav');
+    expect(
+      document.querySelector('.marketing-glass-header__brand-wordmark')
+    ).toBeNull();
+    expect(header).not.toHaveAttribute('data-brand-lockup');
+    const logoLink = screen.getByTestId('site-logo-link');
+    expect(logoLink).toHaveClass('logo-reveal');
+    expect(logoLink).toHaveAccessibleName('Jovie');
+    expect(screen.getByTestId('logo-reveal-mark')).toContainElement(
+      logoLink.querySelector('[data-brand-variant="jovie"]') as HTMLElement
+    );
+    const wordmark = screen.getByTestId('logo-reveal-wordmark');
+    expect(wordmark).toHaveTextContent('Jovie');
+    expect(wordmark).toHaveAttribute('aria-hidden', 'true');
+    expect(wordmark).toHaveClass('logo-reveal__wordmark');
+  });
+
+  it('lets a page force the brand presentation explicitly', () => {
+    render(<MarketingHeader brand='icon' />);
+
+    expect(
+      document.querySelector('.marketing-glass-header__brand-wordmark')
+    ).toBeNull();
+    expect(screen.getByTestId('site-logo-link')).toHaveClass('logo-reveal');
   });
 
   it('renders explicit custom nav links when the shared nav flag is enabled', () => {

@@ -1,5 +1,7 @@
 # Shipping display information architecture
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 The Gem ultrawide HUD and Ovie Ops are different presentations of the same
 shipping system. They may differ in density and diagnostics, but they must not
 rename or visually reinterpret the shared operational concepts below.
@@ -108,7 +110,7 @@ latency, geometry, whether a clear was required, and the continuity contract.
 The focused structural/golden contract is repeatable with:
 
 ```bash
-python3 scripts/symphony/tests/gem-checkin-hud.test.py
+python3 symphony-control/tests/gem-checkin-hud.test.py
 ```
 
 ## Pressure thresholds

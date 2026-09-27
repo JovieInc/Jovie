@@ -9,7 +9,7 @@ describe('HomepageV2FinalCta', () => {
     expect(screen.getByTestId('homepage-v2-final-cta')).toBeInTheDocument();
     expect(
       screen.getByTestId('homepage-v2-final-cta-heading')
-    ).toHaveTextContent('Keep your music moving.');
+    ).toHaveTextContent('Keep your work moving.');
     expect(
       screen.getByTestId('homepage-v2-final-cta-primary')
     ).toHaveTextContent('Get started');

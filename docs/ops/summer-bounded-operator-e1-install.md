@@ -1,9 +1,11 @@
 # Summer bounded-operator — E1 install (JOV-6163)
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 Close repair-to-runtime. Never claim E1 from `--self-test`/coalesce-skip. Never
 weaken `maxAgeMs=600000`. Publisher code is on main (#17725); live Gem install is
 external. If tip churn coalesces past Activate Gem **Install**, dispatch
-publisher-only `gem-publisher-commission.yml` on `jovie-fixed` with
+publisher-only `gem-publisher-commission.yml` (retired from Jovie; JovieInc/symphony-control) on `jovie-fixed` with
 `tip_sha=<40-hex main tip>` + `confirm=install-jov-6163-publisher`. Download
 `e1-publisher-commission-observations`, then:
 
@@ -17,10 +19,9 @@ Exit 0 before `SUMMER_RUNNER_SOURCE_ATTESTATION_*`. Cursor/Fable: 403 on dispatc
 `JOVIE_CONFIGURATION_SOURCE_REVISION` → install on `gem-service-attestation`
 timer → two ≤600s observations → no `runner-source-attestation-unavailable` hold.
 
-
 ## Snapshot publisher and installer source
 
-Gem's existing drain cycle invokes `scripts/symphony/summer_bottleneck_producer.py`.
+Gem's existing drain cycle invokes `symphony-control/summer_bottleneck_producer.py`.
 The rehabilitation installer owns that publisher and its `summer_admissions.py`
 and `summer_existing_repair.py` dependencies. Install them together from one
 reviewed Jovie revision; installing only the service-attestation emitter does

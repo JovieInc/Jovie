@@ -57,17 +57,4 @@ describe('last30days skill adoption (GH-10926)', () => {
     // cost cap required
     expect(content).toContain('$0.30');
   });
-
-  it('Hermes Air config template includes idea-radar schedule', () => {
-    const configPath = join(
-      repoRoot,
-      'scripts/symphony/config.air.template.yaml'
-    );
-    expect(existsSync(configPath), `missing: ${configPath}`).toBe(true);
-    const content = readFileSync(configPath, 'utf8');
-    expect(content).toContain('idea-radar-sweep');
-    expect(content).toContain('0 9 * * 1');
-    // must reference the cost cap
-    expect(content).toContain('cost_cap_usd');
-  });
 });

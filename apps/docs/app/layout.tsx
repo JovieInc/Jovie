@@ -1,21 +1,23 @@
-import { Head, Search } from 'nextra/components';
+import { Head } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
 import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import 'nextra-theme-docs/style.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { HelpCenterSearch } from '@/components/HelpCenterSearch';
 import {
   filterNavigationPageMap,
   loadArticleRegistry,
 } from '@/lib/article-registry.mjs';
+import './help-search.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Jovie Docs',
-    template: '%s | Jovie Docs',
+    default: 'Jovie Help Center',
+    template: '%s | Jovie Help Center',
   },
   description:
-    'Documentation for Jovie - the platform for musicians to manage their career.',
+    'Clear answers for building your profile, sharing your work, and understanding your audience.',
 };
 
 export default async function RootLayout({
@@ -47,10 +49,12 @@ export default async function RootLayout({
             <Navbar
               logo={
                 <span style={{ fontWeight: 700, fontSize: 18 }}>
-                  Jovie Docs
+                  Jovie Help Center
                 </span>
               }
-            />
+            >
+              <HelpCenterSearch variant='mobile-only' />
+            </Navbar>
           }
           pageMap={pageMap}
           docsRepositoryBase='https://github.com/JovieInc/Jovie/tree/main/apps/docs'
@@ -58,7 +62,7 @@ export default async function RootLayout({
           footer={
             <Footer>Copyright {new Date().getFullYear()} Jovie Inc.</Footer>
           }
-          search={<Search />}
+          search={<HelpCenterSearch variant='desktop-only' />}
         >
           {children}
         </Layout>

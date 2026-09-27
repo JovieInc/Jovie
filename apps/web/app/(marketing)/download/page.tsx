@@ -147,7 +147,7 @@ export default function DownloadPage() {
 
       <main
         data-page='download'
-        className='overflow-x-clip bg-(--system-b-cinematic-black) text-(--system-b-text-primary)'
+        className='marketing-hero-dock marketing-hero-dock--inset overflow-x-clip bg-(--system-b-cinematic-black) text-(--system-b-text-primary)'
       >
         <section aria-labelledby='download-hero-heading'>
           <div className='relative flex min-h-svh flex-col overflow-hidden pt-28 sm:pt-32'>

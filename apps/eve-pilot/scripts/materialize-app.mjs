@@ -339,7 +339,7 @@ The source export is preparatory; deployment and commissioning require separate 
     ),
     contracts: {
       shadow: 'jovie.ovie-summer-shadow.event/v1',
-      commercial: 'jovie.summer-commercial.snapshot/v1',
+      commercial: 'jovie.summer-commercial.snapshot/v2',
     },
     status: 'prepared-not-commissioned',
   };

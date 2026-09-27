@@ -1,4 +1,19 @@
-# Commercial recommendations (JOV-5949)
+# Commercial recommendations (JOV-5949, composed with JOV-6065)
+
+The active objective is **LYB shipped + $5,000 MRR by 2026-10-05**. Every
+candidate must declare direct, unblocker, risk-invariant, or compounding work,
+with a causal path (and a bounded invariant for risk work), expected objective
+impact, and agent/CI/founder/cash cost. The snapshot also carries the current
+funnel bottleneck, all six funnel stages, and constrained capacity. Old v1
+snapshots fail closed so an objective change cannot retain a stale priority.
+
+Current-bottleneck LYB direct work and unblockers win contested capacity.
+Stop-ship invariants and paid/control rescue remain protected. Compounding work
+enters the commercial pool only when no eligible current-bottleneck objective
+work exists; this is how genuinely spare capacity is surfaced without stealing
+revenue-path capacity. A fresh bottleneck source changes that pool on the next
+snapshot. Summer remains the governor, Linear the ledger, and Symphony the
+executor; this projection grants no mutation authority.
 
 The deterministic projection consumes a complete bounded snapshot, not a stream
 of amounts to sum. Every metric references a source ID, record URL, revision,
