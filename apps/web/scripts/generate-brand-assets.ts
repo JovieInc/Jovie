@@ -242,7 +242,7 @@ async function renderAppIcon(output: string, size: number): Promise<void> {
   });
 }
 
-async function renderDesktopAppIcon(
+export async function renderDesktopAppIcon(
   output: string,
   size: number
 ): Promise<void> {
