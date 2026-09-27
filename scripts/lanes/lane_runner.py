@@ -1179,12 +1179,14 @@ def dispatch(host: Host) -> int:
         ensure_full_history(host)
         prune_worktrees(host)
         for name, spec in load_providers().items():
-            if not spec.get("enabled", True) or cooling(host, name):
+            slots = host.slots(name, spec.get("slots", 1))
+            # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
+            if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
                 continue
             if not provider_healthy(spec):
                 tick["unhealthy"].append(name)
                 continue
-            for _ in range(host.slots(name, spec.get("slots", 1))):
+            for _ in range(slots):
                 subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  start_new_session=True)
