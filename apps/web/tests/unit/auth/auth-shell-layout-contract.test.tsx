@@ -94,6 +94,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   isElectronRuntime: () => false,
   openDesktopAuthUrl: vi.fn(),
+  redeemDesktopAuthReturnCode: vi.fn(),
+  supportsDesktopAuthReturnCode: () => false,
 }));
 
 import { AuthModalShell } from '@/components/auth/AuthModalShell';

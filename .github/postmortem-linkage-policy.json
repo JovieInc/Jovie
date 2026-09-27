@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "issue": "JOV-6689",
+  "mode": "warn",
+  "blockingAfter": "2026-10-04T00:00:00Z"
+}
