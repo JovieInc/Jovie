@@ -43,7 +43,7 @@ describe('affected-test selector inventory', () => {
 describe('structural control stage execution', () => {
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(16);
+    expect(stages).toHaveLength(17);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -120,6 +120,18 @@ describe('structural control stage execution', () => {
       [
         '--test',
         '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/vercel-output-validate.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=85',
+        '--test-coverage-functions=90',
+        '.github/scripts/vercel-output-validate.test.mjs',
+      ],
+    ]);
+    expect(stages[15]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
         '--test-coverage-include=.github/scripts/production-input-provenance.mjs',
         '--test-coverage-lines=85',
         '--test-coverage-branches=75',
@@ -127,7 +139,7 @@ describe('structural control stage execution', () => {
         '.github/scripts/production-input-provenance.test.mjs',
       ],
     ]);
-    expect(stages[15]).toEqual([
+    expect(stages[16]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);

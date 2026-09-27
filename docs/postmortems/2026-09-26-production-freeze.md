@@ -150,7 +150,7 @@ Two independent mechanisms, in sequence:
 | Issue | Control | Class | State | Live verification receipt |
 | --- | --- | --- | --- | --- |
 | [JOV-6684](https://linear.app/jovie/issue/JOV-6684) | Production freshness alert opens `incident` | `silent-production-staleness` | Backlog | pending |
-| [JOV-6685](https://linear.app/jovie/issue/JOV-6685) | `.vercel/output` extraction-invariant validator | `serial-layer-discovery` | Backlog | pending |
+| [JOV-6685](https://linear.app/jovie/issue/JOV-6685) | `.vercel/output` extraction-invariant validator | `serial-layer-discovery` | In Review | pending |
 | [JOV-6686](https://linear.app/jovie/issue/JOV-6686) | Validator before upload and in the merge queue | `pre-merge-parity-gap` | Backlog (blocked by JOV-6685) | pending |
 | [JOV-6687](https://linear.app/jovie/issue/JOV-6687) | Controller convergence invariant and simulation | `non-convergent-control-loop` | Backlog | pending |
 | [JOV-5934](https://linear.app/jovie/issue/JOV-5934) | Exact-SHA lineage ledger, no skipped-as-green | `green-by-implication` | In Review (existing) | pending |
