@@ -1,26 +1,29 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
+import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import {
   HOMEPAGE_CERTIFIED_EVENTS,
   HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT,
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
 
-const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
-vi.mock('@/components/homepage/homepage-analytics', () => ({
-  trackHomepageEvent: trackAction,
-}));
-
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
+const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
+const push = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
 beforeEach(() => {
-  gate.WAITLIST_ENABLED = false;
+  gate.WAITLIST_ENABLED = true;
+  push.mockClear();
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+  page: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -44,42 +47,34 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
-  it('attributes a standalone closing access action to its caller', () => {
+  it('keeps the name search and /start handoff while the waitlist gate is on', () => {
     gate.WAITLIST_ENABLED = true;
-    render(
-      <HomepagePrimaryAction
-        submitTestId='closing-access'
-        submitAnalytics={{
-          eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-          properties: { placement: 'close' },
-        }}
-      />
+    const html = renderToStaticMarkup(
+      <>
+        <HomepageEditorialHero
+          headingId='home-hero-heading'
+          headline='Control how the world sees you.'
+          support='Find what the internet knows. Turn it into relationships.'
+          search={{ placeholder: 'Search your name', action: 'Find me' }}
+        />
+        <HomepageNoScriptContent />
+      </>
     );
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(action).toHaveAttribute('href', '/signup');
-    expect(action).toHaveAttribute('data-testid', 'closing-access');
-    expect(trackAction).toHaveBeenLastCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      { placement: 'close' }
-    );
-  });
-  it('routes waitlist-on visitors to access with no name-search control', () => {
-    gate.WAITLIST_ENABLED = true;
+    expect(html).toContain('Search your name');
+    expect(html).toContain('Find me');
+    expect(html).toMatch(/href="\/start"/);
+    expect(html).not.toContain('Request access');
+    expect(html).not.toContain('Get started');
+
     renderHero();
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'Ada Lovelace' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Find me' }));
+    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/start\?/));
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    const action = screen.getByRole('link', { name: 'Request access' });
-    action.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(action);
-    expect(trackAction).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      expect.objectContaining({ placement: 'hero' })
-    );
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
   });
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();

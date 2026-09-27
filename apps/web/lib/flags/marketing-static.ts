@@ -28,6 +28,8 @@ export const FEATURE_FLAGS = {
   // "Claim your free profile" on /start. The server-side waitlist gate
   // (`isWaitlistGateEnabled`) still owns post-auth routing. Flip to false
   // to open the doors. /waitlist remains the pending-receipt route.
+  // This flag does not gate the homepage hero. JOV-5085 / JOV-5864 lock `/`
+  // to the name search (Search your name → Find me → /start).
   WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: true,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
