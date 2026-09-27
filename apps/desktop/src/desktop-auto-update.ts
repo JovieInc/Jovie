@@ -168,3 +168,46 @@ export function renderNightlyUpdateLaunchAgentPlist(input: {
 </plist>
 `;
 }
+
+/** Keyboard/mouse idle time before a running app may restart into an update. */
+export const IDLE_UPDATE_INSTALL_SECONDS = 20 * 60;
+/** Local hours [start, end) in which an idle running app may restart. */
+export const IDLE_UPDATE_INSTALL_WINDOW = { startHour: 1, endHour: 6 } as const;
+
+/**
+ * A long-running app otherwise installs only on quit, so it can sit on a
+ * downloaded update for days. Overnight, it restarts into the update when the
+ * Mac has been idle and nothing is playing or waiting to be sent. Voice capture
+ * lives in the renderer and is invisible here, hence the long idle floor and
+ * the overnight-only window. (The nightly LaunchAgent cannot signal a running
+ * app: `open -a` drops --args for an already-running bundle.)
+ */
+export function shouldInstallDownloadedUpdateWhileRunning(input: {
+  readonly updateReadyToInstall: boolean;
+  readonly localHour: number;
+  readonly systemIdleSeconds: number;
+  readonly audible: boolean;
+  readonly hasUnsentInput: boolean;
+}): boolean {
+  return (
+    input.updateReadyToInstall &&
+    input.localHour >= IDLE_UPDATE_INSTALL_WINDOW.startHour &&
+    input.localHour < IDLE_UPDATE_INSTALL_WINDOW.endHour &&
+    !input.audible &&
+    !input.hasUnsentInput &&
+    input.systemIdleSeconds >= IDLE_UPDATE_INSTALL_SECONDS
+  );
+}
+
+/** Minimum gap between wake/unlock-triggered update checks. */
+export const WAKE_UPDATE_CHECK_MIN_INTERVAL_MS = 5 * 60 * 1000;
+
+export function shouldRunWakeUpdateCheck(input: {
+  readonly nowMs: number;
+  readonly lastCheckMs: number | null;
+}): boolean {
+  return (
+    input.lastCheckMs === null ||
+    input.nowMs - input.lastCheckMs >= WAKE_UPDATE_CHECK_MIN_INTERVAL_MS
+  );
+}

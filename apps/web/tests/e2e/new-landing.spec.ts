@@ -36,11 +36,11 @@ test.describe('/new landing page', () => {
 
     await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
     await expect(
-      headerNav.getByRole('link', { name: 'About', exact: true })
-    ).toHaveAttribute('href', APP_ROUTES.ABOUT);
-    await expect(
-      headerNav.getByRole('link', { name: 'For Artists', exact: true })
+      headerNav.getByRole('link', { name: 'Product', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.PRODUCT);
+    await expect(
+      headerNav.getByRole('button', { name: /Customers/ })
+    ).toHaveCount(1);
     await expect(
       headerNav.getByRole('button', { name: 'For', exact: true })
     ).toHaveCount(0);

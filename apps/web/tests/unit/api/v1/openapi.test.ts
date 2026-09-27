@@ -156,7 +156,7 @@ describe('public artist OpenAPI contract', () => {
       { url: 'https://jov.ie', description: 'Production API origin' },
     ]);
     expect(ARTIST_OPENAPI_DOCUMENT.externalDocs.url).toBe(
-      'https://docs.jov.ie/docs/api-reference'
+      'https://docs.jov.ie/docs/developers/api-reference'
     );
     expect(ARTIST_OPENAPI_DOCUMENT.externalDocs.description).toContain(
       'lifecycle policy'

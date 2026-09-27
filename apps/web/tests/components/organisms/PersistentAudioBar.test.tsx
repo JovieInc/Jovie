@@ -394,6 +394,22 @@ describe('PersistentAudioBar', () => {
     );
   });
 
+  it('keeps track identity out of the desktop controls and timeline dock', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar />);
+
+    const desktopDock = screen.getByTestId('audio-surface-expanded-shell');
+    expect(within(desktopDock).queryByText('Midnight Drive')).toBeNull();
+    expect(within(desktopDock).queryByText('DJ Cool')).toBeNull();
+    expect(
+      within(desktopDock).getByRole('button', { name: 'Pause (space)' })
+    ).toBeInTheDocument();
+    expect(
+      within(desktopDock).getByRole('button', { name: 'Show waveform' })
+    ).toBeInTheDocument();
+  });
+
   it('expands to show the waveform and BPM · key facts only when known', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', bpm: 118, musicalKey: '8A' });

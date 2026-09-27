@@ -807,7 +807,13 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
+      # The production SBOM (`pnpm licenses list`) reads package index files
+      # from the pnpm store. An exact node_modules cache hit restores the tree
+      # without any store, which froze production (JOV-6726). Install from the
+      # lockfile into a warm store here instead of restoring a cached tree.
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          package_cache: 'false'
       # Production runtime config comes from the isolated Doppler `prd`
       # service token. Vercel remains the deployment control plane only.
       - uses: ./.github/actions/setup-doppler
@@ -950,8 +956,10 @@ jobs:
 
           provenance_dir="$RUNNER_TEMP/production-input-provenance"
           mkdir "$provenance_dir"
-          node .github/scripts/production-input-provenance.mjs sbom \
-            "$provenance_dir/sbom.cdx.json"
+          if ! node .github/scripts/production-input-provenance.mjs sbom \
+            "$provenance_dir/sbom.cdx.json"; then
+            fail_stage "Unable to generate the production SBOM from the installed dependency tree." production_artifact_failed
+          fi
           node .github/scripts/production-input-provenance.mjs inputs \
             "$provenance_dir/inputs.json" "$provenance_dir/sbom.cdx.json"
 
