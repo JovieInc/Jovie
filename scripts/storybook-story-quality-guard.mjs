@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 /**
  * Storybook story quality guard.
  *
@@ -105,22 +105,32 @@ function gitOutput(args) {
 // ancestor" after the job had verified the checkout was unshallowed; the
 // context below tells the next occurrence whether HEAD was cut off.
 function checkoutContext() {
-  const shallowFile = gitOutput(['rev-parse', '--git-path', 'shallow']);
-  const boundaries =
-    shallowFile && existsSync(path.resolve(root, shallowFile))
-      ? readFileSync(path.resolve(root, shallowFile), 'utf8')
-          .split('\n')
-          .filter(Boolean).length
-      : 0;
+  const gitPath = name => {
+    const file = gitOutput(['rev-parse', '--git-path', name]);
+    return file ? path.resolve(root, file) : '';
+  };
+  const shallowPath = gitPath('shallow');
+  const boundaryShas =
+    shallowPath && existsSync(shallowPath)
+      ? readFileSync(shallowPath, 'utf8').split('\n').filter(Boolean)
+      : [];
   const shallow =
     gitOutput(['rev-parse', '--is-shallow-repository']) === 'true' ||
-    boundaries > 0;
+    boundaryShas.length > 0;
   const head = gitOutput(['rev-parse', '--short', 'HEAD']) || 'unknown';
   const reachable = gitOutput(['rev-list', '--count', 'HEAD']) || 'unknown';
-  return {
-    shallow,
-    summary: `HEAD ${head}, ${reachable} commits reachable, ${boundaries} shallow boundaries`,
-  };
+  let summary = `HEAD ${head}, ${reachable} commits reachable, ${boundaryShas.length} shallow boundaries`;
+  if (boundaryShas.length > 0) {
+    // Name who cut the history: when the shallow file was written, where the
+    // cut is, and what the most recent fetch retrieved.
+    const fetchHeadPath = gitPath('FETCH_HEAD');
+    const lastFetch =
+      fetchHeadPath && existsSync(fetchHeadPath)
+        ? readFileSync(fetchHeadPath, 'utf8').split('\n')[0].trim()
+        : 'none';
+    summary += `; boundary ${boundaryShas.slice(0, 3).join(',')}; shallow file written ${statSync(shallowPath).mtime.toISOString()}; last fetch: ${lastFetch || 'none'}`;
+  }
+  return { shallow, summary };
 }
 
 function stringConstants(text) {

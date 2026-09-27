@@ -129,6 +129,8 @@ export const Fixture = { parameters: { pen: { sourceSha: '${receiptSha}' } } };
       expect(result.status).toBe(1);
       expect(output).toContain('story-provenance-shallow');
       expect(output).toContain('2 commits reachable, 1 shallow boundaries');
+      expect(output).toContain(`boundary ${boundarySha}`);
+      expect(output).toContain('last fetch: none');
       expect(output).not.toContain('story-provenance-ancestor');
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
