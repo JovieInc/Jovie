@@ -82,9 +82,9 @@ export async function qualifyLead(
   const instagramLink = extraction.links.find(
     l => l.platformId === 'instagram'
   );
-  const musicToolsDetected = platforms.filter(p =>
-    MUSIC_TOOL_PLATFORMS.has(p!)
-  ) as string[];
+  const musicToolsDetected = [
+    ...new Set(platforms.filter(p => MUSIC_TOOL_PLATFORMS.has(p!))),
+  ] as string[];
   const trackingPixelPlatforms = Object.keys(
     extraction.discoveredPixels ?? {}
   ).sort((left, right) => left.localeCompare(right));

@@ -1322,6 +1322,20 @@ def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     assert "pnpm --filter=@jovie/web run test" in job
 
 
+def test_nightly_bypass_server_warms_auth_landing_route() -> None:
+    """The chaos sweep's first navigation must not eat a cold dev compile.
+
+    Playwright global setup skips route warmup when BASE_URL is external, so
+    the readiness step has to compile /app via the test-auth enter route or
+    auth.setup times out on page.goto (JOV-6818).
+    """
+    step = _step_block("nightly-tests.yml", "Start route QA bypass server")
+
+    assert "api/dev/test-auth/enter?persona=creator&redirect=/app" in step
+    assert "curl -fsSL" in step
+    assert "--max-time" in step
+
+
 def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     """Missing Slack credentials must not make the notification job fail."""
     job = _job_block("nightly-tests.yml", "notify")

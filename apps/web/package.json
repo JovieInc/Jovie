@@ -225,6 +225,7 @@
     "@headlessui/react": "^2.2.10",
     "@jovie/action-contracts": "workspace:*",
     "@jovie/copy": "workspace:*",
+    "@jovie/extension-contracts": "workspace:*",
     "@jovie/agent-transport-contracts": "workspace:^",
     "@jovie/audio-contracts": "workspace:*",
     "@jovie/auth-routing": "workspace:*",
