@@ -2,8 +2,8 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import {
-  type AcquisitionMachineCertification,
-  machineCertifyPremadeProfile,
+  type AcquisitionPreflightResult,
+  runPremadeProfilePreflight,
 } from '@/lib/acquisition';
 import type { Lead, LeadSignalSnapshot } from '@/lib/db/schema/leads';
 import {
@@ -22,7 +22,7 @@ export const PUBLIC_REQUALIFICATION_SCOPE =
 export const PUBLIC_REQUALIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Bump when derived public fit inputs change so old receipts stay immutable. */
 export const PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION =
-  'public-fit-inputs/v2' as const;
+  'public-fit-inputs/v3' as const;
 
 /**
  * Public DSP signals mirror the existing fit-scoring service's supported
@@ -194,7 +194,7 @@ export interface PublicCandidateRun {
   publicObservation: PublicCandidateObservation;
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
-  machineCertification: AcquisitionMachineCertification;
+  preflightReadiness: AcquisitionPreflightResult;
 }
 
 export interface PublicRequalificationResult {
@@ -213,7 +213,7 @@ export interface PublicRequalificationResult {
   expiresAt: string;
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
-  machineCertification: AcquisitionMachineCertification;
+  preflightReadiness: AcquisitionPreflightResult;
   state: PublicCandidateRun['state'];
   deduplicated: boolean;
   publicObservation: PublicCandidateObservation;
@@ -371,7 +371,7 @@ export function buildPublicRun(input: {
     dspPlatformCount: dspSignals.dspPlatformCount,
     hasTrackingPixels: input.qualification.hasTrackingPixels,
   });
-  const evidence = machineCertifyPremadeProfile({
+  const evidence = runPremadeProfilePreflight({
     displayName: input.qualification.displayName,
     avatarUrl: input.qualification.avatarUrl,
     hasSpotifyLink: input.qualification.hasSpotifyLink,
@@ -387,11 +387,11 @@ export function buildPublicRun(input: {
     fitScoreBreakdown: stableDecisionBreakdown(
       fitResult.breakdown as unknown as Record<string, unknown>
     ),
-    machineCertification: {
+    preflightReadiness: {
       experimentId: evidence.experimentId,
       rubricId: evidence.rubricId,
       passed: evidence.passed,
-      confidence: evidence.confidence,
+      checklistCoverage: evidence.checklistCoverage,
       criteria: evidence.criteria,
       failures: evidence.failures,
     },
@@ -409,7 +409,7 @@ export function buildPublicRun(input: {
       fitInputVersion: PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
     },
   };
-  const machineCertification: AcquisitionMachineCertification = {
+  const preflightReadiness: AcquisitionPreflightResult = {
     ...evidence,
     receipts: evidence.receipts.map(receipt => ({
       ...receipt,
@@ -445,11 +445,11 @@ export function buildPublicRun(input: {
     sourceDigest,
     decisionDigest,
     sourceUrls,
-    state: machineCertification.passed ? 'human_review' : 'machine_failed',
+    state: preflightReadiness.passed ? 'human_review' : 'machine_failed',
     publicObservation,
     fitScore: fitResult.score,
     fitScoreBreakdown,
-    machineCertification,
+    preflightReadiness,
   };
 }
 
@@ -470,7 +470,7 @@ export function resultFromRun(run: PublicCandidateRun, deduplicated: boolean) {
     expiresAt: run.expiresAt,
     fitScore: run.fitScore,
     fitScoreBreakdown: run.fitScoreBreakdown,
-    machineCertification: run.machineCertification,
+    preflightReadiness: run.preflightReadiness,
     state: run.state,
     deduplicated,
     publicObservation: run.publicObservation,
@@ -479,6 +479,10 @@ export function resultFromRun(run: PublicCandidateRun, deduplicated: boolean) {
 export function runFromMetadata(
   metadata: Record<string, unknown>
 ): PublicCandidateRun | null {
+  // Runs written before the preflight rename stored the same object under
+  // `machineCertification`; read both keys so older receipts stay usable.
+  const preflightReadiness =
+    metadata.preflightReadiness ?? metadata.machineCertification;
   if (
     metadata.contract !== PUBLIC_REQUALIFICATION_CONTRACT ||
     typeof metadata.candidateId !== 'string' ||
@@ -493,14 +497,15 @@ export function runFromMetadata(
     typeof metadata.fitScore !== 'number' ||
     !metadata.publicObservation ||
     typeof metadata.publicObservation !== 'object' ||
-    !metadata.machineCertification ||
-    typeof metadata.machineCertification !== 'object'
+    !preflightReadiness ||
+    typeof preflightReadiness !== 'object'
   ) {
     return null;
   }
   const sourceRevision = metadata.sourceRevision;
   return {
     ...metadata,
+    preflightReadiness,
     attemptEventType:
       typeof metadata.attemptEventType === 'string'
         ? metadata.attemptEventType
