@@ -109,11 +109,18 @@ import {
 } from '@/lib/notifications/domain';
 import { generateSubscriptionManagementToken } from '@/lib/notifications/management-token';
 
+// `limit`/`execute` are terminal chain methods on the mocked fluent db object
+// above; they don't exist on DbType, so expose them through a typed handle.
+const mockedDb = db as unknown as {
+  limit: ReturnType<typeof vi.fn>;
+  execute: ReturnType<typeof vi.fn>;
+};
+
 describe('notifications/domain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(db.limit).mockReset().mockResolvedValue([]);
-    vi.mocked(db.execute).mockReset().mockResolvedValue(undefined);
+    vi.mocked(mockedDb.limit).mockReset().mockResolvedValue([]);
+    vi.mocked(mockedDb.execute).mockReset().mockResolvedValue(undefined);
   });
 
   describe('subscribeToNotificationsDomain', () => {
@@ -151,7 +158,7 @@ describe('notifications/domain', () => {
         '@/lib/notifications/sms-consent'
       );
 
-      vi.mocked(db.limit)
+      vi.mocked(mockedDb.limit)
         .mockResolvedValueOnce([
           {
             id: artistId,
@@ -198,10 +205,9 @@ describe('notifications/domain', () => {
 
     it('keeps the subscribe success path when audience enrichment fails', async () => {
       const artistId = '123e4567-e89b-12d3-a456-426614174000';
-      const { db } = await import('@/lib/db');
       const { captureError } = await import('@/lib/error-tracking');
 
-      vi.mocked(db.limit)
+      vi.mocked(mockedDb.limit)
         .mockResolvedValueOnce([
           {
             id: artistId,
@@ -214,7 +220,7 @@ describe('notifications/domain', () => {
         ])
         .mockResolvedValueOnce([]);
 
-      vi.mocked(db.execute).mockRejectedValueOnce(
+      vi.mocked(mockedDb.execute).mockRejectedValueOnce(
         new Error('column "latest_referrer_url" does not exist')
       );
 
@@ -373,7 +379,7 @@ describe('notifications/domain', () => {
     });
 
     it('rejects artist email opt-in without a management token', async () => {
-      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+      vi.mocked(mockedDb.limit).mockResolvedValue([baseRow]);
 
       const result = await updateContentPreferencesDomain({
         artist_id: artistId,
@@ -390,7 +396,7 @@ describe('notifications/domain', () => {
     });
 
     it('rejects enabling a disabled category without a token', async () => {
-      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+      vi.mocked(mockedDb.limit).mockResolvedValue([baseRow]);
 
       const result = await updateContentPreferencesDomain({
         artist_id: artistId,
@@ -408,7 +414,7 @@ describe('notifications/domain', () => {
     });
 
     it('allows opt-outs without a token', async () => {
-      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+      vi.mocked(mockedDb.limit).mockResolvedValue([baseRow]);
 
       const result = await updateContentPreferencesDomain({
         artist_id: artistId,
@@ -427,7 +433,7 @@ describe('notifications/domain', () => {
     });
 
     it('allows escalation with a valid management token', async () => {
-      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+      vi.mocked(mockedDb.limit).mockResolvedValue([baseRow]);
       const token = generateSubscriptionManagementToken(
         artistId,
         'fan@example.com'
@@ -447,7 +453,7 @@ describe('notifications/domain', () => {
     });
 
     it('rejects a token bound to a different email', async () => {
-      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+      vi.mocked(mockedDb.limit).mockResolvedValue([baseRow]);
       const token = generateSubscriptionManagementToken(
         artistId,
         'other@example.com'
@@ -473,7 +479,7 @@ describe('notifications/domain', () => {
         email: null,
         channel: 'sms',
       };
-      vi.mocked(db.limit).mockResolvedValue([smsRow]);
+      vi.mocked(mockedDb.limit).mockResolvedValue([smsRow]);
       const token = generateSubscriptionManagementToken(
         artistId,
         'fan@example.com'
