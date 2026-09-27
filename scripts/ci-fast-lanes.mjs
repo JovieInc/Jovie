@@ -290,12 +290,14 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/company-registry.test.mjs',
   'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/impact-forecast.test.mjs',
   'scripts/summer-commissioning/product-quality-governor.test.mjs',
   'scripts/summer-commissioning/project-creation-policy.test.mjs',
   'scripts/summer-commissioning/receipt-trust.test.mjs',
   'scripts/upstash-production-operator.test.mjs',
   'scripts/vercel-source-contract.test.mjs',
   'scripts/verify-workflow-references.test.mjs',
+  'scripts/visual-baseline-adopt.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
@@ -1773,6 +1775,7 @@ export async function runStructural(opts = {}) {
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs',
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/promotion-loss-metrics.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/promotion-loss-metrics.test.mjs',
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
