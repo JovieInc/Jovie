@@ -37,7 +37,7 @@ import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
 } from '@/lib/profile/unclaimed-artist-profile';
-import { trackServerEvent } from '@/lib/server-analytics';
+import { trackServerEvent, trackServerEventTx } from '@/lib/server-analytics';
 import { finalizePostOnboarding } from './post-onboarding';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -326,6 +326,21 @@ export async function connectOnboardingSpotifyArtist(
             source: 'direct_profile_spotify_match',
             finalizeOnboarding: true,
           });
+
+          // Durable funnel events commit atomically with the claim inside
+          // this transaction; stable identities deduplicate retries.
+          await trackServerEventTx(
+            tx,
+            'claim_completed',
+            { profileId: profile.id, source: 'direct_profile_spotify_match' },
+            { eventIdentity: `claim_completed:${profile.id}` }
+          );
+          await trackServerEventTx(
+            tx,
+            'activation_achieved',
+            { profileId: profile.id, source: 'onboarding_completed' },
+            { eventIdentity: `activation_achieved:${profile.id}` }
+          );
 
           await tx
             .update(creatorProfiles)

@@ -2,7 +2,7 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { withTimeout } from '@/lib/resilience/primitives';
 
@@ -28,7 +28,9 @@ interface ServerAnalyticsEventDefinition {
     | 'release'
     | 'tour'
     | 'notification'
-    | 'entitlement';
+    | 'entitlement'
+    | 'funnel'
+    | 'billing';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -175,6 +177,42 @@ export const SERVER_ANALYTICS_EVENTS = {
     category: 'entitlement',
     properties: ['gate', 'source', 'toolName', 'code', 'planRequired'],
   },
+  claim_started: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  claim_completed: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  signup_completed: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  activation_achieved: {
+    category: 'funnel',
+    properties: ['profileId', 'source'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  checkout_initiated: {
+    category: 'funnel',
+    properties: ['checkoutSessionId', 'plan', 'source'],
+  },
+  payment_succeeded: {
+    category: 'billing',
+    properties: ['stripeEventId', 'billingReason', 'checkoutSessionId'],
+  },
+  subscription_renewed: {
+    category: 'billing',
+    properties: ['stripeEventId', 'billingReason'],
+  },
+  subscription_churned: {
+    category: 'billing',
+    properties: ['stripeEventId'],
+  },
 } as const satisfies Record<string, ServerAnalyticsEventDefinition>;
 
 export type ServerAnalyticsEventName = keyof typeof SERVER_ANALYTICS_EVENTS;
@@ -241,7 +279,12 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
   {
     path: 'app/onboarding/actions/connect-spotify.ts',
     invocations: 1,
-    events: ['releases_synced'],
+    events: ['releases_synced', 'claim_completed', 'activation_achieved'],
+  },
+  {
+    path: 'app/onboarding/actions/index.ts',
+    invocations: 0,
+    events: ['claim_completed', 'signup_completed', 'activation_achieved'],
   },
   {
     path: 'app/r/[slug]/page.tsx',
@@ -265,6 +308,26 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     invocations: 1,
     events: ['entitlement_denial'],
   },
+  {
+    path: 'app/api/stripe/checkout/route.ts',
+    invocations: 1,
+    events: ['checkout_initiated'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/payment-handler.ts',
+    invocations: 1,
+    events: ['payment_succeeded', 'subscription_renewed'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/subscription-handler.ts',
+    invocations: 1,
+    events: ['subscription_churned'],
+  },
+  {
+    path: 'lib/claim/context.ts',
+    invocations: 1,
+    events: ['claim_started'],
+  },
 ] as const satisfies ReadonlyArray<{
   readonly path: string;
   readonly invocations: number;
@@ -281,14 +344,18 @@ const UUID_PROPERTY_NAMES = new Set([
   'tourDateId',
 ]);
 const SAFE_TOKEN_PROPERTY_NAMES = new Set([
+  'billingReason',
+  'checkoutSessionId',
   'code',
   'error_type',
   'gate',
+  'plan',
   'planRequired',
   'provider',
   'reason',
   'result',
   'source',
+  'stripeEventId',
   'toolName',
 ]);
 const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -381,7 +448,11 @@ const UUID_PATTERN =
 const SAFE_TOKEN_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export type ServerAnalyticsDelivery =
-  | { readonly ok: true; readonly eventId: string }
+  | {
+      readonly ok: true;
+      readonly eventId: string | null;
+      readonly deduplicated: boolean;
+    }
   | {
       readonly ok: false;
       readonly error:
@@ -390,6 +461,16 @@ export type ServerAnalyticsDelivery =
         | 'persistence_failed'
         | 'delivery_unknown';
     };
+
+export interface ServerAnalyticsEmitOptions {
+  /**
+   * Stable, server-derived identity for idempotent emission. When present, the
+   * insert runs under the `event_identity` unique constraint so retries,
+   * refreshes, and webhook redeliveries record the business event exactly
+   * once. Must match the safe-token pattern (e.g. `stripe:evt_123`).
+   */
+  readonly eventIdentity?: string;
+}
 
 function isKnownEvent(event: string): event is ServerAnalyticsEventName {
   return Object.hasOwn(SERVER_ANALYTICS_EVENTS, event);
@@ -443,14 +524,22 @@ function sanitizeProperties(
   return sanitized;
 }
 
-export async function trackServerEvent(
-  event: string,
-  properties?: Record<string, unknown>,
-  _distinctId?: string
-): Promise<ServerAnalyticsDelivery> {
-  // JOV-5245 owns identity. This sink deliberately keeps its no-op identity
-  // contract and never persists the raw distinct id.
+type PreparedInsert =
+  | {
+      readonly ok: true;
+      readonly eventName: ServerAnalyticsEventName;
+      readonly values: typeof serverAnalyticsEvents.$inferInsert;
+    }
+  | {
+      readonly ok: false;
+      readonly error: 'unknown_event' | 'invalid_properties';
+    };
 
+function prepareServerAnalyticsInsert(
+  event: string,
+  properties: Record<string, unknown> | undefined,
+  options?: ServerAnalyticsEmitOptions
+): PreparedInsert {
   if (!isKnownEvent(event)) {
     Sentry.captureException(new Error('Unknown server analytics event'), {
       tags: {
@@ -481,31 +570,74 @@ export async function trackServerEvent(
     return { ok: false, error: 'invalid_properties' };
   }
 
-  try {
-    const [stored] = await withTimeout(
-      db
-        .insert(serverAnalyticsEvents)
-        .values({
-          contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
-          eventName: event,
-          category: definition.category,
-          privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
-          consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
-          sourceEntityType: definition.source?.type ?? null,
-          sourceEntityId:
-            typeof sourceEntityId === 'string' ? sourceEntityId : null,
-          properties: sanitized,
-          occurredAt: new Date(),
-        })
-        .returning({ id: serverAnalyticsEvents.id }),
-      {
-        timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
-        context: 'Server analytics delivery',
-      }
-    );
+  if (
+    options?.eventIdentity !== undefined &&
+    !SAFE_TOKEN_PATTERN.test(options.eventIdentity)
+  ) {
+    Sentry.captureException(new Error('Invalid server analytics identity'), {
+      tags: {
+        context: 'server_analytics_contract',
+        contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+        event_name: event,
+      },
+    });
+    return { ok: false, error: 'invalid_properties' };
+  }
 
-    if (!stored) throw new Error('Server analytics insert returned no row');
-    return { ok: true, eventId: stored.id };
+  return {
+    ok: true,
+    eventName: event,
+    values: {
+      contractVersion: SERVER_ANALYTICS_CONTRACT_VERSION,
+      eventName: event,
+      category: definition.category,
+      privacyClass: SERVER_ANALYTICS_PRIVACY_CLASS,
+      consentPolicy: SERVER_ANALYTICS_CONSENT_POLICY,
+      sourceEntityType: definition.source?.type ?? null,
+      sourceEntityId:
+        typeof sourceEntityId === 'string' ? sourceEntityId : null,
+      eventIdentity: options?.eventIdentity ?? null,
+      properties: sanitized,
+      occurredAt: new Date(),
+    },
+  };
+}
+
+async function insertServerAnalyticsRow(
+  client: DbOrTransaction,
+  prepared: Extract<PreparedInsert, { ok: true }>
+): Promise<ServerAnalyticsDelivery> {
+  const [stored] = await client
+    .insert(serverAnalyticsEvents)
+    .values(prepared.values)
+    .onConflictDoNothing({ target: serverAnalyticsEvents.eventIdentity })
+    .returning({ id: serverAnalyticsEvents.id });
+
+  if (!stored) {
+    // The event_identity unique constraint deduplicated this emission; the
+    // business event is already durably recorded.
+    return { ok: true, eventId: null, deduplicated: true };
+  }
+  return { ok: true, eventId: stored.id, deduplicated: false };
+}
+
+export async function trackServerEvent(
+  event: string,
+  properties?: Record<string, unknown>,
+  _distinctId?: string,
+  options?: ServerAnalyticsEmitOptions
+): Promise<ServerAnalyticsDelivery> {
+  // JOV-5245 owns identity. This sink deliberately keeps its no-op identity
+  // contract and never persists the raw distinct id.
+
+  const prepared = prepareServerAnalyticsInsert(event, properties, options);
+  if (!prepared.ok) return prepared;
+
+  try {
+    return await withTimeout(insertServerAnalyticsRow(db, prepared), {
+      timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
+      context: 'Server analytics delivery',
+    });
   } catch (error) {
     const deliveryUnknown =
       error instanceof Error &&
@@ -516,7 +648,7 @@ export async function trackServerEvent(
         context: 'server_analytics_delivery',
         contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
         delivery_outcome: deliveryUnknown ? 'unknown' : 'failed',
-        event_name: event,
+        event_name: prepared.eventName,
       },
     });
     return {
@@ -524,6 +656,24 @@ export async function trackServerEvent(
       error: deliveryUnknown ? 'delivery_unknown' : 'persistence_failed',
     };
   }
+}
+
+/**
+ * Emit a server analytics event inside an existing transaction so the
+ * business state write and its measurement commit atomically. Use this for
+ * revenue-critical transitions (claim/signup/activation) where a post-commit
+ * emission could permanently lose the event. A duplicate `eventIdentity`
+ * deduplicates instead of throwing.
+ */
+export async function trackServerEventTx(
+  tx: DbOrTransaction,
+  event: string,
+  properties?: Record<string, unknown>,
+  options?: ServerAnalyticsEmitOptions
+): Promise<ServerAnalyticsDelivery> {
+  const prepared = prepareServerAnalyticsInsert(event, properties, options);
+  if (!prepared.ok) return prepared;
+  return insertServerAnalyticsRow(tx, prepared);
 }
 
 export async function identifyServerUser(

@@ -17,6 +17,11 @@ const hoisted = vi.hoisted(() => {
   const attributeLeadSignupMock = vi.fn().mockResolvedValue(undefined);
   const getCachedAuthMock = vi.fn().mockResolvedValue({ userId: 'clerk_123' });
   const trackServerEventMock = vi.fn();
+  const trackServerEventTxMock = vi.fn().mockResolvedValue({
+    ok: true,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  });
   const revalidatePathMock = vi.fn();
   const revalidateTagMock = vi.fn();
   const noStoreMock = vi.fn();
@@ -77,6 +82,7 @@ const hoisted = vi.hoisted(() => {
     selectResults,
     syncReleasesFromSpotifyMock,
     trackServerEventMock,
+    trackServerEventTxMock,
     clearPendingClaimContextMock,
     claimPrebuiltProfileForUserMock,
     invalidateProfileCacheMock,
@@ -196,6 +202,7 @@ vi.mock('@/lib/env-server', () => ({
 
 vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: hoisted.trackServerEventMock,
+  trackServerEventTx: hoisted.trackServerEventTxMock,
 }));
 
 vi.mock('@/app/onboarding/actions/post-onboarding', () => ({

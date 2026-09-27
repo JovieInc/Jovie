@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
+  onConflictDoNothing: vi.fn(),
   returning: vi.fn(),
   values: vi.fn(),
 }));
@@ -58,7 +59,10 @@ describe('server analytics contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.returning.mockResolvedValue([{ id: 'event-1' }]);
-    mocks.values.mockReturnValue({ returning: mocks.returning });
+    mocks.onConflictDoNothing.mockReturnValue({ returning: mocks.returning });
+    mocks.values.mockReturnValue({
+      onConflictDoNothing: mocks.onConflictDoNothing,
+    });
     mocks.insert.mockReturnValue({ values: mocks.values });
   });
 
@@ -72,13 +76,13 @@ describe('server analytics contract', () => {
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
-    expect(countProductionCallSites(WEB_ROOT)).toBe(29);
+    expect(countProductionCallSites(WEB_ROOT)).toBe(33);
     expect(
       SERVER_ANALYTICS_CALLSITE_INVENTORY.reduce(
         (total, entry) => total + entry.invocations,
         0
       )
-    ).toBe(29);
+    ).toBe(33);
 
     for (const entry of SERVER_ANALYTICS_CALLSITE_INVENTORY) {
       const source = readFileSync(join(WEB_ROOT, entry.path), 'utf8');
@@ -114,7 +118,11 @@ describe('server analytics contract', () => {
       'raw-user-id-must-not-persist'
     );
 
-    expect(result).toEqual({ ok: true, eventId: 'event-1' });
+    expect(result).toEqual({
+      ok: true,
+      eventId: 'event-1',
+      deduplicated: false,
+    });
     expect(mocks.values).toHaveBeenCalledWith(
       expect.objectContaining({
         contractVersion: 'server-analytics/v1',
@@ -268,6 +276,63 @@ describe('server analytics contract', () => {
           event_name: 'release_deleted',
         }),
       })
+    );
+  });
+
+  it('deduplicates emissions that share a stable event identity', async () => {
+    mocks.returning.mockResolvedValueOnce([]);
+
+    const result = await trackServerEvent(
+      'payment_succeeded',
+      {
+        stripeEventId: 'evt_1',
+        billingReason: 'subscription_create',
+      },
+      undefined,
+      { eventIdentity: 'stripe:evt_1' }
+    );
+
+    expect(result).toEqual({ ok: true, eventId: null, deduplicated: true });
+    expect(mocks.onConflictDoNothing).toHaveBeenCalledWith({
+      target: expect.anything(),
+    });
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventIdentity: 'stripe:evt_1',
+        eventName: 'payment_succeeded',
+        category: 'billing',
+        properties: {
+          stripeEventId: 'evt_1',
+          billingReason: 'subscription_create',
+        },
+      })
+    );
+  });
+
+  it('rejects an unsafe event identity without writing', async () => {
+    const result = await trackServerEvent(
+      'checkout_initiated',
+      { checkoutSessionId: 'cs_1', plan: 'pro', source: 'billing' },
+      undefined,
+      { eventIdentity: 'not a safe identity!!' }
+    );
+
+    expect(result).toEqual({ ok: false, error: 'invalid_properties' });
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it('defines durable revenue funnel events in the versioned contract', () => {
+    expect(SERVER_ANALYTICS_EVENTS.claim_started.category).toBe('funnel');
+    expect(SERVER_ANALYTICS_EVENTS.claim_completed.category).toBe('funnel');
+    expect(SERVER_ANALYTICS_EVENTS.signup_completed.category).toBe('funnel');
+    expect(SERVER_ANALYTICS_EVENTS.activation_achieved.category).toBe('funnel');
+    expect(SERVER_ANALYTICS_EVENTS.checkout_initiated.category).toBe('funnel');
+    expect(SERVER_ANALYTICS_EVENTS.payment_succeeded.category).toBe('billing');
+    expect(SERVER_ANALYTICS_EVENTS.subscription_renewed.category).toBe(
+      'billing'
+    );
+    expect(SERVER_ANALYTICS_EVENTS.subscription_churned.category).toBe(
+      'billing'
     );
   });
 });

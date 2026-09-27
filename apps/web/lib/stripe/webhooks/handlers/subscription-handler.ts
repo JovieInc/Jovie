@@ -27,6 +27,7 @@ import {
   notifySlackUpgrade,
 } from '@/lib/notifications/providers/slack';
 import { expireReferralOnChurn } from '@/lib/referrals/service';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -387,6 +388,21 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         }
       );
       throw new Error(`Failed to downgrade user: ${result.error}`);
+    }
+
+    // Durable churn receipt keyed to the verified Stripe event id. Failure
+    // throws so the webhook stays retryable rather than permanently losing
+    // the churn measurement after entitlement was revoked.
+    const churnDelivery = await trackServerEvent(
+      'subscription_churned',
+      { stripeEventId },
+      undefined,
+      { eventIdentity: `stripe:${stripeEventId}` }
+    );
+    if (!churnDelivery.ok) {
+      throw new Error(
+        `Churn analytics delivery failed: ${churnDelivery.error}`
+      );
     }
 
     // Mark referral as churned on cancellation.
