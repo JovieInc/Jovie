@@ -6,7 +6,9 @@ import {
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditorialChangelog';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
+import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
 import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
@@ -182,6 +184,20 @@ function HomepageStoryStack() {
   );
 }
 
+// Canonical Pen v3 body (dark launch): presence, structure, and the close,
+// on the shared page background. The live story stack is unchanged while off.
+function HomepageIdentityStoryStack() {
+  return (
+    <div
+      className='homepage-identity-stack'
+      data-testid='homepage-identity-story-stack'
+    >
+      <HomepageIdentitySections />
+      <HomepageIdentityClose />
+    </div>
+  );
+}
+
 function HomePageShell({ children }: { readonly children: React.ReactNode }) {
   return (
     <>
@@ -211,7 +227,11 @@ export default async function HomePage() {
     <HomePageShell>
       <HomepageQueryProvider>
         <HomepageHero />
-        <HomepageStoryStack />
+        {HOMEPAGE_V3_ENABLED ? (
+          <HomepageIdentityStoryStack />
+        ) : (
+          <HomepageStoryStack />
+        )}
       </HomepageQueryProvider>
     </HomePageShell>
   );
