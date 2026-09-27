@@ -148,6 +148,19 @@ class StatusFeedTest(unittest.TestCase):
         self.assertNotIn("gate", feed["lanes"])
 
 
+class PublishTest(unittest.TestCase):
+    def test_only_the_primary_host_publishes(self):
+        saved = doctor.PRIMARY_FLAG
+        with tempfile.TemporaryDirectory() as tmp:
+            doctor.PRIMARY_FLAG = Path(tmp) / "primary"
+            host = type("Host", (), {"state": Path(tmp)})()
+            try:
+                self.assertIsNone(doctor.publish_status(host, None, {"x": 1}))
+                self.assertFalse((Path(tmp) / "lanes-status.json").exists(), "a non-primary host writes nothing")
+            finally:
+                doctor.PRIMARY_FLAG = saved
+
+
 class RunTest(unittest.TestCase):
     def test_run_writes_doctor_json_from_observations(self):
         with tempfile.TemporaryDirectory() as tmp:

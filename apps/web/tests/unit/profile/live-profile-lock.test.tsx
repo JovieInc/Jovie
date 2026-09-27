@@ -15,6 +15,13 @@ import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+// This lock covers the flagged desktop surface journey too; the shipped
+// default (flag off) keeps desktop on the compact column and is covered in
+// profile-compact-template.test.tsx.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE = '1';
+});
+
 vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: vi.fn().mockResolvedValue(undefined),
 }));
