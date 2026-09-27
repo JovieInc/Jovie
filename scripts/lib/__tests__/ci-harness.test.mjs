@@ -39,6 +39,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Exact-head Coverage',
   'Build + Layout (combined)',
   'Ovie Build (combined)',
+  'Ovie Typecheck (combined)',
   'Storybook Surface Matrix (combined)',
   'iOS Fast Unit + Coverage (combined)',
   'Mac Build + Test (combined)',
@@ -240,6 +241,7 @@ describe('ci-harness manifest', () => {
       'ci-layout-guard',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -534,6 +536,7 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).toContain('ci-unit-tests');
     expect(mergeReady).toContain('ci-build-layout');
     expect(mergeReady).toContain('ci-build-ovie');
+    expect(mergeReady).toContain('ci-typecheck-ovie');
     expect(mergeReady).toContain('ci-storybook-surfaces');
     expect(mergeReady).toContain('ci-ios');
     expect(mergeReady).toContain('ci-macos');

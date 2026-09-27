@@ -398,6 +398,39 @@ class CodexAccountProbeTests(unittest.TestCase):
                         with self.assertRaises(ProcessLookupError):
                             os.kill(int(raw_pid), 0)
 
+    def test_descendants_are_killed_when_process_table_lookup_fails(self):
+        # On hosts without /proc, descendant discovery shells out to ps. A
+        # failed or slow ps must not let a probe grandchild escape: the probe
+        # runs children in their own session, so the whole process group is
+        # still signalled when per-pid discovery returns nothing.
+        self.write_state()
+        bin_dir = self.root / "bin"
+        bin_dir.mkdir()
+        broken_ps = bin_dir / "ps"
+        broken_ps.write_text("#!/usr/bin/env bash\nexit 1\n")
+        broken_ps.chmod(0o755)
+        pid_file = self.root / "pids"
+        slow = self.root / "slow-tree"
+        slow.write_text(
+            "#!/usr/bin/env bash\n"
+            "sleep 30 &\n"
+            "printf '%s %s\\n' \"$$\" \"$!\" > \"$PID_FILE\"\n"
+            "wait\n"
+        )
+        slow.chmod(0o755)
+        result = self.run_probe(
+            CODEX_REAL_BIN=str(slow),
+            CODEX_ACCOUNT_PROBE_TIMEOUT="1",
+            CODEX_ACCOUNT_PROBE_TOTAL_TIMEOUT="0.25",
+            PID_FILE=str(pid_file),
+            PATH=f"{bin_dir}:{os.environ['PATH']}",
+        )
+        self.assertEqual(result.returncode, 76)
+        self.assertTrue(pid_file.exists())
+        for raw_pid in pid_file.read_text().split():
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(raw_pid), 0)
+
     def test_account_lease_spans_probe_and_state_commit(self):
         self.write_state()
         started_file = self.root / "started"

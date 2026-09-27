@@ -176,7 +176,7 @@ test('ordinary iOS UI changes select the design gate without Ubuntu operations',
   assert.equal(selected.applicable, true);
   assert.deepEqual(selected.domains, ['ios']);
   assert.equal(selected.ubuntuOperationsAffected, false);
-  assert.ok(LANE_GROUPS.remaining.includes('design-conformance'));
+  assert.ok(LANE_GROUPS.web.includes('design-conformance'));
   assert.equal(
     LANE_COMMANDS['design-conformance'],
     'pnpm design:conformance:gate'
@@ -195,7 +195,7 @@ test('the hosted design lane executes the semantic-canvas guard', () => {
   assert.match(designTests, /app-screen-canvas-manifest\.test\.ts/);
   assert.match(designTests, /--config vitest\.config\.mts/);
   assert.doesNotMatch(designTests, /vitest\.config\.minimal\.mts/);
-  assert.ok(LANE_GROUPS.remaining.includes('design-conformance'));
+  assert.ok(LANE_GROUPS.web.includes('design-conformance'));
   assert.equal(
     LANE_COMMANDS['design-conformance'],
     'pnpm design:conformance:gate'

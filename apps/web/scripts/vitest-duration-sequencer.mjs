@@ -12,9 +12,11 @@ import { BaseSequencer } from 'vitest/node';
 // balance toward equal counts; it never drops a file.
 
 // Cost of non-Vitest CI work pinned to a shard (.github/workflows/ci.yml:
-// packages/ui ~41s on 4/10, Ovie ~4s on 1/10) in map cost units (~1.3x wall),
-// preloaded so LPT offsets it.
-export const CI_RESERVED_MS = { '1/10': 5000, '4/10': 55_000 };
+// packages/ui ~43s on 4/14, quarantine retries ~12s on 7/14, Ovie ~3s on
+// 1/14) in map cost units (~1.6x wall on the slower hosted runners: a
+// ~260k-unit 10-way shard ran ~165s), preloaded so LPT offsets it. Keys must
+// match the ci-unit-tests matrix; other shard counts get no reservation.
+export const CI_RESERVED_MS = { '1/14': 5000, '4/14': 68_000, '7/14': 19_000 };
 
 export const DEFAULT_DURATIONS_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -69,6 +71,9 @@ export function partitionByDuration(keys, count, durations, reserved = {}) {
 }
 
 export default class DurationShardSequencer extends BaseSequencer {
+  /** @type {ReturnType<typeof loadDurations> | undefined} */
+  _durations = undefined;
+
   get durations() {
     this._durations ??= loadDurations();
     return this._durations;

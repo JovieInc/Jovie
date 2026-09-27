@@ -2,11 +2,11 @@
 /**
  * Run the cheap CI cluster as labeled lanes.
  *
- * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
- * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
- * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
- * artifact; the aggregate `ci-fast` job also requires the dedicated profile
- * browser admission job.
+ * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
+ * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
+ * Each hosted job checks out and installs once, invokes one value from
+ * LANE_GROUPS, and publishes an isolated lane artifact; the aggregate
+ * `ci-fast` job also requires the dedicated profile browser admission job.
  *
  * Fail-fast: the first failed lane skips the expensive structural lane so
  * biome/typecheck red does not pay for structural Playwright. Cheap lanes
@@ -310,6 +310,15 @@ const STRUCTURAL_PYTHON_JOB_PARTS = new Set([
 ]);
 
 /**
+ * Prefixes of the @jovie/web Vitest runs that ci-fast (structural web) takes
+ * from remaining's pool alongside the web product lane (runStructural).
+ */
+export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
+  'pnpm --filter @jovie/web exec ',
+  'pnpm --dir apps/web exec ',
+]);
+
+/**
  * Structural Python regressions, split so the pool can overlap them. Each
  * command keeps its original `&&` dependencies (coverage run → report).
  */
@@ -344,6 +353,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/runtime-state.test.mjs',
   'scripts/backlog-orchestrator/__tests__/shipping-observability.test.mjs',
   'scripts/backlog-orchestrator/__tests__/summer-live-state.test.mjs',
+  'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/deprecation-intake.test.mjs',
@@ -604,14 +614,17 @@ export const LANE_GROUPS = Object.freeze({
     'design-system-source-ratchet',
     'design-exception-registry',
     'design-governance-enforcement',
-    'design-conformance',
     'ios-fast',
-    'profile-admission',
     'billing-coverage',
     'copy-gate',
     'source-guards',
     'structural',
   ]),
+  // ci-fast (structural web) runs these in the background while its structural
+  // web commands run. They were the two slowest cheap lanes left in remaining
+  // (38s + 35s of a ~150s serial chain that outlasted remaining's structural
+  // lane, merge-group run 36270458408); web finished ~100s before remaining.
+  web: Object.freeze(['design-conformance', 'profile-admission']),
 });
 
 export const LANE_COMMANDS = Object.freeze(
@@ -1607,6 +1620,9 @@ const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
 const OPAQUE_ENTRY_LOCKS = Object.freeze([
   // Runs scripts Vitest suites with the default scripts/coverage directory.
   ['scripts/run-affected-tests.mjs --control', 'coverage:scripts'],
+  // Walks apps/web/** and lstat()s each listed file; a concurrent coverage
+  // run in apps/web deletes files under apps/web/coverage mid-walk (ENOENT).
+  [PLAYWRIGHT_RECEIPT_CI_TEST, 'coverage:apps/web'],
 ]);
 
 function packageScripts(dir) {
@@ -1876,6 +1892,7 @@ export async function runStructural(opts = {}) {
     ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs',
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
@@ -1904,6 +1921,7 @@ export async function runStructural(opts = {}) {
     'python3 scripts/symphony/tests/run-safe-restart-gate.py',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
     'bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh',
+    'python3 scripts/symphony/tests/protected-intake-check.test.py',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage run --branch scripts/symphony/tests/upstream-burrito-payload.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage report --include="*/scripts/symphony/verify_upstream_burrito_payload.py" --show-missing --precision=2 --fail-under=90',
     'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
     'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
@@ -1996,16 +2014,29 @@ export async function runStructural(opts = {}) {
     ...(selected.has('mac') ? macParts : []),
   ];
   // ci-fast (structural python) runs `only` its parts; remaining skips them.
-  // Consume the split mode so nested contract suites (which rebuild this
-  // list) don't inherit it and see a filtered pool.
+  // ci-fast (structural web) does the same for the web product lane plus
+  // every @jovie/web Vitest run (~200s of remaining's ~445s CPU-bound sum);
+  // those share apps/web coverage locks, so they stay together in one job.
+  // Consume the split modes so nested contract suites (which rebuild this
+  // list) don't inherit them and see a filtered pool.
   const mode = process.env.CI_FAST_STRUCTURAL_PYTEST;
   delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+  const webMode = process.env.CI_FAST_STRUCTURAL_WEB;
+  delete process.env.CI_FAST_STRUCTURAL_WEB;
   // Same for the fail-fast status file: the runner's own contract suite runs
   // runStructural and must not abort on this job's cheap-lane status.
   const abortStatusFile = process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
   delete process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
+  const webJobParts = new Set([
+    ...webParts,
+    ...allParts.filter(part =>
+      STRUCTURAL_WEB_JOB_PREFIXES.some(prefix => part.startsWith(prefix))
+    ),
+  ]);
   const parts = allParts.filter(
-    part => mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only')
+    part =>
+      mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only') &&
+      webMode !== (webJobParts.has(part) ? 'skip' : 'only')
   );
   if (parts.length === 0) {
     return {
@@ -2082,6 +2113,11 @@ function annotateFailure(lane, logExcerpt) {
   if (short) console.error(`::error::${short}`);
 }
 
+/** @param {number} ms */
+export function formatLaneDuration(ms) {
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
+}
+
 function writeSummary(results, groupId, timingTables = []) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return;
@@ -2089,11 +2125,13 @@ function writeSummary(results, groupId, timingTables = []) {
   const lines = [
     `### ci-fast lanes (${groupId || 'all'})`,
     '',
-    '| Lane | Status | Next local command |',
-    '| --- | --- | --- |',
+    '| Lane | Status | Duration | Next local command |',
+    '| --- | --- | --- | --- |',
   ];
   for (const r of results) {
-    lines.push(`| ${r.name} | **${r.status}** | \`${r.nextLocalCommand}\` |`);
+    lines.push(
+      `| ${r.name} | **${r.status}** | ${formatLaneDuration(r.durationMs)} | \`${r.nextLocalCommand}\` |`
+    );
   }
   lines.push('');
   const failed = results.filter(r => r.status === 'failure');
@@ -2182,7 +2220,10 @@ async function main() {
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
-        console.log(`[ci-fast] ${lane.id}: skipped`);
+        const durationMs = Math.max(0, Date.now() - laneStartedAt);
+        console.log(
+          `[ci-fast] ${lane.id}: skipped (${formatLaneDuration(durationMs)})`
+        );
         console.log(logExcerpt);
         results.push({
           id: lane.id,
@@ -2190,7 +2231,7 @@ async function main() {
           nextLocalCommand: lane.nextLocalCommand,
           status: 'skipped',
           logExcerpt,
-          durationMs: Math.max(0, Date.now() - laneStartedAt),
+          durationMs,
         });
         continue;
       }
@@ -2220,7 +2261,12 @@ async function main() {
         if (failFast) failedFast = true;
       }
 
-      console.log(`[ci-fast] ${lane.id}: ${status}`);
+      // Per-lane wall time: the job log is the only place the background
+      // lanes' timings surface without downloading the results artifact.
+      const durationMs = Math.max(0, Date.now() - laneStartedAt);
+      console.log(
+        `[ci-fast] ${lane.id}: ${status} (${formatLaneDuration(durationMs)})`
+      );
       if (lane.id === 'structural' && status === 'success') {
         // Keep exact suite/coverage receipts available in GitHub's job log.
         console.log(outcome.output);
@@ -2242,7 +2288,7 @@ async function main() {
         nextLocalCommand: lane.nextLocalCommand,
         status,
         logExcerpt,
-        durationMs: Math.max(0, Date.now() - laneStartedAt),
+        durationMs,
       });
     }
   } catch (error) {

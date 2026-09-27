@@ -28,6 +28,7 @@ import {
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+  STRUCTURAL_WEB_JOB_PREFIXES,
   selectSourceGuards,
   stripGitFetchNoise,
   structuralConcurrency,
@@ -425,6 +426,43 @@ describe('runStructural screenshot contract discovery', () => {
     expect([...only, ...(await run('skip'))].sort()).toEqual(all.sort());
     // Consumed, so nested lane suites see the unsplit pool.
     expect(process.env.CI_FAST_STRUCTURAL_PYTEST).toBeUndefined();
+  });
+
+  it('partitions structural commands across remaining, python and web jobs exactly once', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
+    const run = async env => {
+      vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', env.pytest ?? '');
+      vi.stubEnv('CI_FAST_STRUCTURAL_WEB', env.web ?? '');
+      const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+      await runStructural({ execute });
+      return execute.mock.calls.map(([command]) => command);
+    };
+    const all = await run({});
+    const remaining = await run({ pytest: 'skip', web: 'skip' });
+    const python = await run({ pytest: 'only' });
+    const web = await run({ web: 'only' });
+    expect([...remaining, ...python, ...web].sort()).toEqual([...all].sort());
+    expect(new Set(all).size).toBe(all.length);
+    expect(web).toContain('pnpm component-ship-gate');
+    expect(web).toContain(
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
+    );
+    expect(web.every(command => !python.includes(command))).toBe(true);
+    // Every @jovie/web Vitest run (shared apps/web coverage lock) is web's.
+    for (const command of all) {
+      if (
+        STRUCTURAL_WEB_JOB_PREFIXES.some(prefix => command.startsWith(prefix))
+      ) {
+        expect(web).toContain(command);
+      }
+    }
+    expect(remaining).toContain(ROUTE_PREP_COVERAGE_COMMAND);
+    expect(remaining.some(command => command.includes('@jovie/web'))).toBe(
+      false
+    );
+    // Consumed, so nested lane suites see the unsplit pool.
+    expect(process.env.CI_FAST_STRUCTURAL_WEB).toBeUndefined();
   });
 
   it('uses the default executor on the structural skip path', async () => {
@@ -1232,6 +1270,20 @@ describe('structural command pool', () => {
     expect(structuralLocks(LANE_COMMANDS['profile-admission'])).toEqual([
       'coverage:${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage',
     ]);
+  });
+
+  it('serializes the Playwright receipt walk with apps/web coverage runs', () => {
+    // The receipt lstat()s every apps/web file it lists; a concurrent coverage
+    // run deleted apps/web/coverage/block-navigation.js mid-walk (ENOENT,
+    // merge_group job 108496163540).
+    expect(
+      structuralLocks(
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/playwright-artifact-secrets.test.ts'
+      )
+    ).toContain('coverage:apps/web');
+    expect(structuralLocks(MARKETING_CERTIFICATION_COMMAND)).toContain(
+      'coverage:apps/web'
+    );
   });
 
   it('derives locks for coverage dirs, package aliases, coverage.py, and pytest', () => {

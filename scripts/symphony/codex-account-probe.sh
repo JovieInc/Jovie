@@ -176,6 +176,16 @@ def exited(pid):
     except ProcessLookupError:
         return True
     try:
+        # Reap our own dead children here so a zombie counts as exited even
+        # without /proc. waitpid on a live child returns (0, 0) and on an
+        # unrelated pid raises ChildProcessError; Popen.wait tolerates the
+        # pid already being reaped.
+        reaped, _ = os.waitpid(pid, os.WNOHANG)
+        if reaped == pid:
+            return True
+    except (ChildProcessError, OSError):
+        pass
+    try:
         state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
     except (OSError, IndexError):
         return False
@@ -214,6 +224,18 @@ def terminate_tree(process, _tree_token):
         except (OSError, PermissionError):
             pass
 
+    def send_group(signum):
+        # Every probe child runs with start_new_session=True, so its pid is
+        # also a process-group id. Signalling the group reaches descendants
+        # that a process-table snapshot missed — an orphan reparented to init
+        # before discovery, or the whole subtree when ps is unavailable or
+        # too slow on hosts without /proc. Members that escaped via setsid
+        # are still covered by per-pid discovery above.
+        try:
+            os.killpg(process.pid, signum)
+        except (OSError, PermissionError):
+            pass
+
     discover()
     deadline = time.monotonic() + 1.0
     alive = []
@@ -224,6 +246,8 @@ def terminate_tree(process, _tree_token):
             remember(pid)
             send(pid, signal.SIGCONT)
             send(pid, signal.SIGTERM)
+        send_group(signal.SIGCONT)
+        send_group(signal.SIGTERM)
         alive = [pid for pid in targets if not exited(pid)]
         if not alive:
             break
@@ -232,6 +256,7 @@ def terminate_tree(process, _tree_token):
     for pid in [process.pid, *descendants]:
         remember(pid)
         send(pid, signal.SIGKILL)
+    send_group(signal.SIGKILL)
     try:
         process.communicate(timeout=0.5)
     except subprocess.TimeoutExpired:
@@ -247,6 +272,7 @@ def terminate_tree(process, _tree_token):
         for pid in descendants:
             remember(pid)
             send(pid, signal.SIGKILL)
+        send_group(signal.SIGKILL)
         while True:
             try:
                 reaped, _ = os.waitpid(-1, os.WNOHANG)

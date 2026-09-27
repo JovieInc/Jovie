@@ -352,9 +352,10 @@ exit 0
             '    api_key: $LINEAR_API_KEY\n'
             '  required_labels:\n'
             '    - agent-ready\n'
-            '  # Scheduler filters are labels and states only. There is no identifier or\n'
-            '  # pull-number denylist. JOV-5914, JOV-6519, #17453, and #17156 stay out only\n'
-            '  # while they lack agent-ready. Adding agent-ready with no excluded label admits them.\n'
+            '  # Exact labels are excluded here so the scheduler drops them before claim.\n'
+            '  # Identifier, pull-request, and branch denials, plus the zz-upstream* prefix,\n'
+            '  # are fail-closed in protected-intake-check before workspace creation.\n'
+            '  # The scheduler still has no native identifier denylist.\n'
             '  excluded_labels:\n'
             '    - no-symphony\n'
             '    - billing\n'
@@ -367,7 +368,10 @@ exit 0
             '    - infra\n'
             '    - area:infra\n'
             '    - infrastructure\n'
-            '    - vercel\n',
+            '    - vercel\n'
+            '    - hold\n'
+            '    - protected\n'
+            '    - human-only\n',
             1,
         ).replace(
             "Intake is restricted to the configured project and required label within the Jovie Linear team. "
@@ -380,14 +384,26 @@ exit 0
         ).replace(
             "Only the mechanical `no-symphony` dead-letter label excludes dispatch; "
             "legacy human-review labels never do.",
-            "JOV-5914, JOV-6519, and GitHub PRs #17453 and #17156 are not excluded by "
-            "identifier. They stay outside intake only while they lack `agent-ready`. "
-            "Adding `agent-ready` with no excluded label selects them. "
-            "Deploy, permissions, billing, and spend work is excluded by `vercel`, `infra`, "
-            "`area:infra`, `infrastructure`, `blocked:auth`, `auth`, `area:auth`, `billing`, "
-            "`blocked:payments`, `stripe`, and `cost-monitoring`, in addition to the mechanical "
-            "`no-symphony` dead-letter label. Legacy human-review labels "
-            "(`human-review-required`, `needs-human`, `no-auto`) never exclude dispatch.",
+            "JOV-5914, JOV-6519, GitHub PRs #17453, #17156, #18299, and #17511, and the "
+            "branches in protected-items.json are refused by symphony-protected-intake-check "
+            "before workspace creation, even when labeled `agent-ready`. Labels `hold`, "
+            "`protected`, and `human-only` are scheduler exclusions. The prefix "
+            "`zz-upstream*` is refused by that check because the scheduler matches labels "
+            "exactly. A missing or unparseable protected list, or unresolved pull/branch "
+            "linkage, refuses intake. Deploy, permissions, billing, and spend work is "
+            "excluded by `vercel`, `infra`, `area:infra`, `infrastructure`, `blocked:auth`, "
+            "`auth`, `area:auth`, `billing`, `blocked:payments`, `stripe`, and "
+            "`cost-monitoring`, in addition to the mechanical `no-symphony` dead-letter "
+            "label. Legacy human-review labels (`human-review-required`, `needs-human`, "
+            "`no-auto`) never exclude dispatch.",
+            1,
+        ).replace(
+            '    export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"\n'
+            '    exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"\n',
+            '    export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"\n'
+            '    # Fail closed before clone, package restore, before_run lease checks, or routing.\n'
+            '    python3 "$HOME/.local/bin/symphony-protected-intake-check" --workspace "$PWD" || exit $?\n'
+            '    exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"\n',
             1,
         )
         self.assertEqual(codex, expected)
@@ -398,10 +414,19 @@ exit 0
         for label in (
             "no-symphony", "billing", "blocked:payments", "stripe", "cost-monitoring",
             "blocked:auth", "auth", "area:auth", "infra", "area:infra", "infrastructure", "vercel",
+            "hold", "protected", "human-only",
         ):
             self.assertIn(f"    - {label}\n", front)
-        self.assertIn("#17453", front)
-        self.assertIn("#17156", front)
+        excluded = front.split("excluded_labels:", 1)[1].split("active_states:", 1)[0]
+        self.assertNotIn("human-review-required", excluded)
+        self.assertNotIn("needs-human", excluded)
+        self.assertNotIn("no-auto", excluded)
+        self.assertLess(
+            codex.index("symphony-protected-intake-check"),
+            codex.index('jovie-symphony-workspace-create" "$PWD"'),
+        )
+        self.assertIn("#17453", codex)
+        self.assertIn("#17156", codex)
         self.assertIn("max_retry_attempts: 1", codex)
         self.assertEqual(codex.count("max_concurrent_agents: 5"), 1)
         self.assertNotIn("/usr/bin/false", codex)
