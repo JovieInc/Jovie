@@ -75,8 +75,13 @@ export function PricingRecipeBody({
             href: freeClaim.ctaHref,
           }}
           secondaryCta={{
-            label: 'Explore Artist Profiles',
+            label: 'Explore Jovie Profiles',
             href: APP_ROUTES.ARTIST_PROFILES,
+          }}
+          photo={{
+            src: '/images/marketing-hero/pricing.webp',
+            width: 1600,
+            height: 901,
           }}
           media={
             <div className='system-b-pricing-story-grid'>
