@@ -8,7 +8,9 @@ import { useEffect, useState } from 'react';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
+import { AdminVerificationRequired } from '@/features/admin/AdminVerificationRequired';
 import {
+  isForbiddenError,
   useWaitlistSettingsMutation,
   useWaitlistSettingsQuery,
   type WaitlistSettingsResponse,
@@ -86,9 +88,13 @@ export function WaitlistSettingsPanel() {
         description='Set the approval rules for new people entering the pipeline.'
       >
         <div className='px-4 py-4 text-app text-destructive sm:px-5'>
-          {error instanceof Error
-            ? error.message
-            : 'Unable to load waitlist settings. Please refresh and try again.'}
+          {isForbiddenError(error) ? (
+            <AdminVerificationRequired message='Admin verification required to load waitlist settings.' />
+          ) : error instanceof Error ? (
+            error.message
+          ) : (
+            'Unable to load waitlist settings. Please refresh and try again.'
+          )}
         </div>
       </SettingsPanel>
     );
@@ -169,7 +175,7 @@ export function WaitlistSettingsPanel() {
                 size='sm'
                 className='w-24 text-right tabular-nums'
                 disabled={saving}
-                aria-label='Auto-accept after days'
+                aria-label='Auto-accept After Days'
               />
             }
           />
@@ -201,7 +207,7 @@ export function WaitlistSettingsPanel() {
                 size='sm'
                 className='w-24 text-right tabular-nums'
                 disabled={saving}
-                aria-label='Daily auto-accept limit'
+                aria-label='Daily Auto-accept Limit'
               />
             }
           />

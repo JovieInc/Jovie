@@ -8,7 +8,9 @@ import { toast } from '@/components/feedback';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { AdminVerificationRequired } from '@/features/admin/AdminVerificationRequired';
 import {
+  isForbiddenError,
   queryKeys,
   useLeadPipelineSettingsQuery,
   useUpdateLeadPipelineSettingsMutation,
@@ -80,27 +82,38 @@ export function GrowthStatusPanel() {
               label='Pipeline'
               value={settings.enabled ? 'Active' : 'Paused'}
               subtitle={`Mode: ${detectSpeed(settings) === 'custom' ? 'Custom' : detectSpeed(settings)}`}
-              className='h-full'
             />
             <ContentMetricCard
               label='Query Budget'
               value={`${settings.queriesUsedToday}/${settings.dailyQueryBudget}`}
               subtitle='Used today'
-              className='h-full'
             />
             <ContentMetricCard
               label='Auto-ingested'
               value={settings.autoIngestedToday}
               subtitle={`Limit ${settings.autoIngestDailyLimit} per day`}
-              className='h-full'
             />
             <ContentMetricCard
               label='Send Cap'
               value={settings.dailySendCap}
               subtitle={`${settings.maxPerHour}/hour max`}
-              className='h-full'
             />
           </div>
+        ) : settingsQuery.isError ? (
+          isForbiddenError(settingsQuery.error) ? (
+            <AdminVerificationRequired message='Admin verification required to load Growth status.' />
+          ) : (
+            <div className='px-1 py-3 text-sm text-destructive'>
+              Unable to load Growth status.{' '}
+              <button
+                type='button'
+                className='underline underline-offset-2 hover:text-primary-token'
+                onClick={() => void settingsQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          )
         ) : (
           <div className='px-1 py-3 text-sm text-secondary-token'>
             Loading Growth status...
