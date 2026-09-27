@@ -4,7 +4,9 @@ name: Safe PR Remediation
 # Dependabot PRs: the isolated Eve lockfile (Eve Pilot failures) and the root
 # workspace lockfile (CI ERR_PNPM_OUTDATED_LOCKFILE, e.g. PR #18250). An
 # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH (pnpm.overrides drift, e.g. PR #18247) is
-# refused with an error: overrides are deliberate pins and are never rewritten.
+# refused with a warning annotation: overrides are deliberate pins and are
+# never rewritten. The refusal is an expected policy outcome, so the step
+# stays green instead of paging main-failure intake on every Dependabot retry.
 # Planning never executes PR code. The prepare job executes an allowlisted
 # Dependabot-only diff with a read-only token and no repository/model secrets.
 # The writer never executes PR code and commits one attested lockfile through

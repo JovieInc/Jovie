@@ -18,7 +18,6 @@ export const SANCTIONED_EXEMPTION_BASELINE = [
   '(marketing)/changelog/[version]/page.tsx',
   '(marketing)/demo/video/page.tsx',
   '(marketing)/demovideo/page.tsx',
-  '(marketing)/investors/page.tsx',
   '(marketing)/renders/page.tsx',
   '(marketing)/renders/[state]/page.tsx',
   '(marketing)/renders/profile-admission/page.tsx',

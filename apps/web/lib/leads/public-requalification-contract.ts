@@ -9,7 +9,13 @@ import type { Lead, LeadSignalSnapshot } from '@/lib/db/schema/leads';
 import {
   calculateFitScore,
   FIT_SCORE_VERSION,
+  projectObservedQualificationFitInput,
 } from '@/lib/fit-scoring/calculator';
+import {
+  type JobQualificationResult,
+  PUBLIC_EVIDENCE_EXTRACTION_VERSION,
+  qualifySupportedJob,
+} from '@/lib/leads/job-qualification';
 import type { QualificationResult } from '@/lib/leads/qualify';
 import type { SpotifyLeadEnrichment } from '@/lib/leads/spotify-enrich-lead';
 
@@ -192,6 +198,7 @@ export interface PublicCandidateRun {
   sourceUrls: string[];
   state: 'machine_failed' | 'human_review';
   publicObservation: PublicCandidateObservation;
+  jobQualification?: JobQualificationResult;
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
   preflightReadiness: AcquisitionPreflightResult;
@@ -217,6 +224,7 @@ export interface PublicRequalificationResult {
   state: PublicCandidateRun['state'];
   deduplicated: boolean;
   publicObservation: PublicCandidateObservation;
+  jobQualification: JobQualificationResult | null;
 }
 
 export class PublicRequalificationConflictError extends Error {
@@ -251,7 +259,7 @@ function stableSerialize(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 
-function sha256(value: unknown): string {
+function sha256(value: unknown): `sha256:${string}` {
   return `sha256:${createHash('sha256').update(stableSerialize(value)).digest('hex')}`;
 }
 
@@ -356,20 +364,20 @@ export function buildPublicRun(input: {
   const dedupeKey = `${PUBLIC_REQUALIFICATION_SCOPE}:${input.candidateKey}:${sourceRevision}`;
   const attemptEventType = publicRequalificationEventType(sourceRevision);
   const fitResult = calculateFitScore({
-    ingestionSourcePlatform: 'linktree',
-    hasPaidTier: input.qualification.hasPaidTier ?? undefined,
-    socialLinkPlatforms: input.qualification.allLinks
-      .map(link => link.platformId)
-      .filter((platform): platform is string => Boolean(platform)),
-    hasSpotifyId: input.qualification.hasSpotifyLink,
+    ...projectObservedQualificationFitInput({
+      sourcePlatform: input.qualification.sourcePlatform,
+      hasPaidTier: input.qualification.hasPaidTier,
+      linkPlatforms: input.qualification.allLinks.map(link => link.platformId),
+      hasSpotifyArtist: input.qualification.hasSpotifyLink,
+      hasContactEmail: false,
+      hasTrackingPixels: input.qualification.hasTrackingPixels,
+    }),
     spotifyPopularity: input.spotify.spotifyPopularity,
     genres: input.spotify.spotifyGenres,
     latestReleaseDate: input.spotify.latestReleaseDate,
-    hasContactEmail: false,
     hasAppleMusicId: dspSignals.hasAppleMusicId,
     hasSoundCloudId: dspSignals.hasSoundCloudId,
     dspPlatformCount: dspSignals.dspPlatformCount,
-    hasTrackingPixels: input.qualification.hasTrackingPixels,
   });
   const evidence = runPremadeProfilePreflight({
     displayName: input.qualification.displayName,
@@ -427,6 +435,89 @@ export function buildPublicRun(input: {
   ]
     .filter((url, index, urls) => urls.indexOf(url) === index)
     .sort((left, right) => left.localeCompare(right));
+  const jobQualification = qualifySupportedJob({
+    candidateRunId: runId,
+    identity: {
+      personId: input.candidateId,
+      displayName: input.qualification.displayName,
+      roles: ['artist'],
+      representsIdentityIds: input.existingRepresentation
+        ? [input.candidateId]
+        : [],
+      sourceAliases: [`linktree:${input.candidateKey}`],
+      identityConfidence: input.spotify.artistId ? 0.8 : 0.5,
+      // A cross-platform URL and same display name do not prove ownership.
+      identityDecision: 'review_needed',
+    },
+    activeGoal: null,
+    supportedJobId: 'premade-artist-profile',
+    observedOpportunity: null,
+    source: 'public-linktree',
+    timeWindow: {
+      startsAt: input.observedAt.toISOString(),
+      endsAt: expiresAt.toISOString(),
+    },
+    observations: [
+      {
+        id: `${runId}:linktree-profile`,
+        kind: 'public_profile_snapshot',
+        observedFact: publicObservation.qualification,
+        provenance: {
+          sourceUrl: input.profileUrl,
+          sourceId: input.candidateKey,
+          capturedAt: input.observedAt.toISOString(),
+          sourceDigest,
+          immutableRef: sourceRevision,
+          extractionVersion: PUBLIC_EVIDENCE_EXTRACTION_VERSION,
+          supportingField: 'publicObservation.qualification',
+          supportingExcerpt: null,
+        },
+        confidence: 1,
+        uncertainty: ['ownership_not_proven'],
+        contradictions: [],
+      },
+    ],
+    tools: input.qualification.musicToolsDetected.map(toolId => ({
+      toolId,
+      usageObserved: 'yes',
+      paidAccess: 'unknown',
+      exactPlan: null,
+      exactSpend: null,
+      purchaseControl: 'unknown',
+      replaceability: 'unknown',
+      buyIntent: 'unknown',
+      accessBasis: 'unknown',
+      evidenceIds: [`${runId}:linktree-profile`],
+    })),
+    spotifyUrls: input.qualification.allLinks
+      .filter(link => link.platformId === 'spotify')
+      .map(link => link.url),
+    channelEligibility: [
+      {
+        channel: 'public-profile',
+        decision: 'review_needed',
+        permissionEvidenceIds: [],
+        reasons: ['contact_permission_not_observed'],
+      },
+    ],
+    duplicateOf: [],
+    existingCustomer: false,
+    existingClaim: false,
+    priorOutreach: false,
+    now: input.observedAt.toISOString(),
+    evidenceMaxAgeMs: PUBLIC_REQUALIFICATION_TTL_MS,
+  });
+  const combinedDecisionDigest = sha256({
+    incumbentDecisionDigest: decisionDigest,
+    jobQualification,
+  });
+  const combinedPreflightReadiness: AcquisitionPreflightResult = {
+    ...preflightReadiness,
+    receipts: preflightReadiness.receipts.map(receipt => ({
+      ...receipt,
+      digest: combinedDecisionDigest,
+    })),
+  };
 
   return {
     contract: PUBLIC_REQUALIFICATION_CONTRACT,
@@ -443,13 +534,14 @@ export function buildPublicRun(input: {
     expiresAt: expiresAt.toISOString(),
     sourceRevision,
     sourceDigest,
-    decisionDigest,
+    decisionDigest: combinedDecisionDigest,
     sourceUrls,
     state: preflightReadiness.passed ? 'human_review' : 'machine_failed',
     publicObservation,
+    jobQualification,
     fitScore: fitResult.score,
     fitScoreBreakdown,
-    preflightReadiness,
+    preflightReadiness: combinedPreflightReadiness,
   };
 }
 
@@ -474,6 +566,7 @@ export function resultFromRun(run: PublicCandidateRun, deduplicated: boolean) {
     state: run.state,
     deduplicated,
     publicObservation: run.publicObservation,
+    jobQualification: run.jobQualification ?? null,
   } satisfies PublicRequalificationResult;
 }
 export function runFromMetadata(

@@ -62,6 +62,14 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /**
+   * Redeem the return code shown by the browser when the jovie:// deep link
+   * could not reach the app. The main process adds the PKCE verifier.
+   */
+  readonly redeemDesktopAuthReturnCode?: (returnCode: string) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
   /** Open the current isolated public profile in the system browser. */
   readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
@@ -529,6 +537,30 @@ export async function copyDesktopAuthUrl(
   return { ok: false, reason: 'desktop-auth-copy-bridge-unavailable' };
 }
 
+/** Older Mac builds cannot redeem return codes; hide the entry for them. */
+export function supportsDesktopAuthReturnCode(): boolean {
+  const api = getRawElectronAPI();
+  return typeof api?.redeemDesktopAuthReturnCode === 'function';
+}
+
+export async function redeemDesktopAuthReturnCode(
+  returnCode: string
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.redeemDesktopAuthReturnCode === 'function') {
+    const result = await api.redeemDesktopAuthReturnCode(returnCode);
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason ?? 'desktop-auth-return-code-failed',
+    };
+  }
+  if (api) {
+    reportMissingBridgeMethod('redeemDesktopAuthReturnCode');
+  }
+  return { ok: false, reason: 'desktop-auth-return-code-bridge-unavailable' };
+}
+
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.openPublicProfileInBrowser === 'function') {
@@ -783,6 +815,8 @@ export const __testing = {
   startDesktopAuthHandoff,
   openDesktopAuthUrl,
   copyDesktopAuthUrl,
+  redeemDesktopAuthReturnCode,
+  supportsDesktopAuthReturnCode,
   openPublicProfileInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,

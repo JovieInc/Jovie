@@ -51,9 +51,11 @@ describe('OnboardingProfileRail', () => {
     expect(screen.getAllByTitle('Spotify').length).toBeGreaterThan(0);
     expect(screen.getAllByTitle('Apple Music').length).toBeGreaterThan(0);
     expect(screen.queryByText('open.spotify.com')).toBeNull();
+    // The Pen identity header shows the name and jov.ie handle; the tagline
+    // (here the enrichment follower count) is not repeated on Home.
     expect(
-      screen.getByText('12.3K Spotify followers (source: enrichment)')
-    ).toBeDefined();
+      within(phonePreview).getByTestId('profile-identity-handle')
+    ).toHaveTextContent('jov.ie/testartist');
     expect(
       screen.getByTestId('onboarding-profile-preview-badge')
     ).toHaveTextContent('Preview');

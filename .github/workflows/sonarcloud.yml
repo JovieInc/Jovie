@@ -1,9 +1,10 @@
 name: SonarCloud
 # clock-class: skip-if-unchanged
 
-# Tech-debt scan — runs NIGHTLY against main, not as a per-PR gate. SonarCloud
-# was pure noise on PRs (advisory failures on mechanical/codemod diffs). Debt it
-# surfaces is paid down by the tech-debt routine + ponytail, not by blocking PRs.
+# Native analysis runs nightly against main, not as a per-PR gate. Deterministic
+# local detectors block known failure classes in ci-fast; this fresh analysis
+# confirms merged repairs and catches dataflow/security rules not faithfully
+# expressible locally. Missing scan credentials fail visibly.
 # Hygiene (#10463): no pull_request trigger (path-filter would still burn runners
 # on large source diffs); nightly + manual only.
 on:
@@ -47,9 +48,11 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # trufflehog:ignore (secret reference, not a value)
 
     steps:
-      - name: Skip SonarCloud scan when SONAR_TOKEN is unavailable
+      - name: Fail when SonarCloud scan credentials are unavailable
         if: ${{ env.SONAR_SCAN_ENABLED != 'true' }}
-        run: echo "SONAR_TOKEN is not configured; skipping SonarCloud scan."
+        run: |
+          echo "SONAR_TOKEN is not configured; SonarCloud analysis did not run." >&2
+          exit 1
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
