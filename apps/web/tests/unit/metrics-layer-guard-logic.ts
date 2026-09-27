@@ -62,12 +62,14 @@ const CANONICAL_LAYER = 'lib/analytics/metrics.ts';
 
 /**
  * Sanctioned homes for raw analytics-table references: the Drizzle schema
- * definitions and the canonical query file that feeds the metrics layer.
+ * definitions, the canonical query file that feeds the metrics layer, and
+ * the data-lifecycle registry that names tables as metadata strings.
  * These are exempt from the `tables` rule (but not the `rates` rule).
  */
 const TABLE_RULE_EXEMPT = [
   /^lib\/db\/schema\//,
   /^lib\/db\/queries\/analytics\.ts$/,
+  /^lib\/privacy\/data-classes\.ts$/,
 ];
 
 const TABLE_TOKENS =

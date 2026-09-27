@@ -75,10 +75,9 @@ function sensitiveColumns(columnNames: string[]): string[] {
 
 // Barrel imports of the schema index are restricted, so enumerate tables via
 // an eager glob over the schema directory instead.
-const schemaModules = import.meta.glob<Record<string, unknown>>(
-  '../../../lib/db/schema/*.ts',
-  { eager: true }
-);
+const schemaModules = import.meta.glob('../../../lib/db/schema/*.ts', {
+  eager: true,
+}) as Record<string, Record<string, unknown>>;
 
 function allTables(): Array<{
   exportName: string;
