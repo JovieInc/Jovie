@@ -106,7 +106,7 @@
       "storySources": ["packages/ui/atoms/kbd.stories.tsx"],
       "testSources": ["packages/ui/atoms/kbd.test.tsx"],
       "penRootId": null,
-      "sourceDigest": "c7ce1982a4fcc9aced62b1143fd3e6efb446194f91b6be7c42c11902c2fc1f26"
+      "sourceDigest": "1abc53229f5ed4deb0f6200cf8a33ac6fa1d7960bc88b6e8684123bda22c6bd0"
     }
   ],
   "legacy": {
