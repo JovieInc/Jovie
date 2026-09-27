@@ -35,8 +35,13 @@ import {
   hashEmailOtp,
   isValidEmailOtpFormat,
 } from '@/lib/notifications/email-otp';
+import {
+  generateSubscriptionManagementToken,
+  verifySubscriptionManagementToken,
+} from '@/lib/notifications/management-token';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
+  buildErrorResponse,
   buildInvalidRequestResponse,
   buildMissingIdentifierResponse,
   buildServerErrorResponse,
@@ -72,6 +77,7 @@ import {
 import type {
   NotificationChannel,
   NotificationContactValues,
+  NotificationContentPreferences,
   NotificationPreferences,
   NotificationStatusResponse,
   NotificationSubscriptionState,
@@ -852,7 +858,13 @@ export const subscribeToNotificationsDomain = async (
 
 export const verifyEmailOtpDomain = async (
   payload: unknown
-): Promise<NotificationDomainResponse<{ success: true; message: string }>> => {
+): Promise<
+  NotificationDomainResponse<{
+    success: true;
+    message: string;
+    managementToken: string | null;
+  }>
+> => {
   const parsed = verifyEmailOtpSchema.safeParse(payload);
   if (!parsed.success) {
     return buildValidationErrorResponse('Invalid verification code');
@@ -943,7 +955,14 @@ export const verifyEmailOtpDomain = async (
 
   return {
     status: 200,
-    body: { success: true, message: 'Email verified successfully' },
+    body: {
+      success: true,
+      message: 'Email verified successfully',
+      managementToken: generateSubscriptionManagementToken(
+        parsed.data.artist_id,
+        normalizedEmail
+      ),
+    },
   };
 };
 
@@ -1240,11 +1259,41 @@ export const updateNotificationPreferencesDomain = async (
 };
 
 /**
- * Update content notification preferences for a subscription.
- * Merges new preferences into the existing JSONB preferences column.
+ * Returns true when the requested change would widen the notifications a
+ * subscription row receives — enabling a disabled category or opting in to
+ * artist emails. Escalations require proof of mailbox control (management
+ * token from the email OTP flow); opt-outs stay open.
  */
+function isNotificationScopeEscalation(
+  row: {
+    preferences: FanNotificationPreferences | null;
+    artistEmailOptInAt: Date | null;
+    artistEmailOptOutAt: Date | null;
+  },
+  preferences: Partial<NotificationContentPreferences> | undefined,
+  artistEmailOptIn: boolean | undefined
+): boolean {
+  if (preferences) {
+    const current = mergeJovieAlertPreferences(row.preferences, {});
+    const merged = mergeJovieAlertPreferences(row.preferences, preferences);
+    for (const key of Object.keys(
+      merged
+    ) as (keyof FanNotificationPreferences)[]) {
+      if (merged[key] === true && current[key] !== true) {
+        return true;
+      }
+    }
+  }
+
+  return (
+    artistEmailOptIn === true &&
+    !isArtistEmailOptedIn(row.artistEmailOptInAt, row.artistEmailOptOutAt)
+  );
+}
+
 export const updateContentPreferencesDomain = async (
-  payload: unknown
+  payload: unknown,
+  context?: { managementToken?: string | null }
 ): Promise<NotificationDomainResponse<{ success: true; updated: number }>> => {
   try {
     const result = updateContentPreferencesSchema.safeParse(payload);
@@ -1253,8 +1302,14 @@ export const updateContentPreferencesDomain = async (
       return buildValidationErrorResponse('Invalid request data');
     }
 
-    const { artist_id, email, phone, preferences, artist_email_opt_in } =
-      result.data;
+    const {
+      artist_id,
+      email,
+      phone,
+      preferences,
+      artist_email_opt_in,
+      management_token,
+    } = result.data;
     const normalizedEmail = normalizeSubscriptionEmail(email) ?? null;
     const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
 
@@ -1283,8 +1338,11 @@ export const updateContentPreferencesDomain = async (
     const existing = await db
       .select({
         id: notificationSubscriptions.id,
+        email: notificationSubscriptions.email,
         preferences: notificationSubscriptions.preferences,
         channel: notificationSubscriptions.channel,
+        artistEmailOptInAt: notificationSubscriptions.artistEmailOptInAt,
+        artistEmailOptOutAt: notificationSubscriptions.artistEmailOptOutAt,
       })
       .from(notificationSubscriptions)
       .where(
@@ -1297,6 +1355,31 @@ export const updateContentPreferencesDomain = async (
 
     if (existing.length === 0) {
       return buildValidationErrorResponse('No subscription found');
+    }
+
+    // Fail closed on scope escalation: enabling notifications (a disabled
+    // category or artist email opt-in) requires a management token issued
+    // by the email OTP flow and bound to this artist + email. Opting out
+    // never requires proof of control.
+    const token = management_token ?? context?.managementToken ?? null;
+    for (const row of existing) {
+      if (
+        !isNotificationScopeEscalation(row, preferences, artist_email_opt_in)
+      ) {
+        continue;
+      }
+      const authorized =
+        normalizedEmail !== null &&
+        row.channel === 'email' &&
+        row.email === normalizedEmail &&
+        verifySubscriptionManagementToken(token, artist_id, normalizedEmail);
+      if (!authorized) {
+        return buildErrorResponse(
+          403,
+          'Verify your email to enable notifications',
+          'forbidden'
+        );
+      }
     }
 
     // Merge new preferences into each subscription row

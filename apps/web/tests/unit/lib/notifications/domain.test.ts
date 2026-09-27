@@ -105,7 +105,9 @@ import {
   getNotificationStatusDomain,
   subscribeToNotificationsDomain,
   unsubscribeFromNotificationsDomain,
+  updateContentPreferencesDomain,
 } from '@/lib/notifications/domain';
+import { generateSubscriptionManagementToken } from '@/lib/notifications/management-token';
 
 describe('notifications/domain', () => {
   beforeEach(() => {
@@ -344,6 +346,151 @@ describe('notifications/domain', () => {
       });
 
       expect(result.status).toBeGreaterThanOrEqual(200);
+    });
+  });
+
+  describe('updateContentPreferencesDomain scope-escalation gate', () => {
+    const artistId = '11111111-1111-4111-8111-111111111111';
+    const baseRow = {
+      id: 'sub-1',
+      email: 'fan@example.com',
+      channel: 'email',
+      preferences: {
+        releasePreview: true,
+        releaseDay: true,
+        newMusic: true,
+        tourDates: true,
+        merch: false,
+        general: true,
+        promo: false,
+      },
+      artistEmailOptInAt: null,
+      artistEmailOptOutAt: null,
+    };
+
+    beforeEach(() => {
+      process.env.RESEND_API_KEY = 'test-resend-key';
+    });
+
+    it('rejects artist email opt-in without a management token', async () => {
+      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+
+      const result = await updateContentPreferencesDomain({
+        artist_id: artistId,
+        email: 'fan@example.com',
+        artist_email_opt_in: true,
+      });
+
+      expect(result.status).toBe(403);
+      expect(result.body).toMatchObject({
+        success: false,
+        code: 'forbidden',
+      });
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects enabling a disabled category without a token', async () => {
+      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+
+      const result = await updateContentPreferencesDomain({
+        artist_id: artistId,
+        email: 'fan@example.com',
+        preferences: {
+          newMusic: true,
+          tourDates: true,
+          merch: true,
+          general: true,
+        },
+      });
+
+      expect(result.status).toBe(403);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('allows opt-outs without a token', async () => {
+      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+
+      const result = await updateContentPreferencesDomain({
+        artist_id: artistId,
+        email: 'fan@example.com',
+        preferences: {
+          newMusic: true,
+          tourDates: true,
+          merch: false,
+          general: false,
+        },
+        artist_email_opt_in: false,
+      });
+
+      expect(result.status).toBe(200);
+      expect(db.update).toHaveBeenCalled();
+    });
+
+    it('allows escalation with a valid management token', async () => {
+      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+      const token = generateSubscriptionManagementToken(
+        artistId,
+        'fan@example.com'
+      );
+
+      const result = await updateContentPreferencesDomain(
+        {
+          artist_id: artistId,
+          email: 'fan@example.com',
+          artist_email_opt_in: true,
+        },
+        { managementToken: token }
+      );
+
+      expect(result.status).toBe(200);
+      expect(db.update).toHaveBeenCalled();
+    });
+
+    it('rejects a token bound to a different email', async () => {
+      vi.mocked(db.limit).mockResolvedValue([baseRow]);
+      const token = generateSubscriptionManagementToken(
+        artistId,
+        'other@example.com'
+      );
+
+      const result = await updateContentPreferencesDomain(
+        {
+          artist_id: artistId,
+          email: 'fan@example.com',
+          artist_email_opt_in: true,
+        },
+        { managementToken: token }
+      );
+
+      expect(result.status).toBe(403);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects escalation on a phone-matched row the token does not cover', async () => {
+      const smsRow = {
+        ...baseRow,
+        id: 'sub-2',
+        email: null,
+        channel: 'sms',
+      };
+      vi.mocked(db.limit).mockResolvedValue([smsRow]);
+      const token = generateSubscriptionManagementToken(
+        artistId,
+        'fan@example.com'
+      );
+
+      const result = await updateContentPreferencesDomain(
+        {
+          artist_id: artistId,
+          email: 'fan@example.com',
+          phone: '+15551234567',
+          artist_email_opt_in: true,
+        },
+        { managementToken: token }
+      );
+
+      expect(result.status).toBe(403);
+      expect(db.update).not.toHaveBeenCalled();
     });
   });
 });
