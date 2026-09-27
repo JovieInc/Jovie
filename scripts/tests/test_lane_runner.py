@@ -90,6 +90,18 @@ class SelectionTest(unittest.TestCase):
         self.assertEqual(lane.pick_issue([issue("JOV-1")], failures, now=1000.0 + 1801).identifier, "JOV-1")
         self.assertIsNone(lane.pick_issue([issue("JOV-9", labels=["infra"])], {}))
 
+    def test_only_codex_guarded_lane_admits_sensitive_work(self):
+        sensitive = issue("JOV-9", labels=["infra", lane.SHARED_LABEL])
+        self.assertIsNone(lane.pick_issue([sensitive], {}, provider="devin"))
+        self.assertEqual(lane.pick_issue([sensitive], {}, provider="codex").identifier, "JOV-9")
+
+    def test_guarded_lane_still_rejects_red_lines(self):
+        secret = issue("JOV-9", labels=["infra"])
+        secret.title = "Rotate production credentials"
+        pricing = issue("JOV-10", labels=["billing"])
+        pricing.description = "Change live pricing for annual plans"
+        self.assertIsNone(lane.pick_issue([secret, pricing], {}, provider="codex"))
+
 
 class PromptTest(unittest.TestCase):
     def test_contract_names_branch_issue_and_independent_gate(self):
@@ -103,6 +115,12 @@ class PromptTest(unittest.TestCase):
         self.assertIn("Never stop to ask", prompt)
         self.assertIn("Do not run gstack", prompt)
         self.assertIn("gh pr create --draft", prompt)
+
+    def test_sensitive_contract_names_guarded_gates_and_red_lines(self):
+        prompt = lane.render_prompt(issue(labels=["area:auth"]), "codex/jov-1", "")
+        for needle in ("500 lines", "Migration Guard", "security scan", "boundary", "llm-review",
+                       "Do not rotate", "live billing pricing"):
+            self.assertIn(needle, prompt)
 
     def test_reports_missing_gbrain_instead_of_inventing_context(self):
         self.assertIn("GBrain unavailable", lane.render_prompt(issue(), "b", ""))
@@ -130,6 +148,7 @@ class GateTest(unittest.TestCase):
         self.assertEqual(lane.gate_rules([self.change("apps/web/lib/a.ts"),
                                           self.change("apps/web/lib/a.test.ts")]), [])
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
+        self.assertEqual(lane.gate_rules([self.change(".cursor/rules/general.mdc")]), [])
 
     def test_xcode_tests_directory_counts_as_test(self):
         changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
@@ -149,6 +168,24 @@ class GateTest(unittest.TestCase):
                    self.change("apps/web/lib/profile/catalog.ts", 112),
                    self.change("apps/web/lib/profile/catalog.test.ts", 180)]
         self.assertEqual(lane.gate_rules(changes), [])
+
+    def test_sensitive_diff_uses_the_smaller_review_cap(self):
+        changes = [self.change("apps/web/lib/a.ts", 400), self.change("apps/web/lib/a.test.ts", 101)]
+        self.assertIn("diff-too-large:501", lane.gate_rules(changes, lane.SENSITIVE_REVIEWABLE_LINES))
+
+    def test_sensitive_review_fails_closed_without_an_explicit_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            host = lane.Host(state=root)
+            fake = FakeShell([])
+            original = lane.sh
+            lane.sh = fake
+            try:
+                passed, reasons = lane.sensitive_review(host, {"number": 7, "headRefOid": "abc"}, root, None)
+            finally:
+                lane.sh = original
+        self.assertFalse(passed)
+        self.assertTrue(reasons[0].startswith("llm-review-failed"))
 
     def test_numstat_parsing_handles_binary(self):
         changes = lane.parse_numstat("3\t1\ta.ts\n-\t-\timg.png\nnoise\n")
@@ -254,6 +291,8 @@ class ProviderAndLockTest(unittest.TestCase):
             self.assertTrue(any("{prompt" in arg for arg in spec["cmd"]), name)
             self.assertTrue(spec["health"])
         self.assertTrue(providers["devin"]["model"].startswith("swe-2"))
+        self.assertEqual(providers["codex"]["reasoningEffort"], "xhigh")
+        self.assertIn("xhigh", providers["codex"]["cmd"])
         # Tim 2026-09-26: Devin and Codex are the shipping lanes; every other lane stays off.
         enabled = {name for name, spec in providers.items() if spec.get("enabled", True)}
         self.assertTrue(enabled <= {"devin", "codex"}, enabled)
@@ -406,12 +445,13 @@ class WorkerTest(unittest.TestCase):
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-                      lane.pr_events.claim_event_pr)
+                      lane.pr_events.claim_event_pr, lane.sweep_lane_prs)
+        lane.sweep_lane_prs = lambda host, name, linear, now=None: None
         lane.pr_events.queued_prs = lambda module, kinds: []
         lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs: None
-        lane.lane_prs = lambda name: []
+        lane.lane_prs = lambda name, fields="": []
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
         lane.fix_candidates = lambda name: []
         lane.escalate_exhausted = lambda host, prs, linear: None
@@ -427,7 +467,7 @@ class WorkerTest(unittest.TestCase):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
          lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
          lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-         lane.pr_events.claim_event_pr) = self.saved
+         lane.pr_events.claim_event_pr, lane.sweep_lane_prs) = self.saved
         self.tmp.cleanup()
 
     def test_landing_claims_comments_and_pulls_the_next_issue(self):
@@ -510,6 +550,25 @@ class WorkerTest(unittest.TestCase):
         finally:
             lane.load_providers = saved
         self.assertFalse(list((self.host.state / "slots").glob("*.lock")) if (self.host.state / "slots").exists() else [])
+
+    def test_unreadable_in_flight_set_claims_nothing(self):
+        lane.in_flight_issues = lambda: None
+        lane.run_issue = lambda *a: self.fail("an unknown in-flight set must not open a PR")
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(self.linear.moves, [])
+
+    def test_an_issue_with_an_open_pr_is_not_claimed_again(self):
+        lane.in_flight_issues = lambda: frozenset({"JOV-3"})
+        lane.run_issue = lambda *a: self.fail("duplicate PR for JOV-3")
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(self.linear.moves, [])
+
+    def test_a_lane_over_its_open_pr_budget_claims_nothing_new(self):
+        red = [{"number": n, "headRefName": f"devin/jov-{n}-20260927t000000", "isDraft": True} for n in (1, 2)]
+        lane.lane_prs = lambda name, fields="": red if fields else []  # slots=1 -> budget 2 non-green
+        lane.run_issue = lambda *a: self.fail("over budget: fix/adopt only")
+        self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(self.linear.moves, [])
 
     def test_busy_slots_and_empty_queue_exit_quietly(self):
         held = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
@@ -647,7 +706,11 @@ class FixRedTest(unittest.TestCase):
         green = self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
         self.assertIsNone(lane.red_pr([pending, green], {}))
         self.assertEqual(lane.red_pr([self.pr()], {})["number"], 5)
-        self.assertIsNone(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1}}))
+        self.assertIsNone(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1, "at": time.time()}}),
+                          "a fix still running on this head holds it")
+        self.assertEqual(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1, "at": time.time(),
+                                                         "endedAt": time.time()}})["number"], 5,
+                         "an attempt that ended without moving the head never parks the PR")
         self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
 
@@ -825,7 +888,9 @@ class FixRedTest(unittest.TestCase):
     def test_adopt_gates_the_pr_head_and_leaves_a_receipt(self):
         real_sh, real_gate = lane.sh, lane.gate_pr
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
-        lane.gate_pr = lambda host, pr, worktree, log: {"verdict": "landing", "pr": pr["number"], "reasons": []}
+        lane.gate_pr = lambda host, pr, worktree, log, **kwargs: {
+            "verdict": "landing", "pr": pr["number"], "reasons": []
+        }
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
@@ -932,3 +997,68 @@ class RequeueTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OnePrPerIssueTest(unittest.TestCase):
+    """JOV-6833: one open PR per Linear key; slots count open non-green PRs."""
+    NOW = 1_800_000_000
+
+    def pr(self, number, issue="jov-7", draft=True, state="BLOCKED", pushed_ago=0, lane_name="devin"):
+        return {"number": number, "headRefName": f"{lane_name}/{issue}-20260927t0{number:05d}", "isDraft": draft,
+                "mergeStateStatus": state, "url": f"u{number}", "pushedAgo": pushed_ago}
+
+    def test_in_flight_reads_branches_and_markers_and_fails_closed(self):
+        saved = lane.sh
+        try:
+            lane.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([
+                {"headRefName": "devin/jov-12-20260927t101010", "body": ""},
+                {"headRefName": "feat/anything", "body": "<!-- linear-issue-id:JOV-34 -->"},
+                {"headRefName": "fix/x", "body": "mentions JOV-56 only"}]))
+            self.assertEqual(lane.in_flight_issues(), frozenset({"JOV-12", "JOV-34"}))
+            lane.sh = lambda args, **k: SimpleNamespace(returncode=1, stdout="", stderr="rate limited")
+            self.assertIsNone(lane.in_flight_issues())
+        finally:
+            lane.sh = saved
+
+    def test_budget_counts_only_own_non_green_prs(self):
+        prs = [self.pr(1), self.pr(2, draft=False, state="CLEAN"), self.pr(3, lane_name="codex")]
+        self.assertFalse(lane.over_budget("devin", prs, slots=1))
+        self.assertTrue(lane.over_budget("devin", prs + [self.pr(4, issue="jov-8")], slots=1))
+
+    def test_sweep_supersedes_duplicates_and_closes_stale_red_drafts(self):
+        day = lane.STALE_DRAFT_S
+        prs = [self.pr(1), self.pr(2, draft=False, state="CLEAN"),          # jov-7: keep the green one
+               self.pr(3, issue="jov-8", pushed_ago=day + 1),                # stale red draft
+               self.pr(4, issue="jov-9", pushed_ago=day - 60),               # recent: keep
+               self.pr(5, issue="jov-10", draft=False, pushed_ago=day * 3)]  # ready PRs are not stale
+        pushes = {pr["number"]: self.NOW - pr.pop("pushedAgo") for pr in prs}
+        superseded, stale = lane.sweep_plan(prs, self.NOW, pushes)
+        self.assertEqual([(pr["number"], keep) for pr, keep in superseded], [(1, 2)])
+        self.assertEqual([pr["number"] for pr in stale], [3])
+
+    def test_sweep_closes_moves_only_owned_issues_and_is_throttled(self):
+        saved = (lane.sh, lane.lane_prs)
+        calls = []
+        stale_at = datetime.fromtimestamp(self.NOW - lane.STALE_DRAFT_S * 2, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        def fake_sh(args, **k):
+            calls.append(args)
+            out = f"3 {stale_at}\n4 {stale_at}\n1 {stale_at}" if args[:3] == ["gh", "api", "graphql"] else ""
+            return SimpleNamespace(returncode=0, stdout=out, stderr="")
+        lane.sh = fake_sh
+        lane.lane_prs = lambda name, fields="": [self.pr(1), self.pr(2),
+                                                   self.pr(3, issue="jov-8", pushed_ago=lane.STALE_DRAFT_S * 2),
+                                                   self.pr(4, issue="jov-9", pushed_ago=lane.STALE_DRAFT_S * 2)]
+        linear = FakeLinear([])
+        linear.states = {"JOV-8": "In Progress", "JOV-9": "Done"}
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp), linear_env=Path("unused"))
+                lane.sweep_lane_prs(host, "devin", linear, now=self.NOW)
+                lane.sweep_lane_prs(host, "devin", linear, now=self.NOW + 60)  # throttled: no-op
+        finally:
+            lane.sh, lane.lane_prs = saved
+        closed = [args[3] for args in calls if args[:3] == ["gh", "pr", "close"]]
+        self.assertEqual(closed, ["1", "3", "4"])
+        self.assertIn("superseded by #2", next(a for a in calls if a[:3] == ["gh", "pr", "close"])[-1])
+        self.assertEqual(linear.moves, [("JOV-8", "Todo")])

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import {
+  getExactPublishedMarketingPaths,
   latestContentRevision,
+  SITEMAP_PUBLISHED_LEGAL_PATHS,
+  SITEMAP_PUBLISHED_MACHINE_PATHS,
   toContentRevisionDate,
 } from './sitemap-publication';
 
@@ -32,5 +36,26 @@ describe('toContentRevisionDate', () => {
       null
     );
     expect(latest?.toISOString()).toBe('2026-06-01T00:00:00.000Z');
+  });
+});
+
+describe('investor surfaces in the sitemap', () => {
+  const INVESTOR_PATH = /^\/(?:investors|pitch|investor-portal)(?:\/|$)/u;
+
+  it('publishes no investor, pitch or portal path', () => {
+    const published = [
+      ...getExactPublishedMarketingPaths(),
+      ...SITEMAP_PUBLISHED_LEGAL_PATHS,
+      ...SITEMAP_PUBLISHED_MACHINE_PATHS,
+    ];
+
+    expect(published.length).toBeGreaterThan(0);
+    expect(published.filter(path => INVESTOR_PATH.test(path))).toEqual([]);
+  });
+
+  it('keeps no investor route in the marketing manifest at all', () => {
+    expect(
+      MARKETING_ROUTE_MANIFEST.filter(entry => INVESTOR_PATH.test(entry.url))
+    ).toEqual([]);
   });
 });

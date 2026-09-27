@@ -2753,6 +2753,70 @@ body:has(.home-viewport)::-webkit-scrollbar {
   line-height: 1.5;
 }
 
+/* JOV-6300 "You are not one thing." — bounded multi-hyphenate treatment
+   inside the relationships chapter. Carbon grade surface, warm-white
+   active artifact, at most three contextual lenses. */
+.homepage-identity {
+  margin-top: clamp(var(--space-9), 4vw, var(--space-12));
+  padding-top: clamp(var(--space-7), 3vw, var(--space-9));
+  border-top: 1px solid var(--noir-ion-border-subtle);
+}
+
+.homepage-identity__opening {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: clamp(1.375rem, 2vw, 1.625rem);
+  font-weight: 560;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.homepage-identity__figure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin: var(--space-6) 0 0;
+}
+
+.homepage-identity__portrait {
+  display: block;
+  width: 96px;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--noir-ion-border-subtle);
+  border-radius: 50%;
+  background: #020305;
+}
+
+.homepage-identity__portrait-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.homepage-identity__caption {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.homepage-identity__name {
+  color: var(--color-text-primary-token);
+  font-size: 1rem;
+  font-weight: 560;
+  line-height: 1.3;
+}
+
+.homepage-identity__handle {
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 @media (max-width: 767px) {
   .homepage-connected-identity {
     min-height: 32rem;
@@ -2847,6 +2911,77 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.75rem;
   line-height: 1.4;
+}
+
+.homepage-identity__emphasis {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary-token);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.homepage-identity__lenses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.homepage-identity__lens {
+  display: inline-flex;
+  min-height: var(--space-7);
+  align-items: center;
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--noir-ion-border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary-token);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.homepage-identity__lens[aria-pressed="true"] {
+  border-color: var(--color-text-primary-token);
+  background: var(--color-text-primary-token);
+  color: var(--color-bg-base);
+}
+
+.homepage-identity__lens:focus-visible {
+  outline: 2px solid var(--color-text-primary-token);
+  outline-offset: 2px;
+}
+
+.homepage-identity__payoff {
+  margin: var(--space-6) 0 0;
+  color: var(--color-text-tertiary-token);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-identity__lens,
+  .homepage-identity__emphasis {
+    transition:
+      color 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease;
+  }
+}
+
+@media (max-width: 640px) {
+  .homepage-identity__figure {
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .homepage-identity__portrait {
+    width: 72px;
+  }
 }
 
 @media (min-width: 768px) {
@@ -7677,15 +7812,3 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 /* HOMEPAGE SSR CONTENT FALLBACK END */
-
-/* Bloom ON: 240px action face, with the shared button hit target. */
-.homepage-request-access {
-  width: min(15rem, 100%);
-  margin-inline: auto;
-}
-
-@media (max-width: 767px) {
-  .homepage-request-access {
-    width: 100%;
-  }
-}

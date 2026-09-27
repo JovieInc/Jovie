@@ -162,8 +162,6 @@ export const APP_ROUTES = {
   CLI: '/cli',
   API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',
-  INVESTORS: '/investors',
-  PITCH: '/pitch',
   PLAYLISTS: '/playlists',
   LANDING_NEW: '/new',
   PRICING: '/pricing',
@@ -184,6 +182,9 @@ export const APP_ROUTES = {
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
+  VOICE: '/voice',
+  /** Internal render-fixture index; the page itself 404s unless fixtures are enabled. */
+  RENDERS: '/renders',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',
