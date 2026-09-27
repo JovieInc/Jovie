@@ -43,7 +43,7 @@ describe('HomepageCertifiedExposure', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('fires one exposure receipt and access-exposed event with the variant identity', () => {
+  it('fires search exposure even when the waitlist flag is on', () => {
     render(<HomepageCertifiedExposure />);
 
     expect(mockPage).toHaveBeenCalledTimes(1);
@@ -53,8 +53,12 @@ describe('HomepageCertifiedExposure', () => {
       HOMEPAGE_CERTIFIED_CONTEXT
     );
     expect(mockTrack).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_EXPOSED,
+      HOMEPAGE_CERTIFIED_EVENTS.SEARCH_EXPOSED,
       HOMEPAGE_CERTIFIED_CONTEXT
+    );
+    expect(mockTrack).not.toHaveBeenCalledWith(
+      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_EXPOSED,
+      expect.anything()
     );
     expect(mockTrack).toHaveBeenCalledTimes(2);
   });

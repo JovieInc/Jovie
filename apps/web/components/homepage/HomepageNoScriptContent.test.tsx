@@ -78,14 +78,19 @@ describe('HomepageNoScriptContent', () => {
       cursor = index;
     }
 
-    // The only conversion is the name search; the fallback links it to /start.
+    // Golden-path homepage-cta: name search copy plus a /start handoff,
+    // including while WAITLIST_ENABLED replaces other marketing doors.
     const links = [...(section?.querySelectorAll('a') ?? [])];
     expect(links.map(link => link.textContent)).toEqual([
-      'Request access',
+      'Find me',
       'Contact support',
     ]);
-    expect(links[0]?.getAttribute('href')).toBe('/signup');
-    expect(text).not.toMatch(/Get started|Drop more music|waitlist/i);
+    expect(links[0]?.getAttribute('href')).toBe('/start');
+    expect(text).toContain('Search your name');
+    expect(rawMarkup).toMatch(/href="\/start"/);
+    expect(text).not.toMatch(
+      /Get started|Drop more music|Request access|waitlist/i
+    );
   });
 
   it('hides only the progressive fallback for scripting-enabled browsers', () => {

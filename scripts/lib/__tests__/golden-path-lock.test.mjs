@@ -69,6 +69,12 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/api/waitlist/route.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
     ]);
+    expect(
+      classifyChangedPaths([
+        'apps/web/components/homepage/HomepagePrimaryAction.tsx',
+        'apps/web/app/(home)/page.tsx',
+      ]).touchesGoldenPath
+    ).toBe(true);
   });
 
   it('still records docs-only diffs without treating them as a skip', () => {

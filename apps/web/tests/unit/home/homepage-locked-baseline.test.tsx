@@ -5,6 +5,7 @@
 
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { evaluateHomepageHtml } from '../../../../../scripts/lib/golden-path-lock.mjs';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import {
@@ -12,6 +13,7 @@ import {
   HomepageEditorialChangelog,
 } from '@/components/homepage/HomepageEditorialChangelog';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -186,13 +188,26 @@ describe('JOV-5864 locked homepage baseline', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses access links in both conversion positions when gated', () => {
+  it('keeps the name search and /start handoff when the waitlist flag is on', () => {
     gate.WAITLIST_ENABLED = true;
-    render(<LockedHomepageBody />);
+    const { container } = render(
+      <>
+        <LockedHomepageBody />
+        <HomepageNoScriptContent />
+      </>
+    );
+    const html = container.innerHTML;
+
+    expect(screen.getAllByPlaceholderText('Search your name')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Find me' })).toHaveLength(1);
     expect(
-      screen.getAllByRole('link', { name: 'Request access' })
-    ).toHaveLength(2);
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(evaluateHomepageHtml(html)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+    });
+    expect(html).not.toMatch(/href="\/signup"/);
   });
 
   it('keeps one canonical name search with one terminal return action', () => {
