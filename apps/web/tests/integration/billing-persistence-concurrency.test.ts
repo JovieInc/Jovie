@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, inArray } from 'drizzle-orm';
+import { sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 /* eslint-disable no-restricted-imports -- Integration test requires the real schema and database */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -141,5 +141,65 @@ describe('billing persistence concurrency (integration)', () => {
       .where(eq(billingAuditLog.userId, user.id));
     expect(persisted?.billingVersion).toBe(user.billingVersion + 1);
     expect(auditRows).toHaveLength(1);
+  });
+
+  it('rolls back the user write when its atomic audit write fails', async () => {
+    const suffix = randomUUID();
+    const objectName = `jov_4195_${suffix.replaceAll('-', '_')}`;
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: `billing-rollback-${suffix}@example.test`,
+        userStatus: 'active',
+      })
+      .returning({ id: users.id, billingVersion: users.billingVersion });
+    userIds.add(user.id);
+
+    try {
+      await db.execute(
+        drizzleSql.raw(`CREATE FUNCTION ${objectName}() RETURNS trigger AS $$
+          BEGIN RAISE EXCEPTION 'injected audit failure'; END;
+        $$ LANGUAGE plpgsql`)
+      );
+      await db.execute(
+        drizzleSql.raw(`CREATE TRIGGER ${objectName}
+          BEFORE INSERT ON billing_audit_log
+          FOR EACH ROW EXECUTE FUNCTION ${objectName}()`)
+      );
+
+      await expect(
+        applyBillingUpdateWithAudit({
+          userId: user.id,
+          userIdentity: user.id,
+          expectedBillingVersion: user.billingVersion,
+          isPro: true,
+          plan: 'pro',
+          billingUpdatedAt: new Date(),
+          eventType: 'injected_failure',
+          previousState: { isPro: false },
+          newState: { isPro: true },
+          source: 'integration-test',
+          metadata: {},
+        })
+      ).rejects.toThrow(/injected audit failure/i);
+
+      const [persisted] = await db
+        .select({ isPro: users.isPro, billingVersion: users.billingVersion })
+        .from(users)
+        .where(eq(users.id, user.id));
+      expect(persisted).toMatchObject({
+        isPro: false,
+        billingVersion: user.billingVersion,
+      });
+    } finally {
+      await db.execute(
+        drizzleSql.raw(
+          `DROP TRIGGER IF EXISTS ${objectName} ON billing_audit_log`
+        )
+      );
+      await db.execute(
+        drizzleSql.raw(`DROP FUNCTION IF EXISTS ${objectName}()`)
+      );
+    }
   });
 });

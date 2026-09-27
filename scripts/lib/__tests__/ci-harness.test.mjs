@@ -46,6 +46,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Cross-Product Integration (combined)',
   'Promptfoo Evals (deterministic)',
   'Golden Eval Set (deterministic)',
+  'Database Certification (isolated Neon)',
 ];
 
 describe('ci-harness manifest', () => {
@@ -129,7 +130,6 @@ describe('ci-harness manifest', () => {
       'E2E DB Migrate',
       'Full E2E (Preview)',
       'Admin E2E Smoke',
-      'Neon DB',
       'Preview Deploy (manual)',
       'Production Release',
       'Main Release Ready',
@@ -257,7 +257,6 @@ describe('ci-harness manifest', () => {
 
     const manualJobs = [
       'ci-knip',
-      'neon-db',
       'ci-drizzle-check',
       'ci-build-public',
       'ci-layout-guard',
@@ -542,6 +541,7 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).toContain('ci-macos');
     expect(mergeReady).toContain('ci-cross-product-integration');
     expect(mergeReady).toContain('drizzle-migration-guard');
+    expect(mergeReady).toContain('neon-db');
     expect(mergeReady).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );

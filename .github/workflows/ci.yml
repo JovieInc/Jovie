@@ -874,12 +874,10 @@ jobs:
             echo "run_drizzle=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Neon ephemeral-branch gate: only spin up Neon when DB-relevant code changed.
-          # Covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
-          # lockfile changes that could affect drizzle/DB deps. Version-only package
-          # metadata changes should not spin up ephemeral Neon branches.
+          # Isolated DB certification: merge-group heads run this only when database,
+          # authz, migration, integration-harness, or DB dependency inputs changed.
           # Jobs that create ephemeral Neon branches must check this flag before doing so.
-          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/queries/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml)'
+          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
             echo "run_neon=true" >> "$GITHUB_OUTPUT"
           else
@@ -2316,14 +2314,13 @@ jobs:
         run: pnpm knip
 
   neon-db:
-    name: Neon DB
+    name: Database Certification (isolated Neon)
     needs: [ci-path-changes]
-    # Run for push to main or any selected evidence lane that needs ephemeral DB credentials.
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')) }}
     runs-on: ubuntu-latest
     # 5m was warm-store-only: the admission probe needs @neondatabase/serverless
     # from the installed tree, and a cold pnpm install alone runs ~5m.
-    timeout-minutes: 10
+    timeout-minutes: 18
     concurrency:
       group: neon-endpoint-pool-neon-db-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
@@ -2334,7 +2331,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Confirm manual DB evidence lane
+      - name: Confirm isolated DB evidence lane
         id: check-backend
         run: echo "needs_db=true" >> "$GITHUB_OUTPUT"
 
@@ -2407,6 +2404,82 @@ jobs:
           PROTECTED_BRANCHES: main,development,preview,br-main,br-production
         run: bash scripts/ci/verify-neon-branch-admission.sh
 
+      - name: Resolve certification DATABASE_URL
+        id: resolve-certification-db-url
+        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: ${{ steps.create-branch.outputs.connection_file }}
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
+
+      - name: Apply branch migrations and verify prior-release upgrade
+        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        env:
+          DATABASE_URL: ${{ steps.resolve-certification-db-url.outputs.database_url }}
+          NODE_ENV: test
+          GIT_BRANCH: ci-db-certification
+          ALLOW_PROD_MIGRATIONS: 'true'
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL" || { echo "::error::Missing isolated DATABASE_URL"; exit 1; }
+          pnpm --filter=@jovie/web run drizzle:migrate:ci
+          pnpm --filter=@jovie/web exec tsx scripts/verify-db-migrations.ts
+
+      - name: Measure Drizzle tooling frontier
+        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          started=$SECONDS
+          version=$(pnpm --filter=@jovie/web exec drizzle-kit --version | tail -1)
+          pnpm --filter=@jovie/web run drizzle:check
+          elapsed=$((SECONDS - started))
+          {
+            echo "### Database tooling frontier"
+            echo "- Baseline: ${version}; immutable-history check completed in ${elapsed}s."
+            echo "- Ship now: keep the current stable Drizzle/Kit versions; no upgrade is authorized."
+            echo "- Re-evaluate when: a stable major removes a measured migration bottleneck."
+            echo "- Then: repeat history, custom-policy, failure, and rollback checks on this isolated lane."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run serialized database integration certification
+        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        env:
+          DATABASE_URL: ${{ steps.resolve-certification-db-url.outputs.database_url }}
+          DB_CERTIFICATION: 'true'
+          NODE_ENV: test
+          CI: 'true'
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL" || { echo "::error::Missing isolated DATABASE_URL"; exit 1; }
+          pnpm --filter=@jovie/web run test:integration
+
+      - name: Reject inert database test evidence
+        if: ${{ github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        working-directory: apps/web
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const report = fs.readFileSync('test-report.db-integration.junit.xml', 'utf8');
+          const tests = (report.match(/<testcase\b/g) || []).length;
+          const skipped = (report.match(/<skipped\b/g) || []).length;
+          if (tests === 0 || skipped > 0 || !report.includes('RLS access control')) {
+            console.error(`Database certification is inert: tests=${tests}, skipped=${skipped}, rls=${report.includes('RLS access control')}`);
+            process.exit(1);
+          }
+          console.log(`Database certification executed ${tests} tests with zero skips.`);
+          NODE
+
+      - name: Upload database certification evidence
+        if: ${{ always() && github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: database-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-report.db-integration.junit.xml
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Persist Neon DB connection artifact
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         env:
@@ -2446,10 +2519,10 @@ jobs:
           set -euo pipefail
           node scripts/ci/preview-env-admission.mjs emit-admission \
             --kind neon-branch \
-            --work-id "${{ github.event.inputs.preview_work_id || 'manual-dispatch' }}" \
+            --work-id "${{ github.event_name == 'merge_group' && 'JOV-4195' || github.event.inputs.preview_work_id || 'manual-dispatch' }}" \
             --sha "${{ github.sha }}" \
-            --policy "manual-dispatch" \
-            --reason "${{ github.event.inputs.preview_reason || 'Manually dispatched database-affecting evidence lane.' }}" \
+            --policy "${{ github.event_name == 'merge_group' && 'risk-selected-merge-group' || 'manual-dispatch' }}" \
+            --reason "${{ github.event_name == 'merge_group' && 'Database-affecting combined head requires executable isolation proof.' || github.event.inputs.preview_reason || 'Manually dispatched database-affecting evidence lane.' }}" \
             --evidence "Database-affecting proof that cannot be obtained from normal CI or the shared staging database." \
             --owner "${{ github.actor }}" \
             --surface "ephemeral Neon branch ${{ steps.sanitize-branch.outputs.name }} (isolated database only)" \
@@ -6520,7 +6593,8 @@ jobs:
 
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
-    # Deep browser lanes never provision Neon from this event.
+    # DB-risk heads reuse the existing expiring Neon branch; browser preview
+    # lanes remain manual/post-merge.
     needs:
       [
         ci-path-changes,
@@ -6543,6 +6617,7 @@ jobs:
         ci-golden-path-lock,
         ci-visual-snapshot-compare,
         drizzle-migration-guard,
+        neon-db,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
@@ -6578,6 +6653,7 @@ jobs:
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
+          DATABASE_CERTIFICATION_RESULT="${{ needs.neon-db.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
@@ -6588,6 +6664,7 @@ jobs:
           SHARED_IMPACT="${{ needs.ci-path-changes.outputs.shared_contract_impact }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
+          RUN_NEON="${{ needs.ci-path-changes.outputs.run_neon }}"
           {
             echo "### Merge group ready"
             echo
@@ -6624,8 +6701,9 @@ jobs:
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
             echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
+            echo "| Database Certification (isolated Neon) | $DATABASE_CERTIFICATION_RESULT |"
             echo
-            echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
+            echo "Only risk-selected database changes provision expiring Neon; preview/A11y evidence remains explicit opt-in or post-merge."
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$ADMISSION_RESULT" == "success" && "$ADMISSION_ADMITTED" != "true" ]]; then
@@ -6684,6 +6762,15 @@ jobs:
               exit 1
             fi
           done
+
+          if [[ "$RUN_NEON" == "true" && "$DATABASE_CERTIFICATION_RESULT" != "success" ]]; then
+            echo "::error::Database Certification did not pass for the selected DB-risk head (result: $DATABASE_CERTIFICATION_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_NEON" != "true" && "$DATABASE_CERTIFICATION_RESULT" != "skipped" ]]; then
+            echo "::error::Database Certification ran without DB-risk path selection (result: $DATABASE_CERTIFICATION_RESULT)"
+            exit 1
+          fi
 
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
