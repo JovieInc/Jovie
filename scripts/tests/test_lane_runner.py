@@ -130,6 +130,7 @@ class GateTest(unittest.TestCase):
         self.assertEqual(lane.gate_rules([self.change("apps/web/lib/a.ts"),
                                           self.change("apps/web/lib/a.test.ts")]), [])
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
+        self.assertEqual(lane.gate_rules([self.change(".cursor/rules/general.mdc")]), [])
 
     def test_xcode_tests_directory_counts_as_test(self):
         changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
