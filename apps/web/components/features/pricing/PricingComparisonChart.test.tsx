@@ -4,6 +4,15 @@ import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 describe('PricingComparisonChart', () => {
+  it('names the profile feature as a Jovie profile, not an artist profile', () => {
+    const { container } = render(<PricingComparisonChart />);
+
+    expect(
+      screen.getAllByText('Public Jovie profile page').length
+    ).toBeGreaterThan(0);
+    expect(container.textContent).not.toMatch(/artist profile/i);
+  });
+
   it('renders named comparison tables from monthly-only public offer truth', () => {
     const { container } = render(<PricingComparisonChart />);
 

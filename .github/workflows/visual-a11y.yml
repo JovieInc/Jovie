@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: A failed scheduled run has no PR or reviewer to surface it, so one job with only issues:write opens or updates a single standing issue per lane (GOVERNANCE.md: nothing fails silently).
+# removal-trigger: Remove the report-scheduled-failure job when a shared scheduled-failure reporter covers every scheduled workflow.
 name: Visual & A11y Tests
 # clock-class: skip-if-unchanged
 
@@ -77,4 +81,41 @@ jobs:
             echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "PASS: All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  report-scheduled-failure:
+    # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red scheduled
+    # run opens or updates one standing issue, deduped by title. Not required.
+    name: Report scheduled failure
+    needs: [ci-visual-path-changes, storybook-a11y]
+    if: ${{ always() && github.event_name == 'schedule' && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update standing issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="Visual a11y lane red"
+          BODY=$(cat <<EOF
+          The scheduled $GITHUB_WORKFLOW run failed on ${GITHUB_SHA::8}.
+
+          Run: $RUN_URL
+
+          Reproduce locally: \`pnpm --filter @jovie/web test:a11y\`
+          EOF
+          )
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq '.[] | select(.title == "Visual a11y lane red") | .number' | head -1)
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body "$BODY"
+            echo "Updated standing issue #$EXISTING"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label "design-governance" \
+              || gh issue create --title "$TITLE" --body "$BODY"
           fi

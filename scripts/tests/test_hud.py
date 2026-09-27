@@ -148,3 +148,34 @@ class RenderTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PromotionTest(unittest.TestCase):
+    """JOV-6836: the HUD surfaces promotion-loss metrics, cached, and never blanks on failure."""
+    METRICS = {"firstPass": {"rate": 0.74}, "reenqueueMinutes": {"p75": 365, "pending": 2},
+               "openToFirstEnqueueMinutes": {"p75": 106.7}, "occupancy": {"cleanNotQueued": 6},
+               "intake": {"opensPerHour": 12.6, "mergesPerHour": 7.3, "keysWithMultipleOpenPrs": 10}}
+
+    def setUp(self):
+        hud._promotion.update(at=0.0, data=None)
+
+    def test_line_renders_metrics_and_errors(self):
+        text = "\n".join(plain(line) for line in hud.render(model(github={**model()["github"], "promotion": self.METRICS}), 200, 45))
+        self.assertIn("first-pass 74% · ejected→back p75 365m (2 waiting) · open→enqueue p75 106.7m", text)
+        self.assertIn("opens/h 12.6 vs merges/h 7.3 · CLEAN not queued 6 · keys >1 PR 10", text)
+        self.assertIn("PROMOTION 8h  unread", plain(hud.promotion_line(None)))
+        self.assertIn("boom", plain(hud.promotion_line({"error": "boom"})))
+
+    def test_model_runs_the_script_once_per_interval_and_reports_failures(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return type("R", (), {"returncode": 0, "stdout": '{"firstPass": {"rate": 1}}', "stderr": ""})()
+        self.assertEqual(hud.promotion_model(now=1000, run=run), {"firstPass": {"rate": 1}})
+        hud.promotion_model(now=1000 + hud.PROMOTION_EVERY_S - 1, run=run)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][-3:], ["--since", "8h", "--json"])
+        failed = hud.promotion_model(now=1000 + hud.PROMOTION_EVERY_S, run=lambda *a, **k: type(
+            "R", (), {"returncode": 1, "stdout": "", "stderr": "gh: HTTP 502"})())
+        self.assertIn("gh: HTTP 502", failed["error"])

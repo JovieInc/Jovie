@@ -1,5 +1,6 @@
 'use client';
 
+import { forwardAnalyticsEventToFunnel } from '@/lib/analytics/signup-funnel-client';
 import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 
@@ -36,6 +37,10 @@ function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
 }
 
 export function track(event: string, properties?: Record<string, unknown>) {
+  // First-party funnel steps carry no identifiers, so they do not wait on the
+  // GA consent gate below.
+  forwardAnalyticsEventToFunnel(event, properties);
+
   const analyticsWindow = getAnalyticsWindow();
   if (!analyticsWindow?.gtag) return;
 

@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import {
+  markSignupFirstValuePending,
+  trackFunnelStep,
+} from '@/lib/analytics/signup-funnel-client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 /**
@@ -127,6 +131,16 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
       if (!response.ok) {
         markTriggerCompleted();
         setStatus('error');
+        trackFunnelStep({
+          funnel: 'artist_signup',
+          step: 'claim_complete',
+          outcome: 'error',
+          surface: 'onboarding',
+          reason:
+            body.errorCode === 'WAITLIST_SAVE_FAILED'
+              ? 'waitlist_save_failed'
+              : `http_${response.status}`,
+        });
         if (body.errorCode === 'WAITLIST_SAVE_FAILED') {
           track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_SAVE_FAILED, {
             surface: 'start_chat',
@@ -154,6 +168,13 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
           surface: 'start_chat',
         });
         if (body.waitlist?.entryId) {
+          trackFunnelStep({
+            funnel: 'artist_signup',
+            step: 'claim_complete',
+            outcome: 'dropped',
+            surface: 'onboarding',
+            reason: 'waitlisted',
+          });
           track(ONBOARDING_FUNNEL_EVENTS.WAITLISTED, {
             surface: 'start_chat',
             entry_id: body.waitlist.entryId,
@@ -165,6 +186,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
           return;
         }
         if (body.profile?.profileId) {
+          markSignupFirstValuePending();
           track(ONBOARDING_FUNNEL_EVENTS.PROFILE_CREATED, {
             profile_id: body.profile.profileId,
             handle: body.profile.handle ?? undefined,

@@ -66,6 +66,8 @@ HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
+# Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
+RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
@@ -458,6 +460,29 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int) -> subprocess.Comple
     return subprocess.CompletedProcess(cmd, code)
 
 
+PROVIDER_HANDOFFS = 2
+HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit {code}), most likely an "
+                "exhausted account or provider failure. Its partial work is in this worktree: check "
+                "`git status`, `git diff` and `git log origin/main..HEAD`, then finish the task. Do not "
+                "start over.\n\n")
+
+
+def cool_down(host: Host, name: str) -> None:
+    path = host.state / "cooldown" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+
+
+def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
+    """The cheapest enabled, healthy, non-cooling lane not yet tried on this run."""
+    for name, spec in (providers or load_providers()).items():
+        if name in exclude or not spec.get("enabled", True) or cooling(host, name):
+            continue
+        if provider_healthy(spec):
+            return name, spec
+    return None
+
+
 # ---------------------------------------------------------------- one run
 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
@@ -480,6 +505,26 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             started = time.time()
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
+            # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
+            # lane finishes it on the same worktree.
+            handoffs, current = [], name
+            while agent.returncode != 0 and len(handoffs) < PROVIDER_HANDOFFS:
+                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
+                if nxt is None:
+                    break
+                cool_down(host, current)
+                nxt_name, nxt_spec = nxt
+                handoff_prompt = HANDOFF_NOTE.format(prev=current, code=agent.returncode) + prompt
+                handoff_file = runs / f"{run_id}.handoff{len(handoffs) + 1}.prompt.md"
+                handoff_file.write_text(handoff_prompt)
+                log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
+                log.flush()
+                handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
+                agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
+                                                             "cwd": str(worktree)}), worktree, log, host.agent_timeout)
+                current = nxt_name
+            if handoffs:
+                receipt.update(handoffs=handoffs, finishedBy=current)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
                                            sensitive=issue_is_sensitive(issue)))
@@ -801,6 +846,31 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
+LOCKFILES = frozenset({"pnpm-lock.yaml"})
+
+
+def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
+    """JOV-6837: a PR that conflicts with main only in pnpm-lock.yaml needs no model. Merge
+    main, take its lockfile, regenerate it from the merged manifests, push (no force). Any
+    other conflict, or a failed regeneration, aborts and leaves the PR to the agent."""
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
+        if not conflicted or not conflicted <= LOCKFILES:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
+        regenerated = sh(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], cwd=worktree, timeout=900, log=log)
+        if regenerated.returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
@@ -813,16 +883,22 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "-B", pr["headRefName"], str(worktree),
                 f"origin/{pr['headRefName']}"], cwd=host.repo, log=log)
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            prompt = render_fix_prompt(pr, failure_excerpt(pr))
-            prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
-            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                              worktree, log, host.agent_timeout)
+            lockfile_only = pr.get("mergeStateStatus") == "DIRTY" \
+                and resolve_lockfile_conflict(worktree, pr["headRefName"], log)
+            agent = None
+            if lockfile_only:
+                receipt.update(resolution="lockfile-regenerated")
+            else:
+                sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                prompt_file = runs / f"{run_id}.prompt.md"
+                prompt_file.write_text(prompt)
+                agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                                                         "cwd": str(worktree)}), worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
-            receipt.update(agentExit=agent.returncode, headAfter=after,
+            receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
@@ -1279,7 +1355,7 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *LANE_TESTS],
+        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.
