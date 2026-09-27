@@ -554,6 +554,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/stripe/webhooks unsigned — must 400`,
     '',
     'Fix the product regression. Add or update a regression test. Do not skip because secrets are missing.',
+    'JOV-INV-018: a changed user-visible screen must be registered; run `pnpm screen-registration-gate` before opening the PR or CI fails it.',
     'Do not merge. Do not deploy. Tell Gem she missed this after the lock was on.',
     receipt ? `Receipt: ${JSON.stringify(receipt)}` : '',
   ]
@@ -565,11 +566,13 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
 export function planAutofix({
   cursorApiKey,
   existingAgentIds = [],
+  openPrNumber = null,
   openIssueUrl = '',
   fingerprint,
   checks,
   origin,
   receipt,
+  now = Date.now(),
 } = {}) {
   const checkList = Array.isArray(checks) ? checks : [];
   const hasInconclusive = checkList.some(check => check.inconclusive === true);
@@ -593,6 +596,16 @@ export function planAutofix({
   const owned = (
     Array.isArray(existingAgentIds) ? existingAgentIds : []
   ).filter(id => typeof id === 'string' && id.length > 0);
+  if (openPrNumber) {
+    return {
+      action: 'dedup',
+      reason: 'open_pr_owns_fingerprint',
+      fingerprint,
+      existingAgentIds: owned,
+      openPrNumber,
+      openIssueUrl: openIssueUrl || null,
+    };
+  }
   if (owned.length > 0) {
     return {
       action: 'dedup',
@@ -617,6 +630,9 @@ export function planAutofix({
       },
       target: {
         autoCreatePr: true,
+        // JOV-6832: a fingerprint-derived branch is the dedupe key the agent
+        // list and open PRs both expose; the suffix avoids reusing a closed branch.
+        branchName: `${autofixBranchPrefix(fingerprint)}-${now.toString(36)}`,
       },
     },
   };
@@ -628,15 +644,39 @@ export function cursorAuthHeader(apiKey) {
   return `Basic ${token}`;
 }
 
-/** @param {unknown} agents @param {string} [fingerprint] @returns {string[]} */
+/** @param {string} [fingerprint] @returns {string} */
+export function autofixBranchPrefix(fingerprint) {
+  const slug = String(fingerprint ?? '')
+    .replace(`${GOLDEN_PATH_FINGERPRINT_PREFIX}:`, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `cursor/golden-path-${slug || 'unknown'}`;
+}
+
+const FINISHED_AGENT_STATUSES = new Set(['FINISHED', 'ERROR', 'EXPIRED']);
+
+/**
+ * Active Cursor agents already working this fingerprint. The list API does not
+ * echo the prompt, so match the fingerprint-derived branch too; finished agents
+ * are owned by their PR (see findOpenAutofixPr).
+ * @param {unknown} agents @param {string} [fingerprint] @returns {string[]}
+ */
 export function findOwnedAgents(agents, fingerprint) {
   const list = Array.isArray(agents) ? agents : [];
   const needle = String(fingerprint ?? '');
   if (!needle) return [];
+  const branch = autofixBranchPrefix(needle);
   return list
     .filter(agent => {
+      const record = /** @type {Record<string, unknown>} */ (agent ?? {});
+      if (FINISHED_AGENT_STATUSES.has(String(record.status ?? ''))) {
+        return false;
+      }
       const haystack = JSON.stringify(agent ?? {}).toLowerCase();
-      return haystack.includes(needle.toLowerCase());
+      return (
+        haystack.includes(needle.toLowerCase()) || haystack.includes(branch)
+      );
     })
     .map(agent => {
       const record = /** @type {Record<string, unknown>} */ (agent ?? {});
@@ -646,4 +686,25 @@ export function findOwnedAgents(agents, fingerprint) {
       /** @returns {id is string} */
       id => typeof id === 'string' && id.length > 0
     );
+}
+
+/**
+ * An open Cursor PR already fixing this fingerprint (or any JOV-5085 lock break).
+ * @param {unknown} prs @param {string} [fingerprint] @returns {number | null}
+ */
+export function findOpenAutofixPr(prs, fingerprint) {
+  const list = Array.isArray(prs) ? prs : [];
+  const needle = String(fingerprint ?? '');
+  const branch = autofixBranchPrefix(needle);
+  const hit = list.find(pr => {
+    const head = String(pr?.headRefName ?? '');
+    if (!head.startsWith('cursor/')) return false;
+    const text = `${pr?.title ?? ''}\n${pr?.body ?? ''}`;
+    return (
+      head.startsWith(branch) ||
+      (needle !== '' && text.includes(needle)) ||
+      text.includes('JOV-5085')
+    );
+  });
+  return typeof hit?.number === 'number' ? hit.number : null;
 }

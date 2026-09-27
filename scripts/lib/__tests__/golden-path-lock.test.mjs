@@ -1,10 +1,17 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createGoldenPathLinearIssue } from '../golden-path-intake.mjs';
 import {
+  autofixBranchPrefix,
   buildAutofixPrompt,
   buildMergeGateReceipt,
   buildProdProbeChatPayload,
@@ -18,6 +25,7 @@ import {
   evaluateProdProbe,
   evaluateStripeWebhookLiveness,
   evaluateWaitlistUnauth,
+  findOpenAutofixPr,
   findOwnedAgents,
   GOLDEN_PATH_LOCK_SCHEMA,
   GOLDEN_PATH_LOCK_SELF_TEST_FILES,
@@ -727,5 +735,137 @@ describe('golden-path Linear-only intake', () => {
       reason: 'linear_search_429',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('golden-path autofix dedupe (JOV-6832)', () => {
+  const FINGERPRINT = 'golden-path-lock:prod:homepage-cta';
+  const CHECKS = [{ id: 'homepage-cta', ok: false, reason: 'no name search' }];
+
+  it('derives a stable branch per fingerprint and launches on it', () => {
+    expect(autofixBranchPrefix(FINGERPRINT)).toBe(
+      'cursor/golden-path-homepage-cta'
+    );
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint: FINGERPRINT,
+      checks: CHECKS,
+      now: 36,
+    });
+    expect(plan.request.target.branchName).toBe(
+      'cursor/golden-path-homepage-cta-10'
+    );
+    expect(plan.request.prompt.text).toContain('pnpm screen-registration-gate');
+  });
+
+  it('dedups on an open PR before any agent lookup', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      openPrNumber: 19073,
+      fingerprint: FINGERPRINT,
+      checks: CHECKS,
+    });
+    expect(plan).toMatchObject({
+      action: 'dedup',
+      reason: 'open_pr_owns_fingerprint',
+      openPrNumber: 19073,
+    });
+  });
+
+  it('finds the open Cursor fix PR by branch, fingerprint, or JOV-5085', () => {
+    const prs = [
+      { number: 1, headRefName: 'feature/x', title: 'JOV-5085 docs', body: '' },
+      {
+        number: 2,
+        headRefName: 'cursor/other',
+        title: 'fix(home)',
+        body: `Fingerprint: \`${FINGERPRINT}\``,
+      },
+    ];
+    expect(findOpenAutofixPr(prs, FINGERPRINT)).toBe(2);
+    expect(
+      findOpenAutofixPr(
+        [
+          {
+            number: 3,
+            headRefName: 'cursor/golden-path-homepage-cta-abc',
+            title: '',
+            body: '',
+          },
+        ],
+        FINGERPRINT
+      )
+    ).toBe(3);
+    expect(findOpenAutofixPr([prs[0]], FINGERPRINT)).toBeNull();
+  });
+
+  it('counts only active agents, matched by prompt or branch', () => {
+    const agents = [
+      {
+        id: 'running',
+        status: 'RUNNING',
+        target: { branchName: 'cursor/golden-path-homepage-cta-1' },
+      },
+      {
+        id: 'done',
+        status: 'FINISHED',
+        target: { branchName: 'cursor/golden-path-homepage-cta-0' },
+      },
+      {
+        id: 'other',
+        status: 'RUNNING',
+        target: { branchName: 'cursor/unrelated' },
+      },
+    ];
+    expect(findOwnedAgents(agents, FINGERPRINT)).toEqual(['running']);
+  });
+
+  it('existing open PR: launches nothing and skips intake', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'golden-path-dedupe-'));
+    const receiptPath = join(directory, 'receipt.json');
+    const calls = join(directory, 'gh-calls.log');
+    writeFileSync(
+      receiptPath,
+      `${JSON.stringify(buildProdProbeReceipt({ ok: false, checks: CHECKS }))}\n`
+    );
+    const fakeGh = join(directory, 'gh');
+    writeFileSync(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        `echo "$*" >> '${calls}'`,
+        'case "$1 $2" in',
+        `  "pr list") echo '[{"number":19073,"headRefName":"cursor/golden-path-production-regression-cd2b","title":"fix(home): restore name search (JOV-5085)","body":""}]' ;;`,
+        'esac',
+      ].join('\n')
+    );
+    chmodSync(fakeGh, 0o755);
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          resolve(REPO_ROOT, 'scripts/golden-path-lock.mjs'),
+          'autofix',
+          '--receipt',
+          receiptPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            CURSOR_API_KEY: 'fake-key-no-network',
+            LINEAR_API_KEY: '',
+          },
+        }
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('open autofix PR #19073 owns');
+      expect(result.stderr).not.toContain('Launched Cursor-direct');
+      expect(result.stderr).not.toContain('Linear intake');
+      expect(readFileSync(calls, 'utf8').trim()).toMatch(/^pr list /);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
