@@ -5,7 +5,7 @@ export const linktreeAlternative: AlternativeData = {
   category: 'Linktree',
   title: 'Best Linktree Alternative (2026)',
   metaDescription:
-    'Looking for a Linktree alternative? Jovie gives you a profile that captures visitors, sends automatic update notifications, and adapts to what they came for — not just a list of links.',
+    'Looking for a Linktree alternative? Jovie gives you a profile that captures visitors, sends automatic update notifications, and adapts to what they came for.',
   heroHeadline: 'The best Linktree alternative',
   heroSubheadline:
     'Linktree gives you a static list of links. Jovie gives you a profile that adapts to what you share, captures visitors, and notifies them automatically.',
@@ -15,10 +15,10 @@ export const linktreeAlternative: AlternativeData = {
   },
   whySwitch: [
     'A static link list treats every visitor the same, no matter what they came for.',
-    'No smart routing — you manually reorder links instead of Jovie leading with what matters right now.',
-    'No visitor collection — people click and leave. Jovie captures contacts and builds your audience.',
-    'No update notifications — visitors have to remember to check back. Jovie notifies them automatically.',
-    'No context-aware AI — Jovie’s AI knows your actual profile data.',
+    'No smart routing. You manually reorder links instead of Jovie leading with what matters right now.',
+    'No visitor collection. People click and leave. Jovie captures contacts and builds your audience.',
+    'No update notifications. Visitors have to remember to check back. Jovie notifies them automatically.',
+    'No context-aware AI. Jovie’s AI knows your actual profile data.',
   ],
   highlights: [
     {
@@ -51,7 +51,7 @@ export const linktreeAlternative: AlternativeData = {
     {
       question: 'Is Jovie free?',
       answer:
-        'Yes. Jovie has a free tier that includes a profile, adaptive links, and contact collection. Paid plans unlock advanced analytics, automatic update notifications, and contact export.',
+        'Yes. Jovie has a free tier that includes a profile, adaptive links, and contact collection. Paid plans add advanced analytics, automatic update notifications, and contact export.',
     },
     {
       question: 'Can I use Jovie instead of Linktree?',

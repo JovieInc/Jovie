@@ -15,7 +15,7 @@ export const linkInBioAlternative: AlternativeData = {
   },
   whySwitch: [
     'A static link page treats every update the same, so nothing leads.',
-    'Link pages are passive — visitors click once and forget. Jovie captures contacts and notifies them when you publish something new.',
+    'Link pages are passive. Visitors click once and forget. Jovie captures contacts and notifies them when you publish something new.',
     'Manual link management wastes time. Jovie leads with your most current update automatically.',
     'Page views alone don’t tell you much. Jovie adds source attribution so you know where visitors actually came from.',
   ],
@@ -23,7 +23,7 @@ export const linkInBioAlternative: AlternativeData = {
     {
       title: 'More than a link page',
       description:
-        'Your Jovie profile is a full page: your latest update, social links, contact capture, and more. Not just a list of links.',
+        'Your Jovie profile is a full page. It carries your latest update, social links, and contact capture together.',
     },
     {
       title: 'A profile that leads',

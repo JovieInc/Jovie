@@ -91,12 +91,12 @@ export const linkfireComparison: ComparisonData = {
     {
       question: 'How much does Linkfire cost vs Jovie?',
       answer:
-        'Linkfire requires a paid subscription with no free tier. Jovie has a free tier that includes smart links, artist profiles, and fan collection. Paid plans unlock advanced features.',
+        'Linkfire requires a paid subscription with no free tier. Jovie has a free tier that includes smart links, artist profiles, and fan collection. Paid plans add advanced features.',
     },
     {
       question: 'Can I use Jovie if I\u2019m on a label?',
       answer:
-        'Yes. Jovie works for any musician — independent or signed. But if your label already uses Linkfire for campaign-level analytics, Jovie is ideal as your personal artist platform for fan relationships and direct engagement.',
+        'Yes. Jovie works for any musician, independent or signed. But if your label already uses Linkfire for campaign-level analytics, Jovie is ideal as your personal artist platform for fan relationships and direct engagement.',
     },
   ],
   bottomLine:

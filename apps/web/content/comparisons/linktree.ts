@@ -93,7 +93,7 @@ export const linktreeComparison: ComparisonData = {
     {
       question: 'Is Jovie free like Linktree?',
       answer:
-        'Yes, Jovie has a free tier. Create a profile, add links, and collect contacts at no cost. Paid plans unlock advanced analytics, automatic update notifications, and contact export.',
+        'Yes, Jovie has a free tier. Create a profile, add links, and collect contacts at no cost. Paid plans add advanced analytics, automatic update notifications, and contact export.',
     },
     {
       question: 'Can I add links to any platform?',
