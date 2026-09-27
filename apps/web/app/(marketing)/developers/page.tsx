@@ -48,9 +48,9 @@ const RESOURCE_LINKS = [
   },
   {
     href: '/cli',
-    label: 'Read-only Jovie CLI',
+    label: 'Jovie CLI and MCP server',
     description:
-      'Anonymous, read-only `jovie` commands for the public artist GET routes.',
+      'Anonymous `jovie` commands for agents: read public artist data and create claimable artist profiles.',
   },
   {
     href: '/api-versioning',
