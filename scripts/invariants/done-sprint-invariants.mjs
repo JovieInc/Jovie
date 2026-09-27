@@ -145,13 +145,6 @@ export function scanDoneSprintSources(repoRoot = DEFAULT_ROOT) {
   return errors;
 }
 
-/**
- * @param {{
- *   env?: NodeJS.ProcessEnv,
- *   fetchImpl?: Function,
- *   paths?: readonly string[],
- * }} [options]
- */
 const safeHost = value => {
   try {
     return typeof value === 'string' && value ? new URL(value).host : '';
@@ -160,6 +153,13 @@ const safeHost = value => {
   }
 };
 
+/**
+ * @param {{
+ *   env?: NodeJS.ProcessEnv,
+ *   fetchImpl?: Function,
+ *   paths?: readonly string[],
+ * }} [options]
+ */
 export async function rescanProduction({
   env = process.env,
   fetchImpl = fetch,
