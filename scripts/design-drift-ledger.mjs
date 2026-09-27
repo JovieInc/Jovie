@@ -349,8 +349,19 @@ export function renderMarkdownBlock(ledger) {
   return lines.join('\n');
 }
 
+/**
+ * Pretty JSON with one line per route: keeps the committed diff small enough
+ * for the PR size cap. Biome ignores this generated file so format cannot
+ * expand it; parse is identical.
+ */
 export function serializeLedger(ledger) {
-  return `${JSON.stringify(ledger, null, 2)}\n`;
+  const { routes, ...rest } = ledger;
+  const head = JSON.stringify(rest, null, 2).slice(0, -2);
+  const rows = Object.entries(routes).map(
+    ([route, counts]) =>
+      `    ${JSON.stringify(route)}: ${JSON.stringify(counts)}`
+  );
+  return `${head},\n  "routes": {\n${rows.join(',\n')}\n  }\n}\n`;
 }
 
 function readBlock(markdown) {

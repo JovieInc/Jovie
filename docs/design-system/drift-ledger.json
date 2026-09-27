@@ -67,869 +67,101 @@
     ]
   },
   "routes": {
-    "/app": {
-      "files": 81,
-      "rawPalette": 70,
-      "arbitrary": 42,
-      "rawButton": 17,
-      "linearToken": 10,
-      "oversizeControl": 1,
-      "dangerAlias": 9
-    },
-    "/app/admin": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/activity": {
-      "files": 19,
-      "rawPalette": 27,
-      "arbitrary": 22,
-      "rawButton": 1,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/admin/agent-runs/[id]": {
-      "files": 6,
-      "rawPalette": 2,
-      "arbitrary": 17,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 2
-    },
-    "/app/admin/algorithm-health": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/campaigns": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/chat": {
-      "files": 133,
-      "rawPalette": 77,
-      "arbitrary": 51,
-      "rawButton": 35,
-      "linearToken": 17,
-      "oversizeControl": 7,
-      "dangerAlias": 26
-    },
-    "/app/admin/costs": {
-      "files": 18,
-      "rawPalette": 27,
-      "arbitrary": 24,
-      "rawButton": 1,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/admin/creators": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/features": {
-      "files": 20,
-      "rawPalette": 27,
-      "arbitrary": 22,
-      "rawButton": 1,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/admin/feedback": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/growth": {
-      "files": 55,
-      "rawPalette": 27,
-      "arbitrary": 25,
-      "rawButton": 2,
-      "linearToken": 12,
-      "oversizeControl": 0,
-      "dangerAlias": 25
-    },
-    "/app/admin/growth/yc-metrics": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/hud": {
-      "files": 51,
-      "rawPalette": 46,
-      "arbitrary": 91,
-      "rawButton": 2,
-      "linearToken": 14,
-      "oversizeControl": 1,
-      "dangerAlias": 26
-    },
-    "/app/admin/ingest": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/interviews": {
-      "files": 6,
-      "rawPalette": 2,
-      "arbitrary": 16,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 1
-    },
-    "/app/admin/investors": {
-      "files": 18,
-      "rawPalette": 27,
-      "arbitrary": 25,
-      "rawButton": 1,
-      "linearToken": 12,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/admin/investors/links": {
-      "files": 17,
-      "rawPalette": 27,
-      "arbitrary": 22,
-      "rawButton": 1,
-      "linearToken": 10,
-      "oversizeControl": 1,
-      "dangerAlias": 9
-    },
-    "/app/admin/investors/settings": {
-      "files": 6,
-      "rawPalette": 2,
-      "arbitrary": 18,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 5
-    },
-    "/app/admin/investors/updates": {
-      "files": 6,
-      "rawPalette": 2,
-      "arbitrary": 16,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 2
-    },
-    "/app/admin/leads": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/ops": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/outreach": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/outreach/dm": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/outreach/email": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/outreach/review": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/people": {
-      "files": 101,
-      "rawPalette": 86,
-      "arbitrary": 34,
-      "rawButton": 3,
-      "linearToken": 17,
-      "oversizeControl": 2,
-      "dangerAlias": 34
-    },
-    "/app/admin/platform-connections": {
-      "files": 8,
-      "rawPalette": 4,
-      "arbitrary": 17,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 2
-    },
-    "/app/admin/playlists": {
-      "files": 8,
-      "rawPalette": 2,
-      "arbitrary": 16,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 1
-    },
-    "/app/admin/releases": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/revenue-lift": {
-      "files": 6,
-      "rawPalette": 2,
-      "arbitrary": 19,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 1
-    },
-    "/app/admin/screenshots": {
-      "files": 6,
-      "rawPalette": 2,
-      "arbitrary": 17,
-      "rawButton": 0,
-      "linearToken": 16,
-      "oversizeControl": 0,
-      "dangerAlias": 1
-    },
-    "/app/admin/share-studio": {
-      "files": 16,
-      "rawPalette": 27,
-      "arbitrary": 25,
-      "rawButton": 1,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/admin/system": {
-      "files": 9,
-      "rawPalette": 2,
-      "arbitrary": 16,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 1
-    },
-    "/app/admin/users": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/admin/waitlist": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/audience": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/calendar": {
-      "files": 37,
-      "rawPalette": 27,
-      "arbitrary": 22,
-      "rawButton": 3,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/chat": {
-      "files": 190,
-      "rawPalette": 127,
-      "arbitrary": 73,
-      "rawButton": 52,
-      "linearToken": 17,
-      "oversizeControl": 9,
-      "dangerAlias": 32
-    },
-    "/app/chat/[id]": {
-      "files": 189,
-      "rawPalette": 127,
-      "arbitrary": 73,
-      "rawButton": 52,
-      "linearToken": 17,
-      "oversizeControl": 9,
-      "dangerAlias": 32
-    },
-    "/app/chats": {
-      "files": 32,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/contact": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/contacts": {
-      "files": 87,
-      "rawPalette": 43,
-      "arbitrary": 28,
-      "rawButton": 9,
-      "linearToken": 12,
-      "oversizeControl": 1,
-      "dangerAlias": 5
-    },
-    "/app/dashboard": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/audience": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/catalog-scan": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/chat": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/contacts": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/earnings": {
-      "files": 24,
-      "rawPalette": 25,
-      "arbitrary": 6,
-      "rawButton": 2,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 3
-    },
-    "/app/dashboard/insights": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/library": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/links": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/presence": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/profile": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/release-plan": {
-      "files": 6,
-      "rawPalette": 11,
-      "arbitrary": 15,
-      "rawButton": 0,
-      "linearToken": 33,
-      "oversizeControl": 0,
-      "dangerAlias": 1
-    },
-    "/app/dashboard/releases": {
-      "files": 114,
-      "rawPalette": 71,
-      "arbitrary": 41,
-      "rawButton": 33,
-      "linearToken": 25,
-      "oversizeControl": 2,
-      "dangerAlias": 15
-    },
-    "/app/dashboard/releases/[releaseId]/downloads": {
-      "files": 15,
-      "rawPalette": 28,
-      "arbitrary": 22,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 7
-    },
-    "/app/dashboard/releases/[releaseId]/tasks": {
-      "files": 55,
-      "rawPalette": 46,
-      "arbitrary": 23,
-      "rawButton": 11,
-      "linearToken": 12,
-      "oversizeControl": 1,
-      "dangerAlias": 9
-    },
-    "/app/dashboard/tasks": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/tipping": {
-      "files": 2,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/dashboard/tour-dates": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/earnings": {
-      "files": 24,
-      "rawPalette": 25,
-      "arbitrary": 6,
-      "rawButton": 2,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 3
-    },
-    "/app/feature-flags": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/insights": {
-      "files": 35,
-      "rawPalette": 27,
-      "arbitrary": 23,
-      "rawButton": 2,
-      "linearToken": 12,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/jovie-work": {
-      "files": 30,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 6
-    },
-    "/app/library": {
-      "files": 114,
-      "rawPalette": 71,
-      "arbitrary": 41,
-      "rawButton": 33,
-      "linearToken": 25,
-      "oversizeControl": 2,
-      "dangerAlias": 15
-    },
-    "/app/lyrics/[trackId]": {
-      "files": 29,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/presence": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/profile": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/profiles": {
-      "files": 51,
-      "rawPalette": 27,
-      "arbitrary": 22,
-      "rawButton": 7,
-      "linearToken": 10,
-      "oversizeControl": 1,
-      "dangerAlias": 10
-    },
-    "/app/releases": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/releases/[releaseId]/tasks": {
-      "files": 55,
-      "rawPalette": 46,
-      "arbitrary": 23,
-      "rawButton": 11,
-      "linearToken": 12,
-      "oversizeControl": 1,
-      "dangerAlias": 9
-    },
-    "/app/settings": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/settings/account": {
-      "files": 47,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 12
-    },
-    "/app/settings/admin": {
-      "files": 23,
-      "rawPalette": 25,
-      "arbitrary": 6,
-      "rawButton": 2,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 3
-    },
-    "/app/settings/analytics": {
-      "files": 38,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 5
-    },
-    "/app/settings/appearance": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/settings/artist-profile": {
-      "files": 80,
-      "rawPalette": 77,
-      "arbitrary": 46,
-      "rawButton": 10,
-      "linearToken": 10,
-      "oversizeControl": 2,
-      "dangerAlias": 13
-    },
-    "/app/settings/audience": {
-      "files": 42,
-      "rawPalette": 32,
-      "arbitrary": 25,
-      "rawButton": 3,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 8
-    },
-    "/app/settings/billing": {
-      "files": 33,
-      "rawPalette": 27,
-      "arbitrary": 23,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 5
-    },
-    "/app/settings/connectors": {
-      "files": 32,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 5
-    },
-    "/app/settings/contacts": {
-      "files": 43,
-      "rawPalette": 27,
-      "arbitrary": 22,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 5
-    },
-    "/app/settings/data-privacy": {
-      "files": 33,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/settings/delete-account": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/settings/payments": {
-      "files": 29,
-      "rawPalette": 27,
-      "arbitrary": 23,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 5
-    },
-    "/app/settings/profile": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/settings/referral": {
-      "files": 7,
-      "rawPalette": 2,
-      "arbitrary": 15,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 1
-    },
-    "/app/settings/retargeting-ads": {
-      "files": 6,
-      "rawPalette": 2,
-      "arbitrary": 16,
-      "rawButton": 0,
-      "linearToken": 10,
-      "oversizeControl": 2,
-      "dangerAlias": 1
-    },
-    "/app/settings/touring": {
-      "files": 37,
-      "rawPalette": 28,
-      "arbitrary": 21,
-      "rawButton": 4,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    },
-    "/app/settings/usage": {
-      "files": 33,
-      "rawPalette": 27,
-      "arbitrary": 24,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 7
-    },
-    "/app/tasks": {
-      "files": 75,
-      "rawPalette": 52,
-      "arbitrary": 73,
-      "rawButton": 28,
-      "linearToken": 30,
-      "oversizeControl": 4,
-      "dangerAlias": 14
-    },
-    "/app/threads": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/tipping": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/tour-dates": {
-      "files": 39,
-      "rawPalette": 38,
-      "arbitrary": 22,
-      "rawButton": 3,
-      "linearToken": 10,
-      "oversizeControl": 1,
-      "dangerAlias": 8
-    },
-    "/app/tracks": {
-      "files": 1,
-      "rawPalette": 0,
-      "arbitrary": 0,
-      "rawButton": 0,
-      "linearToken": 0,
-      "oversizeControl": 0,
-      "dangerAlias": 0
-    },
-    "/app/youtube": {
-      "files": 27,
-      "rawPalette": 27,
-      "arbitrary": 21,
-      "rawButton": 2,
-      "linearToken": 10,
-      "oversizeControl": 0,
-      "dangerAlias": 4
-    }
+    "/app": {"files":81,"rawPalette":70,"arbitrary":42,"rawButton":17,"linearToken":10,"oversizeControl":1,"dangerAlias":9},
+    "/app/admin": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/activity": {"files":19,"rawPalette":27,"arbitrary":22,"rawButton":1,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/admin/agent-runs/[id]": {"files":6,"rawPalette":2,"arbitrary":17,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":2},
+    "/app/admin/algorithm-health": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/campaigns": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/chat": {"files":133,"rawPalette":77,"arbitrary":51,"rawButton":35,"linearToken":17,"oversizeControl":7,"dangerAlias":26},
+    "/app/admin/costs": {"files":18,"rawPalette":27,"arbitrary":24,"rawButton":1,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/admin/creators": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/features": {"files":20,"rawPalette":27,"arbitrary":22,"rawButton":1,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/admin/feedback": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/growth": {"files":55,"rawPalette":27,"arbitrary":25,"rawButton":2,"linearToken":12,"oversizeControl":0,"dangerAlias":25},
+    "/app/admin/growth/yc-metrics": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/hud": {"files":51,"rawPalette":46,"arbitrary":91,"rawButton":2,"linearToken":14,"oversizeControl":1,"dangerAlias":26},
+    "/app/admin/ingest": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/interviews": {"files":6,"rawPalette":2,"arbitrary":16,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":1},
+    "/app/admin/investors": {"files":18,"rawPalette":27,"arbitrary":25,"rawButton":1,"linearToken":12,"oversizeControl":0,"dangerAlias":4},
+    "/app/admin/investors/links": {"files":17,"rawPalette":27,"arbitrary":22,"rawButton":1,"linearToken":10,"oversizeControl":1,"dangerAlias":9},
+    "/app/admin/investors/settings": {"files":6,"rawPalette":2,"arbitrary":18,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":5},
+    "/app/admin/investors/updates": {"files":6,"rawPalette":2,"arbitrary":16,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":2},
+    "/app/admin/leads": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/ops": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/outreach": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/outreach/dm": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/outreach/email": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/outreach/review": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/people": {"files":101,"rawPalette":86,"arbitrary":34,"rawButton":3,"linearToken":17,"oversizeControl":2,"dangerAlias":34},
+    "/app/admin/platform-connections": {"files":8,"rawPalette":4,"arbitrary":17,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":2},
+    "/app/admin/playlists": {"files":8,"rawPalette":2,"arbitrary":16,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":1},
+    "/app/admin/releases": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/revenue-lift": {"files":6,"rawPalette":2,"arbitrary":19,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":1},
+    "/app/admin/screenshots": {"files":6,"rawPalette":2,"arbitrary":17,"rawButton":0,"linearToken":16,"oversizeControl":0,"dangerAlias":1},
+    "/app/admin/share-studio": {"files":16,"rawPalette":27,"arbitrary":25,"rawButton":1,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/admin/system": {"files":9,"rawPalette":2,"arbitrary":16,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":1},
+    "/app/admin/users": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/admin/waitlist": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/audience": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/calendar": {"files":37,"rawPalette":27,"arbitrary":22,"rawButton":3,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/chat": {"files":190,"rawPalette":127,"arbitrary":73,"rawButton":52,"linearToken":17,"oversizeControl":9,"dangerAlias":32},
+    "/app/chat/[id]": {"files":189,"rawPalette":127,"arbitrary":73,"rawButton":52,"linearToken":17,"oversizeControl":9,"dangerAlias":32},
+    "/app/chats": {"files":32,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/contact": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/contacts": {"files":87,"rawPalette":43,"arbitrary":28,"rawButton":9,"linearToken":12,"oversizeControl":1,"dangerAlias":5},
+    "/app/dashboard": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/audience": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/catalog-scan": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/chat": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/contacts": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/earnings": {"files":24,"rawPalette":25,"arbitrary":6,"rawButton":2,"linearToken":0,"oversizeControl":0,"dangerAlias":3},
+    "/app/dashboard/insights": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/library": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/links": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/presence": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/profile": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/release-plan": {"files":6,"rawPalette":11,"arbitrary":15,"rawButton":0,"linearToken":33,"oversizeControl":0,"dangerAlias":1},
+    "/app/dashboard/releases": {"files":114,"rawPalette":71,"arbitrary":41,"rawButton":33,"linearToken":25,"oversizeControl":2,"dangerAlias":15},
+    "/app/dashboard/releases/[releaseId]/downloads": {"files":15,"rawPalette":28,"arbitrary":22,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":7},
+    "/app/dashboard/releases/[releaseId]/tasks": {"files":55,"rawPalette":46,"arbitrary":23,"rawButton":11,"linearToken":12,"oversizeControl":1,"dangerAlias":9},
+    "/app/dashboard/tasks": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/tipping": {"files":2,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/dashboard/tour-dates": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/earnings": {"files":24,"rawPalette":25,"arbitrary":6,"rawButton":2,"linearToken":0,"oversizeControl":0,"dangerAlias":3},
+    "/app/feature-flags": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/insights": {"files":35,"rawPalette":27,"arbitrary":23,"rawButton":2,"linearToken":12,"oversizeControl":0,"dangerAlias":4},
+    "/app/jovie-work": {"files":30,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":6},
+    "/app/library": {"files":114,"rawPalette":71,"arbitrary":41,"rawButton":33,"linearToken":25,"oversizeControl":2,"dangerAlias":15},
+    "/app/lyrics/[trackId]": {"files":29,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/presence": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/profile": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/profiles": {"files":51,"rawPalette":27,"arbitrary":22,"rawButton":7,"linearToken":10,"oversizeControl":1,"dangerAlias":10},
+    "/app/releases": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/releases/[releaseId]/tasks": {"files":55,"rawPalette":46,"arbitrary":23,"rawButton":11,"linearToken":12,"oversizeControl":1,"dangerAlias":9},
+    "/app/settings": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/settings/account": {"files":47,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":12},
+    "/app/settings/admin": {"files":23,"rawPalette":25,"arbitrary":6,"rawButton":2,"linearToken":0,"oversizeControl":0,"dangerAlias":3},
+    "/app/settings/analytics": {"files":38,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":5},
+    "/app/settings/appearance": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/settings/artist-profile": {"files":80,"rawPalette":77,"arbitrary":46,"rawButton":10,"linearToken":10,"oversizeControl":2,"dangerAlias":13},
+    "/app/settings/audience": {"files":42,"rawPalette":32,"arbitrary":25,"rawButton":3,"linearToken":10,"oversizeControl":0,"dangerAlias":8},
+    "/app/settings/billing": {"files":33,"rawPalette":27,"arbitrary":23,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":5},
+    "/app/settings/connectors": {"files":32,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":5},
+    "/app/settings/contacts": {"files":43,"rawPalette":27,"arbitrary":22,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":5},
+    "/app/settings/data-privacy": {"files":33,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/settings/delete-account": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/settings/payments": {"files":29,"rawPalette":27,"arbitrary":23,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":5},
+    "/app/settings/profile": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/settings/referral": {"files":7,"rawPalette":2,"arbitrary":15,"rawButton":0,"linearToken":10,"oversizeControl":0,"dangerAlias":1},
+    "/app/settings/retargeting-ads": {"files":6,"rawPalette":2,"arbitrary":16,"rawButton":0,"linearToken":10,"oversizeControl":2,"dangerAlias":1},
+    "/app/settings/touring": {"files":37,"rawPalette":28,"arbitrary":21,"rawButton":4,"linearToken":10,"oversizeControl":0,"dangerAlias":4},
+    "/app/settings/usage": {"files":33,"rawPalette":27,"arbitrary":24,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":7},
+    "/app/tasks": {"files":75,"rawPalette":52,"arbitrary":73,"rawButton":28,"linearToken":30,"oversizeControl":4,"dangerAlias":14},
+    "/app/threads": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/tipping": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/tour-dates": {"files":39,"rawPalette":38,"arbitrary":22,"rawButton":3,"linearToken":10,"oversizeControl":1,"dangerAlias":8},
+    "/app/tracks": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/youtube": {"files":27,"rawPalette":27,"arbitrary":21,"rawButton":2,"linearToken":10,"oversizeControl":0,"dangerAlias":4}
   }
 }
