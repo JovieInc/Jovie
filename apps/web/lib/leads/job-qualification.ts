@@ -277,12 +277,14 @@ function decideEvidence(
         : 'spotify_identity_ambiguous'
     );
   }
+  let state: DecisionState = 'pass';
+  if (reasons.includes('role_not_supported')) {
+    state = 'fail';
+  } else if (reasons.length > 0) {
+    state = 'review_needed';
+  }
   return {
-    state: reasons.some(reason => reason === 'role_not_supported')
-      ? 'fail'
-      : reasons.length > 0
-        ? 'review_needed'
-        : 'pass',
+    state,
     reasons,
     evidenceIds: input.observations.map(item => item.id),
   };
@@ -331,11 +333,12 @@ export function qualifySupportedJob(
       : []),
   ];
   const hardFail = duplicate || evidenceDecision.state === 'fail';
-  const overallState: DecisionState = hardFail
-    ? 'fail'
-    : reasons.length > 0
-      ? 'review_needed'
-      : 'pass';
+  let overallState: DecisionState = 'pass';
+  if (hardFail) {
+    overallState = 'fail';
+  } else if (reasons.length > 0) {
+    overallState = 'review_needed';
+  }
 
   return {
     contract: JOB_QUALIFICATION_CONTRACT,
@@ -360,12 +363,16 @@ export function qualifySupportedJob(
     spotifyArtistId: artistIds.length === 1 ? (artistIds[0] ?? null) : null,
     deterministicKey: digest({
       personId: input.identity.personId,
-      roles: [...input.identity.roles].sort(),
+      roles: [...input.identity.roles].sort((left, right) =>
+        left.localeCompare(right)
+      ),
       supportedJobId: input.supportedJobId,
-      sourceAliases: [...input.identity.sourceAliases].sort(),
+      sourceAliases: [...input.identity.sourceAliases].sort((left, right) =>
+        left.localeCompare(right)
+      ),
       sourceDigests: input.observations
         .map(item => item.provenance.sourceDigest)
-        .sort(),
+        .sort((left, right) => left.localeCompare(right)),
     }),
     explorationSampleEligible: overallState !== 'pass',
   };

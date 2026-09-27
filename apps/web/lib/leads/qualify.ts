@@ -74,7 +74,7 @@ export async function qualifyLead(
   const platforms = extraction.links.map(l => l.platformId).filter(Boolean);
   const spotifyLinks = extraction.links.filter(l => l.platformId === 'spotify');
   const spotifyLink = spotifyLinks.find(link =>
-    /^https:\/\/open\.spotify\.com\/artist\/[A-Za-z0-9]+\/?(?:\?.*)?$/i.test(
+    /^https:\/\/open\.spotify\.com\/artist\/[a-z0-9]+\/?(?:\?.*)?$/i.test(
       link.url
     )
   );
