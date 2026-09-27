@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { generateTextMock, generateObjectMock } = vi.hoisted(() => ({
-  generateTextMock: vi.fn(async () => ({ text: 'ok' })),
-  generateObjectMock: vi.fn(async () => ({ object: {} })),
+  generateTextMock: vi.fn(async (_options: unknown) => ({ text: 'ok' })),
+  generateObjectMock: vi.fn(async (_options: unknown) => ({ object: {} })),
 }));
 
 vi.mock('ai', async () => {

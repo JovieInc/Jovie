@@ -69,7 +69,9 @@ type GatewayTaggableOptions = {
  * Adds AI Gateway reporting tags (`feature:<functionId>` + `app:web`) to a
  * call's `providerOptions.gateway.tags`, keeping any tags the caller set.
  */
-export function withGatewayReportingTags<OPTIONS>(options: OPTIONS): OPTIONS {
+export function withGatewayReportingTags<OPTIONS extends object>(
+  options: OPTIONS
+): OPTIONS & { readonly providerOptions: Record<string, unknown> } {
   const taggable = options as GatewayTaggableOptions;
   const providerOptions = taggable.providerOptions ?? {};
   const gatewayOptions = (providerOptions.gateway ?? {}) as Record<
@@ -101,7 +103,10 @@ function tagFirstArg<ARGS extends readonly [unknown, ...unknown[]]>(
   args: ARGS
 ): ARGS {
   const [options, ...rest] = args;
-  return [withGatewayReportingTags(options), ...rest] as unknown as ARGS;
+  return [
+    withGatewayReportingTags(options as object),
+    ...rest,
+  ] as unknown as ARGS;
 }
 
 export const generateText: typeof ai.generateText = async (...args) => {
