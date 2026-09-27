@@ -77,6 +77,7 @@
     "test:fast": "node scripts/test-fast.mjs",
     "test:seo": "vitest run --config=vitest.config.mts tests/app/robots.test.ts tests/app/sitemap.test.ts tests/unit/ci/seo-ratchet.test.ts tests/unit/seo/guardrail-check.test.ts",
     "seo:guardrail-check": "tsx scripts/seo-guardrail-check.ts",
+    "seo:certify": "tsx scripts/seo-certify.ts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",

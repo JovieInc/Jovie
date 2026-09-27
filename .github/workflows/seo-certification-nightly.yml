@@ -1,0 +1,61 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: Summer has no in-repo runner for the Jovie SEO sweep code; a hosted read-only job fetches public jov.ie pages and publishes the report artifact Summer reads.
+# removal-trigger: Remove when Summer runs scripts/seo-certify.ts on its own schedule and writes receipts to the certification ledger for 14 consecutive days.
+name: SEO Certification Nightly
+# clock-class: production-liveness
+
+# Live sweep of every sitemap page on jov.ie: technical SEO, agent readiness
+# (per-page structured data + domain `is-agentic` score), and the @jovie/copy
+# lint. The JSON report carries jovie.certification/v1 receipts; Summer reads
+# the uploaded artifact as its SEO signal. Policy: docs/marketing/SEO_CERTIFICATION.md.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: '41 9 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: seo-certification-nightly
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: SEO certification sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      # Pinned version; zero dependencies. Reads the latest stored public
+      # report for the domain and never forces a rescan.
+      - name: Fetch is-agentic report
+        continue-on-error: true
+        run: npx --yes is-agentic@1.0.1 jov.ie --json > "$RUNNER_TEMP/is-agentic.json"
+
+      - name: Run SEO certification sweep
+        working-directory: apps/web
+        run: >-
+          pnpm exec tsx scripts/seo-certify.ts
+          --base https://jov.ie
+          --is-agentic-report "$RUNNER_TEMP/is-agentic.json"
+          --out "$RUNNER_TEMP/seo-certification.json"
+          --ratchet
+
+      - name: Upload certification report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seo-certification
+          path: ${{ runner.temp }}/seo-certification.json
+          if-no-files-found: warn
+          retention-days: 30

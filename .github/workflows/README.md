@@ -151,6 +151,10 @@ acknowledgment can be persisted.
 
 The `synthetic-monitoring.yml` workflow runs production canaries against jov.ie at `17 */6 * * *` UTC plus manual dispatch.
 
+## SEO Certification
+
+The `seo-certification-nightly.yml` workflow sweeps every sitemap page on jov.ie at `41 9 * * *` UTC plus manual dispatch. It uploads per-page certification receipts and fails only on ratchet regressions ([policy](../../docs/marketing/SEO_CERTIFICATION.md)).
+
 ## Neon Database
 
 - **Ephemeral branches** - Created only by manual dispatch or scheduled evidence lanes (never automatically per PR) as explicit, expiring exceptions carrying the `jovie-preview-env-admission/v1` contract (JOV-5941; registry: `.github/preview-env-registry.json`)
