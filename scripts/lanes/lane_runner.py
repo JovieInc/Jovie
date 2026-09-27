@@ -290,6 +290,16 @@ class Linear:
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
                 for n in data["issues"]["nodes"]]
 
+    def create_triage(self, title: str, description: str) -> str | None:
+        team = self.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
+                        {})["teams"]["nodes"][0]
+        triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
+        labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
+        data = self.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id}}}',
+                        {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": 2,
+                               "title": title[:200], "description": description}})
+        return data["issueCreate"]["issue"]["id"]
+
     def state_of(self, issue_id: str) -> str:
         data = self.gql('query($id:String!){issue(id:$id){state{name}}}', {"id": issue_id})
         return data["issue"]["state"]["name"]
@@ -562,11 +572,12 @@ def record_held(host: Host, number: int, head: str, evidence: list[str]) -> None
 def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | None:
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
         gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
-        if not conflicted and not gate_held:
+        reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
+        if not conflicted and not gate_held and not reviewed:
             if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
                 continue
             if not any(check.get("conclusion") in RED for check in checks):
@@ -576,6 +587,38 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             continue
         return pr
     return None
+
+
+def exhausted_prs(prs: list[dict], attempts: dict) -> list[dict]:
+    """Heads the fix loop tried MAX_FIX_ATTEMPTS times and that are still stuck, not yet escalated."""
+    stuck = []
+    for pr in prs:
+        record = attempts.get(str(pr["number"]), {})
+        if record.get("sha") == pr["headRefOid"] and record.get("count", 0) >= MAX_FIX_ATTEMPTS \
+                and not record.get("escalated"):
+            checks = pr.get("statusCheckRollup") or []
+            if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED" \
+                    or any(check.get("conclusion") in RED for check in checks):
+                stuck.append(pr)
+    return stuck
+
+
+def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
+    """Bug intake, never Tim: comment on the PR, open a Linear Triage issue once, mark it escalated."""
+    path = host.state / "fix-attempts.json"
+    attempts = json.loads(path.read_text()) if path.exists() else {}
+    for pr in exhausted_prs(prs, attempts):
+        body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
+                f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
+                "Filed for triage; the lane retries when the head moves.")
+        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+        try:
+            linear.create_triage(f"Fix loop exhausted: PR #{pr['number']} {pr.get('title', '')[:80]}",
+                                 f"{pr.get('url')}\n\n{body}\n\nHost `{HOST}`, {now_iso()}.")
+        except Exception:
+            pass
+        attempts[str(pr["number"])] = {**attempts.get(str(pr["number"]), {}), "escalated": True}
+    path.write_text(json.dumps(attempts))
 
 
 def failure_excerpt(pr: dict, limit: int = 6000) -> str:
@@ -592,7 +635,22 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
     return "\n\n".join(parts)[:limit]
 
 
+def review_excerpt(pr: dict, limit: int = 4000) -> str:
+    """The reviewers' own words, so the fixer addresses what was asked, not what it guesses."""
+    if pr.get("reviewDecision") != "CHANGES_REQUESTED":
+        return ""
+    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/comments?per_page=50", "--jq",
+                 '.[] | "- \\(.path):\\(.line // .original_line // 0) \\(.body | gsub("\\n"; " "))"'])
+    reviews = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/reviews?per_page=20", "--jq",
+                  '.[] | select(.state == "CHANGES_REQUESTED") | "- review: \\(.body | gsub("\\n"; " "))"'])
+    text = "\n".join(part for part in ((reviews.stdout or "").strip(), (listed.stdout or "").strip()) if part)
+    return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no comment text readable)."
+
+
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
+    review = review_excerpt(pr) if pr.get("reviewDecision") == "CHANGES_REQUESTED" else ""
+    if review:
+        excerpt = review + ("\n\n" + excerpt if excerpt else "")
     if pr.get("gateEvidence"):
         excerpt = "Lane gate (the repo's pre-push-gate) held this PR:\n" + "\n".join(pr["gateEvidence"]) + \
             ("\n\n" + excerpt if excerpt else "")
@@ -659,9 +717,24 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     return receipt
 
 
+def best_per_issue(prs: list[dict]) -> list[dict]:
+    """One PR per issue, retroactively: when the old runner left several open PRs for one
+    issue, the lanes spend effort only on the one furthest along (ready over draft, clean over
+    conflicted, then newest). The others stay open for a human to close; nothing is deleted."""
+    by_issue: dict[str, list[dict]] = {}
+    rest = []
+    for pr in prs:
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        (by_issue.setdefault(found.group("issue"), []) if found else rest).append(pr)
+    keep = list(rest)
+    for group in by_issue.values():
+        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
+    return sorted(keep, key=lambda pr: pr["number"])
+
+
 def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
     """A lane draft whose head the gate has never seen, e.g. a remote agent that finished late."""
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         if pr.get("isDraft") and verified.get(str(pr["number"])) != pr["headRefOid"]:
             return pr
     return None
@@ -701,10 +774,31 @@ def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
     prs = []
     for owner in names:
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
-                     "--json", "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus"])
+                     "--json", PR_FIELDS])
         own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
         prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
     return prs
+
+
+PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository"
+
+
+def repo_prs() -> list[dict]:
+    """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
+    Tim: no open PR should ever need his action; the fix loop owns them all."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "60",
+                 "--search", "draft:false sort:updated-desc", "--json", PR_FIELDS])
+    return [pr for pr in json.loads(listed.stdout or "[]") if not pr.get("isCrossRepository")]
+
+
+def fix_candidates(name: str) -> list[dict]:
+    """Lane PRs (all lanes) plus every other open non-draft PR, de-duplicated by number."""
+    seen, merged = set(), []
+    for pr in lane_prs(name) + repo_prs():
+        if pr["number"] not in seen:
+            seen.add(pr["number"])
+            merged.append(pr)
+    return merged
 
 
 def in_flight_issues() -> frozenset[str]:
@@ -757,6 +851,8 @@ def failures_path(host: Host) -> Path:
 
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
+    if not spec.get("enabled", True):
+        return 0  # a lane turned off in a newer release stops at its next re-exec
     slot = None
     for index in range(host.slots(name, spec.get("slots", 1))):
         lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
@@ -768,10 +864,13 @@ def worker(host: Host, name: str) -> int:
     linear = Linear(host.linear_env)
     claim = Locked(host.state / "claim.lock", blocking=True)
     try:
-        # Finish before starting: red PRs, then ungated drafts, then new issues.
+        # Finish before starting: red PRs (any open PR in the repo), then ungated lane drafts,
+        # then new issues.
         prs = lane_prs(name)
+        candidates = fix_candidates(name)
         requeue_verified(host, prs)
-        red = claim_red_pr(host, name, prs)
+        escalate_exhausted(host, candidates, linear)
+        red = claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
         if red is None and adopt is None:

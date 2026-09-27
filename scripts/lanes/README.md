@@ -23,6 +23,7 @@ The harness, not the model, owns:
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`), per-run log and prompt, Linear handoff comments | `run_issue()`, `worker()` |
 | Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
+| Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), 2 attempts per head, then one Triage issue | `fix_candidates()`, `red_pr()`, `escalate_exhausted()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run, bank exhausted ones until their reset | `codex_lane.py` |

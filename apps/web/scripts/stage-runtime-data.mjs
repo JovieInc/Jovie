@@ -9,7 +9,6 @@ import { dirname, join } from 'node:path';
 export const RUNTIME_DATA_FILES = Object.freeze([
   'CHANGELOG.md',
   'docs/FEATURE_REGISTRY.md',
-  'scripts/symphony/symphony-codex-account-control.py',
   'apps/eve-pilot/identities/jovie/instructions.md',
   'apps/eve-pilot/identities/summer/instructions.md',
 ]);
