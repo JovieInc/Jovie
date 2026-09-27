@@ -22,6 +22,9 @@ on:
       - 'skills-lock.json'
       - 'scripts/design-governance-audit.mjs'
       - 'scripts/design-governance-audit.test.mjs'
+      - 'scripts/design-drift-ledger.mjs'
+      - 'docs/design-system/drift-ledger.json'
+      - 'docs/design-system/DRIFT_LEDGER.md'
       - '.github/workflows/design-governance.yml'
   pull_request:
     branches: [main]
@@ -32,6 +35,9 @@ on:
       - 'skills-lock.json'
       - 'scripts/design-governance-audit.mjs'
       - 'scripts/design-governance-audit.test.mjs'
+      - 'scripts/design-drift-ledger.mjs'
+      - 'docs/design-system/drift-ledger.json'
+      - 'docs/design-system/DRIFT_LEDGER.md'
       - '.github/workflows/design-governance.yml'
   repository_dispatch:
     types: [founder-decision-recorded, invariant-enforcement-failed]
