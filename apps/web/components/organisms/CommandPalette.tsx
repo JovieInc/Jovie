@@ -30,11 +30,7 @@ import {
   useHeaderActions,
   useOptionalHeaderActions,
 } from '@/contexts/HeaderActionsContext';
-import {
-  APP_SHELL_WORKSPACES,
-  getCurrentAppShellWorkspace,
-  getNextAppShellWorkspace,
-} from '@/lib/app-shell/workspaces';
+import { getNextPermittedAppShellWorkspace } from '@/lib/app-shell/workspaces';
 import type { EntityRef } from '@/lib/commands/entities';
 import {
   getPaletteConversationSubtitle,
@@ -148,29 +144,26 @@ function CommandPaletteInner({
   // entity section so the shared list+keyboard machinery picks them up.
   const additionalSections = useMemo<PaletteSection[]>(() => {
     const sections: PaletteSection[] = [];
-    if (isAdmin) {
-      const currentWorkspace = getCurrentAppShellWorkspace(pathname);
-      const nextWorkspace = getNextAppShellWorkspace(
-        APP_SHELL_WORKSPACES,
-        currentWorkspace.id
-      );
-      if (nextWorkspace) {
-        const nav: NavCommand = {
-          kind: 'nav',
-          id: 'switch-workspace',
-          label: `Switch to ${nextWorkspace.label}`,
-          description: 'Change the active workspace.',
-          iconName: 'Columns2',
-          surfaces: ['cmdk'],
-          href: nextWorkspace.href,
-          shortcutLabel: WORKSPACE_SWITCH_SHORTCUT.keys,
-        };
-        sections.push({
-          id: 'workspace-actions',
-          label: 'Workspace',
-          items: [{ kind: 'nav', nav }],
-        });
-      }
+    const nextWorkspace = getNextPermittedAppShellWorkspace(
+      { isAdmin },
+      pathname
+    );
+    if (nextWorkspace) {
+      const nav: NavCommand = {
+        kind: 'nav',
+        id: 'switch-workspace',
+        label: `Switch to ${nextWorkspace.label}`,
+        description: 'Change the active workspace.',
+        iconName: 'Columns2',
+        surfaces: ['cmdk'],
+        href: nextWorkspace.href,
+        shortcutLabel: WORKSPACE_SWITCH_SHORTCUT.keys,
+      };
+      sections.push({
+        id: 'workspace-actions',
+        label: 'Workspace',
+        items: [{ kind: 'nav', nav }],
+      });
     }
     if (conversations && conversations.length > 0) {
       const currentConversationId = getCurrentConversationId(pathname);
@@ -211,16 +204,15 @@ function CommandPaletteInner({
         return;
       }
       if (id === 'switch-workspace') {
-        const currentWorkspace = getCurrentAppShellWorkspace(pathname);
-        const nextWorkspace = getNextAppShellWorkspace(
-          APP_SHELL_WORKSPACES,
-          currentWorkspace.id
+        const nextWorkspace = getNextPermittedAppShellWorkspace(
+          { isAdmin },
+          pathname
         );
         // Mode is owned by the server layout, which client navigation retains.
         if (nextWorkspace) globalThis.location.assign(nextWorkspace.href);
       }
     },
-    [pathname, router]
+    [isAdmin, pathname, router]
   );
 
   return (

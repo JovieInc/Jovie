@@ -20,7 +20,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     ]);
   });
 
-  it('assigns the 11 sub-pages (+admin) to their approved groups', () => {
+  it('assigns the 11 sub-pages to their approved groups', () => {
     const membership = Object.fromEntries(
       SETTINGS_SIDEBAR_GROUPS.map(group => [
         group.id,
@@ -31,7 +31,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     expect(membership).toEqual({
       profile: ['artist-profile', 'contacts', 'appearance'],
       account: ['account', 'data-privacy', 'delete-account'],
-      workspace: ['connections', 'retargeting-ads', 'admin'],
+      workspace: ['connections', 'retargeting-ads'],
       billing: ['billing', 'usage', 'referral'],
     });
   });
@@ -51,20 +51,10 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
 });
 
 describe('filterSettingsGroups', () => {
-  it('returns all non-admin items for an empty query', () => {
+  it('returns all 11 items for an empty query', () => {
     const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '');
     const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).not.toContain('admin');
     expect(ids).toHaveLength(11);
-  });
-
-  it('includes admin-only items for admins', () => {
-    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, '', {
-      isAdmin: true,
-    });
-    const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).toContain('admin');
-    expect(ids).toHaveLength(12);
   });
 
   it('filters by item label, case-insensitively', () => {
@@ -94,32 +84,20 @@ describe('filterSettingsGroups', () => {
     ).toEqual([]);
   });
 
-  it('never surfaces admin-only items via search for non-admins', () => {
-    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'admin');
-    const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).not.toContain('admin');
-  });
-
-  it('surfaces Ops controls for admins searching operational keywords', () => {
-    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'ops', {
-      isAdmin: true,
-    });
-    const ids = groups.flatMap(group => group.items.map(item => item.id));
-    expect(ids).toContain('admin');
+  it('never surfaces operator controls via search', () => {
+    for (const query of ['admin', 'ops', 'ovie']) {
+      expect(filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, query)).toEqual([]);
+    }
   });
 });
 
-describe('settings Ops controls discovery (JOV-2103)', () => {
-  it('points the admin-only row at the legacy settings admin redirect', () => {
-    const adminItem = SETTINGS_SIDEBAR_GROUPS.flatMap(
-      group => group.items
-    ).find(item => item.id === 'admin');
-
-    expect(adminItem).toBeDefined();
-    expect(adminItem?.label).toBe('Ops Controls');
-    expect(adminItem?.href).toBe(APP_ROUTES.SETTINGS_ADMIN);
-    expect(adminItem?.adminOnly).toBe(true);
-    expect(adminItem?.title).toMatch(/Ops control panel/i);
+describe('customer settings stay free of operator surfaces (JOV-6771)', () => {
+  it('links no item into Ovie or the legacy settings admin redirect', () => {
+    for (const item of SETTINGS_SIDEBAR_GROUPS.flatMap(group => group.items)) {
+      expect(item.href).not.toBe(APP_ROUTES.SETTINGS_ADMIN);
+      expect(item.href.startsWith(APP_ROUTES.OV)).toBe(false);
+      expect(item.href).not.toBe(APP_ROUTES.HUD);
+    }
   });
 });
 

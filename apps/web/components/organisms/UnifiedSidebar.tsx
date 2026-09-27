@@ -44,7 +44,7 @@ import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
-import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
+import { getPermittedAppShellWorkspaces } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
@@ -226,7 +226,7 @@ function SettingsNavigation({
 function SidebarHeaderNav({
   isRouteSidebar,
   isOperatorSection,
-  canSwitchWorkspaces,
+  switchableWorkspaces,
   hasMultipleProfiles,
   isDemoRoute,
   variant = 'jovie',
@@ -235,7 +235,7 @@ function SidebarHeaderNav({
 }: Readonly<{
   isRouteSidebar: boolean;
   isOperatorSection: boolean;
-  canSwitchWorkspaces: boolean;
+  switchableWorkspaces: ReturnType<typeof getPermittedAppShellWorkspaces>;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
   variant?: BrandVariant;
@@ -289,11 +289,11 @@ function SidebarHeaderNav({
             </div>
           );
         }
-        if (canSwitchWorkspaces) {
+        if (switchableWorkspaces.length > 1) {
           return (
             <WorkspaceSelector
               currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
-              workspaces={APP_SHELL_WORKSPACES}
+              workspaces={switchableWorkspaces}
             />
           );
         }
@@ -373,7 +373,10 @@ export function UnifiedSidebar({
   section,
   variant = 'jovie',
 }: UnifiedSidebarProps) {
-  const { creatorProfiles, isAdmin: canSwitchWorkspaces } = useDashboardData();
+  const { creatorProfiles, isAdmin } = useDashboardData();
+  // Server-resolved role; customer-only viewers get a single workspace and
+  // therefore no Ovie switch target.
+  const switchableWorkspaces = getPermittedAppShellWorkspaces({ isAdmin });
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -416,7 +419,7 @@ export function UnifiedSidebar({
         <SidebarHeaderNav
           isRouteSidebar={isRouteSidebar}
           isOperatorSection={isOperatorSection}
-          canSwitchWorkspaces={canSwitchWorkspaces}
+          switchableWorkspaces={switchableWorkspaces}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
           variant={variant}
