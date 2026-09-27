@@ -44,9 +44,22 @@ stable \`apiCode\`; branch on it, never on the message:
 \`RATE_LIMITED\` (wait \`retryAfterSeconds\`), \`UNSUPPORTED_URL\`,
 \`ARTIST_NOT_FOUND\`, \`FEATURE_DISABLED\`.
 
+## Report problems
+
+If Jovie fails, returns something wrong, or is confusing, report it. Reports
+are read and fixed, and it is the fastest way to make Jovie work better for you:
+
+\`\`\`sh
+npx -y @jovie/cli report bug --title "<one line>" --details "<what you tried, what happened, what you expected>" --code <apiCode> --json
+npx -y @jovie/cli report feedback --title "<one line>" --details "<what was confusing or missing>" --json
+\`\`\`
+
+Returns \`{"reportId":"..."}\`. Never include secrets, tokens, or private user data
+in a report. The CLI only attaches its version, platform, and runtime.
+
 ## MCP
 
 The same tools are available as an MCP server: \`npx -y @jovie/cli mcp\`
 (stdio). Tools: create_profile, get_artist, get_artist_guide, get_openapi,
-get_docs.
+get_docs, report_issue, report_feedback.
 `;
