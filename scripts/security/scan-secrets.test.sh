@@ -269,4 +269,76 @@ status="$(run_full_scenario full-blocked "$FULL_BLOCKED_COMMIT")"
 
 bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
 
+# JOV-6809: a transient download failure (curl 35 connection reset on
+# ubuntu-latest) must be retried, not fail the scan outright. Stub curl to
+# fail the first attempt then succeed; stub tar to lay down a no-op binary.
+# A restricted PATH keeps real gitleaks/trufflehog installs from
+# short-circuiting the download path.
+DL_BIN="$TEST_ROOT/dl-bin"
+DL_TMP="$TEST_ROOT/dl-tmp"
+mkdir -p "$DL_BIN" "$DL_TMP"
+cat >"$DL_BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$CURL_COUNT" ]] && count="$(cat "$CURL_COUNT")"
+count=$((count + 1))
+printf '%s\n' "$count" >"$CURL_COUNT"
+if [[ "${CURL_ALWAYS_FAIL:-}" == "1" || $count -eq 1 ]]; then
+  echo "curl: (35) Recv failure: Connection reset by peer" >&2
+  exit 35
+fi
+out=''
+prev=''
+for arg in "$@"; do
+  [[ "$prev" == '-o' ]] && out="$arg"
+  prev="$arg"
+done
+printf 'fake-tarball' >"$out"
+EOF
+cat >"$DL_BIN/tar" <<'EOF'
+#!/usr/bin/env bash
+dest=''
+prev=''
+for arg in "$@"; do
+  [[ "$prev" == '-C' ]] && dest="$arg"
+  prev="$arg"
+done
+member="${!#}"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
+EOF
+chmod +x "$DL_BIN/curl" "$DL_BIN/tar"
+
+export CURL_COUNT="$TEST_ROOT/download.curl-count"
+: >"$CURL_COUNT"
+status=0
+# CI exports TRUFFLEHOG_BIN for the installed-binary regression run; the
+# download path must be exercised without either scanner env override.
+PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$DL_TMP" SCAN_SECRETS_RETRY_DELAY=0 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
+  bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download.output" 2>&1 \
+  || status=$?
+[[ $status -eq 0 ]] \
+  || fail "transient download failure must be retried to success: $status"
+[[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
+  || fail 'expected 1 failed attempt + 2 successful downloads (gitleaks, trufflehog)'
+grep -q 'download attempt 1 failed; retrying' "$TEST_ROOT/download.output" \
+  || fail 'download retry must log the retry'
+grep -q 'PASS: secret scan' "$TEST_ROOT/download.output" \
+  || fail 'scan must still pass after a retried download'
+
+# Exhausted retries still fail the scan with an explicit classification.
+mkdir -p "$TEST_ROOT/dl-tmp2"
+: >"$CURL_COUNT"
+status=0
+PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
+  SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
+  bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download-fail.output" 2>&1 \
+  || status=$?
+[[ $status -ne 0 ]] || fail 'exhausted download retries must fail the scan'
+[[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
+  || fail 'download must stop after exactly 3 attempts'
+grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
+  || fail 'download failure must emit an explicit CI classification'
+
 echo 'PASS: scan-secrets corruption recovery regression tests'

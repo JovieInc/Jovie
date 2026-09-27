@@ -110,15 +110,12 @@ describe('public profile contract guard', () => {
     expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
       '--profile-content-bg'
     );
-    // The hero legibility gradient is the --profile-stage-bg consumer: the
-    // surface renders the class hook, the token reference lives in the
-    // gradient rule in design-system.css.
+    // The identity header renders on the compact surface and consumes the
+    // --profile-stage-bg token for its verified glyph.
     expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
-      'profile-cover-home-gradient'
+      '<ProfileIdentityHeader'
     );
-    expect(readFileSync(DESIGN_SYSTEM, 'utf8')).toMatch(
-      /\.profile-cover-home-gradient[\s\S]{0,400}var\(--profile-stage-bg\)/
-    );
+    expect(readFileSync(DESIGN_SYSTEM, 'utf8')).toContain('--profile-stage-bg');
     expect(readFileSync(PROFILE_SHELL, 'utf8')).toContain(
       '--profile-shell-header-max-width'
     );

@@ -995,6 +995,10 @@ jobs:
           PRODUCTION_ALIAS_RETRY_SECONDS: '5'
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          # The JOV-INV-033 rescan reads the immutable deployment URL, which
+          # sits behind deployment protection; without the bypass it follows
+          # the SSO redirect and reports every marker as missing.
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           {

@@ -71,7 +71,7 @@ const RESOURCE_LINKS = [
     description: 'The expanded version of the site guide.',
   },
   {
-    href: DOCS_URL,
+    href: `${DOCS_URL}/docs/developers`,
     label: 'Jovie Docs',
     description: 'Product help and getting-started guidance.',
   },
@@ -238,7 +238,7 @@ export default function DevelopersPage() {
               Profile requests are limited to 100 per client IP in a fixed
               60-second window. Read the{' '}
               <Link
-                href={`${DOCS_URL}/docs/api-reference`}
+                href={`${DOCS_URL}/docs/developers/api-reference`}
                 className='text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               >
                 API reference

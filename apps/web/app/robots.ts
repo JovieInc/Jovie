@@ -30,7 +30,16 @@ const DISALLOW_PATHS = [
   '/app/',
   '/api/',
   '/out/',
+  // Private investor surfaces (and the retired public /investors, /pitch).
+  // `$` anchors the bare path so a profile handle like /pitchfork stays
+  // crawlable; the trailing-slash form covers every child path.
+  '/investor-portal$',
+  '/investor-portal/',
+  '/investors$',
   '/investors/',
+  '/pitch$',
+  '/pitch/',
+  '/Jovie-Pitch-Deck.pdf$',
   '/engineering/preview/',
   '/renders/',
   '/*?ref=*',

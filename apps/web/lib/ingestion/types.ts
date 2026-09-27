@@ -28,15 +28,14 @@ export interface ExtractionResult {
   displayName?: string | null;
   avatarUrl?: string | null;
   /**
-   * Whether the link-in-bio appears to be on a paid tier.
-   * Detected by absence of platform branding (e.g., "Made with Linktree").
-   * null = not detected, true = paid tier, false = free tier with branding
+   * Legacy compatibility field. `false` means platform branding was observed;
+   * `null` means billing access is unknown. Public presentation must never set
+   * this to `true`; only approved first-party billing evidence may do so.
    */
   hasPaidTier?: boolean | null;
   /**
    * Whether the Linktree profile has a verification badge.
-   * Verification requires a paid plan + identity confirmation.
-   * Stronger paid-tier signal than surface presentation alone.
+   * This is identity/badge evidence, not paid-plan evidence.
    */
   isLinktreeVerified?: boolean | null;
   /**

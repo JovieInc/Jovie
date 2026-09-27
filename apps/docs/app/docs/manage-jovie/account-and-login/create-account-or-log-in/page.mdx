@@ -1,0 +1,91 @@
+---
+id: create-account-or-log-in
+title: Create an account or log in
+description: Use Jovie's current Apple, Google, or one-time email code authentication and recover from sign-in errors.
+documentType: guide
+category: manage-jovie
+productBacked: false
+productRoute: /signin
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - log in
+  - sign in
+  - create account
+  - login help
+redirectAliases: []
+visualProofRefs:
+  - proof/create-account.png
+  - proof/log-in.png
+uiLabels:
+  - Continue to Jovie
+  - Log in to Jovie
+  - Continue with Apple
+  - Continue with Google
+  - or use email
+  - Sign in
+productSourceRefs:
+  - apps/web/components/features/auth/AuthShell.tsx
+  - apps/web/components/features/auth/AuthProviderButtons.tsx
+  - apps/web/components/features/auth/EmailCodeAuthForm.tsx
+  - apps/web/lib/auth/auth-shell-intent.ts
+  - apps/web/lib/auth/oauth-providers.ts
+launchPath: true
+---
+
+<HelpArticle id="create-account-or-log-in">
+
+# Create an account or log in
+
+<HelpOutcome>Create or return to the correct Jovie account with Apple, Google, or a one-time email code.</HelpOutcome>
+
+<HelpSteps>
+
+<HelpStep title="Choose the correct account page">
+Open [Continue to Jovie](https://jov.ie/signup) for a new account. Returning users should open [Log in to Jovie](https://jov.ie/signin), or choose **Sign in** from the sign-up page.
+
+<HelpScreenshot src="/proof/create-account.png" alt="Continue to Jovie page with Apple, Google, and email authentication" caption="The current account creation choices." />
+</HelpStep>
+
+<HelpStep title="Choose a supported method">
+Select **Continue with Apple**, **Continue with Google**, or enter your address below **or use email** to receive a one-time code. Password and retired social-provider sign-ins are not supported.
+</HelpStep>
+
+<HelpStep title="Use the same identity as before">
+Returning users should choose the same provider and provider account, or the same email address, used for the original Jovie account.
+
+<HelpScreenshot src="/proof/log-in.png" alt="Log in to Jovie page showing the returning-user authentication choices" caption="Use the identity connected to the existing account." />
+</HelpStep>
+
+<HelpStep title="Return to the requested task">
+After authentication, Jovie returns you to the safe callback, such as Start or a profile claim. Check the profile shown before continuing.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+You enter the Jovie workspace or resume the profile claim that sent you to authentication.
+
+<HelpTroubleshooting>
+
+### Jovie opens the wrong account
+
+Sign out, return to **Log in to Jovie**, and use the original Apple, Google, or email identity. Choosing another provider account can create or open a different Jovie account.
+
+### Sign-in is cancelled or the callback fails
+
+Return to `/signin` and retry. For a state-mismatch message, restart from the sign-in page instead of reusing the old callback URL.
+
+### The email code does not work
+
+Request a new code with the same address and use only the newest message. If the address already has an account, use **Sign in** rather than creating another one.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="create-account-or-log-in" ids={['find-your-profile', 'claim-your-profile']} />
+
+<HelpFeedback articleId="create-account-or-log-in" />
+
+</HelpArticle>

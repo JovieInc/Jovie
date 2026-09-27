@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import eveAgent from '../agent/agent';
+import { EVE_PILOT_COMPACTION_THRESHOLD_PERCENT } from '../agent/lib/context-budget';
 import {
   assertEvePilotFactoryLock,
   bindEvePilotIdentity,
@@ -33,7 +34,10 @@ describe('eve identity instruction packs', () => {
   });
 
   it('pins the Eve Gateway OIDC speaker model without a Summer root label', () => {
-    expect(eveAgent).toEqual({ model: 'zai/glm-5.3-flash' });
+    expect(eveAgent).toEqual({
+      model: 'zai/glm-5.3-flash',
+      compaction: { thresholdPercent: EVE_PILOT_COMPACTION_THRESHOLD_PERCENT },
+    });
   });
 
   it('denies Jovie privileged gbrain write and Symphony heal at the Eve entry', () => {
@@ -182,7 +186,16 @@ describe('eve identity instruction packs', () => {
       resolve(import.meta.dirname, '../agent/channels/photon.ts'),
       'utf8'
     );
-    expect(photon).toContain('bindEvePilotIdentity(identity)');
+    expect(photon).toContain('photonIdentityFromEnvironment(');
+    expect(
+      readFileSync(
+        resolve(
+          import.meta.dirname,
+          '../agent/instructions/channel-identity.ts'
+        ),
+        'utf8'
+      )
+    ).toContain('bindEvePilotIdentity(identity)');
     const livePhoton = photon
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '')

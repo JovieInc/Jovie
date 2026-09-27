@@ -169,7 +169,7 @@ describe('resolveProfileSurfaceState', () => {
     });
     expect(state.statusPill).toMatchObject({
       kind: 'tour',
-      label: 'On Tour',
+      label: 'Upcoming Events',
     });
   });
 

@@ -96,12 +96,13 @@ web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/|desktop,mobile
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
+web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
 web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
-web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investors/page.tsx|desktop,mobile
+web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
@@ -110,6 +111,7 @@ web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|deskto
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
+web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
 web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
 web.legal-shell|web|legal-shell|apps/web/app/(dynamic)/legal/layout.tsx|desktop,mobile
 web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|desktop,mobile
@@ -126,6 +128,8 @@ web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
+web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
+web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
@@ -153,7 +157,7 @@ ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swif
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
-web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/|desktop,mobile|x|Auth/security lane is out of scope
+web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/mobile-auth-return/|desktop,mobile|x|Auth/security lane is out of scope
 macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope
 ios.auth|ios|auth-security|apps/ios/Jovie/Features/Auth/|compact|x|Auth/security lane is out of scope
 ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell lane is out of scope
@@ -881,6 +885,7 @@ export function evaluateChangedScreens({
   const issues = [];
   const changedScreens = [];
   const excludedChanges = [];
+  const removedScreens = [];
   const supplied = new Map();
   for (const proof of proofs || []) {
     if (isObject(proof) && typeof proof.screenId === 'string') {
@@ -916,6 +921,13 @@ export function evaluateChangedScreens({
       continue;
     }
     if (classified.kind === 'out-of-scope') continue;
+    // A deleted screen renders nothing, so there is no surface to own or
+    // certify; its registry entry is removed with it. Record the removal so
+    // receipts still show it. Added and modified paths stay fail-closed.
+    if (classified.kind === 'unregistered' && file.status === 'D') {
+      removedScreens.push(file.path);
+      continue;
+    }
     if (classified.kind === 'unregistered') {
       issues.push(
         `missing registration for changed in-scope screen ${file.path}`
@@ -963,7 +975,7 @@ export function evaluateChangedScreens({
       issues.push(`proof supplied for unchanged or unknown screen ${screenId}`);
     }
   }
-  return { issues, changedScreens, excludedChanges };
+  return { issues, changedScreens, excludedChanges, removedScreens };
 }
 
 export function routeArtifactRequests({
@@ -1135,6 +1147,7 @@ export function runScreenCertification(options = {}) {
       issues,
       changedScreens: changed.changedScreens,
       excludedChanges: changed.excludedChanges,
+      removedScreens: changed.removedScreens,
       fixtures: red.receipts,
       sweeps: (options.workflows ?? RETAINED_SWEEP_WORKFLOWS).map(item => ({
         path: item.path,

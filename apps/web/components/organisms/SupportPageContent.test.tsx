@@ -51,7 +51,7 @@ describe('SupportPageContent', () => {
       'Still Need Help?',
     ]);
     expect(screen.getAllByRole('article')).toHaveLength(3);
-    expect(screen.getAllByTestId('marketing-footer-cta')).toHaveLength(1);
+    expect(screen.getAllByTestId('support-cta')).toHaveLength(1);
     for (const action of screen
       .getAllByRole('link')
       .filter(link =>
@@ -71,7 +71,7 @@ describe('SupportPageContent', () => {
       expect(action).not.toHaveClass('public-action-inline');
     }
     expect(
-      screen.getByRole('link', { name: 'Contact Support' })
+      screen.getByRole('link', { name: /send email to support team/i })
     ).toHaveAttribute('href', 'mailto:support@jov.ie');
   });
 
@@ -80,12 +80,12 @@ describe('SupportPageContent', () => {
       {
         question: 'How do I get started with Jovie?',
         answer:
-          'Start with Find yourself and follow the setup steps for your Jovie profile. Full walkthrough at https://docs.jov.ie/getting-started.',
+          'Start with Find yourself and follow the setup steps for your Jovie profile. Full walkthrough at https://docs.jov.ie/docs/jovie-essentials/start-here.',
       },
       {
-        question: 'How do music smart links work?',
+        question: 'How do smart links work?',
         answer:
-          'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
+          'Add destinations to your Jovie profile. Jovie makes a smart link that sends each visitor to the destination they choose.',
       },
       {
         question: 'How do I upgrade my plan?',

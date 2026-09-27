@@ -236,8 +236,8 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py -q',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py" --fail-under=85',
     ].join(' && ')
   ),
   ...STRUCTURAL_PYTEST_PARTS,
@@ -252,6 +252,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/admission-receipt.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-hygiene.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/conversation-intake.test.mjs',
   'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
   'scripts/backlog-orchestrator/__tests__/intake-readiness.test.mjs',
   'scripts/backlog-orchestrator/__tests__/lane-capacity.test.mjs',
@@ -264,10 +265,13 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
+  'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/idea-radar/idea-radar.test.mjs',
+  'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
@@ -279,6 +283,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/observability-issue-github.test.mjs',
   'scripts/observability-issue-sync.test.mjs',
   'scripts/performance-artifact-retention.test.mjs',
+  'scripts/postmortem-linkage-check.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
@@ -294,6 +299,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
+  'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
@@ -325,6 +331,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/production-unbound-repair-attestation.test.mjs',
   'scripts/lib/__tests__/projected-tree-budget.test.mjs',
   'scripts/lib/__tests__/qa-swarm.test.mjs',
+  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/ratchet-core.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
@@ -340,6 +347,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/taste-label-guard.test.mjs',
   'scripts/lib/__tests__/tracker.test.mjs',
   'scripts/lib/__tests__/typecheck-singleflight-diagnostics.test.mjs',
+  'scripts/lib/__tests__/typecheck-performance.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
@@ -1763,7 +1771,7 @@ export async function runStructural(opts = {}) {
   const operationsParts = [
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
-    'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs',
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs',
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',

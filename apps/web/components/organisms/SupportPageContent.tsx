@@ -5,10 +5,11 @@ import {
   MarketingContainer,
   MarketingHero,
 } from '@/components/marketing';
-import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
-import { SUPPORT_EMAIL } from '@/constants/domains';
 import { SUPPORT_FAQ_ITEMS } from '@/data/supportCopy';
-import { SupportChannels } from '../../app/(marketing)/support/SupportContent';
+import {
+  SupportChannels,
+  SupportCta,
+} from '../../app/(marketing)/support/SupportContent';
 
 export { SUPPORT_FAQ_ITEMS } from '@/data/supportCopy';
 
@@ -58,14 +59,7 @@ export function SupportPageContent() {
         heading='FAQ'
         headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
       />
-      <MarketingFooterCta
-        title='Still Need Help?'
-        body='Our team is happy to help with anything not covered in the docs.'
-        ctaLabel='Contact Support'
-        ctaHref={`mailto:${SUPPORT_EMAIL}`}
-        ctaAnalyticsEvent='Support Email Clicked'
-        ctaAnalyticsSource='support_page_cta'
-      />
+      <SupportCta />
     </>
   );
 }

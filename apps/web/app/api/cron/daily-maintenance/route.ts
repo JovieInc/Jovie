@@ -17,6 +17,7 @@
  * - AI crawler analytics sync: every day (Cloudflare GraphQL, GH-12748)
  * - Release outcome reconciliation: every day (bounded 30-day snapshots)
  * - Founder-review upload lease cleanup: every day (private Blob orphans)
+ * - AI Gateway spend: every day (admin Costs row + >$5/day alert)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -25,6 +26,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
@@ -192,7 +194,19 @@ export async function GET(request: Request) {
     }
   );
 
-  // 12. Data retention — Sundays only (heavy operation)
+  // 12. AI Gateway spend by feature tag and model (summer-config#107 parity).
+  results.aiGatewaySpend = await runSubJob('aiGatewaySpend', async () => {
+    const spend = await recordDailyGatewaySpend();
+    return {
+      day: spend.day,
+      totalUsd: spend.totalUsd,
+      observed30dUsd: spend.observed30dUsd,
+      topTags: spend.byTag.slice(0, 5),
+      alerts: spend.alerts,
+    };
+  });
+
+  // 13. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)
