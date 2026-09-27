@@ -9,6 +9,17 @@ const consent = vi.hoisted(() => ({
   onChange: vi.fn(),
   unsubscribe: vi.fn(),
 }));
+const runtime = vi.hoisted(() => ({
+  e2eMode: undefined as string | undefined,
+}));
+
+vi.mock('@/lib/env-public', () => ({
+  publicEnv: {
+    get NEXT_PUBLIC_E2E_MODE() {
+      return runtime.e2eMode;
+    },
+  },
+}));
 
 vi.mock('@/lib/tracking/consent', () => ({
   clearAcquisitionId: consent.clearAcquisitionId,
@@ -18,6 +29,7 @@ vi.mock('@/lib/tracking/consent', () => ({
 
 describe('AcquisitionCapture', () => {
   beforeEach(() => {
+    runtime.e2eMode = undefined;
     consent.allowed = true;
     consent.clearAcquisitionId.mockClear();
     consent.getOrCreateAcquisitionId.mockClear();
@@ -36,6 +48,15 @@ describe('AcquisitionCapture', () => {
       '/artist?utm_source=instagram&claim_id=claim-1'
     );
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response()));
+  });
+
+  it('stays inactive in deterministic E2E and visual capture', () => {
+    runtime.e2eMode = '1';
+
+    render(<AcquisitionCapture />);
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(consent.onChange).not.toHaveBeenCalled();
   });
 
   afterEach(() => {

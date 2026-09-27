@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { publicEnv } from '@/lib/env-public';
 import {
   clearAcquisitionId,
   getOrCreateAcquisitionId,
@@ -11,6 +12,10 @@ const FIRST_TOUCH_KEY = 'jovie_acquisition_first_touch_v1';
 
 export function AcquisitionCapture() {
   useEffect(() => {
+    // Deterministic E2E and visual capture do not persist analytics evidence.
+    // Avoid a keepalive request that prevents network-idle certification.
+    if (publicEnv.NEXT_PUBLIC_E2E_MODE === '1') return;
+
     const capture = () => {
       if (!isAnalyticsAllowed()) return;
       const acquisitionId = getOrCreateAcquisitionId();
