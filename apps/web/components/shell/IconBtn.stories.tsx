@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Mic2 } from 'lucide-react';
+import { Mic2, Play } from 'lucide-react';
+import { fn } from 'storybook/test';
 import { IconBtn } from './IconBtn';
 
 const meta = {
@@ -9,8 +10,9 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    label: 'Lyrics',
-    children: <Mic2 className='h-4 w-4' />,
+    label: 'Play',
+    onClick: fn(),
+    children: <Play />,
   },
 } satisfies Meta<typeof IconBtn>;
 
@@ -19,9 +21,22 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const Active: Story = {
+  args: { active: true },
+};
+
+export const Ghost: Story = {
+  args: { tone: 'ghost' },
+};
+
 export const GhostActive: Story = {
+  args: { tone: 'ghost', active: true },
+};
+
+export const Lyrics: Story = {
   args: {
+    label: 'Lyrics',
     tone: 'ghost',
-    active: true,
+    children: <Mic2 className='h-4 w-4' />,
   },
 };

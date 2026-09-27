@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { verifyGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
-import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import {
+  CONNECTOR_PROVIDERS,
+  GOOGLE_OAUTH_SCOPE,
+} from '@/lib/connectors/registry';
 import { storeTokens } from '@/lib/connectors/token-vault';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
@@ -118,9 +121,21 @@ export async function GET(request: Request) {
     const gmailAddress = userInfo.email;
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
     const grantedScopes = tokens.scope.split(' ');
-    const canWrite = grantedScopes.includes(
-      'https://www.googleapis.com/auth/calendar.events'
+    // "Connected" must mean the integration can perform its read operation,
+    // not merely that tokens were stored. Google consent can grant only a
+    // subset of requested scopes, so derive each provider's status and
+    // capabilities from the granted scopes instead of assuming success.
+    const gmailCanRead = grantedScopes.includes(
+      GOOGLE_OAUTH_SCOPE.gmailReadonly
     );
+    const calendarCanRead = grantedScopes.includes(
+      GOOGLE_OAUTH_SCOPE.calendarEventsReadonly
+    );
+    const canWrite =
+      calendarCanRead &&
+      grantedScopes.includes(GOOGLE_OAUTH_SCOPE.calendarEvents);
+    const missingScopeMessage = (label: string) =>
+      `Google did not grant ${label} access. Reconnect and allow ${label} read access.`;
 
     // Upsert gmail connector account using sql cast for enum.
     const [gmailAccount] = await db
@@ -129,9 +144,17 @@ export async function GET(request: Request) {
         userId,
         provider: CONNECTOR_PROVIDERS.gmail,
         providerAccountId: gmailAddress,
-        status: asConnectorStatusSql('connected'),
+        status: asConnectorStatusSql(
+          gmailCanRead ? 'connected' : 'needs_reauth'
+        ),
         scopes: grantedScopes,
-        capabilities: { canRead: true },
+        capabilities: { canRead: gmailCanRead },
+        ...(gmailCanRead
+          ? {}
+          : {
+              lastErrorCode: 'missing_scope',
+              lastErrorUserMessage: missingScopeMessage('Gmail'),
+            }),
       })
       .onConflictDoUpdate({
         target: [
@@ -140,12 +163,16 @@ export async function GET(request: Request) {
           connectorAccounts.providerAccountId,
         ],
         set: {
-          status: asConnectorStatusSql('connected'),
+          status: asConnectorStatusSql(
+            gmailCanRead ? 'connected' : 'needs_reauth'
+          ),
           scopes: grantedScopes,
-          capabilities: { canRead: true },
-          lastErrorCode: null,
+          capabilities: { canRead: gmailCanRead },
+          lastErrorCode: gmailCanRead ? null : 'missing_scope',
           lastErrorDevMessage: null,
-          lastErrorUserMessage: null,
+          lastErrorUserMessage: gmailCanRead
+            ? null
+            : missingScopeMessage('Gmail'),
           updatedAt: new Date(),
         },
       })
@@ -169,9 +196,17 @@ export async function GET(request: Request) {
         userId,
         provider: CONNECTOR_PROVIDERS.google_calendar,
         providerAccountId: gmailAddress,
-        status: asConnectorStatusSql('connected'),
+        status: asConnectorStatusSql(
+          calendarCanRead ? 'connected' : 'needs_reauth'
+        ),
         scopes: grantedScopes,
-        capabilities: { canRead: true, canWrite },
+        capabilities: { canRead: calendarCanRead, canWrite },
+        ...(calendarCanRead
+          ? {}
+          : {
+              lastErrorCode: 'missing_scope',
+              lastErrorUserMessage: missingScopeMessage('Google Calendar'),
+            }),
       })
       .onConflictDoUpdate({
         target: [
@@ -180,12 +215,16 @@ export async function GET(request: Request) {
           connectorAccounts.providerAccountId,
         ],
         set: {
-          status: asConnectorStatusSql('connected'),
+          status: asConnectorStatusSql(
+            calendarCanRead ? 'connected' : 'needs_reauth'
+          ),
           scopes: grantedScopes,
-          capabilities: { canRead: true, canWrite },
-          lastErrorCode: null,
+          capabilities: { canRead: calendarCanRead, canWrite },
+          lastErrorCode: calendarCanRead ? null : 'missing_scope',
           lastErrorDevMessage: null,
-          lastErrorUserMessage: null,
+          lastErrorUserMessage: calendarCanRead
+            ? null
+            : missingScopeMessage('Google Calendar'),
           updatedAt: new Date(),
         },
       })
@@ -205,6 +244,11 @@ export async function GET(request: Request) {
     const redirectTarget = returnTo.startsWith('/')
       ? `${origin}${returnTo}`
       : returnTo;
+    if (!gmailCanRead && !calendarCanRead) {
+      return NextResponse.redirect(`${settingsUrl}?error=missing_scopes`, {
+        status: 302,
+      });
+    }
     return NextResponse.redirect(`${redirectTarget}?connected=google`, {
       status: 302,
     });

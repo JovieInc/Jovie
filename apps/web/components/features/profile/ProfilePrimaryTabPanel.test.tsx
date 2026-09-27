@@ -62,12 +62,12 @@ function renderPanel(
 }
 
 describe('ProfilePrimaryTabPanel', () => {
-  it('labels the tour panel Shows per the shared nav contract', () => {
+  it('labels the tour panel Events per the shared nav contract', () => {
     renderPanel({ mode: 'tour' });
 
     expect(screen.getByTestId('profile-primary-tab-tour')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Shows' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Events' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Events' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Shows' })).toBeNull();
   });
 
   it('labels the About panel About per the shared nav contract', () => {

@@ -237,4 +237,44 @@ describe('MarketingHero source-backed default story', () => {
     );
     expect(shell.innerHTML).not.toContain('--linear-hero-backdrop');
   });
+
+  it('docks the content and landing heroes under the header', () => {
+    const { container } = render(
+      <MarketingHero {...MARKETING_HERO_DEFAULT_PROPS} />
+    );
+    // Content mode already pads by the header height, so it only bleeds.
+    const content = container.querySelector('section.marketing-hero');
+    expect(content).toHaveClass('marketing-hero-dock');
+    expect(content).not.toHaveClass('marketing-hero-dock--inset');
+
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='dock-heading'
+        title='Dock title'
+        body='Dock body'
+        media={<div>Media</div>}
+        testId='dock-hero'
+      />
+    );
+    // Landing mode keeps its copy offset as inner inset (no arbitrary pt).
+    const landing = screen.getByTestId('dock-hero');
+    expect(landing).toHaveClass(
+      'marketing-hero-landing',
+      'marketing-hero-dock',
+      'marketing-hero-dock--inset'
+    );
+    expect(landing.className).not.toMatch(/\bpt-\[/);
+  });
+
+  it('leaves shell heroes out of the dock contract', () => {
+    render(
+      <MarketingHero variant='left' testId='shell-hero'>
+        <h1>Shell</h1>
+      </MarketingHero>
+    );
+    expect(screen.getByTestId('shell-hero')).not.toHaveClass(
+      'marketing-hero-dock'
+    );
+  });
 });

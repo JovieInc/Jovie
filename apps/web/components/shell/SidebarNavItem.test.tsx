@@ -33,6 +33,9 @@ describe('SidebarNavItem active chrome', () => {
   });
 
   it('applies the calm expanded rail geometry without changing collapsed rows', () => {
+    // Founder lock 2026-09-25 (Linear-scale density): calm rows are 28px and
+    // the active state is borderless — same neutral-tint chrome as resting
+    // rows, no visible border reappears on selection.
     const row = getSidebarNavRowClassName({ calm: true, active: true });
     const icon = getSidebarNavIconClassName({ calm: true });
     const collapsedRow = getSidebarNavRowClassName({
@@ -40,13 +43,12 @@ describe('SidebarNavItem active chrome', () => {
       collapsed: true,
     });
 
-    expect(row).toContain('h-9');
+    expect(row).toContain('h-7');
     expect(row).toContain('rounded-lg');
     expect(row).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
-    expect(row).toContain('border-subtle');
+    expect(row).not.toContain('border-subtle');
     expect(icon).toContain('size-(--app-shell-sidebar-icon-size)');
     expect(collapsedRow).toContain('h-7');
-    expect(collapsedRow).not.toContain('h-9');
   });
 
   it('keeps long labels inside the grid and preserves keyboard focus chrome', () => {

@@ -13,6 +13,7 @@ export interface IconBtnProps {
   readonly onClick?: () => void;
   /** Intent signals (e.g. route prefetch on hover/focus). Optional. */
   readonly onMouseEnter?: () => void;
+  readonly onPointerEnter?: () => void;
   readonly onFocus?: () => void;
   readonly active?: boolean;
   readonly shortcut?: ShortcutHint;
@@ -27,6 +28,7 @@ export function IconBtn({
   label,
   onClick,
   onMouseEnter,
+  onPointerEnter,
   onFocus,
   active,
   shortcut,
@@ -42,6 +44,7 @@ export function IconBtn({
         type='button'
         onClick={onClick}
         onMouseEnter={onMouseEnter}
+        onPointerEnter={onPointerEnter}
         onFocus={onFocus}
         data-testid={testId}
         className={cn(

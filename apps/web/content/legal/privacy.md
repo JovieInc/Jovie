@@ -75,7 +75,7 @@ We never introduce other analytics platforms or tracking cookies without explici
 Your data powers the experience you signed up for:
 
 - **Account creation and authentication**: Using Google or Spotify data to securely sign you in and create your account
-- Delivering and personalizing your public artist profile
+- Delivering and personalizing your public Jovie profile
 - Generating analytics to understand performance and health
 - Powering the stats and messaging inside the dashboard
 - Communicating essential updates or billing notices
@@ -110,7 +110,7 @@ Jovie uses artificial intelligence to power optional in-app features. When you u
 
 ### AI Chat Assistant
 
-When you use the Jovie AI assistant in your dashboard, your messages and artist profile context (display name, bio, genres, streaming stats, and analytics summaries) are sent to **Anthropic** (Claude) via the **Vercel AI Gateway** to generate responses. Your conversation content is processed in real time and is not stored by Anthropic beyond the duration of the request.
+When you use the Jovie AI assistant in your dashboard, your messages and Jovie profile context (display name, bio, genres, streaming stats, and analytics summaries) are sent to **Anthropic** (Claude) via the **Vercel AI Gateway** to generate responses. Your conversation content is processed in real time and is not stored by Anthropic beyond the duration of the request.
 
 ### Conversation Titles
 

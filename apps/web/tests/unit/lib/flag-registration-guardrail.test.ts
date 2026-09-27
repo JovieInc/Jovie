@@ -18,12 +18,71 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  APP_FLAG_AUDIT_OWNER,
+  APP_FLAG_AUDIT_REGISTRY,
   APP_FLAG_DEFAULTS,
+  APP_FLAG_OVERRIDE_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
   LOCAL_DEFAULT_ONLY_FLAGS,
 } from '@/lib/flags/contracts';
+import { applyAppFlagOverrides } from '@/lib/flags/overrides';
 
 describe('flag registration guardrail', () => {
+  it('requires complete lifecycle and certification metadata for every active flag', () => {
+    expect(Object.keys(APP_FLAG_AUDIT_REGISTRY).sort()).toEqual(
+      Object.keys(APP_FLAG_DEFAULTS).sort()
+    );
+
+    for (const [flagName, defaultValue] of Object.entries(APP_FLAG_DEFAULTS)) {
+      const audit =
+        APP_FLAG_AUDIT_REGISTRY[
+          flagName as keyof typeof APP_FLAG_AUDIT_REGISTRY
+        ];
+
+      expect(audit.owner, `${flagName} must have an owner`).toBe(
+        APP_FLAG_AUDIT_OWNER
+      );
+      expect(audit.purpose.trim(), `${flagName} must have a purpose`).not.toBe(
+        ''
+      );
+      expect(audit.safeDefault, `${flagName} safe default drifted`).toBe(
+        defaultValue
+      );
+      expect(audit.targeting).toBe('dev_staging_prod_override');
+      expect(
+        audit.removalCondition.trim(),
+        `${flagName} must have a removal condition`
+      ).not.toBe('');
+      expect(audit.schemaAssumption).toBe('feature_flag_overrides_optional');
+      expect(audit.killSwitch).toEqual({
+        disabledValue: false,
+        activationBoundary: 'next_flag_resolution_after_audited_write',
+      });
+      expect(audit.certificationStates).toEqual(['off', 'on']);
+    }
+  });
+
+  it('certifies both kill-switch states for every active flag', () => {
+    for (const flagName of Object.keys(
+      APP_FLAG_DEFAULTS
+    ) as (keyof typeof APP_FLAG_DEFAULTS)[]) {
+      const overrideKey = APP_FLAG_OVERRIDE_KEYS[flagName];
+
+      expect(
+        applyAppFlagOverrides(APP_FLAG_DEFAULTS, { [overrideKey]: false })[
+          flagName
+        ],
+        `${flagName} must resolve its disabled state`
+      ).toBe(false);
+      expect(
+        applyAppFlagOverrides(APP_FLAG_DEFAULTS, { [overrideKey]: true })[
+          flagName
+        ],
+        `${flagName} must resolve its enabled state`
+      ).toBe(true);
+    }
+  });
+
   it('every flag in APP_FLAG_DEFAULTS is either Statsig-mapped or explicitly exempted', () => {
     const statsigMapped = new Set(Object.keys(APP_FLAG_TO_STATSIG_GATE));
     const allFlags = Object.keys(

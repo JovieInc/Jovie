@@ -182,27 +182,15 @@ function buildPrBody(opts: {
       forbiddenActions: ['merge', 'deploy'],
       humanApprovalRequired: false,
       humanGate: { required: false, status: 'not_required' },
+      // Record only checks that actually ran. Agents pick the skills a change
+      // needs; this script cannot know which ran, so it never claims a pass.
       verificationGates: [
         {
-          name: 'gstack.qa.exhaustive',
+          name: 'github.ci',
           required: true,
-          status: 'passed',
-          summary: 'QA evidence recorded during agent run.',
-          checkedAt: new Date().toISOString(),
-        },
-        {
-          name: 'gstack.review',
-          required: true,
-          status: 'passed',
-          summary: 'Code review evidence recorded during agent run.',
-          checkedAt: new Date().toISOString(),
-        },
-        {
-          name: 'gstack.ship',
-          required: true,
-          status: 'passed',
-          summary: 'Ship readiness evidence recorded during agent run.',
-          checkedAt: new Date().toISOString(),
+          status: 'queued',
+          summary: 'PR CI runs after push.',
+          checkedAt: null,
         },
       ],
       createdAt: new Date().toISOString(),

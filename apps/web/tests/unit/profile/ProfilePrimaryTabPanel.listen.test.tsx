@@ -214,7 +214,7 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     expect(screen.getByTestId('profile-primary-tab-music-error')).toBeVisible();
     expect(screen.getByText("Couldn't load releases")).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Try again' })
+      screen.getByRole('button', { name: 'Try Again' })
     ).toBeInTheDocument();
     expect(
       screen.queryByTestId('profile-primary-tab-music-empty')

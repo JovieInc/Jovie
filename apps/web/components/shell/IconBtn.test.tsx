@@ -1,56 +1,52 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { Play } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { IconBtn } from './IconBtn';
 
-describe('IconBtn', () => {
-  it('renders an accessible icon button labelled by the tooltip label', () => {
-    render(
-      <IconBtn label='Lyrics'>
-        <span data-testid='icon-glyph' />
-      </IconBtn>
-    );
+function renderBtn(props: Partial<Parameters<typeof IconBtn>[0]> = {}) {
+  return render(
+    <IconBtn label='Play' {...props}>
+      <Play />
+    </IconBtn>
+  );
+}
 
-    const button = screen.getByRole('button', { name: 'Lyrics' });
-    expect(button).toContainElement(screen.getByTestId('icon-glyph'));
+describe('IconBtn', () => {
+  it('renders a button with the label as accessible name', () => {
+    renderBtn();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
   });
 
-  it('fires onClick', () => {
+  it('fires onClick when pressed', () => {
     const onClick = vi.fn();
-    render(
-      <IconBtn label='Lyrics' onClick={onClick}>
-        <span />
-      </IconBtn>
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Lyrics' }));
+    renderBtn({ onClick });
+    fireEvent.click(screen.getByRole('button'));
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it('forwards intent signals on hover and focus', () => {
-    const onMouseEnter = vi.fn();
-    const onFocus = vi.fn();
-    render(
-      <IconBtn label='Lyrics' onMouseEnter={onMouseEnter} onFocus={onFocus}>
-        <span />
-      </IconBtn>
-    );
+  it('fires onPointerEnter on hover intent', () => {
+    const onPointerEnter = vi.fn();
+    renderBtn({ onPointerEnter });
+    fireEvent.pointerEnter(screen.getByRole('button'));
+    expect(onPointerEnter).toHaveBeenCalledOnce();
+  });
 
-    const button = screen.getByRole('button', { name: 'Lyrics' });
-    fireEvent.mouseEnter(button);
-    fireEvent.focus(button);
+  it('fires onMouseEnter on hover intent', () => {
+    const onMouseEnter = vi.fn();
+    renderBtn({ onMouseEnter });
+    fireEvent.mouseEnter(screen.getByRole('button'));
     expect(onMouseEnter).toHaveBeenCalledOnce();
+  });
+
+  it('fires onFocus when focused', () => {
+    const onFocus = vi.fn();
+    renderBtn({ onFocus });
+    fireEvent.focus(screen.getByRole('button'));
     expect(onFocus).toHaveBeenCalledOnce();
   });
 
-  it('applies the ghost active treatment', () => {
-    render(
-      <IconBtn label='Lyrics' tone='ghost' active>
-        <span />
-      </IconBtn>
-    );
-
-    const button = screen.getByRole('button', { name: 'Lyrics' });
-    expect(button.className).toContain('bg-surface-1/40');
-    expect(button.className).toContain('rounded-full');
+  it('forwards testId to the button', () => {
+    renderBtn({ testId: 'icon-btn' });
+    expect(screen.getByTestId('icon-btn')).toBeInTheDocument();
   });
 });

@@ -14,6 +14,10 @@ import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import {
+  readUnclaimedIdentityEnrichment,
+  type UnclaimedIdentityEnrichmentReceipt,
+} from '@/lib/profile/unclaimed-artist-profile';
 import { escapeLikePattern } from '@/lib/utils/sql';
 import { getHometownFromSettings } from '@/types/db';
 
@@ -42,6 +46,8 @@ export interface AdminCreatorProfileRow {
   hometown: string | null;
   activeSinceYear: number | null;
   lastIngestionError: string | null;
+  /** JOV-6529 identity-enrichment receipt for unclaimed profiles. */
+  identityEnrichment?: UnclaimedIdentityEnrichmentReceipt | null;
   socialLinks?: Array<{
     id: string;
     platform: string;
@@ -181,6 +187,7 @@ function mapRowToProfile(
     location: row.location ?? null,
     hometown: getHometownFromSettings(row.settings) ?? null,
     activeSinceYear: row.activeSinceYear ?? null,
+    identityEnrichment: readUnclaimedIdentityEnrichment(row.settings),
     socialLinks: socialLinksMap.get(row.id) ?? [],
   };
 }

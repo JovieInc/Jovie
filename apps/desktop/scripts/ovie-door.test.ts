@@ -96,17 +96,17 @@ test('package proof requires signature, staple, exact source, and no staging she
   ]);
 });
 
-test('packaged main enters the Ovie talk door and starts the Summer bridge', async () => {
+test('packaged main stays Jovie-first and keeps operator doors out of the consumer menu', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  // JOV-5858: Jovie is the default product; Ovie is the admin-only ops HUD.
+  // The consumer Jovie Mac app must not ship operator doors as menu items.
   expect(mainSource).toMatch(/from '\.\/ovie-door'/);
   expect(mainSource).toMatch(/from '\.\/summer-runtime-bridge'/);
-  expect(mainSource).toMatch(/OVIE_OPERATOR_TALK_ROUTE/);
   expect(mainSource).toMatch(/packagedUsesCompetingStagingShell/);
-  expect(mainSource).toMatch(/ovieOperatorOpsHref/);
-  expect(mainSource).toMatch(/openOvieOperatorTalkDoor/);
-  expect(mainSource).toMatch(/openOvieOperatorOpsDoor/);
-  expect(mainSource).toMatch(/click: openOvieOperatorOpsDoor/);
-  expect(mainSource).toMatch(/click: openOvieOperatorTalkDoor/);
+  expect(mainSource).not.toMatch(/openOvieOperatorTalkDoor/);
+  expect(mainSource).not.toMatch(/openOvieOperatorOpsDoor/);
+  expect(mainSource).not.toMatch(/label: 'Ovie'/);
+  expect(mainSource).not.toMatch(/label: 'Talk'/);
   expect(mainSource).toMatch(/createSummerRuntimeBridge/);
   expect(mainSource).toMatch(/event\.sender\.session\.fetch/);
 });
