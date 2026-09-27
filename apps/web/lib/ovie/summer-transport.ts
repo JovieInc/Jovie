@@ -82,6 +82,8 @@ export type SummerSpeakEvent =
       readonly ok: boolean;
       readonly receiptId: string;
       readonly summary: string;
+      /** Optional structured card payload (e.g. summer.ops-card.v1). */
+      readonly data?: unknown;
     }
   | {
       readonly type: 'error';
@@ -378,6 +380,7 @@ export async function* runOvieSummerTurn(input: {
           ok: event.ok,
           receiptId: event.receiptId,
           summary: event.summary,
+          ...(event.data !== undefined ? { data: event.data } : {}),
         };
         yield { type: 'tool', receipt: toolReceipt };
         if (!event.ok) terminal = 'failed_tool';

@@ -231,6 +231,53 @@ describe('Summer UI message stream', () => {
     expect(message.parts.filter(part => part.type === 'text')).toEqual([]);
   });
 
+  it('passes a valid ops card through to the tool output and drops invalid data', async () => {
+    const card = {
+      schema: 'summer.ops-card.v1',
+      kind: 'shipping',
+      title: 'Shipping lanes',
+      state: 'fresh',
+      observedAt: '2026-09-27T09:00:00.000Z',
+      facts: [{ label: 'Merge queue', value: '3' }],
+      series: { label: 'Live counts', points: [{ label: 'Queued', value: 3 }] },
+    };
+    const withCard = await readTurn([
+      {
+        type: 'tool',
+        receipt: {
+          tool: 'inspect_kanban',
+          ok: true,
+          receiptId: 'kanban-card',
+          summary: 'Shipping state read.',
+          data: card,
+        },
+      },
+      { type: 'state', state: 'completed' },
+    ]);
+    const [cardEvent] = encodeToolEvents(withCard.message.parts) ?? [];
+    expect(cardEvent).toMatchObject({
+      toolName: 'inspect_kanban',
+      state: 'succeeded',
+    });
+    expect(cardEvent?.output?.card).toEqual(card);
+
+    const withBadData = await readTurn([
+      {
+        type: 'tool',
+        receipt: {
+          tool: 'inspect_kanban',
+          ok: true,
+          receiptId: 'kanban-bad',
+          summary: 'Shipping state read.',
+          data: { schema: 'not-a-card' },
+        },
+      },
+      { type: 'state', state: 'completed' },
+    ]);
+    const [badEvent] = encodeToolEvents(withBadData.message.parts) ?? [];
+    expect(badEvent?.output?.card).toBeUndefined();
+  });
+
   it('preserves Summer text alongside exactly one tool receipt', async () => {
     const { message } = await readTurn([
       { type: 'text-delta', text: 'Summer response.' },
