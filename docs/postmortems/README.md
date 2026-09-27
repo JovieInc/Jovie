@@ -10,6 +10,7 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-09-27 | [Production freeze: SBOM step failed every promotion after #18879](2026-09-27-sbom-provenance-freeze.md) | `pre-merge-parity-gap`, `silent-production-staleness`, `green-by-implication` | draft |
 | 2026-09-26 | [Production freeze: jov.ie stuck on `eb15ae0` for five days](2026-09-26-production-freeze.md) | `silent-production-staleness`, `pre-merge-parity-gap`, `serial-layer-discovery`, `non-convergent-control-loop`, `green-by-implication`, `privileged-recovery-only`, `unowned-incident` | reviewed |
 | 2026-07 | [CI/release drain: incident prevention and inheritance](2026-07-ci-release-drain.md) | see the [39-incident CI/release index](../ci/CI_RELEASE_INCIDENTS.md) and [machine ledger](../../.github/ci-harness/ci-release-incidents.json) | contract |
 
