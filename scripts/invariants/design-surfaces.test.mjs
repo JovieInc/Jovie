@@ -5,17 +5,25 @@ import { fileURLToPath } from 'node:url';
 
 import {
   APP_UI_COPY_ROOTS,
+  certifyVisualRules,
   collectCopySurfaceFiles,
+  collectNavEntries,
   DESIGN_SURFACE_ROOTS,
   DESIGN_SURFACES_INVARIANT_ID,
   DESIGN_SURFACES_SCHEMA,
+  designSurfacesCertification,
   FOUNDER_RULES,
+  formatCertificationSummary,
+  HOMEPAGE_COPY_SOURCE,
   LANDING_GRAMMAR_SOURCE,
+  NAVIGATION_SOURCE,
   RECIPES_SOURCE,
   scanFixture,
   scanNavSemantics,
   scanRouteIntent,
   scanScaffoldingCopy,
+  scanTasteLocks,
+  VISUAL_EVALUATOR_MISSING,
   validateDesignSurfaces,
   validateDesignSurfacesContract,
 } from './design-surfaces.mjs';
@@ -31,6 +39,31 @@ const realRecipes = readFileSync(
   new URL(`../../${RECIPES_SOURCE}`, import.meta.url),
   'utf8'
 );
+const realHomepage = readFileSync(
+  new URL(`../../${HOMEPAGE_COPY_SOURCE}`, import.meta.url),
+  'utf8'
+);
+const realNavigation = readFileSync(
+  new URL(`../../${NAVIGATION_SOURCE}`, import.meta.url),
+  'utf8'
+);
+const VISUAL_RULE_IDS = FOUNDER_RULES.filter(
+  rule => rule.classification === 'visual-semantic'
+).map(rule => rule.id);
+
+function mutatedPolicy(mutate) {
+  const mutated = JSON.parse(JSON.stringify(canonical));
+  const invariant = mutated.invariants.find(
+    item => item.id === DESIGN_SURFACES_INVARIANT_ID
+  );
+  mutate(invariant.policy.value);
+  return { registry: mutated, policy: invariant.policy.value };
+}
+
+function replaceOnce(source, from, to) {
+  assert.ok(source.includes(from), `source contains ${from}`);
+  return source.replace(from, to);
+}
 
 function emptyFirstArray(source, key) {
   const pattern = new RegExp(`${key}:\\s*\\[[^\\]]*\\]`);
@@ -208,9 +241,291 @@ describe('founder design invariants (JOV-INV-038)', () => {
     assert.deepEqual(
       scanNavSemantics(
         'apps/web/data/marketingNavigation.ts',
-        "const L = [{ href: APP_ROUTES.CLI, description: 'x' }, { label: 'Founders', href: APP_ROUTES.PRODUCT }];"
+        "const L = [{ href: APP_ROUTES.CLI, label: 'CLI' }, { label: 'Artists', href: APP_ROUTES.SOLUTIONS_ARTISTS }];"
       ),
       []
+    );
+  });
+
+  it('deliberate red: rejects a persona label routed to an unrelated non-tooling page', () => {
+    const findings = scanNavSemantics(
+      NAVIGATION_SOURCE,
+      "const L = [{ href: APP_ROUTES.PRICING, label: 'Artists' }];"
+    );
+    assert.deepEqual(
+      findings.map(item => item.rule),
+      ['nav-label-route-mismatch']
+    );
+    assert.match(findings[0].detail, /APP_ROUTES\.SOLUTIONS_ARTISTS/);
+  });
+
+  it('deliberate red: rejects a persona without its own page borrowing another', () => {
+    assert.deepEqual(
+      scanNavSemantics(
+        NAVIGATION_SOURCE,
+        "const L = [{ href: APP_ROUTES.PRODUCT, label: 'Founders' }];"
+      ).map(item => item.rule),
+      ['nav-label-route-mismatch']
+    );
+  });
+
+  it('deliberate red: rejects a non-persona label pointed at the wrong page', () => {
+    assert.deepEqual(
+      scanNavSemantics(
+        NAVIGATION_SOURCE,
+        "const L = [{ href: APP_ROUTES.BLOG, label: 'Pricing' }];"
+      ).map(item => item.rule),
+      ['nav-label-route-mismatch']
+    );
+  });
+
+  it('deliberate red: rejects a label with no declared destination', () => {
+    assert.deepEqual(
+      scanNavSemantics(
+        NAVIGATION_SOURCE,
+        "const L = [{ href: APP_ROUTES.PRODUCT, label: 'Platform' }];"
+      ).map(item => item.rule),
+      ['nav-label-unbound']
+    );
+  });
+
+  it('deliberate red: fails closed on nav entries it cannot parse', () => {
+    const cases = [
+      "const L = [{ href: APP_ROUTES.CLI, description: 'x' }];",
+      "const L = [{ label: 'Pricing', description: 'x' }];",
+      'const L = [{ href: APP_ROUTES.PRICING, label: pricingLabel }];',
+      "const L = [{ href: '/pricing', label: 'Pricing' }];",
+      "const L = [{ href: routeFor('pricing'), label: 'Pricing' }];",
+      "const L = [{ ...base, label: 'Pricing' }];",
+    ];
+    for (const source of cases) {
+      assert.deepEqual(
+        scanNavSemantics(NAVIGATION_SOURCE, source).map(item => item.rule),
+        ['nav-entry-unparseable'],
+        source
+      );
+    }
+  });
+
+  it('deliberate red: fails closed when no nav entries parse at all', () => {
+    assert.deepEqual(
+      scanNavSemantics(NAVIGATION_SOURCE, 'export const L = [];').map(
+        item => item.rule
+      ),
+      ['nav-entry-unparseable']
+    );
+  });
+
+  it('validates every entry in the live navigation file', () => {
+    const { entries, unparseable } = collectNavEntries(
+      NAVIGATION_SOURCE,
+      realNavigation
+    );
+    assert.deepEqual(unparseable, []);
+    const hrefCount = (realNavigation.match(/\bhref:/g) ?? []).length;
+    // Type annotations (`href: string`) are declarations, not entries.
+    const typeHrefs = (realNavigation.match(/\bhref:\s*string\b/g) ?? [])
+      .length;
+    assert.equal(entries.length, hrefCount - typeHrefs);
+    assert.deepEqual(scanNavSemantics(NAVIGATION_SOURCE, realNavigation), []);
+  });
+
+  it('deliberate red: a mislabeled live nav entry cannot pass by not matching', () => {
+    const mutated = replaceOnce(
+      realNavigation,
+      "{ href: APP_ROUTES.COMPARE, label: 'Compare' }",
+      '{ label: "Compare", href: `${APP_ROUTES.PRICING}#compare` }'
+    );
+    assert.deepEqual(
+      scanNavSemantics(NAVIGATION_SOURCE, mutated).map(item => item.rule),
+      ['nav-label-route-mismatch']
+    );
+  });
+
+  it('deliberate red: grammar lock regression is not masked by a decoy Find me', () => {
+    const mutated = `${replaceOnce(
+      realGrammar,
+      "primaryAction: 'Find me',\n  tasteOwner",
+      "primaryAction: 'Get started',\n  tasteOwner"
+    )}\nexport const DECOY = { primaryAction: 'Find me' };\n`;
+    const findings = scanTasteLocks(repoRoot, {
+      [LANDING_GRAMMAR_SOURCE]: mutated,
+    });
+    assert.deepEqual(
+      findings.map(item => item.rule),
+      ['homepage-cta-lock']
+    );
+    assert.match(findings[0].detail, /found "Get started"/);
+  });
+
+  it('deliberate red: rejects a grammar with no LANDING_PAGE_HOMEPAGE_LOCK', () => {
+    const findings = scanTasteLocks(repoRoot, {
+      [LANDING_GRAMMAR_SOURCE]: replaceOnce(
+        realGrammar,
+        'export const LANDING_PAGE_HOMEPAGE_LOCK',
+        'export const LANDING_PAGE_HOMEPAGE_LOCK_V0'
+      ),
+    });
+    assert.ok(
+      findings.some(
+        item =>
+          item.rule === 'homepage-cta-lock' &&
+          item.detail.includes('declaration missing')
+      )
+    );
+  });
+
+  it('deliberate red: hero search regression is not masked by a decoy search action', () => {
+    const mutated = `${replaceOnce(
+      realHomepage,
+      "action: 'Find me',",
+      "action: 'Get started',"
+    )}\nexport const DECOY = { search: { action: 'Find me' } };\n`;
+    assert.deepEqual(
+      scanTasteLocks(repoRoot, { [HOMEPAGE_COPY_SOURCE]: mutated }).map(
+        item => item.rule
+      ),
+      ['homepage-cta-lock']
+    );
+  });
+
+  it('deliberate red: rejects a locked atom dropped from SHARED_TOKENS but kept elsewhere', () => {
+    const mutated = `${replaceOnce(
+      realGrammar,
+      "  'control:32/510',\n",
+      ''
+    )}\nconst DECOY_TOKENS = ['control:32/510'];\n`;
+    assert.deepEqual(
+      scanTasteLocks(repoRoot, { [LANDING_GRAMMAR_SOURCE]: mutated }).map(
+        item => item.rule
+      ),
+      ['locked-atom-drift']
+    );
+  });
+
+  it('accepts the real homepage and grammar locks', () => {
+    assert.deepEqual(scanTasteLocks(repoRoot), []);
+  });
+
+  it('reports visual rules as not-certified while their dated record is valid', () => {
+    const certification = designSurfacesCertification(canonical, {
+      today: '2026-09-27',
+    });
+    const notCertified = certification.filter(
+      item => item.status !== 'certified'
+    );
+    assert.deepEqual(
+      notCertified.map(item => item.id).sort(),
+      [...VISUAL_RULE_IDS].sort()
+    );
+    for (const item of notCertified) {
+      assert.equal(item.reason, VISUAL_EVALUATOR_MISSING);
+    }
+    assert.match(
+      formatCertificationSummary(certification),
+      /5\/8 founder rules certified; NOT certified: .*visual-evaluator-missing/
+    );
+  });
+
+  it('deliberate red: visual rules block when the pending-evaluator record is absent', () => {
+    const { registry } = mutatedPolicy(policy => {
+      delete policy.pendingEvaluators;
+    });
+    const errors = validateDesignSurfacesContract(registry, {
+      today: '2026-09-27',
+    });
+    for (const id of VISUAL_RULE_IDS) {
+      assert.ok(
+        errors.some(
+          error =>
+            error.startsWith(`${VISUAL_EVALUATOR_MISSING}: ${id}`) &&
+            error.includes('failing closed')
+        ),
+        `${id} blocks without a record`
+      );
+    }
+  });
+
+  it('deliberate red: one missing record blocks only that visual rule', () => {
+    const { policy } = mutatedPolicy(value => {
+      value.pendingEvaluators = value.pendingEvaluators.filter(
+        record => record.ruleId !== 'proximal-proof'
+      );
+    });
+    const { errors } = certifyVisualRules(policy, { today: '2026-09-27' });
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /visual-evaluator-missing: proximal-proof/);
+  });
+
+  it('deliberate red: an expired pending-evaluator record blocks', () => {
+    const { policy } = mutatedPolicy(() => {});
+    const expiry = policy.pendingEvaluators[0].expiresOn;
+    assert.deepEqual(
+      certifyVisualRules(policy, { today: expiry }).errors,
+      [],
+      'valid through its expiry date'
+    );
+    const { errors } = certifyVisualRules(policy, { today: '2099-01-01' });
+    assert.equal(errors.length, VISUAL_RULE_IDS.length);
+    assert.ok(errors.every(error => error.includes('expired')));
+  });
+
+  it('deliberate red: rejects malformed or misowned pending-evaluator records', () => {
+    const { policy } = mutatedPolicy(value => {
+      value.pendingEvaluators[0].owner = 'JOV-1';
+      value.pendingEvaluators[1].status = 'certified';
+      value.pendingEvaluators[2].expiresOn = 'soon';
+    });
+    const { errors } = certifyVisualRules(policy, { today: '2026-09-27' });
+    assert.ok(errors.some(error => error.includes('owned by JOV-6040')));
+    assert.ok(errors.some(error => error.includes('status must be')));
+    assert.ok(errors.some(error => error.includes('ISO recordedOn')));
+  });
+
+  it('deliberate red: deterministic rules cannot be deferred with a pending record', () => {
+    const { policy } = mutatedPolicy(value => {
+      value.pendingEvaluators.push({
+        ...value.pendingEvaluators[0],
+        ruleId: 'route-intent',
+      });
+    });
+    const { errors } = certifyVisualRules(policy, { today: '2026-09-27' });
+    assert.ok(errors.some(error => error.includes('route-intent')));
+  });
+
+  it('certifies a visual rule only through an existing evaluator receipt', () => {
+    const missing = mutatedPolicy(value => {
+      value.pendingEvaluators = value.pendingEvaluators.filter(
+        record => record.ruleId !== 'progressive-depth'
+      );
+      value.rules.find(
+        rule => rule.id === 'progressive-depth'
+      ).evaluatorReceipt = 'scripts/invariants/does-not-exist.mjs';
+    }).policy;
+    assert.ok(
+      certifyVisualRules(missing, { today: '2026-09-27' }).errors.some(error =>
+        error.includes('does-not-exist.mjs')
+      )
+    );
+
+    const wired = mutatedPolicy(value => {
+      value.rules.find(
+        rule => rule.id === 'progressive-depth'
+      ).evaluatorReceipt = 'scripts/invariants/design-surfaces.mjs';
+    }).policy;
+    const stale = certifyVisualRules(wired, { today: '2026-09-27' });
+    assert.ok(
+      stale.errors.some(error => error.includes('stale pending-evaluator')),
+      'a wired receipt must retire its pending record'
+    );
+    wired.pendingEvaluators = wired.pendingEvaluators.filter(
+      record => record.ruleId !== 'progressive-depth'
+    );
+    const certified = certifyVisualRules(wired, { today: '2026-09-27' });
+    assert.deepEqual(certified.errors, []);
+    assert.equal(
+      certified.statuses.find(item => item.id === 'progressive-depth').status,
+      'certified'
     );
   });
 
@@ -244,11 +559,11 @@ describe('founder design invariants (JOV-INV-038)', () => {
     assert.deepEqual(scanRouteIntent(repoRoot), []);
   });
 
-  it('nav detector accepts persona labels routed to persona destinations', () => {
+  it('nav detector accepts persona labels routed to their own solutions page', () => {
     assert.deepEqual(
       scanNavSemantics(
         'apps/web/data/marketingNavigation.ts',
-        "const L = [{ href: APP_ROUTES.PRODUCT, label: 'Founders' }];"
+        "const L = [{ href: APP_ROUTES.SOLUTIONS_FOUNDERS, label: 'Founders' }, { href: 'https://status.jov.ie', label: 'Status', external: true }];"
       ),
       []
     );
