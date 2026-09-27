@@ -3,7 +3,30 @@ export const NOW = new Date('2026-09-04T18:00:00Z');
 export const m = (value: number) => ({ value, sourceId: 'record-1' });
 export function snapshot(): CommercialSnapshot {
   return {
-    schema: 'jovie.summer-commercial.snapshot/v1',
+    schema: 'jovie.summer-commercial.snapshot/v2',
+    objective: {
+      issue: 'JOV-6065',
+      product: 'logyourbody',
+      outcome: 'shipped-and-5000-usd-mrr',
+      targetRecurringMrrCents: 500000,
+      deadline: '2026-10-05',
+      revision: 'founder-2026-09-05',
+    },
+    bottleneck: { stage: 'prospects', sourceId: 'record-1' },
+    funnel: {
+      prospects: m(0),
+      conversations: m(0),
+      activated: m(0),
+      paid: m(0),
+      retained: m(0),
+      mrrCents: m(0),
+    },
+    capacity: {
+      agentMinutesPerDay: m(480),
+      ciMinutesPerDay: m(240),
+      founderMinutesPerDay: m(240),
+      availableCashCents: m(0),
+    },
     sources: [
       {
         id: 'record-1',
@@ -15,15 +38,23 @@ export function snapshot(): CommercialSnapshot {
     ],
     candidates: [
       {
-        id: 'thumbnails',
-        product: 'jovie-thumbnails',
+        id: 'lyb-sales',
+        product: 'logyourbody',
         kind: 'commercial',
+        objectiveClass: 'direct',
+        causalPath: 'Prospecting creates LYB customer conversations.',
+        targetFunnelStage: 'prospects',
+        boundedInvariant: null,
+        stopShip: false,
+        expectedObjectiveImpact: m(10),
+        agentMinutes: m(60),
+        ciMinutes: m(0),
         safetyCleared: true,
         held: false,
         noAuto: false,
         consentCleared: true,
         readinessCleared: true,
-        lybCanaryPassed: false,
+        lybCanaryPassed: true,
         gateSourceId: 'record-1',
         paidValueCompletions: m(1),
         collectedCashCents: m(50000),

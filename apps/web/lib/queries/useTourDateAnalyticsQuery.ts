@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { TourDateAnalyticsData } from '@/types/analytics';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import { createClassifiedRetry } from './retry-policy';
 
 interface UseTourDateAnalyticsQueryOptions {
   tourDateId: string | null;
@@ -30,6 +31,6 @@ export function useTourDateAnalyticsQuery({
     enabled: enabled && Boolean(tourDateId),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-    retry: 2,
+    retry: createClassifiedRetry(2),
   });
 }

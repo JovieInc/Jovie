@@ -1667,6 +1667,45 @@ jobs:
         # The required prevention receipt must exist for every source PR and
         # exact merge-group head, even when no contract file changed.
         run: pnpm ci:incident-contract:validate
+      - name: Resolve incident-labeled Linear issues for this PR
+        # JOV-6689: a PR closing an `incident` issue must ship or link a
+        # post-mortem. The label lookup is the only non-deterministic piece,
+        # so it stays in this step; the check below is pure file/text.
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          ids="$(printf '%s\n%s\n' "${PR_TITLE:-}" "${PR_BODY:-}" \
+            | grep -oE 'JOV-[0-9]+' | sort -u || true)"
+          incident=""
+          if [ -n "${LINEAR_API_KEY:-}" ]; then
+            while IFS= read -r id; do
+              [ -z "$id" ] && continue
+              labels="$(curl -sS --max-time 10 https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_API_KEY" \
+                -H 'Content-Type: application/json' \
+                -d "{\"query\":\"query { issues(filter: { team: { key: { eq: \\\"JOV\\\" } }, number: { eq: ${id#JOV-} } }, first: 1) { nodes { labels { nodes { name } } } } }\"}" \
+                | jq -r '.data.issues.nodes[0].labels.nodes[]?.name' 2>/dev/null || true)"
+              if printf '%s\n' "$labels" | grep -qx 'incident'; then
+                incident="${incident:+$incident,}$id"
+              fi
+            done <<< "$ids"
+          else
+            echo "::notice::LINEAR_API_KEY unavailable; incident label resolution skipped (frontmatter lint still runs)."
+          fi
+          echo "POSTMORTEM_INCIDENT_ISSUES=$incident" >> "$GITHUB_ENV"
+          echo "Incident-labeled references: ${incident:-none}"
+      - name: Post-mortem linkage and frontmatter check
+        # Same always-on placement as the incident contract above: every
+        # source PR and merge-group head, dependency-free (JOV-6689).
+        env:
+          POSTMORTEM_PR_TITLE: ${{ github.event.pull_request.title }}
+          POSTMORTEM_PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/postmortem-linkage-check.mjs
       - name: Verify Node and tsx seed-loader compatibility
         shell: bash
         run: |
@@ -1696,7 +1735,7 @@ jobs:
           STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/brand-scrub\.py|scripts/lanes/|scripts/fleet-gate/|scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy)\.py)'
 
           # Typed company composition must run its real coverage gate on future edits too.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/security/deepsec-policy(\.test)?\.mjs$|^scripts/security/deepsec/|^scripts/summer-commissioning/'
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/security/deepsec-(policy|loop)(\.test)?\.mjs$|^scripts/security/deepsec/|^scripts/summer-commissioning/'
 
           # Evidence collection changes must execute the existing native-queue
           # behavioral tests and per-file coverage, including test-only edits.
@@ -2435,7 +2474,7 @@ jobs:
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
     if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 6
     permissions:
       contents: read
       issues: read
@@ -2454,6 +2493,8 @@ jobs:
         id: check_changes
         shell: bash
         run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
 
       # Skip notification (updated condition)
       - name: Skip notification
@@ -2473,6 +2514,7 @@ jobs:
 
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
+          pnpm exec tsx scripts/online-index-migrate.ts --validate-only
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
@@ -2948,6 +2990,9 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          # Name the blocked file when the artifact guard stops the step;
+          # "exit 1" alone left the JOV-6541 failures undiagnosable.
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'
       - name: Upload combined Storybook failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true

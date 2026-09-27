@@ -213,16 +213,18 @@ struct MobileMeResponseTests {
     #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
   }
 
-  @Test func workspaceStoreForcesJovieForNonAdminAndPersistsOvieForAdmin() {
-    let suiteName = "MobileWorkspaceStoreTests"
-    let defaults = UserDefaults(suiteName: suiteName)!
-    defaults.removePersistentDomain(forName: suiteName)
-    defaults.set(MobileWorkspaceMode.ovie.rawValue, forKey: MobileWorkspaceStore.defaultsKey)
-    #expect(MobileWorkspaceStore.load(isAdmin: false, defaults: defaults) == .jovie)
-    MobileWorkspaceStore.save(.ovie, isAdmin: false, defaults: defaults)
-    #expect(defaults.string(forKey: MobileWorkspaceStore.defaultsKey) == MobileWorkspaceMode.jovie.rawValue)
-    MobileWorkspaceStore.save(.ovie, isAdmin: true, defaults: defaults)
-    #expect(MobileWorkspaceStore.load(isAdmin: true, defaults: defaults) == .ovie)
+  @Test func workspaceStoreForcesJovieForNonAdminAndScopesOvieToSession() {
+    MobileWorkspaceStore.resetSessionForTesting()
+    MobileWorkspaceStore.save(.ovie, isAdmin: false)
+    #expect(MobileWorkspaceStore.load(isAdmin: false) == .jovie)
+    #expect(MobileWorkspaceStore.load(isAdmin: true) == .jovie)
+    MobileWorkspaceStore.save(.ovie, isAdmin: true)
+    #expect(MobileWorkspaceStore.load(isAdmin: true) == .ovie)
+    // Ovie never survives a cold start: the artist app relaunches in Jovie
+    // mode so the Inbox cannot inherit Taste/ops copy (JOV-5358).
+    MobileWorkspaceStore.resetSessionForTesting()
+    #expect(MobileWorkspaceStore.load(isAdmin: true) == .jovie)
+    MobileWorkspaceStore.save(.jovie, isAdmin: true)
   }
 
   @Test func inboxStillImageURLOnlyForStillType() {
