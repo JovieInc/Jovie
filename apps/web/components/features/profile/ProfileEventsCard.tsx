@@ -1,4 +1,3 @@
-// @coverage-via apps/web/components/features/profile/ProfilePrimaryTabPanel.test.tsx
 import type { ReactNode } from 'react';
 import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
 import { ProfileModeCard } from './ProfileModeCard';
