@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ProfileQuickActions } from '@/features/profile/ProfileQuickActions';
+import { ProfileQuickActions } from './ProfileQuickActions';
 
 describe('ProfileQuickActions', () => {
   it('marks the active action and routes pane taps through onModeSelect', () => {

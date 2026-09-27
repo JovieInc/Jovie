@@ -5,6 +5,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfilePacCard } from '@/components/features/profile/pac/ProfilePacCard';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 import { EntityCard } from './EntityCard';
 import type { EntityCardModel } from './types';
@@ -430,6 +431,35 @@ describe('ProfilePacCard landscape states', () => {
         String(eventName).startsWith('capture_')
       )
     ).toBe(false);
+  });
+
+  it('labels an upcoming ticketed show with the generalized Events copy', () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+        captureEnabled={false}
+        hasPlayableDestinations={false}
+        nextShow={
+          {
+            id: 'show-1',
+            title: 'Night One',
+            venueName: 'The Venue',
+            city: 'Los Angeles',
+            ticketUrl: 'https://tickets.test/night-one',
+          } as unknown as TourDateViewModel
+        }
+      />
+    );
+
+    expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+      'data-state',
+      'tickets'
+    );
+    expect(screen.getByText('Upcoming Events')).toBeInTheDocument();
+    expect(screen.queryByText('On Tour')).toBeNull();
   });
 
   it('re-resolves when playable destinations arrive without another inventory change', async () => {
