@@ -15,7 +15,11 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingEditorialHeroPhoto,
+  MarketingHero,
+} from '@/components/marketing';
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -130,12 +134,17 @@ export default async function ChangelogReleasePage({
 
   return (
     <section className='min-h-screen bg-base text-primary-token'>
-      <div className='relative'>
+      <div className='marketing-hero-dock relative overflow-hidden'>
+        <MarketingEditorialHeroPhoto
+          src='/images/hero/changelog-version.webp'
+          opacity={0.22}
+          testId='changelog-version-hero-photo'
+        />
         <div
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'
         />
-        <MarketingHero variant='left'>
+        <MarketingHero variant='left' className='relative z-10'>
           <nav aria-label='Breadcrumb'>
             <ol className='flex flex-wrap items-center gap-2 font-mono text-app'>
               <li>
