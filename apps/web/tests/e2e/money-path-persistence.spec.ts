@@ -401,7 +401,9 @@ test('persists verified checkout entitlement for a fresh and returning session',
       { charge: paidCharge.id, amount: partialAmount },
       { idempotencyKey: `jovie-refund-e2e:${runId}:partial` }
     );
-    expect(partialRefund.livemode).toBe(false);
+    // Refunds carry no livemode; bind them to the test-mode charge instead.
+    expect(partialRefund.charge).toBe(paidCharge.id);
+    expect(partialRefund.status).not.toBe('failed');
 
     const partiallyRefundedCharge = await stripeClient.charges.retrieve(
       paidCharge.id
@@ -446,7 +448,8 @@ test('persists verified checkout entitlement for a fresh and returning session',
       { charge: paidCharge.id, amount: remainingAmount },
       { idempotencyKey: `jovie-refund-e2e:${runId}:final` }
     );
-    expect(finalRefund.livemode).toBe(false);
+    expect(finalRefund.charge).toBe(paidCharge.id);
+    expect(finalRefund.status).not.toBe('failed');
 
     const fullyRefundedCharge = await stripeClient.charges.retrieve(
       paidCharge.id
