@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import {
   directNeonUrl,
   findSessionScopedSql,
-  findTransactionControl,
+  readOnlyStatementError,
   SAFE_READ_ONLY_GUIDANCE,
 } from '../lib/pg-session-scope.mjs';
 
@@ -28,11 +28,9 @@ export function buildPsqlArgs(databaseUrl, query) {
       `Refusing session-scoped SQL (${match}).\n${SAFE_READ_ONLY_GUIDANCE}`
     );
   }
-  const control = findTransactionControl(query);
-  if (control || query.trimStart().startsWith('\\')) {
-    throw new Error(
-      `Refusing transaction control or psql meta-commands (${control ?? '\\'}); pass one read query.`
-    );
+  const invalid = readOnlyStatementError(query);
+  if (invalid) {
+    throw new Error(`Refusing query (${invalid}); pass one read statement.`);
   }
   return [
     directNeonUrl(databaseUrl),

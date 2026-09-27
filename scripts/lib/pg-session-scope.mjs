@@ -17,32 +17,26 @@ const DB_COMMAND =
 // `set -e` is a shell builtin.
 const SESSION_SET =
   /(?:^|[;\n]|["'`])\s*SET\s+(?!LOCAL\b|TRANSACTION\b|CONSTRAINTS\b|[-+])\S+/i;
-const SESSION_SET_CONFIG = /set_config\s*\([^()]*,\s*false\s*\)/i;
+// Arguments may nest parentheses; stay within one statement.
+const SESSION_SET_CONFIG = /set_config\s*\([^;]*?,\s*false\s*\)/i;
 // Role/database defaults persist for every future session, pooled or not.
 const PERSISTENT_SET = /\bALTER\s+(?:ROLE|USER|DATABASE)\b[^;]*\bSET\b/i;
 
 // SQL comments can sit between keywords (`SET /* x */ foo`, `SET--x\nfoo`).
-// Strip block comments and line comments; a shell flag (`--no-psqlrc`) starts
-// after whitespace and has no space after `--`, so it is kept.
+// A shell flag (`--no-psqlrc`) starts after whitespace with no space after
+// `--`, so it is kept. Stripping is not quote-aware, so callers check the raw
+// text as well: a `--` inside a string literal must not hide what follows.
+function expandShellNewlines(text) {
+  return text.replace(/\\n/g, '\n'); // $'...\n...' expands at run time
+}
+
 function stripSqlComments(text) {
   return text
-    .replace(/\\n/g, '\n') // $'...\n...' shell strings expand at run time
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(?<=\S)--[^\n]*|--\s[^\n]*/g, ' ');
 }
 
-// Statement-leading transaction control would end a read-only wrapper.
-// SET TRANSACTION can switch the wrapper's transaction to READ WRITE.
-const TRANSACTION_CONTROL =
-  /(?:^|[;\n])\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE|PREPARE\s+TRANSACTION|SET\s+TRANSACTION|SET\s+SESSION\s+CHARACTERISTICS)\b/i;
-
-export function findTransactionControl(sql) {
-  const match = stripSqlComments(String(sql ?? '')).match(TRANSACTION_CONTROL);
-  return match ? match[0].trim() : null;
-}
-
-export function findSessionScopedSql(text) {
-  const source = stripSqlComments(String(text ?? ''));
+function scan(source) {
   // Statements end at `;`; shell quotes delimit separate `-c` arguments.
   for (const statement of source.split(/[;"'`]/)) {
     const set = statement.match(SESSION_SET);
@@ -56,6 +50,27 @@ export function findSessionScopedSql(text) {
   if (config) return config[0].trim();
   const persistent = source.match(PERSISTENT_SET);
   if (persistent) return persistent[0].trim();
+  return null;
+}
+
+// Best-effort guard against accidental session state from agents; the
+// sanctioned path (scripts/db/prod-read.mjs) does not rely on it alone.
+export function findSessionScopedSql(text) {
+  const raw = expandShellNewlines(String(text ?? ''));
+  return scan(raw) ?? scan(stripSqlComments(raw));
+}
+
+const READ_STATEMENT = /^(?:SELECT|WITH|EXPLAIN|SHOW|TABLE|VALUES)\b/i;
+
+// prod-read accepts exactly one read statement, so caller SQL can never
+// end or reconfigure the wrapping read-only transaction.
+export function readOnlyStatementError(sql) {
+  const body = String(sql ?? '')
+    .replace(/^(?:\s+|--[^\n]*\n|\/\*[\s\S]*?\*\/)*/, '')
+    .replace(/;\s*$/, '');
+  if (body.includes(';')) return 'multiple statements';
+  if (!READ_STATEMENT.test(body))
+    return 'not a SELECT, WITH, EXPLAIN, SHOW, TABLE or VALUES statement';
   return null;
 }
 

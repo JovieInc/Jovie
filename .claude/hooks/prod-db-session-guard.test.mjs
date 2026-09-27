@@ -40,6 +40,8 @@ test('blocks the incident command and other session-scoped settings', () => {
     `psql "$DATABASE_URL" -c "SET /* read only */ default_transaction_read_only=on"`,
     `psql "$DATABASE_URL" -c $'SET--comment\\ndefault_transaction_read_only=on'`,
     `psql "$DATABASE_URL" -c "SET TIME ZONE 'UTC'"`,
+    `psql "$DATABASE_URL" -c "select '--'; set default_transaction_read_only = on"`,
+    `psql "$DATABASE_URL" -c "select pg_catalog.set_config('default_transaction_read_only', concat('o','n'), false)"`,
     `psql "$DATABASE_URL" -c "set schema 'public'"`,
     `psql "$DATABASE_URL" -c "update t set x = 1" -c "set default_transaction_read_only = on"`,
     `psql "$DATABASE_URL" -c "select 1; -- note\nSET statement_timeout = 0"`,
@@ -86,6 +88,13 @@ test('prod-read targets the direct endpoint inside a read-only transaction', () 
     'ep-fixture-endpoint.c-0.us-east-1.aws.neon.tech'
   );
   assert.equal(directNeonUrl(POOLER).includes('sslmode=require'), true);
+  for (const query of [
+    'select 1',
+    '  -- why\nwith x as (select 1) select * from x;',
+    '/* note */ explain select 1',
+  ]) {
+    assert.ok(buildPsqlArgs(POOLER, query), query);
+  }
   const args = buildPsqlArgs(POOLER, 'select 1');
   assert.doesNotMatch(args[0], /-pooler\./);
   assert.deepEqual(args.slice(-6), [
@@ -105,9 +114,11 @@ test('prod-read targets the direct endpoint inside a read-only transaction', () 
     'select 1; begin read write; delete from leads',
     'rollback; /* x */ delete from leads',
     'SET TRANSACTION READ WRITE; DELETE FROM creator_profiles',
+    "SELECT '--'; COMMIT; SET default_transaction_read_only=off; DELETE FROM leads",
+    'DELETE FROM leads',
     '\\! echo hi',
   ]) {
-    assert.throws(() => buildPsqlArgs(POOLER, query), /Refusing transaction control/, query);
+    assert.throws(() => buildPsqlArgs(POOLER, query), /Refusing/, query);
   }
   assert.equal(READ_ONLY_PGOPTIONS, '-c default_transaction_read_only=on');
 });
