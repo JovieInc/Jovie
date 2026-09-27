@@ -12,7 +12,7 @@ By using Jovie, you agree to these Terms of Service. If you disagree with any pa
 
 Jovie is a modern profile and link management platform for musicians. Our core features include:
 
-- Publishable artist profiles that showcase content, tour dates, and digital links
+- Publishable Jovie profiles that showcase content, tour dates, and digital links
 - Connections to your Spotify metadata so your audience sees the latest information
 - Dashboard analytics that highlight engagement and conversion insight
 - Social link management so every call-to-action always points fans where you want

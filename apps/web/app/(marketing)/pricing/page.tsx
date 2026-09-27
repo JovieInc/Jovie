@@ -18,24 +18,24 @@ const requestAccessCopy = `Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with li
 
 export const metadata: Metadata = {
   title: 'Pricing',
-  description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+  description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   keywords: [
     'Jovie pricing',
-    'artist profile pricing',
-    'music marketing tools',
-    'fan engagement pricing',
-    'music release platform pricing',
+    'Jovie profile pricing',
+    'creator marketing tools',
+    'audience engagement pricing',
+    'link in bio platform pricing',
   ],
   openGraph: {
     title: `Pricing - ${APP_NAME}`,
-    description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+    description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
     url: `${BASE_URL}/pricing`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: `Pricing - ${APP_NAME}`,
-    description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+    description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   },
   robots: {
     index: true,
@@ -78,7 +78,7 @@ const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
   name: `Pricing - ${APP_NAME}`,
-  description: `Artist profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+  description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',

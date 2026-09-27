@@ -310,7 +310,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('path-selects and runs the disabled DeepSec policy safety tests', () => {
+  it('path-selects and runs the DeepSec policy and closed-loop tests', () => {
     const initial = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
     const additions = [
       ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
@@ -322,6 +322,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/security/deepsec-policy.test.mjs',
       'scripts/security/deepsec/policy.json',
       'scripts/security/deepsec/targets.json',
+      'scripts/security/deepsec-loop.mjs',
     ]) {
       expect(
         spawnSync('grep', ['-Eq', pattern], {
@@ -332,7 +333,7 @@ describe('ci-fast bounded parallel workflow', () => {
       ).toBe(0);
     }
     expect(CI_FAST_SOURCE).toContain(
-      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs'"
+      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs'"
     );
   });
 

@@ -570,6 +570,37 @@ describe('merge_group workflow contract', () => {
     expect(Object.keys(CI_RESERVED_MS).sort()).toEqual(pinned);
   });
 
+  it('runs packages/ui in its own unit matrix entry, off the web shards', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1] ?? '';
+    const entries = [...matrix.matchAll(/'([^']+)'/g)].map(m => m[1]);
+    expect(entries.filter(entry => !/^\d+\/\d+$/.test(entry))).toEqual([
+      'packages/ui',
+    ]);
+    const stepIf = name => {
+      const start = units.indexOf(`- name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      return units.slice(start).match(/\n\s+if: (.+)\n/)?.[1];
+    };
+    // The web Vitest and its web-only setup never run on the ui entry, so
+    // `--shard=packages/ui` is never handed to Vitest.
+    for (const name of [
+      'Setup Playwright warm path',
+      'Load quarantined unit tests',
+      'Run unit tests',
+    ]) {
+      expect(stepIf(name), name).toContain("matrix.shard != 'packages/ui'");
+    }
+    expect(stepIf('Run packages/ui unit tests')).toBe(
+      "steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'"
+    );
+    // Parallel, not pinned: no web shard carries a packages/ui reservation.
+    expect(units).not.toMatch(
+      /matrix\.shard == '\d+\/\d+'\n\s+run: pnpm turbo test --filter=@jovie\/ui/
+    );
+    expect(Object.keys(CI_RESERVED_MS)).not.toContain('packages/ui');
+  });
+
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
@@ -842,7 +873,7 @@ describe('merge_group workflow contract', () => {
       expect(surfaces).toContain(`pnpm --filter ${check}`);
     }
     expect(unitTests).toContain(
-      `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}]`
+      `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}, 'packages/ui']`
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
@@ -891,7 +922,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "run_full_ci == 'true' && matrix.shard == '4/14'\n        run: pnpm turbo test --filter=@jovie/ui"
+      "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)

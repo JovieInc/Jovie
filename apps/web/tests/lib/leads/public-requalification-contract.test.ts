@@ -115,6 +115,33 @@ describe('public requalification contract', () => {
       'https://linktr.ee/publicartist',
       'https://open.spotify.com/artist/artist123',
     ]);
+    expect(run.jobQualification).toMatchObject({
+      candidateRunId: run.runId,
+      activeGoal: null,
+      supportedJob: {
+        id: 'premade-artist-profile',
+        offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+      },
+      evidenceDecision: {
+        state: 'review_needed',
+        reasons: expect.arrayContaining([
+          'identity_ambiguous',
+          'active_goal_unknown',
+        ]),
+      },
+      commercialDecision: { state: 'review_needed' },
+      contactDecisions: [
+        expect.objectContaining({
+          channel: 'public-profile',
+          decision: 'review_needed',
+        }),
+      ],
+    });
+    expect(run.jobQualification?.observations[0]?.provenance).toMatchObject({
+      sourceUrl: 'https://linktr.ee/publicartist',
+      sourceDigest: run.sourceDigest,
+      immutableRef: run.sourceRevision,
+    });
   });
 
   it('maps public DSP presence into fit inputs and preserves it in the digest', () => {

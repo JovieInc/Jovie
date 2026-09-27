@@ -31,9 +31,25 @@ function getCachedMatrixRelease(
 
 export function useReleaseEntityQuery(profileId: string, releaseId: string) {
   const queryClient = useQueryClient();
+  const matrixKey = queryKeys.releases.matrix(profileId);
   const cached = getCachedMatrixRelease(queryClient, profileId, releaseId);
 
-  return useQuery({
+  // Subscribe to the matrix cache so targeted mutations (setQueryData on the
+  // matrix key in useReleaseMutations) propagate here. The initialData snapshot
+  // alone is not reactive — without this observer the detail view keeps
+  // showing pre-mutation title/artwork while the row already shows fresh data.
+  const matrixSubscription = useQuery<ReleaseViewModel[]>({
+    queryKey: matrixKey,
+    // Observer only: `enabled: false` means the queryFn never runs, so this
+    // can never overwrite or refetch the matrix cache.
+    // eslint-disable-next-line @jovie/require-abort-signal -- observer only; never fetches
+    queryFn: () => Promise.reject(new Error('matrix observer has no fetcher')),
+    enabled: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const liveRelease = matrixSubscription.data?.find(r => r.id === releaseId);
+
+  const query = useQuery({
     queryKey: queryKeys.releases.detail(profileId, releaseId),
     // eslint-disable-next-line @jovie/require-abort-signal -- server action, signal not passable
     queryFn: () => loadReleaseEntity({ profileId, releaseId }),
@@ -45,4 +61,12 @@ export function useReleaseEntityQuery(profileId: string, releaseId: string) {
     initialDataUpdatedAt: cached?.dataUpdatedAt,
     enabled: Boolean(profileId && releaseId) && !cached,
   });
+
+  // Prefer the live matrix row when one is cached: it is the shared source
+  // that release mutations write to. Falls back to the detail query result
+  // (or its seeded initialData) for releases not present in the matrix.
+  if (liveRelease !== undefined && liveRelease !== query.data) {
+    return { ...query, data: liveRelease };
+  }
+  return query;
 }

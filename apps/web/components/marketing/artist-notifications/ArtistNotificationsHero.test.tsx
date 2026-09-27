@@ -26,6 +26,22 @@ describe('ArtistNotificationsHero', () => {
     }
   });
 
+  it('docks under the header and renders the low-opacity dark-underlay hero image', () => {
+    const { container } = render(
+      <ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />
+    );
+
+    expect(container.querySelector('section')).toHaveClass(
+      'marketing-hero-dock'
+    );
+
+    const heroImage = container.querySelector('img[alt=""]');
+    expect(heroImage?.getAttribute('src')).toContain(
+      encodeURIComponent('/images/hero/artist-notifications.webp')
+    );
+    expect(heroImage).toHaveClass('opacity-30');
+  });
+
   it('keeps the adjacent Storybook receipt bound to the production fixture', () => {
     expect(storyMeta.component).toBe(ArtistNotificationsHero);
     expect(Hero.args?.hero).toBe(ARTIST_NOTIFICATIONS_COPY.hero);

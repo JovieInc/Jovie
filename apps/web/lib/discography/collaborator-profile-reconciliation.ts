@@ -11,6 +11,7 @@ import {
   or,
 } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import { admitCreatorUsername } from '@/lib/canonical/creator-username';
 import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
 import {
@@ -197,7 +198,11 @@ async function bindOwnerRegistryArtist(
 async function markArtistProfileConflict(
   tx: DbOrTransaction,
   artist: LockedRegistryArtist,
-  reason: 'duplicate_profiles' | 'handle_collision' | 'profile_insert'
+  reason:
+    | 'duplicate_profiles'
+    | 'handle_collision'
+    | 'profile_insert'
+    | 'implausible_username'
 ): Promise<void> {
   await tx
     .update(artists)
@@ -370,6 +375,26 @@ async function reconcileCandidate(
         handle = buildUnclaimedArtistHandle(candidate.artistId);
       }
 
+      // JOV-5922: the chosen handle must satisfy the versioned semantic
+      // contract before it becomes `creator_profiles.username`. An
+      // implausible value (serialized list, URL, delimiter-joined
+      // candidates, whitespace fragment) is quarantined as a conflict —
+      // never coerced or written to canon.
+      const admission = admitCreatorUsername(handle, {
+        producer: 'collaborator-profile-reconciliation',
+        source: 'spotify_release_credit',
+        confidence: 'inferred',
+      });
+      if (admission.status !== 'accepted' || !admission.canonical) {
+        await markArtistProfileConflict(
+          tx,
+          lockedArtist,
+          'implausible_username'
+        );
+        return { status: 'conflicted' };
+      }
+      const canonicalHandle = admission.canonical;
+
       const [handleOwner] = await tx
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
@@ -395,8 +420,8 @@ async function reconcileCandidate(
         .insert(creatorProfiles)
         .values({
           creatorType: 'creator',
-          username: handle,
-          usernameNormalized: handle,
+          username: canonicalHandle,
+          usernameNormalized: canonicalHandle,
           displayName,
           avatarUrl,
           spotifyId: candidate.spotifyId,

@@ -68,7 +68,7 @@ describe('public profile missing-state source contract', () => {
       '/'
     );
     expect(
-      screen.getByRole('link', { name: 'Search artists' })
+      screen.getByRole('link', { name: 'Explore profiles' })
     ).toHaveAttribute('href', '/artist-profiles');
   });
 

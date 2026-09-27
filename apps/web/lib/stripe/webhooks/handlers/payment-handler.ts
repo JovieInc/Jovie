@@ -22,7 +22,11 @@
 
 import type Stripe from 'stripe';
 
-import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import {
+  captureCriticalError,
+  captureWarning,
+  logFallback,
+} from '@/lib/error-tracking';
 import { recordCommission } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
@@ -232,6 +236,13 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         stripeEventId,
         stripeEventTimestamp,
         eventType: 'payment_succeeded',
+        paymentFacts: {
+          logicalOrderId: invoice.id,
+          invoiceId: invoice.id,
+          grossAmountCents: invoice.amount_paid,
+          currency: invoice.currency,
+          attemptCount: invoice.attempt_count ?? 0,
+        },
       });
 
       if (!result.appUserId) {
@@ -279,8 +290,10 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     stripeEventId: string,
     stripeEventTimestamp: Date
   ): Promise<HandlerResult> {
-    // Log payment failure with safe metadata only (invoice ID is safe, no customer/subscription IDs)
-    await captureCriticalError(
+    // Log payment failure as a warning: expected dunning attempts must not
+    // page as critical. Critical is reserved for processing failures below.
+    // Safe metadata only (invoice ID is safe, no customer/subscription IDs).
+    await captureWarning(
       'Payment failed for invoice',
       new Error('Invoice payment failed'),
       {

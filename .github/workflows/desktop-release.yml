@@ -8,7 +8,9 @@ run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }
 # removal-trigger: Remove this observer hop when Production Controller can request the same signed desktop publication directly.
 
 # Triggers:
-# - Auto after Production Controller verifies exact current main. A checked-in
+# - Auto after Production Controller verifies a generation that is current
+#   main or a trusted ancestor of it (forward-only; exact-SHA supersession
+#   starved desktop while the merge queue outran the controller). A checked-in
 #   VERSION change publishes immediately; production-impacting desktop source
 #   opens one deterministic post-land stamp PR before publication.
 # - Manual dispatch publishes a signed staging prerelease from exact green
@@ -228,7 +230,11 @@ jobs:
           if [ "$EVENT_NAME" = "schedule" ] && [ "$current_main_sha" != "$release_sha" ]; then
             echo "::notice::Scheduled staging generation $release_sha was superseded by $current_main_sha."
             exit 0
-          elif [ "$environment" = "staging" ] && [ "$current_main_sha" != "$release_sha" ]; then
+          elif [ "$current_main_sha" != "$release_sha" ]; then
+            # Forward-only lineage: a verified generation that main has since
+            # advanced past still publishes. Exact-SHA supersession starved
+            # production desktop from 26.9.14 onward (2026-09-21..26) because
+            # the merge queue lands faster than the controller verifies.
             mainline_compare="$(gh api \
               "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
             jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
@@ -243,9 +249,7 @@ jobs:
               echo "::error::Desktop generation $release_sha is not a trusted ancestor of current main $current_main_sha."
               exit 1
             }
-          elif [ "$current_main_sha" != "$release_sha" ]; then
-            echo "::notice::Desktop generation $release_sha was superseded by $current_main_sha."
-            exit 0
+            echo "::notice::Desktop generation $release_sha is a trusted ancestor of current main $current_main_sha; continuing forward-only."
           fi
 
           # Staging publishes an immutable mainline generation whose exact push
@@ -983,6 +987,13 @@ jobs:
             exit 1
           }
           git cat-file -e "${BASELINE_SHA}^{commit}"
+          # Forward-only authorization lets a verified generation arrive after
+          # a newer one already published; it is covered, never re-published.
+          if [ "$BASELINE_SHA" != "$RELEASE_SHA" ] &&
+            git merge-base --is-ancestor "$RELEASE_SHA" "$BASELINE_SHA"; then
+            echo "Verified generation $RELEASE_SHA is already covered by the newer desktop publish $BASELINE_SHA."
+            exit 0
+          fi
           git merge-base --is-ancestor "$BASELINE_SHA" "$RELEASE_SHA" || {
             echo "::error::The last successful desktop release is not an ancestor of current main."
             exit 1
@@ -1058,11 +1069,39 @@ jobs:
             echo "::error::Desktop release stamp SHA is malformed."
             exit 1
           }
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            echo "::notice::Desktop release stamp generation $RELEASE_SHA was superseded by $current_main_sha."
-            exit 0
-          fi
+          # Forward-only: stamp from a verified generation that main has moved
+          # past, unless main already carries newer release state, in which
+          # case the next verified generation publishes it.
+          stamp_lineage_is_current() {
+            local current_main_sha mainline_compare main_version
+            current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Could not resolve exact current main for the desktop release stamp."
+              exit 1
+            }
+            [ "$current_main_sha" = "$RELEASE_SHA" ] && return 0
+            mainline_compare="$(gh api \
+              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::notice::Desktop release stamp generation $RELEASE_SHA left main's lineage (main is $current_main_sha)."
+              return 1
+            }
+            main_version="$(gh api -H 'Accept: application/vnd.github.raw' \
+              "repos/$REPOSITORY/contents/VERSION?ref=$current_main_sha" | tr -d '[:space:]')"
+            if [ "$main_version" != "$(git show "$RELEASE_SHA:VERSION" | tr -d '[:space:]')" ]; then
+              echo "::notice::Main $current_main_sha already carries desktop release state $main_version; the next verified generation publishes it."
+              return 1
+            fi
+          }
+          stamp_lineage_is_current || exit 0
 
           short_sha="${RELEASE_SHA:0:12}"
           branch="cursor/stable-desktop-publish-$short_sha"
@@ -1102,11 +1141,7 @@ jobs:
             --base "$RELEASE_SHA" \
             --branch "$branch"
 
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            echo "::notice::Main advanced to $current_main_sha while stamping; a newer controller generation will own the release."
-            exit 0
-          fi
+          stamp_lineage_is_current || exit 0
 
           release_version="$(tr -d '[:space:]' < VERSION)"
           git config user.name "jovie-bot[bot]"
@@ -1169,7 +1204,7 @@ jobs:
         run: |
           set -euo pipefail
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          if [ "$ENVIRONMENT" = "staging" ] && [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
             mainline_compare="$(gh api \
               "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
             jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
@@ -1184,9 +1219,6 @@ jobs:
               echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main $current_main_sha before packaging."
               exit 1
             }
-          elif [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before packaging."
-            exit 1
           fi
 
       # pnpm must exist before setup-node so `cache: pnpm` can resolve the
@@ -1430,6 +1462,7 @@ jobs:
           grep -Eq '^provider:[[:space:]]*generic[[:space:]]*$' "$update_config"
           grep -Eq '^url:[[:space:]]*https://github.com/JovieInc/Jovie/releases/download/desktop-staging[[:space:]]*$' "$update_config"
           grep -Eq '^channel:[[:space:]]*staging[[:space:]]*$' "$update_config"
+          grep -Eq "^updaterCacheDirName:[[:space:]]*'?jovie-desktop-staging-updater'?[[:space:]]*$" "$update_config"
 
           staging_dmg="apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
           xcrun stapler validate "$staging_dmg"
@@ -1552,10 +1585,22 @@ jobs:
             }
           done
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
-            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before publication."
-            exit 1
-          }
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(gh api \
+              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main $current_main_sha before publication."
+              exit 1
+            }
+          fi
           node scripts/desktop-release-assets.mjs upload-and-publish \
             --sha "$RELEASE_SHA" \
             --dist "apps/desktop/dist"

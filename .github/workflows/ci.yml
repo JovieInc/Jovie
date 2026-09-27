@@ -1696,7 +1696,7 @@ jobs:
           STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/brand-scrub\.py|scripts/lanes/|scripts/fleet-gate/|scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy)\.py)'
 
           # Typed company composition must run its real coverage gate on future edits too.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/security/deepsec-policy(\.test)?\.mjs$|^scripts/security/deepsec/|^scripts/summer-commissioning/'
+          STRUCTURAL_CONTROL_PATTERN+='|^scripts/security/deepsec-(policy|loop)(\.test)?\.mjs$|^scripts/security/deepsec/|^scripts/summer-commissioning/'
 
           # Evidence collection changes must execute the existing native-queue
           # behavioral tests and per-file coverage, including test-only edits.
@@ -2948,6 +2948,9 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          # Name the blocked file when the artifact guard stops the step;
+          # "exit 1" alone left the JOV-6541 failures undiagnosable.
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'
       - name: Upload combined Storybook failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -4591,9 +4594,12 @@ jobs:
       # 14 shards: at 10, balanced ~325-file shards took 155-176s of Vitest on
       # the slower hosted runners (max job ~250s); 14 cuts that to ~125s for
       # ~4 extra runner-minutes of fixed setup per run.
+      # 'packages/ui' is its own entry (same setup, same gate result) that runs
+      # only the @jovie/ui suite: chained after 4/14's Vitest it made that shard
+      # the critical path (192s vs <=180s elsewhere); alone it ends in ~80s.
       max-parallel: 120
       matrix:
-        shard: ['1/14', '2/14', '3/14', '4/14', '5/14', '6/14', '7/14', '8/14', '9/14', '10/14', '11/14', '12/14', '13/14', '14/14']
+        shard: ['1/14', '2/14', '3/14', '4/14', '5/14', '6/14', '7/14', '8/14', '9/14', '10/14', '11/14', '12/14', '13/14', '14/14', 'packages/ui']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -4619,7 +4625,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # Full history for vitest --changed (names via commit graph)
+          # Full history for vitest --changed (names via commit graph); the
+          # packages/ui entry runs no --changed/--affected selection.
+          fetch-depth: ${{ matrix.shard == 'packages/ui' && 1 || 0 }}
           filter: blob:none # historical blobs lazy-fetch; saves ~30s × 5 shards/run
           clean: true
 
@@ -4660,24 +4668,24 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Setup Playwright warm path
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         uses: ./.github/actions/setup-playwright
 
       - name: Load quarantined unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         id: quarantine
         run: node .github/scripts/quarantine-ledger.mjs emit-github-output
 
       - name: Run unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         env:
           # Isolated forks start a fresh process per test file, so each jsdom
           # file re-parses jsdom's ~1,000 modules (the jsdom environment is
           # ~35% of shard worker time). Vitest flushes each fork's V8 compile
           # cache on stop, so later forks load bytecode instead of re-parsing.
           # Entries failing Node's source-hash check recompile, and Vitest
-          # drops the cache itself under v8 coverage. The quarantine and
-          # packages/ui steps below reuse this per-job directory.
+          # drops the cache itself under v8 coverage. The quarantine step
+          # below reuses this per-job directory.
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -4748,11 +4756,11 @@ jobs:
           retention-days: 7
 
       - name: Run packages/ui unit tests
-        # Not sharded: one shard runs it, not every shard. Its cost is preloaded
-        # on 4/14 by CI_RESERVED_MS in apps/web/scripts/vitest-duration-sequencer.mjs.
+        # Not sharded: only the dedicated 'packages/ui' matrix entry runs it, in
+        # parallel with the web shards (so no CI_RESERVED_MS entry is needed).
         env:
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
-        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '4/14'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Preserve failed unit-shard diagnosis
@@ -4778,7 +4786,7 @@ jobs:
 
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
-        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' }}
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
