@@ -4,7 +4,6 @@ updates:
   - package-ecosystem: 'npm'
     directories:
       - '/'
-      - '/scripts/symphony/codex-cli'
     schedule:
       interval: 'daily'
       time: '09:00'

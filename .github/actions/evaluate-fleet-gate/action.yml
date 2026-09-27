@@ -84,4 +84,4 @@ runs:
         FLEET_GATE_CONSUMER: ${{ inputs.consumer }}
         EXPECTED_SHA: ${{ inputs.expected-sha }}
       shell: bash
-      run: bash scripts/symphony/evaluate-fleet-gate.sh
+      run: bash scripts/fleet-gate/evaluate-fleet-gate.sh
