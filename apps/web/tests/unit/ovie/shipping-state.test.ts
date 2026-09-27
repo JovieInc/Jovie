@@ -45,7 +45,7 @@ function projection(overrides: Record<string, unknown> = {}) {
     sequence: 4,
     producerId: 'ubuntu-operational-truth',
     producerVersion: '1',
-    sourceId: 'fleet-receipt',
+    sourceId: 'lanes-status',
     entityId: 'ovie.shipping-state',
     cursor: '4',
     sourceRevision: 'rev-4',
@@ -73,7 +73,7 @@ function projection(overrides: Record<string, unknown> = {}) {
     latencyMs: 12,
     withinM1Budget: true,
     sources: {
-      'symphony-runtime': {
+      'lane-pull-requests': {
         counts: { running: measured(1) },
       },
       'github-native-merge-queue': {
@@ -282,10 +282,10 @@ describe('ovie.shipping-state.v1 client', () => {
   it('parses a publisher projection without turning missing sources into zero', async () => {
     const published = await publishShippingState({
       readers: snapshotReaders({
-        'symphony-runtime': ok('symphony-runtime', {
-          running: [],
-          retrying: [],
-          blocked: [],
+        'lanes-status': ok('lanes-status', {
+          schema: 'symphony-lanes-status/v1',
+          running: 0,
+          idle: 0,
         }),
         'exact-sha-ci': ok(
           'exact-sha-ci',

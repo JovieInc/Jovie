@@ -38,6 +38,11 @@ export function publishConfiguredShippingState(
   });
 }
 
+/** A warm instance has a projection to serve before reconciling. */
+export function hasCachedConfiguredShippingState(): boolean {
+  return getLastKnownShippingState() != null;
+}
+
 /**
  * Synchronous local-cache read for Ovie. The caller can start reconciliation
  * after taking this snapshot; UI latency never depends on Linear or another

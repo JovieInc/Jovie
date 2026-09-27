@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { existsSync, readFileSync } from 'node:fs';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { env } from '@/lib/env-server';
@@ -12,19 +11,21 @@ import {
   emptyOvieMacHudInFlightPullRequests,
   monthlyToWeeklyUsd,
   type OvieMacHudInFlightPullRequests,
+  type OvieMacHudShippingMetric,
   type OvieMacHudSnapshot,
+  shippingFromMerges,
   weeklyGrowthFromPeriodRate,
   windowToWeeklyUsd,
 } from '@/lib/hud/ovie-mac-hud';
-import { WHAT_SHIPPED_STATE_PATH } from '@/lib/hud/what-shipped';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
+import { defaultLiveIo, readMerges } from '@/lib/ovie/shipping-state/live';
 
 const OVIE_MAC_HUD_IN_FLIGHT_PRS_QUERY = `
 query OvieMacHudInFlightPullRequests($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(
       states: OPEN
-      first: 40
+      first: 100
       orderBy: { field: UPDATED_AT, direction: DESC }
     ) {
       totalCount
@@ -75,28 +76,21 @@ fragment OvieMacHudPrFields on PullRequest {
 }
 `;
 
-function readShippingEntries(): {
-  readonly entries: readonly unknown[];
-  readonly available: boolean;
-} {
-  if (!existsSync(WHAT_SHIPPED_STATE_PATH)) {
-    return { entries: [], available: false };
-  }
-  try {
-    const parsed = JSON.parse(readFileSync(WHAT_SHIPPED_STATE_PATH, 'utf8'));
-    const record = parsed as { entries?: unknown; items?: unknown };
-    const rawEntries = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray(record.entries)
-        ? record.entries
-        : Array.isArray(record.items)
-          ? record.items
-          : [];
-    return { entries: rawEntries, available: true };
-  } catch (error) {
-    captureError('Ovie Mac HUD shipping receipts unreadable', error);
-    return { entries: [], available: false };
-  }
+/** Org-wide merged PRs, read with the same HUD token as the in-flight list. */
+async function getOvieMacHudShipping(): Promise<OvieMacHudShippingMetric> {
+  const read = await readMerges(
+    defaultLiveIo({
+      githubToken: env.HUD_GITHUB_TOKEN,
+      githubOwner: env.HUD_GITHUB_OWNER,
+      githubRepo: env.HUD_GITHUB_REPO,
+    })
+  );
+  const merges = read.status === 'ok' ? read.delivery?.merges : null;
+  return shippingFromMerges(
+    merges
+      ? { last7Days: merges.last7Days.value, today: merges.today.value }
+      : null
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -211,14 +205,19 @@ export async function getOvieMacHudSnapshot(
   nowMs: number = Date.now()
 ): Promise<OvieMacHudSnapshot> {
   const generatedAtIso = new Date(nowMs).toISOString();
-  const [stripeMetrics, mercuryMetrics, inFlightPullRequests, lybMrr] =
-    await Promise.all([
-      getAdminStripeOverviewMetrics(),
-      getAdminMercuryMetrics(),
-      getOvieMacHudInFlightPullRequests(),
-      getLybDailyMrr(new Date(nowMs)),
-    ]);
-  const shipping = readShippingEntries();
+  const [
+    stripeMetrics,
+    mercuryMetrics,
+    inFlightPullRequests,
+    lybMrr,
+    shipping,
+  ] = await Promise.all([
+    getAdminStripeOverviewMetrics(),
+    getAdminMercuryMetrics(),
+    getOvieMacHudInFlightPullRequests(),
+    getLybDailyMrr(new Date(nowMs)),
+    getOvieMacHudShipping(),
+  ]);
   const financialAvailable =
     stripeMetrics.isAvailable &&
     mercuryMetrics.isAvailable &&
@@ -254,11 +253,9 @@ export async function getOvieMacHudSnapshot(
       thisWeekActiveUsers: null,
       lastWeekActiveUsers: null,
     },
-    shippingEntries: shipping.entries,
-    shippingAvailable: shipping.available,
+    shipping,
     inFlightPullRequests,
     lybMrr,
     generatedAtIso,
-    nowMs,
   });
 }

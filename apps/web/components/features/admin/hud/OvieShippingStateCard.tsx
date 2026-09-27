@@ -5,6 +5,7 @@ import { Ship } from 'lucide-react';
 import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import type { CountMeasurement } from '@/lib/ovie/shipping-state';
 import type {
   ShippingMeaningView,
   ShippingStateView,
@@ -23,13 +24,63 @@ const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
   recovery: 'Recovery',
 };
 
-function formatCount(count: ShippingStateView['queued']): string {
-  return count.value === null ? '\u2014' : count.value.toLocaleString('en-US');
+const NOT_MEASURED = 'n/a';
+
+type Delivery = ShippingStateView['delivery'];
+
+function formatCount(count: CountMeasurement): string {
+  return count.value === null
+    ? NOT_MEASURED
+    : count.value.toLocaleString('en-US');
 }
 
 function formatMeaning(meaning: ShippingMeaningView): string {
-  if (meaning.value === null) return '\u2014';
+  if (meaning.value === null) return NOT_MEASURED;
   return meaning.value ? 'Yes' : 'No';
+}
+
+function formatLanes(lanes: Delivery['lanes']): string {
+  if (lanes.running.value === null || lanes.slots.value === null) {
+    return NOT_MEASURED;
+  }
+  const value = `${lanes.running.value}/${lanes.slots.value}`;
+  return lanes.stale ? `${value} stale` : value;
+}
+
+function formatWeek(merges: Delivery['merges']): string {
+  const last = merges.last7Days.value;
+  const prior = merges.prior7Days.value;
+  if (last === null) return NOT_MEASURED;
+  const total = last.toLocaleString('en-US');
+  if (prior === null || prior === 0) return total;
+  const change = Math.round(((last - prior) / prior) * 100);
+  return `${total} (${change >= 0 ? '+' : ''}${change}% WoW)`;
+}
+
+function formatProduction(production: Delivery['production']): string {
+  if (!production.sha) return NOT_MEASURED;
+  const sha = production.sha.slice(0, 7);
+  return production.version ? `${production.version} ${sha}` : sha;
+}
+
+const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
+
+function formatAge(seconds: number | null): string | null {
+  if (seconds === null) return null;
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+
+function lanesLine(lanes: Delivery['lanes']): string {
+  const landing = formatAge(lanes.lastLandingAgeSeconds.value);
+  return [
+    ...lanes.lanes.map(lane => `${lane.name} ${lane.running}/${lane.slots}`),
+    lanes.pool.value === null ? null : `pool ${lanes.pool.value}`,
+    landing ? `last landing ${landing}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function truthLabel(view: ShippingStateView): string {
@@ -91,22 +142,51 @@ function ShippingStateBody({
   ]
     .filter(Boolean)
     .join(' / ');
+  const { delivery } = view;
+  const byRepo = delivery.merges.byRepo;
   const rows = [
-    ['Queued', formatCount(view.queued)],
-    ['In Flight', formatCount(view.inFlight)],
-    ['Merged', formatMeaning(view.merged)],
+    ['Lanes Running', formatLanes(delivery.lanes)],
+    ['Merge Queue', formatCount(delivery.mergeQueueDepth)],
+    ['Merged Today', formatCount(delivery.merges.today)],
+    ['In Flight', formatCount(delivery.inFlight)],
+    [
+      'Jovie / LYB / Summer',
+      [byRepo.Jovie, byRepo.LogYourBody, byRepo['summer-config']]
+        .map(formatCount)
+        .join(' / '),
+    ],
+    ['Merged 7d', formatWeek(delivery.merges)],
+    ['Production', formatProduction(delivery.production)],
+    ['Behind Main', formatCount(delivery.production.behindMain)],
     ['CI Green', formatMeaning(view.ciGreen)],
-    ['Production Verified', formatMeaning(view.productionVerified)],
-    ['Exact Live Build', formatMeaning(view.exactLiveBuild)],
+    [
+      'Summer',
+      delivery.summer.availability
+        ? SUMMER_LABEL[delivery.summer.availability]
+        : NOT_MEASURED,
+    ],
   ] as const;
+  const lanesDetail = lanesLine(delivery.lanes);
 
   return (
     <>
-      <div className='grid min-h-28 gap-2 sm:grid-cols-2'>
+      <div
+        className='grid gap-2 sm:grid-cols-2'
+        data-testid='hud-delivery-metrics'
+      >
         {rows.map(([label, value]) => (
           <ContentMetricRow key={label} label={label} value={value} />
         ))}
       </div>
+      <p
+        className='min-h-4 truncate text-2xs leading-4 text-secondary-token'
+        title={lanesDetail || undefined}
+      >
+        {lanesDetail || 'Lanes feed not measured'}
+      </p>
+      <p className='min-h-4 truncate text-2xs leading-4 text-secondary-token'>
+        {delivery.lanes.alerts.join(' · ')}
+      </p>
       <p
         className='min-h-4 break-words text-2xs leading-4 text-tertiary-token'
         title={fullSourceLine || undefined}
