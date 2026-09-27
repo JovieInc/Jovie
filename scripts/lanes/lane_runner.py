@@ -66,9 +66,16 @@ HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
+# Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
+RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
+# JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
+# new issues and only fixes/adopts what it already opened.
+OPEN_PRS_PER_SLOT = 2
+STALE_DRAFT_S = 24 * 3600
+SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
 # Waiting work gains one priority level per day, capped at urgent. This preserves
 # urgent-first admission while guaranteeing that a sustained P1 stream cannot
@@ -453,6 +460,29 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int) -> subprocess.Comple
     return subprocess.CompletedProcess(cmd, code)
 
 
+PROVIDER_HANDOFFS = 2
+HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit {code}), most likely an "
+                "exhausted account or provider failure. Its partial work is in this worktree: check "
+                "`git status`, `git diff` and `git log origin/main..HEAD`, then finish the task. Do not "
+                "start over.\n\n")
+
+
+def cool_down(host: Host, name: str) -> None:
+    path = host.state / "cooldown" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+
+
+def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
+    """The cheapest enabled, healthy, non-cooling lane not yet tried on this run."""
+    for name, spec in (providers or load_providers()).items():
+        if name in exclude or not spec.get("enabled", True) or cooling(host, name):
+            continue
+        if provider_healthy(spec):
+            return name, spec
+    return None
+
+
 # ---------------------------------------------------------------- one run
 
 def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
@@ -475,6 +505,26 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             started = time.time()
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
                               worktree, log, host.agent_timeout)
+            # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
+            # lane finishes it on the same worktree.
+            handoffs, current = [], name
+            while agent.returncode != 0 and len(handoffs) < PROVIDER_HANDOFFS:
+                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
+                if nxt is None:
+                    break
+                cool_down(host, current)
+                nxt_name, nxt_spec = nxt
+                handoff_prompt = HANDOFF_NOTE.format(prev=current, code=agent.returncode) + prompt
+                handoff_file = runs / f"{run_id}.handoff{len(handoffs) + 1}.prompt.md"
+                handoff_file.write_text(handoff_prompt)
+                log.write(f"\n== lane {current} exited {agent.returncode}; handing off to {nxt_name}\n")
+                log.flush()
+                handoffs.append({"from": current, "to": nxt_name, "exit": agent.returncode})
+                agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
+                                                             "cwd": str(worktree)}), worktree, log, host.agent_timeout)
+                current = nxt_name
+            if handoffs:
+                receipt.update(handoffs=handoffs, finishedBy=current)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
                                            sensitive=issue_is_sensitive(issue)))
@@ -490,7 +540,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         except Exception as error:  # a broken run must still leave a receipt and free its issue
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
             sh(["git", "branch", "-D", branch], cwd=host.repo)
     receipt["endedAt"] = now_iso()
     with open(runs / "ledger.jsonl", "a") as ledger:
@@ -796,6 +846,31 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
+LOCKFILES = frozenset({"pnpm-lock.yaml"})
+
+
+def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
+    """JOV-6837: a PR that conflicts with main only in pnpm-lock.yaml needs no model. Merge
+    main, take its lockfile, regenerate it from the merged manifests, push (no force). Any
+    other conflict, or a failed regeneration, aborts and leaves the PR to the agent."""
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
+        if not conflicted or not conflicted <= LOCKFILES:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
+        regenerated = sh(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], cwd=worktree, timeout=900, log=log)
+        if regenerated.returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
@@ -808,16 +883,22 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, log=log)
             sh(["git", "worktree", "add", "-q", "-B", pr["headRefName"], str(worktree),
                 f"origin/{pr['headRefName']}"], cwd=host.repo, log=log)
-            sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            prompt = render_fix_prompt(pr, failure_excerpt(pr))
-            prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
-            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
-                              worktree, log, host.agent_timeout)
+            lockfile_only = pr.get("mergeStateStatus") == "DIRTY" \
+                and resolve_lockfile_conflict(worktree, pr["headRefName"], log)
+            agent = None
+            if lockfile_only:
+                receipt.update(resolution="lockfile-regenerated")
+            else:
+                sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
+                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                prompt_file = runs / f"{run_id}.prompt.md"
+                prompt_file.write_text(prompt)
+                agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                                                         "cwd": str(worktree)}), worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
-            receipt.update(agentExit=agent.returncode, headAfter=after,
+            receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
@@ -827,7 +908,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
             # The attempt is over: a head it did not move may be tried again by the next lane.
             update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
                 endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
@@ -840,7 +921,7 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
 def best_per_issue(prs: list[dict]) -> list[dict]:
     """One PR per issue, retroactively: when the old runner left several open PRs for one
     issue, the lanes spend effort only on the one furthest along (ready over draft, clean over
-    conflicted, then newest). The others stay open for a human to close; nothing is deleted."""
+    conflicted, then newest). sweep_lane_prs closes the others as superseded."""
     by_issue: dict[str, list[dict]] = {}
     rest = []
     for pr in prs:
@@ -848,7 +929,8 @@ def best_per_issue(prs: list[dict]) -> list[dict]:
         (by_issue.setdefault(found.group("issue"), []) if found else rest).append(pr)
     keep = list(rest)
     for group in by_issue.values():
-        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
+        keep.append(max(group, key=lambda pr: (not pr.get("isDraft"), is_green(pr),
+                                               pr.get("mergeStateStatus") != "DIRTY", pr["number"])))
     return sorted(keep, key=lambda pr: pr["number"])
 
 
@@ -877,7 +959,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            remove_worktree(host, worktree)
     if receipt.get("verdict") in ("gate-timeout", "failed"):
         # Not verified: forget the claim so the next adopt pass retries this head.
         update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
@@ -887,7 +969,7 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     return receipt
 
 
-def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
+def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list[dict]:
     """This lane's open PRs (its dated run branches), plus the orphaned PRs of disabled lanes:
     nobody else will fix or gate those, and any enabled lane can."""
     providers = load_providers() if providers is None else providers
@@ -895,13 +977,16 @@ def lane_prs(name: str, providers: dict | None = None) -> list[dict]:
     prs = []
     for owner in names:
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
-                     "--json", PR_FIELDS])
+                     *(["--limit", "200", "--json", fields] if fields else ["--json", PR_FIELDS])])
         own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
         prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
     return prs
 
 
 PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,isCrossRepository,labels"
+# Every lane PR without check rollups: rollups over ~90 PRs time out (HTTP 504), so the full
+# field set stays at gh's default page of 30 and the budget/sweep read this light set.
+LIGHT_PR_FIELDS = "number,url,isDraft,headRefName,mergeStateStatus"
 
 
 def repo_prs() -> list[dict]:
@@ -922,13 +1007,96 @@ def fix_candidates(name: str) -> list[dict]:
     return merged
 
 
-def in_flight_issues() -> frozenset[str]:
-    """Issues that already have an open lane PR from any lane on any host (GitHub is the
-    shared truth, so two hosts cannot both open a PR for one issue)."""
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "300",
-                 "--json", "headRefName"])
-    found = (LANE_BRANCH.match(pr["headRefName"]) for pr in json.loads(listed.stdout or "[]"))
-    return frozenset(match.group("issue").upper() for match in found if match)
+ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
+
+
+def in_flight_issues() -> frozenset[str] | None:
+    """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
+    lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
+    unknown in-flight set is not permission to open a duplicate PR (JOV-6833)."""
+    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "500",
+                 "--json", "headRefName,body"])
+    if listed.returncode != 0:
+        return None
+    keys = set()
+    for pr in json.loads(listed.stdout or "[]"):
+        branch = LANE_BRANCH.match(pr.get("headRefName") or "")
+        marker = ISSUE_MARKER.search(pr.get("body") or "")
+        keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
+    return frozenset(keys)
+
+
+def is_green(pr: dict) -> bool:
+    return not pr.get("isDraft") and pr.get("mergeStateStatus") in ("CLEAN", "HAS_HOOKS")
+
+
+def over_budget(name: str, prs: list[dict], slots: int) -> bool:
+    """Slots bound worktrees, not open PRs; without this a lane keeps opening while its earlier
+    PRs rot (84 devin PRs, 0 green drafts on 2026-09-27). Over budget = fix/adopt only."""
+    own = [pr for pr in prs if (pr.get("headRefName") or "").startswith(f"{name}/")]
+    return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
+
+
+def last_pushes() -> dict[int, float]:
+    """Open PR number -> head commit time, in one paginated query (`gh pr list --json commits`
+    over 200 PRs exceeds GitHub's GraphQL node limit). Empty when GitHub cannot be read."""
+    owner, name = REPO_SLUG.split("/")
+    listed = sh(["gh", "api", "graphql", "--paginate", "-f", f"owner={owner}", "-f", f"name={name}", "-f",
+                 "query=query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){"
+                 "pullRequests(states:OPEN,first:100,after:$endCursor){pageInfo{hasNextPage endCursor}"
+                 "nodes{number commits(last:1){nodes{commit{committedDate}}}}}}}",
+                 "--jq", ".data.repository.pullRequests.nodes[] | "
+                         "\"\\(.number) \\(.commits.nodes[0].commit.committedDate)\""])
+    pushes = {}
+    for line in (listed.stdout or "").splitlines() if listed.returncode == 0 else []:
+        number, _, date = line.partition(" ")
+        if number.isdigit() and created_at_epoch(date) is not None:
+            pushes[int(number)] = created_at_epoch(date)
+    return pushes
+
+
+def sweep_plan(prs: list[dict], now: float, pushes: dict[int, float]) -> tuple[list[tuple[dict, int]], list[dict]]:
+    """(duplicates to close as superseded by the kept PR, stale drafts to close).
+    Only lane-branch PRs; the kept PR per issue is best_per_issue's pick."""
+    kept = {LANE_BRANCH.match(pr["headRefName"]).group("issue"): pr
+            for pr in best_per_issue(prs) if LANE_BRANCH.match(pr.get("headRefName") or "")}
+    superseded, stale = [], []
+    for pr in prs:
+        found = LANE_BRANCH.match(pr.get("headRefName") or "")
+        if not found:
+            continue
+        keep = kept[found.group("issue")]
+        if keep["number"] != pr["number"]:
+            superseded.append((pr, keep["number"]))
+            continue
+        pushed = pushes.get(pr["number"])
+        if pr.get("isDraft") and not is_green(pr) and pushed is not None and now - pushed >= STALE_DRAFT_S:
+            stale.append(pr)
+    return superseded, stale
+
+
+def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> None:
+    """On the existing lane tick (at most every SWEEP_EVERY_S per host): leave one open PR per
+    issue and close drafts with no green run and no push for a day, returning their issue to Todo."""
+    now = time.time() if now is None else now
+    marker = host.state / f"sweep-{name}.json"
+    if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
+        return
+    marker.write_text(json.dumps({"at": now}))
+    superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
+    for pr, keep in superseded:
+        sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
+            f"🤖 lane sweep: superseded by #{keep} (one open PR per Linear issue, JOV-6833)."])
+    for pr in stale:
+        issue = LANE_BRANCH.match(pr["headRefName"]).group("issue").upper()
+        closed = sh(["gh", "pr", "close", str(pr["number"]), "--repo", REPO_SLUG, "--comment",
+                     "🤖 lane sweep: closing this draft; no green run and no push for 24 h (JOV-6833). "
+                     f"{issue} goes back to Todo for a fresh attempt."])
+        # Only reopen work the lane still owns; a Done or Canceled issue stays closed.
+        if closed.returncode == 0 and linear.state_of(issue) == "In Progress":
+            linear.move(issue, "Todo")
+            linear.comment(issue, f"🤖 lane sweep closed stale draft {pr.get('url')} (no green run, "
+                                  "no push for 24 h); back to Todo.")
 
 
 def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
@@ -998,9 +1166,13 @@ def worker(host: Host, name: str) -> int:
         red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None
-        if red is None and adopt is None:
+        sweep_lane_prs(host, name, linear)
+        in_flight = None if red or adopt or over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
+                                                        host.slots(name, spec.get("slots", 1))) \
+            else in_flight_issues()
+        if in_flight is not None:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
-            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight_issues(),
+            issue = pick_issue(linear.lane_issues(spec["label"]), failures, in_flight=in_flight,
                                provider=name)
             if issue and linear.state_of(issue.id) != "Todo":
                 issue = None  # another host claimed it between our read and now
@@ -1083,12 +1255,14 @@ def dispatch(host: Host) -> int:
         ensure_full_history(host)
         prune_worktrees(host)
         for name, spec in load_providers().items():
-            if not spec.get("enabled", True) or cooling(host, name):
+            slots = host.slots(name, spec.get("slots", 1))
+            # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
+            if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
                 continue
             if not provider_healthy(spec):
                 tick["unhealthy"].append(name)
                 continue
-            for _ in range(host.slots(name, spec.get("slots", 1))):
+            for _ in range(slots):
                 subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  start_new_session=True)
@@ -1130,6 +1304,13 @@ def cooling(host: Host, name: str) -> bool:
         return False
 
 
+def remove_worktree(host: Host, worktree: Path) -> None:
+    """Kill whatever still runs from the worktree first: a normal agent exit leaves its
+    backgrounded children (storybook on :6006, esbuild) holding ports for later gates."""
+    sh(["pkill", "-f", str(worktree)])
+    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+
+
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
     """Garbage-collect worktrees a crashed worker left behind; never touch young ones."""
     root = host.state / "worktrees"
@@ -1141,7 +1322,7 @@ def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
         except FileNotFoundError:
             continue  # a worker removed it between listing and stat
         if stale:
-            sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo)
+            remove_worktree(host, path)
             shutil.rmtree(path, ignore_errors=True)
     sh(["git", "worktree", "prune"], cwd=host.repo)
 
@@ -1183,7 +1364,7 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *LANE_TESTS],
+        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.

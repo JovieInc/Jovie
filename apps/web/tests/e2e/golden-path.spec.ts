@@ -441,11 +441,11 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       timeout: 30_000,
     });
 
-    // The certified homepage (JOV-5864) routes onboarding through /start chat;
-    // the hero's conversion control is the name search, not a command center.
-    await expect(
-      page.getByTestId('homepage-editorial-hero-search')
-    ).toBeVisible({
+    // The certified homepage (JOV-5864) routes onboarding through /start chat.
+    // The hero's conversion control carries the homepage-primary-cta testid in
+    // both certified states: the name search when open, or the waitlist-gated
+    // Request access link while prelaunch (JOV-6794) — never a command center.
+    await expect(page.getByTestId('homepage-primary-cta')).toBeVisible({
       timeout: 20_000,
     });
 
