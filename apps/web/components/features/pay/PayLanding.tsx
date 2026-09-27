@@ -100,7 +100,7 @@ function HowItWorksSection() {
             <div>
               <p className='marketing-kicker'>How it works</p>
               {/* ui-casing-allow: marketing display headline */}
-              <h2 className='marketing-h2-linear mt-6 max-w-[14ch] text-primary-token'>
+              <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
                 Three steps to your first follower.
               </h2>
             </div>

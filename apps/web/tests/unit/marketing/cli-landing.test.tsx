@@ -75,6 +75,13 @@ describe('CLI landing page', () => {
     }
   });
 
+  it('docks the hero over its own abstract photo', () => {
+    const { container } = render(<CliLandingPage />);
+    const photo = container.querySelector('.marketing-hero-photo img');
+    expect(photo?.getAttribute('src')).toContain('marketing-hero%2Fcli.webp');
+    expect(photo).toHaveAttribute('alt', '');
+  });
+
   it('composes shared hero, prose, FAQ, and footer CTA primitives', () => {
     const source = readWebSource('components/marketing/CliLandingPage.tsx');
     const route = readWebSource('app/(marketing)/cli/page.tsx');
