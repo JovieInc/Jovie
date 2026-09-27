@@ -10,6 +10,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import { admitCreatorUsername } from '@/lib/canonical/creator-username';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -130,6 +131,32 @@ export async function handleNewProfileIngest({
   hostedAvatarUrl: string | null;
   extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
 }): Promise<NextResponse> {
+  // JOV-5922: enforce the versioned semantic contract on the canonical
+  // username before it can be written — implausible values are quarantined
+  // with provenance, never coerced into canon.
+  const admission = admitCreatorUsername(finalHandle, {
+    producer: 'ingestion.full-extraction',
+    confidence: 'imported',
+  });
+  if (admission.status !== 'accepted' || !admission.canonical) {
+    logger.warn(
+      'Quarantined implausible username at canonical write boundary',
+      {
+        rejections: admission.rejections.map(r => r.code),
+        contractVersion: admission.contractVersion,
+      }
+    );
+    return NextResponse.json(
+      {
+        error: 'Invalid username',
+        details:
+          'The resolved username failed the canonical username contract and was quarantined.',
+      },
+      { status: 422, headers: NO_STORE_HEADERS }
+    );
+  }
+  const canonicalHandle = admission.canonical;
+
   return withSystemIngestionSession(async tx => {
     const {
       token: claimToken,
@@ -151,8 +178,8 @@ export async function handleNewProfileIngest({
       .insert(creatorProfiles)
       .values({
         creatorType: 'creator',
-        username: finalHandle,
-        usernameNormalized: finalHandle,
+        username: canonicalHandle,
+        usernameNormalized: canonicalHandle,
         displayName,
         avatarUrl: hostedAvatarUrl,
         isPublic: qualityResult.isPublic,

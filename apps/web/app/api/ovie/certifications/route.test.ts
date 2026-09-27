@@ -72,6 +72,11 @@ describe('Ovie marketing certification inventory', () => {
       MARKETING_COMPONENT_REGISTRY.map(entry => entry.id)
     );
     expect(body.rows).toHaveLength(MARKETING_COMPONENT_REGISTRY.length);
+    expect(body.queue.contract).toBe('jovie.certification-inbox/v1');
+    expect(body.queue.needsYou).toEqual([]);
+    expect(body.queue.blocked).toHaveLength(
+      MARKETING_COMPONENT_REGISTRY.length
+    );
     expect(body.rows[0]).toMatchObject({
       identityId: MARKETING_COMPONENT_REGISTRY[0]?.id,
       state: 'working',

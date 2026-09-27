@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { oauthProvider } from '@better-auth/oauth-provider';
+import { passkey } from '@better-auth/passkey';
 import {
   type BetterAuthOptions,
   type BetterAuthPlugin,
@@ -26,6 +27,7 @@ import {
   baOauthConsents,
   baOauthRefreshTokens,
   baOauthResources,
+  baPasskeys,
   baSessions,
   baUsers,
   baVerifications,
@@ -34,6 +36,7 @@ import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
 import { resolveOvieWebOrigin } from './ovie-web-origin';
@@ -337,6 +340,9 @@ function buildPlugins() {
       disableClientRequest: true,
       storeToken: 'hashed',
     }),
+    // Admin second factor (JOV-4806): Touch ID / platform passkeys.
+    passkey({ rpName: 'Jovie' }),
+    adminPasskeyStepUp(),
     // nextCookies MUST stay last so Set-Cookie propagates through Next.js
     // server actions (better-auth docs + plan).
     nextCookies(),
@@ -366,6 +372,7 @@ export const auth = betterAuth({
       oauthResource: baOauthResources,
       oauthClientResource: baOauthClientResources,
       oauthClientAssertion: baOauthClientAssertions,
+      passkey: baPasskeys,
     },
   }),
   socialProviders: buildSocialProviders(),

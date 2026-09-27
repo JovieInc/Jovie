@@ -83,7 +83,17 @@ function buildDiscographySection(releases: ReleasePromptContext[]): string {
   return `${releaseLines}${overflowLine}`;
 }
 
-export function buildSystemPrompt(
+/**
+ * `stable` is identical across turns for the same artist, plan and tool set;
+ * `dynamic` changes turn to turn. Send `stable` first as its own cacheable
+ * system block.
+ */
+export interface SystemPromptParts {
+  readonly stable: string;
+  readonly dynamic: string;
+}
+
+export function buildSystemPromptParts(
   context: ArtistContext,
   releases: ReleasePromptContext[],
   options?: {
@@ -117,8 +127,8 @@ export function buildSystemPrompt(
       readonly planRequired: string;
     }[];
   }
-): string {
-  return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
+): SystemPromptParts {
+  const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
 ${buildPromptSecuritySection()}
 ## About This Artist
 - **Name:** ${context.displayName} (@${context.username})
@@ -143,16 +153,14 @@ ${buildDiscographySection(releases)}
 - **Tips Received:** ${context.tippingStats.tipsSubmitted}
 - **Total Earned:** ${formatAmount(context.tippingStats.totalReceivedCents)}
 - **This Month:** ${formatAmount(context.tippingStats.monthReceivedCents)}
-${buildKnowledgeSection(options?.knowledgeContext)}
-${buildAccountAccessSection(options?.accountContext)}
+
 ## Entity & Skill Tokens
 Messages may contain structured tokens the UI attached before sending:
 - \`@release:<id>[<title>]\` — reference to a specific release. Use the id directly (e.g. pass as releaseId to generateAlbumArt). Treat the [title] as display only.
 - \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\` — same pattern for artists/tracks.
 - \`/skill:<toolId>\` — the user picked this skill explicitly. Call the matching tool immediately **only if that tool is available to this artist on their current plan** (anything not in the tools list you were given is gated). If the tool is gated, do not attempt to call it or describe its output; say briefly that the skill is a Pro-plan feature. If the tool is available but required entity slots aren't filled (no matching @entity token), ask for the missing entity before calling.
 Do not echo tokens in your responses. When referring to the entity in your reply, use its display name ("Midnight Drive"), not the token.
-${buildReferencedEntitiesSection(options?.referencedEntities)}
-${buildPinnedOpportunitySection(options?.pinnedOpportunity)}
+
 ## Voice (CRITICAL)
 - You are Jovie: the operator on the artist's side — warm to musicians, ruthless to bad systems. A peer who shows the play, not a support agent, a life coach, or a SaaS brand account.
 - Direct, concise: 1-3 sentences, max 150 words unless detail requested or generating a bio.
@@ -241,6 +249,30 @@ Merch quality standard:
 
 ## Feedback
 When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
+
+  // Per-turn context (retrieved knowledge, live usage counters, referenced
+  // entities, pinned card) goes last so the stable prefix stays byte-identical
+  // across turns and the provider prompt cache can reuse it.
+  const dynamic = [
+    buildKnowledgeSection(options?.knowledgeContext).trim(),
+    buildAccountAccessSection(options?.accountContext).trim(),
+    buildReferencedEntitiesSection(options?.referencedEntities).trim(),
+    buildPinnedOpportunitySection(options?.pinnedOpportunity).trim(),
+  ]
+    .filter(section => section.length > 0)
+    .join('\n\n');
+
+  return { stable, dynamic };
+}
+
+export function buildSystemPrompt(
+  ...args: Parameters<typeof buildSystemPromptParts>
+): string {
+  return joinSystemPromptParts(buildSystemPromptParts(...args));
+}
+
+export function joinSystemPromptParts(parts: SystemPromptParts): string {
+  return parts.dynamic ? `${parts.stable}\n\n${parts.dynamic}` : parts.stable;
 }
 
 function buildLockedToolsSection(

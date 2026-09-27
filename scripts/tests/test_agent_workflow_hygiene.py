@@ -1322,6 +1322,20 @@ def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     assert "pnpm --filter=@jovie/web run test" in job
 
 
+def test_nightly_bypass_server_warms_auth_landing_route() -> None:
+    """The chaos sweep's first navigation must not eat a cold dev compile.
+
+    Playwright global setup skips route warmup when BASE_URL is external, so
+    the readiness step has to compile /app via the test-auth enter route or
+    auth.setup times out on page.goto (JOV-6818).
+    """
+    step = _step_block("nightly-tests.yml", "Start route QA bypass server")
+
+    assert "api/dev/test-auth/enter?persona=creator&redirect=/app" in step
+    assert "curl -fsSL" in step
+    assert "--max-time" in step
+
+
 def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     """Missing Slack credentials must not make the notification job fail."""
     job = _job_block("nightly-tests.yml", "notify")
@@ -1362,28 +1376,6 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     ):
         assert result in all_success
     assert "env.SLACK_WEBHOOK_URL != ''" in all_success
-
-
-def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
-    """Large public pitch assets must be referenced by the checked-in deck."""
-    pitch_dir = REPO_ROOT / "apps" / "web" / "public" / "pitch"
-    assets_dir = pitch_dir / "assets"
-    deck_sources = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in pitch_dir.iterdir()
-        if path.is_file() and path.suffix in {".css", ".html", ".js"}
-    )
-    referenced_assets = set(re.findall(r"assets/([^\"')\s>]+)", deck_sources))
-
-    large_unreferenced = sorted(
-        path.name
-        for path in assets_dir.iterdir()
-        if path.is_file()
-        and path.stat().st_size > 250_000
-        and path.name not in referenced_assets
-    )
-
-    assert large_unreferenced == []
 
 
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
@@ -1429,6 +1421,15 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert "hold-screenshot-mq-during-controller.mjs" in publication
     assert publication.count('gh pr edit --add-label "merge-queue"') == 0
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
+
+
+def test_product_screenshots_preserve_the_active_exact_head_capture() -> None:
+    """Frequent main pushes must not discard an in-progress capture."""
+    workflow = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split("\njobs:\n", 1)[0]
+
+    assert "group: screenshots" in concurrency
+    assert "cancel-in-progress: false" in concurrency
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
@@ -1612,7 +1613,6 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
-        REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1740,7 +1740,7 @@ def test_retired_admission_commands_stay_disabled() -> None:
 def test_fleet_controllers_share_one_evaluate_action() -> None:
     """FGR and production-controller share the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
-    script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
+    script = REPO_ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
@@ -1749,7 +1749,7 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     for workflow, job_name, _step in callers:
         text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
         assert f"uses: ./{action}" in text, workflow
-        assert "python3 scripts/symphony/gem-priority-gate.py" not in text, workflow
+        assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production

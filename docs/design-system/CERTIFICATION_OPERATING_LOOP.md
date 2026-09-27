@@ -22,6 +22,11 @@ Taste digest inputs are `canonical_source`, `invariant_evaluation`,
 excluded from the decision digest, so same-source CI/queue/deploy/runtime
 progress does not stale a valid founder taste decision.
 
+v2 direction: [CERTIFICATION_V2_DOGFOOD.md](CERTIFICATION_V2_DOGFOOD.md)
+reorders this loop so founder taste proof is async and follows production
+dogfood, with confidence-timed human windows. v1 semantics below stay in force
+for `jovie.certification/v1` packets until each caller opts in.
+
 ## Founder Decisions
 
 A founder decision binds to one deterministic decision-evidence digest. The

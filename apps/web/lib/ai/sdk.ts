@@ -55,8 +55,62 @@ function guardGenerateObjectResult<
   }) as RESULT;
 }
 
+/** Tag on every call so Gateway spend (`/v1/report?group_by=tag`) splits by app. */
+export const GATEWAY_APP_TAG = 'app:web';
+/** Feature tag for a call site that set no `experimental_telemetry.functionId`. */
+export const GATEWAY_UNTAGGED_FEATURE_TAG = 'feature:untagged';
+
+type GatewayTaggableOptions = {
+  readonly providerOptions?: Record<string, unknown>;
+  readonly experimental_telemetry?: { readonly functionId?: string };
+};
+
+/**
+ * Adds AI Gateway reporting tags (`feature:<functionId>` + `app:web`) to a
+ * call's `providerOptions.gateway.tags`, keeping any tags the caller set.
+ */
+export function withGatewayReportingTags<OPTIONS extends object>(
+  options: OPTIONS
+): OPTIONS & { readonly providerOptions: Record<string, unknown> } {
+  const taggable = options as GatewayTaggableOptions;
+  const providerOptions = taggable.providerOptions ?? {};
+  const gatewayOptions = (providerOptions.gateway ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const callerTags = Array.isArray(gatewayOptions.tags)
+    ? gatewayOptions.tags.filter(
+        (tag): tag is string => typeof tag === 'string'
+      )
+    : [];
+  const functionId = taggable.experimental_telemetry?.functionId;
+  const hasFeatureTag = callerTags.some(tag => tag.startsWith('feature:'));
+  const featureTags = hasFeatureTag
+    ? []
+    : [functionId ? `feature:${functionId}` : GATEWAY_UNTAGGED_FEATURE_TAG];
+  const tags = [...new Set([...callerTags, ...featureTags, GATEWAY_APP_TAG])];
+
+  return {
+    ...options,
+    providerOptions: {
+      ...providerOptions,
+      gateway: { ...gatewayOptions, tags },
+    },
+  };
+}
+
+function tagFirstArg<ARGS extends readonly [unknown, ...unknown[]]>(
+  args: ARGS
+): ARGS {
+  const [options, ...rest] = args;
+  return [
+    withGatewayReportingTags(options as object),
+    ...rest,
+  ] as unknown as ARGS;
+}
+
 export const generateText: typeof ai.generateText = async (...args) => {
-  const result = await getWrapped().generateText(...args);
+  const result = await getWrapped().generateText(...tagFirstArg(args));
   if (!isLeakGuardEnabled()) {
     return result;
   }
@@ -66,12 +120,13 @@ export const generateText: typeof ai.generateText = async (...args) => {
 
 export const streamText: typeof ai.streamText = ((...args) => {
   const context = leakGuardContext('streamText');
+  const taggedArgs = tagFirstArg(args);
   const guardedArgs = isLeakGuardEnabled()
     ? ([
-        wrapStreamTextOptions(args[0], context),
-        ...args.slice(1),
+        wrapStreamTextOptions(taggedArgs[0], context),
+        ...taggedArgs.slice(1),
       ] as typeof args)
-    : args;
+    : taggedArgs;
   const result = getWrapped().streamText(...guardedArgs);
 
   if (!isLeakGuardEnabled()) {
@@ -82,7 +137,7 @@ export const streamText: typeof ai.streamText = ((...args) => {
 }) as typeof ai.streamText;
 
 export const generateObject: typeof ai.generateObject = async (...args) => {
-  const result = await getWrapped().generateObject(...args);
+  const result = await getWrapped().generateObject(...tagFirstArg(args));
   if (!isLeakGuardEnabled()) {
     return result;
   }
@@ -92,7 +147,7 @@ export const generateObject: typeof ai.generateObject = async (...args) => {
 
 export const streamObject: typeof ai.streamObject = (...args) => {
   const context = leakGuardContext('streamObject');
-  const result = getWrapped().streamObject(...args);
+  const result = getWrapped().streamObject(...tagFirstArg(args));
 
   if (!isLeakGuardEnabled()) {
     return result;

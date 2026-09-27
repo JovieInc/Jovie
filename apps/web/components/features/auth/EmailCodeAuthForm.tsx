@@ -133,6 +133,14 @@ export function EmailCodeAuthForm({
   const [emailAddress, setEmailAddress] = useState(initialEmailAddress ?? '');
   const [code, setCode] = useState('');
   const [isPending, setIsPending] = useState(false);
+  // Until React hydrates, the server-rendered form has no submit handler, so a
+  // click would fall back to a native GET that reloads the page with the
+  // email address in the URL (and server/analytics logs). Keep submit
+  // disabled until the handler is attached.
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -431,7 +439,7 @@ export function EmailCodeAuthForm({
         type='submit'
         className={AUTH_CLASSES.authCta}
         static
-        disabled={isPending}
+        disabled={isPending || !isHydrated}
         aria-busy={isPending || undefined}
       >
         {isPending ? AUTH_EMAIL_SENDING_LABEL : AUTH_EMAIL_SEND_LABEL}

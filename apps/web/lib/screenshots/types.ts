@@ -23,6 +23,26 @@ export type ScreenshotInteraction =
 
 export type ScreenshotCaptureTarget = 'page' | 'locator';
 
+/**
+ * Feature-focus rectangle in percent (0–100) of the captured image, measured
+ * from the top-left corner. `mobileRegion` overrides `region` below the `md`
+ * breakpoint so breakpoint-specific safe areas can keep essential controls,
+ * text, and feature boundaries intact.
+ */
+export interface ScreenshotFeatureFocusRegion {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface ScreenshotFeatureFocus {
+  /** Visible caption identifying the highlighted feature region. */
+  readonly label: string;
+  readonly region: ScreenshotFeatureFocusRegion;
+  readonly mobileRegion?: ScreenshotFeatureFocusRegion;
+}
+
 export interface ScreenshotCanonicalSurfaceMetadata {
   readonly canonicalSurfaceId?: CanonicalSurfaceId;
   readonly canonicalSurfaceLabel?: string;
@@ -57,6 +77,12 @@ export interface ScreenshotScenario {
    * Format: "M:SS" or "MM:SS" — matching the Jovie player display format.
    */
   readonly playerTimestamp?: string;
+  /**
+   * Optional feature-focus declaration for the marketing product-frame
+   * treatment (JOV-6247). When set, `ProductScreenshotFrame` highlights this
+   * region and neutralizes only the surrounding presentation.
+   */
+  readonly featureFocus?: ScreenshotFeatureFocus;
 }
 
 export interface ScreenshotScenario

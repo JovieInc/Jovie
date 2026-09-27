@@ -39,14 +39,19 @@ const TRUSTED_RIPGREP_PATHS = [
   '/usr/local/bin/rg',
   '/opt/homebrew/bin/rg',
 ] as const;
-const CANDIDATE_TOKENS = [
-  '*',
-  'clickEvents',
-  'click_events',
-  'dailyProfileViews',
-  'daily_profile_views',
-  'notificationSubscriptions',
-  'notification_subscriptions',
+// Candidate-file filters. A file can only violate when it names a raw
+// analytics table OR matches the tail of a rate-derivation shape below, so
+// the ripgrep pass only returns files worth reading. Keeping the pre-filter
+// selective matters: an earlier `'*'` fixed-string token matched nearly
+// every source file, so the guard read the whole tree and ran ~29s,
+// starving same-shard timing tests.
+const CANDIDATE_PATTERNS = [
+  'clickEvents|click_events|dailyProfileViews|daily_profile_views|notificationSubscriptions|notification_subscriptions',
+  // Exact tails of the two rate regexes below (`(a / b) * 100` and the legacy
+  // `* 1000) / 10`) — a file must match one to violate. Requiring the
+  // surrounding punctuation keeps timeouts like `60 * 1000` out of the set.
+  '\\)\\s*\\*\\s*100\\b',
+  '\\*\\s*1000\\s*\\)\\s*/\\s*10\\b',
 ] as const;
 
 interface RipgrepResult {
@@ -62,12 +67,14 @@ const CANONICAL_LAYER = 'lib/analytics/metrics.ts';
 
 /**
  * Sanctioned homes for raw analytics-table references: the Drizzle schema
- * definitions and the canonical query file that feeds the metrics layer.
+ * definitions, the canonical query file that feeds the metrics layer, and
+ * the data-lifecycle registry that names tables as metadata strings.
  * These are exempt from the `tables` rule (but not the `rates` rule).
  */
 const TABLE_RULE_EXEMPT = [
   /^lib\/db\/schema\//,
   /^lib\/db\/queries\/analytics\.ts$/,
+  /^lib\/privacy\/data-classes\.ts$/,
 ];
 
 const TABLE_TOKENS =
@@ -124,14 +131,16 @@ function runRipgrepCandidates(webRoot: string): RipgrepResult {
       '--no-ignore',
       '--threads',
       '2',
+      // Multiline: rate derivations legitimately wrap (`*\n  100`), and the
+      // candidate filter must still see them.
+      '--multiline',
       '--glob',
       '*.{ts,tsx}',
       '--glob',
       '!**/*.{test,spec,stories}.{ts,tsx}',
       '--glob',
       '!**/{node_modules,.next,coverage}/**',
-      '--fixed-strings',
-      ...CANDIDATE_TOKENS.flatMap(token => ['--regexp', token]),
+      ...CANDIDATE_PATTERNS.flatMap(pattern => ['--regexp', pattern]),
       ...SCAN_DIRS,
     ],
     {

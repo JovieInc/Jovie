@@ -1,4 +1,12 @@
 name: Production Release
+# Invariant consumer: JOV-INV-022 (bounded hop). JOV-INV-029: merge is not activation.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: Forward-only release lineage must prove that an authorized SHA
+#   is still an ancestor of main; that ancestry lives only behind the GitHub
+#   compare API, because every job checks out the exact release SHA, not main.
+# revisit-trigger: Revisit when the controller carries lineage on its own
+#   workflow_run payload or promotion moves to a webhook-dispatched writer.
 
 on:
   workflow_call:
@@ -63,11 +71,19 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before lease work began."
+          # Forward-only lineage: after the controller authorizes a generation,
+          # main advancing does not cancel it. An authorized SHA that is still an
+          # ancestor of main ships; only a rewind or force-push yields. Exact
+          # equality at every later recheck starved production during PR drains
+          # (2026-09-26: jov.ie 572 commits behind, every generation superseded
+          # mid-pipeline). Stale generations still yield at the controller's
+          # coalesce/authorize boundary before any work starts.
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before lease work began."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
   deploy-staging:
@@ -130,6 +146,15 @@ jobs:
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
         continue-on-error: false
+      - name: DB migrate (staging - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (post-migration schema check)
         id: verify
         env:
@@ -495,11 +520,12 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD before staging alias."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before staging alias."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before staging alias."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
   alias-staging:
@@ -532,11 +558,12 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD at staging alias."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha at staging alias."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at staging alias."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Alias verified deployment
         if: ${{ steps.head.outputs.is_current == 'true' }}
@@ -685,11 +712,12 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD before production mutation."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before production mutation."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before production mutation."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
   migrate-production:
@@ -704,7 +732,7 @@ jobs:
       ]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
@@ -749,6 +777,15 @@ jobs:
           doppler run --project jovie-web --config prd
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
+      - name: DB migrate (production - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (production schema check)
         id: verify-production-schema
         env:
@@ -788,7 +825,13 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
+      # The production SBOM (`pnpm licenses list`) reads package index files
+      # from the pnpm store. An exact node_modules cache hit restores the tree
+      # without any store, which froze production (JOV-6726). Install from the
+      # lockfile into a warm store here instead of restoring a cached tree.
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          package_cache: 'false'
       # Production runtime config comes from the isolated Doppler `prd`
       # service token. Vercel remains the deployment control plane only.
       - uses: ./.github/actions/setup-doppler
@@ -815,12 +858,13 @@ jobs:
             echo "::error::GitHub returned an invalid main HEAD at production mutation."
             exit 1
           }
-          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha at production mutation."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at production mutation."
             echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
       # This is deliberately a restore-only cache by default. The cache is a
       # Next compiler/build cache, never a Vercel deployment artifact. Writes
@@ -849,6 +893,7 @@ jobs:
           PRODUCTION_NEXT_CACHE_RESTORE_HIT: ${{ steps.production-next-cache-restore.outputs.cache-hit }}
           PRODUCTION_NEXT_CACHE_SAVE_ENABLED: ${{ vars.JOVIE_PRODUCTION_NEXT_CACHE_SAVE || 'false' }}
           PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           production_stage() {
             set -euo pipefail
@@ -929,8 +974,12 @@ jobs:
 
           provenance_dir="$RUNNER_TEMP/production-input-provenance"
           mkdir "$provenance_dir"
+          if ! node .github/scripts/production-input-provenance.mjs sbom \
+            "$provenance_dir/sbom.cdx.json"; then
+            fail_stage "Unable to generate the production SBOM from the installed dependency tree." production_artifact_failed
+          fi
           node .github/scripts/production-input-provenance.mjs inputs \
-            "$provenance_dir/inputs.json"
+            "$provenance_dir/inputs.json" "$provenance_dir/sbom.cdx.json"
 
           if ! env -u TURBO_REMOTE_ONLY \
             VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
@@ -987,7 +1036,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           provenance_digests="$(node .github/scripts/production-input-provenance.mjs artifact \
-            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json")"
+            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json" \
+            "$provenance_dir/sbom.cdx.json")"
           read -r input_receipt_digest artifact_digest <<< "$provenance_digests"
           [[ "$input_receipt_digest" =~ ^[0-9a-f]{64}$ && "$artifact_digest" =~ ^[0-9a-f]{64}$ ]] || \
             fail_stage "Production input receipt digest is invalid." production_artifact_failed
@@ -1230,8 +1280,9 @@ jobs:
             echo "::error::Could not resolve an exact main HEAD immediately before production promotion."
             exit 1
           fi
-          if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]; then
-            echo "::notice::Release $EXPECTED_MAIN_SHA was superseded by $current_main_sha after its staged production build; skipping production mutation."
+          if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]] &&
+            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_MAIN_SHA}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
+            echo "::notice::Release $EXPECTED_MAIN_SHA left main's lineage (main is $current_main_sha) after its staged production build; skipping production mutation."
             echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
             exit 0

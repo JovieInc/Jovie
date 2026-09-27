@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
@@ -175,5 +176,30 @@ describe('EmailCodeAuthForm', () => {
     await submitCode('424242');
 
     await waitFor(() => expect(locationAssign).toHaveBeenCalledWith('/start'));
+  });
+});
+
+describe('EmailCodeAuthForm pre-hydration guard', () => {
+  it('server-renders the send button disabled so an early click cannot native-submit the email into the URL', () => {
+    const html = renderToString(
+      <EmailCodeAuthForm mode='sign-up' redirectUrl='/start' />
+    );
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    const sendButton = container.querySelector<HTMLButtonElement>(
+      'button[type="submit"]'
+    );
+
+    expect(sendButton?.disabled).toBe(true);
+  });
+
+  it('enables the send button once the client submit handler is attached', async () => {
+    renderForm();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Send sign-in code' })
+      ).toBeEnabled()
+    );
   });
 });

@@ -3,7 +3,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
+import { HomepageIdentityLenses } from '@/components/homepage/HomepageIdentityLenses';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
@@ -37,7 +39,14 @@ vi.mock('next/image', () => ({
 
 describe('HomepageCertifiedSections', () => {
   it('renders the locked connected and relationships sections without unsupported proof', () => {
-    render(<HomepageCertifiedSections />);
+    render(
+      <HomepageCertifiedSections
+        previews={{
+          connected: HOMEPAGE_MEDIA_MAP.connected.asset,
+          relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+        }}
+      />
+    );
 
     expect(
       screen.queryByTestId('marketing-section-logo-cloud')
@@ -61,33 +70,81 @@ describe('HomepageCertifiedSections', () => {
     expect(connected).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[0].body
     );
+    expect(connected.querySelectorAll('[data-homepage-visual]')).toHaveLength(
+      1
+    );
     expect(connected.querySelector('.ap-phone-frame')).toBeNull();
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'src',
-      '/assets/generated/homepage-identity-optical-v1.webp'
-    );
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'alt',
-      'A conceptual photographic assembly of a profile identity'
-    );
+
+    // JOV-6297: the conceptual artwork is replaced by the approved
+    // customer-zero profile surface — real avatar, name, and public URL
+    // beside the real product export.
+    expect(
+      within(connected)
+        .getByAltText('Tim White Profile — Listen')
+        .getAttribute('src')
+    ).toContain(HOMEPAGE_MEDIA_MAP.connected.asset.publicUrl);
+    const avatar = connected.querySelector<HTMLImageElement>(
+      '.homepage-connected-profile__avatar'
+    )!;
+    expect(avatar).toHaveAttribute('src', '/images/avatars/tim-white.jpg');
+    expect(connected).toHaveTextContent('Tim White');
+    expect(connected).toHaveTextContent('jov.ie/tim');
+    expect(
+      connected.querySelector('[src*="homepage-identity-optical"]')
+    ).toBeNull();
 
     const relationships = document.querySelector<HTMLElement>(
       '[data-homepage-testid="homepage-section-relationships"]'
     )!;
-    expect(relationships).toHaveAttribute('data-rhythm', 'text');
+    expect(relationships).toHaveAttribute('data-rhythm', 'product');
     expect(relationships).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[1].headline
     );
     expect(relationships).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
     );
-    expect(relationships.querySelectorAll('img')).toHaveLength(0);
-    expect(within(relationships).getByRole('list')).toHaveAttribute(
-      'aria-label',
-      'Relationships'
-    );
+    const identity = HOMEPAGE_LAUNCH_COPY.certified.identity;
+    expect(relationships.querySelectorAll('img')).toHaveLength(2);
+    expect(
+      relationships.querySelectorAll('[data-homepage-visual]')
+    ).toHaveLength(1);
+    expect(
+      within(relationships).getByAltText('Tim White Profile — Subscribe')
+    ).toHaveAttribute('src', HOMEPAGE_MEDIA_MAP.relationships.asset.publicUrl);
+    const portrait = relationships.querySelector<HTMLImageElement>(
+      '.homepage-identity__portrait-image'
+    )!;
+    expect(portrait).toHaveAttribute('src', identity.subject.portrait.src);
+    expect(portrait).toHaveAttribute('alt', identity.subject.portrait.alt);
+    const outcomesList = within(relationships)
+      .getAllByRole('list')
+      .find(list => list.getAttribute('aria-label') === 'Relationships')!;
+    expect(outcomesList).toBeDefined();
 
-    const outcomes = within(relationships).getAllByRole('listitem');
+    // JOV-6297: static ordered states of the shipped visibility surfaces —
+    // the public profile for people and the documented {username}/llms.txt
+    // for agents. No simulated third-party answer or vendor claim.
+    const visibility = within(relationships).getByRole('list', {
+      name: 'One Profile, Legible To People And To Agents',
+    });
+    const states = within(visibility).getAllByRole('listitem');
+    expect(states).toHaveLength(2);
+    expect(states[0]).toHaveAttribute('data-audience', 'people');
+    expect(states[1]).toHaveAttribute('data-audience', 'agents');
+    expect(states[0]).toHaveTextContent('People');
+    expect(states[0]).toHaveTextContent('jov.ie/tim');
+    expect(
+      within(states[0])
+        .getByAltText('Tim White Profile — Subscribe')
+        .getAttribute('src')
+    ).toContain('tim-white-profile-subscribe-phone.png');
+    expect(states[1]).toHaveTextContent('Agents');
+    expect(states[1]).toHaveTextContent('# Tim White');
+    expect(states[1]).toHaveTextContent('Canonical URL');
+    expect(states[1]).toHaveTextContent('jov.ie/tim/llms.txt');
+    expect(relationships).not.toHaveTextContent('VERIFIED');
+
+    const outcomes = within(outcomesList).getAllByRole('listitem');
     expect(outcomes).toHaveLength(3);
     expect(outcomes.map(outcome => outcome.textContent)).toEqual([
       expect.stringContaining('Be found. Be understood.'),
@@ -98,19 +155,84 @@ describe('HomepageCertifiedSections', () => {
       outcomes.map(outcome => outcome.querySelector('span')?.textContent)
     ).toEqual(['01', '02', '03']);
 
+    const identityBlock = relationships.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-identity"]'
+    )!;
+    expect(identityBlock).toHaveAttribute(
+      'data-homepage-identity-for',
+      'built'
+    );
+    expect(identityBlock).toHaveTextContent('You are not one thing.');
+    expect(identityBlock).toHaveTextContent(identity.subject.name);
+    expect(identityBlock).toHaveTextContent(identity.subject.profileDisplay);
+    expect(identityBlock).toHaveTextContent('One identity. Every side of you.');
+
+    const lensGroup = within(identityBlock).getByRole('list', {
+      name: 'Perspectives',
+    });
+    const lenses = within(lensGroup).getAllByRole('button');
+    expect(lenses.map(lens => lens.textContent)).toEqual(
+      identity.lenses.map(lens => lens.label)
+    );
+
     expect(screen.queryAllByRole('link')).toHaveLength(0);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(
+      screen.getAllByRole('button').map(button => button.getAttribute('type'))
+    ).toEqual(['button', 'button', 'button']);
+  });
+
+  it('switches the caption emphasis across the three contextual lenses', () => {
+    const identity = HOMEPAGE_LAUNCH_COPY.certified.identity;
+    render(<HomepageIdentityLenses identity={identity} />);
+    const block = document.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-identity"]'
+    )!;
+    const emphasis = block.querySelector('.homepage-identity__emphasis')!;
+
+    const lensFor = (id: string) =>
+      block.querySelector<HTMLButtonElement>(
+        `[data-homepage-testid="homepage-identity-lens-${id}"]`
+      )!;
+
+    expect(lensFor('listener')).toHaveAttribute('aria-pressed', 'true');
+    expect(emphasis).toHaveTextContent('Artist. Releases. Shows.');
+
+    fireEvent.click(lensFor('collaborator'));
+    expect(lensFor('collaborator')).toHaveAttribute('aria-pressed', 'true');
+    expect(lensFor('listener')).toHaveAttribute('aria-pressed', 'false');
+    expect(emphasis).toHaveTextContent('Producer. Credits. Contact.');
+
+    fireEvent.click(lensFor('investor'));
+    expect(lensFor('investor')).toHaveAttribute('aria-pressed', 'true');
+    expect(emphasis).toHaveTextContent('Founder. Company. Work.');
+
+    expect(identity.lenses).toHaveLength(3);
+  });
+
+  it('records publication and fallback receipts for every homepage asset', () => {
+    for (const media of Object.values(HOMEPAGE_MEDIA_MAP)) {
+      expect(media.publicationState).toBe('current-public-export');
+      expect(media.rightsPrivacyApproval).toContain('approved');
+      expect(media.placeholder).toBe(false);
+      expect(media.expiration).toBeNull();
+      expect(media.intendedCrop.desktop).toContain('uncropped');
+      expect(media.intendedCrop.mobile).toContain('uncropped');
+      expect(media.loading).toBe('lazy');
+      expect(media.reducedMotionFallback).toContain('static');
+    }
   });
 });
 
 describe('HomepageClose', () => {
-  it('requests access instead of focusing absent search when gated', () => {
+  it('returns to the name search instead of requesting access when gated', () => {
     gate.WAITLIST_ENABLED = true;
     render(<HomepageClose />);
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Find your profile' })
+    ).toHaveAttribute('type', 'button');
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
   });
   it('renders the saved closing headline and a single focus-only action', () => {
     render(<HomepageClose />);
