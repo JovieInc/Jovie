@@ -49,12 +49,13 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
 | Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
 | Tests/coverage | [.claude/rules/testing.md](.claude/rules/testing.md) |
-| PR, CI, merge, deploy | [docs/PR_FLOW.md](docs/PR_FLOW.md), [.claude/rules/release.md](.claude/rules/release.md) |
+| PR, CI, merge, deploy | [docs/PR_FLOW.md](docs/PR_FLOW.md), [.github/MERGE_QUEUE.md](.github/MERGE_QUEUE.md), [.github/BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md), [.claude/rules/release.md](.claude/rules/release.md) |
 | iOS / macOS | [.claude/rules/ios.md](.claude/rules/ios.md) / [.claude/rules/macos.md](.claude/rules/macos.md) |
 | Pen canvas/registry | [.claude/rules/pen.md](.claude/rules/pen.md) |
 | Skills | [.claude/rules/gstack.md](.claude/rules/gstack.md) |
 
-Other scoped rules: ci-branching, infra, linear, swarm, hermes-air.
+Other scoped rules: ci-branching, infra, linear, motion, pr-stacking, swarm,
+hermes-air.
 Company domain canon: [index](canon/README.md). API/cron/webhook inventories:
 [docs/AI_AGENT_GUIDE.md](docs/AI_AGENT_GUIDE.md). Codex setup: [CODEX.md](CODEX.md).
 <!-- doc-freshness:scoped-rules-count:19 -->
