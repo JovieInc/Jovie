@@ -379,6 +379,9 @@ importers:
       '@jovie/copy':
         specifier: workspace:*
         version: link:../../packages/copy
+      '@jovie/extension-contracts':
+        specifier: workspace:*
+        version: link:../../packages/extension-contracts
       '@jovie/ui':
         specifier: workspace:*
         version: link:../../packages/ui
