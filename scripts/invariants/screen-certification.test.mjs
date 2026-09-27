@@ -154,6 +154,28 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers every founder cockpit route for changed-surface certification', () => {
+    const sources = [
+      'apps/web/app/app/(shell)/admin/activity/page.tsx',
+      'apps/web/app/app/(shell)/admin/growth/page.tsx',
+      'apps/web/app/app/(shell)/admin/needs-you/page.tsx',
+      'apps/web/app/app/(shell)/admin/operations/page.tsx',
+      'apps/web/app/app/(shell)/admin/product/page.tsx',
+    ];
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.ov-founder-cockpit'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.ov-founder-cockpit',
+      platform: 'web',
+      owner: 'ovie-founder-cockpit',
+      sources,
+      viewports: ['desktop', 'mobile'],
+    });
+    for (const source of sources) assert.equal(kindOf(source), 'registered');
+  });
+
   it('registers the public artists directory for changed-surface certification', () => {
     const source = 'apps/web/app/artists/page.tsx';
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.artists');

@@ -18,7 +18,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[34rem] bg-base p-4 text-primary-token'>
+      <div className='w-full max-w-xl bg-base p-4 text-primary-token'>
         <Story />
       </div>
     ),
