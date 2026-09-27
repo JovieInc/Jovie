@@ -66,6 +66,8 @@ HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
+# Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
+RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 RETRY_BACKOFF_S = 1800
@@ -1322,7 +1324,7 @@ def install_release(host: Host) -> int:
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
-        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *LANE_TESTS],
+        archive = subprocess.run(["git", "archive", "origin/main", "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
         # The self-test must never touch this host's live state: point it at a scratch dir.
