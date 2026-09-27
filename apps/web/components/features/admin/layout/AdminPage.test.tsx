@@ -55,6 +55,9 @@ describe('AdminPage', () => {
     expect(screen.getByTestId('admin-overview-view')).toHaveTextContent(
       'Overview content'
     );
+    expect(
+      screen.getByRole('link', { name: 'Open Company Timeline' })
+    ).toHaveAttribute('href', '/app/ov/activity');
   });
 });
 
