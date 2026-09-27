@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".next/types/**/*.ts",
+        "!**/*.test.*",
+        "!**/*.spec.*",
+        "!**/*.stories.*",
+        "!**/*.md",
+        "!public/**",
+        "!test-results/**",
+        "!tests/*.{ts,tsx,js,jsx,json}",
+        "!tests/{app,bench,components,contracts,e2e,eval,fixtures,helpers,integration,journey-auditor,lib,performance,product-screenshots,scripts,seo,test-utils,unit,utils,visual-qa}/**"
+      ]
+    }
+  }
+}

@@ -11,6 +11,12 @@ import {
   useState,
 } from 'react';
 import {
+  articleIdFromPathname,
+  hashQuery,
+  queryLengthBucket,
+  trackHelpCenterEvent,
+} from '@/lib/help-analytics.mjs';
+import {
   categoryLabel,
   excerptSegments,
   highlightedText,
@@ -86,6 +92,9 @@ export function HelpCenterSearch({
       }
     }
     returnFocusRef.current = source ?? (document.activeElement as HTMLElement);
+    void trackHelpCenterEvent('search_opened', {
+      source_surface: 'search_dialog',
+    });
     if (!dialogRef.current?.open) dialogRef.current?.showModal();
     requestAnimationFrame(() =>
       inputRef.current?.focus({ preventScroll: true })
@@ -143,6 +152,20 @@ export function HelpCenterSearch({
         setResults(data);
         setActiveIndex(0);
         setState(data.length ? 'ready' : 'empty');
+        void hashQuery(normalized).then(queryHash => {
+          void trackHelpCenterEvent('search_query_submitted', {
+            query_hash: queryHash,
+            query_length_bucket: queryLengthBucket(normalized),
+            source_surface: 'search_dialog',
+          });
+          if (!data.length) {
+            void trackHelpCenterEvent('search_zero_results', {
+              query_hash: queryHash,
+              query_length_bucket: queryLengthBucket(normalized),
+              source_surface: 'search_zero_results',
+            });
+          }
+        });
       } catch {
         if (request === requestRef.current) {
           setResults([]);
@@ -153,11 +176,34 @@ export function HelpCenterSearch({
     void search();
   }, [query]);
 
-  const selectResult = (result: PagefindResult) => {
+  const selectResult = (result: PagefindResult, rank: number) => {
+    const trimmedQuery = query.trim();
+    void hashQuery(trimmedQuery).then(queryHash => {
+      void trackHelpCenterEvent('search_result_selected', {
+        result_id: articleIdFromPathname(result.url) ?? undefined,
+        result_rank: rank,
+        query_hash: queryHash,
+        query_length_bucket: queryLengthBucket(trimmedQuery),
+        source_surface: 'search_dialog',
+      });
+    });
     const destination = resultUrl(result.url, query.trim());
     dialogRef.current?.close();
     setQuery('');
     router.push(destination);
+  };
+
+  const openSupport = (sourceSurface: string) => {
+    const trimmedQuery = query.trim();
+    void hashQuery(trimmedQuery).then(queryHash => {
+      const context = {
+        query_hash: queryHash || undefined,
+        query_length_bucket: queryLengthBucket(trimmedQuery),
+        source_surface: sourceSurface,
+      };
+      void trackHelpCenterEvent('contact_support_opened', context);
+      void trackHelpCenterEvent('support_escalation', context);
+    });
   };
 
   const onInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -172,7 +218,7 @@ export function HelpCenterSearch({
       setActiveIndex(index => (index - 1 + results.length) % results.length);
     } else if (event.key === 'Enter' && results[activeIndex]) {
       event.preventDefault();
-      selectResult(results[activeIndex]);
+      selectResult(results[activeIndex], activeIndex);
     }
   };
 
@@ -295,7 +341,7 @@ export function HelpCenterSearch({
                       type='button'
                       onMouseEnter={() => setActiveIndex(index)}
                       onFocus={() => setActiveIndex(index)}
-                      onClick={() => selectResult(result)}
+                      onClick={() => selectResult(result, index)}
                     >
                       <span className='help-search-breadcrumb'>
                         {category}
@@ -333,7 +379,10 @@ export function HelpCenterSearch({
                     </button>
                   ))}
                 </div>
-                <a href={supportUrl(query.trim())}>
+                <a
+                  href={supportUrl(query.trim())}
+                  onClick={() => openSupport('search_zero_results')}
+                >
                   Contact support with this search
                 </a>
               </div>
@@ -346,7 +395,12 @@ export function HelpCenterSearch({
                 >
                   Try again
                 </button>
-                <a href={supportUrl(query.trim())}>Contact support</a>
+                <a
+                  href={supportUrl(query.trim(), 'help-search-error')}
+                  onClick={() => openSupport('search_error')}
+                >
+                  Contact support
+                </a>
               </div>
             )}
           </div>
