@@ -191,16 +191,13 @@ describe('MarketingHeader', () => {
     const links = within(flyout as HTMLElement).getAllByRole('link');
     expect(
       links.map(link => [link.textContent, link.getAttribute('href')])
-    ).toEqual([
-      ['Investors', '/investors'],
-      ['Artists', '/solutions/artists'],
-    ]);
-    for (const absent of ['Founders', 'Authors', 'Creators']) {
+    ).toEqual([['Artists', '/solutions/artists']]);
+    for (const absent of ['Founders', 'Authors', 'Creators', 'Investors']) {
       expect(within(flyout as HTMLElement).queryByText(absent)).toBeNull();
     }
     expect(
       flyout?.querySelectorAll('.marketing-glass-header__flyout-arrow')
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(
       flyout?.querySelectorAll('.marketing-glass-header__flyout-description')
     ).toHaveLength(0);

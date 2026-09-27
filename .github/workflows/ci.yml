@@ -2948,6 +2948,9 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          # Name the blocked file when the artifact guard stops the step;
+          # "exit 1" alone left the JOV-6541 failures undiagnosable.
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'
       - name: Upload combined Storybook failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
