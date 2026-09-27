@@ -9,6 +9,7 @@ import {
   classifyDependencyManifestChange,
   classifyEveLockDrift,
   classifyRootLockDrift,
+  reportConfigMismatch,
   validatePlanAuthority,
   validateRemediationArtifact,
   validateRootRemediationArtifact,
@@ -564,6 +565,19 @@ describe('safe root workspace lockfile remediation (PR #18250 class)', () => {
       eligible: false,
       reason: 'lockfile-config-mismatch',
     });
+  });
+
+  it('reports the overrides refusal as a non-fatal warning (JOV-6810)', () => {
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = { eligible: false, reason: 'lockfile-config-mismatch' };
+
+    expect(reportConfigMismatch(result, 18526)).toBe(true);
+    expect(process.exitCode).toBeUndefined();
+    expect(stderr).toHaveBeenCalledOnce();
+    expect(stderr.mock.calls[0][0]).toContain('::warning');
+    expect(stderr.mock.calls[0][0]).toContain('PR #18526');
+    expect(reportConfigMismatch({ eligible: true }, 18526)).toBe(false);
+    stderr.mockRestore();
   });
 
   it('never rewrites a root pnpm.overrides change', () => {
