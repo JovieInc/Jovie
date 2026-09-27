@@ -2,15 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   getProfileByUsername: vi.fn(),
-  getReleasesForProfileLite: vi.fn(),
+  getCachedPublicReleasesForProfile: vi.fn(),
 }));
 
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: hoisted.getProfileByUsername,
 }));
 
-vi.mock('@/lib/discography/queries', () => ({
-  getReleasesForProfileLite: hoisted.getReleasesForProfileLite,
+vi.mock('@/lib/releases/public-release-loader', () => ({
+  getCachedPublicReleasesForProfile: hoisted.getCachedPublicReleasesForProfile,
 }));
 
 vi.mock('@/constants/app', () => ({
@@ -58,7 +58,7 @@ describe('GET /[username]/feed.xml', () => {
       { params: Promise.resolve({ username: 'realartist' }) }
     );
     expect(privateProfile.status).toBe(404);
-    expect(hoisted.getReleasesForProfileLite).not.toHaveBeenCalled();
+    expect(hoisted.getCachedPublicReleasesForProfile).not.toHaveBeenCalled();
   });
 
   it('keeps legitimate public artist feeds discoverable', async () => {
@@ -68,7 +68,7 @@ describe('GET /[username]/feed.xml', () => {
       displayName: 'Real Artist',
       isPublic: true,
     });
-    hoisted.getReleasesForProfileLite.mockResolvedValue([]);
+    hoisted.getCachedPublicReleasesForProfile.mockResolvedValue([]);
 
     const { GET } = await import('./route');
     const res = await GET(new Request('https://jov.ie/realartist/feed.xml'), {

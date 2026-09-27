@@ -56,6 +56,9 @@ export interface DiscoveredPixels {
   facebook?: DiscoveredPixelPlatform;
   tiktok?: DiscoveredPixelPlatform;
   google?: DiscoveredPixelPlatform;
+  twitter?: DiscoveredPixelPlatform;
+  snapchat?: DiscoveredPixelPlatform;
+  pinterest?: DiscoveredPixelPlatform;
 }
 
 export interface CreatorDistributionEventMetadata {
