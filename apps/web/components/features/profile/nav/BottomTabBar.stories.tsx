@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import { fn } from 'storybook/test';
 import { BottomTabBar } from './BottomTabBar';
 
@@ -41,5 +42,22 @@ export const MusicActive: Story = {
 export const MenuOpen: Story = {
   args: {
     isMenuOpen: true,
+  },
+};
+
+/** Tap between tabs to feel the shared lens spring and the glyph press. */
+export const Interactive: Story = {
+  render: function InteractiveBottomTabBar(args) {
+    const [activeTab, setActiveTab] = useState(args.activeTab);
+    return (
+      <BottomTabBar
+        {...args}
+        activeTab={activeTab}
+        onTabSelect={mode => {
+          setActiveTab(mode);
+          args.onTabSelect(mode);
+        }}
+      />
+    );
   },
 };

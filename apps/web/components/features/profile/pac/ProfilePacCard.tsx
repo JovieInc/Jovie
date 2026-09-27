@@ -155,6 +155,14 @@ function getCaptureCopy(
   };
 }
 
+/**
+ * `glass` is the listen slot (Listen / Play / Pause): a flat liquid-glass pill
+ * that shares the bottom tab bar's lens material (`profile-glass-pill` in
+ * design-system.css), so the two read as one family. Conversion actions keep
+ * the solid primary pill. Geometry, hit area and behaviour are identical.
+ */
+type PrimaryPillTone = 'solid' | 'glass';
+
 function PrimaryPill({
   children,
   onClick,
@@ -163,6 +171,7 @@ function PrimaryPill({
   type = 'button',
   disabled,
   ariaLabel,
+  tone = 'solid',
 }: Readonly<{
   children: ReactNode;
   onClick?: (event: MouseEvent<HTMLElement>) => void;
@@ -171,9 +180,13 @@ function PrimaryPill({
   type?: 'button' | 'submit';
   disabled?: boolean;
   ariaLabel?: string;
+  tone?: PrimaryPillTone;
 }>) {
   const className = cn(
-    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground shadow-sm transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
+    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-2xs font-[590] leading-none transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60',
+    tone === 'glass'
+      ? 'profile-glass-pill'
+      : 'bg-btn-primary text-btn-primary-foreground shadow-sm'
   );
 
   if (href && href.startsWith('/')) {
@@ -585,6 +598,7 @@ export function ProfilePacCard({
       if (ctx.inventory.hasPreview) {
         action = (
           <PrimaryPill
+            tone='glass'
             href={listenHref}
             onClick={handlePlayClick}
             ariaLabel={
@@ -603,7 +617,11 @@ export function ProfilePacCard({
         );
       } else if (release || hasPlayableDestinations) {
         // Degraded ladder: no inline preview — link out to listen.
-        action = <PrimaryPill href={listenHref}>Listen</PrimaryPill>;
+        action = (
+          <PrimaryPill tone='glass' href={listenHref}>
+            Listen
+          </PrimaryPill>
+        );
       }
       if (isPacTrackActive && playbackState.duration > 0) {
         status = (
