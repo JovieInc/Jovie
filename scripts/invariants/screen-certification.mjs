@@ -96,6 +96,7 @@ web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/|desktop,mobile
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
+web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
