@@ -189,4 +189,46 @@ describe('MCP server', () => {
       { jsonrpc: '2.0', id: 1, result: {} },
     ]);
   });
+
+  it('exposes report tools with required title/details and files over mcp', async () => {
+    const list = await handleMcpMessage(
+      { id: 20, method: 'tools/list' },
+      context()
+    );
+    const tool = (
+      list?.result as {
+        tools: Array<{ name: string; inputSchema: { required?: string[] } }>;
+      }
+    ).tools.find(entry => entry.name === 'report_issue');
+    expect(tool?.inputSchema.required).toEqual(['title', 'details']);
+
+    let body: Record<string, unknown> = {};
+    const fetchImpl: FetchImplementation = async (_input, init) => {
+      body = JSON.parse(String(init?.body));
+      return new Response('{"reportId":"r-2"}', { status: 201 });
+    };
+    const response = await handleMcpMessage(
+      {
+        id: 21,
+        method: 'tools/call',
+        params: {
+          name: 'report_feedback',
+          arguments: {
+            title: 'confusing',
+            details: 'claim step unclear',
+            scenario: 7,
+          },
+        },
+      },
+      context(fetchImpl)
+    );
+    expect(response?.result).toMatchObject({
+      structuredContent: { reportId: 'r-2' },
+    });
+    expect(body).toMatchObject({
+      kind: 'feedback',
+      context: { channel: 'mcp', cliVersion: '1.2.3' },
+    });
+    expect((body.context as Record<string, unknown>).scenario).toBeUndefined();
+  });
 });
