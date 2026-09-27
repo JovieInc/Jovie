@@ -14,6 +14,8 @@ const common = [
   'agent/channels/photon.ts',
   'agent/lib/imessage-allowlist.ts',
   'agent/lib/context-budget.ts',
+  'patches/eve@0.63.0.patch',
+  'tests/prompt-prefix-stability.test.ts',
   'agent/lib/runtime-commissioning-health.ts',
   'tests/runtime-commissioning-health.test.ts',
 ];

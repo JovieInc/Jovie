@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  eve@0.63.0:
+    hash: o7uayysuee5wadkw65ihem2cby
+    path: patches/eve@0.63.0.patch
+
 importers:
 
   .:
@@ -22,7 +27,7 @@ importers:
         version: 3.35.0(zod@4.6.5)
       eve:
         specifier: 0.63.0
-        version: 0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4)
+        version: 0.63.0(patch_hash=o7uayysuee5wadkw65ihem2cby)(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4)
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -4865,7 +4870,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4):
+  eve@0.63.0(patch_hash=o7uayysuee5wadkw65ihem2cby)(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4):
     dependencies:
       ai: 7.0.107(zod@4.6.5)
       nitro: 3.0.260903-beta
