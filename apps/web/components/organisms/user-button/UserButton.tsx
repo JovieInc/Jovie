@@ -7,9 +7,12 @@ import { Badge, Button, CommonDropdown } from '@jovie/ui';
 import {
   Cookie,
   CreditCard,
+  Eye,
+  EyeOff,
   FileCheck2,
   HelpCircle,
   Keyboard,
+  Lock,
   LogOut,
   MessageSquare,
   Monitor,
@@ -28,6 +31,11 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import {
+  isMoneyHidden,
+  lockWorkspace,
+  setMoneyHidden,
+} from '@/lib/workspace-lock/workspace-lock';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
@@ -73,6 +81,7 @@ interface BuildDropdownItemsParams {
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
   isElectronRuntime: boolean;
+  moneyHidden: boolean;
 }
 
 const USER_MENU_CONTENT_CLASS = 'w-80 max-w-[calc(100vw-1rem)]';
@@ -108,6 +117,7 @@ function buildDropdownItems({
   setIsFeedbackOpen,
   handleOpenShortcuts,
   isElectronRuntime,
+  moneyHidden,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [
     {
@@ -327,6 +337,30 @@ function buildDropdownItems({
     });
   }
 
+  // Privacy controls (JOV-6829): quick workspace lock + money visibility.
+  items.push(
+    {
+      type: 'separator',
+      id: 'sep-privacy',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
+    {
+      type: 'action',
+      id: 'lock-workspace',
+      label: 'Lock Workspace',
+      icon: Lock,
+      onClick: () => lockWorkspace(),
+      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} L`,
+    },
+    {
+      type: 'action',
+      id: 'toggle-money',
+      label: moneyHidden ? 'Show money' : 'Hide money',
+      icon: moneyHidden ? Eye : EyeOff,
+      onClick: () => setMoneyHidden(!moneyHidden),
+    }
+  );
+
   // Add feedback, version info, and sign out.
   // Version is now shown to all users (moved from admin-only sidebar footer).
   items.push(
@@ -390,6 +424,7 @@ export function UserButton({
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const isElectronRuntime = useIsElectronRuntime();
   const { mutateAsync: submitFeedback } = useFeedbackMutation();
+  const [moneyHidden, setMoneyHiddenState] = useState(false);
   const [iosAlphaAccess, setIOSAlphaAccess] = useState<{
     hasAccess: boolean;
     installUrl: string | null;
@@ -445,6 +480,10 @@ export function UserButton({
     window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
     setIsMenuOpen(false);
   }, [setIsMenuOpen]);
+
+  useEffect(() => {
+    setMoneyHiddenState(isMoneyHidden());
+  }, []);
 
   useEffect(() => {
     if (!isElectronRuntime || !isLoaded || !user) {
@@ -553,6 +592,7 @@ export function UserButton({
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,
     isElectronRuntime,
+    moneyHidden,
   });
 
   // Custom trigger — use provided trigger prop or build default

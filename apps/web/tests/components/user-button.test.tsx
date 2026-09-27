@@ -822,7 +822,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
 
     const separators = screen.getAllByRole('separator');
-    expect(separators).toHaveLength(4);
+    expect(separators).toHaveLength(5);
     for (const separator of separators) {
       expect(separator).toHaveClass('h-2', 'border-0');
     }

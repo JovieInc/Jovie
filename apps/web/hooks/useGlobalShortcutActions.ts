@@ -29,6 +29,7 @@ import {
 import { WORKSPACE_SWITCH_KEY } from '@/lib/keyboard-shortcuts';
 import { isFounderDoorToggleEvent } from '@/lib/ovie/founder-door';
 import { isFormElement } from '@/lib/utils/keyboard';
+import { lockWorkspace } from '@/lib/workspace-lock/workspace-lock';
 
 export function useGlobalShortcutActions() {
   const { cycleTheme } = useThemeToggle();
@@ -66,6 +67,21 @@ export function useGlobalShortcutActions() {
     globalThis.addEventListener('keydown', onKey);
     return () => globalThis.removeEventListener('keydown', onKey);
   }, [signOut]);
+
+  // Alt+Shift+L → lock the workspace (JOV-6829). Physical key code so the
+  // binding survives Option-modified keys on macOS, matching the W binding.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.isComposing) return;
+      if (!e.altKey || !e.shiftKey || e.metaKey || e.ctrlKey) return;
+      if (e.code !== 'KeyL' && e.key.toLowerCase() !== 'l') return;
+      if (isFormElement(e.target)) return;
+      e.preventDefault();
+      lockWorkspace();
+    }
+    globalThis.addEventListener('keydown', onKey);
+    return () => globalThis.removeEventListener('keydown', onKey);
+  }, []);
 
   // Alt+Shift+W → cycle to the next authorized workspace.
   useEffect(() => {
