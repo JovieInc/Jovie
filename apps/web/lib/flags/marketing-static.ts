@@ -23,11 +23,12 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_V2_FINAL_CTA: true,
   SHOW_HOMEPAGE_GO_LIVE_SECTION: true,
   SHOW_HOMEPAGE_FAQ: true,
-  // Prelaunch waitlist gate. When true, public-front-door CTAs render as
-  // "Request access" and land on /signup. When false, they revert to
-  // "Claim your free profile" on /start. The server-side waitlist gate
-  // (`isWaitlistGateEnabled`) still owns post-auth routing. Flip to false
-  // to open the doors. /waitlist remains the pending-receipt route.
+  // Prelaunch waitlist gate for nav and other public front-door links.
+  // When true, those CTAs render as "Request access" and land on /signup.
+  // The homepage hero stays the locked name search (Search your name →
+  // Find me → /start, JOV-5085 / JOV-5864) either way. The server-side
+  // waitlist gate (`isWaitlistGateEnabled`) still owns post-/start routing.
+  // Flip to false to open the doors. /waitlist remains the pending-receipt route.
   WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: true,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
