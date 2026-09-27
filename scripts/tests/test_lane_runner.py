@@ -992,17 +992,19 @@ class FixRedTest(unittest.TestCase):
             self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
 
     def test_claim_records_attempt_before_work(self):
-        real = lane.open_prs_summary
+        real = lane.open_prs_summary, lane.sh
         lane.open_prs_summary = lambda: [{**self.pr(number=4), "headRefName": "devin/jov-6525-auto-merge-default"},
                                          {**self.pr(), "headRefName": "devin/jov-1-20260925204809"},
                                          {**self.pr(number=6), "headRefName": "claude/x"}]
+        # No GitHub from tests: claimed_elsewhere/post_claim would read and comment on real PRs.
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="[]")
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             try:
                 self.assertEqual(lane.claim_red_pr(host, "devin")["number"], 5)
                 self.assertIsNone(lane.claim_red_pr(host, "devin"))
             finally:
-                lane.open_prs_summary = real
+                lane.open_prs_summary, lane.sh = real
             record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
             self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
             self.assertAlmostEqual(record["at"], time.time(), delta=60)
