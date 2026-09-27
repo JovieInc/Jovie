@@ -348,9 +348,11 @@ export class ChargeHandler implements WebhookHandler {
   }
 
   /**
-   * Stripe SDK v22 dropped Charge.invoice from the typed surface, but
-   * webhook payloads and PaymentIntents still carry the invoice id.
-   * Read it without inventing a typed field that does not exist.
+   * Older webhook payloads carry Charge.invoice / PaymentIntent.invoice.
+   * On the pinned API (2026-08-26.dahlia) both are gone, and the only link
+   * from a payment to its invoice is an InvoicePayment, so fall back to it.
+   * Without that fallback no refund resolves its invoice (verified in Stripe
+   * test mode 2026-09-27) and refunds never revoke Pro.
    */
   private async resolveInvoice(
     charge: Stripe.Charge
@@ -370,7 +372,18 @@ export class ChargeHandler implements WebhookHandler {
         ? charge.payment_intent
         : await stripe.paymentIntents.retrieve(paymentIntentId);
 
-    return this.coerceInvoice(Reflect.get(paymentIntent, 'invoice'));
+    const fromPaymentIntent = await this.coerceInvoice(
+      Reflect.get(paymentIntent, 'invoice')
+    );
+    if (fromPaymentIntent) {
+      return fromPaymentIntent;
+    }
+
+    const payments = await stripe.invoicePayments.list({
+      payment: { type: 'payment_intent', payment_intent: paymentIntentId },
+      limit: 1,
+    });
+    return this.coerceInvoice(payments.data[0]?.invoice);
   }
 
   private async coerceInvoice(
