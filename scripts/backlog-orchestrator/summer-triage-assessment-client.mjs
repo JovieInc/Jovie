@@ -1,9 +1,20 @@
 import { createPrivateKey, sign as nodeSign } from 'node:crypto';
 import { isIP } from 'node:net';
-import { canonical } from '../symphony/summer-symphony-outbox-consumer.mjs';
 
 export const TRIAGE_ASSESSMENT_DOMAIN =
   'jovie.linear-triage-assessment-request/v1';
+
+/** Byte-stable canonical JSON; Summer verifies the signed request with the same form. */
+export function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${canonical(child)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
 const ROUTE = '/summer/v1/symphony/triage-assessments';
 
 /**

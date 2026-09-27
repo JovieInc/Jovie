@@ -81,7 +81,7 @@ describe('command resolution', () => {
     'scripts/verification/one.test.mjs',
     'scripts/verification/two.test.mjs',
     'scripts/lib/__tests__/rel.test.mjs',
-    'scripts/symphony/lib/__tests__/typed.test.ts',
+    'scripts/gate-ladder/typed.test.ts',
     'scripts/never.test.mjs',
   ];
 
@@ -95,7 +95,7 @@ describe('command resolution', () => {
         },
         {
           source: 'lane',
-          text: 'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/rel.test.mjs symphony/lib/__tests__/typed.test.ts',
+          text: 'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/rel.test.mjs gate-ladder/typed.test.ts',
         },
       ],
       files
@@ -104,9 +104,7 @@ describe('command resolution', () => {
     expect(refs.get('scripts/verification/one.test.mjs')?.size).toBe(1);
     expect(refs.get('scripts/verification/two.test.mjs')?.size).toBe(1);
     expect(refs.get('scripts/lib/__tests__/rel.test.mjs')?.size).toBe(1);
-    expect(refs.get('scripts/symphony/lib/__tests__/typed.test.ts')?.size).toBe(
-      1
-    );
+    expect(refs.get('scripts/gate-ladder/typed.test.ts')?.size).toBe(1);
     expect(refs.get('scripts/never.test.mjs')?.size).toBe(0);
   });
 

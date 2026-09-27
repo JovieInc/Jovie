@@ -396,7 +396,6 @@ module.exports = [
       'lib/eval/calibration.ts',
       'lib/hud/ovie-mac-hud.server.ts',
       'lib/hud/shipper-state.ts',
-      'lib/hud/symphony-codex-accounts.server.ts',
       'lib/library-share/passphrase.ts',
       'lib/merch/artwork.ts',
       'lib/ovie/identity.ts',

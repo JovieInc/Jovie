@@ -193,7 +193,8 @@ describe('JovieWorkFeed', () => {
             newFansDelta: 3,
           },
         },
-        expected: 'Measuring attributed results for 30 days.',
+        expected:
+          'Measuring verified money and attributed engagement for 30 days. Causal lift stays inconclusive until a comparable baseline exists.',
       },
       {
         phase: 'completed',
@@ -207,7 +208,8 @@ describe('JovieWorkFeed', () => {
             newFansDelta: 0,
           },
         },
-        expected: 'No attributed results in the 30-day window.',
+        expected:
+          'No verified money or attributed engagement in the 30-day window. Causal lift is inconclusive.',
       },
       {
         phase: 'completed',
@@ -227,7 +229,7 @@ describe('JovieWorkFeed', () => {
         phase: 'completed',
         statusLabel: 'Done',
         outcome: { state: 'unavailable', metrics: null },
-        expected: 'Attributed results are unavailable.',
+        expected: 'Creator outcomes are unavailable.',
       },
     ] as const;
     const slotClasses = new Set<string>();
@@ -273,9 +275,13 @@ describe('JovieWorkFeed', () => {
         expect(screen.queryByText('$18.00')).toBeNull();
       }
       if (fixture.outcome?.state === 'measured_positive') {
-        expect(screen.getByText('12')).toBeVisible();
-        expect(screen.getByText('3')).toBeVisible();
+        expect(screen.getByText('Verified money')).toBeVisible();
+        expect(screen.getByText('12 clicks · 3 fans')).toBeVisible();
+        expect(screen.getByText('Attributed engagement')).toBeVisible();
+        expect(screen.getByText('Inconclusive')).toBeVisible();
+        expect(screen.getByText('Causal lift')).toBeVisible();
         expect(screen.queryByText('DSP Clicks')).toBeNull();
+        expect(screen.queryByText('GMV')).toBeNull();
       }
 
       view.unmount();

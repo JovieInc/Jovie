@@ -1,9 +1,9 @@
 import 'server-only';
 
-import { and, eq, isNotNull, like } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
-import { merchGenerationBatches } from '@/lib/db/schema/merch';
+import { merchCards, merchGenerationBatches } from '@/lib/db/schema/merch';
 import { RELEASE_AUTOPILOT_MERCH_COMMAND } from '@/lib/services/release-autopilot/types';
 import type {
   ReleaseToRevenueRunStepOutputs,
@@ -81,22 +81,45 @@ export async function findMerchCardIdsForRelease(
   ];
 }
 
+/**
+ * Keep only linked ids that belong to the owning creator (JOV-3705). Listings
+ * written before owner-scoped discovery (JOV-3703) may still carry another
+ * tenant's card id; GMV is already owner-scoped, but the displayed array must
+ * be owner-clean too. Preserves the stored order.
+ */
+async function filterOwnedMerchCardIds(
+  linked: readonly string[],
+  creatorProfileId: string
+): Promise<string[]> {
+  const owned = await db
+    .select({ id: merchCards.id })
+    .from(merchCards)
+    .where(
+      and(
+        eq(merchCards.creatorProfileId, creatorProfileId),
+        inArray(merchCards.id, [...linked])
+      )
+    );
+  const ownedIds = new Set(owned.map(row => row.id));
+  return linked.filter(id => ownedIds.has(id));
+}
+
 export async function resolveMerchCardIdsForRun(
   stepOutputs: ReleaseToRevenueRunStepOutputs
 ): Promise<string[]> {
-  const linked = normalizeStoreListing(stepOutputs.storeListing).merchCardIds;
-  if (linked.length > 0) {
-    return [...linked];
-  }
-
-  if (!stepOutputs.releaseId) {
+  // Owner-scope every path to the run's creator. Fail closed when the owner is
+  // missing rather than trusting or searching across tenants' merch cards.
+  const creatorProfileId = stepOutputs.designPartner?.creatorProfileId;
+  if (!creatorProfileId) {
     return [];
   }
 
-  // Owner-scope the discovery query to the run's creator. Fail closed when the
-  // owner is missing rather than searching across every tenant's merch cards.
-  const creatorProfileId = stepOutputs.designPartner?.creatorProfileId;
-  if (!creatorProfileId) {
+  const linked = normalizeStoreListing(stepOutputs.storeListing).merchCardIds;
+  if (linked.length > 0) {
+    return filterOwnedMerchCardIds(linked, creatorProfileId);
+  }
+
+  if (!stepOutputs.releaseId) {
     return [];
   }
 

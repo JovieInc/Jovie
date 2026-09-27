@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
 import {
   ensureBaseHistory,
   runMergeGroupStorybookCertification,
@@ -140,7 +141,10 @@ function getStepRunScript(jobBlock, stepName) {
     stepStart,
     stepEnd === -1 ? lines.length : stepEnd
   );
-  const runStart = stepLines.findIndex(line => line === '        run: |');
+  // `run: &anchor |` shares the script with ci-fast (structural python).
+  const runStart = stepLines.findIndex(line =>
+    /^ {8}run: (?:&[\w-]+ )?\|$/.test(line)
+  );
   expect(runStart, `Missing run block: ${stepName}`).toBeGreaterThanOrEqual(0);
   return stepLines
     .slice(runStart + 1)
@@ -186,12 +190,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -219,6 +223,7 @@ function workflowDeclaresReadyForReviewType(source) {
 }
 
 const BLOBLESS_BASE_FETCH_JOBS = new Set([
+  'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
 ]);
@@ -231,9 +236,9 @@ describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(3);
+    ).toHaveLength(5);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -408,7 +413,22 @@ describe('merge_group workflow contract', () => {
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
     expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
-    expect(sizeGuard).toContain('timeout-minutes: 1');
+    // External admission producers: the job clock includes runner
+    // provisioning (observed 69s), so a sub-3-minute budget can cancel a
+    // passing run and fail admission closed on a CANCELLED required check.
+    // Each producer must still conclude before admission stops polling.
+    for (const [producerName, producer] of [
+      ['PR Size Guard', sizeGuard],
+      ['Fork PR Gate', getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')],
+    ]) {
+      const producerTimeoutMinutes = Number(
+        producer.match(/timeout-minutes:\s*(\d+)/)?.[1]
+      );
+      expect(producerTimeoutMinutes, producerName).toBeGreaterThanOrEqual(3);
+      expect(producerTimeoutMinutes * 60_000, producerName).toBeLessThanOrEqual(
+        MERGE_GROUP_ADMISSION_WAIT_MS / 2
+      );
+    }
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
     expect(sizeGuard).toContain('--policy=size');
     expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
@@ -427,7 +447,7 @@ describe('merge_group workflow contract', () => {
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-admission');
-      expect(job, jobId).toMatch(/if: >-\s+!cancelled\(\) &&/);
+      expect(job, jobId).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
       expect(job, jobId).not.toContain('always()');
       expect(job, jobId).toContain("github.event_name != 'merge_group'");
       expect(job, jobId).toContain(
@@ -456,6 +476,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -491,7 +512,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(3);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(5);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
@@ -501,6 +522,7 @@ describe('merge_group workflow contract', () => {
     for (const jobId of [
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
     ]) {
       expect(getJobBlock(CI_WORKFLOW, jobId), jobId).toMatch(
@@ -526,13 +548,32 @@ describe('merge_group workflow contract', () => {
       units.indexOf('- name: Run quarantined unit tests (retries)'),
       units.indexOf('- name: Run Ovie route')
     );
-    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/10'\n/);
+    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/14'\n/);
     expect(step).not.toContain('--shard');
+  });
+
+  it('reserves sequencer capacity only on the shards that run pinned CI work', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1];
+    const shards = [...(matrix ?? '').matchAll(/'(\d+\/\d+)'/g)].map(m => m[1]);
+    expect(shards.length).toBeGreaterThan(1);
+    expect(new Set(shards).size).toBe(shards.length);
+    shards.forEach((shard, i) =>
+      expect(shard).toBe(`${i + 1}/${shards.length}`)
+    );
+    const pinned = [
+      ...new Set(
+        [...units.matchAll(/matrix\.shard == '(\d+\/\d+)'/g)].map(m => m[1])
+      ),
+    ].sort();
+    for (const shard of pinned) expect(shards).toContain(shard);
+    expect(Object.keys(CI_RESERVED_MS).sort()).toEqual(pinned);
   });
 
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
+    const typecheck = getJobBlock(CI_WORKFLOW, 'ci-typecheck-ovie');
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     const ovieTests = units.slice(
       units.indexOf(
@@ -540,7 +581,7 @@ describe('merge_group workflow contract', () => {
       ),
       units.indexOf('      - name: Preserve Ovie coverage evidence')
     );
-    expect(ovieTests).toContain("matrix.shard == '1/10'");
+    expect(ovieTests).toContain("matrix.shard == '1/14'");
     expect(ovieTests).toContain('pnpm --filter @jovie/ovie test');
     expect(ovieTests).not.toContain('continue-on-error');
     const ovieBuild = build.slice(
@@ -554,20 +595,54 @@ describe('merge_group workflow contract', () => {
       build.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
     ).toHaveLength(2);
     expect(buildLayout).not.toContain('@jovie/ovie');
-    expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
-    // The build may skip Next's duplicate type pass only because the
-    // standalone typecheck runs first, fail-fast, in the same step.
     expect(ovieBuild).toContain('set -euo pipefail');
-    expect(
-      ovieBuild.indexOf('pnpm --filter @jovie/ovie typecheck')
-    ).toBeLessThan(
-      ovieBuild.indexOf(
-        'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
-      )
+    expect(ovieBuild).toContain(
+      'NEXT_IGNORE_TYPECHECK=1 TURBO_ENGINE_READ_ONLY=1 pnpm --filter @jovie/ovie build'
     );
     expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
-    expect(ovieBuild).not.toMatch(/typecheck[^\n]*\|\|/);
+    // The build may skip Next's duplicate type pass only because the
+    // standalone typecheck runs the full command, fail-closed, in a parallel
+    // job with the same trigger and absent-app guards.
+    expect(typecheck).toContain('name: Ovie Typecheck (combined)');
+    expect(typecheck.slice(0, typecheck.indexOf('    runs-on:'))).toBe(
+      build
+        .slice(0, build.indexOf('    runs-on:'))
+        .replace('ci-build-ovie:', 'ci-typecheck-ovie:')
+        .replace('Ovie Build (combined)', 'Ovie Typecheck (combined)')
+    );
+    expect(
+      typecheck.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
+    ).toHaveLength(2);
+    expect(typecheck).toContain('run: pnpm --filter @jovie/ovie typecheck');
+    expect(typecheck).not.toContain('continue-on-error');
+    expect(typecheck).not.toContain('NEXT_IGNORE_TYPECHECK');
+    expect(typecheck).not.toMatch(/typecheck[^\n]*\|\|/);
+    // Every job that consumes the build result must consume the typecheck
+    // result too, so skipping Next's type pass never weakens a gate.
+    const jobIds = [...CI_WORKFLOW.matchAll(/^  ([a-z0-9-]+):\n/gm)].map(
+      match => match[1]
+    );
+    const consumers = jobIds.filter(jobId => {
+      if (jobId === 'ci-build-ovie') return false;
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      return job
+        .slice(0, job.indexOf('    runs-on:'))
+        .includes('ci-build-ovie');
+    });
+    expect(consumers).toEqual([
+      'ci-cross-product-integration',
+      'ci-product-lane-receipt',
+      'ci-merge-group-ready',
+      'main-release-ready',
+    ]);
+    for (const jobId of consumers) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job.slice(0, job.indexOf('    runs-on:')), jobId).toContain(
+        'ci-typecheck-ovie'
+      );
+      expect(job, jobId).toContain('needs.ci-typecheck-ovie.result');
+    }
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
     expect(ovieBuild).toContain(
       'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
@@ -580,7 +655,7 @@ describe('merge_group workflow contract', () => {
     );
     // Both checks remain inside jobs already required by the merge-group
     // aggregate; neither allocates a heavy source-PR lane.
-    for (const job of [units, build]) {
+    for (const job of [units, build, typecheck]) {
       const header = job.slice(0, job.indexOf('    runs-on:'));
       expect(header).toContain(
         "needs.ci-path-changes.outputs.run_web == 'true'"
@@ -610,6 +685,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-exact-head-coverage');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-build-ovie');
+    expect(aggregate).toContain('ci-typecheck-ovie');
     expect(aggregate).toContain('ci-storybook-surfaces');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');
@@ -635,6 +711,12 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain(
       'OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"'
+    );
+    expect(aggregate).toContain(
+      'OVIE_TYPECHECK_RESULT="${{ needs.ci-typecheck-ovie.result }}"'
+    );
+    expect(aggregate).toContain(
+      '"Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT"'
     );
     expect(aggregate).toContain(
       'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
@@ -708,6 +790,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -742,8 +825,24 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).toContain('Run deterministic layout behavior guard');
     expect(buildLayout).not.toContain('actions/upload-artifact');
     expect(buildLayout).not.toContain('actions/download-artifact');
+    // Build tail: no discarded turbo cache write; web-free checks run in the
+    // parallel Storybook job, which shares this job's gating and aggregates.
+    expect(buildLayout).toContain(
+      "TURBO_CACHE: ${{ github.event_name == 'merge_group' && 'local:r' || env.TURBO_CACHE }}"
+    );
+    expect(buildLayout).not.toContain('@jovie/extension');
+    const surfaces = getJobBlock(CI_WORKFLOW, 'ci-storybook-surfaces');
+    for (const check of [
+      '@jovie/extension typecheck',
+      '@jovie/extension test',
+      '@jovie/extension build',
+      '@jovie/observability-ingest typecheck',
+      '@jovie/observability-ingest test',
+    ]) {
+      expect(surfaces).toContain(`pnpm --filter ${check}`);
+    }
     expect(unitTests).toContain(
-      "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
+      `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}]`
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
@@ -792,10 +891,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "github.event_name == 'merge_group' && matrix.shard == '4/10'"
-    );
-    expect(unitTests).toContain(
-      "github.event_name != 'merge_group' && matrix.shard == '1/10'"
+      "run_full_ci == 'true' && matrix.shard == '4/14'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
@@ -822,51 +918,58 @@ describe('merge_group workflow contract', () => {
   });
 
   it('finishes exact-head coverage inside the native merge-queue check budget', () => {
+    // V8 runs in the ci-exact-head-coverage-shard matrix; the gate job
+    // merges the shard reports and runs the changed-line ratchet.
+    const shard = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage-shard');
     const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    const timeout = Number(coverage.match(/timeout-minutes:\s*(\d+)/)?.[1]);
-    expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
-    expect(timeout).toBeLessThan(
-      NATIVE_QUEUE_POLICY.check_response_timeout_minutes
-    );
     expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
-    expect(coverage).toContain("github.event_name == 'merge_group'");
-    expect(coverage).toContain('github.event.merge_group.head_sha');
-    // The event PR base SHA goes stale on synchronize; the PR diff base is the
-    // merge base with the fetched base tip, the queue keeps its exact base.
-    expect(coverage).not.toContain('github.event.pull_request.base.sha');
-    expect(coverage).toContain(
-      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
-    );
-    expect(coverage).toContain(
-      'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
-    );
-    expect(coverage).toContain('.applicable');
-    expect(coverage).toContain(
-      'pnpm --filter @jovie/web test:coverage --changed'
-    );
-    expect(coverage).not.toContain(
-      'pnpm --filter @jovie/web test:coverage -- --changed'
-    );
-    expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
-    expect(coverage).not.toContain(
+    for (const job of [shard, coverage]) {
+      const timeout = Number(job.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+      expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
+      expect(timeout).toBeLessThan(
+        NATIVE_QUEUE_POLICY.check_response_timeout_minutes
+      );
+      expect(job).toContain("github.event_name == 'merge_group'");
+      expect(job).toContain('github.event.merge_group.head_sha');
+      // The event PR base SHA goes stale on synchronize; the PR diff base is
+      // the merge base with the fetched base tip, the queue keeps its base.
+      expect(job).not.toContain('github.event.pull_request.base.sha');
+      expect(job).toContain(
+        'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+      );
+      expect(job).toContain(
+        'COVERAGE_BASE: ${{ steps.coverage-base.outputs.sha }}'
+      );
+      expect(job).toContain('.applicable');
+      expect(job).not.toContain(
+        'pnpm --filter @jovie/web test:coverage -- --changed'
+      );
+      expect(job).toContain('scripts/check-changed-test-coverage.mjs');
+      expect(job).not.toContain('timeout-minutes: 60');
+    }
+    expect(shard).toContain('pnpm --filter @jovie/web test:coverage --changed');
+    expect(shard).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(shard).not.toContain(
       String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
     );
-    expect(coverage).toContain(
-      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    expect(shard).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\" --bail 1 --shard \"\$COVERAGE_SHARD\"`
     );
-    expect(coverage).toContain('--bail 1');
+    expect(shard).toContain('--bail 1');
     expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
-    expect(coverage).toContain(
+    expect(shard).toContain(
       `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
     );
-    expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
-    expect(coverage).not.toContain('timeout-minutes: 60');
+    expect(coverage).toContain(
+      'needs: [ci-path-changes, ci-exact-head-coverage-shard]'
+    );
   });
 
   it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
     for (const jobId of [
       'ci-fast-remaining',
       'ci-profile-admission-browser',
+      'ci-exact-head-coverage-shard',
       'ci-exact-head-coverage',
     ]) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
@@ -967,79 +1070,87 @@ describe('merge_group workflow contract', () => {
     expect(job).toContain('persist-credentials: false');
   });
 
-  it('prefetches exactly the ratchet diff blobs for blobless exact-head coverage', () => {
-    const job = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
-    const ratchetSource = readFileSync(
-      join(REPO_ROOT, 'scripts/lib/changed-test-coverage.mjs'),
-      'utf8'
-    );
-    // The ratchet's diff arguments; the prefetch must replay the same diff so
-    // every blob it reads is local before persist-credentials: false steps.
-    for (const arg of [
-      "'diff'",
-      "'--unified=0'",
-      "'--diff-filter=ACMR'",
-      "'--no-renames'",
-      '`${base}...${head}`',
-      "'apps/web'",
-    ]) {
-      expect(ratchetSource).toContain(arg);
+  it.each(['ci-exact-head-coverage-shard', 'ci-exact-head-coverage'])(
+    'prefetches exactly the ratchet diff blobs for blobless %s',
+    jobId => {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      const fetchScript = getStepRunScript(job, 'Fetch base-branch history');
+      const ratchetSource = readFileSync(
+        join(REPO_ROOT, 'scripts/lib/changed-test-coverage.mjs'),
+        'utf8'
+      );
+      // The ratchet's diff arguments; the prefetch must replay the same diff so
+      // every blob it reads is local before persist-credentials: false steps.
+      for (const arg of [
+        "'diff'",
+        "'--unified=0'",
+        "'--diff-filter=ACMR'",
+        "'--no-renames'",
+        '`${base}...${head}`',
+        "'apps/web'",
+      ]) {
+        expect(ratchetSource).toContain(arg);
+      }
+      const ratchetDiff =
+        'diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null';
+      const lines = fetchScript.split('\n');
+      const fetchLine = lines.findIndex(line =>
+        line.includes('fetch --no-tags --unshallow --filter=blob:none')
+      );
+      const baseLine = lines.findIndex(
+        line =>
+          line ===
+          'GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"'
+      );
+      const prefetchLine = lines.findIndex(
+        line =>
+          line.startsWith(
+            'git -c "http.https://github.com/.extraheader=$AUTH_HEADER" '
+          ) && line.endsWith(ratchetDiff)
+      );
+      const offlineLine = lines.findIndex(
+        line => line === `GIT_NO_LAZY_FETCH=1 git ${ratchetDiff}`
+      );
+      expect(fetchLine).toBeGreaterThanOrEqual(0);
+      expect(baseLine).toBeGreaterThan(fetchLine);
+      expect(prefetchLine).toBeGreaterThan(baseLine);
+      expect(offlineLine).toBeGreaterThan(prefetchLine);
+      expect(fetchScript).toContain('set -euo pipefail');
+      const fetchStep = job.slice(
+        job.indexOf('      - name: Fetch base-branch history'),
+        job.indexOf('      - name: Verify exact coverage head and diff base')
+      );
+      expect(fetchStep).toContain(
+        "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+      );
+      // The prefetch diffs from the resolved base (PR merge base with the base
+      // tip, or the exact merge-group base), which later steps then consume.
+      expect(fetchStep).toContain('id: coverage-base');
+      expect(fetchStep).toContain(
+        'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
+      );
+      expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
+      expect(fetchScript).toContain(
+        'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
+      );
+      // The base-commit check must not be satisfiable by a promisor fetch.
+      const verifyStart = job.indexOf(
+        '      - name: Verify exact coverage head and diff base'
+      );
+      expect(verifyStart).toBeGreaterThanOrEqual(0);
+      const verifyEnd = job.indexOf('\n      - ', verifyStart + 1);
+      expect(verifyEnd).toBeGreaterThan(verifyStart);
+      const verifyStep = job.slice(verifyStart, verifyEnd);
+      expect(verifyStep).toContain("GIT_NO_LAZY_FETCH: '1'");
+      expect(verifyStep).toContain(
+        'git cat-file -e "${COVERAGE_BASE}^{commit}"'
+      );
+      // Credentials stay step-scoped: no checkout-level blob filter or persisted
+      // token that later test code could reuse.
+      expect(job).not.toContain('filter: blob:none');
+      expect(job).toContain('persist-credentials: false');
     }
-    const ratchetDiff =
-      'diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null';
-    const lines = fetchScript.split('\n');
-    const fetchLine = lines.findIndex(line =>
-      line.includes('fetch --no-tags --unshallow --filter=blob:none')
-    );
-    const baseLine = lines.findIndex(
-      line =>
-        line ===
-        'GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"'
-    );
-    const prefetchLine = lines.findIndex(
-      line =>
-        line.startsWith(
-          'git -c "http.https://github.com/.extraheader=$AUTH_HEADER" '
-        ) && line.endsWith(ratchetDiff)
-    );
-    const offlineLine = lines.findIndex(
-      line => line === `GIT_NO_LAZY_FETCH=1 git ${ratchetDiff}`
-    );
-    expect(fetchLine).toBeGreaterThanOrEqual(0);
-    expect(baseLine).toBeGreaterThan(fetchLine);
-    expect(prefetchLine).toBeGreaterThan(baseLine);
-    expect(offlineLine).toBeGreaterThan(prefetchLine);
-    expect(fetchScript).toContain('set -euo pipefail');
-    const fetchStep = job.slice(
-      job.indexOf('      - name: Fetch base-branch history'),
-      job.indexOf('      - name: Verify exact coverage head and diff base')
-    );
-    expect(fetchStep).toContain(
-      "EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
-    );
-    // The prefetch diffs from the resolved base (PR merge base with the base
-    // tip, or the exact merge-group base), which later steps then consume.
-    expect(fetchStep).toContain('id: coverage-base');
-    expect(fetchStep).toContain(
-      'MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}'
-    );
-    expect(fetchStep).not.toContain('github.event.pull_request.base.sha');
-    expect(fetchScript).toContain(
-      'echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"'
-    );
-    // The base-commit check must not be satisfiable by a promisor fetch.
-    const verifyStep = job.slice(
-      job.indexOf('      - name: Verify exact coverage head and diff base'),
-      job.indexOf('      - uses: ./.github/actions/setup-node-pnpm')
-    );
-    expect(verifyStep).toContain("GIT_NO_LAZY_FETCH: '1'");
-    expect(verifyStep).toContain('git cat-file -e "${COVERAGE_BASE}^{commit}"');
-    // Credentials stay step-scoped: no checkout-level blob filter or persisted
-    // token that later test code could reuse.
-    expect(job).not.toContain('filter: blob:none');
-    expect(job).toContain('persist-credentials: false');
-  });
+  );
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {
     const secret = getJobBlock(CI_WORKFLOW, 'ci-secret-scan');
@@ -1366,20 +1477,32 @@ describe('merge_group workflow contract', () => {
       .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
-    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped
-unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped
-unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped
-unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success
-healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success
-selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped
-selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success
-selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success
-selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success
-selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped
-deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped`;
+    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped|skipped
+unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped|skipped
+unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped|skipped
+unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success|skipped
+healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success|success
+selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped|skipped
+selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success|success
+selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success|success
+selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success|success
+selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped|success
+unselected Web rejects Ovie typecheck execution|false|skipped|skipped|false|skipped|1|skipped|skipped|success
+selected Web rejects failed Ovie typecheck|true|success|success|false|skipped|1|success|success|failure
+deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped|skipped`;
     for (const testCase of cases.split('\n')) {
-      const [name, web, unit, build, runIos, iosResult, status, ovie, story] =
-        testCase.split('|');
+      const [
+        name,
+        web,
+        unit,
+        build,
+        runIos,
+        iosResult,
+        status,
+        ovie,
+        story,
+        ovieTypecheck,
+      ] = testCase.split('|');
       const result = spawnSync(
         'bash',
         [
@@ -1393,6 +1516,7 @@ RUN_IOS="$4"
 IOS_RESULT="$5"
 OVIE_BUILD_RESULT="$6"
 STORYBOOK_SURFACES_RESULT="$7"
+OVIE_TYPECHECK_RESULT="$8"
 RUN_MACOS=false
 MACOS_RESULT=skipped
 RUN_CROSS_PRODUCT=false
@@ -1406,6 +1530,7 @@ ${selectedGateScript}`,
           iosResult,
           ovie,
           story,
+          ovieTypecheck,
         ],
         { encoding: 'utf8' }
       );
@@ -1523,7 +1648,7 @@ ${selectedGateScript}`,
     expect(restore).not.toMatch(/^\s+if:/m);
     expect(restore).toContain('path: apps/web/.next/cache/turbopack');
     expect(restore).toContain(
-      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-day.outputs.day }}"
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
     );
     expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
 
@@ -1552,6 +1677,10 @@ ${selectedGateScript}`,
       'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
     );
     expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
+    // Non-saving runs skip the cache write; push must still persist it.
+    expect(step('Build exact combined head')).toContain(
+      '[ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1\n'
+    );
     expect(buildLayout).not.toContain('pull_request_target');
     expect(buildLayout).not.toContain('secrets.');
   });
@@ -1605,7 +1734,7 @@ ${selectedGateScript}`,
       buildLayout,
       'Restore Next build cache (read-only)'
     );
-    const lookup = stepIn(warm, "Look up today's Next build cache");
+    const lookup = stepIn(warm, "Look up this hour's Next build cache");
     expect(keyLines(ciRestore)).toHaveLength(3);
     expect(keyLines(lookup)).toEqual(keyLines(ciRestore).slice(0, 1));
 
@@ -1616,8 +1745,13 @@ ${selectedGateScript}`,
     expect(warm).not.toContain('restore-keys:');
     const dayRun = step =>
       step.split('\n').find(line => line.trim().startsWith('run:'));
-    expect(dayRun(stepIn(warm, 'Resolve Next build cache day'))).toBe(
-      dayRun(stepIn(buildLayout, 'Resolve Next build cache day'))
+    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toBe(
+      dayRun(stepIn(buildLayout, 'Resolve Next build cache hour'))
+    );
+    // Hourly keys keep merge groups on a recent main; older hours still
+    // restore through the hash prefix.
+    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toContain(
+      'hour=$(date -u +%Y%m%d%H)'
     );
     expect(lookup).toContain('path: apps/web/.next/cache/turbopack');
 
@@ -1626,7 +1760,9 @@ ${selectedGateScript}`,
     expect(lookup).not.toMatch(/^\s+if:/m);
     const miss = "steps.next-build-cache-lookup.outputs.cache-hit != 'true'";
     const setupAt = warm.indexOf('- uses: ./.github/actions/setup-node-pnpm');
-    expect(stepAt("Look up today's Next build cache")).toBeLessThan(setupAt);
+    expect(stepAt("Look up this hour's Next build cache")).toBeLessThan(
+      setupAt
+    );
     expect(
       warm.slice(setupAt, warm.indexOf('\n      - ', setupAt + 1))
     ).toContain(miss);
@@ -1640,6 +1776,7 @@ ${selectedGateScript}`,
     // Same web build and public mock env as the combined head build.
     const build = stepIn(warm, 'Build web for cache');
     expect(build).toContain('run: pnpm turbo build --filter=@jovie/web\n');
+    expect(warm).not.toContain('TURBO_ENGINE_READ_ONLY');
     const envLines = step =>
       step.split('\n').filter(line => /^ {10}NEXT_[A-Z_]+:/.test(line));
     const ciBuild = stepIn(buildLayout, 'Build exact combined head');
@@ -2426,6 +2563,7 @@ ${selectedGateScript}`,
       'ci-fast',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',

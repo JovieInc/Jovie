@@ -4,6 +4,12 @@ import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { THEME_ROUTE_POLICY } from '@/lib/theme/route-policy';
 
+// These cases cover the theme-switching policy itself; production ships with
+// theme switching off (dark forced), covered in lib/theme/route-policy.test.ts.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = '1';
+});
+
 const SCRIPT = readFileSync(
   resolve(process.cwd(), 'public/theme-init.js'),
   'utf8'

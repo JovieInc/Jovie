@@ -94,8 +94,6 @@ import {
   terminalLaunchSpec,
 } from './operator-launch';
 import {
-  OVIE_OPERATOR_TALK_ROUTE,
-  ovieOperatorOpsHref,
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
@@ -154,8 +152,6 @@ if (APP_ENV === 'staging') {
 const APP_ORIGIN = new URL(APP_URL).origin;
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
-const OVIE_OPERATOR_TALK_URL = buildAppUrl(OVIE_OPERATOR_TALK_ROUTE);
-const OVIE_OPERATOR_OPS_URL = buildAppUrl(ovieOperatorOpsHref());
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
@@ -2274,26 +2270,6 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   return win;
 }
 
-function openOvieOperatorTalkDoor(): void {
-  if (isAuthHandoffOpen()) return;
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    createWindow(OVIE_OPERATOR_TALK_URL);
-    return;
-  }
-  void mainWindow.loadURL(OVIE_OPERATOR_TALK_URL);
-  showWindow(mainWindow);
-}
-
-function openOvieOperatorOpsDoor(): void {
-  if (isAuthHandoffOpen()) return;
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    createWindow(OVIE_OPERATOR_OPS_URL);
-    return;
-  }
-  void mainWindow.loadURL(OVIE_OPERATOR_OPS_URL);
-  showWindow(mainWindow);
-}
-
 function openPreferences(): void {
   // Mid-handoff the focused window is the small, non-resizable auth window and
   // the main window is intentionally hidden — loading settings into either
@@ -2483,14 +2459,6 @@ function buildApplicationMenu(): Menu {
             label: 'Preferences...',
             accelerator: 'Command+,',
             click: openPreferences,
-          },
-          {
-            label: 'Ovie',
-            click: openOvieOperatorOpsDoor,
-          },
-          {
-            label: 'Talk',
-            click: openOvieOperatorTalkDoor,
           },
           { type: 'separator' },
           { role: 'services' },

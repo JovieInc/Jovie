@@ -19,10 +19,6 @@ vi.mock('./OvieLauncherRail', () => ({
   OvieLauncherRail: () => null,
 }));
 
-vi.mock('./SymphonyCodexAccountControl', () => ({
-  SymphonyCodexAccountControl: () => null,
-}));
-
 const snapshot: OvieMacHudSnapshot = {
   alive: {
     cashUsd: null,

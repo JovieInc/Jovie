@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { test } from 'node:test';
 
-import { canonical } from '../../symphony/summer-symphony-outbox-consumer.mjs';
 import {
+  canonical,
   requestSummerAssessment,
   summerAssessmentConfig,
   TRIAGE_ASSESSMENT_DOMAIN,
