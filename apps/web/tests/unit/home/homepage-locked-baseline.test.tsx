@@ -186,13 +186,18 @@ describe('JOV-5864 locked homepage baseline', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses access links in both conversion positions when gated', () => {
+  it('keeps the name search and close focus when the waitlist gate is on', () => {
     gate.WAITLIST_ENABLED = true;
     render(<LockedHomepageBody />);
+    expect(screen.getByPlaceholderText('Search your name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Find me' })).toBeInTheDocument();
     expect(
-      screen.getAllByRole('link', { name: 'Request access' })
-    ).toHaveLength(2);
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Find your profile' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Get started')).toBeNull();
   });
 
   it('keeps one canonical name search with one terminal return action', () => {
