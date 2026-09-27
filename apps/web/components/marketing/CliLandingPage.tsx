@@ -103,6 +103,11 @@ export function CliLandingPage() {
           href: APP_ROUTES.DEVELOPERS,
           testId: 'cli-hero-developers',
         }}
+        photo={{
+          src: '/images/marketing-hero/cli.webp',
+          width: 1600,
+          height: 901,
+        }}
         logos={false}
         align='center'
         testId='cli-hero'
@@ -141,6 +146,7 @@ export function CliLandingPage() {
               id='commands-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
+              {/* ui-casing-allow: marketing display headline */}
               What you can do
             </h2>
             <div className='mt-6 space-y-8'>
@@ -165,6 +171,7 @@ export function CliLandingPage() {
               id='reference-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
+              {/* ui-casing-allow: marketing display headline */}
               CLI reference
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
