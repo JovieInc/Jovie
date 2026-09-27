@@ -2474,7 +2474,7 @@ jobs:
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
     if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 6
     permissions:
       contents: read
       issues: read
@@ -2493,6 +2493,8 @@ jobs:
         id: check_changes
         shell: bash
         run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
 
       # Skip notification (updated condition)
       - name: Skip notification
@@ -2512,6 +2514,7 @@ jobs:
 
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
+          pnpm exec tsx scripts/online-index-migrate.ts --validate-only
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
