@@ -1,6 +1,6 @@
 import Foundation
 
-enum LaunchMode: Equatable {
+enum LaunchMode: Equatable, CaseIterable {
   case live
   case unitTesting
   case uiTestingLiveAuth
