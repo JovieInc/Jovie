@@ -80,16 +80,18 @@
     }
   ],
   "research": {
-    "name": "hyperagent-research",
-    "model": "z-ai/glm-5.3",
+    "name": "hyperagent-fable-research",
+    "model": "anthropic/fable-5.1",
     "timeoutS": 1900,
     "health": ["hyperagent", "models", "--json"],
-    "healthy": "glm-5\\.3",
+    "healthy": "models",
     "cmd": [
       "hyperagent",
       "execute",
       "--model",
-      "z-ai/glm-5.3",
+      "anthropic/fable-5.1",
+      "--agent-id",
+      "cmuk33ew70r2e06adfqx6gbpy",
       "--json",
       "--timeout",
       "1800",

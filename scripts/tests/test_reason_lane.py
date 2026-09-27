@@ -348,7 +348,7 @@ class ExecuteTest(unittest.TestCase):
             gone = reason.execute(job, CONFIG, "ctx", Path(tmp), run=Runner(hyperagent=OSError("x")))
         self.assertEqual(out["record"]["confidence"], "research")
         self.assertIn("Answer: yes", out["comment"])
-        self.assertIn("glm-5.3", run.made("hyperagent")[0][3])
+        self.assertIn("fable-5.1", run.made("hyperagent")[0][3])
         self.assertTrue(failed["retry"])
         self.assertEqual(raw["record"]["confidence"], "research")
         self.assertTrue(gone["retry"])
@@ -458,6 +458,18 @@ class DrainAndTickTest(unittest.TestCase):
                                   run=Runner(claude=done('"loggedIn": true')))
             self.assertEqual(capped["status"], "budget-exhausted")
             self.assertEqual(linear.moves, [], "an over-budget job stays in Todo")
+
+    def test_research_still_runs_while_the_proposer_is_logged_out(self):
+        research = description({**JOB_BLOCK, "decisionType": "research", "question": "Why?"})
+        linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "rank", "description": description(), "createdAt": "1"},
+                                  {"id": "i-2", "identifier": "JOV-2", "title": "research", "description": research, "createdAt": "2"}])
+        run = Runner(claude=done("", 1), hyperagent=[done('{"models": {}}'), done(json.dumps({"text": "Answer: yes"}))],
+                     gbrain=done("ok"))
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
+            out = reason.drain(host, self.lane(linear), CONFIG, run=run)
+        self.assertEqual([d["job"] for d in out["done"]], ["JOV-2"])
+        self.assertNotIn(("i-1", "In Progress"), linear.moves, "a ranking job waits for a healthy proposer")
 
     def test_a_failed_job_waits_for_the_next_drain(self):
         linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": "", "createdAt": "1"}])

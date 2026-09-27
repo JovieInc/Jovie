@@ -635,14 +635,18 @@ def drain(host, lane, config: dict | None = None, run=subprocess.run) -> dict:
         return {"status": "busy"}
     done, attempted = [], set()
     try:
-        if not healthy(config["proposer"], run=run):
+        # Research runs on its own model, so a logged-out proposer must not block it (and vice versa).
+        ready = {"decision": healthy(config["proposer"], run=run), "research": healthy(config["research"], run=run)}
+        if not any(ready.values()):
             return {"status": "proposer-unhealthy"}
         linear = lane.Linear(host.linear_env)
+
+        def runnable(job: dict) -> bool:
+            research = parse_job(job["identifier"], job["title"], job.get("description") or "")["decisionType"] == "research"
+            return ready["research" if research else "decision"] and budget_allows(host.state, config, research)
         while True:
             jobs = queued_jobs(linear, config["label"])
-            issue = next((job for job in jobs if job["identifier"] not in attempted and budget_allows(
-                host.state, config, parse_job(job["identifier"], job["title"], job.get("description") or "")
-                ["decisionType"] == "research")), None)
+            issue = next((job for job in jobs if job["identifier"] not in attempted and runnable(job)), None)
             if issue is None:
                 waiting = [job for job in jobs if job["identifier"] not in attempted]
                 return {"status": "budget-exhausted" if waiting else "idle", "done": done}
