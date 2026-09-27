@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ActionDial, type ActionDialOption } from './ActionDial';
 
@@ -172,6 +173,13 @@ describe('ActionDial', () => {
       screen.queryByTestId('action-dial-icon-track')
     ).not.toBeInTheDocument();
     expect(screen.getByText('Spotify icon')).toBeInTheDocument();
+  });
+
+  it('keeps server markup compatible with reduced-motion hydration', () => {
+    const markup = renderToString(<Fixture />);
+
+    expect(markup).not.toContain('action-dial-icon-track');
+    expect(markup).toContain('Spotify icon');
   });
 
   it('selects an adjacent row on a captured pointer tap', () => {

@@ -3,6 +3,7 @@
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { SmartLinkProviderButton } from './SmartLinkProviderButton';
 
@@ -41,12 +42,6 @@ function relativeIndex(
   return forward > count / 2 ? forward - count : forward;
 }
 
-function prefersReducedMotion(): boolean {
-  return typeof globalThis.matchMedia === 'function'
-    ? globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
-
 export function ActionDial({
   options,
   selectedId,
@@ -64,7 +59,7 @@ export function ActionDial({
   const [visualIndex, setVisualIndex] = useState(selectedIndex);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const reducedMotion = prefersReducedMotion();
+  const reducedMotion = useReducedMotion();
   const pointerRef = useRef<{
     id: number;
     y: number;
