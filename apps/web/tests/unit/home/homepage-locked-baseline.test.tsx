@@ -12,6 +12,7 @@ import {
   HomepageEditorialChangelog,
 } from '@/components/homepage/HomepageEditorialChangelog';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -186,13 +187,29 @@ describe('JOV-5864 locked homepage baseline', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses access links in both conversion positions when gated', () => {
+  it('keeps the name search and /start close when the waitlist flag is on', () => {
     gate.WAITLIST_ENABLED = true;
-    render(<LockedHomepageBody />);
+    const { container } = render(
+      <>
+        <LockedHomepageBody />
+        <HomepageNoScriptContent />
+      </>
+    );
+    const html = container.innerHTML;
+
+    expect(screen.getByPlaceholderText('Search your name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Find me' })).toBeEnabled();
     expect(
-      screen.getAllByRole('link', { name: 'Request access' })
-    ).toHaveLength(2);
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Find your profile' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Get started')).not.toBeInTheDocument();
+    // Same strings the production golden-path probe requires in homepage HTML.
+    expect(html).toContain('Search your name');
+    expect(html).toContain('Find me');
+    expect(html).toMatch(/href="\/start"/);
   });
 
   it('keeps one canonical name search with one terminal return action', () => {

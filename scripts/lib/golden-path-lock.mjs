@@ -21,6 +21,7 @@ export const MERGE_GATE_TEST_FILES = Object.freeze([
   'apps/web/tests/unit/onboarding/onboardingChatHelpers.errors.test.ts',
   'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
   'apps/web/tests/unit/api/waitlist/waitlist.test.ts',
+  'apps/web/tests/unit/home/homepage-locked-baseline.test.tsx',
 ]);
 
 export const GOLDEN_PATH_LOCK_SELF_TEST_FILES = Object.freeze([
@@ -56,6 +57,13 @@ export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'apps/web/app/sign-in/',
   'apps/web/app/sign-up/',
   'apps/web/data/homepageFrontDoorCta.ts',
+  'apps/web/data/homepageLaunchCopy.ts',
+  'apps/web/data/homepageCertifiedOptimization.ts',
+  'apps/web/components/homepage/HomepagePrimaryAction.tsx',
+  'apps/web/components/homepage/HomepageEditorialHero.tsx',
+  'apps/web/components/homepage/HomepageClose.tsx',
+  'apps/web/components/homepage/HomepageNoScriptContent.tsx',
+  'apps/web/app/(home)/page.tsx',
   'apps/web/data/marketingCtaIntents.ts',
   'apps/web/lib/flags/marketing-static.ts',
   'apps/web/components/features/onboarding/',
