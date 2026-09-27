@@ -61,19 +61,34 @@ describe('ensureEmailAvailable', () => {
 
   it('passes when email belongs to the same user', async () => {
     const tx = createMockTx();
-    tx.limitMock.mockResolvedValue([{ clerkId: 'clerk_123' }]);
+    tx.limitMock.mockResolvedValue([{ id: 'user-uuid-1' }]);
 
     const { ensureEmailAvailable } = await import(
       '@/app/onboarding/actions/validation'
     );
     await expect(
-      ensureEmailAvailable(tx as any, 'clerk_123', 'existing@test.com')
+      ensureEmailAvailable(tx as any, 'user-uuid-1', 'existing@test.com')
+    ).resolves.toBeUndefined();
+  });
+
+  it('keys ownership on users.id, not the legacy clerk_id (JOV-5401)', async () => {
+    // Better Auth rows carry `clerk_id = 'ba:<id>'`, which never equals the
+    // `users.id` that getCachedAuth() returns. Comparing clerk_id made every
+    // Better Auth user's own email look taken.
+    const tx = createMockTx();
+    tx.limitMock.mockResolvedValue([{ id: 'user-uuid-1', clerkId: 'ba:abc' }]);
+
+    const { ensureEmailAvailable } = await import(
+      '@/app/onboarding/actions/validation'
+    );
+    await expect(
+      ensureEmailAvailable(tx as any, 'user-uuid-1', 'existing@test.com')
     ).resolves.toBeUndefined();
   });
 
   it('throws EMAIL_IN_USE when email belongs to another user', async () => {
     const tx = createMockTx();
-    tx.limitMock.mockResolvedValue([{ clerkId: 'other_user' }]);
+    tx.limitMock.mockResolvedValue([{ id: 'other-user-uuid' }]);
 
     const { ensureEmailAvailable } = await import(
       '@/app/onboarding/actions/validation'
