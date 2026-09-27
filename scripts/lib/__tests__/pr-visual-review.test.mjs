@@ -853,9 +853,7 @@ describe('footer interaction proof follows the theme switching flag', () => {
     expect(capture).toContain(
       'if (!isThemeSwitchingBuild(process.env)) return;'
     );
-    expect(capture).toContain(
-      "return flag === '1' || flag === 'true';"
-    );
+    expect(capture).toContain("return flag === '1' || flag === 'true';");
     expect(capture).toContain('NEXT_PUBLIC_FEATURE_THEME_SWITCHING');
   });
 });
