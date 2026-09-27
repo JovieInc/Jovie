@@ -950,7 +950,7 @@ class UpdateTest(unittest.TestCase):
             self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
             self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
             files = [p.relative_to(ROOT) for p in (ROOT / "scripts/lanes").iterdir() if p.is_file()]
-            for rel in [*files, *map(Path, lane.LANE_TESTS)]:
+            for rel in [*files, *map(Path, lane.LANE_TESTS), *map(Path, lane.RELEASE_EXTRAS)]:
                 (clone / rel).parent.mkdir(parents=True, exist_ok=True)
                 (clone / rel).write_text((ROOT / rel).read_text())
             self.git("add", "-A", cwd=clone)
@@ -963,6 +963,7 @@ class UpdateTest(unittest.TestCase):
                 self.assertEqual(lane.update(host), 0)
                 current = (host.state / "current").resolve()
                 self.assertTrue((current / "lane_runner.py").exists())
+                self.assertTrue((current.parent / "promotion-loss-metrics.mjs").exists())  # HUD PROMOTION line
                 # A running worker's release is never removed or rewritten by a no-op update.
                 self.assertEqual(lane.update(host), 0)
                 self.assertEqual((host.state / "current").resolve(), current)
