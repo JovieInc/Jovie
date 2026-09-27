@@ -18,6 +18,9 @@
  *   excluded from the parsed output — they're for developer reference only.
  * - **Auto-filter**: Entries matching vendor names, dev tooling, or infrastructure
  *   patterns are automatically excluded even without the `[internal]` prefix.
+ * - **`### Dogfood`**: optional bullets telling internal users what to try in
+ *   this release. They feed the in-app What's New surfaces only; they are
+ *   never customer changelog entries and never make a release public.
  */
 
 import { isInternalEntry } from './changelog-filter-rules';
@@ -30,11 +33,15 @@ export interface ChangelogSection {
   removed: string[];
 }
 
+type ParsedSection = keyof ChangelogSection | 'dogfood';
+
 export interface ChangelogRelease {
   version: string;
   date: string;
   summary: string;
   sections: ChangelogSection;
+  /** Optional `### Dogfood` bullets; absent when the release has none. */
+  dogfood?: string[];
 }
 
 export interface ChangelogParseResult {
@@ -55,7 +62,8 @@ export type ChangelogInlineNode =
     };
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
-const SECTION_HEADING_RE = /^### (Featured|Added|Changed|Fixed|Removed)$/;
+const SECTION_HEADING_RE =
+  /^### (Featured|Added|Changed|Fixed|Removed|Dogfood)$/;
 const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
 
 function isValidDate(value: string): boolean {
@@ -230,7 +238,7 @@ export function parseChangelogDocument(markdown: string): ChangelogParseResult {
   const lines = markdown.split('\n');
   const releases: ChangelogRelease[] = [];
   let current: ChangelogRelease | null = null;
-  let currentSection: keyof ChangelogSection | null = null;
+  let currentSection: ParsedSection | null = null;
   let summaryConsumed = false;
 
   for (const line of lines) {
@@ -262,7 +270,7 @@ export function parseChangelogDocument(markdown: string): ChangelogParseResult {
 
 type LineState = {
   current: ChangelogRelease | null;
-  currentSection: keyof ChangelogSection | null;
+  currentSection: ParsedSection | null;
   summaryConsumed: boolean;
 };
 
@@ -288,7 +296,7 @@ function tryParseVersion(
 function tryParseSummary(
   line: string,
   current: ChangelogRelease,
-  currentSection: keyof ChangelogSection | null,
+  currentSection: ParsedSection | null,
   summaryConsumed: boolean
 ): LineState | null {
   if (!currentSection && line.startsWith('> ') && !summaryConsumed) {
@@ -309,7 +317,7 @@ function tryParseSection(
   if (!sMatch) return null;
   return {
     current,
-    currentSection: sMatch[1].toLowerCase() as keyof ChangelogSection,
+    currentSection: sMatch[1].toLowerCase() as ParsedSection,
     summaryConsumed: true,
   };
 }
@@ -317,20 +325,23 @@ function tryParseSection(
 function tryParseBullet(
   line: string,
   current: ChangelogRelease,
-  currentSection: keyof ChangelogSection | null
+  currentSection: ParsedSection | null
 ): void {
   const trimmed = line.trim();
   if (!trimmed.startsWith('- ') || !currentSection) return;
   const entry = trimmed.slice(2);
-  if (isPublicEntry(entry)) {
-    current.sections[currentSection].push(entry);
+  if (!isPublicEntry(entry)) return;
+  if (currentSection === 'dogfood') {
+    current.dogfood = [...(current.dogfood ?? []), entry];
+    return;
   }
+  current.sections[currentSection].push(entry);
 }
 
 function processChangelogLine(
   line: string,
   current: ChangelogRelease | null,
-  currentSection: keyof ChangelogSection | null,
+  currentSection: ParsedSection | null,
   summaryConsumed: boolean,
   releases: ChangelogRelease[]
 ): LineState {
