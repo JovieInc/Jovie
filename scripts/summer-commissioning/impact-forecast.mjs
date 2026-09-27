@@ -1,17 +1,35 @@
-import { digestCanonicalJson, requireIsoTimestamp } from './receipt-trust.mjs';
+import {
+  IMPACT_FORECAST_AUTHORITY,
+  IMPACT_FORECAST_SCHEMA,
+  IMPACT_OBSERVATION_AUTHORITY,
+  impactProducerAttestationPayload,
+  resolveTrustedForecast,
+  resolveTrustedObservation,
+} from './impact-forecast-trust.mjs';
+import {
+  IMPACT_DIMENSIONS as DIMENSIONS,
+  IMPACT_QUANTILES as Q,
+  validateImpactForecastInput,
+} from './impact-forecast-validation.mjs';
+import {
+  digestCanonicalJson,
+  isRecord,
+  requireIsoTimestamp,
+} from './receipt-trust.mjs';
 
-export const IMPACT_FORECAST_SCHEMA = 'jovie.impact-forecast/v1';
 export const IMPACT_CALIBRATION_SCHEMA = 'jovie.impact-calibration/v1';
-const Q = ['p50', 'p95', 'p99'];
-const DIMENSIONS = ['demand', 'resourceLoad', 'cost', 'reliability', 'value'];
-const TARGETS = new Set([
-  'shipping-stall',
-  'post-release-regression',
-  'capacity-envelope-breach',
-]);
+export {
+  IMPACT_FORECAST_AUTHORITY,
+  IMPACT_FORECAST_SCHEMA,
+  IMPACT_OBSERVATION_AUTHORITY,
+  impactProducerAttestationPayload,
+};
 
 function need(value, message) {
   if (!value) throw new Error(message);
+}
+function text(value, field) {
+  need(typeof value === 'string' && value.trim(), `${field} is required`);
 }
 function date(value, field) {
   return Date.parse(requireIsoTimestamp(value, field));
@@ -19,43 +37,30 @@ function date(value, field) {
 function round(value) {
   return Number(value.toFixed(6));
 }
+function ratio(numerator, denominator) {
+  return denominator === 0 ? null : round(numerator / denominator);
+}
 function distribution(mapper) {
   return Object.fromEntries(Q.map(q => [q, round(mapper(q))]));
 }
-function validate(input) {
-  need(
-    input?.object?.id &&
-      input.object.revision &&
-      input.object.environment &&
-      input.object.workloadClass &&
-      input.policy?.version &&
-      input.exposure?.scenarios?.length &&
-      input.dependencies?.length &&
-      input.sources?.length &&
-      input.targets?.every(row => TARGETS.has(row.kind)) &&
-      input.lineage?.policyDisposition,
-    'exact forecast identity required'
-  );
-  const predictedAt = date(input.predictedAt, 'predictedAt');
-  need(
-    input.decisionSnapshot?.features &&
-      date(input.decisionSnapshot.capturedAt, 'snapshot.capturedAt') <=
-        predictedAt,
-    'decision snapshot must exist before prediction'
-  );
-  for (const source of input.sources) {
+
+function requireFiniteOutput(value, field = 'forecast') {
+  if (typeof value === 'number') {
     need(
-      source.key &&
-        ['observed', 'assumption', 'missing'].includes(source.status),
-      'invalid source evidence'
+      Number.isFinite(value),
+      `${field} contains a non-finite derived value`
     );
-    if (source.status !== 'missing')
-      need(
-        source.ref &&
-          date(source.observedAt, 'source.observedAt') <= predictedAt &&
-          date(source.expiresAt, 'source.expiresAt'),
-        'future source evidence is not prospective'
-      );
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      requireFiniteOutput(item, `${field}[${index}]`)
+    );
+    return;
+  }
+  if (isRecord(value)) {
+    for (const [key, item] of Object.entries(value))
+      requireFiniteOutput(item, `${field}.${key}`);
   }
 }
 
@@ -143,6 +148,8 @@ function forecastScenario(input, envelope, certainty) {
   if (errorRisk.p99 > input.policy.maxErrorRate)
     hardBreaches.push('policy.maxErrorRate');
   const headroom = 1 - bottleneck.utilization.p99;
+  const capacityBreachAtExposure =
+    bottleneck.load.p50 >= resource.capacityPerSecond;
   return {
     id: envelope.id,
     envelope: structuredClone(envelope),
@@ -165,16 +172,10 @@ function forecastScenario(input, envelope, certainty) {
       (costUsd.p99 / envelope.durationSeconds) * 3600
     ),
     capacityHeadroomFraction: round(headroom),
-    timeToCapacityBreachSeconds:
-      bottleneck.load.p50 >= resource.capacityPerSecond
-        ? 0
-        : bottleneck.load.p99 < resource.capacityPerSecond
-          ? null
-          : round(
-              (envelope.durationSeconds *
-                (resource.capacityPerSecond - bottleneck.load.p50)) /
-                (bottleneck.load.p99 - bottleneck.load.p50)
-            ),
+    timeToCapacityBreachSeconds: capacityBreachAtExposure ? 0 : null,
+    timeToCapacityBreachBasis: capacityBreachAtExposure
+      ? 'at-exposure'
+      : 'insufficient-temporal-evidence',
     unitEconomics: {
       valueCostRatio: costUsd.p50 ? round(valueUsd.p50 / costUsd.p50) : null,
     },
@@ -191,42 +192,48 @@ function forecastScenario(input, envelope, certainty) {
 
 function recommend(input, certainty, scenarios) {
   const candidates = scenarios.filter(row => row.status !== 'blocked');
+  const safe = candidates.filter(row => row.status === 'safe').at(-1);
   const chosen =
-    certainty.level === 'high'
-      ? (candidates.filter(row => row.status === 'safe').at(-1) ??
-        candidates[0])
-      : candidates[0];
+    certainty.level === 'high' ? (safe ?? candidates[0]) : candidates[0];
+  const stopConditions = {
+    noExposure: !chosen,
+    capacityHeadroomFractionBelow: input.policy.minHeadroomFraction,
+    errorRateAbove: input.policy.maxErrorRate,
+    costUsdAbove: chosen?.envelope.costBudgetUsd ?? null,
+    concurrencyAbove: chosen?.envelope.maxConcurrency ?? null,
+  };
   if (!chosen)
     return {
       action: 'shrink-envelope-or-add-capacity',
       scenarioId: null,
       learningObjective: 'remove-hard-envelope-breach',
       requiredTelemetry: [],
-      stopConditions: ['no-exposure'],
+      stopConditions,
     };
   return {
-    action: certainty.level === 'high' ? 'expand' : 'instrumented-canary',
+    action:
+      certainty.level === 'high' && chosen.status === 'safe'
+        ? 'expand'
+        : 'instrumented-canary',
     scenarioId: chosen.id,
     learningObjective: certainty.materialGaps.length
       ? `resolve:${certainty.materialGaps.join(',')}`
       : 'validate-demand-and-resource-load',
     requiredTelemetry: [...DIMENSIONS],
-    stopConditions: {
-      resource: `${chosen.likelyBottleneck}:utilization>=1`,
-      costUsd: chosen.envelope.costBudgetUsd,
-      concurrency: chosen.envelope.maxConcurrency,
-    },
+    stopConditions,
   };
 }
 
-export function createImpactForecast(input, prior = []) {
-  validate(input);
+export function createImpactForecast(input, prior = [], context = {}) {
+  validateImpactForecastInput(input);
   const key = digestCanonicalJson({
     ...input,
     predictedAt: null,
     lineage: null,
   });
-  const existing = prior.find(row => row.forecastKey === key);
+  const existing = prior
+    .map(entry => resolveTrustedForecast(entry, context.forecastPublicKey))
+    .find(row => row.forecastKey === key);
   if (existing)
     return {
       disposition: existing.sourceFreshness.some(
@@ -245,10 +252,12 @@ export function createImpactForecast(input, prior = []) {
   const scenarios = input.exposure.scenarios
     .toSorted((a, b) => a.maxUsers - b.maxUsers)
     .map(row => forecastScenario(input, row, certainty));
-  const receipt = {
+  const inputDigest = digestCanonicalJson(input);
+  const receiptPayload = {
     schema: IMPACT_FORECAST_SCHEMA,
-    receiptId: `impact-${key.slice(0, 24)}`,
+    receiptId: `impact-${inputDigest}`,
     forecastKey: key,
+    inputDigest,
     predictedAt: input.predictedAt,
     object: structuredClone(input.object),
     decisionSnapshot: structuredClone(input.decisionSnapshot),
@@ -261,15 +270,21 @@ export function createImpactForecast(input, prior = []) {
     sourceFreshness: structuredClone(input.sources),
     confidence: certainty,
     sensitivity: {
-      eventsPerUser: round(
-        input.demand.eventsPerUser.p99 / input.demand.eventsPerUser.p50
+      eventsPerUser: ratio(
+        input.demand.eventsPerUser.p99,
+        input.demand.eventsPerUser.p50
       ),
-      adoption: round(input.demand.adoption.p99 / input.demand.adoption.p50),
+      adoption: ratio(input.demand.adoption.p99, input.demand.adoption.p50),
       fanoutBurst: round(input.demand.fanout * input.demand.burstMultiplier),
     },
     scenarios,
     recommendation: recommend(input, certainty, scenarios),
     authority: 'evidence-only',
+  };
+  requireFiniteOutput(receiptPayload);
+  const receipt = {
+    ...receiptPayload,
+    receiptDigest: digestCanonicalJson(receiptPayload),
   };
   return {
     disposition: 'created',
@@ -290,16 +305,42 @@ function accuracy(predicted, actual) {
   );
 }
 
-export function calibrateImpactForecast(receipt, observations) {
-  need(
-    receipt?.schema === IMPACT_FORECAST_SCHEMA,
-    'impact forecast receipt required'
+export function calibrateImpactForecast(forecastId, observationIds, context) {
+  text(forecastId, 'forecastId');
+  need(isRecord(context?.trustedForecasts), 'trusted forecast store required');
+  const receipt = resolveTrustedForecast(
+    context.trustedForecasts[forecastId],
+    context.forecastPublicKey
   );
-  need(observations?.length, 'observations required');
+  need(receipt.receiptId === forecastId, 'trusted forecast identity mismatch');
+  const calibratedAt = date(context.calibratedAt, 'calibratedAt');
+  need(
+    calibratedAt >= Date.parse(receipt.predictedAt),
+    'calibration cannot precede prediction'
+  );
+  need(
+    Array.isArray(observationIds) && observationIds.length,
+    'observation references required'
+  );
+  need(
+    isRecord(context.trustedObservations),
+    'trusted telemetry store required'
+  );
+  const observations = observationIds.map(observationId =>
+    resolveTrustedObservation(
+      observationId,
+      context.trustedObservations,
+      context.observationPublicKey
+    )
+  );
   const scores = Object.fromEntries(DIMENSIONS.map(key => [key, []]));
   let falseAlarms = 0;
   const leadTimes = [];
+  const seenObservationIds = new Set();
+  const exposureBindings = new Set();
+  const matureObservations = [];
   for (const observation of observations) {
+    text(observation?.observationId, 'observation.observationId');
     need(
       observation.forecastId === receipt.receiptId,
       'observation forecast mismatch'
@@ -308,10 +349,16 @@ export function calibrateImpactForecast(receipt, observations) {
       row => row.id === observation.scenarioId
     );
     const actionAt = date(observation.actionAt, 'observation.actionAt');
+    const observedAt = date(observation.observedAt, 'observation.observedAt');
+    const target = receipt.targets.find(
+      row => row.kind === observation.targetKind
+    );
     need(
       scenario &&
+        target &&
         actionAt >= Date.parse(receipt.predictedAt) &&
-        date(observation.observedAt, 'observation.observedAt') >= actionAt,
+        observedAt >= actionAt &&
+        observedAt <= calibratedAt,
       'retrospective or future-label-leaking observation'
     );
     need(
@@ -320,7 +367,27 @@ export function calibrateImpactForecast(receipt, observations) {
       ),
       'invalid observation state'
     );
+    need(
+      !seenObservationIds.has(observation.observationId),
+      'duplicate observation id'
+    );
+    seenObservationIds.add(observation.observationId);
+    const binding = digestCanonicalJson([
+      observation.scenarioId,
+      observation.actionAt,
+    ]);
+    need(!exposureBindings.has(binding), 'duplicate exposure observation');
+    exposureBindings.add(binding);
     if (observation.state !== 'mature') continue;
+    const requiredMaturitySeconds = Math.max(
+      target.maturitySeconds,
+      scenario.valueLagSeconds
+    );
+    need(
+      observedAt - actionAt >= requiredMaturitySeconds * 1000,
+      'observation is not mature for target'
+    );
+    need(isRecord(observation.actual), 'mature observation actuals required');
     const resource = scenario.resources.find(
       row => row.id === scenario.likelyBottleneck
     );
@@ -339,14 +406,28 @@ export function calibrateImpactForecast(receipt, observations) {
       );
       scores[key].push(accuracy(predicted[index], observation.actual[key]));
     });
+    need(
+      typeof observation.actual.capacityBreached === 'boolean',
+      'actual capacityBreached must be boolean'
+    );
     if (scenario.status === 'blocked' && !observation.actual.capacityBreached)
       falseAlarms += 1;
-    if (observation.actual.capacityBreachedAt)
-      leadTimes.push(
-        (date(observation.actual.capacityBreachedAt, 'capacityBreachedAt') -
-          Date.parse(receipt.predictedAt)) /
-          1000
+    if (observation.actual.capacityBreachedAt) {
+      need(
+        observation.actual.capacityBreached,
+        'capacity breach timestamp requires capacityBreached=true'
       );
+      const breachedAt = date(
+        observation.actual.capacityBreachedAt,
+        'capacityBreachedAt'
+      );
+      need(
+        breachedAt >= actionAt && breachedAt <= observedAt,
+        'capacity breach timestamp must fall inside the observation window'
+      );
+      leadTimes.push((breachedAt - Date.parse(receipt.predictedAt)) / 1000);
+    }
+    matureObservations.push(observation);
   }
   const mature = scores.demand.length;
   const summary = divisor =>
@@ -360,10 +441,12 @@ export function calibrateImpactForecast(receipt, observations) {
           : null,
       ])
     );
-  return {
+  const calibrationPayload = {
     schema: IMPACT_CALIBRATION_SCHEMA,
     forecastId: receipt.receiptId,
-    calibrationId: `calibration-${digestCanonicalJson(observations).slice(0, 24)}`,
+    forecastDigest: receipt.receiptDigest,
+    calibrationId: `calibration-${digestCanonicalJson({ calibratedAt: context.calibratedAt, forecastId, observations })}`,
+    calibratedAt: context.calibratedAt,
     temporalValidation: 'prospective',
     workloadClass: receipt.object.workloadClass,
     targetKinds: receipt.targets.map(row => row.kind),
@@ -378,9 +461,14 @@ export function calibrateImpactForecast(receipt, observations) {
         )
       : null,
     falseAlarmRate: mature ? round(falseAlarms / mature) : null,
-    decisionUsefulness: observations.some(
+    decisionUsefulness: matureObservations.some(
       row => row.scenarioId === receipt.recommendation.scenarioId
     ),
     aggregateScore: null,
+  };
+  requireFiniteOutput(calibrationPayload, 'calibration');
+  return {
+    ...calibrationPayload,
+    calibrationDigest: digestCanonicalJson(calibrationPayload),
   };
 }
