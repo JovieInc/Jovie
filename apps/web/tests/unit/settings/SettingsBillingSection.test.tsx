@@ -69,7 +69,10 @@ describe('SettingsBillingSection', () => {
     render(<SettingsBillingSection />);
 
     expect(screen.getByText('Pro plan')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
+    const activeBadge = screen.getByText('Active');
+    // Canonical Badge owns status color: no call-site palette restyle.
+    expect(activeBadge).toHaveAttribute('data-variant', 'success');
+    expect(activeBadge.className).not.toMatch(/emerald|amber|rounded-md/);
     expect(
       screen.getByText(
         'Open Stripe to manage invoices, payment methods, and subscription details.'
@@ -132,8 +135,10 @@ describe('SettingsBillingSection', () => {
     render(<SettingsBillingSection />);
 
     expect(screen.getByText('Cached')).toBeInTheDocument();
-    expect(
-      screen.getByText('Payment service temporarily unavailable')
-    ).toBeInTheDocument();
+    const staleReason = screen.getByText(
+      'Payment service temporarily unavailable'
+    );
+    expect(staleReason.parentElement).toHaveClass('text-warning');
+    expect(staleReason.parentElement?.className).not.toMatch(/amber/);
   });
 });
