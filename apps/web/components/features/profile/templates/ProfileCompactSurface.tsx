@@ -48,6 +48,7 @@ import {
   type ProfilePacAssignment,
 } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
@@ -184,6 +185,8 @@ interface ProfileCompactSurfaceProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly showSubscriptionConfirmedBanner?: boolean;
@@ -284,6 +287,7 @@ export function ProfileCompactSurface({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   photoDownloadSizes = [],
   tourDates = [],
   showSubscriptionConfirmedBanner = false,
@@ -933,6 +937,8 @@ export function ProfileCompactSurface({
                 genres={genres}
                 pressPhotos={pressPhotos}
                 allowPhotoDownloads={allowPhotoDownloads}
+                contacts={availableContacts}
+                creditSegments={creditSegments}
                 tourDates={tourDates}
                 releases={releases}
                 catalogLoadFailed={catalogLoadFailed}
@@ -983,6 +989,7 @@ export function ProfileCompactSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
           tourDates={tourDates}
           releases={releases}
         />
