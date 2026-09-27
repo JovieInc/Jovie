@@ -36,6 +36,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import doctor  # noqa: E402  (sibling module of the release)
 import pr_events  # noqa: E402
+import reason_lane  # noqa: E402
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -47,8 +48,8 @@ SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked"})
-HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked"})
+EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked", "reasoning-job"})
+HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked", "reasoning-job"})
 SENSITIVE_PROVIDER = "codex"
 SENSITIVE_REVIEWABLE_LINES = 500
 SENSITIVE_RED_LINES = re.compile(
@@ -65,7 +66,8 @@ CLAIM_TTL_S = 2 * 3600
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_lane_runner.py", "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
-              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py"]
+              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
+              "scripts/tests/test_reason_lane.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -1277,6 +1279,10 @@ def dispatch(host: Host) -> int:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
     except Exception as error:  # the ready/orphan queue never takes dispatch down
         tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
+    except Exception as error:  # Summer's reasoning jobs never take dispatch down
+        tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())

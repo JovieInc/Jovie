@@ -1397,11 +1397,13 @@ describe('ProfileCompactTemplate', () => {
 
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
     const carousel = screen.getByTestId('profile-home-carousel');
+    const pacCard = screen.getByTestId('profile-pac');
 
     expect(alertsCard).toHaveTextContent('Alerts');
-    expect(carousel).toHaveTextContent('Listen');
-    // The alerts card is the LAST card of the single home carousel — no
-    // stacked sections outside the track.
+    // The featured mode card carries the release and its Listen CTA; the
+    // alerts card stays last, inside the carousel below it.
+    expect(pacCard).toHaveTextContent("Don't Look Down");
+    expect(pacCard).toHaveTextContent('Listen now');
     expect(carousel.contains(alertsCard)).toBe(true);
     expect(
       screen.getByTestId('profile-pac').compareDocumentPosition(alertsCard)
@@ -1422,9 +1424,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const homeCard = screen.getByTestId('profile-home-carousel');
-    expect(homeCard).toHaveTextContent("Don't Look Down");
-    expect(homeCard).toHaveTextContent('Holding On');
+    const homeRail = screen.getByTestId('profile-home-rail');
+    expect(homeRail).toHaveTextContent("Don't Look Down");
+    expect(homeRail).toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {

@@ -106,6 +106,7 @@ web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mo
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
+web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile
 web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
 web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
@@ -133,6 +134,7 @@ web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|deskto
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
+web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
@@ -156,6 +158,7 @@ ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.
 ios.chat|ios|ios-chat|apps/ios/Jovie/Features/Chat/MobileChatView.swift|compact
 ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swift|compact
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
+ios.teleprompter|ios|ios-teleprompter|apps/ios/Jovie/Features/Teleprompter/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
 web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/mobile-auth-return/|desktop,mobile|x|Auth/security lane is out of scope

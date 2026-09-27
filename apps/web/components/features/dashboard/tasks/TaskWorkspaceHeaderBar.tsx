@@ -122,18 +122,26 @@ export function TaskWorkspaceHeaderBar({
       />
     );
 
+  const primaryAction = (
+    <Button
+      type={mode === 'create' ? 'submit' : 'button'}
+      size='sm'
+      form={mode === 'create' ? createFormId : undefined}
+      disabled={mode === 'create' && (createPending || !draftTitle.trim())}
+      onClick={mode === 'create' ? undefined : onCreateTask}
+      className={TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME}
+    >
+      {mode === 'default' ? (
+        <Plus className='h-3.5 w-3.5' aria-hidden='true' />
+      ) : null}
+      {mode === 'create' ? 'Create' : 'New Task'}
+    </Button>
+  );
+
   const toolbarEnd =
     mode === 'create' ? (
       <>
-        <Button
-          type='submit'
-          size='sm'
-          form={createFormId}
-          disabled={createPending || !draftTitle.trim()}
-          className={TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME}
-        >
-          Create
-        </Button>
+        {primaryAction}
         <Button
           type='button'
           variant='secondary'
@@ -154,16 +162,7 @@ export function TaskWorkspaceHeaderBar({
           shortcutHint='S'
           buttonClassName={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}
         />
-        <PageToolbarActionButton
-          ariaLabel='Create task'
-          label='New Task'
-          onClick={onCreateTask}
-          icon={<Plus className='h-3.5 w-3.5' />}
-          className={cn(
-            TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME,
-            'hidden lg:inline-flex'
-          )}
-        />
+        {primaryAction}
         <DisplayMenuDropdown
           viewMode={viewMode}
           availableViewModes={['board', 'list']}

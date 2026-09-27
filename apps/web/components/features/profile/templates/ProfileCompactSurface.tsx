@@ -37,6 +37,7 @@ import {
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { findVenmoLink } from '@/features/profile/utils/venmo';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
@@ -49,6 +50,10 @@ import {
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import {
+  DEFAULT_ARTWORK_ACCENT,
+  resolveProfileModeCardAccents,
+} from '@/lib/profile/mode-card-accent';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import {
@@ -580,6 +585,22 @@ export function ProfileCompactSurface({
     renderMode === 'interactive' && renderInteractiveOverlays && canGetUpdates;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
+  // Founder accent rotation across the mode cards. The featured Listen card
+  // shows artwork (release art or the profile photo), so it anchors the
+  // rotation and the other mode cards continue from it.
+  const hasListenArtwork = Boolean(
+    homeLatestRelease?.artworkUrl ||
+      releases.some(release => release.artworkUrl) ||
+      resolvedHeroImageUrl
+  );
+  const modeCardAccents = useMemo(
+    () =>
+      resolveProfileModeCardAccents({
+        listenArtworkAccent: hasListenArtwork ? DEFAULT_ARTWORK_ACCENT : null,
+      }),
+    [hasListenArtwork]
+  );
+  const paymentsVenmoLink = hasTip ? findVenmoLink(socialLinks) : null;
   const homeProfileSettings = homeLatestRelease
     ? { ...profileSettings, showOldReleases: true }
     : profileSettings;
@@ -760,6 +781,7 @@ export function ProfileCompactSurface({
                 releases={releases}
                 hasTip={hasTip}
                 pacArtPriority={!resolvedHeroImageUrl}
+                featuredAccent={modeCardAccents.listen}
               />
             ) : (
               <ProfilePrimaryTabPanel
@@ -790,6 +812,8 @@ export function ProfileCompactSurface({
                 previewNotificationsState={previewNotificationsState}
                 onFlowClosed={returnToProfileAfterNotifications}
                 onSubscriptionActivated={handleSubscriptionActivated}
+                modeCardAccents={modeCardAccents}
+                paymentsVenmoLink={paymentsVenmoLink}
               />
             )}
           </div>

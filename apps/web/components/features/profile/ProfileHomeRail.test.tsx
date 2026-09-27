@@ -18,7 +18,7 @@ vi.mock('next/image', () => ({
 }));
 
 describe('ProfileHomeRail', () => {
-  it('renders the single highlights carousel with the PAC card leading', () => {
+  it('renders the PAC as the featured card ahead of the highlights carousel', () => {
     render(
       <ProfileHomeRail
         artist={PROFILE_STORY_ARTIST}
@@ -38,8 +38,13 @@ describe('ProfileHomeRail', () => {
     );
 
     const carousel = screen.getByTestId('profile-home-carousel');
+    const pacCard = screen.getByTestId('profile-pac');
     expect(carousel).toHaveAttribute('data-layout', 'profile-landscape');
-    expect(carousel.contains(screen.getByTestId('profile-pac'))).toBe(true);
+    expect(pacCard).toHaveAttribute('data-presentation', 'featured');
+    expect(carousel.contains(pacCard)).toBe(false);
+    expect(pacCard.compareDocumentPosition(carousel)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
   });
 
   it('caps secondary cards at two and counts the capture card toward the cap', () => {
