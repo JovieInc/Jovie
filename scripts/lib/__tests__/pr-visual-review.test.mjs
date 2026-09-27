@@ -843,3 +843,17 @@ describe('trusted Sonar remediation contracts', () => {
     ).toThrow('valid capacity evidence');
   });
 });
+
+describe('footer interaction proof follows the theme switching flag', () => {
+  it('runs the footer theme-control proof only for theme-switching builds', () => {
+    const capture = readFileSync(
+      '.github/scripts/pr-visual-review-capture.mjs',
+      'utf8'
+    );
+    expect(capture).toContain(
+      'if (!isThemeSwitchingBuild(process.env)) return;'
+    );
+    expect(capture).toContain("return flag === '1' || flag === 'true';");
+    expect(capture).toContain('NEXT_PUBLIC_FEATURE_THEME_SWITCHING');
+  });
+});

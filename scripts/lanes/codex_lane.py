@@ -57,9 +57,20 @@ def read_state() -> dict:
 
 def write_state(state: dict) -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATE.with_suffix(".tmp")
+    tmp = STATE.with_suffix(f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(state, indent=1, sort_keys=True))
     os.replace(tmp, STATE)
+
+
+def update_state(change) -> dict:
+    """Read-modify-write under one lock, so concurrent runs never drop each other's banking."""
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    with open(STATE.with_suffix(".lock"), "w") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        state = read_state()
+        change(state)
+        write_state(state)
+        return state
 
 
 def iso(stamp: float | None) -> str | None:
@@ -155,32 +166,33 @@ def run(args) -> int:
         cmd += ["-C", args.cwd]
     cmd.append("-")
     env = {**os.environ, "CODEX_HOME": str(home)}
-    state.setdefault(name, {}).update(lastUsed=now, runs=int(state.get(name, {}).get("runs") or 0) + 1)
-    write_state(state)
+    update_state(lambda st: st.setdefault(name, {}).update(lastUsed=now, runs=int(st.get(name, {}).get("runs") or 0) + 1))
     print(f"codex-lane: account={name} home={home}", flush=True)
-    captured = []
+    from collections import deque
+    tail = deque(maxlen=400)  # classification only needs the end of the output
     try:
         proc = subprocess.Popen(cmd, cwd=args.cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True)
         proc.stdin.write(prompt)
         proc.stdin.close()
         for line in proc.stdout:
-            captured.append(line)
+            tail.append(line)
             sys.stdout.write(line)
             sys.stdout.flush()
         code = proc.wait()
     finally:
         handle.close()
-    output = "".join(captured)
+    output = "".join(tail)
     kind, until = classify(output, code, time.time())
-    state = read_state()
-    entry = state.setdefault(name, {})
-    entry.update(lastKind=kind, lastExit=code, lastRunAt=time.time())
-    if until:
-        entry.update(exhaustedUntil=until, lastError=(LIMIT.search(output) or AUTH.search(output)).group(0)[:80])
-    else:
-        entry.pop("exhaustedUntil", None)
-    write_state(state)
+
+    def record(st: dict) -> None:
+        entry = st.setdefault(name, {})
+        entry.update(lastKind=kind, lastExit=code, lastRunAt=time.time())
+        if until:
+            entry.update(exhaustedUntil=until, lastError=(LIMIT.search(output) or AUTH.search(output)).group(0)[:80])
+        else:
+            entry.pop("exhaustedUntil", None)
+    update_state(record)
     if kind in ("limit", "auth"):
         print(f"codex-lane: account {name} {kind}; banked until {iso(until)}", file=sys.stderr)
         return NO_ACCOUNT_EXIT if code == 0 else code

@@ -4885,13 +4885,14 @@
 }
 
 :root.dark {
-  /* Sidebar tokens — Noir Ion shell; active uses Ion selection tint */
+  /* Sidebar tokens — Noir Ion shell. Founder lock 2026-09-25: active/selected
+     rows use a neutral hover-level tint, not the ion accent (no blue bg). */
   --sidebar-background: var(--app-shell-sidebar-background-rgb);
   --sidebar-foreground: 245 247 251;
   --sidebar-primary: 245 247 251;
   --sidebar-primary-foreground: 2 3 7;
   --sidebar-accent: 168 176 195 / 0.06;
-  --sidebar-accent-active: 17 175 255 / 0.1;
+  --sidebar-accent-active: 168 176 195 / 0.1;
   --sidebar-accent-foreground: 245 247 251;
   --sidebar-border: 168 176 195 / 0.1;
   --sidebar-ring: 17 175 255 / 0.72;

@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
 import {
   ensureBaseHistory,
   runMergeGroupStorybookCertification,
@@ -412,7 +413,22 @@ describe('merge_group workflow contract', () => {
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
     expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
-    expect(sizeGuard).toContain('timeout-minutes: 1');
+    // External admission producers: the job clock includes runner
+    // provisioning (observed 69s), so a sub-3-minute budget can cancel a
+    // passing run and fail admission closed on a CANCELLED required check.
+    // Each producer must still conclude before admission stops polling.
+    for (const [producerName, producer] of [
+      ['PR Size Guard', sizeGuard],
+      ['Fork PR Gate', getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')],
+    ]) {
+      const producerTimeoutMinutes = Number(
+        producer.match(/timeout-minutes:\s*(\d+)/)?.[1]
+      );
+      expect(producerTimeoutMinutes, producerName).toBeGreaterThanOrEqual(3);
+      expect(producerTimeoutMinutes * 60_000, producerName).toBeLessThanOrEqual(
+        MERGE_GROUP_ADMISSION_WAIT_MS / 2
+      );
+    }
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
     expect(sizeGuard).toContain('--policy=size');
     expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
@@ -532,8 +548,57 @@ describe('merge_group workflow contract', () => {
       units.indexOf('- name: Run quarantined unit tests (retries)'),
       units.indexOf('- name: Run Ovie route')
     );
-    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/10'\n/);
+    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/14'\n/);
     expect(step).not.toContain('--shard');
+  });
+
+  it('reserves sequencer capacity only on the shards that run pinned CI work', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1];
+    const shards = [...(matrix ?? '').matchAll(/'(\d+\/\d+)'/g)].map(m => m[1]);
+    expect(shards.length).toBeGreaterThan(1);
+    expect(new Set(shards).size).toBe(shards.length);
+    shards.forEach((shard, i) =>
+      expect(shard).toBe(`${i + 1}/${shards.length}`)
+    );
+    const pinned = [
+      ...new Set(
+        [...units.matchAll(/matrix\.shard == '(\d+\/\d+)'/g)].map(m => m[1])
+      ),
+    ].sort();
+    for (const shard of pinned) expect(shards).toContain(shard);
+    expect(Object.keys(CI_RESERVED_MS).sort()).toEqual(pinned);
+  });
+
+  it('runs packages/ui in its own unit matrix entry, off the web shards', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1] ?? '';
+    const entries = [...matrix.matchAll(/'([^']+)'/g)].map(m => m[1]);
+    expect(entries.filter(entry => !/^\d+\/\d+$/.test(entry))).toEqual([
+      'packages/ui',
+    ]);
+    const stepIf = name => {
+      const start = units.indexOf(`- name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      return units.slice(start).match(/\n\s+if: (.+)\n/)?.[1];
+    };
+    // The web Vitest and its web-only setup never run on the ui entry, so
+    // `--shard=packages/ui` is never handed to Vitest.
+    for (const name of [
+      'Setup Playwright warm path',
+      'Load quarantined unit tests',
+      'Run unit tests',
+    ]) {
+      expect(stepIf(name), name).toContain("matrix.shard != 'packages/ui'");
+    }
+    expect(stepIf('Run packages/ui unit tests')).toBe(
+      "steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'"
+    );
+    // Parallel, not pinned: no web shard carries a packages/ui reservation.
+    expect(units).not.toMatch(
+      /matrix\.shard == '\d+\/\d+'\n\s+run: pnpm turbo test --filter=@jovie\/ui/
+    );
+    expect(Object.keys(CI_RESERVED_MS)).not.toContain('packages/ui');
   });
 
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
@@ -547,7 +612,7 @@ describe('merge_group workflow contract', () => {
       ),
       units.indexOf('      - name: Preserve Ovie coverage evidence')
     );
-    expect(ovieTests).toContain("matrix.shard == '1/10'");
+    expect(ovieTests).toContain("matrix.shard == '1/14'");
     expect(ovieTests).toContain('pnpm --filter @jovie/ovie test');
     expect(ovieTests).not.toContain('continue-on-error');
     const ovieBuild = build.slice(
@@ -808,7 +873,7 @@ describe('merge_group workflow contract', () => {
       expect(surfaces).toContain(`pnpm --filter ${check}`);
     }
     expect(unitTests).toContain(
-      "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
+      `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}, 'packages/ui']`
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
@@ -857,7 +922,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "run_full_ci == 'true' && matrix.shard == '4/10'\n        run: pnpm turbo test --filter=@jovie/ui"
+      "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)

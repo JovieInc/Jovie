@@ -30,6 +30,7 @@ describe('marketing language context', () => {
 
   it.each([
     APP_ROUTES.ARTIST_PROFILES,
+    APP_ROUTES.SOLUTIONS_ARTISTS,
     APP_ROUTES.ARTIST_NOTIFICATIONS,
     APP_ROUTES.LAUNCH,
     APP_ROUTES.LANDING_NEW,

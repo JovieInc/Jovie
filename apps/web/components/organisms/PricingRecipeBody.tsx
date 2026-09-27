@@ -15,7 +15,7 @@ import {
 const STORY_CARDS = [
   {
     label: 'Profile',
-    headline: 'Public artist profile and audience capture',
+    headline: 'Public Jovie profile and audience capture',
     body: 'Claim profile same day.',
   },
 ] as const;
@@ -69,7 +69,7 @@ export function PricingRecipeBody({
           className='system-b-pricing-hero'
           headingId='pricing-hero-heading'
           headline='Pricing'
-          subtitle={`Artist profiles are free forever. Artist Visibility Pro is ${proMonthlyPrice} with limited access.`}
+          subtitle={`Jovie profiles are free forever. Artist Visibility Pro is ${proMonthlyPrice} with limited access.`}
           primaryCta={{
             label: freeClaim.ctaLabel,
             href: freeClaim.ctaHref,
@@ -112,7 +112,7 @@ export function PricingRecipeBody({
                   Compare All Features
                 </h2>
                 <p className='system-b-pricing-section-body'>
-                  Public artist profile and audience capture.
+                  Public Jovie profile and audience capture.
                 </p>
               </div>
               <div className='system-b-pricing-chart-wrap'>

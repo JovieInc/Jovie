@@ -158,6 +158,16 @@ export const COPY_RULES: readonly CopyRule[] = [
     message: 'Chatbot residue. The reader should never see the model.',
   },
   {
+    id: 'ai-alibi',
+    category: 'leak',
+    severity: 'block',
+    registers: 'all',
+    pattern:
+      /\b(?:(?:astra|grok|fable|chatgpt|gpt[- ]?\d+(?:\.\d+)?|claude|gemini|the model|ai)\b[^.!?\n]{0,60}\b(?:wrote|drafted|handled|did|made|helped with)\b[^.!?\n]{0,35}(?:\bthis\b|\bthese words\b|\b(?:this |the )?(?:launch|tweet|email|status|comms|communications|narrative|copy|post|release notes?)\b)|(?:blame|credit|thanks? to)\b[^.!?\n]{0,25}\b(?:astra|grok|fable|chatgpt|gpt[- ]?\d+(?:\.\d+)?|claude|gemini|the model|ai)\b[^.!?\n]{0,60}\b(?:launch|tweet|email|status|comms|communications|narrative|copy|post|reception|community|landed)\b|(?:astra|grok|fable|chatgpt|gpt[- ]?\d+(?:\.\d+)?|claude|gemini|the model|ai)\b[^.!?\n]{0,50}\b(?:went over|landed)\b[^.!?\n]{0,35}\b(?:community|audience|customers?|people)\b)/i,
+    message:
+      'AI-alibi public narrative. Tim owns the words and their reception; never name a model as author, excuse, or cause.',
+  },
+  {
     id: 'template-residue',
     category: 'leak',
     severity: 'block',

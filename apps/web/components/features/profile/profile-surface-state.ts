@@ -20,7 +20,7 @@ export type ProfileSurfaceLatestRelease = {
 export type ProfileSurfacePrimaryAction =
   | {
       readonly kind: 'tour';
-      readonly label: 'Tickets' | 'Shows';
+      readonly label: 'Tickets' | 'Events';
       readonly mode: ProfilePrimaryTab;
       readonly href: string | null;
     }
@@ -45,7 +45,11 @@ export interface ProfileSurfaceState {
   readonly heroRoleLabel: string | null;
   readonly statusPill: {
     readonly kind: 'tour' | 'release' | 'alerts';
-    readonly label: 'On Tour' | 'New Release' | 'Alerts On' | 'Alerts Ready';
+    readonly label:
+      | 'Upcoming Events'
+      | 'New Release'
+      | 'Alerts On'
+      | 'Alerts Ready';
   };
   readonly primaryAction: ProfileSurfacePrimaryAction;
   readonly latestVisibleRelease: ProfileSurfaceLatestRelease | null;
@@ -228,7 +232,7 @@ function resolvePrimaryAction(params: {
   if (nextShow) {
     return {
       kind: 'tour',
-      label: nextShow.ticketUrl ? 'Tickets' : 'Shows',
+      label: nextShow.ticketUrl ? 'Tickets' : 'Events',
       mode: 'tour',
       href: nextShow.ticketUrl ?? null,
     };
@@ -261,7 +265,7 @@ function resolveStatusPill(params: {
   if (nextShow) {
     return {
       kind: 'tour',
-      label: 'On Tour',
+      label: 'Upcoming Events',
     };
   }
 

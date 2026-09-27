@@ -10,6 +10,7 @@ import {
   parseProductRoutes,
   validateArticleMetadata,
 } from './article-metadata.mjs';
+import { validateArticleStructure } from './article-structure.mjs';
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(moduleDirectory, '../../..');
@@ -50,11 +51,14 @@ export function loadArticleRegistry({
 
   for (const path of findMdxFiles(articleDirectory)) {
     const sourcePath = relative(repositoryRoot, path).split(sep).join('/');
-    const { metadata } = parseFrontmatter(
+    const { metadata, body } = parseFrontmatter(
       readFileSync(path, 'utf8'),
       sourcePath
     );
     validateArticleMetadata(metadata, { features, routes, sourcePath });
+    if (metadata.documentType === 'guide') {
+      validateArticleStructure(body, metadata, { sourcePath });
+    }
     const route = routeFromArticlePath(path, articleDirectory);
     const errors = [];
     if (seenIds.has(metadata.id)) {

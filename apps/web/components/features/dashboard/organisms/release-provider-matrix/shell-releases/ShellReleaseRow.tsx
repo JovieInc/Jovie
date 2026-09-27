@@ -1,5 +1,6 @@
 'use client';
 
+import { QueryClientContext } from '@tanstack/react-query';
 import {
   Clock,
   ExternalLink,
@@ -14,6 +15,7 @@ import {
   type MouseEvent,
   memo,
   useCallback,
+  useContext,
   useMemo,
   useState,
 } from 'react';
@@ -38,6 +40,7 @@ import { TypeBadge } from '@/components/shell/TypeBadge';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { formatStreams } from '@/lib/format-streams';
+import { prefetchReleaseTracks } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
@@ -321,6 +324,21 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const syncLabel = syncStatus ? SHELL_RELEASE_SYNC_LABEL[syncStatus] : null;
   const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
   const { playbackState } = useTrackAudioPlayer();
+  // Optional context: rows also render in stories/tests without a
+  // QueryClientProvider, where intent prefetch must simply no-op.
+  const queryClient = useContext(QueryClientContext);
+
+  /**
+   * Genuine row intent → warm the release's track list so opening the detail
+   * sidebar does not waterfall `useReleaseTracksQuery` behind the drawer
+   * mount. Scoped to releases with tracks; TanStack dedupes repeat intent
+   * while data is fresh, so sweeping rows cannot storm. Touch entry never
+   * fires intent — selection still works without it.
+   */
+  const handleIntent = useCallback(() => {
+    if (!queryClient || release.totalTracks <= 0) return;
+    void prefetchReleaseTracks(queryClient, release.id);
+  }, [queryClient, release.id, release.totalTracks]);
   const isActiveTrack = playbackState.activeTrackId === release.id;
   const [actionsOpen, setActionsOpen] = useState(false);
 
@@ -353,6 +371,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
+      onPointerEnter={handleIntent}
+      onFocus={handleIntent}
       data-shell-release-row
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}

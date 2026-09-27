@@ -1,0 +1,56 @@
+---
+id: help-article-primitives
+title: Help article primitives
+description: Technical reference for the canonical Help Center MDX components and guide anatomy.
+documentType: reference
+category: developers
+productBacked: false
+status: draft
+lastVerifiedAt: null
+verifiedBy: unverified
+keywords:
+  - help center components
+  - mdx primitives
+  - article anatomy
+redirectAliases: []
+visualProofRefs: []
+uiLabels: []
+productSourceRefs:
+  - apps/docs/components/help
+launchPath: false
+searchable: false
+---
+
+# Help article primitives
+
+Help Center guides are MDX pages composed from a fixed set of primitives
+registered in `apps/docs/mdx-components.tsx`. Guides never need ad hoc layout
+CSS; shared formatting lives in `apps/docs/app/globals.css`.
+
+<HelpCallout type="note">
+This page is the technical variant of the authoring contract. Task guides must
+follow the canonical anatomy in `docs/help-center/AUTHORING.md`.
+</HelpCallout>
+
+## Component reference
+
+| Component | Purpose |
+|---|---|
+| `HelpArticle` | Wraps the whole page; emits `data-article-id`, `data-document-type`, `data-category`, and `data-status` hooks for metadata, analytics, search, and screenshot certification. |
+| `HelpOutcome` | The one-sentence outcome under the title. |
+| `HelpPrerequisites` | "Before you begin" section; omit when nothing is required. |
+| `HelpSteps` / `HelpStep` | Ordered action list; three to seven steps with exact UI labels. |
+| `HelpScreenshot` | `figure` with required `alt` and optional `caption`; the build throws without `alt`. |
+| `HelpVideo` | Non-autoplaying `video` with controls, `preload="none"`, and required accessible name. |
+| `HelpCallout` | `note`, `tip`, or `warning`; warnings only for real risk or irreversible behavior. |
+| `HelpTroubleshooting` | Two to three failure cases as `###` symptom headings plus recovery. |
+| `HelpRelatedGuides` | At most three related links; resolves certified articles by `ids` or falls back to same-category registry lookup. |
+| `HelpFeedback` | "Was this helpful?" client component; dispatches the `jovie:help-feedback` CustomEvent with `{ articleId, value }`. |
+| `HelpContactPanel` | Escalation section; defaults to `https://jov.ie/support`. |
+
+## Validation
+
+`apps/docs/lib/article-structure.mjs` enforces the canonical section order on
+every `documentType: guide` page during `pnpm validate:articles` and the docs
+build. Reference, landing, and legacy documents share the primitives but are
+free-form.

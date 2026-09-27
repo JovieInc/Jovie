@@ -37,6 +37,7 @@ const electronRuntimeMock = vi.hoisted(() => ({
 
 const signOutMock = vi.hoisted(() => vi.fn());
 const userButtonPropsMock = vi.hoisted(() => vi.fn());
+const nowPlayingBridgePropsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   isElectronRuntime: () =>
@@ -85,7 +86,10 @@ vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
 }));
 
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
-  SidebarBottomNowPlayingBridge: () => null,
+  SidebarBottomNowPlayingBridge: (props: { readonly collapsed?: boolean }) => {
+    nowPlayingBridgePropsMock(props);
+    return <div data-testid='sidebar-now-playing-bridge' />;
+  },
 }));
 
 const dashboardData: DashboardData = {
@@ -194,6 +198,7 @@ describe('UnifiedSidebar library route', () => {
     document.documentElement.removeAttribute('data-desktop-runtime');
     signOutMock.mockReset();
     userButtonPropsMock.mockReset();
+    nowPlayingBridgePropsMock.mockReset();
     resetDashboardNavTestMocks();
     unifiedPathnameMock.mockReset();
     unifiedPathnameMock.mockReturnValue(APP_ROUTES.CHAT);
@@ -229,6 +234,14 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
+    const dock = document.querySelector('[data-sidebar-dock="true"]');
+    expect(dock).toHaveClass('shrink-0');
+    expect(dock).toContainElement(
+      screen.getByTestId('sidebar-now-playing-bridge')
+    );
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
+      collapsed: false,
+    });
   });
 
   it('keeps pending Inbox work reachable without a sidebar notifications region', () => {
@@ -303,6 +316,18 @@ describe('UnifiedSidebar library route', () => {
     expect(linearTokens).not.toMatch(/--linear-border-divider-subtle/);
     // The retired token must not reappear in the linear namespace.
     expect(linearTokens).not.toMatch(/--linear-app-frame-seam/);
+  });
+
+  it('uses the single unified header-height token for route/operator sidebar headers (founder lock 2026-09-25)', () => {
+    const source = readFileSync(
+      join(__dirname, '../../../..', 'components/organisms/UnifiedSidebar.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'h-(--app-shell-header-height) py-0.5'");
+    expect(source).not.toContain(
+      "'h-(--app-shell-header-height-compact) py-0.5'"
+    );
   });
 
   it('preserves the generic route-override contract for legitimate consumers', async () => {
