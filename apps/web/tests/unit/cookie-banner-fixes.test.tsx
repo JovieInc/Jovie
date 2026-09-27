@@ -374,6 +374,26 @@ describe('CookieBannerMount global preferences controller', () => {
     localStorage.clear();
   });
 
+  it('never mounts banner or preferences UI inside the Electron runtime', async () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    document.cookie = 'jv_cc_required=1; path=/';
+    localStorage.removeItem('jv_cc');
+
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+    render(<CookieBannerMount />);
+
+    globalThis.dispatchEvent(new Event('jv:cookie:open'));
+
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    delete document.documentElement.dataset.desktopRuntime;
+  });
+
   afterEach(() => {
     setCookie('');
     localStorage.clear();

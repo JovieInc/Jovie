@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+  authenticatedRouteFromAuthHandoffNavigation,
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
   isPendingDesktopAuthPkceExpired,
@@ -143,6 +144,39 @@ test('bindPendingDesktopAuthCompletion enforces pending flow, ttl, and nonce', (
     ok: true,
     codeVerifier: 'verifier',
   });
+});
+
+test('authenticated auth-handoff redirects resume only in the main app window', () => {
+  const appOrigin = 'http://localhost:3100';
+
+  expect(
+    authenticatedRouteFromAuthHandoffNavigation(
+      `${appOrigin}/app/ov/design-system-registry?runtime=electron#button`,
+      appOrigin
+    )
+  ).toBe('/app/ov/design-system-registry?runtime=electron#button');
+  expect(
+    authenticatedRouteFromAuthHandoffNavigation(
+      `${appOrigin}/hud?ovie=mac`,
+      appOrigin
+    )
+  ).toBe('/hud?ovie=mac');
+
+  expect(
+    authenticatedRouteFromAuthHandoffNavigation(
+      `${appOrigin}/desktop-auth?auth_url=%2Fauth%2Fstart`,
+      appOrigin
+    )
+  ).toBeNull();
+  expect(
+    authenticatedRouteFromAuthHandoffNavigation(
+      'https://example.com/app/ov',
+      appOrigin
+    )
+  ).toBeNull();
+  expect(
+    authenticatedRouteFromAuthHandoffNavigation('not a url', appOrigin)
+  ).toBeNull();
 });
 
 test('pending desktop auth pkce expires after the configured ttl', () => {

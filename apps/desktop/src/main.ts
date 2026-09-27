@@ -49,6 +49,7 @@ import {
   redeemDesktopReturnCode,
 } from './desktop-auth-handback';
 import {
+  authenticatedRouteFromAuthHandoffNavigation,
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
   type PendingDesktopAuthPkce,
@@ -1095,6 +1096,13 @@ function loadReturnedRoute(route: string): void {
   }
 
   mainWindowHiddenForAuthHandoff = false;
+  // Authentication must return to the real resizable workspace, never leave
+  // the user looking at the small fixed-size handoff geometry. Maximized is
+  // deliberate here: it fills the work area while remaining restorable and
+  // resizable, unlike native macOS full-screen mode.
+  if (!win.isMaximized() && !win.isFullScreen()) {
+    win.maximize();
+  }
   showWindow(win);
 }
 
@@ -1209,7 +1217,10 @@ function showDesktopAuthHandoff(
   );
   authHandoffWindow.webContents.session.setPermissionCheckHandler(() => false);
 
-  authHandoffWindow.webContents.on('will-navigate', (event, url) => {
+  const handleAuthHandoffNavigation = (
+    event: Electron.Event,
+    url: string
+  ): void => {
     const parsed = parseUrl(url);
     if (
       parsed?.origin === APP_ORIGIN &&
@@ -1217,8 +1228,40 @@ function showDesktopAuthHandoff(
     ) {
       return;
     }
+
+    const returnedRoute = authenticatedRouteFromAuthHandoffNavigation(
+      url,
+      APP_ORIGIN
+    );
+    if (returnedRoute) {
+      event.preventDefault();
+      loadReturnedRoute(returnedRoute);
+      return;
+    }
+
     event.preventDefault();
     void openExternalUrl(url);
+  };
+
+  authHandoffWindow.webContents.on(
+    'will-navigate',
+    handleAuthHandoffNavigation
+  );
+  authHandoffWindow.webContents.on(
+    'will-redirect',
+    handleAuthHandoffNavigation
+  );
+
+  // Defense in depth for redirects or automation-driven navigations that can
+  // commit without a cancellable will-navigate event. If authenticated app
+  // content reaches this child window, immediately move the same route to the
+  // main resizable window and close the handoff.
+  authHandoffWindow.webContents.on('did-navigate', (_event, url) => {
+    const returnedRoute = authenticatedRouteFromAuthHandoffNavigation(
+      url,
+      APP_ORIGIN
+    );
+    if (returnedRoute) loadReturnedRoute(returnedRoute);
   });
 
   authHandoffWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -2157,6 +2200,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     y: windowState.y,
     minWidth: 800,
     minHeight: 600,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: true,
     icon: getAppIconPath(),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition:

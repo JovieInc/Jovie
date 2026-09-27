@@ -6431,3 +6431,15 @@
 [data-empty-chat-suggestions="true"] {
   visibility: hidden;
 }
+
+/* Founder-review registries keep table geometry reserved while the canonical
+   app-shell right rail opens in flow beside them. */
+:where(.system-b-founder-review-table-shell) {
+  height: min(35rem, calc(100vh - 19rem));
+  min-height: 28rem;
+}
+
+:where(.system-b-founder-review-table) {
+  width: 100%;
+  table-layout: fixed;
+}

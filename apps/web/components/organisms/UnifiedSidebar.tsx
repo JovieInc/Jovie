@@ -132,7 +132,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
     <nav
       aria-label='OV Navigation'
-      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
+      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       {OPERATOR_NAV_SECTIONS.map(section => (
         <div key={section.label}>

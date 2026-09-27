@@ -9,6 +9,37 @@ export const DESKTOP_AUTH_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 export const DESKTOP_AUTH_PKCE_TTL_MS = 10 * 60 * 1000;
 export const DESKTOP_AUTH_FLOW_PARAM = 'desktop_flow';
 
+/**
+ * Return the authenticated in-app route that must leave the fixed-size auth
+ * handoff window and resume in the primary, resizable desktop window.
+ *
+ * The handoff is intentionally a narrow sign-in surface. It must never become
+ * a second application shell after an auth redirect, dev-auth bootstrap, or
+ * renderer recovery navigation.
+ */
+export function authenticatedRouteFromAuthHandoffNavigation(
+  urlString: string,
+  appOrigin: string
+): string | null {
+  let url: URL;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return null;
+  }
+
+  if (url.origin !== appOrigin) return null;
+
+  const isAuthenticatedAppRoute =
+    url.pathname === '/app' ||
+    url.pathname.startsWith('/app/') ||
+    url.pathname === '/hud' ||
+    url.pathname.startsWith('/hud/');
+
+  if (!isAuthenticatedAppRoute) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 export interface PendingDesktopAuthPkce {
   readonly codeVerifier: string;
   readonly codeChallenge: string;

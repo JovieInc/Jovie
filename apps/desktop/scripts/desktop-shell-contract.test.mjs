@@ -44,6 +44,13 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /function createWindow\(initialUrl = APP_ENTRY_URL\): BrowserWindow/
   );
+  assert.match(mainSource, /resizable: true,/);
+  assert.match(mainSource, /maximizable: true,/);
+  assert.match(mainSource, /fullscreenable: true,/);
+  assert.match(
+    mainSource,
+    /if \(!win\.isMaximized\(\) && !win\.isFullScreen\(\)\) \{\s*win\.maximize\(\);\s*\}/
+  );
   assert.match(
     mainSource,
     /process\.platform === 'darwin' \? MACOS_TRAFFIC_LIGHT_POSITION : undefined/
@@ -666,7 +673,19 @@ test('desktop navigation uses explicit URL disposition allowlists', async () => 
   );
   assert.match(
     mainSource,
-    /authHandoffWindow\.webContents\.on\('will-navigate', \(event, url\) =>/
+    /const handleAuthHandoffNavigation = \(\s*event: Electron\.Event,\s*url: string\s*\): void =>/
+  );
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.webContents\.on\(\s*'will-navigate',\s*handleAuthHandoffNavigation\s*\)/
+  );
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.webContents\.on\(\s*'will-redirect',\s*handleAuthHandoffNavigation\s*\)/
+  );
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.webContents\.on\('did-navigate'/
   );
   assert.match(
     mainSource,
