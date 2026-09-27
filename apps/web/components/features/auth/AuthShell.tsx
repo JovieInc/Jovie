@@ -7,6 +7,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
 import { track } from '@/lib/analytics';
+import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import {
   AUTH_OFFER_SHELL_CONTEXT,
   AUTH_OFFER_SHELL_EVENTS,
@@ -295,6 +296,13 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
 
       setPendingProvider(provider);
       setOauthError(null);
+      if (mode === 'sign-up') {
+        trackFunnelStep({
+          funnel: 'artist_signup',
+          step: 'auth_start',
+          surface: 'signup',
+        });
+      }
 
       try {
         // Better Auth `signIn.social({ provider, callbackURL, errorCallbackURL,
@@ -325,6 +333,15 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
 
         setOauthError(getAuthStartErrorMessage(mode));
         setPendingProvider(null);
+        if (mode === 'sign-up') {
+          trackFunnelStep({
+            funnel: 'artist_signup',
+            step: 'auth_start',
+            outcome: 'error',
+            surface: 'signup',
+            reason: 'oauth_start_failed',
+          });
+        }
         logger.warn(
           'OAuth start failed',
           {

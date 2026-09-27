@@ -20,6 +20,7 @@ import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { MetaPixel } from '@/features/tracking/MetaPixel';
+import { SignupFunnelBeacon } from '@/features/tracking/SignupFunnelBeacon';
 import {
   isProofProfileHandle,
   resolveProofClaimCta,
@@ -466,6 +467,9 @@ async function ArtistPageContent({
 
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+      )}
+      {isPublicNoAuthSmoke || isClaimed ? null : (
+        <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
       )}
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
@@ -366,6 +367,13 @@ export function ProfileInlineNotificationsCTA({
     }
 
     setIsFlowOpen(true);
+    if (!isSubscribed) {
+      trackFunnelStep({
+        funnel: 'fan_subscribe',
+        step: 'cta_click',
+        surface: 'profile',
+      });
+    }
     track('alert_cta_click', {
       ...analyticsBase,
       source: resolvedSource,
@@ -489,6 +497,15 @@ export function ProfileInlineNotificationsCTA({
   );
 
   const handleClose = useCallback(() => {
+    if (!isSubscribed && step === 'email') {
+      trackFunnelStep({
+        funnel: 'fan_subscribe',
+        step: 'cta_click',
+        outcome: 'dropped',
+        surface: 'profile',
+        reason: 'flow_dismissed',
+      });
+    }
     if (isInline) {
       if (onFlowClosed) {
         onFlowClosed();
@@ -506,7 +523,7 @@ export function ProfileInlineNotificationsCTA({
     setFlowOrigin(isSubscribed ? 'manage' : 'subscribe');
     setStep(isSubscribed ? 'preferences' : 'email');
     onFlowClosed?.();
-  }, [isInline, isSubscribed, onFlowClosed]);
+  }, [isInline, isSubscribed, onFlowClosed, step]);
 
   const handleBack = useCallback(() => {
     switch (step) {

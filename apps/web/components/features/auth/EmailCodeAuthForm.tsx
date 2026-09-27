@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AuthInput, FormError, OtpInput } from '@/features/auth/atoms';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import {
   AUTH_EMAIL_CHANGE_LABEL,
   AUTH_EMAIL_EMPTY_ERROR,
@@ -188,6 +189,14 @@ export function EmailCodeAuthForm({
 
     setIsPending(true);
     setErrorMessage(null);
+    const isSignupFunnel = mode === 'sign-up';
+    if (isSignupFunnel) {
+      trackFunnelStep({
+        funnel: 'artist_signup',
+        step: 'auth_start',
+        surface: 'signup',
+      });
+    }
 
     try {
       // `emailOtp.sendVerificationOtp({ email })` triggers the server-side
@@ -210,6 +219,15 @@ export function EmailCodeAuthForm({
       startResendCooldown();
     } catch (error) {
       setErrorMessage(getSendErrorMessage(error));
+      if (isSignupFunnel) {
+        trackFunnelStep({
+          funnel: 'artist_signup',
+          step: 'auth_start',
+          outcome: 'error',
+          surface: 'signup',
+          reason: 'otp_send_failed',
+        });
+      }
       logger.warn(
         'Email OTP send failed',
         {

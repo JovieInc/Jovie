@@ -7,6 +7,7 @@ import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
+import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
@@ -70,6 +71,11 @@ export function OnboardingShell({
   useEffect(() => {
     track(ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED, {
       surface: 'start_chat',
+    });
+    trackFunnelStep({
+      funnel: 'artist_signup',
+      step: 'onboarding_started',
+      surface: 'onboarding',
     });
   }, []);
 
