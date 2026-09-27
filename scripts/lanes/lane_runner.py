@@ -615,7 +615,7 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
     for pr in exhausted_prs(prs, attempts):
         body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
                 f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
-                "Filed for triage; the lane retries when the head moves.")
+                "Filed through bug intake (Linear Triage); the lanes stop here.")
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
         record = attempts.get(str(pr["number"]), {})
         try:
@@ -890,7 +890,7 @@ def worker(host: Host, name: str) -> int:
         candidates = fix_candidates(name)
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
         requeue_verified(host, prs)
-        escalate_exhausted(host, candidates + events, linear)
+        escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
         red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
         adopt = None if red else claim_adoptable_pr(host, name, prs)
         issue = None

@@ -444,6 +444,17 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual((fixed, self.linear.moves), ([5], []))
         self.assertEqual(len(self.execs), 1)
 
+    def test_event_queued_prs_are_fixed_first_and_escalated_once(self):
+        fixed, escalated = [], []
+        lane.fix_candidates = lambda name: [{"number": 5}, {"number": 6}]
+        lane.pr_events.queued_prs = lambda module, kinds: [{"number": 6, "eventKinds": ["red"]}]
+        lane.pr_events.claim_event_pr = lambda host, module, name, prs: prs[0]
+        lane.claim_red_pr = lambda host, name, prs=None: self.fail("the event queue goes first")
+        lane.escalate_exhausted = lambda host, prs, linear: escalated.append(sorted(pr["number"] for pr in prs))
+        lane.fix_red_pr = lambda host, name, spec, pr: fixed.append(pr["number"])
+        lane.worker(self.host, "devin")
+        self.assertEqual((fixed, escalated), ([6], [[5, 6]]))
+
     def test_late_remote_drafts_are_adopted_and_gated(self):
         adopted = []
         lane.claim_adoptable_pr = lambda host, name, prs: {"number": 8}
