@@ -43,7 +43,7 @@
     {
       "id": "combined-integration",
       "name": "Combined Integration",
-      "purpose": "Affected unit, parallel hosted build-plus-layout, Ovie build, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head."
+      "purpose": "Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head."
     },
     {
       "id": "main-deploy",
@@ -158,8 +158,17 @@
       "tier": "combined-integration",
       "mergeGate": true,
       "gateStage": "merge-group",
-      "nextLocalCommand": "pnpm --filter @jovie/ovie typecheck && pnpm --filter @jovie/ovie build",
-      "remediation": "Repair the independent Ovie typecheck or standalone build on the exact combined head; it runs in parallel with Build + Layout and is required by the same aggregates."
+      "nextLocalCommand": "pnpm --filter @jovie/ovie build",
+      "remediation": "Repair the independent Ovie standalone build on the exact combined head; it runs in parallel with Build + Layout and Ovie Typecheck and is required by the same aggregates."
+    },
+    {
+      "id": "ci-typecheck-ovie",
+      "name": "Ovie Typecheck (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm --filter @jovie/ovie typecheck",
+      "remediation": "Repair the independent Ovie typecheck on the exact combined head; it runs in parallel with Ovie Build, whose next build skips only this duplicate type pass, and is required by the same aggregates."
     },
     {
       "id": "ci-storybook-surfaces",

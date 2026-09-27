@@ -1,5 +1,7 @@
 # GPT-6 Astra readiness contract
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 Status: `READY_CONTRACT_ONLY`; live access and runtime compatibility are `UNKNOWN`.
 Owner: JOV-6005. Activation and model-promotion owner: JOV-5929. Live Symphony
 recovery/liveness owner: JOV-6004.
@@ -39,7 +41,7 @@ upstream interface enforces the same contract.
 - Official Symphony's commit, push, pull, Linear, release, land, and debug skills
   were reviewed. Repository authority remains higher priority; an Astra job may
   not infer merge/deploy permission from a skill.
-- `scripts/symphony/WORKFLOW.md` is the active prompt/runtime surface. It
+- `symphony-control/WORKFLOW.md` is the active prompt/runtime surface. It
   and the recovery-owned provider/controller files remain untouched.
 - The current model registry/router, app-server request events, dynamic tool
   definitions, retry/continuation behavior, compaction support, and structural
@@ -47,7 +49,7 @@ upstream interface enforces the same contract.
 
 ## Dispatch interface
 
-`scripts/symphony/astra/contract.json` is the only canonical Astra prompt policy.
+`symphony-control/astra/contract.json` is the only canonical Astra prompt policy.
 Dispatchers compile task facts through `astra_readiness.py compile --input FILE`.
 The input must include `intent`, `constraints`, `authority`, `completion`,
 `model_fit`, `budget`, `tests`, `steering`, `escalation`, and `receipts`. The compiler keeps the stable
@@ -104,7 +106,7 @@ The hosted structural lane runs:
 
 ```sh
 COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" \
-  python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py
+  python3 -m coverage run --branch symphony-control/tests/astra-readiness.test.py
 ```
 
 and enforces at least 90% branch-aware source coverage. The suite covers request

@@ -2,11 +2,11 @@
 /**
  * Run the cheap CI cluster as labeled lanes.
  *
- * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
- * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
- * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
- * artifact; the aggregate `ci-fast` job also requires the dedicated profile
- * browser admission job.
+ * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
+ * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
+ * Each hosted job checks out and installs once, invokes one value from
+ * LANE_GROUPS, and publishes an isolated lane artifact; the aggregate
+ * `ci-fast` job also requires the dedicated profile browser admission job.
  *
  * Fail-fast: the first failed lane skips the expensive structural lane so
  * biome/typecheck red does not pay for structural Playwright. Cheap lanes
@@ -154,8 +154,6 @@ export function webCiContractTestsCommand(
     .join('');
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
-export const ROUTE_PREP_COVERAGE_COMMAND =
-  'python3 scripts/symphony/tests/run-route-prep-coverage-gate.py';
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
@@ -181,8 +179,6 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/tests/test_brand_scrub.py',
   'scripts/tests/test_agent_workflow_hygiene.py',
   'scripts/tests/test_runner_routing.py',
-  'scripts/tests/test_symphony_ui_pilot_runtime.py',
-  'scripts/tests/test_symphony_reconciler_runtime.py',
 ]);
 
 /**
@@ -240,11 +236,6 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"',
-      'python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py -q',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py" --fail-under=85',
     ].join(' && ')
@@ -268,6 +259,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/runtime-state.test.mjs',
   'scripts/backlog-orchestrator/__tests__/shipping-observability.test.mjs',
   'scripts/backlog-orchestrator/__tests__/summer-live-state.test.mjs',
+  'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/deprecation-intake.test.mjs',
@@ -295,8 +287,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/summer-commissioning/product-quality-governor.test.mjs',
   'scripts/summer-commissioning/project-creation-policy.test.mjs',
   'scripts/summer-commissioning/receipt-trust.test.mjs',
-  'scripts/symphony/model-harness-selection.test.mjs',
-  'scripts/symphony/symphony-auto-route.test.mjs',
   'scripts/upstash-production-operator.test.mjs',
   'scripts/vercel-source-contract.test.mjs',
   'scripts/verify-workflow-references.test.mjs',
@@ -305,15 +295,12 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
-  'scripts/lib/__tests__/agent-config-health.test.mjs',
-  'scripts/lib/__tests__/agentcookie.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
   'scripts/lib/__tests__/biome-no-restricted-imports.test.mjs',
   'scripts/lib/__tests__/brand-deals-skill-contract.test.mjs',
   'scripts/lib/__tests__/changelog-parser.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
-  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
   'scripts/lib/__tests__/component-comparative-quality-bar.test.mjs',
   'scripts/lib/__tests__/component-rendered-certification.test.mjs',
   'scripts/lib/__tests__/component-rendered-evaluator.test.mjs',
@@ -321,19 +308,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
-  'scripts/lib/__tests__/ensure-jovie-repo-cwd.test.mjs',
-  'scripts/lib/__tests__/gbrain-health-summary.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
   'scripts/lib/__tests__/help-center-recertification-workflow.test.mjs',
-  'scripts/lib/__tests__/hermes-launchd.test.mjs',
-  'scripts/lib/__tests__/hermes-ops-import-contract.test.mjs',
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
   'scripts/lib/__tests__/lighthouse-production-collect.test.mjs',
   'scripts/lib/__tests__/lighthouse-retry.test.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
   'scripts/lib/__tests__/m2-revenue-path-canary-intake.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
-  'scripts/lib/__tests__/pipeline-scoreboard.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
@@ -352,31 +334,15 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
-  'scripts/lib/__tests__/ship-ledger.test.mjs',
-  'scripts/lib/__tests__/spawn-resource.test.mjs',
   'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
   'scripts/lib/__tests__/story-coverage-ratchet.test.mjs',
   'scripts/lib/__tests__/taste-classifier.test.mjs',
   'scripts/lib/__tests__/taste-label-guard.test.mjs',
-  'scripts/lib/__tests__/tim-brief.test.mjs',
-  'scripts/lib/__tests__/tracker-client.test.mjs',
   'scripts/lib/__tests__/tracker.test.mjs',
   'scripts/lib/__tests__/typecheck-singleflight-diagnostics.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
-  'scripts/symphony/lib/__tests__/backlog-orchestrator-ownership-inventory-recovery.test.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-  'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
-  'scripts/symphony/lib/__tests__/control-plane-liveness-recovery.test.ts',
-  'scripts/symphony/lib/__tests__/controller-liveness.test.ts',
-  'scripts/symphony/lib/__tests__/delivery-liveness-recovery.test.ts',
-  'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
-  'scripts/symphony/lib/__tests__/merge-queue-fleet-gate-recovery.test.ts',
-  'scripts/symphony/lib/__tests__/production-controller-recovery.test.ts',
-  'scripts/symphony/lib/__tests__/release-marker-recovery.test.ts',
-  'scripts/symphony/lib/__tests__/summer-governor-recovery.test.ts',
 ]);
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
   test => test.replace(/^scripts\//u, '')
@@ -522,13 +488,16 @@ export const LANE_GROUPS = Object.freeze({
     'design-system-source-ratchet',
     'design-exception-registry',
     'design-governance-enforcement',
-    'design-conformance',
     'ios-fast',
-    'profile-admission',
     'billing-coverage',
     'copy-gate',
     'structural',
   ]),
+  // ci-fast (structural web) runs these in the background while its structural
+  // web commands run. They were the two slowest cheap lanes left in remaining
+  // (38s + 35s of a ~150s serial chain that outlasted remaining's structural
+  // lane, merge-group run 36270458408); web finished ~100s before remaining.
+  web: Object.freeze(['design-conformance', 'profile-admission']),
 });
 
 export const LANE_COMMANDS = Object.freeze(
@@ -1512,7 +1481,6 @@ export function structuralConcurrency(value) {
 const STRUCTURAL_LONG_POLES = Object.freeze([
   'python3 -m pytest ',
   'pnpm invariants:check',
-  'run-governor-bounded-codex-selector.sh',
   // 2026-09-26 merge groups: 42s and 38s, the slowest web commands. List
   // order started the 42s one 16th of 22, so it set the web-only wall.
   'lib/__tests__/component-live-storybook-certification.test.mjs',
@@ -1524,6 +1492,9 @@ const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
 const OPAQUE_ENTRY_LOCKS = Object.freeze([
   // Runs scripts Vitest suites with the default scripts/coverage directory.
   ['scripts/run-affected-tests.mjs --control', 'coverage:scripts'],
+  // Walks apps/web/** and lstat()s each listed file; a concurrent coverage
+  // run in apps/web deletes files under apps/web/coverage mid-walk (ENOENT).
+  [PLAYWRIGHT_RECEIPT_CI_TEST, 'coverage:apps/web'],
 ]);
 
 function packageScripts(dir) {
@@ -1790,9 +1761,9 @@ export async function runStructural(opts = {}) {
       ? ['pnpm invariants:check']
       : [];
   const operationsParts = [
-    ROUTE_PREP_COVERAGE_COMMAND,
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs',
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
@@ -1804,7 +1775,7 @@ export async function runStructural(opts = {}) {
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
     // merge-group-workflow-contract runs in ci:control:test's Vitest run.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs lib/__tests__/codex-recovery-ci.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
@@ -1814,40 +1785,12 @@ export async function runStructural(opts = {}) {
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',
     'python3 .github/scripts/test-security-suppression-audit.py',
-    // The Gem contract is embedded in the broader Symphony controller suite.
-    "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
-    'python3 scripts/symphony/tests/run-hud-proof-gate.py',
-    'python3 scripts/symphony/tests/run-runtime-proof-gate.py',
-    'python3 scripts/symphony/tests/run-safe-restart-gate.py',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
-    'bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage run --branch scripts/symphony/tests/upstream-burrito-payload.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-upstream-burrito.coverage" python3 -m coverage report --include="*/scripts/symphony/verify_upstream_burrito_payload.py" --show-missing --precision=2 --fail-under=90',
-    'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
-    'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
-    'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
-    'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/gbrain-runtime-assets.test.mjs && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage combine "${RUNNER_TEMP:-/tmp}" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage report --include="*/scripts/symphony/gbrain-runtime/gbrain-mcp-http-proxy.py" --show-missing --precision=2 --fail-under=78; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local GBrain proxy coverage"; fi',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage run --branch scripts/symphony/tests/closure-health.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage report --include="*/scripts/symphony/closure_health.py" --show-missing --precision=2 --fail-under=85',
-    'python3 scripts/symphony/tests/gem-pr-drain.test.py',
-    // Two shards of one file; its ShardPartitionContractTests proves every
-    // class runs in exactly one. Installer tests never import the covered cycle.
-    'GEM_CONTRACT_SHARD=installer python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" GEM_CONTRACT_SHARD=coverage python3 -m coverage run --branch scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-delivery.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-repo-drain-cycle.py" --show-missing --precision=2 --fail-under=95',
-    'bash scripts/symphony/tests/align-runner-source-revision.test.sh',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
-    'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
-    'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage run --branch scripts/symphony/tests/summer-bottleneck-producer.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage report --include="*/scripts/symphony/summer_bottleneck_producer.py" --show-missing --precision=2 --fail-under=80; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local Summer bottleneck producer coverage"; fi',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage run --branch scripts/fleet-gate/tests/closure-health.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage report --include="*/scripts/fleet-gate/closure_health.py" --show-missing --precision=2 --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage run --branch scripts/fleet-gate/tests/gem-priority-gate.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage report --include="*/scripts/fleet-gate/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage run --branch scripts/fleet-gate/tests/test_fleet_admission_receipt.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage report --include="*/scripts/fleet-gate/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-gate.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/shipping-lead-gate.test.mjs',
-    'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-include=scripts/symphony/summer-shipping-lead-contract.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs scripts/symphony/summer-shipping-lead-contract.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi',
-    'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/native-queue-starvation-execute.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=85 scripts/symphony/native-queue-starvation-execute.test.mjs',
-    'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
-    'python3 scripts/symphony/tests/run-model-state-gate.py',
-    'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
-    'python3 scripts/symphony/tests/run-summer-publisher-gate.py',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-ci-audit.coverage" python3 -m coverage run --branch scripts/symphony/tests/summer-ci-audit.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-ci-audit.coverage" python3 -m coverage report --include="*/scripts/symphony/summer_ci_audit.py" --show-missing --precision=2 --fail-under=95',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage report --include="*/scripts/symphony/astra/astra_readiness.py" --show-missing --precision=2 --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-hyperagent-lifecycle.coverage" python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-hyperagent-lifecycle.coverage" python3 -m coverage report --include="*/scripts/symphony/hyperagent/lifecycle.py" --show-missing --precision=2 --fail-under=95',
-    'python3 scripts/symphony/tests/symphony-github-poke.test.py',
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/summer-shipping-lead-contract.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/summer-shipping-lead-contract.test.mjs',
+    'python3 scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
@@ -2012,6 +1955,11 @@ function annotateFailure(lane, logExcerpt) {
   if (short) console.error(`::error::${short}`);
 }
 
+/** @param {number} ms */
+export function formatLaneDuration(ms) {
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
+}
+
 function writeSummary(results, groupId, timingTables = []) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return;
@@ -2019,11 +1967,13 @@ function writeSummary(results, groupId, timingTables = []) {
   const lines = [
     `### ci-fast lanes (${groupId || 'all'})`,
     '',
-    '| Lane | Status | Next local command |',
-    '| --- | --- | --- |',
+    '| Lane | Status | Duration | Next local command |',
+    '| --- | --- | --- | --- |',
   ];
   for (const r of results) {
-    lines.push(`| ${r.name} | **${r.status}** | \`${r.nextLocalCommand}\` |`);
+    lines.push(
+      `| ${r.name} | **${r.status}** | ${formatLaneDuration(r.durationMs)} | \`${r.nextLocalCommand}\` |`
+    );
   }
   lines.push('');
   const failed = results.filter(r => r.status === 'failure');
@@ -2112,7 +2062,10 @@ async function main() {
 
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
-        console.log(`[ci-fast] ${lane.id}: skipped`);
+        const durationMs = Math.max(0, Date.now() - laneStartedAt);
+        console.log(
+          `[ci-fast] ${lane.id}: skipped (${formatLaneDuration(durationMs)})`
+        );
         console.log(logExcerpt);
         results.push({
           id: lane.id,
@@ -2120,7 +2073,7 @@ async function main() {
           nextLocalCommand: lane.nextLocalCommand,
           status: 'skipped',
           logExcerpt,
-          durationMs: Math.max(0, Date.now() - laneStartedAt),
+          durationMs,
         });
         continue;
       }
@@ -2150,7 +2103,12 @@ async function main() {
         if (failFast) failedFast = true;
       }
 
-      console.log(`[ci-fast] ${lane.id}: ${status}`);
+      // Per-lane wall time: the job log is the only place the background
+      // lanes' timings surface without downloading the results artifact.
+      const durationMs = Math.max(0, Date.now() - laneStartedAt);
+      console.log(
+        `[ci-fast] ${lane.id}: ${status} (${formatLaneDuration(durationMs)})`
+      );
       if (lane.id === 'structural' && status === 'success') {
         // Keep exact suite/coverage receipts available in GitHub's job log.
         console.log(outcome.output);
@@ -2172,7 +2130,7 @@ async function main() {
         nextLocalCommand: lane.nextLocalCommand,
         status,
         logExcerpt,
-        durationMs: Math.max(0, Date.now() - laneStartedAt),
+        durationMs,
       });
     }
   } catch (error) {

@@ -18,6 +18,22 @@
       "false"
     ]
   },
+  "codex": {
+    "label": "codex",
+    "model": "codex-default",
+    "slots": 3,
+    "health": ["python3", "{here}/codex_lane.py", "health"],
+    "healthy": "available: [1-9]",
+    "cmd": [
+      "python3",
+      "{here}/codex_lane.py",
+      "run",
+      "--prompt-file",
+      "{prompt_file}",
+      "--cwd",
+      "{cwd}"
+    ]
+  },
   "claude": {
     "label": "claude",
     "model": "sonnet",

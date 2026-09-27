@@ -690,12 +690,9 @@ final class ChatRepository {
     // (load-earlier pages accumulate into the timeline) grows RAM without
     // limit. Keep only the newest window per conversation; older rows remain
     // reachable via load-earlier.
-    messagesByConversationID =
-      messagesByConversationID.mapValues { ChatTranscriptWindow.persistedTail($0) }
-
     let snapshot = CachedChatSnapshot(
       conversations: conversations,
-      messagesByConversationID: messagesByConversationID,
+      messagesByConversationID: messagesByConversationID.mapValues(ChatTranscriptWindow.persistedTail),
       cachedAt: Date(),
       activeConversationID: activeConversationID,
       hasMoreOlderByConversationID: hasMoreOlderByConversationID
@@ -754,6 +751,11 @@ final class ChatRepository {
         default: return "completed"
         }
       }(),
+      // Preserve the server timestamp when the row came from a fetched or
+      // cached window (JOV-6210); otherwise `paintCachedWindow` would derive
+      // an `olderCursor` from restart-time timestamps and load-earlier would
+      // refetch the current window instead of older history. Optimistic rows
+      // have no server timestamp yet, so they fall back to now.
       createdAt: item.createdAt ?? ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )
