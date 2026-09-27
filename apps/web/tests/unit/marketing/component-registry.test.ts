@@ -969,8 +969,8 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
     const entry = sectionEntry('feature-split');
 
     expect(MARKETING_PEN_CONTRACT_IDS.section.featureSplit).toBe('Y44oSU');
-    expect(entry.penRootIds).toEqual(['Y44oSU']);
-    expect(entry.penRootIds).not.toContain('DEIfw');
+    expect(entry?.penRootIds).toEqual(['Y44oSU']);
+    expect(entry?.penRootIds).not.toContain('DEIfw');
     expect(
       marketingPenSelector(MARKETING_PEN_CONTRACT_IDS.section.featureSplit)
     ).toBe('[data-pen-contract="Y44oSU"]');

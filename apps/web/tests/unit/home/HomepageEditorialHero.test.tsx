@@ -152,7 +152,7 @@ describe('HomepageEditorialHero', () => {
     const copy = hero.querySelector('.homepage-editorial-hero__copy');
     if (!stage || !copy) throw new Error('Homepage hero stage is missing');
 
-    expect(stage).toContainElement(copy);
+    expect(stage).toContainElement(copy as HTMLElement);
     expect(copy).toHaveAttribute('data-hero-layer', 'active');
     expect(stage).toContainElement(
       screen.getByTestId('homepage-editorial-hero-search')
