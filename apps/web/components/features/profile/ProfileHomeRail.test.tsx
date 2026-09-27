@@ -42,6 +42,66 @@ describe('ProfileHomeRail', () => {
     expect(carousel.contains(screen.getByTestId('profile-pac'))).toBe(true);
   });
 
+  it('caps secondary cards at two and counts the capture card toward the cap', () => {
+    const releases = ['one', 'two', 'three'].map((slug, index) => ({
+      id: `release-${index}`,
+      title: `Release ${index}`,
+      slug: `release-${slug}`,
+      releaseType: 'single',
+      releaseDate: '2026-01-01T00:00:00.000Z',
+      artworkUrl: null,
+      artistNames: ['DJ Test'],
+      previewUrl: null,
+    }));
+
+    render(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+        releases={releases}
+      />
+    );
+
+    // Capture occupies one of the two secondary slots.
+    expect(screen.getAllByTestId('entity-card-music')).toHaveLength(1);
+    expect(
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toBeInTheDocument();
+  });
+
+  it('shows up to two secondary cards when the capture card is not rendered', () => {
+    const releases = ['one', 'two', 'three'].map((slug, index) => ({
+      id: `release-${index}`,
+      title: `Release ${index}`,
+      slug: `release-${slug}`,
+      releaseType: 'single',
+      releaseDate: '2026-01-01T00:00:00.000Z',
+      artworkUrl: null,
+      artistNames: ['DJ Test'],
+      previewUrl: null,
+    }));
+
+    render(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={true}
+        showAlertsCard={false}
+        releases={releases}
+      />
+    );
+
+    expect(screen.getAllByTestId('entity-card-music')).toHaveLength(2);
+    expect(
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).not.toBeInTheDocument();
+  });
+
   it('drops the alerts fallback card when fan capture is unavailable', () => {
     render(
       <ProfileHomeRail

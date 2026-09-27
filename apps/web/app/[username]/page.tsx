@@ -47,6 +47,7 @@ import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import {
   buildProfileAeoContent,
   buildProfileAeoFaqStructuredData,
+  buildStructuredCollaboratorParagraph,
 } from '@/lib/profile/aeo-content';
 import {
   collectEntityMentions,
@@ -529,6 +530,13 @@ async function ArtistPageContent({
           showOldReleases: profileSettings.showOldReleases === true,
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
+        creditSegments={
+          buildStructuredCollaboratorParagraph(
+            artist.name,
+            artist.handle,
+            releaseCollaborators
+          )?.segments
+        }
         releases={releases}
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
