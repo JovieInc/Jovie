@@ -320,10 +320,12 @@ function extractTestExecutions(job) {
 
 /**
  * Normalize CI matrix job names so shard variants are grouped together.
- * Example: "Unit Tests (1/3)" -> "Unit Tests"
+ * Example: "Unit Tests (1/3)" -> "Unit Tests". The unsharded "packages/ui"
+ * unit matrix entry groups with its shards too, so its step history stays
+ * "Unit Tests › Run packages/ui unit tests".
  */
 function normalizeJobName(name) {
-  return name.replace(/\s*\(\d+\/\d+\)$/, '');
+  return name.replace(/\s*\((?:\d+\/\d+|packages\/ui)\)$/, '');
 }
 
 /**
