@@ -1,7 +1,8 @@
 import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer } from '@/components/marketing';
+import { MarketingContainer, MarketingHeroPhoto } from '@/components/marketing';
+import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
@@ -12,38 +13,59 @@ export const metadata: Metadata = {
   robots: NOINDEX_ROBOTS,
 };
 
+const INVESTORS_HERO_PHOTO = {
+  src: '/images/marketing-hero/investors.webp',
+  width: 1600,
+  height: 901,
+} as const;
+
 export default function InvestorsPage() {
   return (
-    <main className='bg-base py-16 text-primary-token sm:py-20 lg:py-24'>
-      <MarketingContainer width='page' className='flex flex-col gap-10'>
-        <section className='max-w-3xl space-y-5'>
-          <p className='text-sm font-medium tracking-tight text-muted-token'>
-            Investor overview
-          </p>
-          {/* ui-casing-allow: marketing display headline */}
-          <h1 className='text-4xl font-semibold tracking-tight line-clamp-2 sm:text-5xl'>
-            Jovie turns creator traffic into measurable fan value
-          </h1>
-          <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
-            The private investor portal stays token-gated. This public page is a
-            high-level overview of the product thesis: capture the audience,
-            personalize the next action, and compound fan relationships from the
-            first profile visit onward.
-          </p>
-          <div className='flex flex-wrap gap-3'>
-            <Button asChild variant='primary'>
-              <Link href={APP_ROUTES.SUPPORT} prefetch={false}>
-                Request Access
-              </Link>
-            </Button>
-            <Button asChild variant='secondary'>
-              <Link href={APP_ROUTES.AI} prefetch={false}>
-                Read The AI Brief
-              </Link>
-            </Button>
+    <main className='marketing-hero-dock marketing-hero-dock--inset relative overflow-x-clip bg-base text-primary-token'>
+      <section className='relative overflow-hidden'>
+        <MarketingHeroPhoto {...INVESTORS_HERO_PHOTO} />
+        <div
+          aria-hidden='true'
+          className='hero-glow pointer-events-none absolute inset-0'
+        />
+        <MarketingContainer
+          width='page'
+          className='relative z-3 py-16 sm:py-20 lg:py-24'
+        >
+          <div className='max-w-3xl space-y-5'>
+            <p className='text-sm font-medium tracking-tight text-muted-token'>
+              Investor overview
+            </p>
+            {/* ui-casing-allow: marketing display headline */}
+            <h1 className='text-4xl font-semibold tracking-tight line-clamp-2 sm:text-5xl'>
+              Jovie turns creator traffic into measurable audience value
+            </h1>
+            <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
+              The private investor portal stays token-gated. This public page is
+              a high-level overview of the product thesis: capture the audience,
+              personalize the next action, and compound audience relationships
+              from the first profile visit onward.
+            </p>
+            <div className='flex flex-wrap gap-3'>
+              <Button asChild variant='primary'>
+                <Link href={APP_ROUTES.SUPPORT} prefetch={false}>
+                  Request Access
+                </Link>
+              </Button>
+              <Button asChild variant='secondary'>
+                <Link href={APP_ROUTES.AI} prefetch={false}>
+                  Read The AI Brief
+                </Link>
+              </Button>
+            </div>
           </div>
-        </section>
+        </MarketingContainer>
+      </section>
 
+      <MarketingContainer
+        width='page'
+        className='flex flex-col gap-10 pb-16 sm:pb-20 lg:pb-24'
+      >
         <section className='grid gap-4 md:grid-cols-3'>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
@@ -84,9 +106,9 @@ export default function InvestorsPage() {
               Why now
             </h2>
             <p className='text-sm leading-7 text-secondary-token'>
-              Music creation is cheap, distribution is crowded, and static
-              link-in-bio tooling does not adapt to fan context. Jovie sits at
-              the first-party surface where creators already own attention.
+              Content creation is cheap, distribution is crowded, and static
+              link-in-bio tooling does not adapt to audience context. Jovie sits
+              at the first-party surface where creators already own attention.
             </p>
           </div>
           <div className='space-y-4'>
@@ -117,6 +139,15 @@ export default function InvestorsPage() {
           </div>
         </section>
       </MarketingContainer>
+
+      <MarketingFooterCta
+        title='Request access to the investor overview.'
+        ctaLabel='Request Access'
+        ctaHref={APP_ROUTES.SUPPORT}
+        ctaAnalyticsEvent='investors_footer_cta_request_access'
+        ctaAnalyticsSource='investors_page_footer'
+        prefetch={false}
+      />
     </main>
   );
 }
