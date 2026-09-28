@@ -142,6 +142,8 @@ interface MarketingHeroPublicCommon extends MarketingHeroBaseProps {
   readonly primaryCta?: MarketingHeroCta;
   readonly secondaryCta?: MarketingHeroCta;
   readonly linkComponent?: ElementType;
+  /** Unique per-route decorative hero photograph. See `MarketingHeroPhoto`. */
+  readonly photo?: MarketingHeroPhotoInput;
 }
 
 interface MarketingHeroPublicImage {
