@@ -26,10 +26,9 @@ import { cn } from '@/lib/utils';
  * actions slot. Detail rows below this header are the compressed tail —
  * they must never repeat a fact this header already states.
  *
- * JOV-6842 (Pen odpZ8, D6): single owner of rail header anatomy —
- * EntityHeaderCard, DrawerHeader, AudienceMemberHeader and
- * ContactDetailHeader were folded onto it. `layout='chrome'` covers the
- * utility title bar; new variants fail CI via the header ratchet (JOV-6777).
+ * JOV-6842: single owner of rail header anatomy — EntityHeaderCard,
+ * DrawerHeader, AudienceMemberHeader, ContactDetailHeader folded onto it.
+ * `layout='chrome'` = utility title bar; variants fail CI (JOV-6777).
  */
 
 export const ENTITY_HEADER_THUMBNAIL_SIZE_PX = 56;
