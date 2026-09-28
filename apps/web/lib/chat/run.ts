@@ -590,7 +590,11 @@ export async function executeChatTurn(
       },
     }),
     onFinish: async ({ steps, text, finishReason }) => {
-      if (!text && steps.every(step => step.toolCalls.length === 0)) {
+      if (!text.trim() && steps.every(step => step.toolCalls.length === 0)) {
+        const emptyOutputError = Object.assign(
+          new Error('Model turn produced no text or tool calls'),
+          { name: 'EmptyChatTurnError' }
+        );
         // An empty turn is a failure the caller would otherwise persist as a
         // placeholder reply (JOV-6533); console.error so prod logs show it.
         console.error('[chat] model turn produced no output', {
@@ -601,6 +605,19 @@ export async function executeChatTurn(
           steps: steps.length,
           aborted: signal?.aborted ?? false,
         });
+        langfuseTrace.endError(emptyOutputError);
+        await telemetry?.captureException?.(emptyOutputError, {
+          tags: { feature: 'ai-chat', errorType: 'empty_output' },
+          extra: {
+            userId,
+            messageCount: uiMessages.length,
+            requestId,
+            profileId: resolvedProfileId,
+            conversationId: resolvedConversationId,
+          },
+        });
+        await onStreamError?.(emptyOutputError);
+        return;
       }
       let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {
@@ -777,13 +794,15 @@ async function resolveCoreChatTrace(input: {
 function wrapStreamResultWithLeakGuard<T extends ReturnType<typeof streamText>>(
   streamResult: T
 ): T {
-  if (!streamResult?.text) {
+  const textPromise = streamResult?.text;
+  if (!textPromise) {
     return streamResult;
   }
 
-  const sanitizedTextPromise = streamResult.text.then(
+  const sanitizedTextPromise = Promise.resolve(textPromise).then(
     text => sanitizeAssistantResponse(text).text
   );
+  void sanitizedTextPromise.catch(() => undefined);
 
   return Object.create(streamResult, {
     text: {

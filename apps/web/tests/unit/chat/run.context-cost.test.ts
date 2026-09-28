@@ -222,9 +222,11 @@ describe('executeChatTurn context cost', () => {
   });
 
   it('logs the real model stream error even without telemetry (JOV-6533)', async () => {
+    const onStreamError = vi.fn();
     const turn = await executeChatTurn({
       ...baseInput,
       requestId: 'req-1',
+      onStreamError,
       uiMessages: [
         { id: 'a', role: 'user', parts: [{ type: 'text', text: 'hi' }] },
       ] as UIMessage[],
@@ -265,6 +267,9 @@ describe('executeChatTurn context cost', () => {
     expect(consoleError).toHaveBeenCalledWith(
       '[chat] model turn produced no output',
       expect.objectContaining({ requestId: 'req-1', finishReason: 'stop' })
+    );
+    expect(onStreamError).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'EmptyChatTurnError' })
     );
     consoleError.mockRestore();
   });
