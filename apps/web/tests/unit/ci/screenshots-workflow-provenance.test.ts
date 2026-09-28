@@ -80,6 +80,23 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(workflow).toContain("- 'apps/web/tests/visual-qa/**'");
   });
 
+  it('runs and preserves route DOM certification beside exact route captures', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const certify = getStepBlock(workflow, 'Certify route DOM invariants');
+    const upload = getStepBlock(workflow, 'Upload route DOM certification');
+
+    expect(stepIndex(workflow, 'Capture exact marketing routes')).toBeLessThan(
+      stepIndex(workflow, 'Upload exact marketing route captures')
+    );
+    expect(
+      stepIndex(workflow, 'Upload exact marketing route captures')
+    ).toBeLessThan(stepIndex(workflow, 'Certify route DOM invariants'));
+    expect(certify).toContain('route-dom-certification.spec.ts');
+    expect(certify).toContain('EXPECTED_COMMIT_SHA: ${{ github.sha }}');
+    expect(upload).toContain('route-dom-certification-${{ github.sha }}');
+    expect(upload).toContain('route-dom-certification/');
+  });
+
   it('checks production public exports before catalog capture', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const serving = getStepBlock(

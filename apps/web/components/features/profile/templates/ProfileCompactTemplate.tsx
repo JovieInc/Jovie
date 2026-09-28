@@ -930,11 +930,6 @@ export function ProfileCompactTemplate({
         onProfilePacResolved={setResolvedProfilePacAssignment}
         onResolved={markVisitorAssignmentResolved}
       />
-      <ReleaseCreditsDrawer
-        open={creditsOpen}
-        onOpenChange={setCreditsOpen}
-        credits={visibleReleaseCredits}
-      />
       <PublicProfileLayoutShell
         artistName={artist.name}
         heroImageUrl={heroImageUrl}
@@ -961,6 +956,12 @@ export function ProfileCompactTemplate({
             }
             data-public-profile-nav={publicProfileNavIds}
           >
+            <ReleaseCreditsDrawer
+              open={creditsOpen}
+              onOpenChange={setCreditsOpen}
+              credits={visibleReleaseCredits}
+              presentation={drawerPresentation}
+            />
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'

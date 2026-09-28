@@ -107,8 +107,7 @@ describe('golden-path lock evaluators', () => {
   });
 
   it('requires the JOV-5864 name search as the homepage conversion', () => {
-    const certified = `<a href="/start">Find yourself</a>
-      <form><input placeholder="Search your name" /><button>Find me</button></form>`;
+    const certified = `<form action="/start"><input placeholder="Search your name" /><button>Find me</button></form>`;
     expect(evaluateHomepageHtml(certified)).toMatchObject({
       id: 'homepage-cta',
       ok: true,

@@ -136,8 +136,9 @@ export function evaluateHomepageHtml(html) {
   // "Find me" — with a /start handoff still present for the onboarding route.
   const hasPlaceholder = html.includes(GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER);
   const hasAction = html.includes(GOLDEN_PATH_HERO_SEARCH_ACTION);
-  const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
-  if (hasPlaceholder && hasAction && hasStartHref) {
+  const hasStartHandoff =
+    /(?:href|action)\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
+  if (hasPlaceholder && hasAction && hasStartHandoff) {
     return {
       id: 'homepage-cta',
       ok: true,
