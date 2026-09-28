@@ -105,13 +105,13 @@ export const DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE = Object.fromEntries([
   ),
   ...routes(
     'dashboard',
-    '/app/earnings,/app/insights,/app/admin/costs,/app/admin/growth,/app/admin/revenue-lift,/app/admin/system'
+    '/app/earnings,/app/insights,/app/admin/costs,/app/admin/growth'
   ),
   ...routes(
     'detail',
     '/app/chat/[id],/app/lyrics/[trackId],/app/releases/[releaseId]/tasks,/app/admin/agent-runs/[id]'
   ),
-  ...routes('editor', '/app/chat,/app/admin/chat,/app/admin/share-studio'),
+  ...routes('editor', '/app/chat,/app/admin/chat'),
   ...routes(
     'settings',
     '/app/settings/account,/app/settings/analytics,/app/settings/artist-profile,/app/settings/audience,/app/settings/billing,/app/settings/connectors,/app/settings/contacts,/app/settings/data-privacy,/app/settings/referral,/app/settings/retargeting-ads,/app/settings/touring,/app/settings/usage,/app/admin/investors/settings'
@@ -119,7 +119,7 @@ export const DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE = Object.fromEntries([
   ...routes('profile', '/app/profiles'),
   ...routes(
     'feed-list',
-    '/app/calendar,/app/chats,/app/contacts,/app/library,/app/tasks,/app/tour-dates,/app/admin/activity,/app/admin/certifications,/app/admin/features,/app/admin/investors,/app/admin/investors/links,/app/admin/people,/app/admin/platform-connections,/app/admin/playlists,/app/admin/presence,/app/admin/screenshots'
+    '/app/calendar,/app/chats,/app/contacts,/app/library,/app/tasks,/app/tour-dates,/app/admin/activity,/app/admin/certifications,/app/admin/investors,/app/admin/investors/links,/app/admin/people,/app/admin/presence,/app/admin/screenshots'
   ),
 ]) as Readonly<Record<string, AppScreenArchetypeId>>;
 
