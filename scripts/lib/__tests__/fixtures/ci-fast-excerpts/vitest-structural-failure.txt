@@ -1,0 +1,27 @@
+
+ RUN  v5.0.1 /home/runner/work/Jovie/Jovie/scripts
+      Coverage enabled with v8
+
+ ❯ |workspace-scripts| lib/__tests__/design-exception-registry.test.mjs (8 tests | 1 failed) 512ms
+   ❯ design exception-registry contract (JOV-5447) (7)
+     × fails closed for every required rejection 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |workspace-scripts| lib/__tests__/design-exception-registry.test.mjs > design exception-registry contract (JOV-5447) > fails closed for every required rejection
+AssertionError: expected [ 'biome', …(12) ] to include 'design-exception-registry-drift'
+ ❯ lib/__tests__/design-exception-registry.test.mjs:82:35
+     80| describe('design exception-registry contract (JOV-5447)', () => {
+     81|   it('fails closed for every required rejection', () => {
+     82|     expect(LANE_GROUPS.remaining).toContain('design-exception-registry…
+       |                                   ^
+     83|     expect(CHECK_COMMAND).not.toMatch(/vitest|playwright|e2e/i);
+     84|     const family = readJson(FAMILY);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  18:00:24
+   Duration  1.22s (tests 57%, transform 31%, import 8%, worker 3%)

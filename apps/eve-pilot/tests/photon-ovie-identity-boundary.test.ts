@@ -35,9 +35,16 @@ describe('Photon/iMessage identity boundary', () => {
     const photon = readAgentSource('agent/channels/photon.ts');
     const identity = readAgentSource('agent/select-identity.ts');
     const agent = readAgentSource('agent/agent.ts');
-    const liveSurface = withoutComments(`${photon}\n${identity}\n${agent}`);
+    const channelIdentity = readAgentSource(
+      'agent/instructions/channel-identity.ts'
+    );
+    const liveSurface = withoutComments(
+      `${photon}\n${identity}\n${agent}\n${channelIdentity}`
+    );
 
-    expect(photon).toContain('bindEvePilotIdentity(identity)');
+    // The pack binds once per session, not as per-message channel context.
+    expect(channelIdentity).toContain('bindEvePilotIdentity(identity)');
+    expect(withoutComments(photon)).not.toMatch(/\bcontext:/);
     expect(identity).not.toMatch(/id: 'ovie'|EvePilotIdentityId[^\n]*'ovie'/);
     expect(liveSurface).not.toMatch(/bindEvePilotIdentity\('ovie'\)/);
     expect(liveSurface.toLowerCase()).not.toMatch(

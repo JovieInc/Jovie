@@ -4,6 +4,7 @@ import type { HTMLAttributes, ReactNode, SVGProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FridayRhythmSection } from '@/components/marketing/friday-rhythm-section';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 vi.mock('motion/react', () => ({
   motion: {
@@ -38,10 +39,12 @@ describe('FridayRhythmSection', () => {
     render(<FridayRhythmSection />);
 
     expect(
-      screen.getAllByRole('heading', { name: 'Make Every Friday Count' })
+      screen.getAllByRole('heading', {
+        name: segmentedAccessibleName('Make Every Friday', 'Count'),
+      })
     ).toHaveLength(2);
     for (const heading of screen.getAllByRole('heading', {
-      name: 'Make Every Friday Count',
+      name: segmentedAccessibleName('Make Every Friday', 'Count'),
     })) {
       expect(heading).toHaveClass('line-clamp-2');
     }

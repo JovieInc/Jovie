@@ -670,10 +670,9 @@
     {
       "id": "ci-release/gbrain-readiness-diagnosis",
       "failureMode": "GBrain readiness returns a misleading pool-saturation message for wedged or DNS-broken DB sessions.",
-      "regression": {
-        "kind": "test",
-        "command": "pnpm ci:control:test",
-        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+      "lifecycle": {
+        "state": "superseded",
+        "supersededBy": "JovieInc/symphony-control"
       },
       "ciStageOwner": {
         "stage": "scheduled-control-plane",
@@ -892,10 +891,9 @@
     {
       "id": "ci-release/gbrain-admin-secret-log-redaction",
       "failureMode": "GBrain administrative credentials enter persistent service logs instead of redacted diagnostics.",
-      "regression": {
-        "kind": "test",
-        "command": "pnpm ci:control:test",
-        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+      "lifecycle": {
+        "state": "superseded",
+        "supersededBy": "JovieInc/symphony-control"
       },
       "ciStageOwner": {
         "stage": "operator-bootstrap",

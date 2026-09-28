@@ -1,9 +1,9 @@
 # Jovie Positioning Canon
 
-- Version: 1.0
+- Version: 1.1
 - Status: Founder-locked canon
 - Owner: Tim White
-- Last approved: 2026-08-17
+- Last approved: 2026-09-26
 
 This is Jovie's versioned source of truth for customer positioning. It guides
 product, marketing, recruiting, partnership, investor, community, and merch
@@ -62,7 +62,8 @@ availability guarantee.
 
 | Audience or surface | Lead message | Supporting role | AI role |
 | --- | --- | --- | --- |
-| Consumer homepage, landing pages, and creator-facing campaigns | “Jovie has your back.” | Make a specific, capability-backed outcome legible; “Your creative life, in motion.” may frame the territory. | Mention only when it clarifies how a proven feature works or builds trust. |
+| Company homepage (jov.ie) | Jovie's generic identity: a lab-grade company and product statement for founders, investors and first-time visitors | Audience-neutral; no single-ICP proof (music, artist tours, “fund the next release”) on the homepage. A Customers menu routes to ICP landing pages. | May lead with the mechanism at investor depth (“AI leverage for human creators”), with the same authorship, oversight and evidence rules. |
+| ICP landing pages, outreach destinations, and creator-facing campaigns | “Jovie has your back.” | Make a specific, capability-backed outcome legible; “Your creative life, in motion.” may frame the territory. | Mention only when it clarifies how a proven feature works or builds trust. |
 | Product pages, onboarding, and in-product help | The immediate task and user benefit | “Jovie helps you move through the work.” | Use “AI assistance, with you in control.” only where the person can understand, review, and control the relevant assistance. |
 | Product interaction | The next user action | “Jovie. Just ask.” | Do not turn the CTA into a company-wide identity claim. |
 | Recruiting, investors, and partners | Creator outcomes plus the relevant business or product context | “AI leverage for human creators” may explain the mechanism at appropriate depth. | Be explicit about human authorship, oversight, consent, and the evidence behind any capability claim. |
@@ -168,3 +169,4 @@ communication.
 | Version | Date | Change | Approval |
 | --- | --- | --- | --- |
 | 1.0 | 2026-08-17 | Established the founder-locked positioning source of truth and proposal protocol. | Tim White founder direction |
+| 1.1 | 2026-09-26 | Split the homepage from consumer landing pages: jov.ie is a generic, lab-grade identity page for founders and investors; ICP-specific pages carry the creator promise and receive outreach traffic. Public-profile primitives use general nouns (Events, Pay). | Tim White founder direction, 2026-09-26 |

@@ -24,7 +24,7 @@ describe('web-187 investor memo missing-state source contract', () => {
 
   it('keeps access, manifest, markdown, and memo content server-owned', () => {
     const routeSource = readFileSync(
-      resolve(process.cwd(), 'app/investor-portal/[slug]/page.tsx'),
+      resolve(process.cwd(), 'app/investor-portal/(portal)/[slug]/page.tsx'),
       'utf8'
     );
     const storySource = readFileSync(
@@ -36,8 +36,7 @@ describe('web-187 investor memo missing-state source contract', () => {
     );
 
     expect(routeSource).toContain('async function requireInvestorAccess()');
-    expect(routeSource).toContain("cookieStore.get('__investor_token')");
-    expect(routeSource).toContain('if (!token)');
+    expect(routeSource).toContain('await getInvestorPortalAccess()');
     expect(routeSource).toContain('if (!page)');
     expect(routeSource.match(/notFound\(\)/g)).toHaveLength(2);
     expect(routeSource).toContain(

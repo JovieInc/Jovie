@@ -213,8 +213,7 @@ export function reviveGemOpenClawAgent(): never {
 }
 
 export function telemetryBridgeAllowsActuation(
-  surface: (typeof TELEMETRY_BRIDGE.forbiddenActuation)[number]
+  _surface: (typeof TELEMETRY_BRIDGE.forbiddenActuation)[number]
 ): false {
-  void surface;
   return false;
 }

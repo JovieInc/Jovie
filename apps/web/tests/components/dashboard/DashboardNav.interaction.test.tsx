@@ -152,7 +152,7 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
-    expect(screen.getByText('EARLIER')).toBeInTheDocument();
+    expect(screen.getByText('Earlier')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
       'href',
       '/app/chat/thread-newer'

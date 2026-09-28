@@ -39,7 +39,7 @@ export class MemoryIdentityResolver {
         name: candidate.name,
         status: candidate.status ?? 'candidate',
         metadata: buildEvidenceMetadata(candidate.evidence, {
-          ...(candidate.metadata ?? {}),
+          ...candidate.metadata,
           confidence: candidate.confidence,
         }),
       }));
@@ -94,7 +94,7 @@ export class MemoryIdentityResolver {
       await this.store.addEntityIdentity(scope, entityId, {
         ...identity,
         metadata: buildEvidenceMetadata(candidate.evidence, {
-          ...(identity.metadata ?? {}),
+          ...identity.metadata,
         }),
       });
     }

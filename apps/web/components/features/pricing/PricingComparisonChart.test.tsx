@@ -1,10 +1,20 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 describe('PricingComparisonChart', () => {
+  it('names the profile feature as a Jovie profile, not an artist profile', () => {
+    const { container } = render(<PricingComparisonChart />);
+
+    expect(
+      screen.getAllByText('Public Jovie profile page').length
+    ).toBeGreaterThan(0);
+    expect(container.textContent).not.toMatch(/artist profile/i);
+  });
+
   it('renders named comparison tables from monthly-only public offer truth', () => {
-    render(<PricingComparisonChart />);
+    const { container } = render(<PricingComparisonChart />);
 
     const desktopTable = screen.getByRole('table', {
       name: 'Feature comparison by plan',
@@ -27,6 +37,12 @@ describe('PricingComparisonChart', () => {
     expect(within(desktopTable).getByText('$199')).toBeInTheDocument();
     expect(within(desktopTable).getByText('/mo')).toBeInTheDocument();
     expect(screen.queryByText('Max')).not.toBeInTheDocument();
+    expect(screen.queryByText('$149')).not.toBeInTheDocument();
+    expect(
+      container.querySelector(
+        `[data-offer-contract="${ARTIST_VISIBILITY_OFFER_CONTRACT_ID}"]`
+      )
+    ).not.toBeNull();
     expect(screen.queryByText('Automated follow-ups')).not.toBeInTheDocument();
 
     const selector = screen.getByRole('combobox', {

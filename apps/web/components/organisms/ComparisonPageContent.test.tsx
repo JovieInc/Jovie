@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { getComparison } from '@/content/comparisons';
+import { getComparison, getComparisonSlugs } from '@/content/comparisons';
 import { ComparisonPageContent } from './ComparisonPageContent';
 
 const data = getComparison('linktree');
@@ -19,6 +19,9 @@ describe('ComparisonPageContent', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: data.heroHeadline })
     ).toBeInTheDocument();
+    expect(
+      screen.getByAltText(data.heroImage.alt).getAttribute('src')
+    ).toContain(encodeURIComponent(data.heroImage.src));
 
     const table = screen.getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(
@@ -38,6 +41,13 @@ describe('ComparisonPageContent', () => {
       screen.getByRole('link', { name: 'Try Jovie Free' })
     ).toHaveAttribute('href', '/signup');
     expect(screen.getAllByRole('button')).toHaveLength(data.faq.length);
+  });
+
+  it('never repeats a hero image across the checked-in comparison slugs', () => {
+    const slugs = getComparisonSlugs();
+    const images = slugs.map(slug => getComparison(slug)?.heroImage.src);
+
+    expect(images).toHaveLength(new Set(images).size);
   });
 
   it('is shared by the route and deterministic Storybook fixture', () => {

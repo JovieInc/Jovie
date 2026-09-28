@@ -67,10 +67,10 @@ describe('surface elevation guardrails', () => {
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--app-shell-sidebar-background-rgb\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-bg-page:\s*#06080d;/
+      /:root\.dark[\s\S]*--linear-bg-page:\s*#07080a;/
     );
     expect(designSystem).toMatch(
-      /:root\.dark[\s\S]*--app-shell-sidebar-background-rgb:\s*6 8 13;/
+      /:root\.dark[\s\S]*--app-shell-sidebar-background-rgb:\s*7 8 10;/
     );
   });
 
@@ -223,13 +223,9 @@ describe('surface elevation guardrails', () => {
     expect(waitlistSuccess).toContain('<AuthLayout');
   });
 
-  it('keeps the tasks workspace inside a framed content panel', () => {
+  it('keeps the tasks workspace inside the canonical flat content panel', () => {
     const tasksPage = readFileSync(
       join(ROOT, 'components/features/dashboard/tasks/TasksPageClient.tsx'),
-      'utf-8'
-    );
-    const dashboardPanel = readFileSync(
-      join(ROOT, 'components/organisms/AppShellContentPanel.tsx'),
       'utf-8'
     );
     const shellRouteMatches = readFileSync(
@@ -241,8 +237,9 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(tasksPage).toContain('PageShell');
-    expect(dashboardPanel).toContain("frame = 'content-container'");
+    expect(tasksPage).toContain('WorkspacePage');
+    expect(tasksPage).toContain("frame='none'");
+    expect(tasksPage).toContain("contentPadding='none'");
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
     expect(tasksPage).toContain('TaskDataTable');
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
@@ -549,6 +546,24 @@ describe('surface elevation guardrails', () => {
       'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx'
     );
     expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
+  });
+
+  it('names the hidden-header release table for screen readers', () => {
+    const releaseTable = readComponent(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
+    );
+
+    expect(releaseTable).toContain('hideHeader');
+    expect(releaseTable).toContain("caption='Releases'");
+  });
+
+  it('drops the banned Disc3 empty-state glyph from ReleaseTable', () => {
+    const releaseTable = readComponent(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
+    );
+
+    expect(releaseTable).not.toContain('Disc3');
+    expect(releaseTable).toContain("name='Layers'");
   });
 
   it('does not nest DrawerInlineNote inside a card (card-within-card)', () => {

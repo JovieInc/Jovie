@@ -520,14 +520,29 @@ describe('typecheck singleflight process integration', () => {
     );
     childProcesses.push(waiter);
     let stderr = '';
-    waiter.stderr.on('data', chunk => {
-      stderr += chunk.toString('utf8');
+    // Sample once the waiter has announced itself and emitted a heartbeat,
+    // not after a fixed sleep: wrapper cold start (node boot, module load,
+    // git rev-parse) alone can exceed a fixed 160ms budget on a loaded host.
+    const heartbeatSeen = new Promise((resolveSeen, rejectSeen) => {
+      const timer = setTimeout(
+        () =>
+          rejectSeen(new Error(`no waiter heartbeat within 5s:\n${stderr}`)),
+        5_000
+      );
+      waiter.stderr.on('data', chunk => {
+        stderr += chunk.toString('utf8');
+        if (stderr.includes('phase=heartbeat')) {
+          clearTimeout(timer);
+          resolveSeen();
+        }
+      });
     });
 
-    await new Promise(resolveWait => setTimeout(resolveWait, 160));
+    await heartbeatSeen;
     expect(existsSync(marker)).toBe(false);
     expect(existsSync(resolve(stateDir, 'lock.json'))).toBe(true);
     expect(stderr).toContain('phase=wait');
+    expect(stderr).toContain('phase=heartbeat');
     expect(stderr).toContain('role=waiter');
     expect(stderr).toContain('ownerAlive=true');
     expect(stderr).toContain(`ownerPid=${holder.pid}`);

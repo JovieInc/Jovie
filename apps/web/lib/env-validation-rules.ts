@@ -1,5 +1,6 @@
 import 'server-only';
 import type { z } from 'zod';
+import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
 import { publicEnv } from '@/lib/env-public';
 import type { ServerEnvSchema } from './env-server-schema';
 
@@ -308,24 +309,25 @@ const checkUrlEncryptionKey: ValidationRule = ({ server, vercelEnv }) => {
 };
 
 /**
- * Validation rule: Warn when XAI_API_KEY is missing in production/preview.
+ * Validation rule: Warn when album art cannot authenticate to the AI Gateway.
  *
- * xAI powers album-art generation, which gracefully degrades when the key is
- * absent. Warning (not critical) so the app still boots, but loud enough at
- * startup that an operator notices the missing capability.
+ * On Vercel, OIDC covers Gateway auth, so a missing AI_GATEWAY_API_KEY is not
+ * a failure. Off Vercel, production/preview need the static key. Warning (not
+ * critical) so the app still boots, but loud enough that an operator notices
+ * the missing capability.
  */
-const checkXaiApiKey: ValidationRule = ({ server, vercelEnv }) => {
-  if (
-    (vercelEnv === 'production' || vercelEnv === 'preview') &&
-    !server.XAI_API_KEY?.trim()
-  ) {
-    return {
-      type: 'warning',
-      message:
-        'XAI_API_KEY is missing — album art generation will be disabled until configured',
-    };
+const checkAlbumArtGateway: ValidationRule = ({ server, vercelEnv }) => {
+  if (vercelEnv !== 'production' && vercelEnv !== 'preview') {
+    return null;
   }
-  return null;
+  if (isAiGatewayAvailable({ apiKey: server.AI_GATEWAY_API_KEY })) {
+    return null;
+  }
+  return {
+    type: 'warning',
+    message:
+      'AI Gateway is unavailable — album art generation will be disabled until configured',
+  };
 };
 
 /**
@@ -339,10 +341,9 @@ export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
   checkStripePublishableFormat,
   checkStripePairConsistency,
   checkUrlEncryptionKey,
-  // No AI_GATEWAY_API_KEY rule: it only fires on Vercel (production/preview),
-  // where OIDC (VERCEL_OIDC_TOKEN) is always injected and @ai-sdk/gateway
-  // falls back to it automatically; off-Vercel runs use Doppler's key.
-  checkXaiApiKey,
+  // Album art warns only when Gateway auth is missing. On Vercel, OIDC is
+  // injected at runtime and satisfies this check without AI_GATEWAY_API_KEY.
+  checkAlbumArtGateway,
 ];
 
 /** Exported for focused unit tests (no secret material). */

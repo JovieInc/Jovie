@@ -249,11 +249,9 @@ export function generateMusicStructuredData(
   // Track-list recordings reference the first credited artist entity that has
   // a supported destination — never the profile owner, and omitted entirely
   // when no credited artist has one (JOV-6542 invariant 4).
-  const byArtistList = byArtist
-    ? Array.isArray(byArtist)
-      ? byArtist
-      : [byArtist]
-    : [];
+  let byArtistList: Record<string, unknown>[] = [];
+  if (Array.isArray(byArtist)) byArtistList = byArtist;
+  else if (byArtist) byArtistList = [byArtist];
   const byArtistId =
     byArtistList
       .map(entity => entity['@id'])

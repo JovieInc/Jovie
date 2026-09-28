@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Paperclip } from 'lucide-react';
@@ -92,5 +94,15 @@ describe('SlashCommandMenu attachment actions', () => {
     expect(
       screen.getByLabelText('Filter Commands And References')
     ).toHaveFocus();
+  });
+
+  it('drops the retired Disc3 release-kind glyph (banned icon guard, Tim, 2026-09-25)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './SlashCommandMenu.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toContain('Disc3');
+    expect(source).toContain('release: Layers,');
   });
 });

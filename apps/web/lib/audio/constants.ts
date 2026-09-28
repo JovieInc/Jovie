@@ -1,10 +1,8 @@
 import {
-  AUDIO_FILE_ACCEPT,
   AUDIO_MAX_FILE_SIZE_BYTES,
   getAudioFormat,
   isSupportedAudioFile,
   SUPPORTED_AUDIO_FORMAT_LABELS,
-  SUPPORTED_AUDIO_MIME_TYPES_SET,
 } from '@jovie/audio-contracts';
 
 export type {
@@ -19,8 +17,10 @@ export type {
   Seconds,
   SupportedAudioMimeType,
 } from '@jovie/audio-contracts';
+/** @deprecated Prefer AUDIO_FILE_ACCEPT */
 export {
   AUDIO_FILE_ACCEPT,
+  AUDIO_FILE_ACCEPT as AUDIO_ACCEPT,
   AUDIO_FORMAT_REGISTRY,
   AUDIO_MAX_FILE_SIZE_BYTES,
   AUDIO_UPLOAD_POLICIES,
@@ -35,13 +35,8 @@ export {
   SUPPORTED_AUDIO_FORMAT_LABELS,
   SUPPORTED_AUDIO_MIME_TYPES,
   SUPPORTED_AUDIO_MIME_TYPES_SET,
+  SUPPORTED_AUDIO_MIME_TYPES_SET as ALLOWED_AUDIO_MIME_TYPES,
 } from '@jovie/audio-contracts';
-
-/** @deprecated Prefer AUDIO_FILE_ACCEPT */
-export const AUDIO_ACCEPT = AUDIO_FILE_ACCEPT;
-
-/** @deprecated Prefer SUPPORTED_AUDIO_MIME_TYPES_SET */
-export const ALLOWED_AUDIO_MIME_TYPES = SUPPORTED_AUDIO_MIME_TYPES_SET;
 
 /**
  * Resolves the canonical upload MIME for a browser File. Blank or

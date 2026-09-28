@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "idx_creator_profiles_public_discovery" ON "creator_profiles" USING btree (coalesce("display_name", ''),"id") WHERE is_public = true AND is_claimed = true;

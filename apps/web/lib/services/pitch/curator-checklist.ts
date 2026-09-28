@@ -127,7 +127,7 @@ export function getPitchChecklistStatus(
   const instructions = input.instructions?.trim() ?? '';
   const explicitUnknown = new Set(
     PITCH_CHECKLIST_FIELD_IDS.filter(id =>
-      new RegExp(`unknown:\\s*${id}\\b`, 'i').test(instructions)
+      new RegExp(String.raw`unknown:\s*${id}\b`, 'i').test(instructions)
     )
   );
   const listenLink = LISTEN_LINK_PATTERN.exec(instructions)?.[0] ?? null;

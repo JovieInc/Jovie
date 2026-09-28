@@ -43,6 +43,11 @@ export const nextConfig = {
   transpilePackages: ['@jovie/ui'],
   serverExternalPackages: ['@statsig/statsig-node-core'],
   poweredByHeader: false,
+  typescript: {
+    // CI sets NEXT_IGNORE_TYPECHECK=1 only after `pnpm typecheck` has already
+    // checked this exact tsconfig, so the build skips its duplicate pass.
+    ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
+  },
   experimental: { authInterrupts: true },
   images: { unoptimized: true },
   async redirects() {

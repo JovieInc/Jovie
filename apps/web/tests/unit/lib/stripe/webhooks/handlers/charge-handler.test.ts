@@ -14,6 +14,7 @@ const {
   mockStripeInvoicesRetrieve,
   mockStripeChargesRetrieve,
   mockStripePaymentIntentsRetrieve,
+  mockStripeInvoicePaymentsList,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockUpdateUserBillingStatus,
@@ -29,6 +30,7 @@ const {
   mockStripeInvoicesRetrieve: vi.fn(),
   mockStripeChargesRetrieve: vi.fn(),
   mockStripePaymentIntentsRetrieve: vi.fn(),
+  mockStripeInvoicePaymentsList: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
   mockInvalidateBillingCache: vi.fn(),
   mockUpdateUserBillingStatus: vi.fn(),
@@ -66,6 +68,9 @@ vi.mock('@/lib/stripe/client', () => ({
     },
     paymentIntents: {
       retrieve: mockStripePaymentIntentsRetrieve,
+    },
+    invoicePayments: {
+      list: mockStripeInvoicePaymentsList,
     },
   },
 }));
@@ -568,13 +573,43 @@ describe('@critical ChargeHandler', () => {
       expect(mockStripeInvoicesRetrieve).toHaveBeenCalledWith('in_latest');
     });
 
+    it('resolves the invoice through InvoicePayments on the current Stripe API', async () => {
+      // 2026-08-26.dahlia: neither Charge.invoice nor PaymentIntent.invoice exists.
+      mockStripePaymentIntentsRetrieve.mockResolvedValueOnce({
+        id: 'pi_123',
+        object: 'payment_intent',
+      });
+      mockStripeInvoicePaymentsList.mockResolvedValueOnce({
+        data: [{ id: 'inpay_1', invoice: 'in_latest' }],
+      });
+
+      const result = await handler.handle(
+        refundContext(
+          refundedCharge({
+            invoice: undefined,
+            payment_intent: 'pi_123',
+          })
+        )
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockStripeInvoicePaymentsList).toHaveBeenCalledWith({
+        payment: { type: 'payment_intent', payment_intent: 'pi_123' },
+        limit: 1,
+      });
+      expect(mockStripeInvoicesRetrieve).toHaveBeenCalledWith('in_latest');
+      expect(mockUpdateUserBillingStatus).toHaveBeenCalled();
+    });
+
     it('skips unhandled event types', async () => {
       const result = await handler.handle({
+        // Deliberately mismatched payload: the handler must ignore the type.
         event: {
           id: 'evt_other',
           type: 'invoice.payment_succeeded',
+          created: Math.floor(Date.now() / 1000),
           data: { object: refundedCharge() },
-        } as Stripe.Event,
+        } as unknown as Stripe.Event,
         stripeEventId: 'evt_other',
         stripeEventTimestamp: new Date(),
       });

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/dashboard/organisms/onboarding-dsp-step.test.tsx
+
 import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Image from 'next/image';
@@ -14,6 +16,7 @@ import {
 import { AUTH_CLASSES, AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { env } from '@/lib/env-client';
+import { presentUnmanagedListing } from '@/lib/profile/artist-status-presentation';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -204,8 +207,11 @@ export function OnboardingDspStep({
                           )}
                         </div>
                         {artist.isClaimed && (
-                          <span className={AUTH_SURFACE.subtlePill}>
-                            On Jovie
+                          <span
+                            className={AUTH_SURFACE.subtlePill}
+                            data-testid='listing-badge'
+                          >
+                            {presentUnmanagedListing().label}
                           </span>
                         )}
                       </button>

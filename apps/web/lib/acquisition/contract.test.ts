@@ -63,6 +63,19 @@ describe('acquisition contract (JOV-5911 / JOV-5881)', () => {
     expect(nextAcquisitionPath('youtube-closed-loop').reason).toContain(
       'videos.update'
     );
+    const profile = ACQUISITION_GAP_AUDIT.experiments['premade-artist-profile'];
+    expect(profile.find(row => row.stage === 'experience_build')?.status).toBe(
+      'in_flight'
+    );
+    expect(
+      profile.find(row => row.stage === 'machine_certification')?.status
+    ).toBe('missing');
+    expect(profile.find(row => row.stage === 'rejection_rebuild')?.status).toBe(
+      'missing'
+    );
+    expect(
+      profile.find(row => row.stage === 'identity_resolution')?.status
+    ).toBe('exists_uncertified');
   });
 
   it('declares JOV-INV-012 on existing analytics surfaces', () => {

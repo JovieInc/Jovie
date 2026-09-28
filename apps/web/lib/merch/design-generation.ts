@@ -481,6 +481,16 @@ function schedulePrintfulMockupEnrichment(params: {
   );
 }
 
+/** Concept line stored with a generated design. Source suffix stays a separate string. */
+export function formatMerchDesignConcept(
+  directionLabel: string,
+  prompt: string,
+  sourceLabel: string | null
+): string {
+  const sourceSuffix = sourceLabel ? ` · Source: ${sourceLabel}` : '';
+  return `${directionLabel} direction: ${prompt}${sourceSuffix}`;
+}
+
 /**
  * Generate the Phase-A design carousel. Designs are generated in parallel and
  * returned `ready`; the per-card generating shimmer activates once generation is
@@ -674,7 +684,11 @@ export async function generateMerchDesigns(params: {
         const designName = params.source
           ? `${params.source.sourceText} ${direction.label}`
           : `${name} ${direction.label}`;
-        const concept = `${direction.label} direction: ${params.prompt}${sourceLabel ? ` · Source: ${sourceLabel}` : ''}`;
+        const concept = formatMerchDesignConcept(
+          direction.label,
+          params.prompt,
+          sourceLabel
+        );
         try {
           const graphic = await generatePrintGraphic({
             prompt: buildMerchImagePrompt(

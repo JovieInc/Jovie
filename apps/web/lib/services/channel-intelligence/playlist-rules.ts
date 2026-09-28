@@ -270,11 +270,11 @@ function evaluateDormantDropped(): ChannelPlaylistRuleCaseResult {
     ],
     nowIso: RULE_CASE_NOW,
   });
-  const ids = gated.recommendations.map(row => row.id);
+  const ids = new Set(gated.recommendations.map(row => row.id));
   const passed =
-    !ids.includes('pl_dormant') &&
-    ids.includes('pl_fresh') &&
-    ids.includes('pl_year') &&
+    !ids.has('pl_dormant') &&
+    ids.has('pl_fresh') &&
+    ids.has('pl_year') &&
     gated.recommendations[0]?.id === 'pl_fresh';
   return {
     id: 'dormant-dropped',

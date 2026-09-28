@@ -190,6 +190,16 @@ jobs:
             MAX_CONCURRENT=1
           fi
 
+          # JOV-6233: paid-model FX spend is authorized only by an explicit
+          # human/queue-owner workflow_dispatch apply. Automatic push and
+          # workflow_run(CI-completion) events never carry this flag, so a
+          # true conflict on those paths always denies escalation instead of
+          # silently reaching the paid AI Gateway path.
+          escalation_args=()
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "$apply" == 'true' ]]; then
+            escalation_args=(--allow-paid-escalation)
+          fi
+
           event_args=()
           if [[ "$EVENT_NAME" == 'pull_request_target' ]]; then
             test -n "$EVENT_PAYLOAD_PATH"
@@ -199,6 +209,7 @@ jobs:
 
           node scripts/pr-conflict-handler.mjs "$MODE" \
             "${event_args[@]}" \
+            "${escalation_args[@]}" \
             --repo "$REPOSITORY" \
             --max-concurrent "$MAX_CONCURRENT" \
             --runner-capacity "$RUNNER_CAPACITY" \

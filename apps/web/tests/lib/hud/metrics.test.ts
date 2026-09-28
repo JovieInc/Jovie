@@ -22,9 +22,12 @@ vi.mock('@/lib/admin/stripe-metrics', () => ({
   getAdminStripeOverviewMetrics: vi.fn(async () => ({
     mrrUsd: 1000,
     activeSubscribers: 25,
+    mrrUsd30dAgo: 950,
     mrrGrowth30dUsd: 50,
     isConfigured: true,
     isAvailable: true,
+    excludedInternalSubscribers: 0,
+    excludedInternalMrrUsd: 0,
   })),
 }));
 
@@ -252,8 +255,11 @@ describe('getHudMetrics', () => {
           mrrUsd: 1000,
           activeSubscribers: 25,
           mrrGrowth30dUsd: 50,
+          mrrUsd30dAgo: 950,
           isConfigured: true,
           isAvailable: true,
+          excludedInternalSubscribers: 0,
+          excludedInternalMrrUsd: 0,
           observedAtIso: '2026-08-22T18:00:01.000Z',
         };
       }
@@ -320,8 +326,11 @@ describe('getHudMetrics', () => {
       mrrUsd: 0,
       activeSubscribers: 0,
       mrrGrowth30dUsd: 0,
+      mrrUsd30dAgo: 0,
       isConfigured: true,
       isAvailable: false,
+      excludedInternalSubscribers: 0,
+      excludedInternalMrrUsd: 0,
     });
 
     const metrics = await getHudMetrics('admin');

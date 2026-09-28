@@ -16,9 +16,14 @@ import {
   CANONICAL_PUBLIC_SHELL_EVENTS,
 } from '@/data/canonicalPublicShellOptimization';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
+import {
+  type MarketingHeaderBrand,
+  resolveMarketingHeaderBrand,
+} from '@/data/marketing/headerBrand';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import {
+  MARKETING_CUSTOMERS_FLYOUT,
   MARKETING_NAV_LINKS,
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
@@ -31,28 +36,20 @@ export interface MarketingHeaderNavLink extends MarketingNavLink {
 }
 export type MarketingHeaderCta = HeaderNavCta;
 
-const NAV_LINK_BY_LABEL = Object.fromEntries(
-  MARKETING_NAV_LINKS.map(link => [link.label, link])
-) as Readonly<
-  Record<(typeof MARKETING_NAV_LINKS)[number]['label'], MarketingNavLink>
->;
-
+// Display copy is never a lookup key. Keep desktop and mobile destinations in
+// the same declared order; only the desktop shell adds visual treatment.
+// The Customers flyout renders between the wordmark and these links, so the
+// desktop order is Customers, Product, Pricing (Pen header, 2026-09-26).
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-  {
-    href: NAV_LINK_BY_LABEL.Artists.href,
-    label: NAV_LINK_BY_LABEL.Artists.label,
-    treatment: 'leading',
-  },
-  {
-    href: NAV_LINK_BY_LABEL.Product.href,
-    label: NAV_LINK_BY_LABEL.Product.label,
-  },
-  {
-    href: NAV_LINK_BY_LABEL.Pricing.href,
-    label: NAV_LINK_BY_LABEL.Pricing.label,
-  },
-] as const;
+  ...MARKETING_NAV_LINKS.map((link): MarketingHeaderNavLink => ({ ...link })),
+];
+const MARKETING_GLASS_FLYOUT_MENUS: readonly HeaderFlyoutMenu[] = [
+  MARKETING_CUSTOMERS_FLYOUT,
+];
+// Icon-only pages drop the desktop wordmark; the logo reveals it on hover.
+const MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY: readonly MarketingHeaderNavLink[] =
+  MARKETING_GLASS_DESKTOP_LINKS.filter(link => link.treatment !== 'wordmark');
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
   MARKETING_NAV_LINKS;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
@@ -60,12 +57,22 @@ const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
 const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   Partial<Record<string, MarketingHeaderCta>>
 > = {
+  // Homepage conversion lock (JOV-5085): the homepage never shows Request
+  // access, even while waitlisting; /start runs the waitlist gate after auth.
+  // ui-casing-allow: canonical Pen header CTA copy (sentence case)
+  [APP_ROUTES.HOME]: { label: 'Find yourself', href: APP_ROUTES.START },
   [APP_ROUTES.ARTIST_PROFILES]: MARKETING_CTA_INTENTS.claimProfile,
   [APP_ROUTES.ARTIST_PROFILE_LEGACY]: MARKETING_CTA_INTENTS.claimProfile,
 };
 
 export interface MarketingHeaderProps
   extends Readonly<{
+    /**
+     * Brand presentation. Defaults to the per-page config in
+     * `data/marketing/headerBrand.ts` (icon-only when the hero H1 already
+     * says "Jovie").
+     */
+    readonly brand?: MarketingHeaderBrand;
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
@@ -83,7 +90,8 @@ interface ResolvedNavConfig {
 function resolveNavConfig(
   hasSimpleNav: boolean,
   centerNavDisabled: boolean,
-  simpleNavLinks: readonly MarketingHeaderNavLink[]
+  simpleNavLinks: readonly MarketingHeaderNavLink[],
+  iconOnly: boolean
 ): ResolvedNavConfig {
   if (hasSimpleNav) {
     return {
@@ -96,13 +104,16 @@ function resolveNavConfig(
     return { flyoutMenus: undefined, mobileNavLinks: [], desktopNavLinks: [] };
   }
   return {
-    flyoutMenus: undefined,
+    flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
-    desktopNavLinks: MARKETING_GLASS_DESKTOP_LINKS,
+    desktopNavLinks: iconOnly
+      ? MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY
+      : MARKETING_GLASS_DESKTOP_LINKS,
   };
 }
 
 export function MarketingHeader({
+  brand,
   logoSize = 'xs',
   logoVariant = 'word',
   navLinks,
@@ -156,21 +167,21 @@ export function MarketingHeader({
   const hasSimpleNav = isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
   const centerNavDisabled = !centerNavEnabled;
   const hideCenterNav = isMinimal || centerNavDisabled;
+  const iconOnly = resolveMarketingHeaderBrand(pathname, brand) === 'icon';
   const navConfig = resolveNavConfig(
     hasSimpleNav,
     centerNavDisabled,
-    resolvedNavLinks
+    resolvedNavLinks,
+    iconOnly
   );
   const resolvedPrimaryCta =
     primaryCta ??
     (pathname === null ? undefined : MARKETING_HEADER_CTA_BY_PATH[pathname]) ??
     DEFAULT_MARKETING_CTA;
   const resolvedLogoVariant =
-    presentation === 'marketing-glass'
+    presentation === 'marketing-glass' || isArtistProfiles || iconOnly
       ? 'icon'
-      : isArtistProfiles
-        ? 'icon'
-        : logoVariant;
+      : logoVariant;
 
   const header = (
     <HeaderNav
@@ -180,6 +191,7 @@ export function MarketingHeader({
         presentation === 'marketing-glass' || isArtistProfiles ? 'sm' : logoSize
       }
       logoVariant={resolvedLogoVariant}
+      logoReveal={resolvedLogoVariant === 'icon'}
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}

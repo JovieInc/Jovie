@@ -13,7 +13,6 @@ import {
 import { libraryAssetApprovalStatuses } from '@/lib/db/schema/library';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { buildUnclaimedArtistHandle } from '@/lib/discography/artist-profile-routing';
 import { setupDatabaseBeforeAll } from '../setup-db';
 
 vi.mock('@/lib/spotify', async importOriginal => {
@@ -111,7 +110,14 @@ describe('collaborator profile reconciliation concurrency (integration)', () => 
     const releaseId = randomUUID();
     const ownerSpotifyId = `owner${suffix.replaceAll('-', '').slice(0, 17)}`;
     const collaboratorSpotifyId = `collab${suffix.replaceAll('-', '').slice(0, 16)}`;
-    const collaboratorHandle = buildUnclaimedArtistHandle(collaboratorArtistId);
+    // JOV-6528 (#18292): generated collaborator profiles take a friendly handle
+    // composed from the registry artist name; the opaque `a_*` handle is only
+    // the collision fallback. A per-run name token keeps the friendly handle
+    // unique on the shared ephemeral database, so the test pins the primary
+    // path instead of racing leftover rows into the fallback.
+    const collaboratorNameToken = suffix.replaceAll('-', '').slice(0, 10);
+    const collaboratorName = `Concurrency ${collaboratorNameToken}`;
+    const collaboratorHandle = `concurrency${collaboratorNameToken}`;
 
     profileIds.add(ownerProfileId);
     generatedSpotifyIds.add(collaboratorSpotifyId);
@@ -138,7 +144,7 @@ describe('collaborator profile reconciliation concurrency (integration)', () => 
       },
       {
         id: collaboratorArtistId,
-        name: 'Concurrency Collaborator',
+        name: collaboratorName,
         nameNormalized: `concurrency-collaborator-${suffix}`,
         spotifyId: collaboratorSpotifyId,
         isAutoCreated: true,

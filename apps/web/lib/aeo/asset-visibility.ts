@@ -818,8 +818,11 @@ const noId = (v: unknown): boolean =>
       Object.entries(v).every(
         ([key, value]) => !ID_KEYS.has(key) && noId(value)
       );
-const rawAssetId = (v: unknown): string | null =>
-  rec(v) ? (rec(v.asset) ? str(v.asset.assetId) : str(v.profileUrl)) : null;
+function rawAssetId(v: unknown): string | null {
+  if (!rec(v)) return null;
+  if (rec(v.asset)) return str(v.asset.assetId);
+  return str(v.profileUrl);
+}
 const assetKey = (asset: Pick<AeoAssetRef, 'assetId' | 'creatorScopeId'>) =>
   JSON.stringify([asset.creatorScopeId, asset.assetId]);
 

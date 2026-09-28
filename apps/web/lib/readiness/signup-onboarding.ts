@@ -114,18 +114,16 @@ export function formatSignupOnboardingReadinessReport(
 
   if (result.required.length === 0) {
     lines.push(
-      '[signup-readiness] local target: no production signup keys required'
+      '[signup-readiness] local target: no production signup keys required',
+      '[signup-readiness] status=passed'
     );
-    lines.push('[signup-readiness] status=passed');
     return lines.join('\n');
   }
 
   for (const key of result.required) {
-    const state = result.missing.includes(key)
-      ? 'MISSING'
-      : result.invalid.includes(key)
-        ? 'INVALID'
-        : 'SET';
+    let state = 'SET';
+    if (result.missing.includes(key)) state = 'MISSING';
+    else if (result.invalid.includes(key)) state = 'INVALID';
     lines.push(`${key}: ${state}`);
   }
 

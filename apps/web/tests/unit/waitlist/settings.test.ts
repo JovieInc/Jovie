@@ -509,25 +509,24 @@ describe('withRetry scoping (JOV-6137)', () => {
     // Simulates the Neon mid-tx abort: the tx client fails transiently.
     // withRetry must NOT wrap this client, so the error surfaces after
     // exactly ONE attempt for withSerializableRetry to restart cleanly.
-    const fakeTx = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi
-              .fn()
-              .mockRejectedValue(
-                new Error('connection terminated unexpectedly')
-              ),
-          }),
+    const txSelect = vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockRejectedValue(new Error('connection terminated unexpectedly')),
         }),
       }),
-    } as unknown as Parameters<typeof getWaitlistSettings>[0];
+    });
+    const fakeTx = { select: txSelect } as unknown as Parameters<
+      typeof getWaitlistSettings
+    >[0];
 
     await expect(getWaitlistSettings(fakeTx)).rejects.toThrow(
       'connection terminated unexpectedly'
     );
     // Exactly one attempt on the tx client — no inner retry loop.
-    expect(fakeTx.select).toHaveBeenCalledTimes(1);
+    expect(txSelect).toHaveBeenCalledTimes(1);
     // The pooled client is never touched on the tx path.
     expect(mockDbSelect).not.toHaveBeenCalled();
     expect(captureWarning).not.toHaveBeenCalled();

@@ -68,6 +68,49 @@ describe('getHudShipperStatus', () => {
     expect(payload.inFlightCount).toBe(1);
     expect(payload.inFlightJobs[0]?.issue).toBe(12903);
     expect(payload.state).toBe('idle');
+    expect(payload.lastResult).toBe('Scanned');
+  });
+
+  it.each([
+    ['empty_queue', 'Empty queue'],
+    ['capacity_throttled', 'Throttled'],
+    ['dry_run_planned', 'Dry run planned'],
+    ['singleton_active_skip', 'Singleton skip'],
+  ] as const)('labels a %s finish as %s', async (event, label) => {
+    writeJsonl(jobsLogPath, [
+      {
+        job: 'codex-issue-shipper',
+        event: 'start',
+        ts: '2026-07-03T12:00:00.000Z',
+      },
+      { job: 'codex-issue-shipper', event, ts: '2026-07-03T12:00:01.000Z' },
+      {
+        job: 'codex-issue-shipper',
+        event: 'finish',
+        ts: '2026-07-03T12:05:00.000Z',
+      },
+    ]);
+
+    const { getHudShipperStatus } = await import('@/lib/hud/shipper-state');
+    expect(getHudShipperStatus().lastResult).toBe(label);
+  });
+
+  it('labels a finish with no queue event as finished', async () => {
+    writeJsonl(jobsLogPath, [
+      {
+        job: 'codex-issue-shipper',
+        event: 'start',
+        ts: '2026-07-03T12:00:00.000Z',
+      },
+      {
+        job: 'codex-issue-shipper',
+        event: 'finish',
+        ts: '2026-07-03T12:05:00.000Z',
+      },
+    ]);
+
+    const { getHudShipperStatus } = await import('@/lib/hud/shipper-state');
+    expect(getHudShipperStatus().lastResult).toBe('Finished');
   });
 });
 
@@ -99,6 +142,55 @@ describe('getHudWhatShipped', () => {
       title: 'feat(ops): HUD dashboard',
       prNumber: 12950,
       issueNumber: 12903,
+      mergedAt: '2026-07-03T10:00:00.000Z',
+    });
+  });
+
+  it('accepts shippedAt and the short pr and issue fields', async () => {
+    writeFileSync(
+      whatShippedPath,
+      JSON.stringify({
+        entries: [
+          {
+            title: 'fix(ops): shipper labels',
+            shippedAt: '2026-07-04T10:00:00.000Z',
+            pr: 12951,
+            issue: 12904,
+          },
+        ],
+      })
+    );
+
+    const { getHudWhatShipped } = await import('@/lib/hud/shipper-state');
+    expect(getHudWhatShipped().entries[0]).toMatchObject({
+      title: 'fix(ops): shipper labels',
+      mergedAt: '2026-07-04T10:00:00.000Z',
+      prNumber: 12951,
+      issueNumber: 12904,
+    });
+  });
+
+  it('prefers mergedAt and prNumber when both spellings are present', async () => {
+    writeFileSync(
+      whatShippedPath,
+      JSON.stringify([
+        {
+          title: 'fix(ops): both spellings',
+          mergedAt: '2026-07-05T10:00:00.000Z',
+          shippedAt: '2026-07-01T10:00:00.000Z',
+          prNumber: 1,
+          pr: 2,
+          issueNumber: 3,
+          issue: 4,
+        },
+      ])
+    );
+
+    const { getHudWhatShipped } = await import('@/lib/hud/shipper-state');
+    expect(getHudWhatShipped().entries[0]).toMatchObject({
+      mergedAt: '2026-07-05T10:00:00.000Z',
+      prNumber: 1,
+      issueNumber: 3,
     });
   });
 });

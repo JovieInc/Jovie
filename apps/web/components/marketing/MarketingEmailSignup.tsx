@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { ChangelogEmailSignup } from '@/app/(marketing)/changelog/ChangelogEmailSignup';
+import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
 
 const SIGNUP_PAGES = new Set([
   '/about',
@@ -24,13 +25,7 @@ const SIGNUP_PAGES = new Set([
 export function MarketingEmailSignup() {
   const pathname = usePathname();
   if (!pathname) return null;
-  const editorial =
-    pathname === '/blog' ||
-    pathname.startsWith('/blog/') ||
-    pathname === '/engineering' ||
-    (pathname.startsWith('/engineering/') &&
-      !pathname.startsWith('/engineering/preview')) ||
-    pathname.startsWith('/changelog/');
+  const editorial = isEditorialFooterCtaPath(pathname);
   if (!editorial && !SIGNUP_PAGES.has(pathname)) return null;
 
   return (

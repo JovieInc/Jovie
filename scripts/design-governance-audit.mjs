@@ -15,6 +15,7 @@
  *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5437).
  *  10. Shadcn/Typeset outcome inventory is fail-closed (JOV-5438).
  *  11. Design-system authority map declares ordered owners and evidence.
+ *  12. Authed-route drift ledger is shrink-only (WARN on growth, JOV-6850).
  *
  * Invariant consumer: JOV-INV-019.
  *
@@ -36,6 +37,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
 import { findDesignManifestProjectionViolations } from './design-authority-guard.mjs';
+import {
+  checkDriftLedger,
+  LEDGER_JSON as DRIFT_LEDGER_JSON,
+} from './design-drift-ledger.mjs';
 import {
   AUTHORITY_MAP_PATH,
   loadAndValidateDesignSystemAuthorityMap,
@@ -133,25 +138,33 @@ export function runDesignGovernanceAudit(
   if (!existsSync(path.join(repoRoot, SKILLS_DIR))) {
     report('skill-symlinks', 'FAIL', `${SKILLS_DIR} is missing`);
   } else {
-    const symlinks = collectSymlinks(
-      path.join(repoRoot, SKILLS_DIR),
-      SKILLS_DIR
-    );
-    const dangling = symlinks.filter(
-      relative => !existsSync(path.join(repoRoot, relative))
-    );
-    if (dangling.length > 0) {
+    let symlinks = null;
+    try {
+      symlinks = collectSymlinks(path.join(repoRoot, SKILLS_DIR), SKILLS_DIR);
+    } catch (error) {
       report(
         'skill-symlinks',
         'FAIL',
-        `${dangling.length} dangling symlink(s) under ${SKILLS_DIR}: ${dangling.join(', ')}`
+        `${SKILLS_DIR} unreadable: ${error instanceof Error ? error.message : error}`
       );
-    } else {
-      report(
-        'skill-symlinks',
-        'PASS',
-        `${symlinks.length} symlink(s) under ${SKILLS_DIR} all resolve`
+    }
+    if (symlinks !== null) {
+      const dangling = symlinks.filter(
+        relative => !existsSync(path.join(repoRoot, relative))
       );
+      if (dangling.length > 0) {
+        report(
+          'skill-symlinks',
+          'FAIL',
+          `${dangling.length} dangling symlink(s) under ${SKILLS_DIR}: ${dangling.join(', ')}`
+        );
+      } else {
+        report(
+          'skill-symlinks',
+          'PASS',
+          `${symlinks.length} symlink(s) under ${SKILLS_DIR} all resolve`
+        );
+      }
     }
   }
 
@@ -570,6 +583,24 @@ export function runDesignGovernanceAudit(
       'shadcn-outcome-inventory',
       'FAIL',
       `Shadcn outcome inventory unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  // WARN on growth for the first release (JOV-6850); unreadable inputs FAIL.
+  try {
+    const ledger = checkDriftLedger({ repoRoot });
+    report(
+      'design-drift-ledger',
+      ledger.ok ? 'PASS' : 'WARN',
+      ledger.ok
+        ? `${ledger.ledger.aggregate.routes} authed routes within the shrink-only ${DRIFT_LEDGER_JSON}`
+        : `${ledger.issues.join('; ')} (run pnpm design:drift-ledger after review)`
+    );
+  } catch (error) {
+    report(
+      'design-drift-ledger',
+      'FAIL',
+      `drift ledger unreadable: ${error instanceof Error ? error.message : error}`
     );
   }
 

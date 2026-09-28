@@ -20,9 +20,9 @@ export const MIN_VALID_RELEASE_YEAR = 2000;
  */
 export const MAX_ACTIONABLE_OVERDUE_DAYS = 180;
 
-export function parseTaskDate(
-  value: Date | string | number | null | undefined
-): Date | null {
+type TaskDateInput = Date | string | number | null | undefined;
+
+export function parseTaskDate(value: TaskDateInput): Date | null {
   if (value == null) return null;
 
   if (value instanceof Date) {
@@ -61,7 +61,7 @@ function isActionableDue(due: Date, now: Date): boolean {
  * be an absurd multi-month historical overdue.
  */
 export function computeTaskDueDate(
-  releaseDate: Date | string | number | null | undefined,
+  releaseDate: TaskDateInput,
   offsetDays: number | null | undefined,
   options?: { readonly now?: Date }
 ): Date | null {
@@ -85,7 +85,7 @@ export function computeTaskDueDate(
  * paint the Tasks surface red with "12Y ago" chips.
  */
 export function sanitizeTaskDueAt(
-  dueAt: Date | string | number | null | undefined,
+  dueAt: TaskDateInput,
   options?: { readonly now?: Date }
 ): Date | null {
   const due = parseTaskDate(dueAt);
@@ -96,9 +96,7 @@ export function sanitizeTaskDueAt(
 }
 
 /** Safe ISO string for DueChip — handles Date objects and ISO strings. */
-export function toDueIso(
-  dueAt: Date | string | number | null | undefined
-): string | null {
+export function toDueIso(dueAt: TaskDateInput): string | null {
   const due = parseTaskDate(dueAt);
   return due ? due.toISOString() : null;
 }

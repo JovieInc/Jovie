@@ -13,7 +13,12 @@ export default function SettingsLayout({
       scroll='page'
       data-testid='settings-shell-content'
     >
-      <div className='mx-auto w-full space-y-6'>{children}</div>
+      <div
+        className='mx-auto min-w-0 w-full max-w-(--app-shell-content-max-form) space-y-6'
+        data-settings-layout-column='true'
+      >
+        {children}
+      </div>
     </PageShell>
   );
 }

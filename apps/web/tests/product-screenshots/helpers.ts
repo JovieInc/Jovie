@@ -169,7 +169,7 @@ export async function waitForImages(
 export async function prepareImagesForScreenshot(page: Page) {
   await page.locator('img[loading="lazy"]').evaluateAll(images => {
     for (const image of images) {
-      image.loading = 'eager';
+      if (image instanceof HTMLImageElement) image.loading = 'eager';
     }
   });
   await waitForImages(page);

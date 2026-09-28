@@ -2,11 +2,22 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
+import {
+  expectCenteredPhoneColumn,
+  expectDesktopSurfaceBuildMatches,
+  expectedPublicProfileLayout,
+  PROFILE_DESKTOP_SURFACE_SHIPPED,
+} from './utils/profile-desktop-surface';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
   runDspInteraction,
 } from './utils/public-surface-helpers';
+
+const DESKTOP_SURFACE_ONLY =
+  'Exercises the flagged wide desktop surface; set NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=1 for the build and runner';
+const PHONE_COLUMN_ONLY =
+  'Exercises the default mobile-first desktop column; the build ships the desktop surface';
 
 const diagnostics = new WeakMap<object, () => Promise<void>>();
 
@@ -107,10 +118,10 @@ async function waitForSettledProfileLayout(
 }
 
 test.describe('public profile browser admission', () => {
-  for (const viewport of [
-    { width: 1179, layout: 'compact' as const },
-    { width: 1180, layout: 'desktop' as const },
-  ]) {
+  for (const viewport of [1179, 1180].map(width => ({
+    width,
+    layout: expectedPublicProfileLayout(width),
+  }))) {
     test(`${viewport.width}px owns the expected public profile presentation`, async ({
       page,
     }) => {
@@ -123,6 +134,7 @@ test.describe('public profile browser admission', () => {
 
       const shell = page.getByTestId('public-profile-layout-shell');
       await expect(shell).toHaveAttribute('data-layout', viewport.layout);
+      await expectDesktopSurfaceBuildMatches(page);
       await expect(
         page.getByTestId(
           viewport.layout === 'desktop'
@@ -153,11 +165,10 @@ test.describe('public profile browser admission', () => {
     });
   }
 
-  for (const viewport of [
-    { width: 1179, layout: 'compact' as const },
-    { width: 1180, layout: 'desktop' as const },
-    { width: 1512, layout: 'desktop' as const },
-  ]) {
+  for (const viewport of [1179, 1180, 1512].map(width => ({
+    width,
+    layout: expectedPublicProfileLayout(width),
+  }))) {
     test(`${viewport.width}px canonical /unfazed owns its presentation`, async ({
       page,
     }) => {
@@ -199,6 +210,7 @@ test.describe('public profile browser admission', () => {
   test('1512px public route blocks the founder-reported compact desktop hybrid', async ({
     page,
   }, testInfo) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await page.setViewportSize({ width: 1512, height: 932 });
     const response = await page.goto(
       '/renders/profile-admission?layout=public&state=unclaimed',
@@ -243,6 +255,55 @@ test.describe('public profile browser admission', () => {
     });
   });
 
+  test('1512px public route centers the mobile profile in a phone column', async ({
+    page,
+  }, testInfo) => {
+    test.skip(PROFILE_DESKTOP_SURFACE_SHIPPED, PHONE_COLUMN_ONLY);
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1512, height: 932 });
+    const response = await page.goto(
+      '/renders/profile-admission?layout=public&state=unclaimed',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+    await waitForSettledProfileLayout(page, 'compact');
+    await waitForSettledProfile(page);
+    await expectDesktopSurfaceBuildMatches(page);
+
+    // The wide surface never mounts; the compact profile owns every width.
+    await expect(page.getByTestId('profile-desktop-shell')).toHaveCount(0);
+    await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(0);
+    await expectCenteredPhoneColumn(page);
+
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.claimCtaLineCount).toBe(1);
+    expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+
+    // Banner, dock, and drawers stay inside the column instead of stretching
+    // to the viewport.
+    const column = await page
+      .getByTestId('profile-compact-shell')
+      .boundingBox();
+    expect(column).not.toBeNull();
+    const within = async (testId: string) => {
+      const box = await page.getByTestId(testId).first().boundingBox();
+      expect(box, `${testId} must render`).not.toBeNull();
+      expect(box!.x, testId).toBeGreaterThanOrEqual(column!.x - 1);
+      expect(box!.x + box!.width, testId).toBeLessThanOrEqual(
+        column!.x + column!.width + 1
+      );
+    };
+    await within('profile-shell-banner');
+    await within('profile-tab-bar');
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+    await within('profile-menu-drawer');
+    await testInfo.attach('public-profile-phone-column-1512.png', {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+  });
+
   test('1512px long-name claim CTA remains one line', async ({ page }) => {
     await page.setViewportSize({ width: 1512, height: 932 });
     const response = await page.goto(
@@ -250,11 +311,7 @@ test.describe('public profile browser admission', () => {
       { waitUntil: 'domcontentloaded' }
     );
     expect(response?.status()).toBe(200);
-    await expect(page.getByTestId('profile-desktop-surface')).toBeVisible();
-    await expect(page.getByTestId('profile-desktop-surface')).toHaveAttribute(
-      'data-interactive-ready',
-      'true'
-    );
+    await waitForSettledProfileLayout(page, expectedPublicProfileLayout(1512));
     await waitForSettledProfile(page);
 
     const audit = await auditPublicProfileLayout(page);
@@ -290,10 +347,13 @@ test.describe('public profile browser admission', () => {
   });
 
   const responsiveCases = [
-    { id: '1179-compact', width: 1179, height: 932, layout: 'compact' },
-    { id: '1180-desktop', width: 1180, height: 932, layout: 'desktop' },
-    { id: '1512-desktop', width: 1512, height: 982, layout: 'desktop' },
-  ] as const;
+    { width: 1179, height: 932 },
+    { width: 1180, height: 932 },
+    { width: 1512, height: 982 },
+  ].map(({ width, height }) => {
+    const layout = expectedPublicProfileLayout(width);
+    return { id: `${width}-${layout}`, width, height, layout };
+  });
 
   for (const fixture of responsiveCases) {
     test(`${fixture.id} enforces one responsive presentation`, async ({
@@ -318,9 +378,15 @@ test.describe('public profile browser admission', () => {
       await expect(page.getByTestId('profile-compact-shell')).toHaveCount(
         fixture.layout === 'compact' ? 1 : 0
       );
-      await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(
-        fixture.layout === 'desktop' ? 1 : 0
-      );
+      const desktopSurface = page.getByTestId('profile-desktop-surface');
+      if (fixture.layout === 'desktop') {
+        await expect(desktopSurface).toHaveCount(1);
+      } else {
+        // JOV-6452: the desktop surface is server-rendered inside the
+        // display:none desktop shell so a cold desktop paint never morphs —
+        // on compact it must stay mounted but hidden.
+        await expect(desktopSurface).toBeHidden();
+      }
       if (fixture.layout === 'desktop') {
         await expect(
           page.getByRole('button', { name: 'Alerts', exact: true })
@@ -330,7 +396,7 @@ test.describe('public profile browser admission', () => {
         ).toHaveCount(0);
       }
       await captureStill(page, testInfo, `${fixture.id}.png`);
-      if (fixture.id === '1512-desktop') {
+      if (fixture.width === 1512) {
         const music = page.getByRole('button', { name: 'Music', exact: true });
         await music.click();
         await expect(music).toHaveAttribute('aria-current', 'page');
@@ -368,7 +434,7 @@ test.describe('public profile browser admission', () => {
         );
         await waitForSettledProfileLayout(
           page,
-          width < 1180 ? 'compact' : 'desktop'
+          expectedPublicProfileLayout(width)
         );
         const wrappers = page.locator(
           '[data-testid="profile-desktop-banner"]:visible, [data-testid="profile-shell-banner"]:visible'
@@ -397,6 +463,7 @@ test.describe('public profile browser admission', () => {
   test('deliberate red detects reserved space without a rendered banner', async ({
     page,
   }) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1512, height: 932 });
     await page.goto('/renders/profile-admission?layout=public&state=claimed');
@@ -412,6 +479,7 @@ test.describe('public profile browser admission', () => {
   });
 
   test('live resize transfers ownership exactly at 1180', async ({ page }) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1179, height: 932 });
     await page.goto('/renders/profile-admission?layout=public', {
@@ -426,6 +494,35 @@ test.describe('public profile browser admission', () => {
     await page.setViewportSize({ width: 1179, height: 932 });
     await waitForSettledProfileLayout(page, 'compact');
     expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+  });
+
+  test('live resize across 1180 keeps one compact column without remounting', async ({
+    page,
+  }) => {
+    test.skip(PROFILE_DESKTOP_SURFACE_SHIPPED, PHONE_COLUMN_ONLY);
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1179, height: 932 });
+    await page.goto('/renders/profile-admission?layout=public', {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForSettledProfileLayout(page, 'compact');
+    await page
+      .getByTestId('profile-compact-shell')
+      .evaluate(element => element.setAttribute('data-resize-probe', '1'));
+
+    await page.setViewportSize({ width: 1180, height: 932 });
+    await waitForSettledProfileLayout(page, 'compact');
+    await expectCenteredPhoneColumn(page);
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+
+    await page.setViewportSize({ width: 1179, height: 932 });
+    await waitForSettledProfileLayout(page, 'compact');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+    // Same DOM node throughout: resizing never swaps surfaces.
+    await expect(page.getByTestId('profile-compact-shell')).toHaveAttribute(
+      'data-resize-probe',
+      '1'
+    );
   });
 
   for (const width of [1179, 1180, 1512]) {
@@ -449,18 +546,37 @@ test.describe('public profile browser admission', () => {
         await expect(
           page.locator('[data-interactive-ready="true"]')
         ).toHaveCount(0);
-        if (width >= 1180) {
-          await expect(
-            page.getByTestId('profile-desktop-loading')
-          ).toBeVisible();
-          await expect(
-            page.getByTestId('profile-desktop-loading')
-          ).toHaveAttribute('aria-hidden', 'true');
+        // JOV-6452: the server paints the real desktop surface (no
+        // "Loading profile…" interstitial) and CSS picks the visible
+        // breakpoint surface — the compact shell never presents a mobile
+        // tab bar to desktop visitors.
+        await expect(page.getByTestId('profile-desktop-loading')).toHaveCount(
+          0
+        );
+        await expect(page.getByText('Loading profile…')).toHaveCount(0);
+        if (expectedPublicProfileLayout(width) === 'compact' && width >= 1180) {
+          // Default build: the server paints the centered phone column and
+          // never ships the desktop surface markup.
           await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+          await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(
+            0
+          );
+          await expectCenteredPhoneColumn(page);
+        } else if (width >= 1180) {
+          await expect(
+            page.getByTestId('profile-desktop-surface')
+          ).toBeVisible();
+          // The compact slot (mobile shell + tab bar) is clip-hidden by CSS
+          // on server paint — it never presents visually to desktop visitors.
+          const slotBox = await page
+            .locator('.public-profile-layout-compact-slot')
+            .boundingBox();
+          expect(slotBox?.width).toBeLessThanOrEqual(1);
+          expect(slotBox?.height).toBeLessThanOrEqual(1);
         } else {
           await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
           await expect(
-            page.getByTestId('profile-desktop-loading')
+            page.getByTestId('profile-desktop-surface')
           ).toBeHidden();
         }
         await testInfo.attach(`server-paint-${width}`, {
@@ -481,7 +597,7 @@ test.describe('public profile browser admission', () => {
     await page.goto('/renders/profile-admission?layout=public&name=long', {
       waitUntil: 'domcontentloaded',
     });
-    await waitForSettledProfileLayout(page, 'desktop');
+    await waitForSettledProfileLayout(page, expectedPublicProfileLayout(1280));
 
     const audit = await auditPublicProfileLayout(page);
     expect(audit.claimCtaLineCount).toBe(1);
@@ -494,6 +610,7 @@ test.describe('public profile browser admission', () => {
   test('deliberate red detects a desktop artist name escaping its cover', async ({
     page,
   }) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/renders/profile-admission?layout=public&name=long', {
@@ -513,7 +630,7 @@ test.describe('public profile browser admission', () => {
     ).toContain('artist_name_clipped');
   });
 
-  test('captures the founder 3024x1964 retina state without a compact desktop shell', async ({
+  test('captures the founder 3024x1964 retina state in its shipped presentation', async ({
     browser,
   }, testInfo) => {
     const context = await browser.newContext({
@@ -530,7 +647,10 @@ test.describe('public profile browser admission', () => {
         { waitUntil: 'domcontentloaded' }
       );
       expect(response?.status()).toBe(200);
-      await waitForSettledProfileLayout(page, 'desktop');
+      await waitForSettledProfileLayout(
+        page,
+        expectedPublicProfileLayout(1512)
+      );
 
       const audit = await auditPublicProfileLayout(page);
       expect(audit.claimCtaLineCount).toBe(1);

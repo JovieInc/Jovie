@@ -65,50 +65,51 @@ const STATUS_CASES = [
 }>;
 
 describe('ConnectorCard', () => {
-  it.each(
-    STATUS_CASES
-  )('maps $status to its semantic status and $actionLabel action', ({
-    status,
-    statusLabel,
-    statusVariant,
-    actionLabel,
-    actionVariant,
-    actionOwner,
-  }) => {
-    const onConnect = vi.fn();
-    const onDisconnect = vi.fn();
+  it.each(STATUS_CASES)(
+    'maps $status to its semantic status and $actionLabel action',
+    ({
+      status,
+      statusLabel,
+      statusVariant,
+      actionLabel,
+      actionVariant,
+      actionOwner,
+    }) => {
+      const onConnect = vi.fn();
+      const onDisconnect = vi.fn();
 
-    render(
-      <ConnectorCard
-        provider='gmail'
-        status={status}
-        onConnect={onConnect}
-        onDisconnect={onDisconnect}
-      />
-    );
+      render(
+        <ConnectorCard
+          provider='gmail'
+          status={status}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+        />
+      );
 
-    expect(
-      screen.getByRole('status', {
-        name: `Gmail status: ${statusLabel}`,
-      })
-    ).toHaveAttribute('data-variant', statusVariant);
+      expect(
+        screen.getByRole('status', {
+          name: `Gmail status: ${statusLabel}`,
+        })
+      ).toHaveAttribute('data-variant', statusVariant);
 
-    const action = screen.getByRole('button', { name: actionLabel });
-    expect(action).toHaveAttribute('data-variant', actionVariant);
-    if (actionOwner === 'disconnect') {
-      expect(action).toHaveAttribute('data-destructive', 'true');
-    } else {
-      expect(action).not.toHaveAttribute('data-destructive');
+      const action = screen.getByRole('button', { name: actionLabel });
+      expect(action).toHaveAttribute('data-variant', actionVariant);
+      if (actionOwner === 'disconnect') {
+        expect(action).toHaveAttribute('data-destructive', 'true');
+      } else {
+        expect(action).not.toHaveAttribute('data-destructive');
+      }
+
+      fireEvent.click(action);
+      expect(
+        actionOwner === 'connect' ? onConnect : onDisconnect
+      ).toHaveBeenCalledOnce();
+      expect(
+        actionOwner === 'connect' ? onDisconnect : onConnect
+      ).not.toHaveBeenCalled();
     }
-
-    fireEvent.click(action);
-    expect(
-      actionOwner === 'connect' ? onConnect : onDisconnect
-    ).toHaveBeenCalledOnce();
-    expect(
-      actionOwner === 'connect' ? onDisconnect : onConnect
-    ).not.toHaveBeenCalled();
-  });
+  );
 
   it('keeps the action visible but disabled when its callback is unavailable', () => {
     const { rerender } = render(

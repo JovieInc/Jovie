@@ -124,31 +124,31 @@ describe('POST /api/profile/pac-event', () => {
     expect(mockTrackEvent).toHaveBeenCalledTimes(PAC_CLIENT_EVENTS.length);
   });
 
-  it.each([
-    'undecided',
-    'accepted',
-  ] as const)('derives jv_aid from the httpOnly cookie when server policy allows and client consent is %s', async consent => {
-    const response = await POST(
-      buildRequest(buildPayload({ consent, jv_aid: CLIENT_SUPPLIED_JV_AID }))
-    );
+  it.each(['undecided', 'accepted'] as const)(
+    'derives jv_aid from the httpOnly cookie when server policy allows and client consent is %s',
+    async consent => {
+      const response = await POST(
+        buildRequest(buildPayload({ consent, jv_aid: CLIENT_SUPPLIED_JV_AID }))
+      );
 
-    expect(response.status).toBe(204);
-    expect(mockTrackEvent).toHaveBeenCalledWith(
-      'pac_exposure',
-      expect.objectContaining({ jv_aid: JV_AID })
-    );
-    // Statsig user is the trusted cookie value, never the client-supplied id.
-    expect(mockLogStatsigEvent).toHaveBeenCalledWith(
-      JV_AID,
-      'pac_exposure',
-      'copy:default|trigger:30s|s2:merch|tab:visible|dismiss:text',
-      expect.objectContaining({
-        profile_id: PROFILE_ID,
-        pac_state: 'idle',
-        session_id: SESSION_ID,
-      })
-    );
-  });
+      expect(response.status).toBe(204);
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        'pac_exposure',
+        expect.objectContaining({ jv_aid: JV_AID })
+      );
+      // Statsig user is the trusted cookie value, never the client-supplied id.
+      expect(mockLogStatsigEvent).toHaveBeenCalledWith(
+        JV_AID,
+        'pac_exposure',
+        'copy:default|trigger:30s|s2:merch|tab:visible|dismiss:text',
+        expect.objectContaining({
+          profile_id: PROFILE_ID,
+          pac_state: 'idle',
+          session_id: SESSION_ID,
+        })
+      );
+    }
+  );
 
   it('joins identity in a consent-required region only with canonical analytics consent', async () => {
     setCookieValues({
@@ -227,53 +227,53 @@ describe('POST /api/profile/pac-event', () => {
       },
       headers: {},
     },
-  ])('ignores positive client consent under $name', async ({
-    cookies,
-    headers,
-  }) => {
-    setCookieValues(cookies);
+  ])(
+    'ignores positive client consent under $name',
+    async ({ cookies, headers }) => {
+      setCookieValues(cookies);
 
-    const response = await POST(
-      buildRequest(
-        buildPayload({
-          consent: 'accepted',
-          jv_aid: CLIENT_SUPPLIED_JV_AID,
-        }),
-        headers
-      )
-    );
+      const response = await POST(
+        buildRequest(
+          buildPayload({
+            consent: 'accepted',
+            jv_aid: CLIENT_SUPPLIED_JV_AID,
+          }),
+          headers
+        )
+      );
 
-    expect(response.status).toBe(204);
-    expect(mockTrackEvent).toHaveBeenCalledWith(
-      'pac_exposure',
-      expect.objectContaining({ jv_aid: null })
-    );
-    expect(mockLogStatsigEvent).toHaveBeenCalledWith(
-      `pac-session:${SESSION_ID}`,
-      'pac_exposure',
-      expect.anything(),
-      expect.anything()
-    );
-  });
+      expect(response.status).toBe(204);
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        'pac_exposure',
+        expect.objectContaining({ jv_aid: null })
+      );
+      expect(mockLogStatsigEvent).toHaveBeenCalledWith(
+        `pac-session:${SESSION_ID}`,
+        'pac_exposure',
+        expect.anything(),
+        expect.anything()
+      );
+    }
+  );
 
-  it.each([
-    'rejected',
-    'gpc-opted-out',
-  ] as const)('stays anonymous when consent is %s', async consent => {
-    const response = await POST(buildRequest(buildPayload({ consent })));
+  it.each(['rejected', 'gpc-opted-out'] as const)(
+    'stays anonymous when consent is %s',
+    async consent => {
+      const response = await POST(buildRequest(buildPayload({ consent })));
 
-    expect(response.status).toBe(204);
-    expect(mockTrackEvent).toHaveBeenCalledWith(
-      'pac_exposure',
-      expect.objectContaining({ jv_aid: null })
-    );
-    expect(mockLogStatsigEvent).toHaveBeenCalledWith(
-      `pac-session:${SESSION_ID}`,
-      'pac_exposure',
-      expect.anything(),
-      expect.anything()
-    );
-  });
+      expect(response.status).toBe(204);
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        'pac_exposure',
+        expect.objectContaining({ jv_aid: null })
+      );
+      expect(mockLogStatsigEvent).toHaveBeenCalledWith(
+        `pac-session:${SESSION_ID}`,
+        'pac_exposure',
+        expect.anything(),
+        expect.anything()
+      );
+    }
+  );
 
   it('falls back to session scope when no jv_aid cookie exists', async () => {
     setCookieValues({ [COOKIE_BANNER_REQUIRED_COOKIE]: '0' });
@@ -363,14 +363,17 @@ describe('POST /api/profile/pac-event', () => {
   it.each([
     { success: true, degraded: true },
     { success: false, unavailable: true },
-  ])('acknowledges without forwarding when the limiter backend is degraded (%o)', async degradedResult => {
-    mockPublicProfilePacEventLimiterLimit.mockResolvedValue(degradedResult);
+  ])(
+    'acknowledges without forwarding when the limiter backend is degraded (%o)',
+    async degradedResult => {
+      mockPublicProfilePacEventLimiterLimit.mockResolvedValue(degradedResult);
 
-    const response = await POST(buildRequest('not-json{'));
+      const response = await POST(buildRequest('not-json{'));
 
-    expect(response.status).toBe(204);
-    expect(mockLogStatsigEvent).not.toHaveBeenCalled();
-    expect(mockTrackEvent).not.toHaveBeenCalled();
-    expect(mockLoggerInfo).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(204);
+      expect(mockLogStatsigEvent).not.toHaveBeenCalled();
+      expect(mockTrackEvent).not.toHaveBeenCalled();
+      expect(mockLoggerInfo).not.toHaveBeenCalled();
+    }
+  );
 });

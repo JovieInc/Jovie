@@ -67,3 +67,30 @@ function formatYmdParts(parts: Intl.DateTimeFormatPart[]): string {
 
   return `${year}-${month}-${day}`;
 }
+
+const eventMonthFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  timeZone: 'UTC',
+});
+
+/** Month/day labels for the venue's calendar day, independent of the viewer. */
+export function formatEventDateParts(input: {
+  startDate?: string | Date | null;
+  timezone?: string | null;
+}): { month: string; day: string } | null {
+  if (!input.startDate) return null;
+  const parsed =
+    input.startDate instanceof Date
+      ? input.startDate
+      : new Date(input.startDate);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const key = getEventLocalDateKey({
+    startDate: input.startDate,
+    timezone: input.timezone ?? null,
+  });
+  return {
+    month: eventMonthFormatter.format(new Date(`${key}T00:00:00.000Z`)),
+    day: String(Number(key.slice(8, 10))),
+  };
+}

@@ -36,7 +36,7 @@ describe('HeroLinear', () => {
     const shell = screen.getByTestId('homepage-shell');
     const heading = screen.getByRole('heading', {
       level: 1,
-      name: /Drop More Music\.\s+Crush Every Release\./,
+      name: /Drop More Music\.\s*Crush Every Release\./,
     });
     const primaryLink = screen.getByRole('link', { name: 'Request Access' });
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 /**
  * Tests for ReleaseFilterDropdown — filter toggle and clear logic.
  *
@@ -328,6 +330,13 @@ describe('ReleaseFilterDropdown', () => {
       expect(screen.getByText('Release Type')).toBeInTheDocument();
     });
 
+    it('uses the banned-icon-safe Layers glyph for the release-type pill', () => {
+      renderDropdown({ releaseTypes: ['album'] as ReleaseType[] });
+
+      expect(screen.getAllByTestId('icon-Layers').length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('icon-Disc3')).toBeNull();
+    });
+
     it('shows popularity filter pill when levels are selected', () => {
       renderDropdown({ popularity: ['high'] as PopularityLevel[] });
 
@@ -424,5 +433,21 @@ describe('ReleaseFilterDropdown', () => {
         labels: [],
       });
     });
+  });
+});
+
+describe('VirtualizedLabelList virtualized window under React Compiler', () => {
+  it('opts the virtualizer reader out of memoization (JOV-6702)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx'
+      ),
+      'utf8'
+    );
+    const body = source.slice(source.indexOf('function VirtualizedLabelList'));
+    expect(body.slice(0, body.indexOf('useVirtualizer('))).toContain(
+      "'use no memo';"
+    );
   });
 });

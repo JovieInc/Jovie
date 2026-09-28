@@ -356,7 +356,7 @@ describe('ShippingVelocityChart observation states', () => {
     vi.spyOn(document, 'visibilityState', 'get').mockImplementation(
       () => visibility
     );
-    let resumedSignal: AbortSignal | null = null;
+    let resumedSignal = null as AbortSignal | null;
     const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
       resumedSignal = init?.signal ?? null;
       return new Promise<Response>(() => undefined);

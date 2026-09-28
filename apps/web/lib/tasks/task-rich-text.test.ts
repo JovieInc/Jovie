@@ -17,6 +17,20 @@ describe('task rich text metadata', () => {
     });
   });
 
+  it('writes editor content when task metadata is missing', () => {
+    const content = {
+      type: 'doc' as const,
+      content: [{ type: 'paragraph' }],
+    };
+
+    expect(writeTaskDescriptionContent(null, content)).toEqual({
+      descriptionRichTextV1: content,
+    });
+    expect(writeTaskDescriptionContent(undefined, content)).toEqual({
+      descriptionRichTextV1: content,
+    });
+  });
+
   it('merges validated editor content without clobbering task metadata', () => {
     const content = {
       type: 'doc' as const,

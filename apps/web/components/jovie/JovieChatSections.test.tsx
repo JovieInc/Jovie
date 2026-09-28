@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { Virtualizer } from '@tanstack/react-virtual';
 import { render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,7 +12,15 @@ import {
   ChatComposerSurface,
   ChatEmptyStateComposerRegion,
   ChatLoadingConversationSkeleton,
+  ChatThreadMessages,
 } from './JovieChatSections';
+
+vi.mock('@/components/jovie/components', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/components/jovie/components')>()),
+  ChatMessage: ({ id }: { id: string }) => (
+    <div data-testid='thread-row'>{id}</div>
+  ),
+}));
 
 vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
   ChatUsageAlert: () => <div data-testid='usage-alert-probe'>usage-alert</div>,
@@ -186,5 +195,48 @@ describe('ChatComposerSurface one-chrome-layer wiring', () => {
     expect(
       screen.getByRole('textbox', { name: 'Chat Message Input' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('ChatThreadMessages virtualized window', () => {
+  it('renders the rows the virtualizer reports on every render, not the first window', () => {
+    const messages = Array.from({ length: 6 }, (_, index) => ({
+      id: `m${index}`,
+      role: index % 2 ? ('assistant' as const) : ('user' as const),
+      parts: [],
+    }));
+    let window = [0, 1];
+    // One stable object whose state changes between renders, like TanStack Virtual.
+    const virtualizer = {
+      getVirtualItems: () =>
+        window.map(index => ({ index, start: index * 80, key: index })),
+      measureElement: () => undefined,
+    } as unknown as Virtualizer<HTMLDivElement, Element>;
+    const props = {
+      messages,
+      shouldVirtualizeMessages: true,
+      virtualizer,
+      virtualizedMessageViewportHeight: 480,
+      virtualizedMinHeight: 0,
+      messageViewportPaddingBottom: undefined,
+      totalSizeRef: () => undefined,
+      bottomSentinelRef: () => undefined,
+      isStreaming: false,
+      lastAssistantIndex: 5,
+      knownMessageIds: new Set<string>(),
+      inlineChatError: null,
+      isStuckToBottom: true,
+      onScrollToBottom: () => undefined,
+    };
+    const view = render(<ChatThreadMessages {...props} />);
+    expect(
+      screen.getAllByTestId('thread-row').map(row => row.textContent)
+    ).toEqual(['m0', 'm1']);
+
+    window = [4, 5];
+    view.rerender(<ChatThreadMessages {...props} />);
+    expect(
+      screen.getAllByTestId('thread-row').map(row => row.textContent)
+    ).toEqual(['m4', 'm5']);
   });
 });

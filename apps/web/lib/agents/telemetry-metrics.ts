@@ -94,12 +94,12 @@ export function aggregateSkillRunFixtures(
     .map(group => {
       const sortedCosts = [...group.costs].sort((a, b) => a - b);
       const mid = Math.floor(sortedCosts.length / 2);
-      const medianCostUsd =
-        sortedCosts.length === 0
-          ? null
-          : sortedCosts.length % 2 === 0
-            ? (sortedCosts[mid - 1]! + sortedCosts[mid]!) / 2
-            : sortedCosts[mid]!;
+      let medianCostUsd: number | null = null;
+      if (sortedCosts.length > 0 && sortedCosts.length % 2 === 0) {
+        medianCostUsd = (sortedCosts[mid - 1]! + sortedCosts[mid]!) / 2;
+      } else if (sortedCosts.length % 2 === 1) {
+        medianCostUsd = sortedCosts[mid]!;
+      }
 
       return {
         skillId: group.skillId,
@@ -118,11 +118,11 @@ export function aggregateSkillRunFixtures(
         },
       };
     })
-    .sort((a, b) =>
-      a.skillId === b.skillId
-        ? a.skillVersion === b.skillVersion
-          ? (a.cohort ?? '').localeCompare(b.cohort ?? '')
-          : a.skillVersion.localeCompare(b.skillVersion)
-        : a.skillId.localeCompare(b.skillId)
-    );
+    .sort((a, b) => {
+      if (a.skillId !== b.skillId) return a.skillId.localeCompare(b.skillId);
+      if (a.skillVersion !== b.skillVersion) {
+        return a.skillVersion.localeCompare(b.skillVersion);
+      }
+      return (a.cohort ?? '').localeCompare(b.cohort ?? '');
+    });
 }

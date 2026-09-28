@@ -7,7 +7,6 @@ import {
 } from 'eve/channels/telegram';
 
 import { admitOvieTelegramMessage } from '../lib/telegram-allowlist';
-import { bindEvePilotIdentity } from '../select-identity';
 
 /**
  * Telegram is a private fallback presentation surface for Summer. Ovie is
@@ -22,7 +21,6 @@ export function onSummerTelegramMessage(
   const auth = defaultTelegramAuth(message);
   if (!auth) return null;
 
-  const turn = bindEvePilotIdentity('summer');
   return {
     auth: {
       ...auth,
@@ -34,7 +32,8 @@ export function onSummerTelegramMessage(
         source: 'telegram',
       },
     },
-    context: [turn.instructions],
+    // No per-message context: Eve appends it to history on every message.
+    // instructions/channel-identity.ts binds the pack once per session.
   };
 }
 

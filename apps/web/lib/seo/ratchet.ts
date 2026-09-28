@@ -223,11 +223,11 @@ export function validateSourceMetadataPatterns(
 ): SeoValidationIssue[] {
   const issues: SeoValidationIssue[] = [];
   const patternChecks: Partial<Record<SeoRequiredField, RegExp>> = {
-    canonical: /alternates:\s*\{[\s\S]*canonical(?::|,)/,
+    canonical: /alternates:\s*\{[\s\S]*canonical[:,]/,
     openGraph: /openGraph:\s*\{/,
     twitter: /twitter:\s*\{/,
-    title: /\btitle(?::|,)/,
-    description: /\bdescription(?::|,)/,
+    title: /\btitle[:,]/,
+    description: /\bdescription[:,]/,
   };
 
   for (const field of required) {

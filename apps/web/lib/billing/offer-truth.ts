@@ -18,6 +18,18 @@ import { formatAmount, formatAmountNoCents } from '@/lib/utils/format-number';
 
 export { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 
+/** Public /pricing offer lock. Free, Pro, and Enterprise only; no Max price. */
+export const ARTIST_VISIBILITY_OFFER_CONTRACT_ID =
+  'artist-visibility-offer-contract-v1' as const;
+
+/** Must not appear in the public /pricing document. */
+export const FORBIDDEN_PUBLIC_PRICING_PAGE_MARKERS = [
+  '$149',
+  '149/mo',
+  'Max Early Access',
+  'marketing-pricing-plan-max',
+] as const;
+
 /** Implemented Pro reverse-trial length. Matches `activateTrial` + published terms. */
 export const PRO_TRIAL_DURATION_DAYS = 14;
 
@@ -31,7 +43,7 @@ export const PRO_TRIAL_TRUTH =
 export const PRO_LIMITED_ACCESS_TRUTH = 'Limited access.';
 
 export const FREE_PROFILE_TRUTH =
-  'Your artist profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
+  'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
 
 export const MAX_NO_TRIAL_TRUTH = 'Paid Max plan. No Max trial.';
 
