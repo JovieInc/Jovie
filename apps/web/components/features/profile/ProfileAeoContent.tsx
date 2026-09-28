@@ -52,9 +52,12 @@ export function ProfileAeoContent({
                     <Badge
                       variant='outline'
                       size='md'
-                      className='profile-aeo-content__fact-value w-full max-w-full justify-start border-(--profile-aeo-border) bg-transparent sm:w-auto'
+                      className='w-full max-w-full justify-start sm:w-auto'
                     >
-                      <span className='min-w-0 truncate' title={fact.value}>
+                      <span
+                        className='profile-aeo-content__fact-value min-w-0 truncate'
+                        title={fact.value}
+                      >
                         {fact.value}
                       </span>
                     </Badge>
@@ -136,33 +139,35 @@ export function ProfileAeoContent({
           </div>
         </div>
 
-        <div className='space-y-4'>
-          <h3 className='profile-aeo-content__subheading text-xl font-semibold leading-tight tracking-tight'>
-            {content.artistName} FAQ
-          </h3>
-          <dl className='profile-aeo-content__faq-list divide-y border-y'>
-            {content.faqs.map(item => (
-              <div
-                key={item.question}
-                className='profile-aeo-content__faq-item grid gap-2 py-4 sm:gap-5'
-              >
-                <dt className='profile-aeo-content__term text-mid font-semibold leading-6 text-pretty'>
-                  {item.question}
-                </dt>
-                <dd className='profile-aeo-content__answer text-sm leading-6 text-pretty'>
-                  <span>{item.answer}</span>
-                  <span aria-hidden='true'> </span>
-                  <a
-                    href={item.source.href}
-                    className='profile-aeo-content__source -my-2.5 inline-flex min-h-11 items-center py-2.5 font-medium underline underline-offset-4 transition-colors duration-subtle'
-                  >
-                    Source: {item.source.label}
-                  </a>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+        {content.faqs.length > 0 ? (
+          <div className='space-y-4'>
+            <h3 className='profile-aeo-content__subheading text-xl font-semibold leading-tight tracking-tight'>
+              {content.artistName} FAQ
+            </h3>
+            <dl className='profile-aeo-content__faq-list divide-y border-y'>
+              {content.faqs.map(item => (
+                <div
+                  key={item.question}
+                  className='profile-aeo-content__faq-item grid gap-2 py-4 sm:gap-5'
+                >
+                  <dt className='profile-aeo-content__term text-mid font-semibold leading-6 text-pretty'>
+                    {item.question}
+                  </dt>
+                  <dd className='profile-aeo-content__answer text-sm leading-6 text-pretty'>
+                    <span>{item.answer}</span>
+                    <span aria-hidden='true'> </span>
+                    <a
+                      href={item.source.href}
+                      className='profile-aeo-content__source -my-2.5 inline-flex min-h-11 items-center py-2.5 font-medium underline underline-offset-4 transition-colors duration-subtle'
+                    >
+                      Source: {item.source.label}
+                    </a>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
 
         {claimHref ? (
           <aside

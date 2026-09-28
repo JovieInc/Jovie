@@ -63,6 +63,13 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(doctor.judge(obs(lastLandingAge=None, pool=0), {"poolEmptySince": 1_000_000.0}), {})
         self.assertIn("never in 24h", doctor.judge(obs(lastLandingAge=None))["no-landing"])
 
+    def test_spawn_exit_needs_spawned_workers_no_worktrees_and_no_recent_run(self):
+        idle = {"tick": {"at": "x", "unhealthy": [], "error": None, "spawned": ["devin", "codex"]}, "worktrees": 0}
+        self.assertEqual(doctor.judge(obs(**idle, lastWorkAge=600)), {})
+        self.assertEqual(doctor.judge(obs(**{**idle, "worktrees": 2}, lastWorkAge=None)), {})
+        self.assertIn("workers exit on claim", doctor.judge(obs(**idle, lastWorkAge=3601))["spawn-exit"])
+        self.assertIn("spawn-exit", doctor.judge(obs(**idle, lastWorkAge=None)))
+
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
         self.assertIn("codex-broken", doctor.judge(obs(codex={"error": "no codex", "accounts": {}, "available": []})))
@@ -169,7 +176,7 @@ class StatusFeedTest(unittest.TestCase):
             host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
             lane = type("Lane", (), {"Linear": staticmethod(lambda env: (_ for _ in ()).throw(OSError("x"))),
                                      "load_providers": staticmethod(lambda: {}),
-                                     "load_github_env": staticmethod(lambda: None), "HOST": "gem"})
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
@@ -208,7 +215,7 @@ class RunTest(unittest.TestCase):
                 def __init__(self, env):
                     raise OSError("no env")
             lane = type("Lane", (), {"Linear": FakeLinear, "load_providers": staticmethod(lambda: {}),
-                                     "load_github_env": staticmethod(lambda: None), "HOST": "test"})
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "test"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {"count": 0, "available": [], "accounts": {}})})
             tracker = FakeTracker()
             os.environ["LANES_SELFTEST"] = "1"  # no gist from a unit test

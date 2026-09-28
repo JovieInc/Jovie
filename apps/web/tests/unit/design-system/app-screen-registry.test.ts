@@ -123,7 +123,6 @@ describe('authenticated app screen registry', () => {
         issue => issue.code
       )
     ).toContain('component-pen-root-readback-mismatch');
-
     const promoteTable = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
       component.id === bound?.id
         ? { ...component, penReferenceEligible: true }

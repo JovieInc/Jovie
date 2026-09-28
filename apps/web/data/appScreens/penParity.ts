@@ -428,7 +428,6 @@ export const APP_SCREEN_PEN_REFERENCE_HOLDS: readonly PenReferenceHold[] = [
       'One entity header: Pen odpZ8 vs five code header variants. RosMb instances odpZ8, so its anatomy waits on that owner decision.',
   },
 ];
-
 /** Reads one property of a master or slot from the committed export. */
 export function penParityValue(
   exported: AppScreenPenGeometryExport,

@@ -461,7 +461,7 @@ def ledger(host, receipt: dict) -> None:
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
 pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title url isDraft
-headRefName headRefOid mergeStateStatus isInMergeQueue isCrossRepository updatedAt labels(first:30){nodes{name}}
+headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository updatedAt labels(first:30){nodes{name}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 

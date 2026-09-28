@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("lane_runner", ROOT / "scripts/lanes/lane_runner.py")
 lane = importlib.util.module_from_spec(SPEC)
@@ -544,7 +545,7 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(lane.worker(self.host, "devin"), 1)
         self.assertTrue(lane.cooling(self.host, "devin"))
         self.assertFalse((self.host.state / "failures.json").exists())
-        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Triage"))
         self.assertEqual(self.execs, [])
 
     def test_red_prs_are_fixed_before_new_issues_are_claimed(self):
@@ -651,8 +652,8 @@ class DispatchTest(unittest.TestCase):
     def test_spawns_one_worker_per_slot_of_healthy_enabled_providers_and_prunes(self):
         saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run)
         spawned = []
-        lane.load_providers = lambda: {"a": {"slots": 2}, "b": {"slots": 3}, "c": {"slots": 1, "enabled": False}}
-        lane.provider_healthy = lambda spec: spec["slots"] == 2
+        lane.load_providers = lambda: {"a": {"slots": 2}, "b": {"slots": 3}, "c": {"slots": 1, "enabled": False}, "d": {"slots": 4}}
+        lane.provider_healthy = lambda spec: self.fail("host-scoped-off provider was probed") if spec["slots"] == 4 else spec["slots"] == 2
         lane.subprocess.Popen = lambda args, **kw: spawned.append(args[-1])
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
@@ -660,10 +661,12 @@ class DispatchTest(unittest.TestCase):
             old = Path(tmp) / "worktrees/old"
             old.mkdir(parents=True)
             os.utime(old, (0, 0))
+            os.environ["LANES_SLOTS_D"] = "0"  # d is scoped off this host
             try:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
                 self.assertEqual(lane.dispatch(host), 0)
             finally:
+                os.environ.pop("LANES_SLOTS_D", None)
                 lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run = saved
             self.assertFalse(old.exists())
             tick = json.loads((host.state / "tick.json").read_text())
@@ -696,6 +699,16 @@ class DispatchTest(unittest.TestCase):
             finally:
                 lane.ensure_full_history, lane.doctor.run = saved
             self.assertIn("git exploded", json.loads((host.state / "tick.json").read_text())["error"])
+
+    def test_worktree_removal_kills_its_leftover_processes_first(self):
+        fake, real = FakeShell([]), lane.sh
+        lane.sh = fake
+        try:
+            lane.remove_worktree(lane.Host(state=Path("/s"), repo=Path("/r")), Path("/s/worktrees/run-1"))
+        finally:
+            lane.sh = real
+        self.assertEqual(fake.calls, [["pkill", "-f", "/s/worktrees/run-1"],
+                                      ["git", "worktree", "remove", "--force", "/s/worktrees/run-1"]])
 
     def test_prune_survives_a_worktree_removed_mid_scan(self):
         real = lane.sh
@@ -804,6 +817,47 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.failure_excerpt = real, real_excerpt
         self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
 
+    def test_a_pr_merged_before_its_fix_run_is_skipped_not_failed(self):
+        real = lane.sh
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:3] == ["git", "worktree", "add"]:
+                return SimpleNamespace(returncode=128, stdout="",
+                                       stderr="fatal: invalid reference: origin/devin/jov-1")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+            finally:
+                lane.sh = real
+        self.assertEqual(receipt["verdict"], "skipped")
+        self.assertIn("invalid reference", receipt["reasons"][0])
+
+    def test_a_lockfile_only_conflict_skips_the_agent_and_re_arms(self):
+        real, real_resolve, real_agent = lane.sh, lane.resolve_lockfile_conflict, lane.run_agent
+        lane.resolve_lockfile_conflict = lambda worktree, branch, log: True
+        lane.run_agent = lambda *a, **k: self.fail("a lockfile-only conflict needs no model")
+        calls = []
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            calls.append(args)
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                                          {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+            finally:
+                lane.sh, lane.resolve_lockfile_conflict, lane.run_agent = real, real_resolve, real_agent
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "lockfile-regenerated"))
+        self.assertNotIn(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], calls)
+        self.assertIn(["gh", "pr", "merge", "5", "--repo", lane.REPO_SLUG, "--auto"], calls)
+
     def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=(
@@ -864,13 +918,52 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(lane.red_pr([human], {})["number"], 42)
         clean = {**human, "reviewDecision": "APPROVED"}
         self.assertIsNone(lane.red_pr([clean], {}))
-        real = lane.sh
-        lane.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([
-            {**human, "isCrossRepository": False}, {**human, "number": 43, "isCrossRepository": True}]))
+        real = lane.open_prs_summary
+        lane.open_prs_summary = lambda: [{**human, "isCrossRepository": False},
+                                         {**human, "number": 43, "isCrossRepository": True},
+                                         {**human, "number": 44, "isDraft": True}]
         try:
-            self.assertEqual([pr["number"] for pr in lane.repo_prs()], [42], "fork PRs cannot be pushed to")
+            self.assertEqual([pr["number"] for pr in lane.repo_prs()], [42], "fork and draft PRs are not candidates")
         finally:
-            lane.sh = real
+            lane.open_prs_summary = real
+
+    def test_summary_lists_red_prs_without_per_check_rollups(self):
+        """2026-09-27: per-check rollups for 45 devin PRs hit GitHub's secondary limit, so the
+        lane saw zero red PRs. The aggregate state alone must still mark PRs red or pending."""
+        saved = (lane.pr_events.open_prs_state, dict(lane._SUMMARY))
+        states = {1: "FAILURE", 2: "PENDING", 3: "SUCCESS", 4: None}
+        lane.pr_events.open_prs_state = lambda _lane: [
+            {**self.pr(number=n), "headRefName": f"devin/jov-{n}-20260927", "rollup": state} for n, state in states.items()]
+        lane._SUMMARY.update(at=0.0, prs=[])
+        try:
+            prs = lane.lane_prs("devin", providers={"devin": {}})
+            self.assertEqual([pr["number"] for pr in prs], [1, 2, 3, 4])
+            self.assertEqual(lane.red_pr(prs, {})["number"], 1)
+            self.assertIsNone(lane.red_pr([pr for pr in prs if pr["number"] != 1], {}),
+                              "pending, green and unchecked heads are not red")
+            lane.pr_events.open_prs_state = lambda _lane: self.fail("the summary is cached for a minute")
+            self.assertEqual(len(lane.open_prs_summary()), 4)
+        finally:
+            lane.pr_events.open_prs_state = saved[0]
+            lane._SUMMARY.clear()
+            lane._SUMMARY.update(saved[1])
+
+    def test_claimed_pr_gets_its_real_checks(self):
+        synthetic = {**self.pr(number=8), "statusCheckRollup": [{"name": "rollup", "synthetic": True,
+                                                                 "conclusion": "FAILURE"}]}
+        real_checks = [{"name": "ci-fast", "conclusion": "FAILURE", "detailsUrl": "https://x/job/9"}]
+        saved = lane.sh
+        calls = []
+        lane.sh = lambda args, **k: calls.append(args) or SimpleNamespace(
+            returncode=0, stderr="", stdout=json.dumps({"statusCheckRollup": real_checks}))
+        try:
+            self.assertEqual(lane.with_checks(synthetic)["statusCheckRollup"], real_checks)
+            already = {**synthetic, "statusCheckRollup": real_checks}
+            self.assertIs(lane.with_checks(already), already)
+        finally:
+            lane.sh = saved
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][:4], ["gh", "pr", "view", "8"])
 
     def test_exhausted_heads_escalate_once_to_triage(self):
         stuck = {**self.pr(number=7), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
@@ -899,21 +992,38 @@ class FixRedTest(unittest.TestCase):
             self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
 
     def test_claim_records_attempt_before_work(self):
-        real = lane.sh
-        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
-            [{**self.pr(number=4), "headRefName": "devin/jov-6525-auto-merge-default"},
-             {**self.pr(), "headRefName": "devin/jov-1-20260925204809"},
-             {**self.pr(number=6), "headRefName": "claude/x"}]))
+        real = lane.open_prs_summary, lane.sh
+        lane.open_prs_summary = lambda: [{**self.pr(number=4), "headRefName": "devin/jov-6525-auto-merge-default"},
+                                         {**self.pr(), "headRefName": "devin/jov-1-20260925204809"},
+                                         {**self.pr(number=6), "headRefName": "claude/x"}]
+        # No GitHub from tests: claimed_elsewhere/post_claim would read and comment on real PRs.
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout="[]")
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             try:
                 self.assertEqual(lane.claim_red_pr(host, "devin")["number"], 5)
                 self.assertIsNone(lane.claim_red_pr(host, "devin"))
             finally:
-                lane.sh = real
+                lane.open_prs_summary, lane.sh = real
             record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
             self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
             self.assertAlmostEqual(record["at"], time.time(), delta=60)
+
+    def test_a_head_claimed_elsewhere_is_skipped_not_a_stop(self):
+        first, second = {**self.pr(number=4), "headRefName": "devin/jov-4-20260925204809"}, \
+            {**self.pr(), "headRefName": "devin/jov-1-20260925204809"}
+        saved = (lane.claimed_elsewhere, lane.post_claim)
+        lane.claimed_elsewhere = lambda number, sha, kind: number == 4
+        lane.post_claim = lambda *a, **k: None
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            try:
+                self.assertEqual(lane.claim_red_pr(host, "devin", [first, second])["number"], 5)
+                drafts = [{**pr, "isDraft": True} for pr in (first, second)]
+                self.assertEqual(lane.claim_adoptable_pr(host, "devin", drafts)["number"], 5)
+            finally:
+                lane.claimed_elsewhere, lane.post_claim = saved
+            self.assertNotIn("4", json.loads((host.state / "fix-attempts.json").read_text()))
 
     def test_unverified_drafts_are_adopted_once_per_head(self):
         draft = {**self.pr(), "isDraft": True, "headRefName": "hyperagent/jov-6438-20260925t213221"}
@@ -980,8 +1090,45 @@ class FixRedTest(unittest.TestCase):
                 lane.sh, lane.failure_excerpt = real, real_excerpt
             self.assertEqual((receipt["verdict"], receipt["headAfter"]), ("fix-pushed", "h2"))
             self.assertIn("fix-red", (host.state / "runs/ledger.jsonl").read_text())
+    def test_non_pushing_fix_runs_the_configured_second_attempt(self):
+        real, real_excerpt = lane.sh, lane.failure_excerpt
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        lane.sh, lane.failure_excerpt = fake, lambda pr: "err"
+        self.addCleanup(lambda: (setattr(lane, "sh", real), setattr(lane, "failure_excerpt", real_excerpt)))
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            first = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+            second = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
+        self.assertEqual((first["execution"]["terminalState"], first["execution"]["retryDecision"],
+                          second["verdict"], second["execution"]["attempt"]), (None, "retry", "fix-no-change", 2))
 
+    def test_non_lockfile_conflict_preserves_the_second_agent_attempt(self):
+        real_sh, real_excerpt, real_resolve = lane.sh, lane.failure_excerpt, lane.resolve_lockfile_conflict
 
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+        lane.sh, lane.failure_excerpt = fake, lambda pr: "err"
+        lane.resolve_lockfile_conflict = lambda worktree, branch, log: False
+        self.addCleanup(lambda: (setattr(lane, "sh", real_sh),
+                                 setattr(lane, "failure_excerpt", real_excerpt),
+                                 setattr(lane, "resolve_lockfile_conflict", real_resolve)))
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            dirty = {**self.pr(), "mergeStateStatus": "DIRTY"}
+            first = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, dirty)
+            second = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, dirty)
+        self.assertEqual((first["execution"]["retryDecision"], second["execution"]["attempt"],
+                          second["execution"]["terminalState"]), ("retry", 2, "quarantined"))
 
 @unittest.skipIf(os.environ.get("LANES_SELFTEST") == "1", "running inside a release self-test")
 class UpdateTest(unittest.TestCase):
@@ -1108,3 +1255,78 @@ class OnePrPerIssueTest(unittest.TestCase):
         self.assertEqual(closed, ["1", "3", "4"])
         self.assertIn("superseded by #2", next(a for a in calls if a[:3] == ["gh", "pr", "close"])[-1])
         self.assertEqual(linear.moves, [("JOV-8", "Todo")])
+
+
+class LockfileConflictTest(unittest.TestCase):
+    """JOV-6837: a lockfile-only conflict is resolved without a model; anything else is not."""
+
+    def git(self, *args, cwd):
+        return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
+                              check=True, capture_output=True, text=True).stdout.strip()
+
+    def repo(self, tmp: Path, pr_changes: dict):
+        origin, work = tmp / "origin.git", tmp / "work"
+        self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+        self.git("clone", "-q", str(origin), str(work), cwd=tmp)
+        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}.items():
+            (work / name).write_text(text)
+        self.git("add", "-A", cwd=work)
+        self.git("commit", "-qm", "base", cwd=work)
+        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
+        self.git("checkout", "-q", "-b", "devin/jov-1-20260927", cwd=work)
+        for name, text in pr_changes.items():
+            (work / name).write_text(text)
+        self.git("commit", "-qam", "pr", cwd=work)
+        self.git("push", "-q", "origin", "HEAD:devin/jov-1-20260927", cwd=work)
+        self.git("checkout", "-q", "main", cwd=work)
+        (work / "pnpm-lock.yaml").write_text("main\n")
+        (work / "a.ts").write_text("main\n")
+        self.git("commit", "-qam", "main moves", cwd=work)
+        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
+        self.git("checkout", "-q", "devin/jov-1-20260927", cwd=work)
+        self.git("fetch", "-q", "origin", cwd=work)
+        return origin, work
+
+    def run_resolve(self, work: Path):
+        real, calls = lane.sh, []
+
+        def sh(args, cwd=None, timeout=600, env=None, log=None, stream=False):
+            calls.append(args)
+            if args[:2] == ["pnpm", "install"]:
+                (Path(cwd) / "pnpm-lock.yaml").write_text("regenerated\n")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return real(args, cwd=cwd, timeout=timeout, env=env)
+        lane.sh = sh
+        try:
+            with open(os.devnull, "w") as log:
+                env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                       "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+                saved = dict(os.environ)
+                os.environ.update(env)
+                try:
+                    return lane.resolve_lockfile_conflict(work, "devin/jov-1-20260927", log), calls
+                finally:
+                    os.environ.clear()
+                    os.environ.update(saved)
+        finally:
+            lane.sh = real
+
+    def test_lockfile_only_conflict_is_regenerated_and_pushed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
+            pushed = self.git("show", "devin/jov-1-20260927:pnpm-lock.yaml", cwd=origin)
+            self.assertEqual(pushed, "regenerated")
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
+
+    def test_a_source_conflict_is_left_to_the_agent_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", "a.ts": "pr\n"})
+            before = self.git("rev-parse", "devin/jov-1-20260927", cwd=origin)
+            ok, calls = self.run_resolve(work)
+            self.assertFalse(ok)
+            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
+            self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
+            self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)

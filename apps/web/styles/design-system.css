@@ -828,6 +828,23 @@
   flex: 0 0 auto;
 }
 
+/* From md up the compact surface is a fixed-height phone card with overflow
+   hidden. Natural-height content ran past the card, under the tab bar, and
+   could never be scrolled into view (jov.ie/tim dogfood 2026-09-27). Bound the
+   column so the content region scrolls inside the card; its bottom padding
+   keeps the last row reachable above the dock. */
+@media (min-width: 768px) {
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-content-column,
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      .profile-home-content-scroll
+  ) {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+}
+
 /* Mobile home: the identity header and the rail share one scroll region.
    Keep the rail at the top of its remaining region so the featured card
    follows the identity header without an ownerless spacer. */
