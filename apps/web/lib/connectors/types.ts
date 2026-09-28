@@ -25,6 +25,7 @@ export type ConnectorDbStatus = EnumConnectorDbStatus;
 export const CONNECTOR_PROVIDER_IDS = [
   'gmail',
   'google_calendar',
+  'spotify',
   'youtube',
 ] as const satisfies readonly ConnectorProviderId[];
 
@@ -45,9 +46,9 @@ export const CONNECTOR_DB_STATUS_IDS = [
  */
 export type ConnectorStatus = ConnectorDbStatus | 'not_connected' | 'syncing';
 
-export type ConnectorIconKey = 'mail' | 'calendar' | 'youtube';
+export type ConnectorIconKey = 'mail' | 'calendar' | 'spotify' | 'youtube';
 
-export type ConnectorOAuthBundle = 'google' | 'youtube';
+export type ConnectorOAuthBundle = 'google' | 'spotify' | 'youtube';
 
 /** Shared vault used by all OAuth connectors today (`lib/connectors/token-vault.ts`). */
 export type ConnectorTokenHandler = 'shared_token_vault';
