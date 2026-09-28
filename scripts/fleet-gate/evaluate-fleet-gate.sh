@@ -79,23 +79,31 @@ jq -e '
   exit 2
 }
 
-# Forward-only lineage (JOV-6993, as #18809 did for the release rechecks): main
-# advancing past the expected subject while a generation waited for the
-# production-mutation lock is not a mismatch. Only a rewind or force-push, where
-# GitHub's compare from the subject to observed main is not "ahead", fails.
+# Forward-only, like the release rechecks (#18809): a generation whose subject
+# main has since moved past is still admissible; a diverged or unreadable
+# lineage fails closed. An exact-only match starved every generation while
+# merges kept landing during the production-mutation lock wait (JOV-6993).
+subject_is_ancestor_of_main() {
+  local main_sha="$1" status
+  if [[ -n "${FLEET_GATE_COMPARE_STATUS:-}" ]]; then
+    status="$FLEET_GATE_COMPARE_STATUS" # test fixture, like FLEET_GATE_EVALUATE_JSON
+  elif [[ -n "${GEM_PRIORITY_GATE_REPO:-}" ]]; then
+    status="$(gh api "repos/$GEM_PRIORITY_GATE_REPO/compare/$EXPECTED_SHA...$main_sha" --jq .status 2>/dev/null)" || return 1
+  else
+    return 1
+  fi
+  [[ "$status" == "ahead" ]]
+}
+
 if [[ -n "${EXPECTED_SHA:-}" ]]; then
-  observed_sha="$(jq -r '.signals.main.sha' "$receipt")"
-  if [[ "$observed_sha" != "$EXPECTED_SHA" ]]; then
-    lineage_repo="${GEM_PRIORITY_GATE_REPO:-${GITHUB_REPOSITORY:-}}"
-    lineage=""
-    if [[ -n "$lineage_repo" ]]; then
-      lineage="$(gh api "repos/$lineage_repo/compare/${EXPECTED_SHA}...${observed_sha}" --jq '.status // empty' 2>/dev/null || true)"
-    fi
-    if [[ "$lineage" != "ahead" ]]; then
+  main_sha="$(jq -r '.signals.main.sha' "$receipt")"
+  if [[ "$main_sha" != "$EXPECTED_SHA" ]]; then
+    if subject_is_ancestor_of_main "$main_sha"; then
+      echo "::notice::Fleet gate subject $EXPECTED_SHA is an ancestor of main $main_sha; admitting forward-only." >&2
+    else
       echo '::error::Fleet gate main.sha is not the expected subject or a descendant of it.' >&2
       exit 2
     fi
-    echo "::notice::Fleet gate main advanced ${EXPECTED_SHA:0:12} -> ${observed_sha:0:12} (forward-only)." >&2
   fi
 fi
 

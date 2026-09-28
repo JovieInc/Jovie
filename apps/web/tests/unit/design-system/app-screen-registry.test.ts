@@ -5,6 +5,7 @@ import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_PEN_EXPORT_SCHEMA,
   APP_SCREEN_PEN_GEOMETRY,
+  APP_SCREEN_PEN_PENDING_DECISIONS,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
   type AppScreenRegistryEntry,
@@ -123,6 +124,7 @@ describe('authenticated app screen registry', () => {
         issue => issue.code
       )
     ).toContain('component-pen-root-readback-mismatch');
+
     const promoteTable = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
       component.id === bound?.id
         ? { ...component, penReferenceEligible: true }
@@ -139,6 +141,24 @@ describe('authenticated app screen registry', () => {
         penPendingDecisions: [],
       }).map(issue => issue.code)
     ).not.toContain('reference-component-with-pending-pen-decision');
+
+    const promoteShell = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === 'component.app-shell-frame'
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    const headerOnly = APP_SCREEN_PEN_PENDING_DECISIONS.filter(
+      decision => decision.checkId === 'app-header.height'
+    );
+    expect(headerOnly).toHaveLength(1);
+    expect(
+      validateAppScreenSystem({
+        components: promoteShell,
+        penPendingDecisions: headerOnly,
+      }).find(
+        issue => issue.code === 'reference-component-with-pending-pen-decision'
+      )?.message
+    ).toMatch(/D1 is pending on JwsdW/);
 
     const promoteEntitySidebar = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
       component.id === 'component.entity-sidebar'

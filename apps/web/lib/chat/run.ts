@@ -589,7 +589,19 @@ export async function executeChatTurn(
         chatToolStepLimit: toolStepLimit,
       },
     }),
-    onFinish: async ({ steps, text }) => {
+    onFinish: async ({ steps, text, finishReason }) => {
+      if (!text && steps.every(step => step.toolCalls.length === 0)) {
+        // An empty turn is a failure the caller would otherwise persist as a
+        // placeholder reply (JOV-6533); console.error so prod logs show it.
+        console.error('[chat] model turn produced no output', {
+          requestId,
+          mode,
+          selectedModel,
+          finishReason,
+          steps: steps.length,
+          aborted: signal?.aborted ?? false,
+        });
+      }
       let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {
         const sanitized = sanitizeAssistantResponse(text);
@@ -662,6 +674,18 @@ export async function executeChatTurn(
           plan: userPlan,
           mode,
         },
+      });
+    },
+    onAbort: ({ steps }) => {
+      console.error('[chat] model stream aborted', {
+        requestId,
+        mode,
+        selectedModel,
+        steps: steps.length,
+        reason:
+          signal?.reason instanceof Error
+            ? `${signal.reason.name}: ${signal.reason.message}`
+            : String(signal?.reason ?? 'unknown'),
       });
     },
     onError: async ({ error }) => {

@@ -223,28 +223,25 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
         self.assertEqual(outputs["mode"], "normal")
 
-        code, outputs, receipt = run_wrapper(signals(), expected_sha="b" * 40,
-                                             extra_env={"GEM_PRIORITY_GATE_REPO": "", "GITHUB_REPOSITORY": ""})
-        self.assertEqual(code, 2, "no readable lineage fails closed")
+        code, outputs, receipt = run_wrapper(signals(), expected_sha="b" * 40)
+        self.assertEqual(code, 2)
         self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
         self.assertNotEqual(outputs.get("mode"), "normal")
 
-    def test_expected_sha_accepts_main_that_advanced_past_it_only(self):
-        """JOV-6993: a generation whose subject main has moved past (compare "ahead") passes;
-        a rewind or unreadable lineage still fails closed."""
-        with tempfile.TemporaryDirectory() as tmp:
-            stub = pathlib.Path(tmp) / "gh"
-            stub.write_text('#!/bin/sh\ncase "$*" in *compare/*) printf "%s\\n" "$STUB_COMPARE_STATUS" ;; esac\n')
-            stub.chmod(0o755)
-            base = {"PATH": f"{tmp}:{os.environ['PATH']}", "GEM_PRIORITY_GATE_REPO": "JovieInc/Jovie"}
-            code, outputs, _ = run_wrapper(signals(), expected_sha="b" * 40,
-                                           extra_env={**base, "STUB_COMPARE_STATUS": "ahead"})
-            self.assertEqual(code, 0)
-            self.assertEqual(outputs["mode"], "normal")
-            for status in ("behind", "diverged", ""):
-                code, _, _ = run_wrapper(signals(), expected_sha="b" * 40,
-                                         extra_env={**base, "STUB_COMPARE_STATUS": status})
-                self.assertEqual(code, 2, status or "unreadable lineage")
+    def test_expected_sha_admits_an_ancestor_subject_forward_only(self):
+        # Main moved past the generation's subject while it waited for the lock.
+        code, outputs, receipt = run_wrapper(
+            signals(), expected_sha="b" * 40, extra_env={"FLEET_GATE_COMPARE_STATUS": "ahead"}
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(outputs["mode"], "normal")
+        for status in ("diverged", "behind", "identical", ""):
+            code, outputs, _ = run_wrapper(
+                signals(), expected_sha="b" * 40, extra_env={"FLEET_GATE_COMPARE_STATUS": status}
+            )
+            # "" falls through to the live compare; with no repo slug it fails closed.
+            self.assertEqual(code, 2, status)
+            self.assertNotEqual(outputs.get("mode"), "normal")
 
     def test_deployment_consumer_uses_deployment_admission_not_promotion(self):
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
