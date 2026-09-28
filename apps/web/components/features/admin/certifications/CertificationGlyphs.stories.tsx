@@ -45,7 +45,7 @@ export const StateMatrix: Story = {
 
 export const EvidenceMatrix: Story = {
   render: () => (
-    <div className='grid grid-cols-[auto_repeat(4,auto)] gap-x-4 gap-y-2 rounded-md border border-subtle bg-base p-4 text-xs text-primary-token'>
+    <div className='grid grid-cols-5 gap-x-4 gap-y-2 rounded-md border border-subtle bg-base p-4 text-xs text-primary-token'>
       <span />
       {TIER_STATUSES.map(status => (
         <span key={status} className='capitalize text-tertiary-token'>
