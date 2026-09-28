@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import {
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -138,7 +138,7 @@ function CompanyPageRail({
       emptyMessage='Select a page to view details.'
       entityHeader={
         page ? (
-          <EntityHeaderCard
+          <EntityHeader
             title={page.label}
             subtitle={`${COMPANY_PAGE_KIND_LABELS[page.kind]} · ${page.path}`}
             meta={

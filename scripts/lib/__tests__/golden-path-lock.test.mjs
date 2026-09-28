@@ -106,6 +106,27 @@ describe('golden-path lock evaluators', () => {
     });
   });
 
+  it('accepts the homepage link claim submitting to /start (Tim 2026-09-28)', () => {
+    const claim = `<form action="/start" method="get"><span>jov.ie/</span>
+      <input name="handle" placeholder="you" /><button type="submit">Claim</button></form>`;
+    expect(evaluateHomepageHtml(claim)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+      reason: expect.stringContaining('link claim'),
+    });
+    // A claim that does not submit to /start is not a conversion.
+    expect(
+      evaluateHomepageHtml(
+        '<form action="/signup"><span>jov.ie/</span><button>Claim</button></form>'
+      )
+    ).toMatchObject({ ok: false });
+    expect(
+      evaluateHomepageHtml(
+        '<form action="/start"><span>jov.ie/</span><button>Claim it now</button></form>'
+      )
+    ).toMatchObject({ ok: false });
+  });
+
   it('requires the JOV-5864 name search as the homepage conversion', () => {
     const certified = `<form action="/start"><input placeholder="Search your name" /><button>Find me</button></form>`;
     expect(evaluateHomepageHtml(certified)).toMatchObject({

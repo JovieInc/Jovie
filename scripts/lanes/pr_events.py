@@ -59,6 +59,9 @@ HELD_REASONS = (
 )
 # Held codes that green CI supersedes (the lane's local gate, not a diff policy, said no).
 CI_SUPERSEDES = frozenset({"gate-check-failed", "gate-timeout"})
+# Hold next_actions a pushed head can still clear. The rest (bug-intake, close-pr, ...)
+# name conditions no agent push satisfies, so the fix loop must not burn attempts on them.
+FIXABLE_ACTIONS = frozenset({"fix-loop", "regate"})
 RUN_FAILURES = (
     ("timeout:", "agent-timeout"),
     ("harness-error:", "harness-error"),
@@ -86,6 +89,14 @@ def held_record(sha: str, evidence: list[str], at: float | None = None) -> dict:
     reason, action = held_reason(evidence)
     return {"sha": sha, "evidence": evidence[-60:], "reason": reason, "next_action": action,
             "at": time.time() if at is None else at}
+
+
+def fixable_hold(entry: dict | None, sha: str) -> bool:
+    """False when the gate's recorded hold on this exact head names a reason no push can
+    clear (e.g. `diff-too-large`): the fix loop cannot help and bug intake owns the PR."""
+    if not entry or entry.get("sha") != sha:
+        return True
+    return held_reason(entry.get("evidence") or [])[1] in FIXABLE_ACTIONS
 
 
 def failure_reason(receipt: dict, exhausted: bool) -> dict:
@@ -134,6 +145,12 @@ def relay_targets(event: str, payload: dict) -> list[tuple[int, str, str | None]
     pr = payload.get("pull_request") or {}
     head = (pr.get("head") or {}).get("sha")
     if event == "pull_request_target" and payload.get("action") == "dequeued":
+        # A hand dequeue (re-enqueue, hold), a merge or a deleted branch says nothing about the
+        # code; treating it as a failure sent the fix loop after healthy queued PRs and
+        # escalated #18873 as exhausted (2026-09-28). A missing reason keeps the old behaviour.
+        reason = str(payload.get("reason") or "").lower()
+        if any(word in reason for word in ("manual", "merged", "branch_removed", "branch removed")):
+            return []
         return [(pr["number"], "dequeued", head)]
     if event == "pull_request_review" and payload.get("action") == "submitted":
         review = payload.get("review") or {}
@@ -393,6 +410,9 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
                 and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):
             continue  # the tick's no-model sync with main goes first
+        if not fixable_hold(held.get(str(pr["number"])), pr["headRefOid"]):
+            consume(lane, pr)  # intake owns this head; the label must not keep queueing fixes
+            continue
         if not may_take(name, pr, record, order, now) or lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
         entry = held.get(str(pr["number"]), {})
@@ -428,7 +448,9 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     if queued.returncode != 0:
         lane.update_json(host.state / "requeue.json",
                          lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
-    receipt = {"schema": "jovie-lane-run/v1", "kind": "ready-green", "pr": pr["number"], "headSha": pr["headRefOid"],
+    receipt = {"schema": "jovie-lane-run/v1", "kind": "ready-green", "origin": "autonomous-lane",
+               "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+               "pr": pr["number"], "headSha": pr["headRefOid"],
                "prUrl": pr.get("url"), "verdict": "landing" if queued.returncode == 0 else "verified-not-queued",
                "endedAt": lane.now_iso()}
     ledger(host, receipt)
@@ -496,7 +518,9 @@ def sync_main(host, lane, pr: dict, now: float) -> str:
     ok = result.returncode == 0
     lane.update_json(host.state / "synced.json",
                      lambda synced: synced.update({str(pr["number"]): {"from": pr["headRefOid"], "at": now, "ok": ok}}))
-    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "sync-main", "pr": pr["number"], "headBefore": pr["headRefOid"],
+    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
+                  "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                  "pr": pr["number"], "headBefore": pr["headRefOid"],
                   "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()})
     return "synced" if ok else "sync-failed"
 

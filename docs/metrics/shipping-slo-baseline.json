@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "_comment": "Shipping SLO ratchet baseline (JOV-6783). The scheduled workflow .github/workflows/shipping-slo.yml measures rolling 7d p50/p95 metrics from the GitHub API and compares them here. >10% improvement held 3 consecutive daily snapshots → bot PR tightens the value. >20% regression (or >20% throughput drop, or flat WoW growth for flatGrowthWeeks) → one deduped slo-regression issue per metric. Seed values below derive from existing targets: .github/ci-harness/duration-ratchet.json (gate p95 900s) and scripts/lib/ci-metrics-compute.mjs (ready→merge p95 900s); they ratchet toward measured reality.",
+  "updatedAt": "2026-09-28T00:00:00Z",
+  "windowDays": 7,
+  "thresholds": {
+    "improvementFraction": 0.1,
+    "improvementHoldDays": 3,
+    "regressionFraction": 0.2,
+    "throughputDropFraction": 0.2,
+    "wowGrowthTarget": 0.08,
+    "flatGrowthWeeks": 2
+  },
+  "metrics": {
+    "ci_walltime.pull_request.p95": {
+      "value": 900,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "ci_walltime.merge_group.p95": {
+      "value": 1200,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "merge_queue.wait.p95": {
+      "value": 900,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "merge_queue.ejection_rate": {
+      "value": 0.1,
+      "unit": "ratio",
+      "direction": "lower"
+    },
+    "lead_time.devin.p95": {
+      "value": 21600,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "lead_time.codex.p95": {
+      "value": 21600,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "lead_time.other.p95": {
+      "value": 172800,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "remediation.pr_red_to_green.p95": {
+      "value": 3600,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "remediation.main_red_to_green.p95": {
+      "value": 1800,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "remediation.production_promote_hold.p95": {
+      "value": 3600,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "production_lag.merged_to_verified.p95": {
+      "value": 1800,
+      "unit": "seconds",
+      "direction": "lower"
+    },
+    "throughput.merges_per_day": {
+      "value": 20,
+      "unit": "per_day",
+      "direction": "higher"
+    },
+    "throughput.verified_per_day": {
+      "value": 15,
+      "unit": "per_day",
+      "direction": "higher"
+    }
+  },
+  "history": []
+}
