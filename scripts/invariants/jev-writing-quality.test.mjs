@@ -195,7 +195,7 @@ test('wrong ids, types, and out-of-range choices never produce findings', async 
       'p99.claim-support': answer('violation'),
       [expectedIds[0]]: { type: 'text', text: 'great!' },
       [expectedIds[1]]: answer('not-a-verdict'),
-      [expectedIds[2]]: answer('violation', 'high'),
+      [expectedIds[2]]: answer('violation', /** @type {any} */ ('high')),
       [expectedIds[3]]: answer('violation', 1.5),
     }),
     request

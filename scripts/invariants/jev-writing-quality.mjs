@@ -360,6 +360,7 @@ export function prepareWritingQualityRequest(input) {
     input.passages ?? segmentPassages(input.contract.exactCandidate);
   const { decided } = detectWritingFindings(passages, input.contract);
   const axes = unresolvedAxes(input.contract, input.contract.priorDraft);
+  /** @type {Record<string, {type?: string, instructions?: string, criteria?: Record<string, string>}>} */
   const questions = {};
   for (const passage of passages)
     for (const axis of axes) {
