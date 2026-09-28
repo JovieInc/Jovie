@@ -21,6 +21,7 @@
   "codex": {
     "label": "codex",
     "model": "codex-default",
+    "accountClass": "chatgpt-oauth",
     "reasoningEffort": "xhigh",
     "slots": 3,
     "health": ["python3", "{here}/codex_lane.py", "health"],
@@ -33,6 +34,8 @@
       "xhigh",
       "--prompt-file",
       "{prompt_file}",
+      "--receipt-file",
+      "{provider_receipt}",
       "--cwd",
       "{cwd}"
     ]

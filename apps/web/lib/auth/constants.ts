@@ -44,7 +44,7 @@ export const AUTH_SURFACE = {
   card: 'rounded-xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--linear-bg-surface-0))] shadow-none',
   fieldShell:
     'flex w-full items-center gap-3 rounded-full border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
-  fieldShellError: 'border-destructive/60',
+  fieldShellError: 'border-error/60',
   fieldInput:
     'min-w-0 flex-1 bg-transparent text-sm leading-5 text-primary-token placeholder:text-tertiary-token focus-visible:outline-none',
   pillOption:
@@ -63,7 +63,7 @@ export const AUTH_SURFACE = {
 export const AUTH_CLASSES = {
   /** Error message styling with fade-in animation */
   fieldError:
-    'text-xs font-[450] text-destructive text-left animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
+    'text-xs font-[450] text-error text-left animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
   /** Step transition animation for multi-step forms */
   stepTransition:
     'animate-in fade-in-0 slide-in-from-bottom-2 duration-cinematic ease-out',

@@ -172,6 +172,29 @@ jobs:
           public-images: true
           diagnostic-paths: true
 
+      - name: Certify route DOM invariants
+        timeout-minutes: 30
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/route-dom-certification.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: test-results/route-dom-certification
+
+      - name: Upload route DOM certification
+        if: ${{ always() && hashFiles('apps/web/test-results/route-dom-certification/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: route-dom-certification-${{ github.sha }}
+          path: apps/web/test-results/route-dom-certification/
+          if-no-files-found: error
+          retention-days: 14
+          diagnostic-paths: true
+
       - name: Capture public-profile screen proof
         timeout-minutes: 10
         run: |

@@ -170,6 +170,12 @@ describe('HeroSpotifySearch', () => {
       expect(getInput()).toHaveAttribute('role', 'combobox');
     });
 
+    it('keeps a native /start handoff in the rendered document', () => {
+      renderComponent();
+      expect(getInput().closest('form')).toHaveAttribute('action', '/start');
+      expect(getInput()).toHaveAttribute('name', 'artist_name');
+    });
+
     it('keeps the homepage search focus indicator visible', () => {
       renderComponent();
 

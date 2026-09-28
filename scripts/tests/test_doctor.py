@@ -37,6 +37,11 @@ def obs(**overrides):
     return base
 
 
+def throughput_stub(_receipts, provider_names=(), _merged=None, attribution_receipts=None):
+    return {"schema": "jovie-provider-throughput/v1", "windowHours": 24,
+            "providers": {name: {} for name in provider_names}, "landedByAttribution": {}}
+
+
 class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
@@ -71,10 +76,35 @@ class JudgeTest(unittest.TestCase):
 
     def test_spawn_exit_needs_spawned_workers_no_worktrees_and_no_recent_run(self):
         idle = {"tick": {"at": "x", "unhealthy": [], "error": None, "spawned": ["devin", "codex"]}, "worktrees": 0}
-        self.assertEqual(doctor.judge(obs(**idle, lastWorkAge=600)), {})
+        self.assertEqual(doctor.judge(obs(**idle, lastWorkAge=60)), {})
         self.assertEqual(doctor.judge(obs(**{**idle, "worktrees": 2}, lastWorkAge=None)), {})
-        self.assertIn("workers exit on claim", doctor.judge(obs(**idle, lastWorkAge=3601))["spawn-exit"])
+        self.assertIn("workers exit on claim", doctor.judge(obs(**idle, lastWorkAge=301))["spawn-exit"])
         self.assertIn("spawn-exit", doctor.judge(obs(**idle, lastWorkAge=None)))
+
+    def test_available_provider_capacity_with_compatible_work_and_no_starts_is_p0(self):
+        idle = {"tick": {"at": "x", "unhealthy": [], "error": None,
+                         "spawned": ["devin"] * 4 + ["codex"] * 3},
+                "poolByProvider": {"codex": 12, "devin": 10},
+                "capacityByProvider": {"codex": {"running": 0, "slots": 3},
+                                       "devin": {"running": 0, "slots": 4}}}
+        previous = {"providerIdleSince": {name: 1_000_000.0 - doctor.PROVIDER_IDLE_S - 1
+                                          for name in ("codex", "devin")}}
+        alerts = doctor.judge(obs(**idle), previous)
+        self.assertIn("0/3 workers", alerts["provider-idle:codex"])
+        self.assertIn("0/4 workers", alerts["provider-idle:devin"])
+        self.assertNotIn("provider-idle:devin", doctor.judge(obs(**{**idle, "capacityByProvider": {
+            **idle["capacityByProvider"], "devin": {"running": 1, "slots": 4}}}), previous))
+        self.assertNotIn("provider-idle:codex", doctor.judge(
+            obs(**idle), {"providerIdleSince": {"codex": 1_000_000.0 - doctor.PROVIDER_IDLE_S + 1}}))
+
+    def test_unhealthy_provider_is_named_without_false_idle_recovery(self):
+        observed = obs(tick={"at": "x", "unhealthy": ["devin"], "error": None,
+                             "spawned": ["devin"] * 4},
+                       poolByProvider={"devin": 12},
+                       capacityByProvider={"devin": {"running": 0, "slots": 4}})
+        alerts = doctor.judge(observed, {"providerIdleSince": {"devin": 0}})
+        self.assertIn("provider-down:devin", alerts)
+        self.assertNotIn("provider-idle:devin", alerts)
 
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
@@ -84,7 +114,7 @@ class JudgeTest(unittest.TestCase):
 
 class FakeTracker:
     def __init__(self):
-        self.opened, self.reopened, self.closed = [], [], []
+        self.opened, self.reopened, self.closed, self.contradicted = [], [], [], []
 
     def open(self, key, text):
         self.opened.append((key, text))
@@ -95,6 +125,56 @@ class FakeTracker:
 
     def close(self, issue_id):
         self.closed.append(issue_id)
+
+    def contradict_invariant(self, event):
+        self.contradicted.append(event["idempotencyKey"])
+
+
+class ConditionReceiptTest(unittest.TestCase):
+    def test_unknown_linear_and_pool_are_a_typed_degraded_condition(self):
+        observed = obs(now=1000.0, linearError="HTTPError: 429", pool=None, tickAge=2)
+        alerts = doctor.judge(observed)
+        event = doctor.condition_receipts(alerts, {}, observed, "gem")["linear-down"]
+        self.assertEqual(event["schema"], "jovie.control-plane-liveness-condition/v1")
+        self.assertEqual(event["source"]["status"], "unknown")
+        self.assertEqual(event["affectedResources"], ["linear", "pool"])
+        self.assertEqual(event["owner"], "symphony-lanes-doctor")
+        self.assertEqual(event["owningInvariant"], "JOV-6004")
+
+    def test_failed_devin_restarts_emit_one_bounded_summer_escalation_generation(self):
+        observed = obs(now=1000.0, tickAge=3,
+                       tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"] * 4},
+                       poolByProvider={"devin": 20},
+                       capacityByProvider={"devin": {"running": 0, "slots": 4}})
+        previous = {"providerIdleSince": {"devin": 699.0}}
+        alerts = doctor.judge(observed, previous)
+        events = doctor.condition_receipts(alerts, previous, observed, "gem")
+        tracker = FakeTracker()
+        state = doctor.reconcile(alerts, previous, tracker, observed["now"], events)
+        event = state["conditions"]["provider-idle:devin"]
+        self.assertEqual(event["idempotencyKey"], "gem:provider-idle:devin:1")
+        self.assertEqual(event["firstObservedAt"], doctor.epoch_iso(699.0))
+        self.assertEqual(event["recovery"], {"action": "dispatch-provider-workers", "outcome": "failed"})
+        self.assertEqual(event["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(tracker.contradicted, [event["idempotencyKey"]])
+
+        observed["now"] += 60
+        same_events = doctor.condition_receipts(alerts, state, observed, "gem")
+        state = doctor.reconcile(alerts, state, tracker, observed["now"], same_events)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["generation"], 1)
+        self.assertEqual(len(tracker.opened), 1)
+        self.assertEqual(len(tracker.contradicted), 1)
+
+        observed["now"] += 60
+        cleared = doctor.condition_receipts({}, state, observed, "gem")
+        state = doctor.reconcile({}, state, tracker, observed["now"], cleared)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["terminalOutcome"], "health-proven")
+
+        observed["now"] += 60
+        refired = doctor.condition_receipts(alerts, state, observed, "gem")
+        state = doctor.reconcile(alerts, state, tracker, observed["now"], refired)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["generation"], 2)
+        self.assertEqual(len(tracker.contradicted), 2)
 
 
 class ReconcileTest(unittest.TestCase):
@@ -140,6 +220,46 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(tracker.title("disk-low"), "Symphony doctor: disk-low (gem)")
         self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
 
+    def test_idle_codex_alert_opens_as_urgent(self):
+        captured = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}]}}]}}
+                captured.append(variables["i"])
+                return {"issueCreate": {"issue": {"id": "urgent", "identifier": "JOV-1"}}}
+
+        self.assertEqual(doctor.Tracker(FakeLinear(), "gem").open("provider-idle:codex", "idle"), "urgent")
+        self.assertEqual(captured[0]["priority"], 1)
+
+    def test_new_condition_generation_reopens_completed_liveness_owner(self):
+        class FakeLinear:
+            def __init__(self):
+                self.moves, self.comments = [], []
+
+            def gql(self, query, variables):
+                self.assert_query = (query, variables)
+                return {"issues": {"nodes": [{"id": "owner", "state": {"type": "completed"}}]}}
+
+            def move(self, issue_id, state):
+                self.moves.append((issue_id, state))
+
+            def comment(self, issue_id, text):
+                self.comments.append((issue_id, text))
+
+        linear = FakeLinear()
+        event = {"idempotencyKey": "gem:provider-idle:devin:2", "evidence": "0/4 workers",
+                 "firstObservedAt": "2026-09-28T21:00:00Z", "deadlineAt": "2026-09-28T21:10:00Z",
+                 "nextAction": "wake-summer"}
+        doctor.Tracker(linear, "gem").contradict_invariant(event)
+        self.assertEqual(linear.moves, [("owner", "Triage")])
+        self.assertIn("gem:provider-idle:devin:2", linear.comments[0][1])
+
 
 class OrphanPrTest(unittest.TestCase):
     def test_orphan_prs_from_a_fresh_sweep_raise_one_alert(self):
@@ -161,12 +281,15 @@ class StatusFeedTest(unittest.TestCase):
             held = open(state / "slots" / "devin.0.lock", "w")
             fcntl.flock(held, fcntl.LOCK_EX)
             host = type("Host", (), {"state": state})()
-            lane = type("Lane", (), {"HOST": "gem"})
-            feed = doctor.status_feed(host, lane, obs(pool=12, lastLandingAge=30), {"disk-low": "x"}, {"release": "abc1234"})
+            lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+            conditions = {"disk-low": {"schema": "jovie.control-plane-liveness-condition/v1"}}
+            feed = doctor.status_feed(host, lane, obs(pool=12, lastLandingAge=30), {"disk-low": "x"},
+                                      {"release": "abc1234"}, conditions=conditions)
             held.close()
         self.assertEqual((feed["running"], feed["idle"], feed["pool"], feed["release"]), (1, 2, 12, "abc1234"))
         self.assertEqual(feed["lanes"]["devin"], {"running": 1, "slots": 2})
         self.assertEqual(feed["alerts"], {"disk-low": "x"})
+        self.assertEqual(feed["conditions"], conditions)
         self.assertNotIn("gate", feed["lanes"])
         self.assertEqual((feed["held_by_reason"], feed["failed_by_reason"], feed["prs"], feed["orphan_prs"]),
                          ({}, {}, {}, []))
@@ -182,7 +305,8 @@ class StatusFeedTest(unittest.TestCase):
             host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
             lane = type("Lane", (), {"Linear": staticmethod(lambda env: (_ for _ in ()).throw(OSError("x"))),
                                      "load_providers": staticmethod(lambda: {}),
-                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "gem"})
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
+                                     "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
@@ -194,6 +318,20 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
         self.assertEqual(feed["failed_by_reason"], {"agent-timeout": 1, "legacy": 2})
 
+    def test_feed_tracks_available_codex_capacity_idle_while_compatible_work_waits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "slots").mkdir()
+            (state / "slots/codex.0.lock").touch()
+            host = type("Host", (), {"state": state})()
+            lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+            observed = obs(now=1000.0, poolByProvider={"codex": 5})
+            feed = doctor.status_feed(host, lane, observed, {}, {}, {"idleQualifiedSince": {"codex": 900.0}})
+        metric = feed["throughput"]["providers"]["codex"]
+        self.assertEqual(metric["idleReason"], "capacity-idle-with-qualified-work")
+        self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
+        self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
+
 
 class SloFeedTest(unittest.TestCase):
     def test_feed_passes_the_slo_block_through(self):
@@ -201,7 +339,7 @@ class SloFeedTest(unittest.TestCase):
             state = Path(tmp)
             (state / "slots").mkdir()
             host = type("Host", (), {"state": state})()
-            lane = type("Lane", (), {"HOST": "gem"})
+            lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
             slo = {"at": "2026-09-28T00:00:00Z", "throughput": {"mergesPerDay": 25}}
             feed = doctor.status_feed(host, lane, obs(slo=slo), {}, {})
             self.assertEqual(feed["slo"], slo)
@@ -266,6 +404,7 @@ class RunTest(unittest.TestCase):
             self.assertIn("linear-down", result["alerts"])
             written = json.loads((state / "doctor.json").read_text())
             self.assertEqual(set(written["alerts"]) >= {"provider-down:devin", "linear-down"}, True)
+            self.assertEqual(written["conditions"]["linear-down"]["source"]["status"], "unknown")
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
 
 

@@ -35,6 +35,12 @@ def model(**overrides) -> dict:
                 {"pid": 2, "provider": "devin", "run": None},
             ],
             "ledger24h": {"landing": 3, "failed": 1, "gate-timeout": 2}, "runs24h": 6,
+            "receipts24h": [{"runId": "lane-1", "issue": "JOV-1", "provider": "devin", "pr": 18671,
+                              "agentExit": 0, "verdict": "landing", "startedAt": "2026-09-26T19:00:00Z",
+                              "endedAt": "2026-09-26T19:30:00Z"}],
+            "attributionReceipts": [{"runId": "lane-1", "issue": "JOV-1", "provider": "devin", "pr": 18671,
+                                      "agentExit": 0, "verdict": "landing", "startedAt": "2026-09-26T19:00:00Z",
+                                      "endedAt": "2026-09-26T19:30:00Z"}],
             "lastLanding": "2026-09-26T20:30:00Z", "held": {"18712": {"sha": "a", "evidence": ["check-failed:bash scripts/hooks/pre-push-gate.sh affected"]}},
             "failures": {"JOV-1": {"count": 1, "at": 0}}, "gateTimeouts": {}, "requeue": {"18720": "h"},
             "cooldowns": {"hyperagent": 600}, "gateSeats": 2,
@@ -52,8 +58,12 @@ def model(**overrides) -> dict:
                              "issue": "JOV-6544", "draft": False, "merge": "UNSTABLE", "updatedAt": "2026-09-26T20:20:26Z"},
                             {"number": 18712, "title": "JOV-6544 fix(web): warm release detail", "lane": "devin", "issue": "JOV-6544",
                              "draft": True, "merge": "CLEAN", "updatedAt": "2026-09-26T18:29:49Z"}],
-                   "merged24h": [{"number": 18671, "title": "fix(ios): preserve chat cache timestamps", "mergedAt": "2026-09-26T20:12:00Z", "lane": "devin"},
-                                 {"number": 18759, "title": "fix(lanes): one PR per issue", "mergedAt": "2026-09-26T20:54:50Z", "lane": None}],
+                   "merged24h": [{"number": 18671, "title": "fix(ios): preserve chat cache timestamps",
+                                   "createdAt": "2026-09-26T19:00:00Z", "mergedAt": "2026-09-26T20:12:00Z",
+                                   "headRefName": "devin/jov-1-20260926t190000", "lane": "devin"},
+                                 {"number": 18759, "title": "fix(lanes): one PR per issue",
+                                  "createdAt": "2026-09-26T20:00:00Z", "mergedAt": "2026-09-26T20:54:50Z",
+                                  "headRefName": "tim/jov-1", "lane": None}],
                    "queue": {"depth": 2, "entries": [{"number": 18724, "state": "AWAITING_CHECKS", "enqueuedAt": "2026-09-26T20:20:28Z"}]},
                    "rate": {"core": 4800, "graphql": 4700, "resetAt": "2026-09-26T21:30:00+00:00"},
                    "fetchedAt": "2026-09-26T21:00:00+00:00"},
@@ -114,7 +124,9 @@ class RenderTest(unittest.TestCase):
         self.assertIn("requeue pending #18720", text)
         self.assertIn("gate-timeout 2", text)
         self.assertIn("Todo pool 99 (agent-ready 87 · devin 0 · codex 19)", text)
-        self.assertIn("lanes 1 of 2 in 24h", text)
+        self.assertIn("autonomous 1 · manual Codex app 0 · old codex/* 0 · total 2 in 24h", text)
+        self.assertIn("THROUGHPUT 24h · codex offer 0", text)
+        self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)
 
     def test_failed_sources_render_their_reason_never_a_blank(self):

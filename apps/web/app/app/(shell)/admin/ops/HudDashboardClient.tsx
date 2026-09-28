@@ -224,7 +224,7 @@ const DEPLOYMENT_STATE_LABELS: Record<HudDeploymentState, string> = {
 
 const DEPLOYMENT_STATE_DOT_CLASSNAMES: Record<HudDeploymentState, string> = {
   success: 'bg-success',
-  failure: 'bg-destructive',
+  failure: 'bg-error',
   in_progress: 'bg-info',
   unknown: 'bg-tertiary-token',
   not_configured: 'bg-tertiary-token',

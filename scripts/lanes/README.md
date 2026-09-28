@@ -25,7 +25,7 @@ The harness, not the model, owns:
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
-| Receipts (`runs/ledger.jsonl`), per-run log and prompt, Linear handoff comments | `run_issue()`, `worker()` |
+| Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
 | Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
 | Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), 2 attempts per head, then one Triage issue | `fix_candidates()`, `red_pr()`, `escalate_exhausted()` |
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
@@ -37,6 +37,7 @@ The harness, not the model, owns:
 | Disk-pressure guard on the tick and each worker spawn: under 15% free it sweeps idle DerivedData (>5h), clean idle worktrees (>12h, branches kept), `.next`/`test-results`, dead simulators and the pnpm store; under 5% the doctor pages Summer | `disk_guard.py`, `dispatch()`, `worker()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
+| Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash) hands the same worktree to the next enabled, healthy, uncooled lane, up to 2 handoffs; the receipt records `handoffs` and `finishedBy` | `run_issue()`, `next_provider()` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 
@@ -67,6 +68,17 @@ Gaps closed after the first week (no PR may sit unowned):
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
   draft idle for 48h gets `stale` (or is closed when superseded or out of attempts, its issue
   back to Todo), and a PR that went CLEAN or entered the queue starts a fresh episode.
+- Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
+  drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
+  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). An aged-out agent
+  draft is closed as abandoned — unless its body names a still-open dependency
+  ("blocked by #n", "pull/n"), in which case it holds as `hold:dependency` and is revalidated
+  every sweep: the note is never authoritative once the dependency lands or closes. A human's
+  branch is never touched.
+- Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
+  oldest first: `advancing`, `queued`, `ready`, `hold:<reason>`, `hold:dependency`,
+  `closing`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
+  7 days so the shipping cockpit always names the oldest PRs and why they are still open.
 - Invariant: every open non-draft PR is in the merge queue, carries a `lane-fix-*` label the
   lanes will still act on, or is held with a reason (a hold label, or `lane-fix-exhausted`
   after bug intake). Anything else is listed in `reconcile.json` and raised by the doctor as
@@ -110,9 +122,18 @@ disk and the HUD heartbeat, and writes `doctor.json` (the HUD's NEEDS ATTENTION 
 Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony doctor:
 <key>") so Summer routes it; when the condition clears the issue is commented and moved
 to Done; a key that fires again within six hours reopens the same issue. Keys:
-`tick-error`, `provider-down:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
+`tick-error`, `provider-down:<lane>`, `provider-idle:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
 `pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `disk-critical`,
 `github-quota`, `hud-stale`, `orphan-prs`.
+`provider-idle:<lane>` is urgent: after five continuous minutes with compatible work, a
+healthy provider, configured slots, repeated dispatch attempts, and zero workers, capacity
+is being lost. Every alert also produces a generation-deduped
+`jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
+status feed. The receipt carries its owner, affected resources, first observation, source
+freshness, ten-minute escalation deadline, recovery result, next action, and terminal
+health proof. A new generation wakes Summer once through Linear and reopens JOV-6004 when
+that invariant had been closed; unknown Linear/pool state remains degraded evidence in the
+status feed even when Linear cannot carry the escalation itself.
 
 ## Codex lane
 

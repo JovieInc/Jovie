@@ -17,7 +17,7 @@ import {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { SidebarMenuItem } from '@/components/organisms/Sidebar';
+import { SidebarMenuItem } from '@/components/organisms/sidebar';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,

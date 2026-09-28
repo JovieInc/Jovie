@@ -511,3 +511,157 @@ describe('certification admission kernel', () => {
     );
   });
 });
+
+describe('first-human design baseline routing (JOV-6947)', () => {
+  function approveWithAuthority(
+    packet: CertificationReviewPacket,
+    overrides: {
+      readonly certifierAuthority?: 'human' | 'machine';
+      readonly id?: string;
+      readonly reviewer?: string;
+      readonly existingDecisions?: readonly ReturnType<typeof approve>[];
+    } = {}
+  ) {
+    const recorded = recordFounderCertificationDecision({
+      decision: {
+        certifierAuthority: overrides.certifierAuthority,
+        decision: 'approved',
+        evidenceDigest: buildCertificationDecisionDigest(packet),
+        id: overrides.id ?? 'decision-1',
+        notes: null,
+        reviewer:
+          overrides.reviewer ??
+          (overrides.certifierAuthority === 'machine'
+            ? 'design-ci-machine-ensemble@v1'
+            : 'founder'),
+      },
+      existingDecisions: overrides.existingDecisions ?? [],
+      packet,
+    });
+    expect(recorded.ok).toBe(true);
+    if (!recorded.ok) throw new Error('expected approval to record');
+    return recorded.decision;
+  }
+  const fullOperationalEvidence = {
+    ci: [receipt('ci', 'ci-green')],
+    deploy: [receipt('deploy', 'deploy-green')],
+    queueMerge: [receipt('queue_merge', 'merged')],
+    runtimeDogfood: [receipt('runtime_dogfood', 'dogfood-green')],
+  };
+
+  it('reports never_human_certified for a blocked or awaiting-review subject', () => {
+    const blocked = evaluateCertificationAdmission({
+      packet: reviewPacket({ canonicalReferences: [] }),
+    });
+    expect(blocked.state).toBe('working');
+    expect(blocked.baselineStatus).toBe('never_human_certified');
+    expect(blocked.founderBaseline).toBeNull();
+
+    const awaitingReview = evaluateCertificationAdmission({
+      packet: reviewPacket(),
+    });
+    expect(awaitingReview.state).toBe('review_ready');
+    expect(awaitingReview.baselineStatus).toBe('never_human_certified');
+    expect(awaitingReview.founderBaseline).toBeNull();
+  });
+
+  it('lets a never-certified subject ship on machine authority alone, without ever calling it human-certified', () => {
+    const packet = reviewPacket({ operational: fullOperationalEvidence });
+    const machineApproval = approveWithAuthority(packet, {
+      certifierAuthority: 'machine',
+    });
+    const admission = evaluateCertificationAdmission({
+      decisions: [machineApproval],
+      packet,
+    });
+    expect(admission.state).toBe('monitored');
+    expect(admission.baselineStatus).toBe('machine_certified_live');
+    expect(admission.founderBaseline).toBeNull();
+  });
+
+  it('establishes the protected baseline on the first human approval', () => {
+    const packet = reviewPacket();
+    const founderApproval = approveWithAuthority(packet);
+    const admission = evaluateCertificationAdmission({
+      decisions: [founderApproval],
+      packet,
+    });
+    expect(admission.baselineStatus).toBe('human_certified_baseline');
+    expect(admission.founderBaseline).toEqual(founderApproval);
+  });
+
+  it('treats new evidence against an established baseline as a candidate pending recertification, not a fresh unblocked start', () => {
+    const packet = reviewPacket();
+    const founderApproval = approveWithAuthority(packet);
+    const changedPacket = reviewPacket({
+      canonicalReferences: [
+        {
+          ...receipt('canonical_references', 'design-canon-reference'),
+          digest:
+            'sha256:changed00000000000000000000000000000000000000000000000000',
+        },
+      ],
+    });
+    const admission = evaluateCertificationAdmission({
+      decisions: [founderApproval],
+      packet: changedPacket,
+    });
+    expect(admission.state).toBe('review_ready');
+    expect(admission.baselineStatus).toBe('candidate_pending_recertification');
+    expect(admission.founderBaseline).toEqual(founderApproval);
+  });
+
+  it('lets a founder replace an existing baseline with a fresh approval', () => {
+    const packet = reviewPacket();
+    const originalApproval = approveWithAuthority(packet);
+    const changedPacket = reviewPacket({
+      canonicalReferences: [
+        {
+          ...receipt('canonical_references', 'design-canon-reference'),
+          digest:
+            'sha256:changed00000000000000000000000000000000000000000000000000',
+        },
+      ],
+    });
+    const replacementApproval = approveWithAuthority(changedPacket, {
+      existingDecisions: [originalApproval],
+      id: 'decision-2',
+    });
+    const admission = evaluateCertificationAdmission({
+      decisions: [originalApproval, replacementApproval],
+      packet: changedPacket,
+    });
+    expect(admission.baselineStatus).toBe('human_certified_baseline');
+    expect(admission.founderBaseline).toEqual(replacementApproval);
+  });
+
+  it('does not let a machine approval reinterpret an established human baseline as machine-certified', () => {
+    const packet = reviewPacket();
+    const founderApproval = approveWithAuthority(packet);
+    const changedPacket = reviewPacket({
+      operational: fullOperationalEvidence,
+      canonicalReferences: [
+        {
+          ...receipt('canonical_references', 'design-canon-reference'),
+          digest:
+            'sha256:changed00000000000000000000000000000000000000000000000000',
+        },
+      ],
+    });
+    const machineApproval = approveWithAuthority(changedPacket, {
+      certifierAuthority: 'machine',
+      existingDecisions: [founderApproval],
+      id: 'decision-2',
+    });
+    const admission = evaluateCertificationAdmission({
+      decisions: [founderApproval, machineApproval],
+      packet: changedPacket,
+    });
+    // The machine decision still moves shipping forward under existing rules...
+    expect(admission.state).toBe('monitored');
+    // ...but the registry keeps the founder's prior baseline as protected,
+    // and never relabels this machine pass as the human baseline.
+    expect(admission.baselineStatus).toBe('candidate_pending_recertification');
+    expect(admission.founderBaseline).toEqual(founderApproval);
+  });
+});
