@@ -1,0 +1,75 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: No existing controller turns post-mortems, escaped defects, invariant evidence, route budgets, and test coverage into deduped test/guardrail/invariant proposals; this files capped Linear Backlog issues only and writes no code, branches, or deploys.
+# removal-trigger: Remove when Summer's improvement loop runs scripts/quality-gap-finder.mjs natively on the same evidence and caps.
+name: Quality Gap Finder
+
+# clock-class: skip-if-unchanged
+# Daily, and when a post-mortem or the invariant registry lands on main:
+# propose missing tests, guardrails, and invariants from repo and Linear
+# evidence. High confidence -> Linear Backlog `quality-gap` (+ `agent-ready`
+# when mechanical). Low confidence -> `quality-gap:needs-tim`, which Summer
+# turns into Ovie inbox cards (max 3/day). See docs/quality/QUALITY_GAP_FINDER.md.
+# Bug-intake and dogfood events trigger it through repository_dispatch.
+
+on:
+  schedule:
+    - cron: '41 14 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/postmortems/**'
+      - 'canon/invariants.jsonl'
+  repository_dispatch:
+    types: [quality-gap-scan]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report only, do not file Linear issues
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: quality-gap-finder
+  cancel-in-progress: false
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Find and file quality gaps
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = 'true' ]; then
+            node scripts/quality-gap-finder.mjs --out quality-gaps.json > /dev/null
+          else
+            node scripts/quality-gap-finder.mjs --file --out quality-gaps.json > /dev/null
+          fi
+
+      - name: Upload report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: quality-gaps-${{ github.run_id }}
+          path: quality-gaps.json
+          retention-days: 14
+          if-no-files-found: ignore
