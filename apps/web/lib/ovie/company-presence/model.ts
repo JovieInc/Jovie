@@ -3,7 +3,6 @@ import type {
   ConnectionStatus,
   PresenceSignal,
 } from '@/lib/profile-surfaces/workspace';
-
 /** Jovie's pages use creator Presence primitives; unwired checks never render as zero. */
 
 export type CompanyPageKind =
@@ -12,17 +11,14 @@ export type CompanyPageKind =
   | 'profile'
   | 'legal'
   | 'machine';
-
 export const COMPANY_PRESENCE_CHECK_IDS = [
   'indexed',
   'seo_certification',
   'copy_gate',
   'lighthouse',
 ] as const;
-
 export type CompanyPresenceCheckId =
   (typeof COMPANY_PRESENCE_CHECK_IDS)[number];
-
 export const COMPANY_PRESENCE_CHECK_LABELS: Readonly<
   Record<CompanyPresenceCheckId, string>
 > = {
@@ -31,9 +27,7 @@ export const COMPANY_PRESENCE_CHECK_LABELS: Readonly<
   copy_gate: 'Copy Gate',
   lighthouse: 'Lighthouse',
 };
-
 export type CompanyPresenceCheckOutcome = 'pass' | 'warn' | 'fail';
-
 export type CompanyPresenceCheck =
   | {
       readonly state: 'unconfigured';
@@ -46,7 +40,6 @@ export type CompanyPresenceCheck =
       readonly summary: string;
       readonly checkedAt: string;
     };
-
 export interface CompanyPresencePage {
   readonly id: string;
   /** Site-relative path, e.g. `/pricing`. */

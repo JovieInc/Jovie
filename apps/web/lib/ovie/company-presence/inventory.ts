@@ -13,7 +13,6 @@ import {
   type CompanyPresencePage,
   type CompanyPresenceSourceStatus,
 } from './model';
-
 /** Declared reads stay unconfigured until a per-path source is wired. */
 export const COMPANY_PRESENCE_SOURCES: readonly CompanyPresenceSourceStatus[] =
   [
@@ -46,12 +45,10 @@ export const COMPANY_PRESENCE_SOURCES: readonly CompanyPresenceSourceStatus[] =
         'Lighthouse runs in CI. Per-page scores are not stored for Ovie yet.',
     },
   ];
-
 export interface OwnedProfileRef {
   readonly username: string;
   readonly displayName: string | null;
 }
-
 function unconfiguredChecks(
   sources: readonly CompanyPresenceSourceStatus[]
 ): Record<CompanyPresenceCheckId, CompanyPresenceCheck> {
