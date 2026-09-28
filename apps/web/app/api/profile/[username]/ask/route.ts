@@ -92,28 +92,19 @@ async function persistInquiry(
   }
 }
 
+const TOO_MANY = {
+  success: false,
+  error: 'Too many requests. Please wait and try again.',
+} as const;
+
 export async function POST(request: NextRequest, context: RouteContext) {
   const clientIp = getClientIP(request);
-  const rateLimitResult = await generalLimiter.limit(clientIp);
-  if (!rateLimitResult.success) {
-    return json(
-      {
-        success: false,
-        error: 'Too many requests. Please wait and try again.',
-      },
-      429
-    );
-  }
-
-  const askLimit = await askLimiter.limit(clientIp);
-  if (!askLimit.success) {
-    return json(
-      {
-        success: false,
-        error: 'Too many requests. Please wait and try again.',
-      },
-      429
-    );
+  const [general, askLimit] = await Promise.all([
+    generalLimiter.limit(clientIp),
+    askLimiter.limit(clientIp),
+  ]);
+  if (!general.success || !askLimit.success) {
+    return json(TOO_MANY, 429);
   }
 
   const { username: rawUsername } = await context.params;

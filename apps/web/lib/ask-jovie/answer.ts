@@ -43,38 +43,32 @@ export type AskJovieAnswer =
   | { readonly kind: 'answer'; readonly text: string }
   | { readonly kind: 'unknown' };
 
-const DSP_PLATFORMS = new Set([
-  'spotify',
-  'apple_music',
-  'apple music',
-  'youtube',
-  'youtube_music',
-  'soundcloud',
-  'bandcamp',
-  'tidal',
-  'amazon_music',
-  'amazon music',
-  'deezer',
-  'pandora',
-]);
+const DSP_PLATFORMS = new Set(
+  'spotify|apple_music|apple music|youtube|youtube_music|soundcloud|bandcamp|tidal|amazon_music|amazon music|deezer|pandora'.split(
+    '|'
+  )
+);
 
-function normalize(value: string): string {
-  return value.toLowerCase().trim();
-}
+const normalize = (value: string) => value.toLowerCase().trim();
 
-function isDspLink(link: AskJovieLink): boolean {
-  return DSP_PLATFORMS.has(normalize(link.platform));
-}
+const isDspLink = (link: AskJovieLink) =>
+  DSP_PLATFORMS.has(normalize(link.platform));
+
+const DSP_DISPLAY_NAMES: Record<string, string> = {
+  'apple music': 'Apple Music',
+  'youtube music': 'YouTube Music',
+  'amazon music': 'Amazon Music',
+};
 
 function platformLabel(platform: string): string {
   const key = normalize(platform).replaceAll(/[_-]/g, ' ');
-  if (key === 'apple music') return 'Apple Music';
-  if (key === 'youtube music') return 'YouTube Music';
-  if (key === 'amazon music') return 'Amazon Music';
-  return key
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return (
+    DSP_DISPLAY_NAMES[key] ??
+    key
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  );
 }
 
 function formatShowDate(isoDate: string): string {
@@ -213,18 +207,17 @@ function answerTourDates(
     return { kind: 'answer', text: `Yes — ${list}${extra}.` };
   }
 
+  const list = shows.slice(0, 3).map(describeTourDate).join('; ');
   const nearIntent = /\b(near|in|at|la|los angeles|nyc|london|around)\b/.test(
     q
   );
   if (nearIntent && /in|near|at|around/.test(q)) {
-    const list = shows.slice(0, 3).map(describeTourDate).join('; ');
     return {
       kind: 'answer',
       text: `Nothing listed there right now. Upcoming shows: ${list}.`,
     };
   }
 
-  const list = shows.slice(0, 3).map(describeTourDate).join('; ');
   const extra = shows.length > 3 ? ` — plus ${shows.length - 3} more` : '';
   return {
     kind: 'answer',

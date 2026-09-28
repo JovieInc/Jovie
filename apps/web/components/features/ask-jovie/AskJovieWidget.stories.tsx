@@ -6,11 +6,8 @@ const meta = {
   component: AskJovieWidget,
   parameters: {
     layout: 'fullscreen',
-    // `disabled` only exists on internal buttons while a request is pending —
-    // not a public prop of the widget.
-    jovie: {
-      uncoveredProps: ['disabled'],
-    },
+    // `disabled` exists only on internal pending buttons, not a public prop.
+    jovie: { uncoveredProps: ['disabled'] },
   },
   args: {
     username: 'timwhite',

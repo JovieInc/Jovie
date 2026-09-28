@@ -2,16 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AskJovieWidget } from './AskJovieWidget';
 
-vi.mock('@/lib/analytics', () => ({
-  track: vi.fn(),
-}));
+vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 
 // jsdom does not implement Element.scrollTo.
 window.HTMLElement.prototype.scrollTo = vi.fn();
 
+const WIDGET = <AskJovieWidget username='test' artistName='Test Artist' />;
+
 function mockFetch(
   impl: (body: Record<string, unknown>) => Promise<Record<string, unknown>>
-): ReturnType<typeof vi.fn> {
+) {
   const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
     impl(JSON.parse(String(init?.body ?? '{}'))).then(payload => ({
       ok: true,
@@ -22,11 +22,10 @@ function mockFetch(
   return fetchMock;
 }
 
-function openWidget() {
+const openWidget = () =>
   fireEvent.click(
     screen.getByRole('button', { name: 'Ask Jovie about Test Artist' })
   );
-}
 
 describe('AskJovieWidget', () => {
   afterEach(() => {
@@ -34,8 +33,7 @@ describe('AskJovieWidget', () => {
   });
 
   it('opens the dialog with a greeting and suggested questions', () => {
-    render(<AskJovieWidget username='test' artistName='Test Artist' />);
-
+    render(WIDGET);
     openWidget();
 
     expect(
@@ -60,9 +58,8 @@ describe('AskJovieWidget', () => {
           : {}
       )
     );
-    render(<AskJovieWidget username='test' artistName='Test Artist' />);
+    render(WIDGET);
     openWidget();
-
     fireEvent.click(
       screen.getByRole('button', { name: 'What song should I start with?' })
     );
@@ -84,7 +81,7 @@ describe('AskJovieWidget', () => {
             : {}
       )
     );
-    render(<AskJovieWidget username='test' artistName='Test Artist' />);
+    render(WIDGET);
     openWidget();
 
     const input = screen.getByPlaceholderText('Ask about Test Artist…');
@@ -106,7 +103,7 @@ describe('AskJovieWidget', () => {
       screen.getByPlaceholderText('Email (optional, for a reply)'),
       { target: { value: 'pat@example.com' } }
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send Message' }));
 
     expect(
       await screen.findByText(/Done — I sent that to Test Artist/)
@@ -117,7 +114,7 @@ describe('AskJovieWidget', () => {
     const fetchMock = mockFetch(body =>
       Promise.resolve(body.action === 'intent' ? { success: true } : {})
     );
-    render(<AskJovieWidget username='test' artistName='Test Artist' />);
+    render(WIDGET);
     openWidget();
 
     fireEvent.click(screen.getByRole('button', { name: 'Local Show Alerts' }));
@@ -127,17 +124,16 @@ describe('AskJovieWidget', () => {
     fireEvent.change(screen.getByPlaceholderText('Your city'), {
       target: { value: 'Portland' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Notify me' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Notify Me' }));
 
     expect(
       await screen.findByText(/I'll let you know when Test Artist plays/)
     ).toBeTruthy();
 
     await waitFor(() => {
-      const calls = fetchMock.mock.calls.map(c =>
-        JSON.parse(String(c[1]?.body))
-      );
-      const intentCall = calls.find(b => b.action === 'intent');
+      const intentCall = fetchMock.mock.calls
+        .map(c => JSON.parse(String(c[1]?.body)))
+        .find(b => b.action === 'intent');
       expect(intentCall).toMatchObject({
         intent: 'local_show_alerts',
         email: 'fan@example.com',
@@ -147,11 +143,9 @@ describe('AskJovieWidget', () => {
   });
 
   it('closes via the header button', () => {
-    render(<AskJovieWidget username='test' artistName='Test Artist' />);
+    render(WIDGET);
     openWidget();
-
     fireEvent.click(screen.getByRole('button', { name: 'Close Ask Jovie' }));
-
     expect(
       screen.queryByRole('dialog', { name: 'Ask Jovie about Test Artist' })
     ).toBeNull();

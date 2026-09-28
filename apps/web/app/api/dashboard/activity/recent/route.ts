@@ -399,9 +399,7 @@ export async function GET(request: NextRequest) {
         });
 
       const inquiryActivities: ActivityRow[] = inquiryRows.map(row => {
-        const who = row.visitorName?.trim()
-          ? row.visitorName.trim()
-          : 'Someone';
+        const who = row.visitorName?.trim() || 'Someone';
         const snippet =
           row.message.length > 80
             ? `${row.message.slice(0, 80)}…`

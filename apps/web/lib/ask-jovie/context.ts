@@ -44,8 +44,7 @@ export async function loadAskJovieContext(
       })),
       latestRelease: result.latestRelease
         ? {
-            title: result.latestRelease.title,
-            releaseType: result.latestRelease.releaseType,
+            ...result.latestRelease,
             releaseDate:
               result.latestRelease.releaseDate?.toISOString() ?? null,
           }

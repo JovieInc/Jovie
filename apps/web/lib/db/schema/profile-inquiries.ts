@@ -10,19 +10,8 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { creatorProfiles } from './profiles';
 
 /**
- * Profile inquiries — structured messages and intents captured by the public
- * "Ask Jovie" surface on a creator's profile.
- *
- * Two record shapes share this table:
- * - `kind = 'message'`: a visitor-directed message (fan mail, booking, press,
- *   collaboration, business, other) that Jovie could not answer from grounded
- *   public data, or that the visitor explicitly addressed to the owner.
- * - `kind = 'intent'`: an audience-capture record pairing a contact channel
- *   with a structured intent (e.g. `new_release_alerts`, `local_show_alerts`)
- *   rather than a generic subscriber record.
- * - `kind = 'question'`: a question Jovie could not answer from grounded
- *   data. Persisted so the owner sees demand signals ("what people ask
- *   about") even when the visitor declines to leave contact info.
+ * Profile inquiries — visitor messages, intents, and unanswered questions
+ * captured by the public "Ask Jovie" surface on a creator's profile.
  */
 export const profileInquiries = pgTable(
   'profile_inquiries',
@@ -35,12 +24,7 @@ export const profileInquiries = pgTable(
     kind: text('kind', { enum: ['message', 'intent', 'question'] })
       .notNull()
       .default('message'),
-    /**
-     * Coarse routing category. For messages: fan_mail, booking, press,
-     * collaboration, business, support, other. For intents: the intent id
-     * (new_release_alerts, local_show_alerts, general_updates,
-     * ticket_sale_alerts).
-     */
+    /** Message category (fan_mail, booking, …) or intent id for intents. */
     category: text('category').notNull().default('other'),
     /** Free-text question or message body from the visitor. */
     message: text('message').notNull(),

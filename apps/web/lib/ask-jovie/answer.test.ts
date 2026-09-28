@@ -8,11 +8,7 @@ const ctx: AskJovieProfileContext = {
   location: 'Los Angeles',
   genres: ['indie pop', 'dream pop'],
   releases: [
-    {
-      title: 'Glasshouse',
-      releaseType: 'album',
-      releaseDate: '2026-03-01',
-    },
+    { title: 'Glasshouse', releaseType: 'album', releaseDate: '2026-03-01' },
     { title: 'Waves', releaseType: 'single', releaseDate: '2025-11-10' },
   ],
   tourDates: [
@@ -38,70 +34,51 @@ const ctx: AskJovieProfileContext = {
   ],
 };
 
+const answer = (q: string, c = ctx) => {
+  const r = answerProfileQuestion(q, c);
+  return r.kind === 'answer' ? r.text : null;
+};
+
 describe('answerProfileQuestion', () => {
   it('answers "tell me about this artist" from grounded bio data', () => {
-    const result = answerProfileQuestion('Tell me about this artist', ctx);
-    expect(result.kind).toBe('answer');
-    if (result.kind === 'answer') {
-      expect(result.text).toContain('Luna Vale');
-      expect(result.text).toContain('Indie pop artist');
-      expect(result.text).toContain('Los Angeles');
-    }
+    const text = answer('Tell me about this artist');
+    expect(text).toContain('Luna Vale');
+    expect(text).toContain('Indie pop artist');
+    expect(text).toContain('Los Angeles');
   });
 
   it('recommends the most recent release as a starting point', () => {
-    const result = answerProfileQuestion('What song should I start with?', ctx);
-    expect(result).toEqual({
-      kind: 'answer',
-      text: expect.stringContaining('Glasshouse'),
-    });
+    expect(answer('What song should I start with?')).toContain('Glasshouse');
   });
 
   it('answers a city-scoped tour question with matching shows only', () => {
-    const result = answerProfileQuestion(
-      'When are they playing in Los Angeles?',
-      ctx
-    );
-    expect(result.kind).toBe('answer');
-    if (result.kind === 'answer') {
-      expect(result.text).toContain('The Wiltern');
-      expect(result.text).toContain('Los Angeles');
-      expect(result.text).not.toContain('Brooklyn Steel');
-    }
+    const text = answer('When are they playing in Los Angeles?');
+    expect(text).toContain('The Wiltern');
+    expect(text).toContain('Los Angeles');
+    expect(text).not.toContain('Brooklyn Steel');
   });
 
   it('lists upcoming shows when the requested city has none', () => {
-    const result = answerProfileQuestion('Are they playing in Chicago?', ctx);
-    expect(result.kind).toBe('answer');
-    if (result.kind === 'answer') {
-      expect(result.text).toContain('Nothing listed there');
-      expect(result.text).toContain('The Wiltern');
-    }
+    const text = answer('Are they playing in Chicago?');
+    expect(text).toContain('Nothing listed there');
+    expect(text).toContain('The Wiltern');
   });
 
   it('answers "where can I listen" with DSP links only', () => {
-    const result = answerProfileQuestion('Where can I listen?', ctx);
-    expect(result.kind).toBe('answer');
-    if (result.kind === 'answer') {
-      expect(result.text).toContain('Spotify');
-      expect(result.text).toContain('Apple Music');
-      expect(result.text).not.toContain('Instagram');
-    }
+    const text = answer('Where can I listen?');
+    expect(text).toContain('Spotify');
+    expect(text).toContain('Apple Music');
+    expect(text).not.toContain('Instagram');
   });
 
   it('answers questions about a named release', () => {
-    const result = answerProfileQuestion('Tell me about Waves', ctx);
-    expect(result.kind).toBe('answer');
-    if (result.kind === 'answer') {
-      expect(result.text).toContain('"Waves"');
-      expect(result.text).toContain('Luna Vale');
-    }
+    const text = answer('Tell me about Waves');
+    expect(text).toContain('"Waves"');
+    expect(text).toContain('Luna Vale');
   });
 
   it('returns unknown for questions the data cannot answer', () => {
-    expect(answerProfileQuestion('What is their favorite pizza?', ctx)).toEqual(
-      { kind: 'unknown' }
-    );
+    expect(answer('What is their favorite pizza?')).toBeNull();
   });
 
   it('never fabricates releases or shows when none exist', () => {
@@ -112,13 +89,9 @@ describe('answerProfileQuestion', () => {
       tourDates: [],
       links: [],
     };
-    expect(answerProfileQuestion('What should I start with?', empty)).toEqual({
-      kind: 'unknown',
-    });
-    const tour = answerProfileQuestion('Any upcoming shows?', empty);
-    expect(tour.kind).toBe('answer');
-    if (tour.kind === 'answer') {
-      expect(tour.text).toContain("doesn't have any upcoming shows");
-    }
+    expect(answer('What should I start with?', empty)).toBeNull();
+    expect(answer('Any upcoming shows?', empty)).toContain(
+      "doesn't have any upcoming shows"
+    );
   });
 });

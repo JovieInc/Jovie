@@ -2737,9 +2737,6 @@ body {
 
 /* Ask Jovie public-profile affordance: icon does one 360° spin on hover. */
 @keyframes ask-jovie-spin {
-  from {
-    transform: rotate(0deg);
-  }
   to {
     transform: rotate(360deg);
   }
