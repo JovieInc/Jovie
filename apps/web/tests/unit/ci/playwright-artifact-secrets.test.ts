@@ -104,7 +104,7 @@ const protectedJobs: Record<string, string[]> = {
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
   'canary-health-gate.yml': 1,
-  'ci.yml': 17,
+  'ci.yml': 16,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
