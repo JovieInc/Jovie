@@ -22,17 +22,17 @@ type DbTransaction = Parameters<Parameters<typeof withDbSessionTx>[0]>[0];
  */
 export async function ensureEmailAvailable(
   tx: DbTransaction,
-  clerkUserId: string,
+  appUserId: string,
   userEmail: string
 ): Promise<void> {
   try {
     const [emailOwner] = await tx
-      .select({ clerkId: users.clerkId })
+      .select({ id: users.id })
       .from(users)
       .where(eq(users.email, userEmail))
       .limit(1);
 
-    if (emailOwner && emailOwner.clerkId !== clerkUserId) {
+    if (emailOwner && emailOwner.id !== appUserId) {
       throw onboardingErrorToError(
         createOnboardingError(
           OnboardingErrorCode.EMAIL_IN_USE,

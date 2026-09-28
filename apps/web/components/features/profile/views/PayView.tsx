@@ -1,80 +1,96 @@
 'use client';
 
-import { useCallback } from 'react';
-import { toast } from '@/components/feedback';
-import { PaySelector } from '@/components/molecules/PaySelector';
-import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
-import { track } from '@/lib/analytics';
+import { useCallback, useEffect, useState } from 'react';
+import { PaySection } from '@/components/organisms/PaySection';
 
 export interface PayViewProps {
+  readonly profileId?: string;
   readonly artistHandle: string;
   readonly venmoLink: string;
   readonly venmoUsername?: string | null;
   readonly amounts?: readonly number[];
 }
 
-/**
- * Body of the `pay` mode: amount picker that hands off to Venmo.
- *
- * Pure view component — no title or shell. The enclosing wrapper
- * (`ProfileDrawerShell`, or a routed page in plan PR 3a) owns chrome.
- */
+/** The public Pay view shares the fixed-action dial with music Smart Links. */
 export function PayView({
+  profileId,
   artistHandle,
   venmoLink,
   venmoUsername,
   amounts = [5, 10, 20],
 }: PayViewProps) {
-  const handleAmountSelected = useCallback(
-    (amount: number) => {
-      if (!isAllowedVenmoUrl(venmoLink)) {
-        track('tip_handoff_failed', {
-          reason: 'invalid_venmo_url',
+  const [capability, setCapability] = useState<{
+    key: string;
+    profileId: string;
+  } | null>(null);
+  const lookupKey = profileId
+    ? `profileId=${encodeURIComponent(profileId)}`
+    : `handle=${encodeURIComponent(artistHandle)}`;
+  const checkoutProfileId =
+    capability?.key === lookupKey ? capability.profileId : null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadCapability = async () => {
+      try {
+        const response = await fetch(`/api/tips/create-checkout?${lookupKey}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const result = await response.json();
+        if (!controller.signal.aborted) {
+          const eligibleId =
+            profileId ||
+            (typeof result.profileId === 'string' ? result.profileId : null);
+          setCapability(
+            response.ok && result.available === true && eligibleId
+              ? { key: lookupKey, profileId: eligibleId }
+              : null
+          );
+        }
+      } catch {
+        if (!controller.signal.aborted) setCapability(null);
+      }
+    };
+    void loadCapability();
+    return () => controller.abort();
+  }, [lookupKey, profileId]);
+
+  const startStripeCheckout = useCallback(
+    async (amount: number) => {
+      if (!checkoutProfileId) throw new Error('Checkout unavailable');
+      const response = await fetch('/api/tips/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: checkoutProfileId,
           handle: artistHandle,
-          venmoLink,
-        });
-        toast.error('Unable to open Venmo. The payment link is not valid.');
-        return;
+          amountCents: Math.round(amount * 100),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || typeof result.url !== 'string') {
+        throw new Error('Unable to start checkout');
       }
-
-      const sep = venmoLink.includes('?') ? '&' : '?';
-      const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(
-        venmoUsername ?? ''
-      )}`;
-
-      // @ts-expect-error - joviePixel is set by JoviePixel component
-      if (globalThis.joviePixel?.track) {
-        // @ts-expect-error - joviePixel is set by JoviePixel component
-        globalThis.joviePixel.track('tip_intent', {
-          tipAmount: amount,
-          tipMethod: 'venmo',
-        });
+      const destination = new URL(result.url);
+      if (
+        destination.protocol !== 'https:' ||
+        destination.hostname !== 'checkout.stripe.com'
+      ) {
+        throw new Error('Checkout returned an invalid destination');
       }
-
-      const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        track('tip_handoff_failed', {
-          reason: 'popup_blocked',
-          handle: artistHandle,
-          amount,
-        });
-        toast.error(
-          'Venmo could not be opened. Please allow pop-ups and try again.'
-        );
-      }
+      globalThis.location.assign(destination.toString());
     },
-    [venmoLink, venmoUsername, artistHandle]
+    [artistHandle, checkoutProfileId]
   );
 
   return (
-    <PaySelector
+    <PaySection
+      handle={artistHandle}
       amounts={[...amounts]}
-      onContinue={handleAmountSelected}
-      presentation='drawer'
-      primaryLabel='Continue with Venmo'
-      paymentLabel='Venmo'
-      showOtherPaymentOptions={false}
-      screenReaderDescription={`Send support to ${artistHandle} with Venmo.`}
+      venmoLink={venmoLink}
+      venmoUsername={venmoUsername}
+      onStripePayment={checkoutProfileId ? startStripeCheckout : undefined}
     />
   );
 }

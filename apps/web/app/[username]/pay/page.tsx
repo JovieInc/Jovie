@@ -31,6 +31,7 @@ export default async function PayPage({ params }: ProfileIntentRouteProps) {
       artistHandle={artist.handle}
     >
       <PayView
+        profileId={artist.id}
         artistHandle={artist.handle}
         venmoLink={venmoLink}
         venmoUsername={extractVenmoUsername(venmoLink)}
