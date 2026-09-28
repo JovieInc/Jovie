@@ -131,6 +131,7 @@ describe('rankOpsBottlenecks', () => {
         count: 100,
         conversionRate: null,
         dropOff: null,
+        drillDownHref: '/app/ov/people?stage=onboarding_chats',
       },
       {
         key: 'accounts_created',
@@ -139,6 +140,7 @@ describe('rankOpsBottlenecks', () => {
         count: 40,
         conversionRate: 0.4,
         dropOff: 60,
+        drillDownHref: '/app/ov/people?stage=accounts_created',
       },
     ],
   };
