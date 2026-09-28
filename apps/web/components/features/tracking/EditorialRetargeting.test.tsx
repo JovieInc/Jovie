@@ -51,10 +51,10 @@ vi.mock('@/lib/tracking/consent', async importOriginal => {
   };
 });
 
-let EditorialRetargeting: typeof import('@/features/tracking/EditorialRetargeting').EditorialRetargeting;
+let EditorialRetargeting: typeof import('./EditorialRetargeting').EditorialRetargeting;
 
 beforeAll(async () => {
-  const mod = await import('@/features/tracking/EditorialRetargeting');
+  const mod = await import('./EditorialRetargeting');
   EditorialRetargeting = mod.EditorialRetargeting;
 });
 
