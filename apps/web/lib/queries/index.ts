@@ -506,6 +506,7 @@ export {
 // Release queries and mutations
 export { useReleasesQuery } from './useReleasesQuery';
 export {
+  prefetchReleaseTracks,
   type ReleaseTrack,
   useReleaseTracksQuery,
 } from './useReleaseTracksQuery';

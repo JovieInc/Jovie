@@ -1,0 +1,81 @@
+.root {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 48rem;
+  padding: 4rem 1.5rem 6rem;
+}
+
+.back {
+  color: hsl(var(--nextra-primary-hue) 60% 48%);
+  font-size: 0.875rem;
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.back:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.back:focus-visible,
+.list a:focus-visible {
+  outline: 2px solid hsl(var(--nextra-primary-hue) 85% 50%);
+  outline-offset: 3px;
+}
+
+.root h1 {
+  margin: 1.5rem 0 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+}
+
+.description {
+  margin-top: 1rem;
+  color: rgb(113 113 122);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.list {
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li,
+.empty {
+  padding: 1.25rem 0;
+  border-top: 1px solid rgb(127 127 127 / 0.18);
+}
+
+.list a,
+.empty h2 {
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.list p,
+.empty p {
+  margin: 0.45rem 0 0;
+  color: rgb(113 113 122);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .description,
+  .list p,
+  .empty p {
+    color: rgb(161 161 170);
+  }
+}
+
+@media (max-width: 40rem) {
+  .root {
+    padding: 3rem 1rem 4rem;
+  }
+}

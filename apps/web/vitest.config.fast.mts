@@ -154,7 +154,7 @@ export default defineConfig({
     // Listed DOM-free files run in `node`; everything else keeps jsdom.
     projects: environmentProjects,
 
-    // CI `--shard=n/10` balances files by measured cost
+    // CI `--shard=n/14` balances files by measured cost
     // (tests/unit-shard-durations.json) instead of equal file counts, so no
     // single shard collects the heavy files and gates the matrix. Unsharded
     // runs keep Vitest's default ordering.

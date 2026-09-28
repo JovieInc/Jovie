@@ -33,6 +33,34 @@ const INVENTORY = rankLaunchers({
 });
 
 describe('OvieLauncherRail', () => {
+  it('explains the admin step-up lock instead of a generic failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 403, json: async () => ({}) })
+    );
+    render(<OvieLauncherRail />);
+    expect(
+      await screen.findByText(
+        'Admin data is locked. Unlock with Touch ID, then retry.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the generic failure for real outages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+    );
+    render(<OvieLauncherRail />);
+    expect(
+      await screen.findByText('Launcher destinations could not be loaded.')
+    ).toBeInTheDocument();
+  });
+
   it('separates local/SSH from web, disables unavailable, and hides agent CLI', async () => {
     vi.stubGlobal(
       'fetch',

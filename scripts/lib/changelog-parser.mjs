@@ -105,6 +105,12 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
       continue;
     }
 
+    // Any other H3 (e.g. `### Dogfood`) ends the current section so its
+    // bullets never leak into the previous customer section.
+    if (line.startsWith('### ')) {
+      currentSection = null;
+    }
+
     // Collect raw content
     target.raw += line + '\n';
 

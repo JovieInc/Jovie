@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -89,6 +89,34 @@ describe('public CTA guard', () => {
     );
     // Native text containment and real 44px hit ownership remain browser checks
     // in homepage.spec.ts; JSDOM cannot certify rendered dimensions.
+  });
+
+  it('adds no competing CTA through the compact Customers flyout', () => {
+    render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        authMode: 'public-static',
+        presentation: 'marketing-glass',
+        publicCta: { href: '/signup', label: 'Request access' },
+        flyoutMenus: [
+          {
+            id: 'customers',
+            label: 'Customers',
+            heading: 'Customers',
+            links: [
+              { href: '/investors', label: 'Investors' },
+              { href: '/artist-profiles', label: 'Artists' },
+            ],
+          },
+        ],
+      })
+    );
+    fireEvent.focus(screen.getByRole('button', { name: /Customers/ }));
+    const flyout = document.getElementById('marketing-header-flyout-customers');
+    expect(flyout).toHaveClass('marketing-glass-header__flyout--compact');
+    expect(flyout?.querySelectorAll('[data-variant]')).toHaveLength(0);
+    expect(
+      screen.getAllByRole('link', { name: 'Request access' })
+    ).toHaveLength(1);
   });
 
   it('audits the exact public CTA owner modules', () => {
@@ -201,8 +229,9 @@ describe('public CTA guard', () => {
 
     // JOV-5349: the production mobile authenticated slot must render the
     // design-system showUserInfo variant, not the bare compact avatar.
-    expect(headerNav).toContain(
-      'authenticatedUserSlot={\n                  <UserButton showUserInfo settingsHref={APP_ROUTES.SETTINGS} />\n                }'
+    // Match structure, not indentation: formatter reflow must not break it.
+    expect(headerNav).toMatch(
+      /authenticatedUserSlot=\{\s*<UserButton\s+showUserInfo\s+settingsHref=\{APP_ROUTES\.SETTINGS\}\s*\/>\s*\}/
     );
   });
 

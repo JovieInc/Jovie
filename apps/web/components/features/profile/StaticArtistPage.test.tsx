@@ -10,12 +10,14 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     claimFooterHref,
     claimFooterLabel,
     releaseCredits,
+    creditSegments,
   }: {
     readonly catalogLoadFailed?: boolean;
     readonly proofClaim?: boolean;
     readonly claimFooterHref?: string | null;
     readonly claimFooterLabel?: string;
     readonly releaseCredits?: readonly { readonly label: string }[];
+    readonly creditSegments?: readonly { readonly type: string }[];
   }) => (
     <div
       data-testid='mock-compact-template'
@@ -24,6 +26,9 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       data-claim-footer-href={claimFooterHref ?? ''}
       data-claim-footer-label={claimFooterLabel ?? ''}
       data-release-credits={(releaseCredits ?? []).map(g => g.label).join('|')}
+      data-credit-segments={(creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
     />
   ),
 }));
@@ -104,6 +109,32 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('mock-compact-template')).toHaveAttribute(
       'data-release-credits',
       'Producer'
+    );
+  });
+
+  it('forwards selected-credit segments onto the compact template (JOV-6199)', () => {
+    render(
+      <StaticArtistPage
+        mode='profile'
+        artist={PROFILE_STORY_ARTIST}
+        socialLinks={[]}
+        contacts={[]}
+        subtitle='Artist profile'
+        showBackButton={false}
+        creditSegments={[
+          { type: 'text', text: 'Credited on "' },
+          {
+            type: 'release',
+            text: 'Neon Circuit',
+            href: '/timwhite/neon-circuit',
+          },
+          { type: 'text', text: '".' },
+        ]}
+      />
+    );
+    expect(screen.getByTestId('mock-compact-template')).toHaveAttribute(
+      'data-credit-segments',
+      'text|release|text'
     );
   });
 });

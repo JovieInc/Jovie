@@ -1,16 +1,21 @@
 import { Head } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
 import 'nextra-theme-docs/style.css';
+import './globals.css';
 import './help.css';
+import './help-search.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
+import { ArticleFeedback } from '@/components/ArticleFeedback';
+import { HelpCenterAnalytics } from '@/components/HelpCenterAnalytics';
 import { HelpShell } from '@/components/help/HelpShell';
 import {
   filterNavigationPageMap,
   loadArticleRegistry,
 } from '@/lib/article-registry.mjs';
+import { DOCS_ORIGIN } from '@/lib/help-center-seo.mjs';
 import { buildHelpNav } from '@/lib/help-nav.mjs';
 
 const inter = Inter({
@@ -20,12 +25,20 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(DOCS_ORIGIN),
   title: {
     default: 'Jovie Help Center',
     template: '%s | Jovie Help Center',
   },
   description:
-    'Help Center for Jovie - the platform for musicians to manage their career.',
+    'Clear answers for building your profile, sharing your work, and understanding your audience.',
+  openGraph: {
+    siteName: 'Jovie Help Center',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+  },
 };
 
 export default async function RootLayout({
@@ -64,7 +77,11 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <HelpShell nav={nav}>{children}</HelpShell>
+          <HelpShell nav={nav}>
+            {children}
+            <ArticleFeedback />
+          </HelpShell>
+          <HelpCenterAnalytics />
         </ThemeProvider>
       </body>
     </html>

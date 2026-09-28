@@ -39,8 +39,18 @@ test('pinned updater and packaged staging identity stay fail-closed', async () =
     /provider:\s*generic/,
     /releases\/download\/desktop-staging/,
     /channel:\s*staging/,
+    /^extraMetadata:\n\s+name: jovie-desktop-staging$/m,
   ])
     assert.match(config, pattern);
+  const productionConfig = await readFile(
+    new URL('../electron-builder.yml', import.meta.url),
+    'utf8'
+  );
+  assert.doesNotMatch(
+    productionConfig,
+    /jovie-desktop-staging/,
+    'staging and production need distinct updater cache directories'
+  );
   assert.doesNotMatch(main, /autoUpdater\.channel\s*=/);
   assert.match(main, /autoUpdater\.allowDowngrade\s*=\s*false/);
   const matches = (channel, version, id, packagedVersion = version) =>

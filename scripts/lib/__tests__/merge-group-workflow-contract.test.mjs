@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
 import {
   ensureBaseHistory,
   runMergeGroupStorybookCertification,
@@ -34,6 +35,10 @@ import {
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+  'utf8'
+);
+const SETUP_NODE_PNPM_ACTION = readFileSync(
+  resolve(REPO_ROOT, '.github/actions/setup-node-pnpm/action.yml'),
   'utf8'
 );
 const IOS_CI_WORKFLOW = readFileSync(
@@ -254,6 +259,33 @@ describe('merge_group workflow contract', () => {
     expect(EVENT.merge_group.base_sha).toMatch(/^[0-9a-f]{40}$/);
     expect(EVENT.merge_group.head_sha).toMatch(/^[0-9a-f]{40}$/);
     expect(EVENT.merge_group.head_ref).toContain('gh-readonly-queue/main/');
+  });
+
+  it('reuses one validated dependency workspace across isolated merge-group jobs', () => {
+    const producer = getJobBlock(CI_WORKFLOW, 'ci-merge-group-workspace');
+    expect(producer).toContain("github.event_name == 'merge_group'");
+    expect(producer).toContain('github.event.merge_group.head_sha');
+    expect(producer).toContain('save_merge_group_workspace:');
+    expect(producer).toContain(
+      'node scripts/lib/ci-dependency-workspace.mjs validate'
+    );
+
+    const consumers =
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+    for (const jobId of consumers.split(' ')) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job, jobId).toContain('ci-merge-group-workspace');
+      expect(job, jobId).toContain("reuse_merge_group_workspace: 'true'");
+    }
+
+    for (const fragment of [
+      'key: pnpm-node-modules-v4-',
+      "github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true'",
+      'Prepared merge-group dependency workspace was not restored.',
+      'node scripts/lib/ci-dependency-workspace.mjs prepare',
+      'node scripts/lib/ci-dependency-workspace.mjs validate',
+    ])
+      expect(SETUP_NODE_PNPM_ACTION).toContain(fragment);
   });
 
   it('runs deterministic CI against the synthetic base-to-head diff', () => {
@@ -547,8 +579,57 @@ describe('merge_group workflow contract', () => {
       units.indexOf('- name: Run quarantined unit tests (retries)'),
       units.indexOf('- name: Run Ovie route')
     );
-    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/10'\n/);
+    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/14'\n/);
     expect(step).not.toContain('--shard');
+  });
+
+  it('reserves sequencer capacity only on the shards that run pinned CI work', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1];
+    const shards = [...(matrix ?? '').matchAll(/'(\d+\/\d+)'/g)].map(m => m[1]);
+    expect(shards.length).toBeGreaterThan(1);
+    expect(new Set(shards).size).toBe(shards.length);
+    shards.forEach((shard, i) =>
+      expect(shard).toBe(`${i + 1}/${shards.length}`)
+    );
+    const pinned = [
+      ...new Set(
+        [...units.matchAll(/matrix\.shard == '(\d+\/\d+)'/g)].map(m => m[1])
+      ),
+    ].sort();
+    for (const shard of pinned) expect(shards).toContain(shard);
+    expect(Object.keys(CI_RESERVED_MS).sort()).toEqual(pinned);
+  });
+
+  it('runs packages/ui in its own unit matrix entry, off the web shards', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1] ?? '';
+    const entries = [...matrix.matchAll(/'([^']+)'/g)].map(m => m[1]);
+    expect(entries.filter(entry => !/^\d+\/\d+$/.test(entry))).toEqual([
+      'packages/ui',
+    ]);
+    const stepIf = name => {
+      const start = units.indexOf(`- name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      return units.slice(start).match(/\n\s+if: (.+)\n/)?.[1];
+    };
+    // The web Vitest and its web-only setup never run on the ui entry, so
+    // `--shard=packages/ui` is never handed to Vitest.
+    for (const name of [
+      'Setup Playwright warm path',
+      'Load quarantined unit tests',
+      'Run unit tests',
+    ]) {
+      expect(stepIf(name), name).toContain("matrix.shard != 'packages/ui'");
+    }
+    expect(stepIf('Run packages/ui unit tests')).toBe(
+      "steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'"
+    );
+    // Parallel, not pinned: no web shard carries a packages/ui reservation.
+    expect(units).not.toMatch(
+      /matrix\.shard == '\d+\/\d+'\n\s+run: pnpm turbo test --filter=@jovie\/ui/
+    );
+    expect(Object.keys(CI_RESERVED_MS)).not.toContain('packages/ui');
   });
 
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
@@ -562,7 +643,7 @@ describe('merge_group workflow contract', () => {
       ),
       units.indexOf('      - name: Preserve Ovie coverage evidence')
     );
-    expect(ovieTests).toContain("matrix.shard == '1/10'");
+    expect(ovieTests).toContain("matrix.shard == '1/14'");
     expect(ovieTests).toContain('pnpm --filter @jovie/ovie test');
     expect(ovieTests).not.toContain('continue-on-error');
     const ovieBuild = build.slice(
@@ -788,7 +869,7 @@ describe('merge_group workflow contract', () => {
     expect(migrationGuard).toMatch(
       /- uses: actions\/checkout@[^\n]+\n\s+if: needs\.ci-path-changes\.outputs\.run_drizzle == 'true'\n\s+with:\n\s+fetch-depth: 0/
     );
-    expect(migrationGuard).toContain('timeout-minutes: 3');
+    expect(migrationGuard).toContain('timeout-minutes: 6');
     expect(migrationGuard).toContain(
       'run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}'
     );
@@ -800,6 +881,9 @@ describe('merge_group workflow contract', () => {
     );
     expect(migrationGuard).toContain('./scripts/check-migrations.sh');
     expect(migrationGuard).toContain('./scripts/validate-migrations.sh');
+    expect(migrationGuard).toContain(
+      'pnpm exec tsx scripts/online-index-migrate.ts --validate-only'
+    );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     expect(buildLayout).toContain('runs-on: ubuntu-latest');
     expect(buildLayout).toContain('Build exact combined head');
@@ -823,7 +907,7 @@ describe('merge_group workflow contract', () => {
       expect(surfaces).toContain(`pnpm --filter ${check}`);
     }
     expect(unitTests).toContain(
-      "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
+      `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}, 'packages/ui']`
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
@@ -872,7 +956,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "run_full_ci == 'true' && matrix.shard == '4/10'\n        run: pnpm turbo test --filter=@jovie/ui"
+      "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
@@ -3519,5 +3603,25 @@ describe('merge-group Playwright artifact guard', () => {
       expect(step).toContain('guard-playwright-artifacts.mjs" --run --');
       expect(step).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/u);
     }
+  });
+});
+
+describe('merge-queue green enroll scan window (JOV-6831)', () => {
+  const ENROLL = readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
+    'utf8'
+  );
+
+  it('pages through every open PR instead of one oldest-first window', () => {
+    expect(ENROLL).toContain('after: $cursor');
+    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
+    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).not.toMatch(/direction:\s*ASC/);
+  });
+
+  it('keeps the rejected-head rule: no re-enqueue without a new push', () => {
+    expect(ENROLL).toContain(
+      'if (removedAt && committedAt && removedAt > committedAt) continue;'
+    );
   });
 });

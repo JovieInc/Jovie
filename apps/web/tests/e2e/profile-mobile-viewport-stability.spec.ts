@@ -575,7 +575,8 @@ type ReleaseCardLayout = {
     readonly width: number;
     readonly height: number;
   };
-  readonly pacIsFirstCard: boolean;
+  readonly pacIsFeaturedAboveCarousel: boolean;
+  readonly firstCarouselCardIsIntact: boolean;
   readonly peerCard: {
     readonly width: number;
     readonly height: number;
@@ -594,7 +595,8 @@ type ReleaseCardLayout = {
     readonly top: number;
     readonly bottom: number;
   } | null;
-  readonly cover: {
+  readonly portrait: {
+    readonly width: number;
     readonly height: number;
   } | null;
 };
@@ -610,10 +612,10 @@ async function collectMockHomeReleaseCardLayout(
       '[data-testid="profile-pac"]'
     );
     const hero = document.querySelector<HTMLElement>(
-      '[data-testid="profile-hero-identity-block"]'
+      '[data-testid="profile-identity-header"]'
     );
-    const cover = document.querySelector<HTMLElement>(
-      '[data-testid="profile-cover"]'
+    const portrait = document.querySelector<HTMLElement>(
+      '[data-testid="profile-identity-portrait"]'
     );
     const tabBar = document.querySelector<HTMLElement>(
       '[data-testid="profile-tab-bar"]'
@@ -636,22 +638,27 @@ async function collectMockHomeReleaseCardLayout(
     };
 
     const firstLi = carousel.querySelector(':scope > li');
-    // A peer card in the same track (entity card or alerts card) used to
-    // verify the PAC card shares the fixed 9:4 carousel geometry.
-    const peerLi = [...carousel.querySelectorAll(':scope > li')].find(
-      li => li !== firstLi
-    );
+    // The second carousel card must rest fully outside the track.
+    const peerLi = [...carousel.querySelectorAll(':scope > li')].at(1) as
+      | HTMLElement
+      | undefined;
 
     const railRect = carousel.getBoundingClientRect();
-    const pacContent = pac.children.item(1);
-    const pacCopy = pacContent?.children.item(0);
+    const modeCard = pac.querySelector<HTMLElement>('.profile-mode-card');
 
     return {
       pac: rect(pac),
-      // offsetWidth/offsetHeight are transform-free (edge-dimmed peer cards
-      // are scaled to 0.96 via transform, which would skew getBoundingClientRect).
       pacBox: { width: pac.offsetWidth, height: pac.offsetHeight },
-      pacIsFirstCard: Boolean(firstLi?.contains(pac)),
+      pacIsFeaturedAboveCarousel:
+        pac.dataset.presentation === 'featured' &&
+        !carousel.contains(pac) &&
+        Boolean(
+          pac.compareDocumentPosition(carousel) &
+            Node.DOCUMENT_POSITION_FOLLOWING
+        ),
+      firstCarouselCardIsIntact: firstLi
+        ? firstLi.getBoundingClientRect().right <= railRect.right + 1
+        : true,
       peerCard: peerLi
         ? {
             width: peerLi.offsetWidth,
@@ -664,14 +671,15 @@ async function collectMockHomeReleaseCardLayout(
         right: railRect.right,
         scrollSnapType: getComputedStyle(carousel).scrollSnapType,
       },
-      pacCopyFits: pacCopy
-        ? pacCopy.scrollHeight <= pacCopy.clientHeight + 1
+      pacCopyFits: modeCard
+        ? modeCard.scrollHeight <= modeCard.clientHeight + 1
         : false,
       tabBar: tabBar ? { top: tabBar.getBoundingClientRect().top } : null,
       hero: hero ? rect(hero) : null,
-      cover: cover
+      portrait: portrait
         ? {
-            height: cover.getBoundingClientRect().height,
+            width: portrait.getBoundingClientRect().width,
+            height: portrait.getBoundingClientRect().height,
           }
         : null,
     };
@@ -721,29 +729,22 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
 
       const layout = await collectMockHomeReleaseCardLayout(page);
 
-      // The featured release card (PAC) is the FIRST card of the single home
-      // carousel — the old stacked bento strip above the carousel is gone.
+      // Pen parity: the featured release card (PAC) is the Listen mode card
+      // under the identity header; the rest of the highlights follow in the
+      // carousel below it.
       expect(
-        layout.pacIsFirstCard,
-        `${viewport.label} featured release card should be the first carousel card`
+        layout.pacIsFeaturedAboveCarousel,
+        `${viewport.label} featured release card should lead above the carousel`
       ).toBe(true);
-
-      // Same fixed 9:4 geometry as every other card in the track.
-      if (layout.peerCard) {
-        expect(
-          Math.abs(layout.pacBox.height - layout.peerCard.height),
-          `${viewport.label} featured card should match peer card height`
-        ).toBeLessThanOrEqual(2);
-        expect(
-          Math.abs(layout.pacBox.width - layout.peerCard.width),
-          `${viewport.label} featured card should match peer card width`
-        ).toBeLessThanOrEqual(2);
-      }
       expect(
-        Math.abs(layout.pacBox.width / layout.pacBox.height - 2.25),
-        `${viewport.label} featured card should keep the 9:4 card aspect`
-      ).toBeLessThanOrEqual(0.02);
+        Math.abs(layout.pacBox.width - (layout.rail.right - layout.rail.left)),
+        `${viewport.label} featured card should span the content width`
+      ).toBeLessThanOrEqual(2 * 32 + 2);
       expect(layout.rail.scrollSnapType).toBe('x mandatory');
+      expect(
+        layout.firstCarouselCardIsIntact,
+        `${viewport.label} first carousel card should rest inside the track`
+      ).toBe(true);
       expect(
         layout.pacCopyFits,
         `${viewport.label} featured card copy should not clip behind its action`
@@ -758,8 +759,8 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       if (layout.hero) {
         expect(
           layout.pac.top,
-          `${viewport.label} featured card should sit below hero identity`
-        ).toBeGreaterThanOrEqual(layout.hero.bottom + 4);
+          `${viewport.label} featured card should sit below the identity header`
+        ).toBeGreaterThanOrEqual(layout.hero.bottom - 1);
       }
 
       // Fully visible above the bottom tab bar inside the profile shell — no
@@ -804,18 +805,19 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         `${viewport.label} featured card should not change height`
       ).toBeLessThanOrEqual(1);
 
-      if (viewport.height <= 820 && layout.cover) {
-        // Token-driven hero: clamp(220px, 34svh, 400px) — the old ≤190px
-        // shrink-wrap band is gone and the hero never collapses.
-        expect(
-          layout.cover.height,
-          `${viewport.label} home hero should keep its 220px floor on compact viewports`
-        ).toBeGreaterThanOrEqual(220);
-        expect(
-          layout.cover.height,
-          `${viewport.label} home hero should stay within the 400px token cap`
-        ).toBeLessThanOrEqual(400);
-      }
+      // The identity portrait holds its 80px circle on every viewport.
+      expect(
+        layout.portrait,
+        `${viewport.label} portrait is required`
+      ).not.toBeNull();
+      expect(
+        Math.abs((layout.portrait?.width ?? 0) - 80),
+        `${viewport.label} portrait should be 80px`
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs((layout.portrait?.height ?? 0) - 80),
+        `${viewport.label} portrait should be 80px`
+      ).toBeLessThanOrEqual(1);
     });
   }
 });
@@ -854,29 +856,45 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         carousel.evaluate(el => {
           const rail = el.getBoundingClientRect();
           const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-          const pac = cards[0]?.querySelector<HTMLElement>(
+          const pac = document.querySelector<HTMLElement>(
             '[data-testid="profile-pac"]'
           );
-          const pacContent = pac?.children.item(1);
-          const pacCopy = pacContent?.children.item(0);
-          const cover = document.querySelector<HTMLElement>(
-            '[data-testid="profile-cover"]'
+          const modeCard =
+            pac?.querySelector<HTMLElement>('.profile-mode-card');
+          const portrait = document.querySelector<HTMLElement>(
+            '[data-testid="profile-identity-portrait"]'
           );
-          const mediaStage = cover?.querySelector<HTMLElement>(
-            '.profile-cover-home-media'
-          );
-          const coverImage = mediaStage?.querySelector<HTMLElement>('img');
-          const mediaRect = mediaStage?.getBoundingClientRect();
-          const imageRect = coverImage?.getBoundingClientRect();
+          const portraitImage = portrait?.querySelector<HTMLElement>('img');
+          const portraitRect = portrait?.getBoundingClientRect();
+          const imageRect = portraitImage?.getBoundingClientRect();
           const dockHost = document.querySelector<HTMLElement>(
             '[data-testid="profile-tab-bar"]'
           );
           const glassDock = dockHost?.querySelector<HTMLElement>('nav');
           const glassStyle = glassDock ? getComputedStyle(glassDock) : null;
+          const targetsOf = (root: Element | null | undefined) =>
+            root
+              ? [...root.querySelectorAll<HTMLElement>('a, button')].map(
+                  target => {
+                    const targetRect = target.getBoundingClientRect();
+                    return {
+                      width: targetRect.width,
+                      height: targetRect.height,
+                    };
+                  }
+                )
+              : [];
           return {
             scrollLeft: el.scrollLeft,
             rail: { left: rail.left, right: rail.right },
             snap: getComputedStyle(el).scrollSnapType,
+            pac: pac
+              ? {
+                  featured: pac.dataset.presentation === 'featured',
+                  outsideCarousel: !el.contains(pac),
+                  targets: targetsOf(pac),
+                }
+              : null,
             cards: cards.map(card => {
               const rect = card.getBoundingClientRect();
               return {
@@ -884,29 +902,21 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
                 right: rect.right,
                 width: card.offsetWidth,
                 height: card.offsetHeight,
-                targets: [
-                  ...card.querySelectorAll<HTMLElement>('a, button'),
-                ].map(target => {
-                  const targetRect = target.getBoundingClientRect();
-                  return {
-                    width: targetRect.width,
-                    height: targetRect.height,
-                  };
-                }),
+                targets: targetsOf(card),
               };
             }),
-            pacCopyFits: pacCopy
-              ? pacCopy.scrollHeight <= pacCopy.clientHeight + 1
+            pacCopyFits: modeCard
+              ? modeCard.scrollHeight <= modeCard.clientHeight + 1
               : false,
-            heroFilled: Boolean(
-              mediaRect &&
+            portraitFilled: Boolean(
+              portraitRect &&
                 imageRect &&
-                imageRect.left <= mediaRect.left + 1 &&
-                imageRect.right >= mediaRect.right - 1 &&
-                imageRect.top <= mediaRect.top + 1 &&
-                imageRect.bottom >= mediaRect.bottom - 1 &&
-                coverImage &&
-                getComputedStyle(coverImage).objectFit === 'cover'
+                imageRect.left <= portraitRect.left + 1 &&
+                imageRect.right >= portraitRect.right - 1 &&
+                imageRect.top <= portraitRect.top + 1 &&
+                imageRect.bottom >= portraitRect.bottom - 1 &&
+                portraitImage &&
+                getComputedStyle(portraitImage).objectFit === 'cover'
             ),
             glassDock: glassStyle
               ? {
@@ -922,9 +932,26 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       expect(first.snap, `${viewport.label} uses mandatory x snapping`).toBe(
         'x mandatory'
       );
-      expect(first.cards, `${viewport.label} has carousel peers`).toHaveLength(
-        2
-      );
+      expect(
+        first.pac?.featured && first.pac.outsideCarousel,
+        `${viewport.label} PAC leads as the featured mode card`
+      ).toBe(true);
+      expect(
+        first.pac?.targets.length,
+        `${viewport.label} featured card exposes an action`
+      ).toBeGreaterThan(0);
+      expect(
+        first.pac?.targets.every(target => target.height >= 44),
+        `${viewport.label} featured-card actions meet the 44px floor`
+      ).toBe(true);
+      expect(
+        first.pacCopyFits,
+        `${viewport.label} PAC copy does not clip behind its action`
+      ).toBe(true);
+      expect(
+        first.cards.length,
+        `${viewport.label} keeps the highlights carousel`
+      ).toBeGreaterThan(0);
       expect(
         first.cards[0]?.left,
         `${viewport.label} first left`
@@ -933,10 +960,12 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         first.cards[0]?.right,
         `${viewport.label} first right`
       ).toBeLessThanOrEqual(first.rail.right);
-      expect(
-        first.cards[1]?.left,
-        `${viewport.label} next card hidden`
-      ).toBeGreaterThanOrEqual(first.rail.right - 1);
+      if (first.cards[1]) {
+        expect(
+          first.cards[1].left,
+          `${viewport.label} next card hidden`
+        ).toBeGreaterThanOrEqual(first.rail.right - 1);
+      }
       expect(
         Math.abs(
           (first.cards[0]?.width ?? 0) / (first.cards[0]?.height ?? 1) - 2.25
@@ -944,20 +973,12 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         `${viewport.label} keeps the 9:4 card geometry`
       ).toBeLessThanOrEqual(0.02);
       expect(
-        first.pacCopyFits,
-        `${viewport.label} PAC copy does not clip behind its action`
-      ).toBe(true);
-      expect(
-        first.cards[0]?.targets.length,
-        `${viewport.label} first card exposes an action`
-      ).toBeGreaterThan(0);
-      expect(
         first.cards[0]?.targets.every(target => target.height >= 44),
         `${viewport.label} first-card actions meet the 44px floor`
       ).toBe(true);
       expect(
-        first.heroFilled,
-        `${viewport.label} hero image fills its stage`
+        first.portraitFilled,
+        `${viewport.label} portrait image fills its circle`
       ).toBe(true);
       expect(
         first.glassDock?.backdropFilter,
@@ -972,46 +993,45 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         `${viewport.label} dock keeps its hairline`
       ).not.toBe('rgba(0, 0, 0, 0)');
 
-      const targetScrollLeft = await carousel.evaluate(el => {
-        const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-        const requestedTarget =
-          (cards.at(-1)?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0);
-        const target = Math.min(
-          requestedTarget,
-          el.scrollWidth - el.clientWidth
-        );
-        el.scrollTo({ left: target, behavior: 'auto' });
-        return target;
-      });
-      await expect
-        .poll(async () =>
-          Math.abs(
-            (await carousel.evaluate(el => el.scrollLeft)) - targetScrollLeft
+      if (first.cards.length > 1) {
+        const targetScrollLeft = await carousel.evaluate(el => {
+          const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
+          const requestedTarget =
+            (cards.at(-1)?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0);
+          const target = Math.min(
+            requestedTarget,
+            el.scrollWidth - el.clientWidth
+          );
+          el.scrollTo({ left: target, behavior: 'auto' });
+          return target;
+        });
+        await expect
+          .poll(async () =>
+            Math.abs(
+              (await carousel.evaluate(el => el.scrollLeft)) - targetScrollLeft
+            )
           )
-        )
-        .toBeLessThanOrEqual(1);
+          .toBeLessThanOrEqual(1);
 
-      const last = await readGeometry();
-      expect(
-        last.cards[0]?.right,
-        `${viewport.label} previous card hidden`
-      ).toBeLessThanOrEqual(last.rail.left + 1);
-      expect(
-        last.cards[1]?.left,
-        `${viewport.label} last left`
-      ).toBeGreaterThanOrEqual(last.rail.left);
-      expect(
-        last.cards[1]?.right,
-        `${viewport.label} last right`
-      ).toBeLessThanOrEqual(last.rail.right + 1);
-      expect(
-        last.cards[1]?.targets.length,
-        `${viewport.label} last card exposes an action`
-      ).toBeGreaterThan(0);
-      expect(
-        last.cards[1]?.targets.every(target => target.height >= 44),
-        `${viewport.label} last-card actions meet the 44px floor`
-      ).toBe(true);
+        const last = await readGeometry();
+        const lastCard = last.cards.at(-1);
+        expect(
+          last.cards[0]?.right,
+          `${viewport.label} previous card hidden`
+        ).toBeLessThanOrEqual(last.rail.left + 1);
+        expect(
+          lastCard?.left,
+          `${viewport.label} last left`
+        ).toBeGreaterThanOrEqual(last.rail.left);
+        expect(
+          lastCard?.right,
+          `${viewport.label} last right`
+        ).toBeLessThanOrEqual(last.rail.right + 1);
+        expect(
+          lastCard?.targets.every(target => target.height >= 44),
+          `${viewport.label} last-card actions meet the 44px floor`
+        ).toBe(true);
+      }
     }
   });
 
@@ -1686,7 +1706,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await page.keyboard.press(focusNextKey);
       focusedEvents = await page.evaluate(
-        () => document.activeElement?.getAttribute('aria-label') === 'Shows'
+        () => document.activeElement?.getAttribute('aria-label') === 'Events'
       );
       if (focusedEvents) break;
     }
@@ -1694,7 +1714,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/calvin-demo\?mode=tour$/);
     await expect(
-      page.getByRole('heading', { name: 'Shows', exact: true })
+      page.getByRole('heading', { name: 'Events', exact: true })
     ).toBeVisible();
   });
 });

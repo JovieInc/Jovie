@@ -1,16 +1,17 @@
 'use client';
 
-import { Search } from 'nextra/components';
+import { HelpCenterSearch } from '@/components/HelpCenterSearch';
 
 /**
- * Stable search slot for the Help Center utility bar. Wraps the Nextra
- * Pagefind-backed `Search` so later issues can restyle or replace the
- * underlying engine without touching the shell composition.
+ * Stable search slot for the Help Center utility bar. Wraps the Pagefind-
+ * backed `HelpCenterSearch` so the shell composition stays fixed while the
+ * underlying engine can be restyled or replaced in one place.
  */
 export function HelpSearchTrigger() {
   return (
     <search className='help-search'>
-      <Search placeholder='Search Help Center…' className='help-search-input' />
+      <HelpCenterSearch variant='desktop-only' />
+      <HelpCenterSearch variant='mobile-only' />
     </search>
   );
 }

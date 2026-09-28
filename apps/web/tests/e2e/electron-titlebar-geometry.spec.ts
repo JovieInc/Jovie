@@ -288,6 +288,22 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       persona: 'creator-ready',
       expectedNewChatRows: 0,
     },
+    ...[
+      APP_ROUTES.SETTINGS_CONNECTORS,
+      APP_ROUTES.SETTINGS_USAGE,
+      APP_ROUTES.SETTINGS_BILLING,
+      APP_ROUTES.SETTINGS_PAYMENTS,
+      APP_ROUTES.SETTINGS_DATA_PRIVACY,
+      APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      APP_ROUTES.SETTINGS_CONTACTS,
+      APP_ROUTES.SETTINGS_TOURING,
+      APP_ROUTES.SETTINGS_ANALYTICS,
+      APP_ROUTES.SETTINGS_AUDIENCE,
+    ].map(route => ({
+      route,
+      persona: 'creator-ready' as const,
+      expectedNewChatRows: 0,
+    })),
   ];
 
   for (const { route, persona, expectedNewChatRows } of routeChecks) {
@@ -310,12 +326,20 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const mainPlane = document.querySelector<HTMLElement>(
         '[data-app-shell-main-plane="true"]'
       );
+      const settingsShell = document.querySelector<HTMLElement>(
+        '[data-testid="settings-shell-content"]'
+      );
+      const settingsColumn = document.querySelector<HTMLElement>(
+        '[data-settings-layout-column="true"]'
+      );
       if (!titlebar || !body || !sidebar || !mainPlane) return null;
 
       const titlebarBox = titlebar.getBoundingClientRect();
       const bodyBox = body.getBoundingClientRect();
       const sidebarBox = sidebar.getBoundingClientRect();
       const mainPlaneBox = mainPlane.getBoundingClientRect();
+      const settingsShellBox = settingsShell?.getBoundingClientRect();
+      const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
         titlebarTop: titlebarBox.top,
@@ -323,6 +347,13 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
+        mainPlaneCenterX: mainPlaneBox.left + mainPlaneBox.width / 2,
+        settingsShellTop: settingsShellBox?.top ?? null,
+        settingsColumnTop: settingsColumnBox?.top ?? null,
+        settingsColumnCenterX:
+          settingsColumnBox === undefined
+            ? null
+            : settingsColumnBox.left + settingsColumnBox.width / 2,
       };
     });
 
@@ -343,6 +374,20 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       Math.abs((geometry?.mainPlaneTop ?? 0) - (geometry?.bodyTop ?? 0)),
       `${route} main plane aligns to the body grid`
     ).toBeLessThanOrEqual(1);
+
+    if (route.startsWith(APP_ROUTES.SETTINGS)) {
+      expect(
+        Math.abs(
+          (geometry?.settingsColumnCenterX ?? 0) -
+            (geometry?.mainPlaneCenterX ?? 0)
+        ),
+        `${route} centers its shared column in the post-sidebar main pane`
+      ).toBeLessThanOrEqual(1);
+      expect(
+        (geometry?.settingsColumnTop ?? 0) - (geometry?.settingsShellTop ?? 0),
+        `${route} begins at the canonical compact content inset`
+      ).toBeLessThanOrEqual(12);
+    }
 
     if (route === APP_ROUTES.CHAT) {
       await expect(
@@ -378,4 +423,63 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       ).toBeLessThanOrEqual(1);
     }
   }
+});
+
+test('settings shell keeps compact, 200% zoom, keyboard, and collapsed-sidebar clearance', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(180_000);
+
+  await page.setViewportSize({ width: 800, height: 640 });
+  await installElectronRuntime(page);
+  await gotoShellRoute(page, APP_ROUTES.SETTINGS_ACCOUNT);
+  await page.evaluate(() => {
+    document.body.style.zoom = '2';
+  });
+
+  const sidebarToggle = page.getByTestId('electron-sidebar-toggle');
+  const initialToggleLabel = await sidebarToggle.getAttribute('aria-label');
+  await sidebarToggle.focus();
+  await expect(sidebarToggle).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => sidebarToggle.getAttribute('aria-label'))
+    .not.toBe(initialToggleLabel);
+
+  const geometry = await page.evaluate(() => {
+    const mainPlane = document.querySelector<HTMLElement>(
+      '[data-app-shell-main-plane="true"]'
+    );
+    const column = document.querySelector<HTMLElement>(
+      '[data-settings-layout-column="true"]'
+    );
+    const titlebar = document.querySelector<HTMLElement>(
+      '[data-electron-titlebar="true"]'
+    );
+    if (!mainPlane || !column || !titlebar) return null;
+    const mainBox = mainPlane.getBoundingClientRect();
+    const columnBox = column.getBoundingClientRect();
+    const titlebarBox = titlebar.getBoundingClientRect();
+    return {
+      centeredDelta: Math.abs(
+        columnBox.left +
+          columnBox.width / 2 -
+          (mainBox.left + mainBox.width / 2)
+      ),
+      horizontalOverflow: column.scrollWidth - column.clientWidth,
+      titlebarBottom: titlebarBox.bottom,
+      columnTop: columnBox.top,
+    };
+  });
+
+  expect(geometry).not.toBeNull();
+  expect(geometry?.centeredDelta).toBeLessThanOrEqual(1);
+  expect(geometry?.horizontalOverflow).toBeLessThanOrEqual(0);
+  expect(geometry?.columnTop ?? 0).toBeGreaterThanOrEqual(
+    geometry?.titlebarBottom ?? 0
+  );
 });

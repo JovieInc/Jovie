@@ -13,7 +13,7 @@ import {
 } from '@/lib/entitlements/registry';
 
 const PUBLIC_PRICING_FEATURE_NAMES = new Set([
-  'Public artist profile page',
+  'Public Jovie profile page',
   'Contact / subscriber capture',
 ]);
 

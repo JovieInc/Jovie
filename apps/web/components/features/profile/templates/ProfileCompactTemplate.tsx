@@ -44,6 +44,8 @@ import {
 } from '@/lib/flags/profile-pac';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import { PROFILE_DESKTOP_SURFACE_ENABLED } from '@/lib/profile/desktop-surface-flag';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
   buildProfileAccentCssVars,
@@ -93,6 +95,8 @@ interface ProfileCompactTemplateProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
@@ -247,6 +251,7 @@ export function ProfileCompactTemplate({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   photoDownloadSizes = [],
   tourDates = [],
   visitTrackingToken,
@@ -356,7 +361,13 @@ export function ProfileCompactTemplate({
     const embeddedQuery = globalThis.matchMedia('(min-width: 768px)');
     const desktopQuery = globalThis.matchMedia('(min-width: 1180px)');
     const syncPresentation = () => {
-      const ownsDesktopLayout = desktopQuery.matches && !embeddedPreview;
+      // With the desktop surface flagged off (the default), desktop widths
+      // keep the compact surface in its centered phone column, so drawers use
+      // the same embedded presentation as tablet widths.
+      const ownsDesktopLayout =
+        PROFILE_DESKTOP_SURFACE_ENABLED &&
+        desktopQuery.matches &&
+        !embeddedPreview;
       setIsDesktopLayout(ownsDesktopLayout);
       setDrawerPresentation(
         ownsDesktopLayout
@@ -913,6 +924,7 @@ export function ProfileCompactTemplate({
                 genres={genres}
                 pressPhotos={pressPhotos}
                 allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
                 photoDownloadSizes={photoDownloadSizes}
                 tourDates={tourDates}
                 showSubscriptionConfirmedBanner={
@@ -962,53 +974,60 @@ export function ProfileCompactTemplate({
             </div>
           </div>
         }
-        desktopBanner={embeddedPreview ? null : profileBanner}
+        desktopBanner={
+          embeddedPreview || !PROFILE_DESKTOP_SURFACE_ENABLED
+            ? null
+            : profileBanner
+        }
         desktopSurface={
-          <ProfileDesktopSurface
-            presentation='modal'
-            overlaysEnabled={isDesktopLayout}
-            onReady={handleDesktopSurfaceReady}
-            artist={artist}
-            socialLinks={socialLinks}
-            contacts={contacts}
-            showPayButton={showPayButton}
-            latestRelease={latestRelease}
-            profileSettings={profileSettings}
-            alertOptInVariant={resolvedAlertOptInVariant}
-            allowFanCapture={allowFanCapture}
-            genres={genres}
-            pressPhotos={pressPhotos}
-            allowPhotoDownloads={allowPhotoDownloads}
-            photoDownloadSizes={photoDownloadSizes}
-            tourDates={tourDates}
-            viewerCountryCode={viewerCountryCode}
-            releases={releases}
-            catalogLoadFailed={catalogLoadFailed}
-            drawerOpen={drawerOpen}
-            drawerView={drawerView}
-            activeMode={requestedMode}
-            onModeSelect={nextMode => {
-              clearCloseResetTimer();
-              setRequestedMode(nextMode);
-            }}
-            onAlertsModalClose={() => setRequestedMode('profile')}
-            onDrawerOpenChange={handleDrawerOpenChange}
-            onDrawerViewChange={handleDrawerViewChange}
-            onOpenMenu={() => openDrawerMode('menu')}
-            onPlayClick={handlePlayClick}
-            onBack={handleBack}
-            profileHref={profileHref}
-            isSubscribed={isSubscribed}
-            contentPrefs={contentPrefs}
-            onTogglePref={handleTogglePref}
-            onUnsubscribe={handleUnsubscribe}
-            isUnsubscribing={unsubMutation.isPending}
-            onOpenReleaseCredits={
-              visibleReleaseCredits.length > 0
-                ? () => setCreditsOpen(true)
-                : undefined
-            }
-          />
+          PROFILE_DESKTOP_SURFACE_ENABLED ? (
+            <ProfileDesktopSurface
+              presentation='modal'
+              overlaysEnabled={isDesktopLayout}
+              onReady={handleDesktopSurfaceReady}
+              artist={artist}
+              socialLinks={socialLinks}
+              contacts={contacts}
+              showPayButton={showPayButton}
+              latestRelease={latestRelease}
+              profileSettings={profileSettings}
+              alertOptInVariant={resolvedAlertOptInVariant}
+              allowFanCapture={allowFanCapture}
+              genres={genres}
+              pressPhotos={pressPhotos}
+              allowPhotoDownloads={allowPhotoDownloads}
+              creditSegments={creditSegments}
+              photoDownloadSizes={photoDownloadSizes}
+              tourDates={tourDates}
+              viewerCountryCode={viewerCountryCode}
+              releases={releases}
+              catalogLoadFailed={catalogLoadFailed}
+              drawerOpen={drawerOpen}
+              drawerView={drawerView}
+              activeMode={requestedMode}
+              onModeSelect={nextMode => {
+                clearCloseResetTimer();
+                setRequestedMode(nextMode);
+              }}
+              onAlertsModalClose={() => setRequestedMode('profile')}
+              onDrawerOpenChange={handleDrawerOpenChange}
+              onDrawerViewChange={handleDrawerViewChange}
+              onOpenMenu={() => openDrawerMode('menu')}
+              onPlayClick={handlePlayClick}
+              onBack={handleBack}
+              profileHref={profileHref}
+              isSubscribed={isSubscribed}
+              contentPrefs={contentPrefs}
+              onTogglePref={handleTogglePref}
+              onUnsubscribe={handleUnsubscribe}
+              isUnsubscribing={unsubMutation.isPending}
+              onOpenReleaseCredits={
+                visibleReleaseCredits.length > 0
+                  ? () => setCreditsOpen(true)
+                  : undefined
+              }
+            />
+          ) : null
         }
       />
     </ProfileNotificationsContext.Provider>

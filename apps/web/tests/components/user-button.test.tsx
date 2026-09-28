@@ -244,7 +244,9 @@ describe('UserButton billing actions', () => {
       error: null,
     } as any);
     render(<UserButton calm showUserInfo profileHref='/adele' />);
-    expect(screen.getByText('Jovie workspace')).toBeVisible();
+    // Founder lock 2026-09-25: single compact 32px row, name only — the
+    // workspace subtitle line is hidden.
+    expect(screen.queryByText('Jovie workspace')).not.toBeInTheDocument();
     await userEvent.click(screen.getByText('Adele Adkins'));
     expect(await screen.findByText('Settings')).toBeVisible();
   });

@@ -321,7 +321,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
 
   it('forwards a bounded commercial snapshot without asserting its facts are verified', async () => {
     const commercialSnapshot = {
-      schema: 'jovie.summer-commercial.snapshot/v1',
+      schema: 'jovie.summer-commercial.snapshot/v2',
       sources: [],
       candidates: [],
       activeCommercialId: null,
@@ -428,7 +428,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       request({
         ...validEvent,
         commercialSnapshot: {
-          schema: 'jovie.summer-commercial.snapshot/v1',
+          schema: 'jovie.summer-commercial.snapshot/v2',
           candidates: 'invalid',
         },
       })

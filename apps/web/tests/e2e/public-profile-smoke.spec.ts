@@ -184,7 +184,7 @@ test.describe('public profile document semantics @regression', () => {
       await expect(page.locator('footer')).toHaveCount(1);
 
       const homeAction = page.getByRole('link', { name: 'Go home' });
-      const searchAction = page.getByRole('link', { name: 'Search artists' });
+      const searchAction = page.getByRole('link', { name: 'Explore profiles' });
 
       await expect(homeAction).toHaveAttribute('href', '/');
       await expect(searchAction).toHaveAttribute('href', '/artist-profiles');
