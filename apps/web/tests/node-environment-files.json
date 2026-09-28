@@ -31,7 +31,6 @@
   "app/onboarding/checkout/page.test.ts",
   "app/openapi.json/route.test.ts",
   "app/r/[slug]/page.test.ts",
-  "components/features/admin/leads/GtmFunnel.test.ts",
   "components/features/dashboard/",
   "components/features/profile/",
   "components/features/settings/settings-sidebar-config.test.ts",
