@@ -79,11 +79,9 @@ const jovie = [
 ];
 export const disabledTools = [
   'agent',
-  'ask_question',
   'bash',
   'read_file',
   'write_file',
-  'todo',
   'web_fetch',
   'web_search',
   'load_skill',
