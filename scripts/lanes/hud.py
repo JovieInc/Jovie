@@ -495,14 +495,20 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     else:
         parts = []
         for name, row in accounts.get("accounts", {}).items():
+            remaining = "?" if row.get("remainingPercent") is None else f"{row['remainingPercent']}%"
+            reset = "?" if row.get("naturalResetInS") is None else dur(row["naturalResetInS"])
+            banked = "?" if row.get("bankedResetCount") is None else str(row["bankedResetCount"])
+            detail = f"{name} {remaining} left · reset {reset} · banked {banked}"
             if row["leased"]:
-                parts.append(rgb(PURPLE, f"● {name} leased"))
+                parts.append(rgb(PURPLE, f"● {detail} · leased"))
             elif row["available"]:
-                parts.append(rgb(GREEN, f"✓ {name}"))
+                parts.append(rgb(GREEN, f"✓ {detail}"))
             else:
-                parts.append(rgb(RED, f"✕ {name} banked {dur(row['resetsInS'])}"))
+                parts.append(rgb(RED, f"✕ {detail} · retry {dur(row['resetsInS'])}"))
         summary = f"{len(accounts.get('available', []))}/{accounts.get('count', 0)} available"
-        lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(DIM, summary + "  ") + "  ".join(parts or [rgb(DIM, "no ChatGPT profiles found")]), width))
+        lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(DIM, summary), width))
+        for part in parts or [rgb(DIM, "no ChatGPT profiles found")]:
+            lines.append(pad("  " + part, width))
 
     # pipeline
     open_prs = github.get("open", [])
