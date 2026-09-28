@@ -33,6 +33,9 @@ FAILED_RUN_ALERT = 10
 DISK_MIN_PCT = 10
 DISK_CRIT_PCT = 5
 GITHUB_MIN_REMAINING = 300
+# An open PR older than this is a governor signal (JOV-7079): the cockpit names it and its
+# disposition instead of letting it age silently.
+AGED_PR_S = 7 * 24 * 3600
 
 
 def now_iso() -> str:
@@ -244,6 +247,14 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         listed = " ".join(f"#{number}" for number in sweep["orphans"][:20])
         alerts["orphan-prs"] = (f"{len(sweep['orphans'])} open PRs have no owner (not queued, no live lane-fix label, "
                                 f"no hold): {listed}")
+    if swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
+        aged = [row for row in sweep.get("dispositions") or []
+                if (row.get("ageH") or 0) * 3600 >= AGED_PR_S and row.get("state") != "closing"]
+        if aged:
+            listed = ", ".join(f"#{row['pr']} {row['ageH'] // 24}d {row['state']}"
+                               + (f" ({row['reason']})" if row.get("reason") else "")
+                               for row in aged[:8])
+            alerts["aged-prs"] = (f"{len(aged)} open PRs are older than {AGED_PR_S // 86400}d: {listed}")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -414,6 +425,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "prs": (obs.get("reconcile") or {}).get("counts") or {}, "_idleQualifiedSince": next_idle_since,
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
+            "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
+            "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
             "slo": obs.get("slo")}
 
 

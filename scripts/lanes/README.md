@@ -68,6 +68,17 @@ Gaps closed after the first week (no PR may sit unowned):
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
   draft idle for 48h gets `stale` (or is closed when superseded or out of attempts, its issue
   back to Todo), and a PR that went CLEAN or entered the queue starts a fresh episode.
+- Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
+  drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
+  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). An aged-out agent
+  draft is closed as abandoned — unless its body names a still-open dependency
+  ("blocked by #n", "pull/n"), in which case it holds as `hold:dependency` and is revalidated
+  every sweep: the note is never authoritative once the dependency lands or closes. A human's
+  branch is never touched.
+- Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
+  oldest first: `advancing`, `queued`, `ready`, `hold:<reason>`, `hold:dependency`,
+  `closing`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
+  7 days so the shipping cockpit always names the oldest PRs and why they are still open.
 - Invariant: every open non-draft PR is in the merge queue, carries a `lane-fix-*` label the
   lanes will still act on, or is held with a reason (a hold label, or `lane-fix-exhausted`
   after bug intake). Anything else is listed in `reconcile.json` and raised by the doctor as
