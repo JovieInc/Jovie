@@ -5,6 +5,7 @@ import {
   getPlaylistSpotifyStatus,
   getSpotifyConnectorAccount,
 } from '@/lib/admin/platform-connections';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { REQUIRED_PLAYLIST_SPOTIFY_SCOPES } from '@/lib/spotify/system-account';
 
 export interface AdminPlatformConnectionsData {
@@ -28,14 +29,13 @@ export interface AdminPlatformConnectionsData {
   };
 }
 
-export async function loadAdminPlatformConnectionsData(
-  userId: string
-): Promise<AdminPlatformConnectionsData> {
+export async function loadAdminPlatformConnectionsData(): Promise<AdminPlatformConnectionsData> {
+  const { userId } = await getCachedAuth();
   const [spotifyStatus, engineSettings, currentSpotifyAccount] =
     await Promise.all([
       getPlaylistSpotifyStatus(),
       getPlaylistEngineSettings(),
-      getSpotifyConnectorAccount(userId),
+      userId ? getSpotifyConnectorAccount(userId) : Promise.resolve(null),
     ]);
 
   const hasSpotify =

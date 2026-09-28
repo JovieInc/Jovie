@@ -51,7 +51,7 @@ export default async function AdminPlatformConnectionsPage({
 }: Readonly<{
   searchParams: Promise<{ tab?: string }>;
 }>) {
-  const userId = await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess();
 
   const { tab = 'spotify' } = await searchParams;
   const currentTab = (
@@ -60,7 +60,7 @@ export default async function AdminPlatformConnectionsPage({
 
   let data = FALLBACK_PLATFORM_CONNECTIONS_DATA;
   try {
-    data = await loadAdminPlatformConnectionsData(userId);
+    data = await loadAdminPlatformConnectionsData();
   } catch (error) {
     await captureError(
       'Admin platform connections failed to load optional settings',
