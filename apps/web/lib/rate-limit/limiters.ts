@@ -365,6 +365,18 @@ export const claimTokenAccessLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for private library asset share pages (`/p/[token]`).
+ * A dedicated bucket prevents share traffic from consuming the claim-link or
+ * public-profile budgets.
+ */
+export const libraryAssetShareAccessLimiter = createRateLimiter(
+  RATE_LIMITERS.libraryAssetShareAccess,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for public click endpoint
  * Limit: 50 requests per minute per IP
  */
@@ -1268,6 +1280,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicArtistApi: publicArtistApiLimiter,
     agentProfileCreate: agentProfileCreateLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
+    libraryAssetShareAccess: libraryAssetShareAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,
     publicProfileCaptureDismissal: publicProfileCaptureDismissalLimiter,
