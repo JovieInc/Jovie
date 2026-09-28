@@ -37,7 +37,11 @@ import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
 } from '@/lib/profile/unclaimed-artist-profile';
-import { trackServerEvent, trackServerEventTx } from '@/lib/server-analytics';
+import {
+  type ServerAnalyticsDelivery,
+  trackServerEvent,
+  trackServerEventTx,
+} from '@/lib/server-analytics';
 import { finalizePostOnboarding } from './post-onboarding';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -51,6 +55,22 @@ const DSP_DISCOVERY_PROVIDERS = [
 ] as const;
 
 class SpotifyProfileIdentityConflictError extends Error {}
+
+async function requireFunnelDelivery(
+  event: string,
+  delivery: ServerAnalyticsDelivery
+): Promise<void> {
+  if (delivery.ok) return;
+
+  const error = new Error(
+    `Onboarding Spotify funnel event rejected: ${event} (${delivery.error})`
+  );
+  await captureError('onboarding Spotify funnel event rejected', error, {
+    action: 'connectOnboardingSpotifyArtist',
+    event,
+  });
+  throw error;
+}
 
 export interface ConnectOnboardingSpotifyArtistParams {
   artistName: string;
@@ -329,17 +349,23 @@ export async function connectOnboardingSpotifyArtist(
 
           // Durable funnel events commit atomically with the claim inside
           // this transaction; stable identities deduplicate retries.
-          await trackServerEventTx(
-            tx,
+          await requireFunnelDelivery(
             'claim_completed',
-            { profileId: profile.id, source: 'direct_profile_spotify_match' },
-            { eventIdentity: `claim_completed:${profile.id}` }
+            await trackServerEventTx(
+              tx,
+              'claim_completed',
+              { profileId: profile.id, source: 'direct_profile_spotify_match' },
+              { eventIdentity: `claim_completed:${profile.id}` }
+            )
           );
-          await trackServerEventTx(
-            tx,
+          await requireFunnelDelivery(
             'activation_achieved',
-            { profileId: profile.id, source: 'onboarding_completed' },
-            { eventIdentity: `activation_achieved:${profile.id}` }
+            await trackServerEventTx(
+              tx,
+              'activation_achieved',
+              { profileId: profile.id, source: 'onboarding_completed' },
+              { eventIdentity: `activation_achieved:${profile.id}` }
+            )
           );
 
           await tx

@@ -397,7 +397,10 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       'subscription_churned',
       { stripeEventId },
       undefined,
-      { eventIdentity: `stripe:${stripeEventId}` }
+      {
+        eventIdentity: `stripe:${stripeEventId}`,
+        occurredAt: stripeEventTimestamp,
+      }
     );
     if (!churnDelivery.ok) {
       throw new Error(

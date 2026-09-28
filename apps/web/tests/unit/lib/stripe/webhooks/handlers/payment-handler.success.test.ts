@@ -3,12 +3,16 @@
  *
  * Tests for invoice.payment_succeeded handling.
  */
-vi.mock('@/lib/server-analytics', () => ({
-  trackServerEvent: vi.fn(async () => ({
+const mockTrackServerEvent = vi.hoisted(() =>
+  vi.fn(async () => ({
     ok: true as const,
     eventId: 'server-event-1',
     deduplicated: false,
-  })),
+  }))
+);
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
   trackServerEventTx: vi.fn(async () => ({
     ok: true as const,
     eventId: 'server-event-1',
@@ -94,6 +98,7 @@ describe('@critical PaymentHandler - payment succeeded', () => {
   });
 
   it('processes payment succeeded with user ID in subscription metadata', async () => {
+    const stripeEventTimestamp = new Date('2026-09-27T10:00:00.000Z');
     const mockSubscription = {
       id: 'sub_123',
       status: 'active',
@@ -120,7 +125,7 @@ describe('@critical PaymentHandler - payment succeeded', () => {
         },
       } as Stripe.Event,
       stripeEventId: 'evt_payment_123',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp,
     };
 
     const result = await handler.handle(context);
@@ -137,6 +142,15 @@ describe('@critical PaymentHandler - payment succeeded', () => {
       })
     );
     expect(mockInvalidateBillingCache).toHaveBeenCalled();
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
+      'payment_succeeded',
+      expect.objectContaining({ stripeEventId: 'evt_payment_123' }),
+      undefined,
+      {
+        eventIdentity: 'stripe:evt_payment_123',
+        occurredAt: stripeEventTimestamp,
+      }
+    );
   });
 
   it('handles invoice with expanded subscription object', async () => {

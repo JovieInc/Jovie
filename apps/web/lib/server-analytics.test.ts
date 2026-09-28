@@ -25,6 +25,7 @@ import {
   SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
   SERVER_ANALYTICS_EVENTS,
   trackServerEvent,
+  trackServerEventTx,
 } from './server-analytics';
 
 const WEB_ROOT = process.cwd();
@@ -306,6 +307,68 @@ describe('server analytics contract', () => {
           billingReason: 'subscription_create',
         },
       })
+    );
+  });
+
+  it('persists an authoritative business timestamp for delayed events', async () => {
+    const occurredAt = new Date('2026-09-27T10:00:00.000Z');
+
+    await trackServerEvent(
+      'subscription_churned',
+      { stripeEventId: 'evt_delayed' },
+      undefined,
+      { eventIdentity: 'stripe:evt_delayed', occurredAt }
+    );
+
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({ occurredAt })
+    );
+  });
+
+  it('rejects an invalid authoritative timestamp without writing', async () => {
+    const result = await trackServerEvent(
+      'subscription_churned',
+      { stripeEventId: 'evt_invalid_time' },
+      undefined,
+      {
+        eventIdentity: 'stripe:evt_invalid_time',
+        occurredAt: new Date(Number.NaN),
+      }
+    );
+
+    expect(result).toEqual({ ok: false, error: 'invalid_properties' });
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Invalid server analytics timestamp',
+      }),
+      expect.objectContaining({
+        tags: expect.objectContaining({ event_name: 'subscription_churned' }),
+      })
+    );
+  });
+
+  it('applies a database-enforced timeout inside caller transactions', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+
+    const result = await trackServerEventTx(
+      {
+        execute,
+        insert: mocks.insert,
+      } as never,
+      'signup_completed',
+      { profileId: PROFILE_ID, source: 'organic' },
+      { eventIdentity: `signup_completed:${PROFILE_ID}` }
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      eventId: 'event-1',
+      deduplicated: false,
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(JSON.stringify(execute.mock.calls[0])).toContain(
+      String(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS)
     );
   });
 

@@ -38,6 +38,7 @@ const {
   mockWithDbSessionTx,
   mockWithRetry,
   mockRevalidatePath,
+  mockTrackServerEventTx,
 } = vi.hoisted(() => ({
   cookieSetMock: vi.fn(),
   mockAttributeLeadSignupFromAppUserId: vi.fn(),
@@ -80,6 +81,11 @@ const {
   mockWithDbSessionTx: vi.fn(),
   mockWithRetry: vi.fn(),
   mockRevalidatePath: vi.fn(),
+  mockTrackServerEventTx: vi.fn().mockResolvedValue({
+    ok: true,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  }),
 }));
 
 vi.mock('next/cache', () => ({
@@ -151,6 +157,10 @@ vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
 
 vi.mock('@/lib/onboarding/rate-limit', () => ({
   enforceOnboardingRateLimit: mockEnforceOnboardingRateLimit,
+}));
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEventTx: mockTrackServerEventTx,
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -691,6 +701,34 @@ describe('completeOnboarding', () => {
     );
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockGetCachedCurrentUser).toHaveBeenCalled();
+  });
+
+  it('fails the completion when a durable funnel event is rejected', async () => {
+    mockTrackServerEventTx.mockResolvedValueOnce({
+      ok: false,
+      error: 'invalid_properties',
+    });
+
+    await expect(
+      completeOnboarding({
+        username: 'artist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow(
+      'Onboarding funnel event rejected: signup_completed (invalid_properties)'
+    );
+
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'onboarding funnel event rejected: signup_completed',
+      expect.any(Error),
+      {
+        route: 'onboarding',
+        event: 'signup_completed',
+      }
+    );
+    expect(mockFinalizePostOnboarding).not.toHaveBeenCalled();
+    expect(cookieSetMock).not.toHaveBeenCalled();
   });
 
   it('updates an existing incomplete profile and deactivates orphaned profiles', async () => {

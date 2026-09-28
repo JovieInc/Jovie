@@ -112,14 +112,14 @@ async function recordFunnelDelivery(
   // Contract/prepare failures are deterministic bugs, not transient loss: a
   // database failure throws inside the transaction and rolls the state write
   // back with it, so an undelivered event here means our contract is wrong.
-  await captureError(
-    `onboarding funnel event rejected: ${event}`,
-    new Error(delivery.error),
-    {
-      route: 'onboarding',
-      event,
-    }
+  const error = new Error(
+    `Onboarding funnel event rejected: ${event} (${delivery.error})`
   );
+  await captureError(`onboarding funnel event rejected: ${event}`, error, {
+    route: 'onboarding',
+    event,
+  });
+  throw error;
 }
 
 /**
@@ -133,12 +133,11 @@ async function recordFunnelDelivery(
 async function emitOnboardingFunnelEventsTx(
   tx: DbOrTransaction,
   params: {
-    clerkUserId: string;
     pendingClaim: PendingClaimContext | null;
     result: CompletionResult;
   }
 ): Promise<void> {
-  const { pendingClaim, result, clerkUserId } = params;
+  const { pendingClaim, result } = params;
   if (!result.profileId) return;
 
   if (pendingClaim) {
@@ -159,7 +158,7 @@ async function emitOnboardingFunnelEventsTx(
       tx,
       'signup_completed',
       { profileId: result.profileId, source: pendingClaim?.mode ?? 'organic' },
-      { eventIdentity: `signup_completed:${clerkUserId}` }
+      { eventIdentity: `signup_completed:${result.profileId}` }
     )
   );
 
@@ -423,7 +422,6 @@ export async function completeOnboarding({
                 await markWaitlistSignedUpInTx(tx, clerkUserId);
               }
               await emitOnboardingFunnelEventsTx(tx, {
-                clerkUserId,
                 pendingClaim,
                 result,
               });
@@ -445,7 +443,6 @@ export async function completeOnboarding({
               );
               await markWaitlistSignedUpInTx(tx, clerkUserId);
               await emitOnboardingFunnelEventsTx(tx, {
-                clerkUserId,
                 pendingClaim,
                 result,
               });
@@ -463,7 +460,6 @@ export async function completeOnboarding({
             );
             await markWaitlistSignedUpInTx(tx, clerkUserId);
             await emitOnboardingFunnelEventsTx(tx, {
-              clerkUserId,
               pendingClaim,
               result,
             });

@@ -1,12 +1,16 @@
 /**
  * Subscription Handler Tests - Deleted Events
  */
-vi.mock('@/lib/server-analytics', () => ({
-  trackServerEvent: vi.fn(async () => ({
+const mockTrackServerEvent = vi.hoisted(() =>
+  vi.fn(async () => ({
     ok: true as const,
     eventId: 'server-event-1',
     deduplicated: false,
-  })),
+  }))
+);
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
   trackServerEventTx: vi.fn(async () => ({
     ok: true as const,
     eventId: 'server-event-1',
@@ -41,6 +45,7 @@ describe('@critical SubscriptionHandler - Deleted', () => {
   });
 
   it('processes subscription deleted and revokes pro access', async () => {
+    const stripeEventTimestamp = new Date('2026-09-27T11:00:00.000Z');
     const context: WebhookContext = {
       event: {
         id: 'evt_deleted_123',
@@ -58,7 +63,7 @@ describe('@critical SubscriptionHandler - Deleted', () => {
         },
       } as Stripe.Event,
       stripeEventId: 'evt_deleted_123',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp,
     };
 
     const result = await handler.handle(context);
@@ -76,6 +81,15 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       })
     );
     expect(mockInvalidateBillingCache).toHaveBeenCalled();
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
+      'subscription_churned',
+      { stripeEventId: 'evt_deleted_123' },
+      undefined,
+      {
+        eventIdentity: 'stripe:evt_deleted_123',
+        occurredAt: stripeEventTimestamp,
+      }
+    );
   });
 
   it('sends a Slack cancellation notification on subscription deleted', async () => {

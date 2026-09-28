@@ -1,6 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
 import {
   SIGNUP_FUNNEL_ALL_STEPS,
@@ -521,6 +522,8 @@ export interface ServerAnalyticsEmitOptions {
    * once. Must match the safe-token pattern (e.g. `stripe:evt_123`).
    */
   readonly eventIdentity?: string;
+  /** Authoritative server-side business timestamp for delayed/retried events. */
+  readonly occurredAt?: Date;
 }
 
 function isKnownEvent(event: string): event is ServerAnalyticsEventName {
@@ -635,6 +638,20 @@ function prepareServerAnalyticsInsert(
     return { ok: false, error: 'invalid_properties' };
   }
 
+  if (
+    options?.occurredAt !== undefined &&
+    !Number.isFinite(options.occurredAt.getTime())
+  ) {
+    Sentry.captureException(new Error('Invalid server analytics timestamp'), {
+      tags: {
+        context: 'server_analytics_contract',
+        contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+        event_name: event,
+      },
+    });
+    return { ok: false, error: 'invalid_properties' };
+  }
+
   return {
     ok: true,
     eventName: event,
@@ -649,7 +666,7 @@ function prepareServerAnalyticsInsert(
         typeof sourceEntityId === 'string' ? sourceEntityId : null,
       eventIdentity: options?.eventIdentity ?? null,
       properties: sanitized,
-      occurredAt: new Date(),
+      occurredAt: options?.occurredAt ?? new Date(),
     },
   };
 }
@@ -724,6 +741,13 @@ export async function trackServerEventTx(
 ): Promise<ServerAnalyticsDelivery> {
   const prepared = prepareServerAnalyticsInsert(event, properties, options);
   if (!prepared.ok) return prepared;
+
+  // Bound lock waits and execution in the database itself. A JavaScript race
+  // cannot cancel an in-flight statement and could let the surrounding
+  // transaction remain pinned after the caller has already timed out.
+  await tx.execute(
+    drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS)}, true)`
+  );
   return insertServerAnalyticsRow(tx, prepared);
 }
 

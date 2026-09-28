@@ -449,6 +449,51 @@ describe('connectOnboardingSpotifyArtist', () => {
     );
   });
 
+  it('fails the direct claim transaction when a durable funnel event is rejected', async () => {
+    queueOwnedProfile();
+    queueNoExistingClaim();
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: 'artist_spotify_id',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    hoisted.trackServerEventTxMock.mockResolvedValueOnce({
+      ok: false,
+      error: 'invalid_properties',
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    await expect(
+      connectOnboardingSpotifyArtist({
+        artistName: 'Artist Name',
+        profileId: 'profile_123',
+        spotifyArtistId: 'artist_spotify_id',
+        spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+      })
+    ).rejects.toThrow(
+      'Onboarding Spotify funnel event rejected: claim_completed (invalid_properties)'
+    );
+
+    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
+      'onboarding Spotify funnel event rejected',
+      expect.any(Error),
+      {
+        action: 'connectOnboardingSpotifyArtist',
+        event: 'claim_completed',
+      }
+    );
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.attributeLeadSignupMock).not.toHaveBeenCalled();
+    expect(hoisted.cookiesSetMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
   it('does not report direct claim success when activation receipt persistence fails', async () => {
     queueOwnedProfile();
     queueNoExistingClaim();

@@ -263,7 +263,10 @@ export class PaymentHandler extends BaseSubscriptionHandler {
           billingReason: invoice.billing_reason ?? undefined,
         },
         undefined,
-        { eventIdentity: `stripe:${stripeEventId}` }
+        {
+          eventIdentity: `stripe:${stripeEventId}`,
+          occurredAt: stripeEventTimestamp,
+        }
       );
       if (!paymentDelivery.ok) {
         throw new Error(
