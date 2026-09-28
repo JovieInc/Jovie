@@ -2,6 +2,7 @@ import { readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { encodeToolEvents } from '@/lib/chat/tool-events';
 import { MemoryOperatingStore } from './mcp/store';
+import { summerFailureText } from './summer-failure';
 import {
   appendSummerTurn,
   CURRENT_SUMMER_SESSION_ID,
@@ -71,13 +72,19 @@ describe('Summer UI message stream', () => {
         events.push(event);
       }
       const { message, errorText } = await readTurn(events);
-      // A textless failure is a real stream error, not a fake assistant
-      // reply, so the client restores the composer and offers Retry.
-      expect(errorText).toMatch(/Summer/);
-      expect(errorText).toMatch(/unavailable|unknown|failed|failure/);
+      const hop =
+        state === 'failure' ? 'summer_turn_failed' : 'summer_unreachable';
+      // A textless failure is a real stream error that names the hop, not a
+      // fake assistant reply, so the client restores the composer and Retry.
+      expect(errorText).toBe(summerFailureText(hop));
       expect(message.parts.filter(part => part.type === 'text')).toEqual([]);
       expect(message.metadata).toMatchObject({
         summerState: state === 'failure' ? 'failure' : 'unavailable',
+        // A recorded failure replays on its id; an unrecorded one is re-read.
+        summerFailure: {
+          hop,
+          retry: state === 'failure' ? 'new-turn' : 'same-turn',
+        },
       });
       // A display diagnostic is not a Summer answer or a new durable receipt.
       const session = await loadCurrentSummerSession(store);
@@ -104,6 +111,42 @@ describe('Summer UI message stream', () => {
     // dead-end "do not resend" content is rendered or persisted as an answer.
     expect(errorText).toBe(notice);
     expect(message.parts.filter(part => part.type === 'text')).toEqual([]);
+    expect(message.metadata).toMatchObject({
+      summerFailure: { hop: 'summer_unreachable', retry: 'same-turn' },
+    });
+  });
+
+  it('names a pending result hop and keeps Retry on the same unrecorded turn', async () => {
+    const store = new MemoryOperatingStore();
+    const events: SummerTurnEvent[] = [];
+    for await (const event of runOvieSummerTurn({
+      store,
+      receipts: [],
+      userText: 'What shipped today?',
+      clientTurnId: 'pending-turn',
+      speaker: {
+        id: 'summer',
+        runtime: 'eve',
+        async *speak() {
+          yield {
+            type: 'error',
+            state: 'unknown',
+            hop: 'summer_result_pending',
+          };
+        },
+      },
+    })) {
+      events.push(event);
+    }
+    const { message, errorText } = await readTurn(events);
+    expect(errorText).toBe(summerFailureText('summer_result_pending'));
+    expect(message.parts.filter(part => part.type === 'text')).toEqual([]);
+    expect(message.metadata).toMatchObject({
+      summerFailure: { hop: 'summer_result_pending', retry: 'same-turn' },
+    });
+    expect((await loadCurrentSummerSession(store))?.turns ?? []).toHaveLength(
+      0
+    );
   });
 
   it('re-speaks a persisted empty failed turn on same-id retry so it can reconcile', async () => {
@@ -170,9 +213,7 @@ describe('Summer UI message stream', () => {
       { type: 'state', state: 'unknown' },
       { type: 'state', state: 'unavailable' },
     ]);
-    expect(errorText).toEqual(
-      expect.stringContaining('Summer connection status: unknown.')
-    );
+    expect(errorText).toBe(summerFailureText('summer_unreachable'));
     expect(message.parts.filter(part => part.type === 'text')).toEqual([
       expect.objectContaining({ text: '  ' }),
     ]);
@@ -198,10 +239,11 @@ describe('Summer UI message stream', () => {
     const { message, errorText } = await readTurn([
       { type: 'state', state: 'failed_tool' },
     ]);
-    expect(errorText).toEqual(
-      expect.stringContaining('Summer connection status: failed_tool.')
-    );
+    expect(errorText).toBe(summerFailureText('summer_turn_failed'));
     expect(message.parts.filter(part => part.type === 'text')).toEqual([]);
+    expect(message.metadata).toMatchObject({
+      summerFailure: { hop: 'summer_turn_failed', retry: 'new-turn' },
+    });
   });
 
   it.each([true, false])('renders a tool-only receipt with ok=%s', async ok => {
