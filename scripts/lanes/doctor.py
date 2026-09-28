@@ -22,11 +22,15 @@ import pr_events  # noqa: E402  (sibling module of the release)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
+# Workers spawning but no agent run starting or ending: the 2026-09-28 spawn-exit deadlock
+# (every worker exited on claim), which looked busy to every other rule.
+NO_WORK_S = 60 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
 FAILED_RUN_ALERT = 10
 DISK_MIN_PCT = 10
+DISK_CRIT_PCT = 5
 GITHUB_MIN_REMAINING = 300
 
 
@@ -84,8 +88,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     github = None
     try:
         lane.load_github_env()
-        result = subprocess.run(["gh", "api", "rate_limit"], capture_output=True, text=True, timeout=30)
-        github = json.loads(result.stdout)["resources"]["graphql"]["remaining"] if result.returncode == 0 else None
+        budget = lane.graphql_budget()
+        github = budget[0] if budget else None
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         pass
     held = read_json(state / "held.json", {})
@@ -101,11 +105,14 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "gateTimeouts24h": sum(1 for r in receipts if r.get("verdict") == "gate-timeout"),
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
+        "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
+        "worktrees": len(list((state / "worktrees").glob("*"))),
         "busy": len([p for p in (state / "slots").glob("*.lock") if not p.name.startswith("gate.") and _locked(p)]),
         "codex": accounts, "pool": pool, "linearError": linear_error, "githubRemaining": github,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_pr_numbers()),
+        "reconcile": read_json(state / "reconcile.json", {}),
         "failedByReason": failed_by_reason(failures),
     }
 
@@ -170,14 +177,27 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if pool and busy and obs.get("runs24h") and (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S):
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = f"{busy} slots busy with {pool} issues waiting but nothing passed the gate ({last})"
+    spawned = len((obs.get("tick") or {}).get("spawned") or [])
+    if pool and spawned and not obs.get("worktrees", 1) and (obs.get("lastWorkAge") or NO_WORK_S + 1) > NO_WORK_S:
+        alerts["spawn-exit"] = (f"{spawned} workers spawn each tick but no agent run started or ended in "
+                                f"{NO_WORK_S // 60}m with {pool} issues waiting; workers exit on claim")
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
-    if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
+    if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
+        alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
+                                 f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
+    elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
     if obs.get("githubRemaining") is not None and obs["githubRemaining"] < GITHUB_MIN_REMAINING:
         alerts["github-quota"] = f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; enqueues and listings will fail"
+    sweep = obs.get("reconcile") or {}
+    swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
+    if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
+        listed = " ".join(f"#{number}" for number in sweep["orphans"][:20])
+        alerts["orphan-prs"] = (f"{len(sweep['orphans'])} open PRs have no owner (not queued, no live lane-fix label, "
+                                f"no hold): {listed}")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -284,7 +304,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
             "pool": obs.get("pool"), "lastLandingAgeS": obs.get("lastLandingAge"),
             "codexAvailable": len((obs.get("codex") or {}).get("available") or []),
             "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
-            "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {}}
+            "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
+            "prs": (obs.get("reconcile") or {}).get("counts") or {},
+            "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or []}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"

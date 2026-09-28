@@ -285,6 +285,39 @@ describe('electron-bridge — defensive guards', () => {
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
+  it('redeems return codes only through the explicit bridge method', async () => {
+    const redeemDesktopAuthReturnCode = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({
+        ok: false,
+        reason: 'invalid-code',
+      })
+    );
+    setElectronAPI({ redeemDesktopAuthReturnCode });
+
+    expect(__testing.supportsDesktopAuthReturnCode()).toBe(true);
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({ ok: false, reason: 'invalid-code' });
+    expect(redeemDesktopAuthReturnCode).toHaveBeenCalledWith('BCDF-GHJK');
+
+    redeemDesktopAuthReturnCode.mockResolvedValueOnce({ ok: true });
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it('reports return codes unsupported on a stale bridge', async () => {
+    setElectronAPI({ versions: { app: '0.1.0' } });
+
+    expect(__testing.supportsDesktopAuthReturnCode()).toBe(false);
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-auth-return-code-bridge-unavailable',
+    });
+  });
+
   it('copyDesktopAuthUrl fails closed for a stale bridge', async () => {
     setElectronAPI({ versions: { app: '0.1.0' } });
 

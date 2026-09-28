@@ -22,7 +22,6 @@ jobs:
       actions: write
       contents: read
       pull-requests: read
-      statuses: write
     outputs:
       should_alert: ${{ steps.evaluate.outputs.should_alert }}
       summary: ${{ steps.evaluate.outputs.summary }}
@@ -30,20 +29,13 @@ jobs:
       run_url: ${{ steps.evaluate.outputs.run_url }}
       failed_run_id: ${{ steps.evaluate.outputs.failed_run_id }}
       should_notify: ${{ steps.dedupe.outputs.should_notify }}
-      needs_autofix: ${{ steps.evaluate.outputs.needs_autofix }}
-      autofix_skip_reason: ${{ steps.evaluate.outputs.autofix_skip_reason }}
       failing_run_id: ${{ steps.evaluate.outputs.failing_run_id }}
       failing_run_attempt: ${{ steps.evaluate.outputs.failing_run_attempt }}
-      repair_attempt: ${{ steps.evaluate.outputs.repair_attempt }}
       failing_sha: ${{ steps.evaluate.outputs.failing_sha }}
       failing_short_sha: ${{ steps.evaluate.outputs.failing_short_sha }}
       last_green_sha: ${{ steps.evaluate.outputs.last_green_sha }}
       failed_job_names: ${{ steps.evaluate.outputs.failed_job_names }}
-      systemic: ${{ steps.evaluate.outputs.systemic }}
-      repair_in_flight: ${{ steps.evaluate.outputs.repair_in_flight }}
-      repair_marker_owned: ${{ steps.evaluate.outputs.repair_marker_owned }}
-      repair_terminal: ${{ steps.evaluate.outputs.repair_terminal }}
-      repair_state_known: ${{ steps.evaluate.outputs.repair_state_known }}
+      evidence_known: ${{ steps.evaluate.outputs.evidence_known }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -157,14 +149,14 @@ jobs:
           echo "Evaluating failed CI run $FAILED_RUN_ID for auto-rerun..."
 
           # Guard: only re-run once per failed run to avoid infinite retry loops.
-          # If attempt > 1, autofix takes over (see .github/workflows/main-autofix.yml).
+          # If attempt > 1, the lanes fix loop owns red-main repair.
           ATTEMPT=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID" --jq '.run_attempt // empty')
           [[ "$ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
             echo "::error::Could not establish the exact failed run attempt; refusing a blind rerun."
             exit 1
           }
           if [ "$ATTEMPT" -gt 1 ]; then
-            echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping — autofix will handle."
+            echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping — the lanes fix loop owns repair."
             exit 0
           fi
 

@@ -36,6 +36,7 @@ export function SmartLinkAudioPreview({
 
   const isThisTrack = playbackState.activeTrackId === contentId;
   const isLoading = isThisTrack && playbackState.playbackStatus === 'loading';
+  const isError = isThisTrack && playbackState.playbackStatus === 'error';
   const isPlaying = isThisTrack && playbackState.isPlaying;
   const currentTime = isThisTrack ? playbackState.currentTime : 0;
   const duration = isThisTrack ? playbackState.duration : 0;
@@ -75,7 +76,7 @@ export function SmartLinkAudioPreview({
 
   const currentTimeFormatted = formatDuration(Math.round(currentTime) * 1000);
   const durationFormatted =
-    duration > 0 ? formatDuration(Math.round(duration) * 1000) : '–:––';
+    duration > 0 ? formatDuration(Math.round(duration) * 1000) : null;
   let fallbackSourceLabel: string | null = null;
   if (previewVerification === 'fallback') {
     const sourceLabels: Record<string, string> = {
@@ -91,6 +92,15 @@ export function SmartLinkAudioPreview({
 
   let statusLabel = isPlaying ? 'Pause preview' : 'Play preview';
   if (isLoading) statusLabel = 'Loading preview';
+
+  let durationSlot: string;
+  if (isError) {
+    durationSlot = 'Unavailable';
+  } else if (durationFormatted) {
+    durationSlot = `${durationFormatted}${duration < 45 ? ' · Preview' : ''}`;
+  } else {
+    durationSlot = '—';
+  }
 
   return (
     <div className='space-y-1.5' data-testid='smart-link-audio-preview'>
@@ -129,16 +139,13 @@ export function SmartLinkAudioPreview({
           </div>
           <div className='flex h-3.5 items-center justify-between text-3xs tabular-nums text-white/35'>
             <span className='min-w-8'>{currentTimeFormatted}</span>
-            <span className='min-w-12 text-right'>
-              {durationFormatted}
-              {duration > 0 && duration < 45 ? ' · Preview' : ''}
-            </span>
+            <span className='min-w-12 text-right'>{durationSlot}</span>
           </div>
         </div>
       </div>
-      <p className='min-h-3.5 text-3xs text-white/45'>
-        {fallbackSourceLabel ?? '\u00a0'}
-      </p>
+      {fallbackSourceLabel ? (
+        <p className='text-3xs text-white/45'>{fallbackSourceLabel}</p>
+      ) : null}
     </div>
   );
 }

@@ -15,11 +15,18 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingEditorialHeroPhoto,
+  MarketingHero,
+} from '@/components/marketing';
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { changelogInlineText } from '@/lib/changelog-parser';
+import {
+  changelogInlineText,
+  changelogVersionLabel,
+} from '@/lib/changelog-parser';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import {
   buildArticleSchema,
@@ -32,12 +39,12 @@ export const revalidate = false;
 const CHANGELOG_OG_IMAGE = `${BASE_URL}/og/default.png`;
 
 function releaseDescription(
-  version: string,
+  label: string,
   summary: string | null | undefined
 ): string {
   return summary
     ? changelogInlineText(summary)
-    : `Features, improvements, and fixes in ${APP_NAME} v${version}.`;
+    : `Features, improvements, and fixes in ${APP_NAME} ${label}.`;
 }
 
 type ChangelogReleasePageProps = {
@@ -58,13 +65,14 @@ export async function generateMetadata({
   if (!release) return {};
 
   const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
-  const description = releaseDescription(version, release.summary);
+  const label = changelogVersionLabel(version);
+  const description = releaseDescription(label, release.summary);
   return {
-    title: `${APP_NAME} v${version}`,
+    title: `${APP_NAME} ${label}`,
     description,
     alternates: { canonical },
     openGraph: {
-      title: `${APP_NAME} v${version}`,
+      title: `${APP_NAME} ${label}`,
       description,
       type: 'article',
       url: canonical,
@@ -75,7 +83,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${APP_NAME} v${version}`,
+      title: `${APP_NAME} ${label}`,
       description,
       images: [CHANGELOG_OG_IMAGE],
     },
@@ -152,10 +160,11 @@ export default async function ChangelogReleasePage({
 
   const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
   // Undated releases get breadcrumbs only: Article requires datePublished.
+  const label = changelogVersionLabel(version);
   const articleSchema = release.date
     ? buildArticleSchema({
-        headline: `${APP_NAME} v${version}`,
-        description: releaseDescription(version, release.summary),
+        headline: `${APP_NAME} ${label}`,
+        description: releaseDescription(label, release.summary),
         datePublished: release.date,
         authorName: APP_NAME,
         url: canonical,
@@ -164,7 +173,7 @@ export default async function ChangelogReleasePage({
   const breadcrumbSchema = buildBreadcrumbSchema([
     { name: APP_NAME, url: BASE_URL },
     { name: 'Changelog', url: `${BASE_URL}${APP_ROUTES.CHANGELOG}` },
-    { name: `v${version}`, url: canonical },
+    { name: label, url: canonical },
   ]);
 
   return (
@@ -173,12 +182,17 @@ export default async function ChangelogReleasePage({
         <script type='application/ld+json'>{articleSchema}</script>
       ) : null}
       <script type='application/ld+json'>{breadcrumbSchema}</script>
-      <div className='relative'>
+      <div className='marketing-hero-dock relative overflow-hidden'>
+        <MarketingEditorialHeroPhoto
+          src='/images/hero/changelog-version.webp'
+          opacity={0.22}
+          testId='changelog-version-hero-photo'
+        />
         <div
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'
         />
-        <MarketingHero variant='left'>
+        <MarketingHero variant='left' className='relative z-10'>
           <nav aria-label='Breadcrumb'>
             <ol className='flex flex-wrap items-center gap-2 font-mono text-app'>
               <li>
@@ -193,15 +207,16 @@ export default async function ChangelogReleasePage({
                 <ChevronRight className='size-3 text-quaternary-token' />
               </li>
               <li aria-current='page' className='text-accent'>
-                {/* ui-casing-allow: semantic version path segment */}/v
-                {release.version}
+                {/* ui-casing-allow: version or date path segment */}/
+                {changelogVersionLabel(release.version)}
               </li>
             </ol>
           </nav>
 
           <div className='mt-8 flex flex-wrap items-center gap-5'>
             <h1 className='changelog-version-identity line-clamp-2 font-mono text-primary-token'>
-              {/* ui-casing-allow: semantic version string */}v{release.version}
+              {/* ui-casing-allow: semantic version or date-key string */}
+              {changelogVersionLabel(release.version)}
             </h1>
             <div className='flex flex-col items-start gap-2'>
               {isLatest && (

@@ -2120,7 +2120,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: hidden;
   gap: var(--space-2);
   padding: var(--homepage-name-search-inset) var(--homepage-name-search-inset)
-    var(--homepage-name-search-inset) var(--space-5);
+    var(--homepage-name-search-inset) var(--space-4);
   border: var(--space-px) solid transparent;
   border-radius: var(--radius-pill);
   background: var(--homepage-editorial-field);
@@ -2142,6 +2142,38 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 510;
   padding-inline: var(--space-4);
+}
+
+/* The input is the pill (JOV-6946 rule 7): it fills the whole field so its
+   own focus ring traces the pill edge, never a square box inside it. The
+   glyph and the submit button sit above it; the padding keeps typed text
+   clear of both. */
+.homepage-name-search__field .homepage-name-search__input {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  padding-left: calc(var(--space-4) + var(--space-4) + var(--space-2));
+  padding-right: 7.5rem;
+}
+
+.homepage-name-search__field .homepage-name-search__input:focus-visible {
+  /* Inset: the field clips at the pill edge, so the ring draws inside it. */
+  box-shadow: inset 0 0 0 var(--space-0-5, 2px) var(--color-focus);
+}
+
+.homepage-name-search__icon {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.homepage-name-search__field .homepage-name-search__submit {
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
 }
 
 .homepage-name-search__results {
@@ -2221,6 +2253,39 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-name-search__field {
     transition: none;
+  }
+}
+
+/* JOV-6296 carbon-frame scroll transition. The hero mounts as a true
+   full-viewport field; across the first bounded scroll interval it settles
+   into a rounded frame on near-black gutters. The animation is scroll-driven
+   and geometry-only (scale + radius on the composited section), so layout,
+   the search geometry, and the shared header never move. Browsers without
+   scroll() timelines and reduced-motion users keep the certified still. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .home-viewport {
+      background: var(--system-b-cinematic-black);
+    }
+
+    .homepage-editorial-hero {
+      will-change: transform;
+      animation: homepage-editorial-hero-frame linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0px 40vh;
+    }
+  }
+}
+
+@keyframes homepage-editorial-hero-frame {
+  from {
+    border-radius: 0;
+    transform: scale(1);
+  }
+
+  to {
+    border-radius: var(--system-b-radius-panel);
+    transform: scale(0.96);
   }
 }
 /* HOMEPAGE EDITORIAL HERO END */
@@ -2531,13 +2596,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: block;
 }
 
-.homepage-connected-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-8);
-  align-items: start;
-}
-
 .homepage-certified-section__eyebrow {
   margin: 0 0 var(--space-4);
   color: var(--color-text-tertiary-token);
@@ -2557,66 +2615,150 @@ body:has(.home-viewport)::-webkit-scrollbar {
   line-height: 1.1;
 }
 
-.homepage-connected-header > .homepage-certified-section__body,
 .homepage-certified-section--relationships .homepage-certified-section__body {
   color: var(--color-text-secondary-token);
   font-size: 1.125rem;
   line-height: 1.5;
 }
 
-.homepage-connected-artwork {
-  width: 100%;
-  margin-top: clamp(var(--space-8), 4vw, var(--space-12));
+.homepage-chapter-visual {
+  border-radius: var(--radius-xl);
+  background: var(--system-b-text-primary);
+}
+
+/* JOV-6300 "You are not one thing." — bounded multi-hyphenate treatment
+   inside the relationships chapter. Carbon grade surface, warm-white
+   active artifact, at most three contextual lenses. */
+.homepage-identity {
+  margin-top: clamp(var(--space-9), 4vw, var(--space-12));
+  padding-top: clamp(var(--space-7), 3vw, var(--space-9));
+  border-top: 1px solid var(--noir-ion-border-subtle);
+}
+
+.homepage-identity__opening {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: clamp(1.375rem, 2vw, 1.625rem);
+  font-weight: 560;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.homepage-identity__figure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin: var(--space-6) 0 0;
+}
+
+.homepage-identity__portrait {
+  display: block;
+  width: 96px;
+  aspect-ratio: 1;
+  flex-shrink: 0;
   overflow: hidden;
-  aspect-ratio: 1902 / 827;
+  border: 1px solid var(--noir-ion-border-subtle);
+  border-radius: 50%;
   background: #020305;
 }
 
-.homepage-connected-artwork__image {
+.homepage-identity__portrait-image {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.homepage-relationship-outcomes {
+.homepage-identity__caption {
   display: flex;
-  margin: 0;
-  padding: 0;
+  min-width: 0;
   flex-direction: column;
-  gap: clamp(var(--space-8), 3vw, var(--space-11));
-  list-style: none;
+  gap: var(--space-1);
 }
 
-.homepage-relationship-outcome {
-  display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1fr);
-  gap: var(--space-6);
-  align-items: start;
+.homepage-identity__name {
+  color: var(--color-text-primary-token);
+  font-size: 1rem;
+  font-weight: 560;
+  line-height: 1.3;
 }
 
-.homepage-relationship-outcome__index {
-  padding-top: 0.2rem;
+.homepage-identity__handle {
   color: var(--color-text-tertiary-token);
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.75rem;
   line-height: 1.4;
 }
 
-.homepage-relationship-outcome__copy h3 {
-  margin: 0;
-  color: var(--color-text-primary-token);
-  font-size: 1.375rem;
-  font-weight: 590;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
+.homepage-identity__emphasis {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary-token);
+  font-size: 0.9375rem;
+  line-height: 1.4;
 }
 
-.homepage-relationship-outcome__copy p {
-  margin: var(--space-2) 0 0;
+.homepage-identity__lenses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.homepage-identity__lens {
+  display: inline-flex;
+  min-height: var(--space-7);
+  align-items: center;
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--noir-ion-border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
   color: var(--color-text-secondary-token);
-  font-size: 1.125rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.homepage-identity__lens[aria-pressed="true"] {
+  border-color: var(--color-text-primary-token);
+  background: var(--color-text-primary-token);
+  color: var(--color-bg-base);
+}
+
+.homepage-identity__lens:focus-visible {
+  outline: 2px solid var(--color-text-primary-token);
+  outline-offset: 2px;
+}
+
+.homepage-identity__payoff {
+  margin: var(--space-6) 0 0;
+  color: var(--color-text-tertiary-token);
+  font-size: 1rem;
   line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-identity__lens,
+  .homepage-identity__emphasis {
+    transition:
+      color 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease;
+  }
+}
+
+@media (max-width: 640px) {
+  .homepage-identity__figure {
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .homepage-identity__portrait {
+    width: 72px;
+  }
 }
 
 .homepage-editorial-changelog {
@@ -2696,28 +2838,31 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-align: center;
 }
 
+/* One accent per card, centered on its exact token and glowing from one
+   corner over the page ground (Pen My0zu, JOV-6914). Visual order rotates
+   blue, purple, pink. */
+.homepage-editorial-card__media--blue,
+.homepage-editorial-card__media--purple,
+.homepage-editorial-card__media--pink {
+  background:
+    radial-gradient(
+      ellipse 75% 70% at 88% 8%,
+      color-mix(in oklab, var(--homepage-editorial-accent) 62%, transparent),
+      transparent 72%
+    ),
+    var(--system-b-bg-page);
+}
+
 .homepage-editorial-card__media--blue {
-  background: linear-gradient(
-    35deg,
-    color-mix(in oklab, var(--color-accent-blue) 20%, var(--system-b-bg-page)),
-    color-mix(in oklab, var(--color-accent-blue) 66%, var(--system-b-bg-page))
-  );
+  --homepage-editorial-accent: var(--color-accent-blue);
+}
+
+.homepage-editorial-card__media--purple {
+  --homepage-editorial-accent: var(--color-accent-purple);
 }
 
 .homepage-editorial-card__media--pink {
-  background: linear-gradient(
-    35deg,
-    color-mix(in oklab, var(--color-accent-pink) 20%, var(--system-b-bg-page)),
-    color-mix(in oklab, var(--color-accent-pink) 66%, var(--system-b-bg-page))
-  );
-}
-
-.homepage-editorial-card__media--green {
-  background: linear-gradient(
-    35deg,
-    color-mix(in oklab, var(--color-accent-green) 20%, var(--system-b-bg-page)),
-    color-mix(in oklab, var(--color-accent-green) 66%, var(--system-b-bg-page))
-  );
+  --homepage-editorial-accent: var(--color-accent-pink);
 }
 
 .homepage-editorial-card__theme-title {
@@ -2751,20 +2896,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (min-width: 900px) {
-  .homepage-connected-header {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: clamp(var(--space-4), 2vw, var(--space-6));
-  }
-
-  .homepage-connected-header .homepage-certified-section__copy {
-    grid-column: 1 / span 7;
-  }
-
-  .homepage-connected-header > .homepage-certified-section__body {
-    grid-column: 9 / span 4;
-    margin-top: var(--space-6);
-  }
-
   .homepage-editorial-changelog__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: clamp(var(--space-5), 2.5vw, var(--space-8));
@@ -2782,6 +2913,46 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-close__copy {
     transition: none;
   }
+}
+
+/* Pen My0zu (JOV-6946): two real jov.ie/tim next steps side by side on the
+   page ground. No light panel: the phones are the only surface. */
+.homepage-next-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(var(--space-12), 8vw, var(--space-24));
+  margin-top: clamp(var(--space-12), 5vw, var(--space-16));
+}
+
+.homepage-next-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  width: min(100%, 18rem);
+  margin: 0;
+}
+
+/* Both captures render at one device width so the pair reads as a set. */
+.homepage-next-step .homepage-certified-section__device {
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  /* The next steps are a full-width row under the copy (Pen My0zu), not a
+     side column. */
+  .homepage-next-steps {
+    grid-column: 1 / -1;
+  }
+}
+
+.homepage-next-step__caption {
+  max-width: 18rem;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* HOMEPAGE CERTIFIED SECTIONS END */
@@ -7441,15 +7612,3 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 /* HOMEPAGE SSR CONTENT FALLBACK END */
-
-/* Bloom ON: 240px action face, with the shared button hit target. */
-.homepage-request-access {
-  width: min(15rem, 100%);
-  margin-inline: auto;
-}
-
-@media (max-width: 767px) {
-  .homepage-request-access {
-    width: 100%;
-  }
-}

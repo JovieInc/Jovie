@@ -310,7 +310,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('path-selects and runs the disabled DeepSec policy safety tests', () => {
+  it('path-selects and runs the DeepSec policy and closed-loop tests', () => {
     const initial = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
     const additions = [
       ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
@@ -322,6 +322,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/security/deepsec-policy.test.mjs',
       'scripts/security/deepsec/policy.json',
       'scripts/security/deepsec/targets.json',
+      'scripts/security/deepsec-loop.mjs',
     ]) {
       expect(
         spawnSync('grep', ['-Eq', pattern], {
@@ -332,7 +333,7 @@ describe('ci-fast bounded parallel workflow', () => {
       ).toBe(0);
     }
     expect(CI_FAST_SOURCE).toContain(
-      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs'"
+      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs'"
     );
   });
 
@@ -552,6 +553,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'eslint-server-boundaries',
       'guardrails',
       'ios-fast',
+      'merge-group-guards',
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
@@ -957,6 +959,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(warm).toContain("github.ref == 'refs/heads/main' &&");
     expect(warm).not.toMatch(/secrets\.|TURBO_TOKEN|continue-on-error/);
     expect(warm).toContain('persist-credentials: false');
+    // JOV-6835: the only main-scoped node_modules writer must not be gated
+    // on the tsc key, or main's dependency cache goes stale after manifests move.
+    expect(warm).toMatch(
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n {6}- name:/
+    );
     const keys = body =>
       body.split('\n').filter(line => line.includes('jovie-web-tsbuildinfo'));
     const [ciKey, ...ciFallbacks] = keys(restore).map(line => line.trim());
@@ -1034,7 +1041,7 @@ describe('ci-fast bounded parallel workflow', () => {
         const [selector] = selectors;
         expect(block).toContain(`name: ${jobName}`);
         expect(block).toMatch(
-          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
         );
         expect(block).not.toContain('always()');
         // Aliased gate jobs share remaining's anchored condition verbatim.
@@ -1072,6 +1079,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance',
       'ios-fast',
       'profile-admission',
+      'merge-group-guards',
       'billing-coverage',
       'copy-gate',
       'structural',
@@ -1104,6 +1112,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-governance-enforcement':
         'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
+      'merge-group-guards':
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
@@ -1339,7 +1349,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
-        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
       );
     }
   });
@@ -1735,7 +1745,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
@@ -1825,6 +1835,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_GROUPS.web).toEqual([
       'design-conformance',
       'profile-admission',
+      'merge-group-guards',
     ]);
     for (const laneId of LANE_GROUPS.web) {
       expect(LANE_GROUPS.remaining).not.toContain(laneId);

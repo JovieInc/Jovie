@@ -12,6 +12,7 @@ import {
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  net,
   powerMonitor,
   type Session,
   screen,
@@ -44,6 +45,10 @@ import {
   setDesktopAuthRecoveryNavigationPending,
 } from './desktop-auth-browser-route';
 import {
+  DESKTOP_AUTH_HANDBACK_PATH,
+  redeemDesktopReturnCode,
+} from './desktop-auth-handback';
+import {
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
   type PendingDesktopAuthPkce,
@@ -53,8 +58,12 @@ import {
 import {
   buildDesktopUpdateMenuItem,
   buildManualUpdateCheckFeedback,
+  DESKTOP_UPDATE_INITIAL_STATE,
+  type DesktopUpdateEvent,
+  type DesktopUpdatePhase,
   hasNightlyUpdateFlag,
   NIGHTLY_UPDATE_TIMEOUT_MS,
+  reduceDesktopUpdateState,
   shouldInstallDownloadedUpdateNow,
   shouldInstallDownloadedUpdateWhileRunning,
   shouldRunWakeUpdateCheck,
@@ -217,6 +226,12 @@ const MACOS_TRAFFIC_LIGHT_POSITION = {
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
+const DESKTOP_UPDATE_STATE_CHANNEL = 'desktop-update-state';
+const DESKTOP_UPDATE_GET_STATE_CHANNEL = 'desktop-update-get-state';
+const DESKTOP_UPDATE_CHECK_CHANNEL = 'desktop-update-check';
+const DESKTOP_UPDATE_DOWNLOAD_CHANNEL = 'desktop-update-download';
+const DESKTOP_UPDATE_INSTALL_CHANNEL = 'desktop-update-install';
+const DESKTOP_UPDATE_NOTES_URL = `${APP_ORIGIN}/changelog`;
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
@@ -224,6 +239,8 @@ const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
+const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
+  'redeem-desktop-auth-return-code';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
@@ -298,6 +315,8 @@ const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
+// Typed updater phase mirrored to the renderer via desktop-update-state IPC.
+let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // Set only for a menu-initiated "Check for updates…" click so its result
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
@@ -310,6 +329,9 @@ let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
 let desktopBrowserAuthRouteState = emptyDesktopBrowserAuthRouteState();
+// A return code and a late deep link can deliver the same exchange code; the
+// second must not surface a fresh "no pending flow" handoff after success.
+let lastCompletedAuthCode: string | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 // webContents ids still showing the web build that preceded the current one.
@@ -659,6 +681,19 @@ function clearPendingDesktopAuthFlow(): void {
   desktopBrowserAuthRouteState = clearDesktopBrowserAuthRouteState();
 }
 
+// A fresh install, a second copy of Jovie, or an app launched from a
+// translocated path can leave jovie:// pointing somewhere else. Reclaim it
+// before each browser handoff. The return code covers the case where macOS
+// still routes the link elsewhere.
+function ensureAuthReturnProtocolRegistered(): void {
+  if (isAuthReturnProtocolRegistered()) return;
+  registerAuthReturnProtocol();
+  reportDesktopSecurityEvent(
+    'auth-protocol-handler-repaired',
+    isAuthReturnProtocolRegistered() ? 'repaired' : 'still-unregistered'
+  );
+}
+
 function createCentralDesktopAuthRoute(
   intent: DesktopAuthIntent,
   returnTo: string
@@ -672,6 +707,8 @@ function createCentralDesktopAuthRoute(
   authUrl.searchParams.set('code_challenge', pkce.codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set(DESKTOP_AUTH_FLOW_PARAM, pkce.flowNonce);
+  // This build can redeem a typed return code (desktop-auth-handback.ts).
+  authUrl.searchParams.set('desktop_return_code', '1');
   return {
     authUrl: `${authUrl.pathname}${authUrl.search}`,
     pendingPkce: pkce,
@@ -1015,6 +1052,8 @@ function surfaceNoPendingAuthFlow(): void {
 function handleAuthCompletion(
   completion: NonNullable<ReturnType<typeof parseDesktopAuthReturnDeepLink>>
 ): void {
+  if (completion.code === lastCompletedAuthCode) return;
+
   const binding = bindPendingDesktopAuthCompletion(
     desktopBrowserAuthRouteState.pendingPkce,
     completion
@@ -1036,6 +1075,7 @@ function handleAuthCompletion(
   }
 
   clearPendingDesktopAuthFlow();
+  lastCompletedAuthCode = completion.code;
 
   const nativeCompletion: DesktopAuthCompletion = {
     code: completion.code,
@@ -2647,28 +2687,68 @@ function handleTrayAction(action: TrayAction): void {
   }
 }
 
-function sendToAppWindows(channel: UpdateChannel): void {
+function sendToAppWindows(channel: string, payload?: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     const parsed = parseUrl(win.webContents.getURL());
     if (parsed?.origin === APP_ORIGIN) {
-      win.webContents.send(channel);
+      win.webContents.send(channel, payload);
     }
   }
 }
 
-// Wire auto-updater events to renderer IPC so the web UI can show the update pill.
-autoUpdater.on('update-available', () => {
+/** Record the typed updater phase and push it to every trusted app window. */
+function emitDesktopUpdatePhase(phase: DesktopUpdatePhase): void {
+  desktopUpdatePhase = phase;
+  sendToAppWindows(DESKTOP_UPDATE_STATE_CHANNEL, phase);
+}
+
+function pushUpdateEvent(event: DesktopUpdateEvent): void {
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(event, DESKTOP_UPDATE_NOTES_URL)
+  );
+}
+
+function updateErrorEvent(error: unknown): DesktopUpdateEvent {
+  return {
+    type: 'error',
+    message: error instanceof Error ? error.message : String(error),
+  };
+}
+
+// Wire auto-updater events to renderer IPC so the web UI can show the update
+// pill (legacy boolean channels) and the typed update surfaces (JOV-6683).
+autoUpdater.on('checking-for-update', () => {
+  pushUpdateEvent({ type: 'checking-for-update' });
+});
+
+autoUpdater.on('update-available', info => {
   updateReadyToInstall = false;
   pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_AVAILABLE_CHANNEL);
+  pushUpdateEvent({
+    type: 'update-available',
+    version: info.version,
+    releaseDate: info.releaseDate ?? null,
+  });
 });
 
-autoUpdater.on('update-downloaded', () => {
+autoUpdater.on('download-progress', progress => {
+  pushUpdateEvent({
+    type: 'download-progress',
+    percent: progress.percent,
+    transferredBytes: progress.transferred,
+    totalBytes: progress.total,
+    bytesPerSecond: progress.bytesPerSecond,
+  });
+});
+
+autoUpdater.on('update-downloaded', info => {
   updateReadyToInstall = true;
   pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
+  pushUpdateEvent({ type: 'update-downloaded', version: info.version });
 
   const hasVisibleWindow = BrowserWindow.getAllWindows().some(
     win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
@@ -2686,13 +2766,15 @@ autoUpdater.on('update-downloaded', () => {
 });
 
 autoUpdater.on('update-not-available', () => {
+  pushUpdateEvent({ type: 'update-not-available' });
   showManualUpdateCheckFeedback('not-available');
   if (nightlyUpdateLaunch) {
     app.quit();
   }
 });
 
-autoUpdater.on('error', () => {
+autoUpdater.on('error', error => {
+  pushUpdateEvent(updateErrorEvent(error));
   showManualUpdateCheckFeedback('error');
   if (nightlyUpdateLaunch) {
     app.quit();
@@ -2727,6 +2809,49 @@ ipcMain.handle(
     return { ok: true };
   }
 );
+
+// Typed update surface (JOV-6683): the renderer's jovieDesktop.updates bridge.
+const INVALID_IPC = { ok: false, reason: 'invalid-request' } as const;
+
+ipcMain.handle(DESKTOP_UPDATE_GET_STATE_CHANNEL, event =>
+  isTrustedIpcSender(event) ? desktopUpdatePhase : null
+);
+
+ipcMain.handle(DESKTOP_UPDATE_CHECK_CHANNEL, event => {
+  if (!isTrustedIpcSender(event)) return INVALID_IPC;
+  if (!desktopUpdatesSupported()) return { ok: false, reason: 'unsupported' };
+  runDesktopUpdateCheck('silent');
+  return { ok: true };
+});
+
+ipcMain.handle(DESKTOP_UPDATE_DOWNLOAD_CHANNEL, event => {
+  if (!isTrustedIpcSender(event)) return INVALID_IPC;
+  // autoDownload normally starts the download as soon as an update is found;
+  // treat an in-flight or completed download as success and only kick a
+  // manual download when the update is still waiting.
+  if (
+    desktopUpdatePhase.state === 'downloading' ||
+    desktopUpdatePhase.state === 'ready'
+  ) {
+    return { ok: true };
+  }
+  if (desktopUpdatePhase.state !== 'available') {
+    return { ok: false, reason: 'no-update-available' };
+  }
+  void autoUpdater
+    .downloadUpdate()
+    .catch(error => pushUpdateEvent(updateErrorEvent(error)));
+  return { ok: true };
+});
+
+ipcMain.handle(DESKTOP_UPDATE_INSTALL_CHANNEL, event => {
+  if (!isTrustedIpcSender(event)) return INVALID_IPC;
+  if (!updateReadyToInstall) {
+    return { ok: false, reason: 'update-not-downloaded' };
+  }
+  autoUpdater.quitAndInstall();
+  return { ok: true };
+});
 
 // Hosted app first-paint heartbeat (JOV-3595). Uses send (not invoke) so a
 // missing main handler on a stale binary cannot reject the renderer promise.
@@ -2832,6 +2957,7 @@ ipcMain.handle(
       return { ok: false, reason: resolution.reason };
     }
 
+    ensureAuthReturnProtocolRegistered();
     return openExternalUrl(new URL(resolution.authUrl, APP_URL).toString());
   }
 );
@@ -2884,6 +3010,43 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
+  REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,
+  async (
+    event: IpcMainInvokeEvent,
+    returnCode: unknown,
+    ...args: unknown[]
+  ): Promise<DesktopAuthOpenResult> => {
+    if (!isTrustedDesktopAuthSender(event) || args.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    const pending = desktopBrowserAuthRouteState.pendingPkce;
+    const result = await redeemDesktopReturnCode({
+      endpoint: new URL(DESKTOP_AUTH_HANDBACK_PATH, APP_URL).toString(),
+      // net.fetch follows the system proxy configuration (PAC, corporate
+      // proxies). No cookies: the PKCE verifier is the proof.
+      fetch: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+      pending,
+      returnCode,
+    });
+    if (!result.ok) {
+      if (result.reason === 'invalid-code') {
+        reportDesktopSecurityEvent('auth-return-code-rejected');
+      }
+      return { ok: false, reason: result.reason };
+    }
+
+    // The user may have cancelled or restarted while the request was out.
+    if (desktopBrowserAuthRouteState.pendingPkce !== pending) {
+      return { ok: false, reason: 'no-pending-flow' };
+    }
+
+    handleAuthCompletion(result.completion);
+    return { ok: true };
+  }
+);
+
+ipcMain.handle(
   CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL,
   (event: IpcMainInvokeEvent, ...args: unknown[]) => {
     if (!isTrustedDesktopAuthCompleteSender(event) || args.length !== 0) {
@@ -2910,7 +3073,9 @@ ipcMain.handle(
   }
 );
 
-function registerAuthReturnProtocol(): void {
+function getAuthReturnProtocolClientArgs():
+  | readonly [string, readonly string[]]
+  | null {
   const defaultAppProcess = process as NodeJS.Process & {
     readonly defaultApp?: boolean;
   };
@@ -2920,13 +3085,30 @@ function registerAuthReturnProtocol(): void {
     process.argv.length >= 2 &&
     !app.isPackaged
   ) {
-    app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME, process.execPath, [
-      path.resolve(process.argv[1]),
+    return [process.execPath, [path.resolve(process.argv[1])]];
+  }
+  return null;
+}
+
+function registerAuthReturnProtocol(): void {
+  const devArgs = getAuthReturnProtocolClientArgs();
+  if (devArgs) {
+    app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME, devArgs[0], [
+      ...devArgs[1],
     ]);
     return;
   }
 
   app.setAsDefaultProtocolClient(AUTH_RETURN_SCHEME);
+}
+
+function isAuthReturnProtocolRegistered(): boolean {
+  const devArgs = getAuthReturnProtocolClientArgs();
+  return devArgs
+    ? app.isDefaultProtocolClient(AUTH_RETURN_SCHEME, devArgs[0], [
+        ...devArgs[1],
+      ])
+    : app.isDefaultProtocolClient(AUTH_RETURN_SCHEME);
 }
 
 if (gotSingleInstanceLock) {

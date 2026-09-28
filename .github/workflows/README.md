@@ -20,11 +20,12 @@ The all-PR drain is retired: **Merge Queue Auto-Enroll** is disabled and removed
 while **Auto-Ready Agent Drafts** has been `disabled_manually` since
 2026-07-20 (verified 2026-09-20) — drafts are undrafted by their writer, not
 automatically; re-enabling it is a founder decision. Enable **Main CI Health
-Monitor** and **Main Autofix** only after
+Monitor** only after
 the queue and production topology have produced bounded proof. GitHub AI
-Orchestrator, GitHub AI Dispatcher, and Agent Tick are retired at source because
-Linear-backed Symphony is the sole intake selector. Keep Agent Pipeline, PR
-Conflict Handler, Stuck Draft Auto-Close, Auto-Fix Lint on Agent Drafts, Taste
+Orchestrator, GitHub AI Dispatcher, Agent Tick, Main Autofix, and Auto-Fix Lint
+on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
+repair. Keep Agent Pipeline, PR
+Conflict Handler, Stuck Draft Auto-Close, Taste
 Classifier/Guard, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows
@@ -128,24 +129,17 @@ GitHub-Issue workflows remain visible for auditability but cannot run:
 ## Main CI Health Monitor
 
 The `main-ci-health-monitor.yml` workflow declares `8,28,48 * * * *` UTC (every
-20 minutes) plus manual dispatch. It remains disabled during the initial drain
-activation and, once explicitly enabled with Main Autofix after topology proof,
-alerts `#alerts-production` when:
+20 minutes) plus manual dispatch. It alerts `#alerts-production` when:
 
 - A `ci.yml` run on `main` is queued/in-progress for more than 45 minutes
 - The latest `main` CI run failed and remains unresolved for over 45 minutes
 - No successful `main` CI has occurred for 3+ hours while merged PRs are waiting
 
-It issues at most one failed-job rerun before autofix becomes eligible at
-`run_attempt >= 2`. Before fixed-runner repair begins, Main Autofix records a
-durable exact-SHA commit-status owner. Active workflows/PRs and terminal markers
-suppress duplicate Slack alerts and dispatch only while that SHA remains red;
-a newer main SHA or green rerun wins automatically. An authoritatively active
-workflow owns the SHA until its bounded workflow timeout makes it terminal; an
-orphaned marker gets only a 30-minute consistency grace lease. Three expired,
-cancelled, or otherwise terminal leases become a terminal escalation.
-Repair-state API uncertainty is alerted at most once per SHA when its
-acknowledgment can be persisted.
+It issues at most one failed-job rerun per exact run attempt and deduplicates
+Slack alerts with an exact run/attempt artifact marker. Evidence lookups fail
+closed: when run, commit, PR, or job evidence cannot be fetched, the alert and
+the rerun are suppressed rather than paged on stale state. Repair of red main
+is owned by the lanes fix loop, not this monitor.
 
 ## Synthetic Monitoring
 
@@ -208,7 +202,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
+| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group), `Lighthouse (dashboard gate)` (merge-group), `Lighthouse (onboarding gate)` (merge-group) |
 | Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. Lineage is forward-only: after authorization a generation that is still an ancestor of main ships even though main advanced, yields only to a generation already queued behind it, and never yields once main has carried unshipped commits past the starvation bound (release-lineage-gate.sh, 90 min). | none |
 | Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. JOV-INV-033 rescans Done-sprint HTML (JOV-6218 pricing truth, JOV-6260 directory hygiene) against that same URL before the `Production Verified` marker. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. The five-minute continuity guard also reports production-stale (main has carried unshipped commits for 2 h) to the founder Slack path without admitting a provider-recovery task. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -237,6 +231,8 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
+| `Lighthouse (dashboard gate)` | merge-group | combined-integration | `pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr` |
+| `Lighthouse (onboarding gate)` | merge-group | combined-integration | `pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr` |
 
 ### Risk Signals and Opt-in Evidence
 
