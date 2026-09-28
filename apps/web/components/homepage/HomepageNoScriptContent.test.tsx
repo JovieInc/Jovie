@@ -3,7 +3,6 @@ import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { HomepageNoScriptContent } from './HomepageNoScriptContent';
 
 const homepageSource = readFileSync(
@@ -60,12 +59,11 @@ describe('HomepageNoScriptContent', () => {
 
     const ordered = [
       HOMEPAGE_IDENTITY_COPY.hero.subhead,
-      ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
+      ...HOMEPAGE_IDENTITY_COPY.sections.flatMap(item => [
         item.headline,
         item.body,
-        ...item.steps.map(step => step.caption),
       ]),
-      HOMEPAGE_LAUNCH_COPY.certified.close.headline,
+      HOMEPAGE_IDENTITY_COPY.close.headline,
     ];
     let cursor = -1;
     for (const line of ordered) {
@@ -77,11 +75,10 @@ describe('HomepageNoScriptContent', () => {
       cursor = index;
     }
 
-    // The only conversion is the name search; the fallback links it to /start.
-    expect(text).toContain(HOMEPAGE_LAUNCH_COPY.hero.search.placeholder);
+    // The only conversion is the jov.ie/you claim; the fallback links /start.
     const links = [...(section?.querySelectorAll('a') ?? [])];
     expect(links.map(link => link.textContent)).toEqual([
-      'Find me',
+      'Claim jov.ie/you',
       'Contact support',
     ]);
     expect(links[0]?.getAttribute('href')).toBe('/start');

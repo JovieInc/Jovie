@@ -448,8 +448,8 @@ function matchesVariant(
         brief.availableAssets.productScreenshots
       );
     }
-    if (variantId === 'centered-video') {
-      return recipeId === 'launch' && brief.availableAssets.videoAsset;
+    if (variantId === 'split-claim-card') {
+      return recipeId === 'homepage';
     }
     if (variantId === 'centered-none') {
       return (
