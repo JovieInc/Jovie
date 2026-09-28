@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -293,6 +294,15 @@ async function applyExistingUserProfileTx(
   return newProfile;
 }
 
+/** Funnel reason for a failed claim; null for Next's redirect control flow. */
+function getClaimFailureReason(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('NEXT_REDIRECT')) return null;
+  if (message.includes('PROFILE_CONFLICT')) return 'profile_conflict';
+  if (message.includes('CLAIM_NOT_FOUND')) return 'claim_not_found';
+  return 'failed';
+}
+
 export async function completeOnboarding({
   username,
   displayName,
@@ -552,6 +562,11 @@ export async function completeOnboarding({
       await finalizePostOnboarding(userId, completion.username);
     }
 
+    await recordFunnelStep({
+      funnel: 'artist_signup',
+      step: 'claim_complete',
+    });
+
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
     // This ensures the app layout gets fresh data showing onboarding is complete
     revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
@@ -569,6 +584,15 @@ export async function completeOnboarding({
         error.message.includes('CLAIM_NOT_FOUND'))
     ) {
       await clearPendingClaimContext();
+    }
+    const failureReason = getClaimFailureReason(error);
+    if (failureReason) {
+      await recordFunnelStep({
+        funnel: 'artist_signup',
+        step: 'claim_complete',
+        outcome: 'error',
+        reason: failureReason,
+      });
     }
     await captureError('completeOnboarding failed', error, {
       route: 'onboarding',

@@ -1,5 +1,6 @@
 'use client';
 
+import { forwardAnalyticsEventToFunnel } from '@/lib/analytics/signup-funnel-client';
 import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 
@@ -51,6 +52,9 @@ export function track(
   event: string,
   properties?: Record<string, unknown>
 ): TrackDispatchOutcome {
+  // First-party funnel steps carry no identifiers, so they do not wait on the
+  // GA consent gate below.
+  forwardAnalyticsEventToFunnel(event, properties);
   const analyticsWindow = getAnalyticsWindow();
   if (!analyticsWindow?.gtag) return 'skipped_no_transport';
 
