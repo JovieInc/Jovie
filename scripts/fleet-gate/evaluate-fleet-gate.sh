@@ -79,11 +79,24 @@ jq -e '
   exit 2
 }
 
+# Forward-only lineage (JOV-6993, as #18809 did for the release rechecks): main
+# advancing past the expected subject while a generation waited for the
+# production-mutation lock is not a mismatch. Only a rewind or force-push, where
+# GitHub's compare from the subject to observed main is not "ahead", fails.
 if [[ -n "${EXPECTED_SHA:-}" ]]; then
-  jq -e --arg expected "$EXPECTED_SHA" '.signals.main.sha == $expected' "$receipt" >/dev/null || {
-    echo '::error::Fleet gate main.sha is not the exact expected subject.' >&2
-    exit 2
-  }
+  observed_sha="$(jq -r '.signals.main.sha' "$receipt")"
+  if [[ "$observed_sha" != "$EXPECTED_SHA" ]]; then
+    lineage_repo="${GEM_PRIORITY_GATE_REPO:-${GITHUB_REPOSITORY:-}}"
+    lineage=""
+    if [[ -n "$lineage_repo" ]]; then
+      lineage="$(gh api "repos/$lineage_repo/compare/${EXPECTED_SHA}...${observed_sha}" --jq '.status // empty' 2>/dev/null || true)"
+    fi
+    if [[ "$lineage" != "ahead" ]]; then
+      echo '::error::Fleet gate main.sha is not the expected subject or a descendant of it.' >&2
+      exit 2
+    fi
+    echo "::notice::Fleet gate main advanced ${EXPECTED_SHA:0:12} -> ${observed_sha:0:12} (forward-only)." >&2
+  fi
 fi
 
 if [[ "$consumer" == "deployment" ]]; then
