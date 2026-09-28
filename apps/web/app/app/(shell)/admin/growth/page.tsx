@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
+import { CanonicalLifecycleFunnel } from '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel';
 import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
@@ -10,8 +11,8 @@ import {
 } from '@/components/features/admin/leads/GtmFunnel';
 import { getLeadFunnelCounts } from '@/components/features/admin/leads/LeadPipelineKpis';
 import { LeadTable } from '@/components/features/admin/leads/LeadTable';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { getCanonicalContactMetrics } from '@/lib/admin/contacts';
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
@@ -33,9 +34,10 @@ export default async function AdminGrowthPage({
   await requireCurrentAdminPageAccess();
 
   const params = await adminGrowthSearchParams.parse(searchParams);
-  const [counts, funnel] = await Promise.all([
+  const [counts, funnel, lifecycleMetrics] = await Promise.all([
     getLeadFunnelCounts(),
     getFounderFunnelData('30d'),
+    getCanonicalContactMetrics(),
   ]);
 
   return (
@@ -46,18 +48,7 @@ export default async function AdminGrowthPage({
       viewTestId='admin-growth-view-leads'
     >
       <FounderFunnelBand initialFunnel={funnel} />
-      <ContentSurfaceCard surface='details'>
-        <div className='p-3'>
-          <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>
-            Lifecycle Coverage
-          </h2>
-          <p className='mt-1 text-app text-secondary-token'>
-            Visited, qualified, retained, and expanded are not yet backed by a
-            complete authoritative cohort series. Ovie leaves those stages
-            unmeasured instead of inferring them from signups or subscriptions.
-          </p>
-        </div>
-      </ContentSurfaceCard>
+      <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <Suspense fallback={<GtmFunnelSkeleton />}>
         <GtmFunnel counts={counts} />
       </Suspense>
