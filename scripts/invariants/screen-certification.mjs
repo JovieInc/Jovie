@@ -145,9 +145,11 @@ web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investo
 web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
 web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
 web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
+web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx|desktop,mobile
 web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/needs-you/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/admin/feature-registry/page.tsx|desktop,mobile
+web.admin-platform-connections|web|admin-platform-connections|apps/web/app/app/(shell)/admin/platform-connections/|desktop,mobile
 web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx|desktop,mobile
 web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile

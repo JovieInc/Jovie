@@ -11,3 +11,5 @@ export const TIM_WHITE_PROFILE = {
   spotifyArtistId: TIM_WHITE_SPOTIFY_ID,
   spotifyUrl: `https://open.spotify.com/artist/${TIM_WHITE_SPOTIFY_ID}`,
 } as const;
+
+export const TIM_DEFAULT_TIMEZONE = 'America/Los_Angeles';

@@ -172,6 +172,19 @@ describe('Summer history restoration', () => {
     expect(screen.queryByText('Keep the existing owner.')).toBeNull();
   });
 
+  it('keeps a new Summer message available when history has a temporary server failure', async () => {
+    vi.spyOn(store, 'getDecisionForUpdate').mockRejectedValueOnce(
+      new Error('temporary store outage')
+    );
+    const { client } = mount('ov');
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(h.send).toHaveBeenCalledTimes(1);
+  });
+
   it('merges repeated durable reads without duplicates or store writes', async () => {
     const cas = vi.spyOn(store, 'putDecisionIfUnchanged');
     const { client } = mount('ov');
@@ -384,24 +397,25 @@ describe('Summer history restoration', () => {
     }
   );
 
-  it.each(['missing', 'unavailable', 'unauthorized'] as const)(
-    'shows %s history failure without starting or replaying a turn',
-    async kind => {
-      if (kind === 'missing')
-        h.store.mockReturnValue(new MemoryOperatingStore());
-      if (kind === 'unavailable')
-        h.store.mockImplementation(() => {
-          throw new Error('private backend detail');
-        });
-      if (kind === 'unauthorized')
-        h.session.mockResolvedValue({ user: { id: 'customer' } });
-      mount('ov');
-      await screen.findByRole('alert');
-      expect(screen.queryByText('Keep the existing owner.')).toBeNull();
-      expect(screen.queryByText('private backend detail')).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
-      expect(h.send).not.toHaveBeenCalled();
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    }
-  );
+  it('starts a first Summer turn when no durable history exists yet', async () => {
+    h.store.mockReturnValue(new MemoryOperatingStore());
+    const { client } = mount('ov');
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('Keep the existing owner.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(h.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows unauthorized history failure without starting or replaying a turn', async () => {
+    h.session.mockResolvedValue({ user: { id: 'customer' } });
+    mount('ov');
+    await screen.findByRole('alert');
+    expect(screen.queryByText('Keep the existing owner.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(h.send).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
