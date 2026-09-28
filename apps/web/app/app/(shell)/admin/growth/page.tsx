@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
+import { CanonicalLifecycleFunnel } from '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel';
 import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
@@ -12,6 +13,7 @@ import { getLeadFunnelCounts } from '@/components/features/admin/leads/LeadPipel
 import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { getCanonicalContactMetrics } from '@/lib/admin/contacts';
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
@@ -33,9 +35,10 @@ export default async function AdminGrowthPage({
   await requireCurrentAdminPageAccess();
 
   const params = await adminGrowthSearchParams.parse(searchParams);
-  const [counts, funnel] = await Promise.all([
+  const [counts, funnel, lifecycleMetrics] = await Promise.all([
     getLeadFunnelCounts(),
     getFounderFunnelData('30d'),
+    getCanonicalContactMetrics(),
   ]);
 
   return (
@@ -46,6 +49,7 @@ export default async function AdminGrowthPage({
       viewTestId='admin-growth-view-leads'
     >
       <FounderFunnelBand initialFunnel={funnel} />
+      <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>
           <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>

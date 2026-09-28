@@ -70,6 +70,16 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     includeInFastHealth: true,
   },
   {
+    id: 'people-contacts',
+    name: 'Admin People Customers',
+    path: buildAdminPeopleHref('contacts'),
+    rootTestId: 'admin-people-view-contacts',
+    snapshotSlug: 'admin-people-contacts',
+    primaryWorkspace: true,
+    utilityRoot: false,
+    includeInFastHealth: true,
+  },
+  {
     id: 'people-waitlist',
     name: 'Admin People Waitlist',
     path: buildAdminPeopleHref('waitlist'),

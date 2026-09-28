@@ -6,10 +6,12 @@ type SearchParamRecord = Record<
 >;
 
 export const adminPeopleViews = [
+  'contacts',
   'waitlist',
   'creators',
   'users',
   'releases',
+  'assets',
   'feedback',
 ] as const;
 
@@ -70,6 +72,8 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
   'chat',
+  'certifications',
+  'shipping',
   'people',
   'platform_connections',
   'activity',
@@ -120,14 +124,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'workspaces',
   },
   {
-    id: 'shipping',
-    label: 'Shipping',
-    href: APP_ROUTES.ADMIN_SHIPPING,
-    description:
-      'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
-    section: 'utilities',
-  },
-  {
     id: 'chat',
     label: 'Chat',
     href: APP_ROUTES.ADMIN_CHAT,
@@ -140,6 +136,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_CERTIFICATIONS,
     description:
       'Founder review of certification evidence, with certify and reject',
+    section: 'utilities',
+  },
+  {
+    id: 'shipping',
+    label: 'Shipping',
+    href: APP_ROUTES.ADMIN_SHIPPING,
+    description:
+      'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
     section: 'utilities',
   },
   {
@@ -225,10 +229,12 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
 ] as const;
 
 export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
+  contacts: 'Customers',
   waitlist: 'Waitlist',
   creators: 'Creators',
   users: 'Users',
   releases: 'Releases',
+  assets: 'Assets',
   feedback: 'Feedback',
 };
 

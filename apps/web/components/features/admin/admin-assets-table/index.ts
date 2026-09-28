@@ -1,0 +1,1 @@
+export { AdminAssetsTable } from './AdminAssetsTable';

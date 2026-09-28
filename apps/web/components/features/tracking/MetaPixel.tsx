@@ -1,18 +1,16 @@
 'use client';
 
 import Script from 'next/script';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
-import { isMarketingAllowed } from '@/lib/tracking/consent';
+import {
+  ensureFbqStub,
+  type Fbq,
+  useMarketingConsent,
+} from '@/lib/tracking/use-marketing-consent';
 
 const FBEVENTS_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
-
-type Fbq = ((...args: unknown[]) => void) & {
-  queue?: unknown[];
-  loaded?: boolean;
-  version?: string;
-};
 
 type MetaPixelWindow = Window & {
   fbq?: Fbq;
@@ -42,38 +40,7 @@ export function MetaPixel({ pixelIds }: MetaPixelProps) {
   const skip = ids.length === 0 || isPassive || isDemo;
   const hasTrackedPageView = useRef(false);
 
-  const [allowed, setAllowed] = useState(false);
-
-  useEffect(() => {
-    if (skip) return;
-    if (globalThis.window === undefined) return;
-
-    // Sync consent state on mount (covers SSR → client transition)
-    setAllowed(isMarketingAllowed());
-
-    let unsubConsent: (() => void) | undefined;
-
-    const attach = () => {
-      if (!globalThis.JVConsent) return;
-      unsubConsent = globalThis.JVConsent.onChange(() => {
-        setAllowed(isMarketingAllowed());
-      });
-    };
-
-    if (globalThis.JVConsent) {
-      attach();
-      return () => {
-        unsubConsent?.();
-      };
-    }
-
-    const onReady = () => attach();
-    globalThis.addEventListener('jvconsent:ready', onReady, { once: true });
-    return () => {
-      globalThis.removeEventListener('jvconsent:ready', onReady);
-      unsubConsent?.();
-    };
-  }, [skip]);
+  const allowed = useMarketingConsent(skip);
 
   useEffect(() => {
     if (skip || !allowed || hasTrackedPageView.current) return;
@@ -81,19 +48,7 @@ export function MetaPixel({ pixelIds }: MetaPixelProps) {
     hasTrackedPageView.current = true;
 
     const metaWindow = globalThis.window as MetaPixelWindow;
-
-    // Stub fbq so calls queue until fbevents.js loads and drains them.
-    if (!metaWindow.fbq) {
-      const stub = ((...args: unknown[]) => {
-        stub.queue?.push(args);
-      }) as Fbq;
-      stub.queue = [];
-      stub.loaded = true;
-      stub.version = '2.0';
-      metaWindow.fbq = stub;
-      metaWindow._fbq = stub;
-    }
-    const fbq = metaWindow.fbq;
+    const fbq = ensureFbqStub(metaWindow);
     if (!fbq) return;
 
     // init is idempotent per pixel ID across mounts (client-side navigation
