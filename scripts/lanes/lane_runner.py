@@ -765,6 +765,10 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
+        # A held PR is Tim's/Summer's call: fixing it re-arms auto-merge and re-enqueues it
+        # (#17541, 2026-09-28). The event path already skips holds via pr_events.in_scope.
+        if {label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS:
+            continue
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
         gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]

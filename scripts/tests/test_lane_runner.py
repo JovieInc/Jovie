@@ -775,6 +775,13 @@ class FixRedTest(unittest.TestCase):
         self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
 
+    def test_red_pr_never_takes_a_held_pr(self):
+        held = {**self.pr(), "labels": [{"name": "Hold"}]}
+        self.assertIsNone(lane.red_pr([held], {}), "fixing a held PR re-arms auto-merge and re-enqueues it")
+        self.assertEqual(lane.red_pr([held, self.pr(number=6)], {})["number"], 6)
+        poison = {**self.pr(), "labels": [{"name": "queue-poison"}]}
+        self.assertEqual(lane.red_pr([poison], {})["number"], 5, "queue-poison alone still goes to remediation")
+
     def test_gate_held_prs_go_to_the_fix_loop_with_the_gate_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
