@@ -1,21 +1,24 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import { SwipeToReveal, SwipeToRevealGroup } from './SwipeToReveal';
 
 const Actions = () => (
   <>
-    <button
+    <Button
       type='button'
-      className='flex h-full w-10 items-center justify-center bg-info text-app text-white'
+      variant='ghost'
+      className='h-full w-10 rounded-none bg-info text-app text-white'
     >
       Edit
-    </button>
-    <button
+    </Button>
+    <Button
       type='button'
-      className='flex h-full w-10 items-center justify-center bg-error text-app text-white'
+      variant='ghost'
+      className='h-full w-10 rounded-none bg-error text-app text-white'
     >
       Delete
-    </button>
+    </Button>
   </>
 );
 
