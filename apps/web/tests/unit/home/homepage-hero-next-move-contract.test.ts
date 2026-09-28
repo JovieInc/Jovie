@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -20,6 +21,13 @@ function readNameSearchCss(): string {
 }
 
 describe('homepage hero contract (JOV-5864)', () => {
+  it('proves the hero with the profile home tab, not a back-arrow subpage', () => {
+    expect(HOMEPAGE_MEDIA_MAP.connected.sourceScenarioId).toBe(
+      'tim-white-profile-live-mobile'
+    );
+    expect(HOMEPAGE_MEDIA_MAP.connected.sourceRoute).toContain('release=live');
+  });
+
   it('mounts only the approved hero rasters, never CSS background images', () => {
     const pageSource = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),

@@ -118,6 +118,7 @@ import { createManageTasksTool } from '@/lib/chat/tools/tasks';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
+  markChatTurnTerminal,
   persistTerminalAssistantMessage,
   recordChatTurnModel,
   reserveChatTurn,
@@ -3054,11 +3055,9 @@ export async function POST(req: Request) {
 
       streamFailurePersisted = true;
       const failure = classifyChatStreamFailure(error);
-      await persistTerminalAssistantMessage({
-        conversationId: reservedTurn.conversationId,
+      await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
         status: 'failed_model_error',
-        content: failure.userMessage,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3142,8 +3141,14 @@ export async function POST(req: Request) {
               toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,
-      onFinish: async ({ responseMessage, isAborted }) => {
+      onFinish: async ({ responseMessage, isAborted, outcome }) => {
         if (!reservedTurn || streamFailurePersisted) return;
+        if (outcome.status === 'failed') {
+          await persistStreamFailure(
+            outcome.error ?? new Error('Assistant stream failed')
+          );
+          return;
+        }
 
         const assistantText = sanitizeAssistantResponse(
           extractUIMessageText(
@@ -3154,16 +3159,23 @@ export async function POST(req: Request) {
           parts: responseMessage.parts,
           isAborted,
         });
+        if (
+          !isAborted &&
+          !assistantText.trim() &&
+          (!toolCalls || toolCalls.length === 0)
+        ) {
+          await persistStreamFailure(
+            new Error('Model turn produced no text or tool calls')
+          );
+          return;
+        }
         await persistTerminalAssistantMessage({
           conversationId: reservedTurn.conversationId,
           turnId: reservedTurn.turnId,
           status: isAborted ? 'canceled' : 'completed',
           content: isAborted
             ? 'This response was canceled before Jovie could finish. Retry when you are ready.'
-            : assistantText ||
-              (toolCalls && toolCalls.length > 0
-                ? ''
-                : 'Done. What would you like to do next?'),
+            : assistantText,
           toolCalls,
           ...(isAborted
             ? {
@@ -3209,11 +3221,9 @@ export async function POST(req: Request) {
 
     if (reservedTurn) {
       const failure = classifyChatStreamFailure(error);
-      await persistTerminalAssistantMessage({
-        conversationId: reservedTurn.conversationId,
+      await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
         status: 'failed_model_error',
-        content: failure.userMessage,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);
