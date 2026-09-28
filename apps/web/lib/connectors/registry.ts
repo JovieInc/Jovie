@@ -12,6 +12,7 @@
  */
 
 import { z } from 'zod';
+import { SPOTIFY_OAUTH_SCOPES } from './spotify/scopes';
 import {
   CONNECTOR_PROVIDER_IDS,
   type ConnectorDefinition,
@@ -35,6 +36,7 @@ export {
 export const CONNECTOR_PROVIDERS = {
   gmail: 'gmail',
   google_calendar: 'google_calendar',
+  spotify: 'spotify',
   youtube: 'youtube',
 } as const satisfies Record<string, ConnectorProviderId>;
 
@@ -79,6 +81,19 @@ export const CONNECTOR_REGISTRY = {
     webhookHandler: null,
     displayOrder: 2,
   },
+  [CONNECTOR_PROVIDERS.spotify]: {
+    id: CONNECTOR_PROVIDERS.spotify,
+    label: 'Spotify',
+    description:
+      'Connect a Spotify account so agent workflows can publish playlists and read catalog data.',
+    iconKey: 'spotify',
+    oauthBundle: 'spotify',
+    oauthScopes: [...SPOTIFY_OAUTH_SCOPES],
+    tokenHandler: 'shared_token_vault',
+    syncRunner: null,
+    webhookHandler: null,
+    displayOrder: 3,
+  },
   [CONNECTOR_PROVIDERS.youtube]: {
     id: CONNECTOR_PROVIDERS.youtube,
     label: 'YouTube',
@@ -90,7 +105,7 @@ export const CONNECTOR_REGISTRY = {
     tokenHandler: 'shared_token_vault',
     syncRunner: CONNECTOR_PROVIDERS.youtube,
     webhookHandler: null,
-    displayOrder: 3,
+    displayOrder: 4,
   },
 } as const satisfies Record<ConnectorProviderId, ConnectorDefinition>;
 

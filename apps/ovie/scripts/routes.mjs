@@ -17,7 +17,9 @@ export const ROUTE_ROOTS = [
   ['api/ops/what-shipped', 'api/ops/what-shipped'],
   ['api/health/build-info', 'api/health/build-info'],
   ['api/health/env', 'api/health/env'],
-  ['api/connectors/suggested-actions', 'api/connectors/suggested-actions'],
+  // Canonical connector OAuth + suggested actions — same implementation as
+  // Jovie; connected accounts attach to the signed-in (company) user.
+  ['api/connectors', 'api/connectors'],
   ['api/library/audio/upload-token', 'api/library/audio/upload-token'],
   ['api/billing/status', 'api/billing/status'],
   ['api/usage/summary', 'api/usage/summary'],
