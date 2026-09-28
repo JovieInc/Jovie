@@ -82,6 +82,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       async (input: { userId: string; expectedBillingVersion: number }) => ({
         appUserId: input.userId,
         billingVersion: input.expectedBillingVersion + 1,
+        deduplicated: false,
       })
     );
   });
@@ -250,6 +251,51 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       expect(result.skipped).toBeFalsy();
       expect(mockApplyBillingUpdateWithAudit).toHaveBeenCalled();
     });
+
+    it('returns a skipped success when the Stripe event was already applied', async () => {
+      const { updateUserBillingStatus } = await import(
+        '@/lib/stripe/customer-sync'
+      );
+      mockDbSelect.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve([
+                {
+                  id: 'uuid-123',
+                  isPro: true,
+                  plan: 'pro',
+                  stripeCustomerId: 'cus_existing',
+                  stripeSubscriptionId: 'sub_existing',
+                  stripePriceId: 'price_existing',
+                  billingVersion: 2,
+                  lastBillingEventAt: new Date('2024-01-15T12:00:00Z'),
+                },
+              ]),
+          }),
+        }),
+      });
+      mockApplyBillingUpdateWithAudit.mockResolvedValueOnce({
+        appUserId: 'uuid-123',
+        billingVersion: 2,
+        deduplicated: true,
+      });
+
+      await expect(
+        updateUserBillingStatus({
+          clerkUserId: 'user_test123',
+          isPro: true,
+          stripeEventId: 'evt_existing',
+          stripeEventTimestamp: new Date('2024-01-15T12:00:00Z'),
+          eventType: 'payment_succeeded',
+        })
+      ).resolves.toEqual({
+        success: true,
+        appUserId: 'uuid-123',
+        skipped: true,
+        reason: 'Stripe event already applied',
+      });
+    });
   });
 
   describe('Optimistic Locking', () => {
@@ -293,6 +339,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
             : {
                 appUserId: input.userId,
                 billingVersion: input.expectedBillingVersion + 1,
+                deduplicated: false,
               };
         });
 
