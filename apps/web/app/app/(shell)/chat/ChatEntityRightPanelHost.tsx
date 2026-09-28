@@ -227,10 +227,9 @@ function ChatProfileContextCard({
       data-context-kind='profile'
       className='system-b-chat-entity-context-card group flex w-full items-stretch'
     >
-      <Button
+      <button
         type='button'
-        variant='ghost'
-        className='flex min-w-0 flex-1 items-center justify-start gap-0 rounded-none border-0 bg-transparent p-0 text-left hover:bg-transparent active:bg-transparent'
+        className='flex min-w-0 flex-1 items-center gap-0 border-0 bg-transparent p-0 text-left'
         onClick={() => onOpenProfilePreview?.()}
       >
         <div className='system-b-chat-entity-context-avatar'>
@@ -249,7 +248,7 @@ function ChatProfileContextCard({
           )}
         </div>
         <ChatContextCardCopy title={title} meta={meta} />
-      </Button>
+      </button>
       <ChatContextDismissControl
         label='Dismiss Profile Context'
         focusKey={target.focusKey}
@@ -328,10 +327,9 @@ function ChatEntityContextCard({
         data-context-kind={target.kind}
         className='system-b-chat-entity-context-card group flex w-full items-stretch'
       >
-        <Button
+        <button
           type='button'
-          variant='ghost'
-          className='flex min-w-0 flex-1 items-center justify-start gap-0 rounded-none border-0 bg-transparent p-0 text-left hover:bg-transparent active:bg-transparent'
+          className='flex min-w-0 flex-1 items-center gap-0 border-0 bg-transparent p-0 text-left'
           onClick={() => onOpenProfilePreview?.()}
         >
           <div className='system-b-chat-entity-context-icon'>
@@ -341,7 +339,7 @@ function ChatEntityContextCard({
             title={title}
             meta={`${contextKindLabel(target.kind)} Context`}
           />
-        </Button>
+        </button>
         <ChatContextDismissControl
           label={dismissLabel}
           focusKey={target.focusKey}

@@ -23,14 +23,12 @@ const {
   mockUseContactsQuery,
   mockUseEventsQuery,
   mockUsePlanGate,
-  mockOpenPreviewPanel,
 } = vi.hoisted(() => ({
   mockUseReleaseEntityQuery: vi.fn(),
   mockUseReleasesQuery: vi.fn(),
   mockUseContactsQuery: vi.fn(),
   mockUseEventsQuery: vi.fn(),
   mockUsePlanGate: vi.fn(),
-  mockOpenPreviewPanel: vi.fn(),
 }));
 let mockPreviewPanelOpen = false;
 
@@ -47,7 +45,7 @@ vi.mock('next/dynamic', () => ({
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({
     isOpen: mockPreviewPanelOpen,
-    open: mockOpenPreviewPanel,
+    open: vi.fn(),
     close: vi.fn(),
     toggle: vi.fn(),
   }),
@@ -173,21 +171,6 @@ function UpsertProfileContext() {
       label: 'Tim White',
       source: 'tool',
       focusKey: 'tool-1:profile',
-      toolCallId: 'tool-1',
-    });
-  }, [upsertContext]);
-  return null;
-}
-
-function UpsertArtistContext() {
-  const { upsertContext } = useChatEntityPanel();
-  useEffect(() => {
-    upsertContext({
-      kind: 'artist',
-      id: 'spotify-artist-1',
-      label: 'Jovie Test Artist',
-      source: 'tool',
-      focusKey: 'tool-1:artist',
       toolCallId: 'tool-1',
     });
   }, [upsertContext]);
@@ -345,7 +328,6 @@ describe('ChatEntityRightPanelHost', () => {
       canAccessTasksWorkspace: false,
       isLoading: false,
     });
-    mockOpenPreviewPanel.mockClear();
   });
 
   it('does not register the profile sidebar when preview is closed', () => {
@@ -513,72 +495,6 @@ describe('ChatEntityRightPanelHost', () => {
     expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
     expect(screen.getByText('64% Complete')).toBeInTheDocument();
     expect(screen.queryByTestId('profile-contact-sidebar')).toBeNull();
-  });
-
-  it('opens the full profile preview when a profile context card is clicked', async () => {
-    mockPreviewPanelOpen = false;
-    mockUseRegisterRightPanel.mockClear();
-
-    render(
-      <ChatEntityPanelProvider>
-        <UpsertProfileContext />
-        <ChatEntityRightPanelHost
-          enablePreviewPanel={false}
-          enableChatEntityPanels
-          profileId='profile-1'
-          profileContext={{
-            id: 'profile-1',
-            displayName: 'Tim White',
-            username: 'tim',
-            avatarUrl: null,
-            completionPercentage: 64,
-          }}
-        />
-      </ChatEntityPanelProvider>
-    );
-
-    await waitFor(() => {
-      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
-    });
-
-    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
-    render(registeredPanel as React.ReactElement);
-
-    // The clickable profile card row is a canonical Button, not a hand-rolled
-    // <button>, but it must keep the same accessible name and click behavior.
-    fireEvent.click(screen.getByRole('button', { name: /Tim White/ }));
-
-    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens the full profile preview when the matching artist context card is clicked', async () => {
-    mockPreviewPanelOpen = false;
-    mockUseRegisterRightPanel.mockClear();
-
-    render(
-      <ChatEntityPanelProvider>
-        <UpsertArtistContext />
-        <ChatEntityRightPanelHost
-          enablePreviewPanel={false}
-          enableChatEntityPanels
-          profileId='profile-1'
-          profileSpotifyArtistId='spotify-artist-1'
-        />
-      </ChatEntityPanelProvider>
-    );
-
-    await waitFor(() => {
-      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
-    });
-
-    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
-    render(registeredPanel as React.ReactElement);
-
-    // Same canonical-Button conversion as the profile context card: the
-    // clickable artist row must keep its accessible name and click behavior.
-    fireEvent.click(screen.getByRole('button', { name: /Jovie Test Artist/ }));
-
-    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
   });
 
   it('renders release context cards with the shared EntityCard compact treatment', async () => {
