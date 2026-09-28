@@ -44,7 +44,8 @@ interface MockSelectChain {
   orderBySql: string[];
 }
 
-function mockDbSelectRows(rows: unknown[]): MockSelectChain {
+function mockDbSelectBatches(batches: unknown[][]): MockSelectChain {
+  let callIndex = 0;
   const dialect = new PgDialect();
   const chain: MockSelectChain & {
     from: () => unknown;
@@ -80,11 +81,24 @@ function mockDbSelectRows(rows: unknown[]): MockSelectChain {
       return chain;
     },
     then(resolve: (v: unknown[]) => unknown) {
-      return resolve(rows);
+      return resolve(batches[callIndex++] ?? []);
     },
   };
   selectMock.mockReturnValue(chain);
   return chain;
+}
+
+function mockDbSelectRows(rows: unknown[]): MockSelectChain {
+  return mockDbSelectBatches([rows]);
+}
+
+function makeIneligibleCatalogRow(index: number) {
+  const handle = `placeholder${index}`;
+  return {
+    ...makeCatalogRow(index),
+    username: handle,
+    displayName: handle,
+  };
 }
 
 function makeCatalogRow(index: number) {
@@ -285,6 +299,73 @@ describe('artists directory pagination (JOV-6451)', () => {
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
     expect(result.nextCursor).toBeNull();
+  });
+
+  it('keeps scanning until the page fills with eligible profiles (JOV-6939)', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    // First raw batch is entirely ineligible (placeholder identities); the
+    // eligible profiles live beyond it. A raw-row page bound would render an
+    // empty page with a dangling next cursor.
+    mockDbSelectBatches([
+      Array.from({ length: ARTISTS_DIRECTORY_PAGE_SIZE + 1 }, (_, i) =>
+        makeIneligibleCatalogRow(i)
+      ),
+      [makeCatalogRow(100), makeCatalogRow(101)],
+    ]);
+
+    const result = await loadArtistsDirectoryProfiles();
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.profiles.map(profile => profile.username)).toEqual([
+      'artist100',
+      'artist101',
+    ]);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('does not emit a nextCursor when all remaining rows are ineligible (JOV-6939)', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    // Raw lookahead says "more rows", but every one is filtered out — the
+    // cursor must be null so "Load more" never leads to an empty dead end.
+    mockDbSelectBatches([
+      [
+        makeCatalogRow(0),
+        ...Array.from({ length: ARTISTS_DIRECTORY_PAGE_SIZE }, (_, i) =>
+          makeIneligibleCatalogRow(i + 1)
+        ),
+      ],
+      [],
+    ]);
+
+    const result = await loadArtistsDirectoryProfiles();
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.profiles).toHaveLength(1);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('emits a nextCursor only when another eligible profile exists', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    mockDbSelectBatches([
+      Array.from({ length: ARTISTS_DIRECTORY_PAGE_SIZE + 1 }, (_, i) =>
+        i === ARTISTS_DIRECTORY_PAGE_SIZE
+          ? makeIneligibleCatalogRow(i)
+          : makeCatalogRow(i)
+      ),
+      [makeCatalogRow(200)],
+    ]);
+
+    const result = await loadArtistsDirectoryProfiles();
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.profiles).toHaveLength(ARTISTS_DIRECTORY_PAGE_SIZE);
+    expect(result.nextCursor).not.toBeNull();
+
+    const decoded = decodeArtistsDirectoryCursor(result.nextCursor);
+    expect(decoded).toEqual({
+      key: `Artist ${ARTISTS_DIRECTORY_PAGE_SIZE - 1}`,
+      id: `id-${String(ARTISTS_DIRECTORY_PAGE_SIZE - 1).padStart(6, '0')}`,
+    });
   });
 
   it('applies a keyset cursor predicate instead of an offset', async () => {

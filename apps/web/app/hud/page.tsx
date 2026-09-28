@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { forbidden, unauthorized } from 'next/navigation';
-import { HudDashboardClient } from '@/app/app/(shell)/admin/ops/HudDashboardClient';
+import { OpsCockpitClient } from '@/app/app/(shell)/admin/ops/OpsCockpitClient';
 import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
@@ -9,7 +9,6 @@ import { OperationalControlPanel } from '@/components/features/admin/Operational
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { authorizeHud } from '@/lib/auth/hud';
-import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { getOvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud.server';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
@@ -63,12 +62,11 @@ export default async function HudPage({
       : getFounderFunnelData('30d').catch(() => null),
   ]);
   const dashboard = (
-    <HudDashboardClient
+    <OpsCockpitClient
       initialMetrics={metrics}
       density={tokenOk || fullscreen ? 'kiosk' : 'shell'}
       presentationMode={tokenOk ? 'token' : 'shell'}
       kioskToken={tokenOk ? kioskToken : null}
-      useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
       initialFunnel={funnel}
     />
   );
