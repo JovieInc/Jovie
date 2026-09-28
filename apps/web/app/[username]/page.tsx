@@ -48,6 +48,7 @@ import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import {
   buildProfileAeoContent,
   buildProfileAeoFaqStructuredData,
+  buildStructuredCollaboratorParagraph,
 } from '@/lib/profile/aeo-content';
 import {
   collectEntityMentions,
@@ -252,7 +253,6 @@ async function ArtistPageContent({
   profileResult,
 }: Readonly<ArtistPageContentProps>) {
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
-  const viewerCountryCode = null;
 
   // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
   // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
@@ -260,6 +260,9 @@ async function ArtistPageContent({
   // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
   // renders AnonCookieBootstrap which resolves the per-user variant client-side
   // via /api/profile/audience-anon-cookie and updates its own state.
+  // Viewer geo reaches the client through the readable jv_country cookie the
+  // proxy stamps on the response; ProfileCompactTemplate reads it post-mount
+  // for DSP geo-sorting, so no server-side country input is passed here.
 
   const {
     profile,
@@ -490,7 +493,6 @@ async function ArtistPageContent({
         mode={initialMode}
         artist={artist}
         socialLinks={links}
-        viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
         subtitle={subtitle}
         showBackButton={showBackButton}
@@ -533,6 +535,13 @@ async function ArtistPageContent({
           showOldReleases: profileSettings.showOldReleases === true,
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
+        creditSegments={
+          buildStructuredCollaboratorParagraph(
+            artist.name,
+            artist.handle,
+            releaseCollaborators
+          )?.segments
+        }
         releases={releases}
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}

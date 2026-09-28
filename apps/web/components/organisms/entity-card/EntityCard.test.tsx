@@ -374,7 +374,7 @@ describe('EntityCard source contract', () => {
     const source = readFileSync(resolve(__dirname, './EntityCard.tsx'), 'utf8');
 
     expect(source).toContain(
-      "'block min-w-0 truncate text-[11.5px] text-tertiary-token'"
+      "'block min-w-0 truncate text-xs text-tertiary-token'"
     );
     expect(source).toContain(
       "<span className='block text-2xs text-tertiary-token'>"
@@ -713,6 +713,82 @@ describe('ProfilePacCard landscape states', () => {
         email: 'fan@example.com',
         source: 'profile_pac',
       })
+    );
+  });
+
+  it('renders the featured mode card with the rotating accent and a neutral Listen now CTA', () => {
+    mockUseTrackAudioPlayer.mockReturnValue({
+      playbackState: {
+        activeTrackId: null,
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+      },
+      toggleTrack: vi.fn(),
+      seek: vi.fn(),
+    });
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Never Say A Word',
+          slug: 'never-say-a-word',
+          artworkUrl: '/release.jpg',
+          previewUrl: null,
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        presentation='featured'
+        accent={{ accent: 'ultra', strength: 'art' }}
+        renderMode='preview'
+        captureEnabled={false}
+      />
+    );
+
+    const card = screen.getByTestId('profile-pac');
+    expect(card).toHaveAttribute('data-presentation', 'featured');
+    const modeCard = card.querySelector('.profile-mode-card');
+    expect(modeCard).toHaveAttribute('data-accent', 'ultra');
+    expect(modeCard).toHaveAttribute('data-accent-strength', 'art');
+    expect(modeCard).toHaveClass('min-h-80');
+    expect(card).toHaveTextContent('Featured');
+    expect(
+      screen.getByRole('heading', { name: 'Never Say A Word' })
+    ).toBeInTheDocument();
+    // Featured meta is the artist, not the release type/year.
+    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    const listen = screen.getByRole('link', { name: 'Listen now' });
+    expect(listen).toHaveAttribute('href', '/tim/never-say-a-word');
+    expect(listen).toHaveClass('h-11', 'w-full');
+    // Neutral CTA face, not the glass slot.
+    expect(listen.firstElementChild).toHaveClass('h-7', 'rounded-full');
+    expect(listen.className).not.toContain('profile-glass-pill');
+  });
+
+  it('keeps the featured capture form stacked and hides the art while prompting', async () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: '/preview.mp3',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        presentation='featured'
+      />
+    );
+
+    const card = screen.getByTestId('profile-pac');
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'prompt'));
+    expect(screen.queryByTestId('profile-pac-featured-art')).toBeNull();
+    const email = screen.getByRole('textbox', { name: /email address/i });
+    expect(email.closest('form')).toHaveClass('flex-col');
+    expect(screen.getByRole('button', { name: 'Get Updates' })).toHaveClass(
+      'h-11',
+      'w-full'
     );
   });
 });

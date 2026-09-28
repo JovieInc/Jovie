@@ -50,6 +50,19 @@ await invalidateAvatarCache(userId, usernameNormalized);
 - Cache lifetime uses the `hours` profile to keep profiles snappy while still refreshing in the background.
 - Mutations call `updateTag()` and `revalidateTag(..., 'max')` via `invalidateProfileCache()` to keep read-your-write behavior immediate.
 
+### Redis edge cache + stampede protection
+
+**Scope:** `lib/services/profile/queries.ts` (`getProfileWithLinks`)
+
+- Profiles are cached in Redis for 5 minutes (`profile:data:<username>`). A Redis
+  read failure falls through to the database — the outage contract is graceful
+  degradation to origin, never a silent correctness failure.
+- Concurrent cache misses for the same username are coalesced through a
+  single-flight in-flight map, so a stampede on a hot or expired profile issues
+  one multi-query Neon fetch per instance instead of one per request. The
+  `skipCache` option (post-mutation readers) bypasses coalescing to guarantee
+  freshness.
+
 ## Social links
 
 **Scope:** `app/api/dashboard/social-links/route.ts`

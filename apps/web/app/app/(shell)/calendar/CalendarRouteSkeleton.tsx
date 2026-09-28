@@ -1,5 +1,6 @@
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { PageContent } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 
 const CALENDAR_WEEKDAY_KEYS = [
   'weekday-sun',
@@ -58,7 +59,7 @@ const CALENDAR_GRID_CELL_KEYS = [
 
 export function CalendarRouteSkeleton() {
   return (
-    <PageShell
+    <WorkspacePage
       aria-busy='true'
       aria-label='Loading Calendar'
       aria-live='polite'
@@ -110,6 +111,6 @@ export function CalendarRouteSkeleton() {
           </div>
         </div>
       </PageContent>
-    </PageShell>
+    </WorkspacePage>
   );
 }

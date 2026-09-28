@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "4149040ddbbf67f7a6ce0da23fb9a5a75cd62f4dd7011e48244d28c150e0cc59"
+    "bodySha256": "d2dda48623eeb3cdc8361ffc0308398d169c4c782cc5e06ca7cb38a9b21e345c"
   },
   {
     "file": ".claude/rules/db.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "88fabca13db5a04ba6b038cb3f8c248e0c64171de401d9c909b450a74ea44d75"
+    "bodySha256": "2267f9f5883677bf19f3b29d7bcf1122c402cdee572e48b64277bfe76c19834a"
   },
   {
     "file": ".claude/rules/security.md",

@@ -47,6 +47,8 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Promptfoo Evals (deterministic)',
   'Golden Eval Set (deterministic)',
   'Database Certification (isolated Neon)',
+  'Lighthouse (dashboard gate)',
+  'Lighthouse (onboarding gate)',
 ];
 
 describe('ci-harness manifest', () => {
@@ -117,8 +119,6 @@ describe('ci-harness manifest', () => {
       'Component Ship Gate (via ci-fast structural)',
       'UI Story Coverage Audit (shadow)',
       'Lighthouse (public routes manual)',
-      'Lighthouse (dashboard manual)',
-      'Lighthouse (onboarding manual)',
       'Lighthouse (admin manual)',
       'Lighthouse (chat manual)',
       'A11y (axe)',
@@ -262,8 +262,6 @@ describe('ci-harness manifest', () => {
       'ci-layout-guard',
       'ci-mobile-overflow',
       'ci-lighthouse-pr',
-      'ci-lighthouse-dashboard-pr',
-      'ci-lighthouse-onboarding-pr',
       'ci-lighthouse-admin-pr',
       'ci-lighthouse-chat-pr',
       'ci-pr-neon-migrate',
@@ -284,6 +282,30 @@ describe('ci-harness manifest', () => {
       const controller = job.slice(0, job.indexOf('    steps:'));
       expect(controller).toContain("github.event_name == 'workflow_dispatch'");
       expect(controller).not.toContain("github.event_name == 'pull_request'");
+    }
+    // JOV-6002: dashboard/onboarding Lighthouse are merge-group launch gates
+    // keyed on the launch-gate path flag, never source-PR events.
+    for (const jobId of [
+      'ci-lighthouse-dashboard-pr',
+      'ci-lighthouse-onboarding-pr',
+    ]) {
+      const job = extractWorkflowJobBlock(workflow, jobId);
+      const controller = job.slice(0, job.indexOf('    steps:'));
+      expect(controller).toContain("github.event_name == 'merge_group'");
+      expect(controller).toContain(
+        "needs.ci-path-changes.outputs.run_golden_path == 'true'"
+      );
+      expect(controller).not.toContain("github.event_name == 'pull_request'");
+    }
+    const mergeGroupReady = extractWorkflowJobBlock(
+      workflow,
+      'ci-merge-group-ready'
+    );
+    for (const jobId of [
+      'ci-lighthouse-dashboard-pr',
+      'ci-lighthouse-onboarding-pr',
+    ]) {
+      expect(mergeGroupReady).toContain(jobId);
     }
     expect(
       extractWorkflowJobBlock(workflow, 'ci-pr-vercel-preview')

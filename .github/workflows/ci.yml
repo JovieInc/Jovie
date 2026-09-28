@@ -1358,6 +1358,15 @@ jobs:
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      # The homepage render uses mock keys only, so its screenshots are public.
+      # Without this the producer guard omits every image and a failed compare
+      # uploads no -actual.png, leaving an intentional homepage change no
+      # CI-rendered baseline to adopt (scripts/visual-baseline-adopt.mjs).
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      # A failed compare also writes Playwright's error-context.md. Without
+      # this the guard blocks it as an unknown binary and uploads nothing
+      # (run 36347764603). Markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1474,6 +1483,7 @@ jobs:
           retention-days: 14
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
 
   ci-fast-typecheck:
     name: ci-fast (typecheck)
@@ -2853,6 +2863,10 @@ jobs:
           done
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+      - name: Enforce authed route initial JS budgets
+        # Deterministic gzip sizes from the build manifests; a few seconds.
+        # Ratchet lives in apps/web/scripts/route-js-budgets.json.
+        run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
       - name: Run deterministic layout behavior guard
         run: |
           set -euo pipefail
@@ -4113,9 +4127,26 @@ jobs:
           retention-days: 3
 
   ci-lighthouse-dashboard-pr:
-    name: Lighthouse (dashboard manual)
+    name: Lighthouse (dashboard gate)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    # Launch gate (JOV-6002): blocking on the merge-group combined head when
+    # launch-gate paths change; manual dispatch keeps deep-evidence runs.
+    # neon-db and ci-build-public are dispatch-only needs, so they may be
+    # skipped on merge_group — a failure still blocks the job.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.neon-db.result != 'failure' &&
+      needs.neon-db.result != 'cancelled' &&
+      needs.ci-build-public.result != 'failure' &&
+      needs.ci-build-public.result != 'cancelled' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_golden_path == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -4279,9 +4310,26 @@ jobs:
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-lighthouse-onboarding-pr:
-    name: Lighthouse (onboarding manual)
+    name: Lighthouse (onboarding gate)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    # Launch gate (JOV-6002): blocking on the merge-group combined head when
+    # launch-gate paths change; manual dispatch keeps deep-evidence runs.
+    # neon-db and ci-build-public are dispatch-only needs, so they may be
+    # skipped on merge_group — a failure still blocks the job.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.neon-db.result != 'failure' &&
+      needs.neon-db.result != 'cancelled' &&
+      needs.ci-build-public.result != 'failure' &&
+      needs.ci-build-public.result != 'cancelled' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_golden_path == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -4296,14 +4344,15 @@ jobs:
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        # neon-db is dispatch-only; merge-group runs fall back to DATABASE_URL_MAIN.
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -4312,16 +4361,16 @@ jobs:
           fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Export DATABASE_URL (main — non-DB PR)
         # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        if: needs.ci-path-changes.outputs.run_neon != 'true' || needs.neon-db.result != 'success'
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -6713,6 +6762,8 @@ jobs:
         ci-visual-snapshot-compare,
         drizzle-migration-guard,
         neon-db,
+        ci-lighthouse-dashboard-pr,
+        ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
@@ -6749,6 +6800,8 @@ jobs:
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           DATABASE_CERTIFICATION_RESULT="${{ needs.neon-db.result }}"
+          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
+          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
@@ -6760,6 +6813,7 @@ jobs:
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
           RUN_NEON="${{ needs.ci-path-changes.outputs.run_neon }}"
+          RUN_LAUNCH_GATE="${{ needs.ci-path-changes.outputs.run_golden_path }}"
           {
             echo "### Merge group ready"
             echo
@@ -6797,6 +6851,8 @@ jobs:
             echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
             echo "| Database Certification (isolated Neon) | $DATABASE_CERTIFICATION_RESULT |"
+            echo "| Dashboard Lighthouse (launch-gate paths) | $DASHBOARD_LIGHTHOUSE_RESULT |"
+            echo "| Onboarding Lighthouse (launch-gate paths) | $ONBOARDING_LIGHTHOUSE_RESULT |"
             echo
             echo "Only risk-selected database changes provision expiring Neon; preview/A11y evidence remains explicit opt-in or post-merge."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -6869,7 +6925,9 @@ jobs:
 
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
-            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT"; do
+            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT" \
+            "Dashboard Lighthouse:$RUN_LAUNCH_GATE:$DASHBOARD_LIGHTHOUSE_RESULT" \
+            "Onboarding Lighthouse:$RUN_LAUNCH_GATE:$ONBOARDING_LIGHTHOUSE_RESULT"; do
             name="${selected_gate%%:*}"
             selection_and_result="${selected_gate#*:}"
             selected="${selection_and_result%%:*}"
