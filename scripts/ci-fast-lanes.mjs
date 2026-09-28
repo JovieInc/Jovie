@@ -1494,7 +1494,8 @@ function runMergeGroupGuards() {
         !file.startsWith('apps/web/tests/e2e/') &&
         existsSync(resolve(REPO_ROOT, file))
     )
-    .map(file => file.replace(/^apps\/web\//, ''));
+    .map(file => file.replace(/^apps\/web\//, ''))
+    .map(file => JSON.stringify(file));
   return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
 }
 
@@ -1888,10 +1889,7 @@ export async function runStructural(opts = {}) {
     // is FAIL, not advisory).
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts tests/unit/design-system/single-column-one-width-v1.test.ts tests/unit/design-system/one-chrome-layer-v1.test.ts tests/unit/design-system/one-notification-v1.test.ts tests/unit/design-system/one-modal-layer-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
-    // Merge-group-only unit guards, run on PRs too: a PR green on PR CI that
-    // trips them poisons every merge group behind it (three ~2h zero-merge
-    // stalls on 2026-09-27: #19124, #18985 metrics layer; #18960 retirement gate).
-    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/design-system/component-family-ratchet.test.ts',
+    // Merge-group-only unit guards run in their own web lane (merge-group-guards).
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
   const allParts = [

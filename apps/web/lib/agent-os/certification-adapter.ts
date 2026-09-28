@@ -25,6 +25,7 @@ export const MARKETING_CERTIFICATION_STORE_KEY =
 
 import {
   type CertificationRecordBackend,
+  certificationRecordJson,
   CERTIFICATION_CAS_ATTEMPTS as MAX_COMPARE_AND_SET_ATTEMPTS,
   mutateCertificationRecord,
   CERTIFICATION_PERSISTENCE_TTL_SECONDS as PERSISTENCE_TTL_SECONDS,
@@ -866,8 +867,9 @@ export function isPersistedAuditEvent(
   );
 }
 
-function parseLedger(raw: unknown): MarketingCertificationLedger {
-  if (typeof raw !== 'string') {
+function parseLedger(stored: unknown): MarketingCertificationLedger {
+  const raw = certificationRecordJson(stored);
+  if (raw === null) {
     throw new MarketingCertificationPersistenceError(
       'Certification ledger must be stored as one compare-and-set JSON string.'
     );

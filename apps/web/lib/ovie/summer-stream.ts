@@ -4,6 +4,11 @@
 
 import { randomUUID } from 'node:crypto';
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
+import {
+  type SummerFailureHop,
+  summerFailureText,
+  summerRetryMode,
+} from '@/lib/ovie/summer-failure';
 import type { SummerTurnEvent } from '@/lib/ovie/summer-transport';
 
 export async function createSummerAssistantStreamResponse(input: {
@@ -21,6 +26,7 @@ export async function createSummerAssistantStreamResponse(input: {
       let hasVisibleContent = false;
       let textStarted = false;
       let failureState: (SummerTurnEvent & { type: 'state' }) | undefined;
+      let terminalState: string | undefined;
       let lastNotice: { text: string; code: string } | undefined;
       writer.write({
         type: 'start',
@@ -59,6 +65,7 @@ export async function createSummerAssistantStreamResponse(input: {
         }
         if (event.type === 'state') {
           metadata = { ...metadata, summerState: event.state };
+          terminalState = event.state;
           if (
             [
               'unknown',
@@ -97,18 +104,36 @@ export async function createSummerAssistantStreamResponse(input: {
       if (textStarted) {
         writer.write({ type: 'text-end', id: textId });
       }
-      if (failureState && !hasVisibleContent) {
-        // Surface a real stream error, not a fake assistant reply: the chat
-        // client restores the composer text and offers Retry, and no dead-end
-        // "do not resend" bubble is rendered or recorded as an answer.
-        writer.write({ type: 'message-metadata', messageMetadata: metadata });
-        writer.write({
-          type: 'error',
-          errorText:
-            lastNotice?.text ??
-            `Summer connection status: ${failureState.state}. No reply was recorded; retry the message to reconcile the turn.`,
-        });
-        return;
+      if (failureState) {
+        // Display-only status, not a Summer answer or a durable turn. Keep
+        // admission, same-turn recovery and budget checkpoint semantics intact.
+        const hop: SummerFailureHop =
+          failureState.hop ??
+          (failureState.state === 'failure' ||
+          failureState.state === 'failed_tool'
+            ? 'summer_turn_failed'
+            : 'summer_unreachable');
+        metadata = {
+          ...metadata,
+          summerFailure: { hop, retry: summerRetryMode(hop, terminalState) },
+        };
+        if (!hasVisibleContent) {
+          // Surface a real stream error, not a fake assistant reply: the chat
+          // client restores the composer text and offers Retry, and no
+          // dead-end bubble is rendered or recorded as an answer.
+          writer.write({ type: 'message-metadata', messageMetadata: metadata });
+          // The error chunk ends the stream without onFinish, so carry the
+          // hop + retry mode on a data part the client can read in onError.
+          writer.write({
+            type: 'data-summer-failure',
+            data: { hop, retry: summerRetryMode(hop, terminalState) },
+          });
+          writer.write({
+            type: 'error',
+            errorText: lastNotice?.text ?? summerFailureText(hop),
+          });
+          return;
+        }
       }
       writer.write({ type: 'finish-step' });
       writer.write({

@@ -36,6 +36,8 @@ export interface ChatMessage {
   clientMessageId?: string | null;
   turnId?: string | null;
   createdAt: string;
+  /** Founder Summer history only: this turn recorded no answer. */
+  summerFailed?: true;
 }
 
 interface CreateConversationInput {
