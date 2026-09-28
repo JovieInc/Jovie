@@ -216,7 +216,7 @@
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.94",
-    "@ai-sdk/react": "^4.0.119",
+    "@ai-sdk/react": "^4.0.120",
     "@better-auth/oauth-provider": "1.7.6",
     "@better-auth/passkey": "1.7.6",
     "@dnd-kit/core": "^6.3.1",
