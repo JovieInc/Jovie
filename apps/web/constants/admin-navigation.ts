@@ -6,6 +6,7 @@ type SearchParamRecord = Record<
 >;
 
 export const adminPeopleViews = [
+  'contacts',
   'waitlist',
   'creators',
   'users',
@@ -199,6 +200,7 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
 ] as const;
 
 export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
+  contacts: 'Customers',
   waitlist: 'Waitlist',
   creators: 'Creators',
   users: 'Users',
