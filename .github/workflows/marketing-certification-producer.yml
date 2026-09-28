@@ -52,17 +52,32 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      # The whole push range, from the compare API: merge-queue pushes batch
+      # several PRs, and a shallow checkout cannot diff back to `before`, so
+      # the old git fallback saw only the last commit and silently dropped
+      # the rest (2026-09-28: #19204's tests were never evaluated).
       - name: Changed files in this push
         id: changed
         env:
           BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           out="${RUNNER_TEMP}/changed.txt"
-          if [ -n "${BEFORE:-}" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            git diff --name-only "$BEFORE" "$GITHUB_SHA" > "$out"
+          all=false
+          if [[ "${BEFORE:-}" =~ ^[0-9a-f]{40}$ && "$BEFORE" != "0000000000000000000000000000000000000000" ]]; then
+            if ! gh api "repos/$REPO/compare/$BEFORE...$GITHUB_SHA" --jq '.files[].filename' > "$out"; then
+              all=true
+            fi
           else
-            git diff --name-only HEAD~1 HEAD > "$out"
+            all=true
+          fi
+          # The compare API lists at most 300 files; a larger push could hide an
+          # affected entry, so evaluate everything instead of guessing.
+          if [ "$all" = true ] || [ "$(wc -l < "$out")" -ge 300 ]; then
+            echo "all=true" >> "$GITHUB_OUTPUT"
+            : > "$out"
           fi
           echo "path=$out" >> "$GITHUB_OUTPUT"
           wc -l < "$out"
@@ -83,7 +98,7 @@ jobs:
           # Real defects (failed evidence) upsert one fingerprinted Linear issue.
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           CHANGED: ${{ steps.changed.outputs.path }}
-          ALL: ${{ (github.event_name == 'schedule' || inputs.all) && '--all' || '' }}
+          ALL: ${{ (github.event_name == 'schedule' || inputs.all || steps.changed.outputs.all == 'true') && '--all' || '' }}
           RUN_REF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
