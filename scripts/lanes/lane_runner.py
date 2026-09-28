@@ -965,6 +965,11 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             pushed = bool(after) and after != pr["headRefOid"]
             receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
+            if pushed:
+                # A new fix head earns another queue try; a repeat failure re-marks it. The PR
+                # summary carries no labels, so delete unconditionally (404 when absent).
+                sh(["gh", "api", "-X", "DELETE",
+                    f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
                 sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
