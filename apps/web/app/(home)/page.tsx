@@ -21,8 +21,8 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
 const CERTIFIED_PREVIEWS = {
-  connected: HOMEPAGE_MEDIA_MAP.connected.asset,
-  relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+  subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+  pay: HOMEPAGE_MEDIA_MAP.pay.asset,
 } as const satisfies HomepageCertifiedPreviews;
 
 export const revalidate = false;

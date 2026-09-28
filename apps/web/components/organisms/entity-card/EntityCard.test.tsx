@@ -374,7 +374,7 @@ describe('EntityCard source contract', () => {
     const source = readFileSync(resolve(__dirname, './EntityCard.tsx'), 'utf8');
 
     expect(source).toContain(
-      "'block min-w-0 truncate text-[11.5px] text-tertiary-token'"
+      "'block min-w-0 truncate text-xs text-tertiary-token'"
     );
     expect(source).toContain(
       "<span className='block text-2xs text-tertiary-token'>"
