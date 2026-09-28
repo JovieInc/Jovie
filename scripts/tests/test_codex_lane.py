@@ -202,6 +202,52 @@ class LedgerTest(Isolated):
     def test_installer_pins_the_hourly_monitor_and_revision_receipt(self):
         self.assertTrue(all(value in (ROOT / "scripts/lanes/install.sh").read_text() for value in ("ledger_cadence=3600", "install-receipt")))
 
+    def test_exhaustion_waits_for_the_latest_depleted_window(self):
+        now = 1_000_000
+        snapshot = rate_snapshot(now)
+        for key in ("primary", "secondary"):
+            snapshot["rateLimits"]["rateLimits"][key]["usedPercent"] = 100
+        codex.reconcile(now, 0, lambda _: snapshot)
+        self.assertEqual(codex.read_state()["alpha"]["exhaustedUntil"], now + 7200)
+
+    def test_reconcile_stamps_the_cadence_when_a_snapshot_is_malformed(self):
+        codex.reconcile(1_000_000, 0, lambda _: "not-a-dict")
+        result = codex.reconcile(1_000_001, 3600, lambda _: rate_snapshot())
+        self.assertFalse(result["reconciled"])
+        self.assertIn("alpha", codex.read_state()["_ledger"]["errors"])
+
+    def test_redemption_deadline_uses_every_access_loss_field(self):
+        now = 1_000_000
+        credits = {"availableCount": 1, "credits": [
+            {"id": "c", "status": "available", "resetType": "codexRateLimits", "grantedAt": 1, "expiresAt": None}]}
+        rates = rate_snapshot(now, credits)["rateLimits"]
+        lifecycle = {"observedSustainableThroughputPerHour": 200, "observedConcurrency": 1, "throughputObservedAt": now}
+        event = {"type": "terminal_limit"}
+        for field in ({"paymentFailure": True, "graceEndsAt": now + 100},
+                      {"canceledAtPeriodEnd": True, "subscriptionEndAt": now + 100}):
+            decision = codex.redemption_decision("alpha", event, rates, {**lifecycle, **field}, True, True, now)
+            self.assertEqual(decision["reason"], "access-loss-before-drain")
+
+    def test_a_pending_reset_retries_the_same_credit_and_key(self):
+        now = time.time()
+        before = rate_snapshot()["rateLimits"]
+        after = rate_snapshot()["rateLimits"]
+        for key in ("primary", "secondary"):
+            after["rateLimits"][key]["usedPercent"] = 0
+        codex.write_state({"alpha": {"pendingReset": {"creditId": "c1", "idempotencyKey": "k1", "before": before},
+                                     "exhaustedUntil": now + 3600}})
+        calls = []
+        saved = codex.app_server_calls
+        codex.app_server_calls = lambda name, requested, **kw: calls.append(requested) or [{"outcome": "alreadyRedeemed"}, after]
+        try:
+            self.assertTrue(codex.maybe_redeem("alpha", handle=type("H", (), {"closed": False})(), now=now))
+        finally:
+            codex.app_server_calls = saved
+        self.assertEqual(calls[0][0][1], {"creditId": "c1", "idempotencyKey": "k1"})
+        entry = codex.read_state()["alpha"]
+        self.assertNotIn("pendingReset", entry)
+        self.assertNotIn("exhaustedUntil", entry)
+
 
 class StatusTest(Isolated):
     def test_status_reports_availability_resets_and_health_exit(self):

@@ -250,7 +250,11 @@ def redemption_decision(name: str, event: dict, rate_response: dict, lifecycle: 
         reason = "missing-or-stale-drain-evidence"
     drain = None if reason else 3600 * 100 / (throughput * concurrency)
     resets = [w.get("resetsAt") for w in _windows(rate_response).values() if isinstance(w.get("resetsAt"), int)]
-    access = lifecycle.get("accessLossAt") or (lifecycle.get("subscriptionEndAt") if lifecycle.get("canceledAtPeriodEnd") else None)
+    access = lifecycle.get("accessLossAt")
+    if lifecycle.get("canceledAtPeriodEnd"):
+        access = min(filter(None, (access, lifecycle.get("subscriptionEndAt"))), default=None)
+    if lifecycle.get("paymentFailure"):
+        access = min(filter(None, (access, lifecycle.get("graceEndsAt"))), default=None)
     deadline = min(filter(None, [*resets, access]), default=None)
     if reason is None and (deadline is None or deadline - now <= drain):
         reason = "natural-reset-before-drain" if resets and min(resets) == deadline else "access-loss-before-drain"
@@ -342,35 +346,38 @@ def reconcile(now: float | None = None, if_due: int = LEDGER_CADENCE_S, fetch=ac
     def apply(state: dict) -> None:
         events = []
         for name, snapshot in snapshots.items():
-            entry = state.setdefault(name, {})
-            fresh, digests = announcement_evidence((snapshot.get("messages") or {}).get("messages", []), entry.get("announcementDigests"))
-            stored = entry.setdefault("announcementEvidence", {})
-            stored.update({row["messageId"]: row for row in fresh})
-            snapshot["announcementEvidence"], entry["announcementDigests"] = list(stored.values()), digests
-            window = ((snapshot.get("rateLimits") or {}).get("rateLimits") or {}).get("primary") or {}
-            sample = entry.get("usageSample") or {}
-            if sample.get("resetsAt") == window.get("resetsAt") and all(isinstance(value, (int, float)) for value in (sample.get("at"), sample.get("usedPercent"), window.get("usedPercent"))) and now > sample["at"] and window["usedPercent"] > sample["usedPercent"]:
-                entry.setdefault("lifecycle", {}).update(observedSustainableThroughputPerHour=3600 * (window["usedPercent"] - sample["usedPercent"]) / (now - sample["at"]), observedConcurrency=1, throughputObservedAt=now, throughputConfidence="observed", source="derived:account/rateLimits/read")
-            entry["usageSample"] = {"at": now, "usedPercent": window.get("usedPercent"), "resetsAt": window.get("resetsAt")}
-            lease_value = build_capacity_lease(name, snapshot, entry.get("lifecycle"), now)
-            old = entry.get("capacityLease") or {}
-            old_digest, new_digest = (_lease_digest(old) if old else None), _lease_digest(lease_value)
-            entry["capacityLease"] = lease_value
-            pending = entry.get("pendingReset") or {}
-            if pending.get("before") and reset_readback_verified(pending["before"], snapshot["rateLimits"]):
-                entry.pop("pendingReset", None)
-                entry.pop("exhaustedUntil", None)
-                entry["lastRedemptionReadbackAt"] = now
-            remaining = list(lease_value["usableCapacityRemaining"].values())
-            depleted = min((row for row in remaining if row["remainingPercent"] == 0 and row.get("resetsAt")), key=lambda row: row["resetsAt"], default=None)
-            if depleted:
-                entry["exhaustedUntil"] = depleted["resetsAt"]
-            elif remaining and all(row["remainingPercent"] > 0 for row in remaining) and not entry.get("pendingReset"):
-                entry.pop("exhaustedUntil", None)
-            if old_digest != new_digest:
-                events.append({"schema": "jovie.capacity-lease-change/v1", "at": iso(now),
-                               "leaseId": lease_value["leaseId"], "previousDigest": old_digest,
-                               "currentDigest": new_digest, "lease": lease_value})
+            try:
+                entry = state.setdefault(name, {})
+                fresh, digests = announcement_evidence((snapshot.get("messages") or {}).get("messages", []), entry.get("announcementDigests"))
+                stored = entry.setdefault("announcementEvidence", {})
+                stored.update({row["messageId"]: row for row in fresh})
+                snapshot["announcementEvidence"], entry["announcementDigests"] = list(stored.values()), digests
+                window = ((snapshot.get("rateLimits") or {}).get("rateLimits") or {}).get("primary") or {}
+                sample = entry.get("usageSample") or {}
+                if sample.get("resetsAt") == window.get("resetsAt") and all(isinstance(value, (int, float)) for value in (sample.get("at"), sample.get("usedPercent"), window.get("usedPercent"))) and now > sample["at"] and window["usedPercent"] > sample["usedPercent"]:
+                    entry.setdefault("lifecycle", {}).update(observedSustainableThroughputPerHour=3600 * (window["usedPercent"] - sample["usedPercent"]) / (now - sample["at"]), observedConcurrency=1, throughputObservedAt=now, throughputConfidence="observed", source="derived:account/rateLimits/read")
+                entry["usageSample"] = {"at": now, "usedPercent": window.get("usedPercent"), "resetsAt": window.get("resetsAt")}
+                lease_value = build_capacity_lease(name, snapshot, entry.get("lifecycle"), now)
+                old = entry.get("capacityLease") or {}
+                old_digest, new_digest = (_lease_digest(old) if old else None), _lease_digest(lease_value)
+                entry["capacityLease"] = lease_value
+                pending = entry.get("pendingReset") or {}
+                if pending.get("before") and reset_readback_verified(pending["before"], snapshot["rateLimits"]):
+                    entry.pop("pendingReset", None)
+                    entry.pop("exhaustedUntil", None)
+                    entry["lastRedemptionReadbackAt"] = now
+                remaining = list(lease_value["usableCapacityRemaining"].values())
+                depleted = max((row["resetsAt"] for row in remaining if row["remainingPercent"] == 0 and row.get("resetsAt")), default=None)
+                if depleted:
+                    entry["exhaustedUntil"] = depleted
+                elif remaining and all(row["remainingPercent"] > 0 for row in remaining) and not entry.get("pendingReset"):
+                    entry.pop("exhaustedUntil", None)
+                if old_digest != new_digest:
+                    events.append({"schema": "jovie.capacity-lease-change/v1", "at": iso(now),
+                                   "leaseId": lease_value["leaseId"], "previousDigest": old_digest,
+                                   "currentDigest": new_digest, "lease": lease_value})
+            except Exception as error:
+                errors[name] = f"{type(error).__name__}: {error}"[:160]
         state["_ledger"] = {"schema": LEDGER_SCHEMA, "reconciledAt": now, "errors": errors}
         if events:
             path = STATE.parent / "capacity-events.jsonl"
@@ -378,31 +385,48 @@ def reconcile(now: float | None = None, if_due: int = LEDGER_CADENCE_S, fetch=ac
                 for event in events:
                     handle.write(json.dumps(event, sort_keys=True) + "\n")
 
-    update_state(apply)
+    # The tick runs minutely and suppresses failures, so the cadence must be stamped on
+    # attempt, not only on success — otherwise one bad snapshot or write hot-loops full
+    # account reads every minute instead of hourly.
+    try:
+        update_state(apply)
+    except Exception as error:
+        errors["_reconcile"] = f"{type(error).__name__}: {error}"[:160]
+        try:
+            update_state(lambda state: state.__setitem__("_ledger",
+                         {"schema": LEDGER_SCHEMA, "reconciledAt": now, "errors": errors}))
+        except Exception:
+            pass
+        return {"reconciled": False, "accounts": sorted(snapshots), "errors": errors}
     return {"reconciled": True, "accounts": sorted(snapshots), "errors": errors}
 
 def maybe_redeem(name: str, handle, now: float) -> bool:
     state = read_state()
-    lifecycle = state.get(name, {}).get("lifecycle") or {}
-    if not all(lifecycle.get(key) is not None for key in
-               ("observedSustainableThroughputPerHour", "observedConcurrency", "throughputObservedAt")):
-        return False
-    try:
-        snapshot = account_snapshot(name)
-    except Exception:
-        return False
-    others = [n for n in accounts() if n != name]
-    decision = redemption_decision(name, {"type": "terminal_limit", "id": f"{name}:{state[name].get('lastRunAt')}"}, snapshot["rateLimits"], lifecycle,
-        now - float(state.get("_ledger", {}).get("reconciledAt") or 0) <= EVIDENCE_MAX_AGE_S and all(
-            n not in state.get("_ledger", {}).get("errors", {}) and not available(n, state, now) and any(
-                row.get("remainingPercent") == 0 for row in ((state.get(n, {}).get("capacityLease") or {}).get("usableCapacityRemaining") or {}).values()) for n in others),
-        not handle.closed, now)
-    update_state(lambda data: data.setdefault(name, {}).update(lastRedemptionDecision=decision))
-    if not decision["eligible"]:
-        return False
-    pending = {"creditId": decision["credit"]["id"], "idempotencyKey": decision["idempotencyKey"],
-               "before": snapshot["rateLimits"]}
-    update_state(lambda data: data.setdefault(name, {}).update(pendingReset=pending))
+    pending = dict(state.get(name, {}).get("pendingReset") or {})
+    if not pending.get("creditId") or not pending.get("before") or not pending.get("idempotencyKey"):
+        # No in-flight redemption: a retry must reuse the recorded credit and idempotency
+        # key — the previous consume may have succeeded while its readback failed, and
+        # selecting a different credit here would burn two credits for one event.
+        lifecycle = state.get(name, {}).get("lifecycle") or {}
+        if not all(lifecycle.get(key) is not None for key in
+                   ("observedSustainableThroughputPerHour", "observedConcurrency", "throughputObservedAt")):
+            return False
+        try:
+            snapshot = account_snapshot(name)
+        except Exception:
+            return False
+        others = [n for n in accounts() if n != name]
+        decision = redemption_decision(name, {"type": "terminal_limit", "id": f"{name}:{state[name].get('lastRunAt')}"}, snapshot["rateLimits"], lifecycle,
+            now - float(state.get("_ledger", {}).get("reconciledAt") or 0) <= EVIDENCE_MAX_AGE_S and all(
+                n not in state.get("_ledger", {}).get("errors", {}) and not available(n, state, now) and any(
+                    row.get("remainingPercent") == 0 for row in ((state.get(n, {}).get("capacityLease") or {}).get("usableCapacityRemaining") or {}).values()) for n in others),
+            not handle.closed, now)
+        update_state(lambda data: data.setdefault(name, {}).update(lastRedemptionDecision=decision))
+        if not decision["eligible"]:
+            return False
+        pending = {"creditId": decision["credit"]["id"], "idempotencyKey": decision["idempotencyKey"],
+                   "before": snapshot["rateLimits"]}
+        update_state(lambda data: data.setdefault(name, {}).update(pendingReset=pending))
     try:
         consumed, after = app_server_calls(name, [
             ("account/rateLimitResetCredit/consume", {"creditId": pending["creditId"],
