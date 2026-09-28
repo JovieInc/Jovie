@@ -31,26 +31,26 @@ describe('homepage v3 dark-launch flag', () => {
     );
   });
 
-  it('switches only the hero and shell, keeping the live path intact', () => {
+  it('switches only the story stack, keeping the live hero and shell intact', () => {
     const page = read('app/(home)/page.tsx');
     const hero = page.slice(
       page.indexOf('function HomepageHero()'),
       page.indexOf('function HomepageUnlockedSections()')
     );
-    expect(hero).toMatch(
-      /if \(HOMEPAGE_V3_ENABLED\) \{\s*return <HomepageIdentityHero headingId='home-hero-heading' \/>;/
+    // The identity hero shipped live: it renders unconditionally, flag or not.
+    expect(hero).not.toContain('HOMEPAGE_V3_ENABLED');
+    expect(hero).toContain(
+      "return <HomepageIdentityHero headingId='home-hero-heading' />"
     );
-    expect(hero).toContain('<HomepageEditorialHero');
 
+    // The flag gates only the v3 body (presence, structure, close).
+    expect(page).toContain('HOMEPAGE_V3_ENABLED ? (');
+    expect(page).toContain('<HomepageIdentityStoryStack />');
+    expect(page).toContain('<HomepageStoryStack />');
+
+    // One canonical shell: the layout no longer branches on the flag.
     const layout = read('app/(home)/layout.tsx');
-    const v3 = layout.slice(
-      layout.indexOf('if (HOMEPAGE_V3_ENABLED)'),
-      layout.indexOf('// The homepage uses the canonical marketing shell.')
-    );
-    // v3 uses the default landing header (docked) and the full footer.
-    expect(v3).not.toContain('headerVariant=');
-    expect(v3).not.toContain('mainOffset={false}');
-    expect(v3).toContain("footerVariant='expanded'");
-    expect(v3).not.toContain('HomeScrollWatcher');
+    expect(layout).not.toContain('HOMEPAGE_V3_ENABLED');
+    expect(layout).toContain("footerVariant='expanded'");
   });
 });

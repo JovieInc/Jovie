@@ -68,14 +68,18 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
       })
     ).toBeInTheDocument();
 
-    // One primary action label and destination in hero and close.
+    // One certified name search action in hero and close (JOV-5085).
     const hero = screen.getByTestId('marketing-section-hero');
     const close = screen.getByTestId('marketing-section-cta');
     for (const region of [hero, close]) {
-      const actions = within(region).getAllByRole('link');
-      expect(actions).toHaveLength(1);
-      expect(actions[0]).toHaveAccessibleName('Request access');
-      expect(actions[0]).toHaveAttribute('href', '/signup');
+      expect(within(region).getByRole('combobox')).toHaveAttribute(
+        'placeholder',
+        'Search your name'
+      );
+      expect(within(region).queryAllByRole('link')).toHaveLength(0);
+      expect(
+        within(region).queryByText('Request access')
+      ).not.toBeInTheDocument();
     }
 
     // Each background image once, each in its own section.
@@ -89,14 +93,15 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     expect(screen.queryByText("What's new in Jovie")).toBeNull();
   });
 
-  it('keeps the live homepage unchanged with the flag off', async () => {
+  it('keeps the live story stack with the flag off', async () => {
     flags.HOMEPAGE_V3_ENABLED = false;
     await renderHomePage();
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe(
-      'A living identity for the internet.'
-    );
-    expect(screen.queryByTestId('homepage-identity-hero-texture')).toBeNull();
+    // The identity hero stays live; only the v3 body is gated.
+    expect(screen.getByTestId('homepage-identity-hero-texture')).not.toBeNull();
+    expect(screen.getByTestId('homepage-story-stack')).not.toBeNull();
+    expect(screen.queryByTestId('homepage-identity-story-stack')).toBeNull();
     expect(screen.queryByTestId('homepage-presence-material')).toBeNull();
+    expect(screen.queryByTestId('homepage-section-structure')).toBeNull();
   });
 });

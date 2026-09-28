@@ -22,6 +22,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
+  useArtistSearchQuery: () => ({
+    results: [],
+    state: 'idle',
+    search: vi.fn(),
+    clear: vi.fn(),
+  }),
+}));
+
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
     const { fill, priority, quality, ...rest } = props;
@@ -133,7 +142,7 @@ describe('HomepageIdentitySections', () => {
 });
 
 describe('HomepageIdentityClose', () => {
-  it('repeats the one Request access action when gated', () => {
+  it('repeats the certified name search action when gated (JOV-5085)', () => {
     render(<HomepageIdentityClose />);
 
     const section = screen.getByRole('region', {
@@ -141,11 +150,17 @@ describe('HomepageIdentityClose', () => {
     });
     expect(section).toBe(screen.getByTestId('marketing-section-cta'));
     expect(section).toHaveAttribute('data-homepage-testid', 'homepage-close');
-    const links = within(section).getAllByRole('link');
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAccessibleName('Request access');
-    expect(links[0]).toHaveAttribute('href', '/signup');
-    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(section).getByRole('combobox')).toHaveAttribute(
+      'placeholder',
+      'Search your name'
+    );
+    expect(within(section).getByTestId('homepage-close-cta')).toHaveTextContent(
+      'Find me'
+    );
+    expect(within(section).queryAllByRole('link')).toHaveLength(0);
+    expect(
+      within(section).queryByText('Request access')
+    ).not.toBeInTheDocument();
   });
 
   it('returns focus to the hero name search while the waitlist is off', () => {

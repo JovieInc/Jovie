@@ -13,8 +13,9 @@ import { HomepagePrimaryAction } from './HomepagePrimaryAction';
 import './HomepageIdentity.css';
 
 /**
- * Canonical Pen v3 close (2026-09-26, dark launch): one headline and the same Request access
- * action as the header and hero. The open-state action returns to search.
+ * Canonical Pen v3 close (2026-09-26, dark launch): one headline and the same
+ * certified name search action as the hero (JOV-5085). The open-state action
+ * returns focus to search.
  */
 export function HomepageIdentityClose() {
   const { close } = HOMEPAGE_IDENTITY_COPY;
@@ -44,9 +45,13 @@ export function HomepageIdentityClose() {
         <div className='homepage-identity-close__actions'>
           {FEATURE_FLAGS.WAITLIST_ENABLED ? (
             <HomepagePrimaryAction
+              appearance='editorial'
+              inputId='homepage-close-name-search'
+              placeholder={HOMEPAGE_IDENTITY_COPY.hero.search.placeholder}
+              submitLabel={HOMEPAGE_IDENTITY_COPY.hero.search.action}
               submitTestId='homepage-close-cta'
               submitAnalytics={{
-                eventName: HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
+                eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
                 properties: {
                   ...HOMEPAGE_CERTIFIED_CONTEXT,
                   placement: 'close',
