@@ -71,6 +71,7 @@ class GithubEnvTest(unittest.TestCase):
             shim = (shim_dir / "gh").read_text()
             self.assertIn("gh_app_token.py", shim)
             self.assertIn("exec /usr/bin/gh", shim)
+            self.assertIn("[ \"$1\" = gist ] && exec /usr/bin/gh", shim, "gists keep the host login")
             self.assertTrue(os.environ["PATH"].startswith(str(shim_dir)))
 
     def test_no_key_and_no_env_changes_nothing(self):
