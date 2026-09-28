@@ -33,7 +33,7 @@ describe('chat entity right panel System B style guard', () => {
     );
     expect(source).toContain('system-b-chat-entity-right-panel-shell');
     expect(source).toContain('EntitySidebarShell');
-    expect(source).toContain('EntityHeaderCard');
+    expect(source).toContain('EntityHeader');
     expect(source).toContain('DrawerSection');
     expect(source).not.toContain('system-b-chat-entity-panel-surface');
     expect(source).not.toContain('system-b-chat-entity-panel-header');

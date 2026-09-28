@@ -2,7 +2,7 @@
 
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import * as React from 'react';
-
+import { useMenuOriginFocusRestore } from '../lib/overlay-focus';
 import {
   centeredContentStyles,
   descriptionStyles,
@@ -60,8 +60,13 @@ const AlertDialogContent = React.forwardRef<
     portalProps,
     overlayProps,
     disablePortal = false,
+    onCloseAutoFocus,
     ...contentProps
   } = props;
+  const { contentRef, handleCloseAutoFocus } = useMenuOriginFocusRestore(
+    ref,
+    onCloseAutoFocus
+  );
   const contentClassName = cn(
     centeredContentStyles.position,
     centeredContentStyles.layout,
@@ -74,11 +79,12 @@ const AlertDialogContent = React.forwardRef<
 
   const content = (
     <AlertDialogPrimitive.Content
-      ref={ref}
+      ref={contentRef}
       className={contentClassName}
       data-slot='alert-dialog-content'
       data-testid={testId}
       {...contentProps}
+      onCloseAutoFocus={handleCloseAutoFocus}
     />
   );
 
