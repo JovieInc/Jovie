@@ -55,7 +55,7 @@ const PILL_FACE_CLASS_NAME =
 /**
  * 44px hit slot for the 28px pill face. The canonical Button is a transparent
  * overlay (layout-only classes — shadcn/no-restyle forbids visual overrides)
- * so the row keeps raw <button> usage at zero; the pill face owns the look.
+ * so the row adds no raw button element; the pill face owns the look.
  */
 const PILL_HIT_SLOT_CLASS_NAME =
   'relative flex h-11 min-w-0 flex-1 touch-manipulation items-center';
