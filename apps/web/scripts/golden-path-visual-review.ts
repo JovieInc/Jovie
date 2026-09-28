@@ -240,6 +240,8 @@ async function main() {
     console.log(
       `[golden-path-review] ${record.id}: layout=${layout.blockers.length ? 'BLOCKER' : 'ok'} model=${model.verdict}${suspected ? ' -> SUSPECTED' : ''}`
     );
+    if (model.verdict === 'unknown')
+      console.log(`  - model unavailable: ${model.reason}`);
     for (const line of [
       ...layout.blockers,
       ...(model.verdict === 'blocker' ? model.findings : []),
