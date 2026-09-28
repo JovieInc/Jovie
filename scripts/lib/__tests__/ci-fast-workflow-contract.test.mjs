@@ -1377,10 +1377,6 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('enforces external shared health contract coverage for package and test changes', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
     expect(STRUCTURAL_CONTROL_PATHS).toContain(
       'packages/agent-transport-contracts/'
     );
@@ -1400,10 +1396,6 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('selects structural coverage for native queue evidence and collector edits', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
     const pattern = structuralControlPattern();
     for (const path of [
       'scripts/native-queue-eval.mjs',
@@ -1429,10 +1421,6 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('selects the existing control lane for conflict event entrypoint and proof edits', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
     const pattern = structuralControlPattern();
     for (const path of [
       'scripts/pr-conflict-handler.mjs',
@@ -1451,11 +1439,6 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('enforces fleet gate and backlog-orchestrator coverage in structural CI', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-
     expect(STRUCTURAL_CONTROL_PATHS).toContain('scripts/fleet-gate/');
     expect(CI_FAST_SOURCE).toContain('elif [ "\\${CI:-}" = "true" ]');
     expect(CI_FAST_SOURCE).not.toContain('elif [[');
