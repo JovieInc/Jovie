@@ -186,9 +186,11 @@ export function ProfileDrawerShell({
           className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/24`}
           onClick={handleDismiss}
         />
+        {/* A native dialog defaults to width: fit-content, so inset-x-0 alone
+            does not stretch it; w-full keeps the sheet full width. */}
         <dialog
           ref={attachModalRef}
-          className={`absolute inset-x-0 bottom-0 ${PROFILE_Z.STICKY_CHROME} m-0 max-w-none border-0 bg-transparent p-0`}
+          className={`absolute inset-x-0 bottom-0 ${PROFILE_Z.STICKY_CHROME} m-0 w-full max-w-none border-0 bg-transparent p-0`}
           data-testid={dataTestId}
           aria-modal='true'
           aria-describedby={accessibleDescriptionId}

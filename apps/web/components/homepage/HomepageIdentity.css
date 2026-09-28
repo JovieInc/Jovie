@@ -107,20 +107,36 @@
     );
 }
 
-.homepage-identity-hero__texture {
+/* One Ion light enters from the lower right, as if its source sat just off
+   frame, and falls off optically into the page ground (Pen My0zu hero,
+   JOV-6914). The header band and centre stay dark for the copy; the last
+   layer fades the seam into the next section. */
+.homepage-identity-hero__light {
   position: absolute;
   z-index: -2;
-  /* Overscan covers the ambient drift so no edge is ever exposed. */
-  inset: calc(-1 * var(--space-3));
-  /* Offscreen subtrees skip rendering, which pauses the drift (CSS only). */
-  content-visibility: auto;
-  animation: homepage-identity-texture-drift 20s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-.homepage-identity-hero__texture-image {
-  object-fit: cover;
-  object-position: 100% 50%;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 72%,
+      var(--homepage-identity-hero-ground) 100%
+    ),
+    radial-gradient(
+      ellipse 60% 55% at 72% 102%,
+      color-mix(in oklab, var(--color-accent-blue) 16%, transparent),
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 80% 58% at 98% 104%,
+      color-mix(in oklab, var(--color-accent-blue) 34%, transparent),
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 110% 75% at 112% 118%,
+      color-mix(in oklab, var(--color-accent-blue) 55%, transparent),
+      transparent 100%
+    );
 }
 
 /* Narrow viewports put the bright perforation behind the copy, so the
@@ -137,32 +153,6 @@
         100%
     );
   }
-
-  .homepage-identity-hero__texture-image {
-    object-position: 72% 50%;
-  }
-}
-
-@keyframes homepage-identity-texture-drift {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-
-  to {
-    transform: translate3d(
-        calc(-1 * var(--space-3)),
-        calc(-1 * var(--space-2)),
-        0
-      )
-      scale(1.02);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .homepage-identity-hero__texture {
-    animation: none;
-    will-change: auto;
-  }
 }
 
 .homepage-identity-hero__inner {
@@ -173,7 +163,6 @@
   text-align: center;
 }
 
-.homepage-identity-hero__eyebrow,
 .homepage-identity-specimen__handle,
 .homepage-identity-specimen__caption,
 .homepage-identity-structure__label,
@@ -186,14 +175,10 @@
   line-height: 1.4;
 }
 
-.homepage-identity-hero__eyebrow {
-  color: var(--homepage-identity-hero-ink-2);
-  text-transform: uppercase;
-}
-
 .homepage-identity-hero__headline {
-  max-width: 11ch;
-  margin: var(--space-6) 0 0;
+  /* "Your living identity / on the internet." balances to two lines. */
+  max-width: 20ch;
+  margin: 0;
   color: var(--homepage-identity-hero-ink);
   font-family: var(--homepage-identity-display);
   font-size: clamp(2.25rem, 4.6vw, 4rem);
@@ -597,4 +582,14 @@
   .homepage-identity-structure__anatomy > :last-child {
     grid-column: 5 / span 8;
   }
+}
+
+/* Real first-party proof (JOV-6946): Tim White's live profile rises out of
+   the Ion light under the name search. */
+.homepage-identity-hero__proof {
+  margin: clamp(var(--space-10), 5vw, var(--space-12)) 0 0;
+}
+
+.homepage-identity-hero__device {
+  width: min(70vw, 18rem);
 }

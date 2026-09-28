@@ -6,13 +6,12 @@
  */
 export const HOMEPAGE_IDENTITY_COPY = {
   seo: {
-    title: 'Jovie | A living identity for the internet',
+    title: 'Jovie | Your living identity on the internet',
     description:
       'Your work, your links, your next chapter. Together in your Jovie profile.',
   },
   hero: {
-    eyebrow: 'Jovie / Identity, connected',
-    headline: 'A living identity for the internet.',
+    headline: 'Your living identity on the internet.',
     subhead:
       'Your work, your links, your next chapter. Together in your Jovie profile.',
     // Certified conversion (JOV-5085): the hero action is always the name
@@ -21,28 +20,9 @@ export const HOMEPAGE_IDENTITY_COPY = {
       placeholder: 'Search your name',
       action: 'Find me',
     },
-    // Avery Chen is fictional illustrative content, not a customer or
-    // evidence of product behavior. The caption labels it as a preview.
-    specimen: {
-      handle: 'jov.ie/avery',
-      name: 'Avery Chen',
-      bio: 'Building tools for a more thoughtful internet.',
-      portraitAlt: 'Portrait of Avery Chen, a fictional example profile',
-      rows: [
-        {
-          id: 'work',
-          title: 'Fieldnotes',
-          detail: 'Tools for thoughtful teams',
-        },
-        {
-          id: 'writing',
-          title: 'On building things that matter',
-          detail: 'Avery’s latest essay',
-        },
-      ],
-      action: 'Get updates',
-      caption: 'Your Jovie profile · Illustrative preview',
-    },
+    // Real first-party proof (JOV-6946): the hero shows Tim White's live
+    // jov.ie/tim profile, never a fictional placeholder person.
+    proofAlt: 'Tim White’s Jovie profile at jov.ie/tim',
   },
   // Presence and structure chapters, then the close.
   sections: [

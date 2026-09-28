@@ -73,11 +73,13 @@ describe('mounted homepage hero System B source contract', () => {
       "submitTestId='homepage-primary-cta'"
     );
     expect(heroComponentSource).not.toMatch(/<Button|<Link|href=/);
-    expect(heroComponentSource).toContain('<HomepageProfileSpecimen');
+    // Real first-party proof (JOV-6946), never the fictional specimen.
+    expect(heroComponentSource).toContain('<ArtistProfilePhoneFrame');
+    expect(heroComponentSource).not.toContain('<HomepageProfileSpecimen');
 
     for (const className of [
       'homepage-identity-hero',
-      'homepage-identity-hero__texture',
+      'homepage-identity-hero__light',
       'homepage-identity-hero__inner',
       'homepage-identity-hero__headline',
       'homepage-identity-hero__support',

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -412,5 +414,13 @@ describe('ProfileCompactSurface', () => {
       'data-payments-link',
       ''
     );
+  });
+
+  it('forwards the release credits opener to the overflow menu drawer', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ProfileCompactSurface.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('onOpenReleaseCredits={onOpenReleaseCredits}');
   });
 });
