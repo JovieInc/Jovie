@@ -11,6 +11,7 @@ import {
 } from '@/components/organisms/Dialog';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
 import type { DesktopUpdatePhase } from '@/lib/desktop/desktop-updates';
+import { DesktopUpdateModalPrimaryAction } from './DesktopUpdateModalPrimaryAction';
 
 export interface DesktopUpdateReleaseNotes {
   readonly summary: string;
@@ -115,21 +116,12 @@ export function DesktopUpdateModalView({
         <Button variant='secondary' onClick={onLater}>
           {COPY.laterAction}
         </Button>
-        {state.state === 'available' ? (
-          <Button variant='primary' onClick={onDownload}>
-            {COPY.downloadAction}
-          </Button>
-        ) : null}
-        {state.state === 'ready' ? (
-          <Button variant='primary' onClick={onInstall}>
-            {COPY.restartAction}
-          </Button>
-        ) : null}
-        {state.state === 'error' ? (
-          <Button variant='primary' onClick={onRetry}>
-            {COPY.retryAction}
-          </Button>
-        ) : null}
+        <DesktopUpdateModalPrimaryAction
+          state={state}
+          onDownload={onDownload}
+          onInstall={onInstall}
+          onRetry={onRetry}
+        />
       </DialogActions>
     </Dialog>
   );
