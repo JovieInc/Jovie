@@ -1494,7 +1494,8 @@ function runMergeGroupGuards() {
         !file.startsWith('apps/web/tests/e2e/') &&
         existsSync(resolve(REPO_ROOT, file))
     )
-    .map(file => file.replace(/^apps\/web\//, ''));
+    .map(file => file.replace(/^apps\/web\//, ''))
+    .map(file => JSON.stringify(file));
   return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
 }
 

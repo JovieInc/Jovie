@@ -6,8 +6,8 @@
  * `seo.technical`, `seo.agentic`, `seo.copy`) so the certification ledger and
  * Summer consume one evidence envelope instead of a second SEO registry.
  *
- * Producers: `scripts/seo-certify.ts` (nightly live sweep) and the blog content
- * source test. Policy: docs/marketing/SEO_CERTIFICATION.md.
+ * Producers: the blog content source test; the sitemap-driven live sweep
+ * (`seo:certify`) lands in a follow-up.
  */
 import { type CopyRegister, lintCopy } from '@jovie/copy';
 import type { CertificationEvidenceReceipt } from '@/lib/agent-os/certification';
