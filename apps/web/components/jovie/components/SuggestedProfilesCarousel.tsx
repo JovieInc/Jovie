@@ -193,6 +193,7 @@ function ProfileReadyCard({
       <div className='relative p-4'>
         {/* Dismiss button */}
         <IconButton
+          type='button'
           variant='ghost'
           size='xs'
           onClick={onDismiss}
@@ -200,7 +201,7 @@ function ProfileReadyCard({
           className='absolute right-3 top-3'
           ariaLabel='Dismiss'
         >
-          <X />
+          <X className='h-3.5 w-3.5' />
         </IconButton>
 
         {/* Header */}

@@ -153,6 +153,7 @@ export function ChatStarterActionsRail({
             {visiblePaginationIndexes.map(index => (
               <IconButton
                 key={cards[index]?.id ?? index}
+                type='button'
                 variant='ghost'
                 size='md'
                 aria-label={`Show Starter Action ${index + 1} Of ${cards.length}: ${cards[index]?.title ?? ''}`}

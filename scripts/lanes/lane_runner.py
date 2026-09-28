@@ -888,6 +888,12 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
 
 
+UPDATE_TEST_TIMEOUT_S = 900
+# `update` runs ahead of every dispatch tick, so a refused tree waits this long before its
+# self-test runs again instead of stalling dispatch every minute.
+UPDATE_RETRY_S = 1800
+
+
 def update_json(path: Path, change) -> None:
     data = json.loads(path.read_text()) if path.exists() else {}
     change(data)
@@ -1784,6 +1790,11 @@ def install_release(host: Host) -> int:
     if not needs_update(marker.read_text().strip() if marker.exists() else None, tree):
         return 0
     release = host.state / "releases" / tree
+    refused_path = host.state / "update-refused.json"
+    refused = json.loads(refused_path.read_text()) if refused_path.exists() else {}
+    if not release.exists() and refused.get("tree") == tree and time.time() - refused.get("at", 0) < UPDATE_RETRY_S:
+        print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
+        return 1
     if not release.exists():
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
@@ -1794,12 +1805,21 @@ def install_release(host: Host) -> int:
         # The self-test must never touch this host's live state: point it at a scratch dir.
         scratch = staging / ".selftest-state"
         scratch.mkdir(exist_ok=True)
-        test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                              cwd=staging, capture_output=True, text=True, timeout=300,
-                              env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+        # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
+        # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
+        def refuse(why: str) -> int:
+            refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+            return 1
+        try:
+            test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                                  env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+        except subprocess.TimeoutExpired:
+            refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
+            raise
         if test.returncode != 0:
             print(f"lane update refused: release tests failed\n{test.stderr[-2000:]}", file=sys.stderr)
-            return 1
+            return refuse("release tests failed")
         (staging / "scripts/lanes/.tree").write_text(tree)
         staging.rename(release)
     link = host.state / ".current.tmp"

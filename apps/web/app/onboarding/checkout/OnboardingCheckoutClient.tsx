@@ -8,7 +8,7 @@ import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/u
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import {
   emitProofClaimEvent,
   hasStoredProofClaimAttribution,

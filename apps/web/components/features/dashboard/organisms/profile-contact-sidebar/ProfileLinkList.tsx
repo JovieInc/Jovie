@@ -9,12 +9,12 @@ import type {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { toast } from '@/components/feedback';
 import {
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { PROVIDER_LABELS } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';

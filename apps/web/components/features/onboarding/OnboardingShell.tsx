@@ -4,7 +4,7 @@ import { Skeleton } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
