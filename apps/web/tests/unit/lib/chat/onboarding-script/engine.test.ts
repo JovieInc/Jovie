@@ -348,8 +348,10 @@ describe('decideFallbackTurn', () => {
     // High Spotify followers already clear the bar once handle+social complete.
     expect(turn.line.stepId).toBe('instant_access');
     const actions = turn.toolEvents.map(event => event.output.action);
-    expect(actions).toContain('propose_next_step');
-    expect(actions).toContain('propose_checkout');
+    const nextStep = actions.indexOf('propose_next_step');
+    const checkout = actions.indexOf('propose_checkout');
+    expect(nextStep).toBeGreaterThanOrEqual(0);
+    expect(checkout).toBe(nextStep + 1);
   });
 
   it('waitlists strong signals while controlled access is enabled', async () => {

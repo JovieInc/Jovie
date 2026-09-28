@@ -50,7 +50,7 @@ export function NotFoundPageContent({
               href={APP_ROUTES.ARTIST_PROFILES}
               className={`${prefix}-action-secondary`}
             >
-              Search artists
+              Explore profiles
             </Link>
           ) : null}
         </div>

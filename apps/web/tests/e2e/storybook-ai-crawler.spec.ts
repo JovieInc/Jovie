@@ -206,11 +206,11 @@ async function saveEvidence(
   await mkdir(EVIDENCE_DIR, { recursive: true });
   await writeFile(join(EVIDENCE_DIR, `crawler-${state.name}.png`), screenshot);
   await writeFile(join(EVIDENCE_DIR, `crawler-${state.name}.json`), evidence);
-  await testInfo.attach(`crawler-${state.name}`, {
+  await testInfo.attach(`crawler-${state.name}.png`, {
     body: screenshot,
     contentType: 'image/png',
   });
-  await testInfo.attach(`crawler-${state.name}-receipt`, {
+  await testInfo.attach(`crawler-${state.name}-receipt.json`, {
     body: evidence,
     contentType: 'application/json',
   });

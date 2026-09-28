@@ -14,6 +14,7 @@ export function MarketingPageContractMarkers() {
     <div
       hidden
       aria-hidden='true'
+      data-copy-scope={contract.copyScope}
       data-page-job={contract.job}
       data-proof={contract.proof}
       data-success-event={contract.successEvent}

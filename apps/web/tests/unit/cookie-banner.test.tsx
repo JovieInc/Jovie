@@ -106,7 +106,9 @@ describe('CookieActions', () => {
       'height',
       'padding',
     ] as const) {
-      expect(acceptAll).toHaveStyle({ [property]: rejectAll.style[property] });
+      // Compare authored inline styles: jsdom 30 resolves undefined var()
+      // tokens to initial computed values, which toHaveStyle would compare.
+      expect(acceptAll.style[property]).toBe(rejectAll.style[property]);
     }
     expect(rejectAll).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
     expect(customize).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
@@ -191,9 +193,21 @@ describe('CookieBannerSection', () => {
     expect(shouldSuppressCookieBannerForPathname(pathname)).toBe(true);
   });
 
+  it.each(['/hud', '/hud/wiki', '/hud-tv'])(
+    'suppresses authenticated Ops surface %s',
+    pathname => {
+      expect(shouldSuppressCookieBannerForPathname(pathname)).toBe(true);
+    }
+  );
+
+  it('does not suppress public routes that share a prefix', () => {
+    expect(shouldSuppressCookieBannerForPathname('/huddle')).toBe(false);
+  });
+
   it.each([
     ['/tim', true],
     ['/tim/alerts', true],
+    ['//tim//alerts', true],
     ['/dualipa/merch/card-1', true],
     ['/pricing', false],
     ['/artist-profiles', false],

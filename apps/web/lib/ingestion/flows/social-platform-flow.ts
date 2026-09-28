@@ -10,6 +10,7 @@
 import { and, eq, max } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import { admitCreatorUsername } from '@/lib/canonical/creator-username';
 import type { DbOrTransaction } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -213,6 +214,36 @@ export async function createNewSocialProfile(
     spotifyData,
   } = context;
 
+  // JOV-5922: the value about to become `creator_profiles.username` must
+  // satisfy the versioned semantic contract. An implausible handle (serialized
+  // list, URL, delimiter-joined candidates, whitespace fragment) is rejected
+  // here with provenance — never coerced or written to canon.
+  const admission = admitCreatorUsername(finalHandle, {
+    producer: 'ingestion.social-platform',
+    source: platformId,
+    confidence: 'observed',
+  });
+  if (admission.status !== 'accepted' || !admission.canonical) {
+    await captureWarning(
+      'Quarantined implausible username at canonical write boundary',
+      new Error(admission.rejections.map(r => r.code).join(', ')),
+      {
+        platform: platformId,
+        rejections: admission.rejections.map(r => r.code),
+        contractVersion: admission.contractVersion,
+      }
+    );
+    return NextResponse.json(
+      {
+        error: 'Invalid username',
+        details:
+          'The resolved username failed the canonical username contract and was quarantined.',
+      },
+      { status: 422, headers: NO_STORE_HEADERS }
+    );
+  }
+  const canonicalHandle = admission.canonical;
+
   const {
     token: claimToken,
     tokenHash: claimTokenHash,
@@ -240,8 +271,8 @@ export async function createNewSocialProfile(
     .insert(creatorProfiles)
     .values({
       creatorType: 'creator',
-      username: finalHandle,
-      usernameNormalized: finalHandle,
+      username: canonicalHandle,
+      usernameNormalized: canonicalHandle,
       displayName,
       avatarUrl: spotifyData?.imageUrl ?? null,
       bio: spotifyData?.bio ?? null,

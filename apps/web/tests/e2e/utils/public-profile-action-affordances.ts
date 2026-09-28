@@ -29,7 +29,7 @@ export const PUBLIC_PROFILE_ACTION_AFFORDANCE_SELECTORS = [
   'button:has-text("Open support")',
   'button[aria-label="Home"]',
   'button[aria-label="Music"]',
-  'button[aria-label="Shows"]',
+  'button[aria-label="Events"]',
   'button[aria-label="About"]',
   'button:has-text("Get updates")',
   '[data-mode]',

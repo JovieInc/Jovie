@@ -14,6 +14,7 @@ export const DESIGN_SYSTEM_COMPONENT_IDS = [
   'atom.separator',
   'atom.switch',
   'atom.sheet',
+  'atom.kbd',
   'atom.icon-button',
   'atom.link',
   'atom.brand-logo',
@@ -225,6 +226,25 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
     },
   },
   {
+    id: 'atom.kbd',
+    layer: 'atom',
+    source: 'packages/ui/atoms/kbd.tsx',
+    exportName: 'Kbd',
+    storySource: 'packages/ui/atoms/kbd.stories.tsx',
+    storybookTitle: 'UI/Atoms/Kbd',
+    storyExport: 'ShortcutSequence',
+    testSources: ['packages/ui/atoms/kbd.test.tsx'],
+    dependsOn: [],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'No source-mapped Pen Kbd root exists; source ownership remains authoritative until Pen promotion.',
+    variantAxes: {
+      variant: ['default', 'tooltip'],
+    },
+  },
+  {
     id: 'atom.icon-button',
     layer: 'atom',
     source: 'packages/ui/atoms/icon-button.tsx',
@@ -267,10 +287,8 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
         canonicalImportSource: '@jovie/ui',
       },
     ],
-    penRootId: null,
-    referenceEligible: false,
-    penIdentityReason:
-      'No source-mapped Pen icon-button root exists; source ownership remains authoritative until Pen promotion.',
+    penRootId: 'XYhft',
+    referenceEligible: true,
     variantAxes: {
       variant: ICON_BUTTON_VARIANT_NAMES,
       size: ICON_BUTTON_SIZE_NAMES,

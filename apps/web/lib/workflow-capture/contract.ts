@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
 
-export { WORKFLOW_CAPTURE_REQUEST_KIND };
+export { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
 
 export const WORKFLOW_CAPTURE_SCHEMA_VERSION = 1 as const;
 export const WORKFLOW_CAPTURE_MAX_BYTES = 250 * 1024 * 1024;

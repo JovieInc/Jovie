@@ -1,84 +1,23 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import {
-  clampRangeToRetention,
-  isAnalyticsRange,
-} from '@/lib/analytics/time-range';
+import { readAuthorizedDashboardAnalytics } from '@/lib/analytics/authorized-read';
 import { requireAuth } from '@/lib/auth/session';
-import { cacheQuery, invalidateCache } from '@/lib/db/cache';
-import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { logger } from '@/lib/utils/logger';
-import type { AnalyticsRange, DashboardAnalyticsView } from '@/types/analytics';
-
-type TimeRange = AnalyticsRange;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-function isView(value: string): value is DashboardAnalyticsView {
-  return value === 'traffic' || value === 'full';
-}
 
 export async function GET(request: Request) {
   try {
     const userId = await requireAuth();
-
-    // Parse query parameters
     const { searchParams } = new URL(request.url);
-    const rangeParam = searchParams.get('range');
-    const viewParam = searchParams.get('view');
-    const refreshParam = searchParams.get('refresh');
+    const { analytics } = await readAuthorizedDashboardAnalytics({
+      userId,
+      range: searchParams.get('range'),
+      view: searchParams.get('view'),
+      forceRefresh: searchParams.get('refresh') === '1',
+    });
 
-    const rawRange: TimeRange =
-      rangeParam && isAnalyticsRange(rangeParam) ? rangeParam : '30d';
-    const view: DashboardAnalyticsView =
-      viewParam && isView(viewParam) ? viewParam : 'full';
-    const forceRefresh = refreshParam === '1';
-
-    // Clamp date range to user's plan retention limit.
-    // Cache the entitlement lookup (5 min TTL) to avoid repeated billing
-    // round-trips on every analytics fetch.
-    const retentionDays = await cacheQuery(
-      `analytics-retention:${userId}`,
-      async () => {
-        try {
-          const entitlements = await getCurrentUserEntitlements();
-          return entitlements.analyticsRetentionDays;
-        } catch {
-          // Billing unavailable — use free-tier default (7 days)
-          return 7;
-        }
-      },
-      { ttlSeconds: 5 * 60 }
-    );
-    // null = unlimited (Max tier), skip clamping
-    const range =
-      retentionDays === null
-        ? rawRange
-        : clampRangeToRetention(rawRange, retentionDays);
-
-    const key = `dashboard-analytics:${userId}:${view}:${range}`;
-
-    if (forceRefresh) {
-      await invalidateCache(key);
-    }
-
-    const payload = await cacheQuery(
-      key,
-      async () => {
-        const analytics = await getUserDashboardAnalytics(userId, range, view);
-        return {
-          ...analytics,
-          top_cities: analytics.top_cities ?? [],
-          top_countries: analytics.top_countries ?? [],
-          top_referrers: analytics.top_referrers ?? [],
-          top_links: analytics.top_links ?? [],
-        };
-      },
-      { ttlSeconds: 60 }
-    );
-
-    return NextResponse.json(payload, {
+    return NextResponse.json(analytics, {
       status: 200,
       headers: NO_STORE_HEADERS,
     });

@@ -152,6 +152,24 @@ describe('/hud page auth', () => {
     expect(getHudMetricsMock).not.toHaveBeenCalled();
   });
 
+  it('calls unauthorized for a rejected kiosk token', async () => {
+    authorizeHudMock.mockResolvedValue({ ok: false, reason: 'unauthorized' });
+    getCurrentAdminPageAccessMock.mockResolvedValue({
+      isAuthenticated: false,
+      hasAdminRole: false,
+      userId: null,
+    });
+
+    await expect(
+      HudPage({ searchParams: Promise.resolve({ kiosk: 'bad-token' }) })
+    ).rejects.toThrow('NEXT_UNAUTHORIZED');
+
+    expect(authorizeHudMock).toHaveBeenCalledWith('bad-token');
+    expect(getCurrentAdminPageAccessMock).toHaveBeenCalled();
+    expect(unauthorizedMock).toHaveBeenCalled();
+    expect(getHudMetricsMock).not.toHaveBeenCalled();
+  });
+
   it('calls forbidden for signed-in non-admin users', async () => {
     getCurrentAdminPageAccessMock.mockResolvedValue({
       isAuthenticated: true,

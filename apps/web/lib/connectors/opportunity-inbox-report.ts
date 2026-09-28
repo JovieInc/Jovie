@@ -128,11 +128,15 @@ export function parseReportMeasurement(
     return null;
   }
 
+  let direction: 'up' | 'down' | 'flat' = 'flat';
+  if (deltaPercent > 0) direction = 'up';
+  else if (deltaPercent < 0) direction = 'down';
+
   return {
     metricLabel,
     deltaPercent,
     deltaDisplay: formatReportDelta(deltaPercent),
-    direction: deltaPercent > 0 ? 'up' : deltaPercent < 0 ? 'down' : 'flat',
+    direction,
     series: parseSeries(measurement.series),
     items: parseBreakdownItems(measurement.items),
     experimentId: asNonEmptyString(record.experimentId),

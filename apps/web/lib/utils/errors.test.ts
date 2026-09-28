@@ -25,6 +25,14 @@ describe('unwrapCapturedError', () => {
     expect(unwrapCapturedError({ error: inner })).toBe(inner);
   });
 
+  it('drops a missing context bag and keeps wrapper fields', () => {
+    const inner = upstashError('ERR max requests limit exceeded');
+    expect(unwrapCapturedContext({ error: inner })).toBeUndefined();
+    expect(
+      unwrapCapturedContext({ clerkUserId: 'user_1', error: inner })
+    ).toEqual({ clerkUserId: 'user_1' });
+  });
+
   it('keeps leftover wrapper fields as capture context', () => {
     const inner = upstashError('ERR max requests limit exceeded');
     expect(

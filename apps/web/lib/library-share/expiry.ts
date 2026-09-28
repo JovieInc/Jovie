@@ -5,6 +5,8 @@ export function resolveLibraryShareExpiryIso(
   now = Date.now()
 ): string | null {
   if (preset === 'never') return null;
-  const days = preset === '7d' ? 7 : preset === '30d' ? 30 : 90;
+  let days = 90;
+  if (preset === '7d') days = 7;
+  else if (preset === '30d') days = 30;
   return new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
 }

@@ -5,12 +5,19 @@ import {
   assertSingleAiVisibilityLayer,
   buildAiVisibilityMeasurement,
   getAiVisibilityMetric,
+  isAiVisibilityMetricKey,
   layerForAiVisibilityMetric,
   requireMeasuredAiVisibilityMetric,
   summarizeAiVisibilityLayers,
 } from './visibility-measurement';
 
 describe('AI visibility measurement layers', () => {
+  it('accepts catalog keys and rejects unknown values', () => {
+    expect(isAiVisibilityMetricKey('profile_published')).toBe(true);
+    expect(isAiVisibilityMetricKey('not_a_metric')).toBe(false);
+    expect(isAiVisibilityMetricKey(1)).toBe(false);
+  });
+
   it('pins every catalog metric to exactly one layer', () => {
     expect(layerForAiVisibilityMetric('profile_published')).toBe('readiness');
     expect(layerForAiVisibilityMetric('ai_crawlers_allowed')).toBe('readiness');
@@ -107,6 +114,18 @@ describe('AI visibility measurement layers', () => {
     expect(summarizeAiVisibilityLayers(measurement).businessOutcome).toBe(
       'unmeasured'
     );
+  });
+
+  it('marks readiness ready only when every measured flag is true', () => {
+    const measurement = buildAiVisibilityMeasurement({
+      readiness: {
+        profilePublished: true,
+        aiCrawlersAllowed: true,
+        brandIntegrityReady: true,
+      },
+    });
+
+    expect(summarizeAiVisibilityLayers(measurement).readiness).toBe('ready');
   });
 
   it('keeps readiness flags out of observed and outcome buckets', () => {

@@ -41,6 +41,7 @@ describe('computeTaskDueDate', () => {
     expect(
       computeTaskDueDate(releaseDate, 0, { now })?.toISOString().slice(0, 10)
     ).toBe('2026-04-15');
+    expect(releaseDate.toISOString()).toBe('2026-04-15T00:00:00.000Z');
   });
 
   it('returns null for missing offset, missing baseline, or pre-2000 epoch-like baselines', () => {

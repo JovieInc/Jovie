@@ -3,6 +3,7 @@
 import { Check, Minus } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import {
+  ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
@@ -12,7 +13,7 @@ import {
 } from '@/lib/entitlements/registry';
 
 const PUBLIC_PRICING_FEATURE_NAMES = new Set([
-  'Public artist profile page',
+  'Public Jovie profile page',
   'Contact / subscriber capture',
 ]);
 
@@ -143,7 +144,10 @@ export function PricingComparisonChart() {
     planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
 
   return (
-    <div className='system-b-pricing-chart'>
+    <div
+      className='system-b-pricing-chart'
+      data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}
+    >
       <div className='system-b-pricing-mobile-selector'>
         <select
           aria-label='Select Plan To Compare'

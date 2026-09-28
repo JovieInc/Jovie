@@ -27,10 +27,13 @@ describe('access route matrix (JOV-3087)', () => {
         false,
         APP_ROUTES.USER_CREATION_ERROR,
       ],
-    ])('maps %s to app-shell access %s and /start redirect %s', (state, expectedAppAccess, expectedStartRedirect) => {
-      expect(canAccessAppShell(state)).toBe(expectedAppAccess);
-      expect(getStartRouteRedirect(state)).toBe(expectedStartRedirect);
-    });
+    ])(
+      'maps %s to app-shell access %s and /start redirect %s',
+      (state, expectedAppAccess, expectedStartRedirect) => {
+        expect(canAccessAppShell(state)).toBe(expectedAppAccess);
+        expect(getStartRouteRedirect(state)).toBe(expectedStartRedirect);
+      }
+    );
 
     it.each([
       [CanonicalUserState.UNAUTHENTICATED, APP_ROUTES.SIGNIN],
@@ -139,16 +142,17 @@ describe('access route matrix (JOV-3087)', () => {
       expect(getWaitlistRouteRedirect(state)).toBe(expected);
     });
 
-    it.each(
-      allStates
-    )('does not bounce %s in a /start ↔ /waitlist redirect loop', state => {
-      const startRedirect = getStartRouteRedirect(state);
-      const waitlistRedirect = getWaitlistRouteRedirect(state);
-      const loops =
-        startRedirect === APP_ROUTES.WAITLIST &&
-        waitlistRedirect === APP_ROUTES.START;
-      expect(loops).toBe(false);
-    });
+    it.each(allStates)(
+      'does not bounce %s in a /start ↔ /waitlist redirect loop',
+      state => {
+        const startRedirect = getStartRouteRedirect(state);
+        const waitlistRedirect = getWaitlistRouteRedirect(state);
+        const loops =
+          startRedirect === APP_ROUTES.WAITLIST &&
+          waitlistRedirect === APP_ROUTES.START;
+        expect(loops).toBe(false);
+      }
+    );
 
     it('projects pre-receipt waitlist states as onboarding, not waitlist, for proxy', () => {
       expect(
@@ -166,6 +170,20 @@ describe('access route matrix (JOV-3087)', () => {
         isBanned: false,
       });
       expect(toProxyUserState(CanonicalUserState.NEEDS_DB_USER)).toEqual({
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+        isBanned: false,
+      });
+      expect(toProxyUserState(CanonicalUserState.USER_CREATION_FAILED)).toEqual(
+        {
+          needsWaitlist: false,
+          needsOnboarding: true,
+          isActive: false,
+          isBanned: false,
+        }
+      );
+      expect(toProxyUserState('UNRECOGNIZED' as CanonicalUserState)).toEqual({
         needsWaitlist: false,
         needsOnboarding: true,
         isActive: false,

@@ -45,17 +45,23 @@ export async function GET(request: Request, { params }: RouteParams) {
     if (!blob || blob.statusCode !== 200 || !blob.stream) {
       throw new WorkflowCaptureError('capture-media-unavailable', 404);
     }
-    return new Response(blob.stream, {
-      headers: {
-        'Cache-Control': 'private, no-store',
-        'Content-Disposition': 'inline',
-        'Content-Type': blob.blob.contentType,
-        ETag: blob.blob.etag,
-      },
+    const headers = new Headers({
+      'Cache-Control': 'private, no-store',
+      'Content-Disposition': 'inline',
+      'Content-Type': blob.blob.contentType,
+      ETag: blob.blob.etag,
     });
-  } catch (caught) {
+    for (const header of ['accept-ranges', 'content-length', 'content-range']) {
+      const value = blob.headers.get(header);
+      if (value) headers.set(header, value);
+    }
+    return new Response(blob.stream, {
+      headers,
+      status: headers.has('content-range') ? 206 : 200,
+    });
+  } catch (error_) {
     return workflowCaptureErrorResponse(
-      caught,
+      error_,
       '/api/workflow-captures/[id]/media'
     );
   }

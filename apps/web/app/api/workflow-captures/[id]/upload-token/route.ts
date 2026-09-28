@@ -52,9 +52,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     });
     return NextResponse.json(response, { headers: NO_STORE_HEADERS });
-  } catch (caught) {
+  } catch (error_) {
     return workflowCaptureErrorResponse(
-      caught,
+      error_,
       '/api/workflow-captures/[id]/upload-token'
     );
   }

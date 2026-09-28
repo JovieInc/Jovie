@@ -167,6 +167,17 @@ export function ReleaseSidebar({
     setActiveTab('overview');
   }, [release?.id]);
 
+  // Opening the release drawer is the intent signal for the per-release
+  // tasks workspace. Warm the route once per release so "open full page"
+  // paints immediately; task rows are already shared through
+  // useReleaseTasksQuery via ReleaseTaskChecklist.
+  const prefetchedTasksReleaseRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!release || prefetchedTasksReleaseRef.current === release.id) return;
+    prefetchedTasksReleaseRef.current = release.id;
+    router.prefetch(buildReleaseTasksRoute(release.id));
+  }, [release, router]);
+
   useEffect(() => {
     if (isRescanningIsrc) {
       wasRescanningPlatformsRef.current = true;
@@ -658,7 +669,6 @@ export function ReleaseSidebar({
               />
             }
             controls={activeTab === 'dsps' ? platformCardActions : undefined}
-            contentClassName='pt-2'
           >
             {renderTabContent()}
           </DrawerTabbedCard>

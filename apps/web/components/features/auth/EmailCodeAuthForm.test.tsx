@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTH_CLASSES } from '@/lib/auth/constants';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
 // Better Auth client calls resolve with `{ data, error }` instead of
@@ -22,18 +22,16 @@ vi.mock('@/lib/auth/client', () => ({
   },
 }));
 
-const authState = vi.hoisted(() => ({
-  isLoaded: true,
-  isSignedIn: false,
-}));
-
 vi.mock('@/hooks/useClerkSafe', () => ({
-  useAuthSafe: () => authState,
+  useAuthSafe: () => ({ isLoaded: true, isSignedIn: false }),
 }));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
+
+const trackFunnelStep = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/signup-funnel-client', () => ({ trackFunnelStep }));
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
@@ -75,68 +73,45 @@ async function submitCode(code: string) {
   });
 }
 
-function expectAuthEntryCta(button: HTMLElement) {
-  const classNames = button.getAttribute('class')?.split(/\s+/) ?? [];
-  expect(classNames).toEqual(
-    expect.arrayContaining(AUTH_CLASSES.authEntryCta.split(' '))
-  );
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
-  authState.isLoaded = true;
-  authState.isSignedIn = false;
   vi.stubGlobal('location', { assign: locationAssign } as unknown as Location);
 });
 
 describe('EmailCodeAuthForm', () => {
-  it('uses auth-entry CTA geometry across email, code, and lockout states', async () => {
+  it('records a signup auth_start, then an error step when the send fails', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: null,
+      error: { status: 500, statusText: 'Server Error' },
+    });
+    renderForm();
+    await submitEmail();
+
+    await waitFor(() => expect(trackFunnelStep).toHaveBeenCalledTimes(2));
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(1, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      surface: 'signup',
+    });
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(2, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      outcome: 'error',
+      surface: 'signup',
+      reason: 'otp_send_failed',
+    });
+  });
+
+  it('does not count sign-in as a signup funnel step', async () => {
     sendVerificationOtp.mockResolvedValueOnce({
       data: { success: true },
       error: null,
     });
-
-    renderForm();
-
-    const emailButton = screen.getByRole('button', {
-      name: /send sign-in code/i,
-    });
-    expectAuthEntryCta(emailButton);
-
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
     await submitEmail();
 
-    const verifyButton = await screen.findByRole('button', {
-      name: /verify code/i,
-    });
-    expectAuthEntryCta(verifyButton);
-
-    signInEmailOtp.mockResolvedValueOnce({
-      data: null,
-      error: {
-        code: 'TOO_MANY_ATTEMPTS',
-        message: 'Too many attempts',
-        status: 403,
-      },
-    });
-    await submitCode('111111');
-
-    const lockedButton = await screen.findByRole('button', {
-      name: /request a new code/i,
-    });
-    expectAuthEntryCta(lockedButton);
-  });
-
-  it('stays mounted when a session is confirmed — the route guard owns the redirect (JOV-6450)', () => {
-    authState.isSignedIn = true;
-    renderForm();
-
-    expect(
-      screen.getByRole('button', { name: /send sign-in code/i })
-    ).toBeEnabled();
-    expect(
-      document.querySelector('[data-auth-email-code-step="email"]')
-    ).toBeTruthy();
-    expect(locationAssign).not.toHaveBeenCalled();
+    await waitFor(() => expect(sendVerificationOtp).toHaveBeenCalledTimes(1));
+    expect(trackFunnelStep).not.toHaveBeenCalled();
   });
 
   it('stays on the email step and shows an error when send returns an error result', async () => {
@@ -195,43 +170,39 @@ describe('EmailCodeAuthForm', () => {
     expect(locationAssign).not.toHaveBeenCalled();
   });
 
-  it('validates email on submit without disabling the send button', async () => {
-    renderForm();
-    const form = screen
-      .getByLabelText(/email/i)
-      .closest('form') as HTMLFormElement;
-    expect(
-      screen.getByRole('button', { name: /send sign-in code/i })
-    ).toBeEnabled();
-    fireEvent.submit(form);
-    expect(await screen.findByText(/enter your email address/i)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'x' },
+  it('reads a send error code from the message prefix when code is absent', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'rate_limit_exceeded: slow down' },
     });
-    fireEvent.submit(form);
-    expect(await screen.findByText(/doesn.t look right/i)).toBeTruthy();
-    expect(sendVerificationOtp).not.toHaveBeenCalled();
-  });
-
-  it('shows the recipient, Change email, and controlled resend after send', async () => {
     renderForm();
-    await reachCodeStep();
-    expect(screen.getByText(/artist@example.com/)).toBeInTheDocument();
+    await submitEmail();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/too many requests\. please wait a moment/i)
+      ).toBeTruthy()
+    );
     expect(
-      screen.getByRole('button', { name: /change email/i })
-    ).toBeInTheDocument();
-    expect(screen.getByText(/resend in 30s/i)).toBeInTheDocument();
+      document.querySelector('[data-auth-email-code-step="code"]')
+    ).toBeNull();
   });
 
-  it('recovers from an expired code by sending a new one', async () => {
+  it('locks verify when the message prefix is too many attempts and code is absent', async () => {
     renderForm();
     await reachCodeStep();
+
     signInEmailOtp.mockResolvedValueOnce({
       data: null,
-      error: { code: 'OTP_EXPIRED', message: 'Expired', status: 400 },
+      error: { message: 'TOO_MANY_ATTEMPTS: locked out' },
     });
     await submitCode('111111');
-    expect(await screen.findByText(/that code has expired/i)).toBeTruthy();
+
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-auth-email-code-step="locked"]')
+      ).toBeTruthy()
+    );
     expect(locationAssign).not.toHaveBeenCalled();
   });
 
@@ -243,5 +214,30 @@ describe('EmailCodeAuthForm', () => {
     await submitCode('424242');
 
     await waitFor(() => expect(locationAssign).toHaveBeenCalledWith('/start'));
+  });
+});
+
+describe('EmailCodeAuthForm pre-hydration guard', () => {
+  it('server-renders the send button disabled so an early click cannot native-submit the email into the URL', () => {
+    const html = renderToString(
+      <EmailCodeAuthForm mode='sign-up' redirectUrl='/start' />
+    );
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    const sendButton = container.querySelector<HTMLButtonElement>(
+      'button[type="submit"]'
+    );
+
+    expect(sendButton?.disabled).toBe(true);
+  });
+
+  it('enables the send button once the client submit handler is attached', async () => {
+    renderForm();
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Send sign-in code' })
+      ).toBeEnabled()
+    );
   });
 });

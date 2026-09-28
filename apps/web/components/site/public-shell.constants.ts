@@ -8,3 +8,6 @@ export const PUBLIC_SHELL_FOOTER_LINKS = [
 
 export const PUBLIC_SHELL_MAIN_OFFSET_CLASS =
   'pt-(--public-shell-header-offset)';
+
+/** Lets a leading `.marketing-hero-dock` hero bleed under the docked header. */
+export const PUBLIC_SHELL_MAIN_DOCKED_CLASS = 'public-shell-main--docked';

@@ -12,7 +12,7 @@ const STORAGE_KEY = 'jovie:chat-proposal-dismissals:v1';
 type LedgerMap = Record<string, true>;
 
 function readLedger(): LedgerMap {
-  if (typeof globalThis.localStorage === 'undefined') {
+  if (globalThis.localStorage === undefined) {
     return {};
   }
   try {
@@ -39,7 +39,7 @@ function readLedger(): LedgerMap {
 }
 
 function writeLedger(map: LedgerMap): void {
-  if (typeof globalThis.localStorage === 'undefined') {
+  if (globalThis.localStorage === undefined) {
     return;
   }
   try {

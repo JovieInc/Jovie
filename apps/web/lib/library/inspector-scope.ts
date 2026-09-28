@@ -167,15 +167,17 @@ export function libraryInspectorSelectionForAsset(
   if (asset.source?.canonicalId) scopeIds.add(asset.source.canonicalId);
   if (asset.linkedReleaseId) scopeIds.add(asset.linkedReleaseId);
 
-  const kind: LibraryInspectorKind =
+  let kind: LibraryInspectorKind = 'asset';
+  if (
     asset.itemKind === 'audio' ||
     (asset.itemKind != null &&
       asset.itemKind !== 'release' &&
       Boolean(asset.linkedReleaseId))
-      ? 'track'
-      : asset.itemKind == null || asset.itemKind === 'release'
-        ? 'release'
-        : 'asset';
+  ) {
+    kind = 'track';
+  } else if (asset.itemKind == null || asset.itemKind === 'release') {
+    kind = 'release';
+  }
 
   return { kind, scopeIds };
 }

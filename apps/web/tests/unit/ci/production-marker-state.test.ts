@@ -58,6 +58,14 @@ function job(
   };
 }
 
+interface MarkerJobStep {
+  number: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+}
+type MarkerJob = ReturnType<typeof job> & { steps?: MarkerJobStep[] };
+
 function earlyCoalescedJobs() {
   return [
     job('Coalesce release wave', 1, 'completed', 'success'),
@@ -728,7 +736,7 @@ describe('recovered production marker state', () => {
         recoveredFromControllerAttempt: '1',
       },
       attemptRun: markerRecoveryRun('completed', 'success'),
-      attemptJobs: [],
+      attemptJobs: [] as MarkerJob[],
       originalRun: run(1, 'completed', 'failure'),
       originalJobs: [
         job(

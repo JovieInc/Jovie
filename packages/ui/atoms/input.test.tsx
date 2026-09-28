@@ -116,6 +116,23 @@ describe('Input', () => {
       expect(input.className).toContain('text-xs');
     });
 
+    it.each([
+      ['sm', 'sm:h-7', 'sm:text-xs'],
+      ['md', 'sm:h-8', 'sm:text-app'],
+      ['lg', 'sm:h-10', 'sm:text-app'],
+    ] as const)(
+      'keeps the %s desktop contract while meeting the mobile field contract',
+      (inputSize, desktopHeight, desktopText) => {
+        render(<Input inputSize={inputSize} data-testid='input' />);
+        const input = screen.getByTestId('input');
+
+        expect(input.className).toContain('h-11');
+        expect(input.className).toContain('text-base');
+        expect(input.className).toContain(desktopHeight);
+        expect(input.className).toContain(desktopText);
+      }
+    );
+
     it('applies md size classes by default', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
@@ -221,16 +238,16 @@ describe('Input', () => {
       expect(input.className).toContain('border-error');
     });
 
-    it.each([
-      'grammar',
-      'spelling',
-    ] as const)('preserves the %s aria-invalid reason', reason => {
-      render(<Input aria-invalid={reason} data-testid='input' />);
-      const input = screen.getByTestId('input');
+    it.each(['grammar', 'spelling'] as const)(
+      'preserves the %s aria-invalid reason',
+      reason => {
+        render(<Input aria-invalid={reason} data-testid='input' />);
+        const input = screen.getByTestId('input');
 
-      expect(input).toHaveAttribute('aria-invalid', reason);
-      expect(input.className).toContain('border-error');
-    });
+        expect(input).toHaveAttribute('aria-invalid', reason);
+        expect(input.className).toContain('border-error');
+      }
+    );
 
     it('associates error message with input via aria-describedby', () => {
       render(<Input error='Invalid email' data-testid='input' />);

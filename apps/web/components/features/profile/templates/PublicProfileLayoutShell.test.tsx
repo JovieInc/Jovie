@@ -58,7 +58,7 @@ describe('PublicProfileLayoutShell', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('owns exactly the compact surface below the desktop boundary', () => {
+  it('shares server-rendered desktop content below the desktop boundary', () => {
     render(
       <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
     );
@@ -68,11 +68,11 @@ describe('PublicProfileLayoutShell', () => {
       'compact'
     );
     expect(screen.getByTestId('compact-content')).toBeInTheDocument();
-    expect(screen.queryByTestId('desktop-content')).not.toBeInTheDocument();
-    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    // Both surfaces are SSR'd and CSS picks the visible one per breakpoint, so
+    // a cold desktop load never morphs through a mobile shell or loading text
+    // (JOV-6452).
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -111,5 +111,83 @@ describe('PublicProfileLayoutShell', () => {
     expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
     expect(cta).toHaveTextContent('Request access');
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
+  });
+
+  it('does not infer a banner height from a child that renders null', () => {
+    function NoBanner() {
+      return null;
+    }
+
+    render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout
+        desktopBanner={<NoBanner />}
+      />
+    );
+    expect(screen.getByTestId('profile-desktop-banner')).toBeEmptyDOMElement();
+  });
+
+  it('renders the real desktop surface instead of a loading interstitial before hydration', () => {
+    render(
+      <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
+    );
+
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
+    expect(screen.queryByText('Loading profile…')).toBeNull();
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+  });
+
+  it('marks the viewport for the desktop hand-off only when a desktop surface ships', () => {
+    render(
+      <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
+    );
+
+    expect(screen.getByTestId('public-profile-layout-shell')).toHaveClass(
+      'profile-viewport--desktop-surface'
+    );
+  });
+
+  it('renders only the compact column when the desktop surface is flagged off', () => {
+    const { desktopSurface: _desktopSurface, ...compactOnlyProps } =
+      commonProps;
+    render(
+      <PublicProfileLayoutShell
+        {...compactOnlyProps}
+        isDesktopLayout={false}
+        desktopBanner={<div data-testid='desktop-banner-content'>Banner</div>}
+        showClaimFooter
+        claimFooterHref='/test/claim'
+      />
+    );
+
+    const viewport = screen.getByTestId('public-profile-layout-shell');
+    expect(viewport).toHaveAttribute('data-layout', 'compact');
+    expect(viewport).not.toHaveClass('profile-viewport--desktop-surface');
+    expect(screen.getByTestId('compact-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
+    expect(screen.queryByTestId('desktop-banner-content')).toBeNull();
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
+    // The claim footer still sits under the centered column.
+    expect(screen.getByTestId('profile-claim-footer-cta')).toHaveAttribute(
+      'href',
+      '/test/claim'
+    );
+  });
+
+  it('keeps the desktop placeholder for embedded previews', () => {
+    render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout={false}
+        embedded
+      />
+    );
+
+    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.queryByTestId('desktop-content')).toBeNull();
   });
 });

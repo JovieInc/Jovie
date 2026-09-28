@@ -140,8 +140,10 @@ queued, and cancelled checks do not imply a terminal source failure.
 
 ## Retired admission automation
 
-`merge-queue-autoenroll.yml`, its heartbeat dispatch, and ownerless source
-admission are retired. The Queue-Deferred Release workflow and its automatic
+`merge-queue-autoenroll.yml`, its heartbeat dispatch, and its fleet gate are
+retired. Since 2026-09-26, `merge-queue-green-enroll.yml` enqueues CLEAN,
+non-draft, unlabeled-hold PRs on green checks so production holds never stall
+merging; required checks on the merge group remain the only gate. The Queue-Deferred Release workflow and its automatic
 label writer are also retired. Do not re-enable those paths to finish a PR.
 
 `queue-deferred`, `needs-rebase`, and `needs-conflict-resolution` are historical

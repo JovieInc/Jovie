@@ -78,6 +78,9 @@ const freeConfig: RateLimitConfig = {
   limit: 10,
   window: '1 d',
   prefix: 'test:free',
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'authenticated',
 };
 
 const proConfig: RateLimitConfig = {
@@ -85,6 +88,9 @@ const proConfig: RateLimitConfig = {
   limit: 100,
   window: '1 d',
   prefix: 'test:pro',
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'authenticated',
 };
 
 const trialConfig: RateLimitConfig = {
@@ -92,6 +98,9 @@ const trialConfig: RateLimitConfig = {
   limit: 50,
   window: '1 d',
   prefix: 'test:trial',
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'authenticated',
 };
 
 const maxConfig: RateLimitConfig = {
@@ -99,6 +108,9 @@ const maxConfig: RateLimitConfig = {
   limit: 500,
   window: '1 d',
   prefix: 'test:max',
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'authenticated',
 };
 
 // ---------------------------------------------------------------------------

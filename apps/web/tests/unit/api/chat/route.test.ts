@@ -138,8 +138,8 @@ vi.mock('@/lib/eval/scorers/online', () => ({
 }));
 
 vi.mock('@/lib/services/album-art/provider-xai', () => ({
-  isXaiConfigured: vi.fn().mockReturnValue(false),
-  XaiApiKeyMissingError: class XaiApiKeyMissingError extends Error {},
+  isAlbumArtGatewayConfigured: vi.fn().mockReturnValue(false),
+  AlbumArtGatewayUnconfiguredError: class AlbumArtGatewayUnconfiguredError extends Error {},
   buildAlbumArtBackgroundPrompt: vi.fn(),
   generateAlbumArtBackgrounds: vi.fn(),
 }));

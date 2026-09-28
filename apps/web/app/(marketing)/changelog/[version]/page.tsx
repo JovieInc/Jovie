@@ -15,11 +15,18 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingEditorialHeroPhoto,
+  MarketingHero,
+} from '@/components/marketing';
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { changelogInlineText } from '@/lib/changelog-parser';
+import {
+  changelogInlineText,
+  changelogVersionLabel,
+} from '@/lib/changelog-parser';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import '../changelog-editorial.css';
 
@@ -43,15 +50,16 @@ export async function generateMetadata({
   if (!release) return {};
 
   const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
+  const label = changelogVersionLabel(version);
   const description = release.summary
     ? changelogInlineText(release.summary)
-    : `Features, improvements, and fixes in ${APP_NAME} v${version}.`;
+    : `Features, improvements, and fixes in ${APP_NAME} ${label}.`;
   return {
-    title: `${APP_NAME} v${version}`,
+    title: `${APP_NAME} ${label}`,
     description,
     alternates: { canonical },
     openGraph: {
-      title: `${APP_NAME} v${version}`,
+      title: `${APP_NAME} ${label}`,
       description,
       type: 'article',
       url: canonical,
@@ -130,12 +138,17 @@ export default async function ChangelogReleasePage({
 
   return (
     <section className='min-h-screen bg-base text-primary-token'>
-      <div className='relative'>
+      <div className='marketing-hero-dock relative overflow-hidden'>
+        <MarketingEditorialHeroPhoto
+          src='/images/hero/changelog-version.webp'
+          opacity={0.22}
+          testId='changelog-version-hero-photo'
+        />
         <div
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'
         />
-        <MarketingHero variant='left'>
+        <MarketingHero variant='left' className='relative z-10'>
           <nav aria-label='Breadcrumb'>
             <ol className='flex flex-wrap items-center gap-2 font-mono text-app'>
               <li>
@@ -150,15 +163,16 @@ export default async function ChangelogReleasePage({
                 <ChevronRight className='size-3 text-quaternary-token' />
               </li>
               <li aria-current='page' className='text-accent'>
-                {/* ui-casing-allow: semantic version path segment */}/v
-                {release.version}
+                {/* ui-casing-allow: version or date path segment */}/
+                {changelogVersionLabel(release.version)}
               </li>
             </ol>
           </nav>
 
           <div className='mt-8 flex flex-wrap items-center gap-5'>
             <h1 className='changelog-version-identity line-clamp-2 font-mono text-primary-token'>
-              {/* ui-casing-allow: semantic version string */}v{release.version}
+              {/* ui-casing-allow: semantic version or date-key string */}
+              {changelogVersionLabel(release.version)}
             </h1>
             <div className='flex flex-col items-start gap-2'>
               {isLatest && (

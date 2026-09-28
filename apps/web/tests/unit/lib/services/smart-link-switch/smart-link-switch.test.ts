@@ -60,6 +60,30 @@ describe('smart_link_switch_live evidence floor', () => {
     expect(JSON.stringify(stopped)).not.toContain('https://jov.ie/placeholder');
   });
 
+  it('trims a padded share url and treats whitespace as no link', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: {
+          shareUrl: `  ${EXISTING}  `,
+          live: true,
+          resolvedDsps: ['spotify'],
+        },
+      })
+    ).toMatchObject({
+      disposition: 'keep',
+      shareUrl: EXISTING,
+    });
+    expect(
+      gateSmartLinkSwitch({
+        existing: { shareUrl: '   ', live: true, resolvedDsps: ['spotify'] },
+        proposed: { shareUrl: '   ' },
+      })
+    ).toMatchObject({
+      disposition: 'skip',
+      shareUrl: null,
+    });
+  });
+
   it('keeps an already-live shareUrl and cites only resolved DSPs', () => {
     const kept = gateSmartLinkSwitch({
       existing: {

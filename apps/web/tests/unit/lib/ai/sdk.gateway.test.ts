@@ -76,4 +76,22 @@ describe('lib/ai/sdk gateway routing', () => {
       headers: undefined,
     });
   });
+
+  it('routes image models through the same gateway provider', async () => {
+    process.env.AI_GATEWAY_API_KEY = 'gateway-key';
+    delete process.env.HELICONE_GATEWAY_BASE_URL;
+    const image = vi.fn((modelId: string) => ({ __image: modelId }));
+    const provider = Object.assign(
+      vi.fn((modelId: string) => ({ __model: modelId })),
+      { image }
+    );
+    mockCreateGateway.mockReturnValue(provider);
+
+    const { gateway } = await import('@/lib/ai/sdk');
+    const model = gateway.image('spacexai/grok-imagine-image');
+
+    expect(mockCreateGateway).toHaveBeenCalledWith({ apiKey: 'gateway-key' });
+    expect(image).toHaveBeenCalledWith('spacexai/grok-imagine-image');
+    expect(model).toEqual({ __image: 'spacexai/grok-imagine-image' });
+  });
 });

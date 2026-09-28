@@ -101,6 +101,14 @@ describe('useModalFocusBoundary', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
+  it('leaves focus on the modal backdrop', () => {
+    render(<BoundaryHarness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    const backdrop = screen.getByRole('button', { name: 'Backdrop' });
+    backdrop.focus();
+    expect(backdrop).toHaveFocus();
+  });
+
   it('pulls escaped focus back into the topmost dialog', () => {
     render(<BoundaryHarness />);
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));

@@ -521,6 +521,20 @@ export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'assistant',
 ]);
 
+// Conversation Insights Enums (JOV-6784)
+export const conversationFunnelStageEnum = pgEnum('conversation_funnel_stage', [
+  'anonymous',
+  'claimed',
+  'paid',
+]);
+
+export const objectionStatusEnum = pgEnum('objection_status', [
+  'draft',
+  'approved',
+  'published',
+  'rejected',
+]);
+
 export const chatTurnStatusEnum = pgEnum('chat_turn_status', [
   'reserved',
   'running',
@@ -855,4 +869,35 @@ export const libraryProfileVisibilityEnum = pgEnum(
 export const libraryAssetVisibilityEnum = pgEnum('library_asset_visibility', [
   'public',
   'private',
+]);
+
+// ---------------------------------------------------------------------------
+// Coding Agent Run Ingestion Enums (JOV-6508)
+// ---------------------------------------------------------------------------
+
+/** External coding-agent provider that produced the run. */
+export const codingAgentSourceEnum = pgEnum('coding_agent_source', [
+  'hyperagent',
+  'devin',
+  'cursor',
+  'grokbot',
+  'manual',
+]);
+
+/** Whether `cost_usd` is billed truth from the provider or a backfill estimate. */
+export const codingAgentCostSourceEnum = pgEnum('coding_agent_cost_source', [
+  'actual',
+  'estimated',
+]);
+
+/**
+ * Outcome label for the run's linked PR. Rows stay `open` until the 7-day
+ * post-merge window closes — never label landed prematurely.
+ */
+export const codingAgentOutcomeEnum = pgEnum('coding_agent_outcome', [
+  'open',
+  'landed',
+  'reverted',
+  'failed',
+  'abandoned',
 ]);

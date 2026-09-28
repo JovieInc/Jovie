@@ -31,7 +31,10 @@ interface PublicProfileLayoutShellProps {
   readonly shouldRenderHeading: boolean;
   readonly profileAccentStyle: CSSProperties;
   readonly compactSurface: ReactNode;
-  readonly desktopSurface: ReactNode;
+  /** Wide desktop surface. `null` (the default while
+   *  NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE is off) keeps every width on
+   *  the compact surface, centered in a phone-width column at desktop widths. */
+  readonly desktopSurface?: ReactNode;
   readonly desktopBanner?: ReactNode;
   readonly previewExitHref?: string;
   /** Desktop spare-space growth CTA (JOV-3544). */
@@ -69,11 +72,15 @@ export function PublicProfileLayoutShell({
   // a redundant full-res image fetch (JOV-2263). The heroImageUrl / heroImageError
   // props are retained in the interface for API compatibility with callers.
   const hasAmbientBg = Boolean(heroImageUrl && !heroImageError);
+  // The CSS desktop hand-off at 1180px is scoped to this class, so a build
+  // without the desktop surface never hides the compact surface.
+  const hasDesktopSurface = desktopSurface != null;
   return (
     <div
       className={cn(
         'profile-viewport relative h-dvh overflow-hidden bg-(--profile-stage-bg) text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden md:overflow-y-auto',
-        embedded && 'profile-viewport--embedded'
+        embedded && 'profile-viewport--embedded',
+        hasDesktopSurface && 'profile-viewport--desktop-surface'
       )}
       style={profileAccentStyle}
       data-testid='public-profile-layout-shell'
@@ -134,24 +141,22 @@ export function PublicProfileLayoutShell({
               compactSurface
             )}
           </div>
-          <div
-            className='public-profile-layout-desktop-shell overflow-hidden rounded-3xl'
-            data-testid='profile-desktop-shell'
-          >
-            {desktopBanner ? (
-              <div
-                className='relative z-20 w-full shrink-0 overflow-hidden rounded-t-3xl'
-                data-testid='profile-desktop-banner'
-              >
-                {desktopBanner}
-              </div>
-            ) : null}
-            {isDesktopLayout ? (
-              desktopSurface
-            ) : (
-              <ProfileDesktopLoadingPlaceholder />
-            )}
-          </div>
+          {hasDesktopSurface ? (
+            <div
+              className='public-profile-layout-desktop-shell overflow-hidden rounded-3xl'
+              data-testid='profile-desktop-shell'
+            >
+              {desktopBanner ? (
+                <div
+                  className='relative z-20 w-full shrink-0 overflow-hidden rounded-t-3xl'
+                  data-testid='profile-desktop-banner'
+                >
+                  {desktopBanner}
+                </div>
+              ) : null}
+              {embedded ? <ProfileDesktopLoadingPlaceholder /> : desktopSurface}
+            </div>
+          ) : null}
           {showClaimFooter && claimFooterHref ? (
             <ProfileClaimFooter
               href={claimFooterHref}

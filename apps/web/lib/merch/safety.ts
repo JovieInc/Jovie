@@ -89,8 +89,8 @@ export function getMerchCardSellability(
   if (!card.primaryImageUrl || card.mockupUrls.length === 0) {
     reasons.push('Missing mockups.');
   }
-  reasons.push(...getMerchContentReviewBlockers(card.qualityReview));
   reasons.push(
+    ...getMerchContentReviewBlockers(card.qualityReview),
     ...getMerchSellability(
       {
         currency: card.currency,

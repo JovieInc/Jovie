@@ -187,7 +187,7 @@ export class MemoryIngestHarness {
           name: source.catalogSong.title,
           identities: source.catalogSong.externalIds,
           metadata: {
-            ...(source.catalogSong.metadata ?? {}),
+            ...source.catalogSong.metadata,
             catalogTitle: source.catalogSong.title,
           },
         },
@@ -248,7 +248,7 @@ export class MemoryIngestHarness {
           name: source.release.title,
           identities: source.release.externalIds,
           metadata: {
-            ...(source.release.metadata ?? {}),
+            ...source.release.metadata,
             releaseDate: source.release.releaseDate,
           },
         },
@@ -299,7 +299,7 @@ export class MemoryIngestHarness {
       kind: 'voice_memo',
       storageKey: source.voiceMemo.storageKey ?? null,
       metadata: buildEvidenceMetadata(evidence, {
-        ...(source.voiceMemo.metadata ?? {}),
+        ...source.voiceMemo.metadata,
         title: source.voiceMemo.title,
         songTitle: source.voiceMemo.songTitle,
         recordedAt: source.voiceMemo.recordedAt,

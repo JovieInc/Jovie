@@ -51,7 +51,8 @@ export const M2_SIGNED_OUT_MARKERS = [
   'data-testid="hero-claim-handle"',
 ] as const;
 
-export const M2_CLAIM_FIRST_COPY = 'Claim the profile first';
+export const M2_CLAIM_FIRST_COPY = 'Claim my free profile';
+export const M2_CLAIM_PRO_ACCESS_COPY = 'Request access';
 export const M2_CLAIM_PRICE_DISPLAY = `$${M2_PRO_MONTHLY_USD}`;
 
 export const M2_ACTIVATION_MARKERS = [
@@ -245,6 +246,15 @@ export function evaluateClaimSurface(input: {
     };
   }
   evidence.push(M2_CLAIM_FIRST_COPY);
+  if (!input.pricingBody.includes(M2_CLAIM_PRO_ACCESS_COPY)) {
+    return {
+      ok: false,
+      statusCode: input.pricingStatus,
+      detail: 'Pricing page is missing the Pro request-access handoff',
+      evidence,
+    };
+  }
+  evidence.push(M2_CLAIM_PRO_ACCESS_COPY);
   if (!input.pricingBody.includes(M2_CLAIM_PRICE_DISPLAY)) {
     return {
       ok: false,
@@ -497,7 +507,7 @@ export async function runM2RevenuePathCanary(
       ...init,
       headers: {
         ...headers,
-        ...(init.headers ?? {}),
+        ...init.headers,
       },
       signal: init.signal ?? AbortSignal.timeout(timeoutMs),
     });

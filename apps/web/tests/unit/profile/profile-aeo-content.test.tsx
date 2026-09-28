@@ -185,14 +185,19 @@ describe('Profile AEO content', () => {
       expect(faq.source.label.length).toBeGreaterThan(0);
     }
 
-    expect(content.faqs[1]?.answer).toContain('May 1, 2026');
+    expect(content.faqs[1]?.answer).toBe(
+      'DJ Test\'s latest listed release is "Neon Circuit", a single released on May 1, 2026. The public catalog currently lists 2 releases.'
+    );
     expect(content.faqs[1]?.source.href).toBe('/dj-test/neon-circuit');
-    expect(content.faqs[2]?.answer).toContain('Warehouse 9');
+    expect(content.faqs[2]?.answer).toBe(
+      'Yes. DJ Test has 1 upcoming show listed on Jovie; the next listed date is July 4, 2026 at Warehouse 9 in Brooklyn, NY, US.'
+    );
     expect(content.faqs[2]?.source.href).toBe(
       'https://tickets.example.com/dj-test'
     );
-    expect(content.faqs[3]?.answer).toContain('Signal Hoodie');
-    expect(content.faqs[3]?.answer).toContain('$68.00');
+    expect(content.faqs[3]?.answer).toBe(
+      'Official DJ Test merch is available on Jovie. The current featured item is "Signal Hoodie", a hoodie priced at $68.00.'
+    );
 
     // Copy quality: no generic pronoun boilerplate or awkward "working in".
     expect(content.description.join(' ')).not.toContain('Their public Jovie');
@@ -375,6 +380,33 @@ describe('Profile AEO content', () => {
     ).toContain('description-identity-missing');
   });
 
+  it('treats a dot in the artist name as a literal character', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        name: 'A.B',
+        handle: 'ab',
+        tagline: 'Producer',
+        career_highlights: 'A.B plays clubs.',
+      },
+      now,
+    });
+
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const dottedAsAnyChar: ProfileAeoContentModel = {
+      ...content,
+      descriptionBlocks: content.descriptionBlocks.map(block => ({
+        ...block,
+        text: block.text.replaceAll('A.B', 'AxB'),
+      })),
+    };
+
+    expect(
+      validateProfileAeoContent(dottedAsAnyChar).map(issue => issue.code)
+    ).toContain('description-identity-missing');
+  });
+
   it('preserves accepted source spans around unsupported claims', () => {
     const content = buildProfileAeoContent({
       artist: {
@@ -446,6 +478,18 @@ describe('Profile AEO content', () => {
       value: 'Berlin, DE',
     });
     expect(content.facts.some(fact => fact.label === 'Hometown')).toBe(false);
+
+    const samePlace = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        hometown: 'Austin, TX',
+        location: 'Austin, TX',
+      },
+      now,
+    });
+    expect(samePlace.facts.filter(fact => fact.label === 'Based In')).toEqual(
+      []
+    );
 
     const withHometown = buildProfileAeoContent({ artist: baseArtist, now });
     expect(withHometown.facts).toContainEqual({
@@ -561,7 +605,7 @@ describe('Profile AEO content', () => {
     ).toHaveAttribute('href', 'https://itstimwhite.com/');
   });
 
-  it('omits empty touring and merch FAQs from the public surface', () => {
+  it('omits empty touring, merch, and unknown-release FAQs from the public surface', () => {
     const content = buildProfileAeoContent({
       artist: baseArtist,
       tourDates: [],
@@ -571,7 +615,6 @@ describe('Profile AEO content', () => {
 
     expect(content.faqs.map(faq => faq.question)).toEqual([
       'Where is DJ Test from?',
-      "What is DJ Test's latest release?",
     ]);
     expect(content.faqs.some(faq => faq.question.includes('touring'))).toBe(
       false
@@ -579,6 +622,9 @@ describe('Profile AEO content', () => {
     expect(content.faqs.some(faq => faq.question.includes('merch'))).toBe(
       false
     );
+    expect(
+      content.faqs.some(faq => faq.question.includes('latest release'))
+    ).toBe(false);
   });
 
   it('uses profile DSP URL columns for the listen row when no social links exist', () => {
@@ -625,9 +671,9 @@ describe('Profile AEO content', () => {
     expect(facts.querySelectorAll('dt')).toHaveLength(4);
     expect(facts.querySelectorAll('dd')).toHaveLength(4);
     for (const definition of facts.querySelectorAll('dd')) {
-      expect(definition.firstElementChild).toHaveClass(
-        'profile-aeo-content__fact-value'
-      );
+      expect(
+        definition.querySelector('.profile-aeo-content__fact-value')
+      ).not.toBeNull();
     }
 
     const listen = screen.getByTestId('profile-about-listen');
@@ -764,6 +810,8 @@ describe('Profile AEO content', () => {
     expect(screen.queryByTestId('profile-about-facts')).toBeNull();
     expect(screen.queryByTestId('profile-about-listen')).toBeNull();
     expect(screen.queryByTestId('profile-about-follow')).toBeNull();
+    // No sourced facts means no FAQ block — sparse stays sparse.
+    expect(screen.queryByText('DJ Test FAQ')).toBeNull();
     expect(screen.getByTestId('profile-about-share')).toBeVisible();
     expect(screen.getByTestId('profile-aeo-content')).toBeVisible();
   });
@@ -811,17 +859,10 @@ describe('Profile AEO content', () => {
     expect(first.description.join(' ')).not.toBe(second.description.join(' '));
     expect(first.description.join(' ')).toContain('@first-artist');
     expect(second.description.join(' ')).toContain('@second-artist');
-    // Sparse profiles only keep origin + latest-release FAQs (no empty tour/merch).
-    expect(first.faqs).toHaveLength(2);
-    expect(
-      first.faqs.every(
-        faq =>
-          faq.source.href.startsWith('/') ||
-          faq.source.href.startsWith('https://')
-      )
-    ).toBe(true);
-    // Same-origin FAQ sources stay environment-relative (no hard-coded prod).
-    expect(first.faqs[0]?.source.href).toBe('/first-artist');
+    // Sparse profiles keep no FAQs at all: unknown origin and unknown release
+    // answers are filler, not evidence (JOV-6199).
+    expect(first.faqs).toHaveLength(0);
+    expect(second.faqs).toHaveLength(0);
   });
 
   it('renders visible FAQ and source links into static HTML', () => {
@@ -951,6 +992,7 @@ describe('Profile AEO content', () => {
       artistProfileId: `profile-collaborator-${position}`,
       profileIsPublic: true,
       profileIsClaimed: false,
+      profileUsername: `collaborator-${position}`,
       creditName: null,
       role: 'main_artist' as const,
       releaseDate: new Date(`2026-0${position + 1}-01T00:00:00.000Z`),

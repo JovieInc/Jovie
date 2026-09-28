@@ -2,6 +2,12 @@ appId: app.jov.ie.staging
 productName: Jovie Staging
 executableName: Jovie Staging
 artifactName: Jovie-Staging-${version}-${arch}.${ext}
+# electron-builder derives app-update.yml `updaterCacheDirName` from the package
+# name. Without a distinct name, staging and production share
+# ~/Library/Caches/@joviedesktop-updater and each app's download clears the
+# other's pending update before install-on-quit.
+extraMetadata:
+  name: jovie-desktop-staging
 directories:
   output: dist
 afterPack: scripts/apply-electron-fuses.cjs
@@ -14,6 +20,8 @@ files:
 extraResources:
   - from: build/build-identity.json
     to: build-identity.json
+  - from: ../web/public/brand/Jovie-Wordmark-Cream.svg
+    to: Jovie-Wordmark-Cream.svg
 mac:
   category: public.app-category.music
   darkModeSupport: true

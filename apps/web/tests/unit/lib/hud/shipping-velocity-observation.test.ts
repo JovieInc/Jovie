@@ -15,6 +15,11 @@ describe('shipping-velocity-observation', () => {
     expect(observationFromShippingVelocityBuckets(buckets)).toBe('empty');
   });
 
+  it('treats an empty series as empty', () => {
+    expect(shippingVelocityBucketsAreEmpty([])).toBe(true);
+    expect(observationFromShippingVelocityBuckets([])).toBe('empty');
+  });
+
   it('treats any activity as a fresh observation', () => {
     const buckets = [{ merged: 1, opened: 0, closed: 0 }];
 

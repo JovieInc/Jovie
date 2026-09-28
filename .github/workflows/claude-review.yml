@@ -10,7 +10,7 @@ name: Claude Review (gbrain-aware)
 #
 # REQUIRED SECRETS (Tim to set — workflow runs without gbrain context until then,
 # and just notes gbrain was unavailable):
-#   CLAUDE_CODE_OAUTH_TOKEN  (already set — used by main-autofix)
+#   CLAUDE_CODE_OAUTH_TOKEN  (already set)
 #   JOVIE_BOT_PRIVATE_KEY    (already set) + vars.JOVIE_BOT_APP_ID
 #   GBRAIN_CONNECTION        (NEW — the connection string/token your gbrain CLI
 #                             reads to reach your brain backend; confirm the exact
@@ -204,7 +204,7 @@ jobs:
 
       - name: Claude review
         id: claude
-        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
+        uses: anthropics/claude-code-action@9171db3e57d6a3140a37ddc2ba92788584e0ead6 # v1
         env:
           GBRAIN_CONNECTION: ${{ secrets.GBRAIN_CONNECTION }}
         with:

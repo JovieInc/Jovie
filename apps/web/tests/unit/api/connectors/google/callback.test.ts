@@ -369,6 +369,90 @@ describe('GET /api/connectors/google/callback', () => {
     });
   });
 
+  // JOV-6049: "Connected" is a user-visible promise that the integration can
+  // perform its read operation. Storing tokens when Google withheld a
+  // provider's read scope must not mint a `connected` row — the durable state
+  // has to say needs_reauth instead of lying to the settings UI.
+  it('marks only the providers whose read scopes were actually granted as connected', async () => {
+    const validState = signGoogleOAuthState({
+      userId: 'db-user-1',
+      returnTo: '/app/settings/connectors',
+    });
+    hoisted.serverFetchMock
+      .mockResolvedValueOnce(
+        tokenResponse({
+          scope: [
+            // User declined Gmail; only calendar scopes granted.
+            'https://www.googleapis.com/auth/calendar.events.readonly',
+            'https://www.googleapis.com/auth/calendar.events',
+            'https://www.googleapis.com/auth/userinfo.email',
+          ].join(' '),
+        })
+      )
+      .mockResolvedValueOnce(userInfoResponse('partial-dj@example.com'));
+    const inserts = trackInserts(['gmail-acct-id', 'calendar-acct-id']);
+    trackUpdates();
+
+    const { GET } = await import('@/app/api/connectors/google/callback/route');
+    const response = await GET(
+      callbackRequest({ code: 'auth-code-123', state: validState })
+    );
+
+    expect(inserts).toHaveLength(2);
+
+    // Gmail: not connected, cannot read, carries a user-facing reason.
+    expect(JSON.stringify(inserts[0].values.status)).toContain('needs_reauth');
+    expect(inserts[0].values).toMatchObject({
+      provider: 'gmail',
+      capabilities: { canRead: false },
+      lastErrorCode: 'missing_scope',
+    });
+    expect(inserts[0].values.lastErrorUserMessage).toBeTruthy();
+
+    // Calendar: fully connected including write capability.
+    expect(JSON.stringify(inserts[1].values.status)).toContain('connected');
+    expect(inserts[1].values).toMatchObject({
+      provider: 'google_calendar',
+      capabilities: { canRead: true, canWrite: true },
+    });
+
+    // At least one provider connected, so the success redirect still stands.
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/app/settings/connectors?connected=google'
+    );
+  });
+
+  it('never reports connected when neither provider scope was granted', async () => {
+    const validState = signGoogleOAuthState({
+      userId: 'db-user-1',
+      returnTo: '/app/settings/connectors',
+    });
+    hoisted.serverFetchMock
+      .mockResolvedValueOnce(
+        tokenResponse({
+          scope: 'https://www.googleapis.com/auth/userinfo.email',
+        })
+      )
+      .mockResolvedValueOnce(userInfoResponse('scopes-denied@example.com'));
+    const inserts = trackInserts(['gmail-acct-id', 'calendar-acct-id']);
+    trackUpdates();
+
+    const { GET } = await import('@/app/api/connectors/google/callback/route');
+    const response = await GET(
+      callbackRequest({ code: 'auth-code-123', state: validState })
+    );
+
+    for (const insert of inserts) {
+      expect(JSON.stringify(insert.values.status)).toContain('needs_reauth');
+      expect(insert.values.lastErrorCode).toBe('missing_scope');
+    }
+
+    // No usable provider → no connected redirect claim.
+    expect(response.headers.get('location')).toBe(
+      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=missing_scopes`
+    );
+  });
+
   it('persists AES-256-GCM encrypted tokens that are not plaintext and decrypt back to the original values', async () => {
     hoisted.mockEnv.PII_ENCRYPTION_KEY =
       'a-real-32-byte-plus-test-key-for-gcm-checks';
