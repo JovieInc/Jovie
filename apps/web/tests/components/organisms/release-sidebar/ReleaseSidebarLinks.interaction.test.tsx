@@ -145,20 +145,20 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeader: ({
     thumbnail,
     title,
-    details,
+    subtitle,
     statusGlyph,
     actions,
   }: {
     thumbnail?: React.ReactNode;
     title?: React.ReactNode;
-    details?: React.ReactNode;
+    subtitle?: React.ReactNode;
     statusGlyph?: React.ReactNode;
     actions?: React.ReactNode;
   }) => (
     <div>
       {thumbnail}
       {title}
-      {details}
+      {subtitle}
       {statusGlyph}
       {actions}
     </div>

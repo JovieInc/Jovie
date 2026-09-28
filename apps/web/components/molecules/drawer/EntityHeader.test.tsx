@@ -26,12 +26,12 @@ describe('EntityHeader', () => {
       <EntityHeader
         thumbnail={<EntityHeaderThumbnail variant='person' name='Tim White' />}
         title='Tim White'
-        details='Brand partnerships · Worldwide'
+        subtitle='Brand partnerships · Worldwide'
       />
     );
 
     const title = screen.getByTestId('entity-header-title');
-    const details = screen.getByTestId('entity-header-details');
+    const details = screen.getByTestId('entity-header-details-row');
 
     expect(title).toHaveTextContent('Tim White');
     expect(title).toHaveClass('font-semibold', 'text-primary-token');
@@ -40,7 +40,7 @@ describe('EntityHeader', () => {
     expect(details.className).not.toContain('font-semibold');
   });
 
-  it('omits the details row entirely when no details or status glyph exist', () => {
+  it('omits the details row entirely when no subtitle or status glyph exist', () => {
     render(
       <EntityHeader
         thumbnail={<EntityHeaderThumbnail variant='person' name='Tim White' />}
@@ -63,6 +63,85 @@ describe('EntityHeader', () => {
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
+  });
+
+  it('only clamps the subtitle in stable layout and reserves optional slots', () => {
+    const first = render(
+      <EntityHeader title='Audience member' subtitle='Artist team' />
+    );
+    expect(screen.getByText('Artist team')).not.toHaveClass('line-clamp-1');
+    first.unmount();
+
+    const second = render(
+      <EntityHeader title='Long entity name' stableLayout reserveFooterSlot />
+    );
+    const title = screen.getByText('Long entity name');
+    expect(title).toHaveClass('line-clamp-1', 'min-h-6');
+    expect(screen.getByTestId('entity-header-meta-slot')).toHaveClass(
+      'invisible'
+    );
+    expect(title.parentElement?.nextElementSibling).toHaveClass(
+      'invisible',
+      'min-h-4'
+    );
+    second.unmount();
+
+    render(
+      <EntityHeader title='Track title' stableLayout meta={<span>3:42</span>} />
+    );
+    expect(
+      screen.getByTestId('entity-header-meta-slot').firstElementChild
+    ).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
+  });
+
+  it('assigns media, identity, metadata, and actions to explicit grid cells', () => {
+    render(
+      <EntityHeader
+        layout='grid'
+        title='Alex Rivera'
+        subtitle='Management'
+        thumbnail={<span>AR</span>}
+        meta={<span>North America</span>}
+        actions={<button type='button'>More actions</button>}
+      />
+    );
+
+    const header = screen.getByTestId('entity-header');
+    expect(header).toHaveAttribute('data-layout', 'grid');
+    expect(header).toHaveClass('grid', 'grid-cols-[auto_minmax(0,1fr)_auto]');
+    expect(header.querySelector('[data-entity-header-image]')).toHaveClass(
+      'row-span-2'
+    );
+    expect(header.querySelector('[data-entity-header-identity]')).toHaveClass(
+      'col-start-2'
+    );
+    expect(header.querySelector('[data-entity-header-metadata]')).toHaveClass(
+      'row-start-2'
+    );
+    expect(header.querySelector('[data-entity-header-actions]')).toHaveClass(
+      'col-start-3'
+    );
+  });
+});
+
+describe('EntityHeader chrome layout', () => {
+  it('renders title and actions in a utility bar', () => {
+    const first = render(
+      <EntityHeader layout='chrome' title='Contact Details' />
+    );
+    expect(screen.getByText('Contact Details')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    first.unmount();
+
+    render(
+      <EntityHeader
+        layout='chrome'
+        title={<span data-testid='custom-title'>Custom</span>}
+        actions={<button type='button'>Edit</button>}
+      />
+    );
+    expect(screen.getByTestId('custom-title')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
   });
 });
 
