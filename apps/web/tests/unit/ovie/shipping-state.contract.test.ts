@@ -1847,12 +1847,10 @@ describe('terminal failures are not aliased to blocked', () => {
       })
     );
 
-    expect(projection.sources['lanes-status'].counts.terminalFailures).toEqual(
-      {
-        state: 'measured-nonzero',
-        value: 3,
-      }
-    );
+    expect(projection.sources['lanes-status'].counts.terminalFailures).toEqual({
+      state: 'measured-nonzero',
+      value: 3,
+    });
     expect(projection.terminalFailures).toEqual({
       state: 'measured-nonzero',
       value: 3,
