@@ -161,6 +161,29 @@ class RelayTest(unittest.TestCase):
         missing = Shell({("gh", "pr", "view"): (1, "")})
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, missing, set()), [])
 
+    def test_a_second_failed_ejection_in_a_day_marks_the_pr_queue_poison(self):
+        now = time.time()
+        stamp = lambda ago: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - ago))
+        view = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h7",
+                "isCrossRepository": False, "labels": []}
+        payload = {"action": "dequeued", "pull_request": {"number": 7, "head": {"sha": "h7"}}}
+
+        def relay_with(removals, labels=()):
+            shell = Shell({("gh", "pr", "view"): {**view, "labels": [{"name": n} for n in labels]},
+                           ("gh", "api", "graphql"): removals})
+            return events.relay("pull_request_target", payload, shell, set()), shell
+
+        added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"},
+                                   {"createdAt": stamp(3600), "reason": "MANUAL"},
+                                   {"createdAt": stamp(30 * 3600), "reason": "failed_checks"}])
+        self.assertEqual(added, [(7, "dequeued")], "one failure today plus a manual or old removal is not poison")
+        added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"},
+                                   {"createdAt": stamp(7200), "reason": "failed_checks"}])
+        self.assertEqual(added, [(7, "queue-poison"), (7, "dequeued")])
+        self.assertEqual(len(shell.made("gh", "pr", "comment")), 1)
+        added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"}] * 3, labels=["queue-poison"])
+        self.assertEqual(shell.made("gh", "pr", "comment"), [], "an already-poisoned PR is not re-announced")
+
     def test_a_push_to_main_labels_newly_conflicting_prs_after_mergeability_settles(self):
         reads = iter([
             [{"number": 5, "headRefName": "tim/fix", "isDraft": False, "mergeable": "UNKNOWN", "labels": []}],

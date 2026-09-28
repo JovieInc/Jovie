@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui/atoms/tooltip';
 import type { Preview } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
 import { ThemeProvider } from './next-themes-mock';
@@ -138,6 +139,23 @@ if (typeof window !== 'undefined') {
       urlObj.origin === window.location.origin &&
       urlObj.pathname.startsWith('/api/')
     ) {
+      // Per-story API mocks. Some clients (e.g. better-auth's authClient)
+      // pin `fetch` at module init, so swapping `globalThis.fetch` inside a
+      // story decorator can never reach them. Registering a handler on
+      // `window.__jovieApiMock` works because this pinned wrapper consults
+      // the live global on every request.
+      const storyApiMock = (
+        window as Window & {
+          __jovieApiMock?: (request: {
+            url: URL;
+            init?: RequestInit;
+          }) => Response | Promise<Response> | undefined;
+        }
+      ).__jovieApiMock;
+      if (storyApiMock) {
+        const mocked = await storyApiMock({ url: urlObj, init });
+        if (mocked) return mocked;
+      }
       // Auth-backed account stories need a signed-in fixture after the
       // Better Auth migration; the old Clerk mock no longer supplies it.
       if (
@@ -236,19 +254,23 @@ const preview: Preview = {
 
       return (
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider
-            attribute='class'
-            defaultTheme='dark'
-            enableSystem={false}
-            disableTransitionOnChange
-            storageKey='jovie-theme-storybook'
-          >
-            <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-              <ToastProvider>
-                <Story />
-              </ToastProvider>
-            </TooltipProvider>
-          </ThemeProvider>
+          {/* nuqs hooks (e.g. release-table sort params) throw without an
+              adapter; the testing adapter emulates URL state in-memory. */}
+          <NuqsTestingAdapter>
+            <ThemeProvider
+              attribute='class'
+              defaultTheme='dark'
+              enableSystem={false}
+              disableTransitionOnChange
+              storageKey='jovie-theme-storybook'
+            >
+              <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+                <ToastProvider>
+                  <Story />
+                </ToastProvider>
+              </TooltipProvider>
+            </ThemeProvider>
+          </NuqsTestingAdapter>
         </QueryClientProvider>
       );
     },

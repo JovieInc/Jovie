@@ -40,10 +40,12 @@ const meta = {
   args: {
     open: true,
     onOpenChange: profileStoryNoop,
-    view: 'menu',
+    view: 'pay',
     onViewChange: profileStoryNoop,
     artist: PROFILE_STORY_ARTIST,
-    socialLinks: [],
+    socialLinks: [
+      { platform: 'venmo', url: 'https://venmo.com/demo' } as never,
+    ],
     contacts: [bookingContact],
     dsps: [],
     isSubscribed: false,
@@ -51,8 +53,8 @@ const meta = {
     onTogglePref: profileStoryNoop,
     onUnsubscribe: profileStoryNoop,
     isUnsubscribing: false,
-    hasTip: false,
-    hasContacts: true,
+    hasTip: true,
+    hasContacts: false,
     hasTourDates: false,
     hasReleases: false,
   },
@@ -72,3 +74,5 @@ export const AboutDestination: StoryObj<typeof meta> = {
     ],
   },
 };
+
+export const PayNow: StoryObj<typeof meta> = {};

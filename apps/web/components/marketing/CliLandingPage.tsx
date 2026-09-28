@@ -58,7 +58,7 @@ export const CLI_FAQ_ITEMS = [
   {
     question: 'Which Node.js version does it need?',
     answer:
-      'Node.js 22.23.2 or later, and below Node 23. That matches the published package engines field.',
+      'Node.js 24.21.0 or later, and below Node 25. That matches the published package engines field.',
   },
   {
     question: 'Can I point it at another Jovie deployment?',
@@ -177,9 +177,16 @@ export function CliLandingPage() {
                   <h3 className='text-base font-semibold text-primary-token'>
                     {item.title}
                   </h3>
-                  <pre className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-4 text-sm leading-relaxed text-primary-token'>
-                    <code>{item.command}</code>
-                  </pre>
+                  <section
+                    aria-label={`${item.title} command`}
+                    className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                    // biome-ignore lint/a11y/noNoninteractiveTabindex: long commands scroll sideways on narrow screens and need a keyboard entry point (axe scrollable-region-focusable)
+                    tabIndex={0}
+                  >
+                    <pre className='p-4 text-sm leading-relaxed text-primary-token'>
+                      <code>{item.command}</code>
+                    </pre>
+                  </section>
                   <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                     {item.body}
                   </p>

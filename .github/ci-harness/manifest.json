@@ -250,19 +250,21 @@
     },
     {
       "id": "ci-lighthouse-dashboard-pr",
-      "name": "Lighthouse (dashboard manual)",
-      "tier": "preview-evidence",
-      "mergeGate": false,
+      "name": "Lighthouse (dashboard gate)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr",
-      "remediation": "An explicitly requested dashboard Lighthouse run regressed. Fix the route behavior or budget drift instead of bypassing it."
+      "remediation": "Dashboard Lighthouse regressed on the launch-gate path set. Fix the route behavior or budget drift instead of bypassing it."
     },
     {
       "id": "ci-lighthouse-onboarding-pr",
-      "name": "Lighthouse (onboarding manual)",
-      "tier": "preview-evidence",
-      "mergeGate": false,
+      "name": "Lighthouse (onboarding gate)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr",
-      "remediation": "An explicitly requested onboarding Lighthouse run regressed. Verify /start with the test-auth bypass."
+      "remediation": "Onboarding Lighthouse regressed on the launch-gate path set. Verify /start with the test-auth bypass."
     },
     {
       "id": "ci-lighthouse-admin-pr",

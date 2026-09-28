@@ -34,6 +34,7 @@ export type AdminWorkspaceId =
   | 'product'
   | 'operations'
   | 'needs_you'
+  | 'certifications'
   | 'people'
   | 'growth'
   | 'platform_connections'
@@ -66,6 +67,7 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
   'chat',
+  'certifications',
   'people',
   'platform_connections',
   'activity',
@@ -119,6 +121,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Chat',
     href: APP_ROUTES.ADMIN_CHAT,
     description: 'Operator chat surface on the signed-in artist profile',
+    section: 'utilities',
+  },
+  {
+    id: 'certifications',
+    label: 'Certifications',
+    href: APP_ROUTES.ADMIN_CERTIFICATIONS,
+    description:
+      'Founder review of certification evidence, with certify and reject',
     section: 'utilities',
   },
   {

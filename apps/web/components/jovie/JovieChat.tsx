@@ -18,7 +18,11 @@ import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPan
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { track } from '@/lib/analytics';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
-import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
+import {
+  CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
+  CHAT_TRANSCRIPT_WINDOW,
+  measureChatTranscriptRow,
+} from '@/lib/chat/transcript-window';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
@@ -127,6 +131,8 @@ export function JovieChat({
     isLoading,
     isSubmitting,
     hasMessages,
+    collapsedSummerFailureCount,
+    showCollapsedSummerFailures,
     isLoadingConversation,
     conversationTitle,
     status,
@@ -196,6 +202,8 @@ export function JovieChat({
     scrollContainerRef,
     bottomSentinelRef,
   } = useStickToBottom(messages.length);
+  const isStuckToBottomRef = useRef(isStuckToBottom);
+  isStuckToBottomRef.current = isStuckToBottom;
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
@@ -400,9 +408,14 @@ export function JovieChat({
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 80,
+    estimateSize: () => CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
     overscan: CHAT_TRANSCRIPT_WINDOW.overscanRowCount,
-    measureElement: el => el.getBoundingClientRect().height,
+    // The scroll viewport mounts after history resolves; seed from the live
+    // scrollTop so a scroll that landed before the offset observer attached
+    // isn't replayed as offset 0 (JOV-6702).
+    initialOffset: () => scrollContainerRef.current?.scrollTop ?? 0,
+    measureElement: el =>
+      measureChatTranscriptRow(el, scrollContainerRef.current),
   });
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
 
@@ -574,15 +587,40 @@ export function JovieChat({
     if (!showThreadView || !shouldVirtualizeMessages) return;
     const container = scrollContainerRef.current;
     if (!container) return;
-    const nextMinHeight = container.clientHeight;
-    setVirtualizedMinHeight(prev =>
-      prev === nextMinHeight ? prev : nextMinHeight
-    );
+    const applyMinHeight = () => {
+      const nextMinHeight = container.clientHeight;
+      setVirtualizedMinHeight(prev =>
+        prev === nextMinHeight ? prev : nextMinHeight
+      );
+    };
+    applyMinHeight();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    let lastHeight = container.clientHeight;
+    const observer = new ResizeObserver(() => {
+      const nextHeight = container.clientHeight;
+      // Zero-height mount (hidden workspace surface, pre-layout first paint)
+      // can leave cached ~0px row heights and a stale scroll offset. Once the
+      // viewport is real, drop the cache and re-anchor a pinned transcript to
+      // the live tail (JOV-6702).
+      if (lastHeight === 0 && nextHeight > 0) {
+        virtualizer.measure();
+        if (isStuckToBottomRef.current) {
+          scrollToBottom('auto');
+        }
+      }
+      lastHeight = nextHeight;
+      applyMinHeight();
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [
     showThreadView,
     shouldVirtualizeMessages,
     scrollContainerRef,
     messages.length,
+    virtualizer,
+    scrollToBottom,
   ]);
 
   const virtualizedMessageViewportBaseHeight = Math.max(
@@ -886,6 +924,8 @@ export function JovieChat({
                   isStuckToBottom={isStuckToBottom}
                   onScrollToBottom={() => scrollToBottom()}
                   conversationId={activeConversationId ?? conversationId}
+                  collapsedFailureCount={collapsedSummerFailureCount}
+                  onShowCollapsedFailures={showCollapsedSummerFailures}
                 />
               </>
             )}

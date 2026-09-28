@@ -173,6 +173,83 @@ export function prepareJevBoundedRequest(input, fields) {
   });
 }
 
+/** Digest of caller-verified promotion evidence; a digest is not pricing authority. */
+export function freePromotionDigest(promotion) {
+  return evidenceFingerprint(promotion);
+}
+
+function freeAdmission(approval, credentialRef, time) {
+  const p = approval.promotion;
+  return (
+    p &&
+    approval.maxUsd === 0 &&
+    approval.estimatedUpperBoundUsd === 0 &&
+    Number.isFinite(approval.availableUsd) &&
+    approval.availableUsd >= 0 &&
+    p.gateway === JEV_ROUTE.provider &&
+    p.provider === 'typesafe-ai' &&
+    p.model === JEV_ROUTE.model &&
+    p.endpoint === JEV_ROUTE.endpoint &&
+    typeof p.credentialRef === 'string' &&
+    p.credentialRef.length > 0 &&
+    p.credentialRef === credentialRef &&
+    typeof p.evidenceRef === 'string' &&
+    p.evidenceRef.trim().length > 0 &&
+    Number.isFinite(p.checkedAt) &&
+    p.checkedAt <= time &&
+    time - p.checkedAt <= TTL &&
+    Number.isFinite(p.expiresAt) &&
+    p.expiresAt > time &&
+    approval.expiresAt <= p.expiresAt &&
+    p.inputUsdPerToken === 0 &&
+    p.outputUsdPerToken === 0 &&
+    p.feesUsd === 0 &&
+    Number.isSafeInteger(p.maxCalls) &&
+    p.maxCalls > 0 &&
+    approval.policyDigest === freePromotionDigest(p)
+  );
+}
+
+function money(value) {
+  if (
+    typeof value !== 'number' &&
+    !(typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value))
+  )
+    return null;
+  const amount = Number(value);
+  if (amount === 0 && typeof value === 'string' && !/^0+(?:\.0+)?$/.test(value))
+    return null;
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function probabilities(answer) {
+  const p = answer?.probabilities;
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+  const keys = Object.keys(CRITERIA);
+  if (
+    Object.keys(p).length !== keys.length ||
+    !keys.every(key => Number.isFinite(p[key]) && p[key] >= 0 && p[key] <= 1) ||
+    Math.abs(keys.reduce((sum, key) => sum + p[key], 0) - 1) > 0.001
+  )
+    return null;
+  return Object.freeze(Object.fromEntries(keys.map(key => [key, p[key]])));
+}
+
+function returnedEvidence(result) {
+  const gateway = result?.providerMetadata?.gateway;
+  const routing = gateway?.routing;
+  return {
+    billedCostUsd: money(gateway?.gatewayCost),
+    modelCostUsd: money(gateway?.cost),
+    surchargeCostUsd: money(gateway?.surchargeCost),
+    generationId:
+      typeof gateway?.generationId === 'string' ? gateway.generationId : null,
+    resolvedModel: routing?.canonicalSlug ?? null,
+    resolvedProvider: routing?.finalProvider ?? null,
+    probabilities: probabilities(result?.answers?.alignment),
+  };
+}
+
 /**
  * Bounded label-choice request for a separately admitted decision surface.
  * Only `choice` questions with non-empty labelled criteria are allowed, so the
@@ -243,9 +320,9 @@ export function prepareJevRequest(input) {
 }
 
 /**
- * @typedef {{apiKey?: string, signal?: AbortSignal, fetch?: typeof globalThis.fetch}} TransportOptions
- * @typedef {{answers?: Record<string, {type?: string, choice?: string}>, response?: {modelId?: string, headers?: Record<string, string>}, usage?: {inputTokens?: number, outputTokens?: number}, warnings?: readonly unknown[]}} TransportResult
- * @typedef {{fingerprint: string, dataApproved: boolean, fundingApproved: boolean, expiresAt: number, authorityRef: string, availableUsd: number, maxUsd: number, estimatedUpperBoundUsd: number}} EvaluationApproval
+ * @typedef {{apiKey?: string, signal?: AbortSignal, fetch?: typeof globalThis.fetch, freeOnly?: boolean}} TransportOptions
+ * @typedef {{answers?: Record<string, {type?: string, choice?: string, probabilities?: Record<string, number>}>, response?: {modelId?: string, headers?: Record<string, string>}, usage?: {inputTokens?: number, outputTokens?: number}, warnings?: readonly unknown[], providerMetadata?: {gateway?: {cost?: unknown, gatewayCost?: unknown, surchargeCost?: unknown, generationId?: string, routing?: {canonicalSlug?: string, finalProvider?: string}}}}} TransportResult
+ * @typedef {{fingerprint: string, dataApproved: boolean, fundingApproved: boolean, expiresAt: number, authorityRef: string, availableUsd: number, maxUsd: number, estimatedUpperBoundUsd: number, fundingMode?: 'paid' | 'free-only', policyDigest?: string, promotion?: {gateway: string, provider: string, model: string, endpoint: string, credentialRef: string, evidenceRef: string, checkedAt: number, expiresAt: number, inputUsdPerToken: number, outputUsdPerToken: number, feesUsd: number, maxCalls: number}}} EvaluationApproval
  */
 
 /**
@@ -255,7 +332,7 @@ export function prepareJevRequest(input) {
  */
 export async function evaluateThroughGateway(
   request,
-  { apiKey, signal, fetch }
+  { apiKey, signal, fetch, freeOnly = false }
 ) {
   if (!apiKey?.trim()) throw new Error('Gateway credential unavailable');
   const gateway = createGateway({
@@ -266,6 +343,13 @@ export async function evaluateThroughGateway(
     model: gateway.evaluationModel(JEV_ROUTE.model),
     state: request.state,
     questions: request.questions,
+    ...(freeOnly
+      ? {
+          providerOptions: {
+            gateway: { only: ['typesafe-ai'], models: [JEV_ROUTE.model] },
+          },
+        }
+      : {}),
     maxRetries: 0,
     abortSignal: signal,
   });
@@ -275,7 +359,8 @@ function interpretAlignment(result, request) {
   const answer = result?.answers?.alignment;
   if (
     answer?.type !== 'choice' ||
-    !Object.hasOwn(request.questions.alignment.criteria, answer.choice)
+    !Object.hasOwn(request.questions.alignment.criteria, answer.choice) ||
+    (answer.probabilities != null && probabilities(answer) === null)
   ) {
     return { invalid: true };
   }
@@ -299,7 +384,7 @@ function interpretAlignment(result, request) {
  * maps a transport result to `{detail}` merged into an `evaluated` receipt, or
  * `{invalid: true}`; it never sees raw provider errors.
  * @param {ReturnType<typeof prepareJevBoundedRequest>} request
- * @param {{approval?: EvaluationApproval, readCurrentFingerprint?: () => string | Promise<string>, apiKey?: string, signal?: AbortSignal, previous?: {requestFingerprint?: string, status?: string}, transport?: (request: ReturnType<typeof prepareJevBoundedRequest>, options: TransportOptions) => Promise<TransportResult>, now?: () => number, timeoutMs?: number}} options
+ * @param {{approval?: EvaluationApproval, readCurrentFingerprint?: () => string | Promise<string>, apiKey?: string, signal?: AbortSignal, previous?: {requestFingerprint?: string, status?: string}, credentialRef?: string, reserveFreeCall?: (claim: {policyDigest: string, fingerprint: string, maxCalls: number, expiresAt: number}) => number | Promise<number>, transport?: (request: ReturnType<typeof prepareJevBoundedRequest>, options: TransportOptions) => Promise<TransportResult>, now?: () => number, timeoutMs?: number}} options
  * @param {(result: TransportResult, request: ReturnType<typeof prepareJevBoundedRequest>) => {invalid?: boolean, detail?: object}} interpret
  */
 export async function runPreparedJevEvaluation(
@@ -308,6 +393,8 @@ export async function runPreparedJevEvaluation(
     approval,
     readCurrentFingerprint,
     apiKey,
+    credentialRef,
+    reserveFreeCall,
     signal,
     previous = null,
     transport = evaluateThroughGateway,
@@ -334,8 +421,11 @@ export async function runPreparedJevEvaluation(
     shipBlocking: false,
     startedAt,
   };
+  let observed = {};
   const finish = (status, detail = {}) =>
-    Object.freeze({ ...base, status, ...detail });
+    Object.freeze({ ...base, ...observed, status, ...detail });
+  const freeOnly = approval?.fundingMode === 'free-only';
+  const admissionDigest = freeOnly ? evidenceFingerprint(approval) : null;
   if (typeof readCurrentFingerprint !== 'function') return finish('stale');
   if (signal?.aborted) return finish('cancelled');
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 15000)
@@ -354,13 +444,19 @@ export async function runPreparedJevEvaluation(
     approval.expiresAt > now() &&
     approval.expiresAt <= startedAt + TTL &&
     approval.authorityRef?.trim() &&
-    Number.isFinite(approval.availableUsd) &&
-    Number.isFinite(approval.maxUsd) &&
-    approval.maxUsd > 0 &&
-    approval.availableUsd >= approval.maxUsd &&
-    Number.isFinite(approval.estimatedUpperBoundUsd) &&
-    approval.estimatedUpperBoundUsd > 0 &&
-    approval.estimatedUpperBoundUsd <= approval.maxUsd;
+    (freeOnly
+      ? evidenceFingerprint(approval) === admissionDigest &&
+        typeof reserveFreeCall === 'function' &&
+        freeAdmission(approval, credentialRef, now())
+      : (approval.fundingMode === undefined ||
+          approval.fundingMode === 'paid') &&
+        Number.isFinite(approval.availableUsd) &&
+        Number.isFinite(approval.maxUsd) &&
+        approval.maxUsd > 0 &&
+        approval.availableUsd >= approval.maxUsd &&
+        Number.isFinite(approval.estimatedUpperBoundUsd) &&
+        approval.estimatedUpperBoundUsd > 0 &&
+        approval.estimatedUpperBoundUsd <= approval.maxUsd);
   const work = async () => {
     const initialFingerprint = await readCurrentFingerprint();
     // Late preflight completion must not start I/O after the caller has returned.
@@ -372,10 +468,55 @@ export async function runPreparedJevEvaluation(
         previousStatus: previous.status ?? 'unknown',
       });
     }
+    if (freeOnly) {
+      // The existing caller must atomically persist the claim across processes.
+      // Failed/cancelled attempts consume a slot; never refund or retry it here.
+      const callNumber = await reserveFreeCall({
+        policyDigest: approval.policyDigest,
+        fingerprint: request.fingerprint,
+        maxCalls: approval.promotion.maxCalls,
+        expiresAt: approval.expiresAt,
+      });
+      controller.signal.throwIfAborted();
+      if (
+        !Number.isSafeInteger(callNumber) ||
+        callNumber < 1 ||
+        callNumber > approval.promotion.maxCalls
+      )
+        return finish('quota-exhausted');
+      const fresh = await readCurrentFingerprint();
+      controller.signal.throwIfAborted();
+      if (!admitted() || fresh !== request.fingerprint) return finish('stale');
+      observed = {
+        fundingMode: 'free-only',
+        policyDigest: approval.policyDigest,
+        callNumber,
+      };
+    }
     const result = await transport(request, {
       apiKey,
       signal: controller.signal,
+      freeOnly,
     });
+    observed = { ...observed, ...returnedEvidence(result) };
+    // Cost failures must remain actionable even when the output or source is stale.
+    if (freeOnly) {
+      if (
+        !observed.generationId ||
+        [
+          observed.billedCostUsd,
+          observed.modelCostUsd,
+          observed.surchargeCostUsd,
+        ].includes(null)
+      )
+        return finish('cost-unknown');
+      if (
+        observed.billedCostUsd !== 0 ||
+        observed.modelCostUsd !== 0 ||
+        observed.surchargeCostUsd !== 0
+      )
+        return finish('cost-violation');
+    }
     controller.signal.throwIfAborted();
     const currentFingerprint = await readCurrentFingerprint();
     controller.signal.throwIfAborted();
@@ -385,6 +526,12 @@ export async function runPreparedJevEvaluation(
     if (
       result?.response?.modelId !== JEV_ROUTE.model ||
       (result.warnings?.length ?? 0) > 0
+    )
+      return finish('invalid-response');
+    if (
+      freeOnly &&
+      (observed.resolvedModel !== JEV_ROUTE.model ||
+        observed.resolvedProvider !== 'typesafe-ai')
     )
       return finish('invalid-response');
     const read = interpret(result, request);
@@ -397,7 +544,6 @@ export async function runPreparedJevEvaluation(
       responseId: result.response.headers?.['x-vercel-id'] ?? null,
       inputTokens: result.usage?.inputTokens ?? null,
       outputTokens: result.usage?.outputTokens ?? null,
-      billedCostUsd: null,
       authorityRef: approval.authorityRef,
     });
   };

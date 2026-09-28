@@ -5,6 +5,7 @@ import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_PEN_EXPORT_SCHEMA,
   APP_SCREEN_PEN_GEOMETRY,
+  APP_SCREEN_PEN_PENDING_DECISIONS,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
   type AppScreenRegistryEntry,
@@ -32,7 +33,7 @@ describe('authenticated app screen registry', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(99);
+    expect(APP_SCREEN_REGISTRY).toHaveLength(100);
   });
 
   it('has a valid registered recipe and component composition', () => {
@@ -46,7 +47,7 @@ describe('authenticated app screen registry', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
-    expect(references).toHaveLength(46);
+    expect(references).toHaveLength(47);
     for (const screen of references) {
       expect(screen.archetypeId, screen.route).not.toBeNull();
     }
@@ -123,6 +124,61 @@ describe('authenticated app screen registry', () => {
         issue => issue.code
       )
     ).toContain('component-pen-root-readback-mismatch');
+
+    const promoteTable = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === bound?.id
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    expect(
+      validateAppScreenSystem({ components: promoteTable }).map(
+        issue => issue.code
+      )
+    ).toContain('reference-component-with-pending-pen-decision');
+    expect(
+      validateAppScreenSystem({
+        components: promoteTable,
+        penPendingDecisions: [],
+      }).map(issue => issue.code)
+    ).not.toContain('reference-component-with-pending-pen-decision');
+
+    const promoteShell = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === 'component.app-shell-frame'
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    const headerOnly = APP_SCREEN_PEN_PENDING_DECISIONS.filter(
+      decision => decision.checkId === 'app-header.height'
+    );
+    expect(headerOnly).toHaveLength(1);
+    expect(
+      validateAppScreenSystem({
+        components: promoteShell,
+        penPendingDecisions: headerOnly,
+      }).find(
+        issue => issue.code === 'reference-component-with-pending-pen-decision'
+      )?.message
+    ).toMatch(/D1 is pending on JwsdW/);
+
+    const promoteEntitySidebar = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === 'component.entity-sidebar'
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    const entityIssues = validateAppScreenSystem({
+      components: promoteEntitySidebar,
+    });
+    expect(
+      entityIssues.find(
+        issue => issue.code === 'reference-component-with-pending-pen-decision'
+      )?.message
+    ).toMatch(/D6 is pending on RosMb/);
+    expect(
+      validateAppScreenSystem({
+        components: promoteEntitySidebar,
+        penReferenceHolds: [],
+      }).map(issue => issue.code)
+    ).not.toContain('reference-component-with-pending-pen-decision');
   });
 
   it('keeps every recipe behind a real error boundary', () => {
@@ -146,14 +202,14 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('assigns exactly 46 unique deterministic browser-safe story IDs', () => {
+  it('assigns exactly 47 unique deterministic browser-safe story IDs', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
     // Source-of-truth pin: the Pen lane must derive this count from the
     // export receipt, never hardcode it. /app/ov/ops and /app/admin redirect
     // to /hud.
-    expect(references).toHaveLength(46);
+    expect(references).toHaveLength(47);
     const storyIds = references.map(entry => {
       expect(entry.story, entry.route).not.toBeNull();
       return entry.story?.id as string;
@@ -223,7 +279,7 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 46,
+      designReferences: 47,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
       archetypes: 8,

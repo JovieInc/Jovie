@@ -14,7 +14,7 @@ describe('ArtistNotificationsHero', () => {
         level: 1,
         name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
       })
-    ).toHaveClass('line-clamp-2');
+    ).not.toHaveClass('line-clamp-2');
     expect(
       screen.getByRole('link', {
         name: ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaLabel,

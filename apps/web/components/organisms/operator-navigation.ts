@@ -1,5 +1,6 @@
 import {
   Activity,
+  BadgeCheck,
   Banknote,
   Briefcase,
   Cable,
@@ -30,6 +31,7 @@ const OPERATOR_ICON_BY_ID = {
   product: Flag,
   operations: Gauge,
   needs_you: CircleAlert,
+  certifications: BadgeCheck,
   people: Users,
   growth: FolderKanban,
   platform_connections: Cable,
