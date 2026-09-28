@@ -32,7 +32,9 @@ export type AdminWorkspaceId =
   | 'overview'
   | 'chat'
   | 'certifications'
-  | 'ops'
+  | 'product'
+  | 'operations'
+  | 'needs_you'
   | 'people'
   | 'growth'
   | 'platform_connections'
@@ -56,15 +58,18 @@ export interface AdminNavRegistryItem {
 }
 
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
-  'ops',
-  'certifications',
-  'people',
+  'overview',
   'growth',
-  'platform_connections',
-  'activity',
+  'product',
+  'operations',
+  'needs_you',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
+  'chat',
+  'people',
+  'platform_connections',
+  'activity',
   'investors',
   'screenshots',
   'share_studio',
@@ -76,19 +81,46 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   {
+    id: 'overview',
+    label: 'Now',
+    href: APP_ROUTES.ADMIN_NOW,
+    description: 'Company pulse, ranked signals, health, and freshness',
+    section: 'workspaces',
+  },
+  {
+    id: 'growth',
+    label: 'Growth',
+    href: APP_ROUTES.ADMIN_GROWTH,
+    description: 'Visited through expanded, with people behind every stage',
+    section: 'workspaces',
+  },
+  {
+    id: 'product',
+    label: 'Product',
+    href: APP_ROUTES.ADMIN_PRODUCT,
+    description: 'Certified, deployed, exposed, and observed customer reality',
+    section: 'workspaces',
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    href: APP_ROUTES.ADMIN_OPERATIONS,
+    description: 'Autonomous execution outcomes, exceptions, costs, and queues',
+    section: 'workspaces',
+  },
+  {
+    id: 'needs_you',
+    label: 'Needs You',
+    href: APP_ROUTES.ADMIN_NEEDS_YOU,
+    description: 'Founder judgments that automation cannot safely make',
+    section: 'workspaces',
+  },
+  {
     id: 'chat',
     label: 'Chat',
     href: APP_ROUTES.ADMIN_CHAT,
     description: 'Operator chat surface on the signed-in artist profile',
-    section: 'workspaces',
-  },
-  {
-    id: 'ops',
-    label: 'Ops',
-    href: APP_ROUTES.ADMIN_OPS,
-    description:
-      'Canonical company Ops — decisions, survival, bottleneck, delivery',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'certifications',
@@ -96,7 +128,7 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_CERTIFICATIONS,
     description:
       'Founder review of certification evidence, with certify and reject',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'people',
@@ -104,28 +136,21 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_PEOPLE,
     description:
       'User table, roles, waitlist, creators, and individual actions',
-    section: 'workspaces',
-  },
-  {
-    id: 'growth',
-    label: 'Growth',
-    href: APP_ROUTES.ADMIN_GROWTH,
-    description: 'Acquisition funnel, referral, outreach, and conversion',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'platform_connections',
     label: 'Platform Connections',
     href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
     description: 'Spotify publisher and playlist generation controls',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'activity',
-    label: 'Activity',
+    label: 'Timeline',
     href: APP_ROUTES.ADMIN_ACTIVITY,
-    description: 'Cross-cutting operational feed and recent changes',
-    section: 'workspaces',
+    description: 'Semantic company changes, evidence, and measured outcomes',
+    section: 'utilities',
   },
   {
     id: 'investors',
