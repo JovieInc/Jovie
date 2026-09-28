@@ -137,9 +137,10 @@ function DecisionQueuePanel({
 
   return (
     <ContentSurfaceCard
-      className='flex flex-col gap-2 p-3.5'
+      className='flex flex-col'
       data-testid='ovie-mac-hud-decision-queue'
     >
+      <div className='flex flex-col gap-2 p-3.5'>
       <div className='flex min-h-6 items-center justify-between gap-3'>
         <p className='truncate text-2xs font-semibold tracking-normal text-tertiary-token'>
           Decision queue
@@ -209,6 +210,7 @@ function DecisionQueuePanel({
           );
         })}
       </ol>
+      </div>
     </ContentSurfaceCard>
   );
 }

@@ -160,6 +160,13 @@ html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
   padding-top: var(--electron-titlebar-height);
 }
 
+/* JOV-6796: the admin step-up bar renders in-flow at the window's top edge,
+   where the OS window controls (traffic lights at ~x=20,y=17) would cover its
+   leading text. Drop it below the reserved titlebar row. */
+html[data-desktop-runtime="electron"] [data-admin-step-up-banner="true"] {
+  margin-top: var(--electron-titlebar-height);
+}
+
 html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
   > div {
@@ -928,6 +935,41 @@ body {
   }
   @media (prefers-contrast: more) {
     .hero-glow {
+      display: none;
+    }
+  }
+  /* Unique per-route hero photograph (marketing-routes-code-spec,
+     2026-09-26). Lives behind hero copy inside the existing
+     `.relative overflow-hidden` hero wrapper. The scrim guarantees
+     header + headline legibility no matter how bright the source
+     photo is; `MarketingHeroPhoto`'s `opacity` prop tunes overall
+     image strength for specific routes (/ai, /download). */
+  .marketing-hero-photo {
+    z-index: 0;
+  }
+  .marketing-hero-photo__img {
+    object-fit: cover;
+    object-position: right center;
+  }
+  .marketing-hero-photo__scrim {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--system-b-cinematic-black) 55%, transparent),
+        transparent 18%
+      ),
+      linear-gradient(
+        90deg,
+        var(--system-b-cinematic-black) 0%,
+        color-mix(in oklab, var(--system-b-cinematic-black) 68%, transparent)
+          34%,
+        color-mix(in oklab, var(--system-b-cinematic-black) 14%, transparent)
+          62%,
+        transparent 82%
+      );
+  }
+  @media (prefers-contrast: more) {
+    .marketing-hero-photo {
       display: none;
     }
   }

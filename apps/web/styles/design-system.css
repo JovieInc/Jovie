@@ -43,7 +43,6 @@
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
   --profile-notification-icon-size: 17px;
-  --profile-hero-identity-min-height: calc(var(--space-24) + var(--space-2));
   --app-dialog-radius: var(--profile-inner-radius);
   --app-shell-sidebar-floating-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
@@ -491,43 +490,6 @@
   }
 }
 
-:where(.profile-hero-identity-scrim) {
-  min-height: var(--profile-hero-identity-min-height);
-  background: var(--profile-stage-bg);
-}
-
-/* Single hero legibility gradient, limited to the bottom ~55% of the cover so
-   the artist photo stays clearly visible in the upper zone. Replaces the old
-   stacked full-height scrims (profile-cover-home-gradient +
-   profile-cover-home-fade) that darkened the whole photo. */
-:where(.profile-cover-home-gradient) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 55%;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(3, 4, 6, 0.42) 52%,
-    rgba(5, 6, 8, 0.9) 86%,
-    var(--profile-stage-bg) 100%
-  );
-}
-
-/* The public compact hero reserves identity outside the image, so it needs
-   only a shallow media-edge transition. This modifier preserves the shared
-   legacy class contract while ensuring the live surface never lays a tall
-   scrim across the subject. */
-:where(.profile-cover-home-gradient--face-safe) {
-  height: var(--space-8);
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in oklab, var(--profile-stage-bg) 44%, transparent) 54%,
-    var(--profile-stage-bg) 100%
-  );
-}
-
 /* Profile home carousel card geometry: one 3:4 shape that fills the remaining
    viewport height. Width derives from height via aspect-ratio; the max-height
    cap keeps width at or under ~78vw (width = 0.75 × height). Cards center
@@ -555,6 +517,17 @@
   max-height: none;
   align-self: flex-start;
   container-type: inline-size;
+}
+
+/* A short viewport or enlarged identity must scroll the card, never compress
+   the horizontal track and clip its action below an overflow-hidden edge.
+   The landscape card height is content-driven (aspect-ratio is only a
+   preferred ratio), so the floor is the card's own content height, not a
+   fixed pixel value. */
+.profile-horizontal-rail[data-layout="profile-landscape"] {
+  height: auto;
+  min-height: max-content;
+  flex-shrink: 0;
 }
 
 /* Unified card anatomy: the art zone is a full-width square, so the text
@@ -844,49 +817,6 @@
   }
 }
 
-/* Compact mobile home hero: one definite token-driven height on every
-   viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
-   shrink-wraps; media crops via object-cover and the carousel below owns the
-   remaining viewport height. */
-/* The fixed token remains the minimum crop-safe media height. On the home
-   surface, the shell gives every additional vertical pixel to the real hero
-   instead of leaving an ownerless flex region below the primary card. The
-   content column stays intrinsic, so the card and dock never stretch and no
-   fake spacer participates in the layout. */
-:where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    > .profile-home-fluid-hero
-) {
-  flex: 1 1 auto;
-  min-height: var(--cover-height);
-  height: auto;
-  /* The base declaration preserves the established media floor; this
-     supported calc also reserves the non-overlay identity band. */
-  min-height: calc(
-    var(--cover-height) +
-    var(--profile-hero-identity-min-height)
-  );
-}
-
-/* Profiles without real hero media keep the identity chrome compact instead
-   of stretching a decorative gradient through most of the first viewport. */
-:where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    > .profile-home-fluid-hero--no-media
-) {
-  flex: 0 0 auto;
-  height: calc(
-    max(env(safe-area-inset-top), 16px) +
-    5rem +
-    var(--profile-hero-identity-min-height)
-  );
-  min-height: calc(
-    max(env(safe-area-inset-top), 16px) +
-    5rem +
-    var(--profile-hero-identity-min-height)
-  );
-}
-
 :where(
   [data-testid="profile-compact-surface"][data-mode="profile"]
     > .profile-home-content-column,
@@ -898,31 +828,27 @@
   flex: 0 0 auto;
 }
 
-/* The public mobile contract gives the media slot the tokenized 34svh height;
-   the in-flow identity band is additive and remains directly attached to the
-   media. Keep the rail at the top of its remaining region so the primary card
-   follows the identity without introducing an ownerless spacer. */
+/* From md up the compact surface is a fixed-height phone card with overflow
+   hidden. Natural-height content ran past the card, under the tab bar, and
+   could never be scrolled into view (jov.ie/tim dogfood 2026-09-27). Bound the
+   column so the content region scrolls inside the card; its bottom padding
+   keeps the last row reachable above the dock. */
+@media (min-width: 768px) {
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-content-column,
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      .profile-home-content-scroll
+  ) {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+}
+
+/* Mobile home: the identity header and the rail share one scroll region.
+   Keep the rail at the top of its remaining region so the featured card
+   follows the identity header without an ownerless spacer. */
 @media (max-width: 767px) {
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      > .profile-home-fluid-hero:not(.profile-home-fluid-hero--no-media)
-  ) {
-    flex: 0 0 auto;
-    height: auto;
-    min-height: calc(
-      var(--cover-height) +
-      var(--profile-hero-identity-min-height)
-    );
-  }
-
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      .profile-cover-home-media
-  ) {
-    flex: 0 0 var(--cover-height);
-    height: var(--cover-height);
-  }
-
   :where(
     [data-testid="profile-compact-surface"][data-mode="profile"]
       > .profile-home-content-column,
@@ -1080,45 +1006,6 @@
     .profile-floating-tab-bar {
     position: fixed;
   }
-}
-
-/* Query-mode profile URLs are served from the ISR home shell, then hydrate into
-   the requested mode from window.location. Match the mode header on first paint
-   so hydration does not move the compact profile frame. */
-html[data-profile-initial-mode]
-[data-testid="profile-compact-surface"][data-mode="profile"] {
-  --cover-height: calc(3.5rem + max(env(safe-area-inset-top), 0px));
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  [data-testid="profile-cover"] {
-  height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
-  max-height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-chrome {
-  padding-top: max(env(safe-area-inset-top), 10px) !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-media,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-gradient,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  [data-testid="profile-hero-identity-block"] {
-  display: none !important;
-}
-
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-mode-title {
-  display: block !important;
 }
 
 @media (min-width: 768px) {
@@ -3146,14 +3033,16 @@ html:not(.dark) .smart-link-powered-by {
   outline: none;
 }
 
-:where(
-  input,
-  textarea,
-  select,
-  [contenteditable="true"],
-  [role="textbox"]
-):focus-visible {
-  box-shadow: none;
+@layer base {
+  :where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus-visible {
+    box-shadow: none;
+  }
 }
 
 /* ============================================

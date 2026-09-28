@@ -210,6 +210,9 @@ function formatGithubOutput(result) {
     'failed_tests<<EOF',
     ...result.failedTests,
     'EOF',
+    // JSON-escaped single-line variant safe to embed inside a JSON string in
+    // the Slack custom_payload (raw newlines break JSON.parse).
+    `failed_tests_slack=${JSON.stringify(result.failedTests.join('\n')).slice(1, -1)}`,
     'test_warnings<<EOF',
     ...result.testWarnings,
     'EOF',

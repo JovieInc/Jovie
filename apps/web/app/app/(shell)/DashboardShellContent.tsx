@@ -7,6 +7,7 @@ import { AdminStepUpBanner } from '@/features/admin/AdminStepUpBanner';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBannerWrapper } from '@/features/admin/OperatorBannerWrapper';
 import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
+import { shouldRenderOperatorChrome } from '@/lib/app-shell/workspaces';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { AppFlagProvider } from '@/lib/flags/client';
@@ -75,10 +76,16 @@ export async function DashboardShellContent({
     return <UnavailablePage />;
   }
 
+  // Operator chrome renders only in Ovie; the customer shell looks the same
+  // for admins and creators (JOV-6771).
+  const showOperatorChrome = shouldRenderOperatorChrome(mode, {
+    isAdmin: dashboardData.isAdmin,
+  });
+
   // Admin APIs need a passkey step-up on this session (JOV-4806). Decided
   // here so the unlock bar paints on first render.
   const needsAdminStepUp =
-    dashboardData.isAdmin &&
+    showOperatorChrome &&
     !(await hasRecentAdminMfaReverification(await getCachedAuth()));
 
   if (
@@ -97,8 +104,8 @@ export async function DashboardShellContent({
 
   const shellContents = (
     <div className='h-full'>
-      {/* ENG-004: Show environment issues to admins in non-production */}
-      <OperatorBannerWrapper isAdmin={dashboardData.isAdmin} />
+      {/* ENG-004: Show environment issues to admins in Ovie, non-production */}
+      <OperatorBannerWrapper isAdmin={showOperatorChrome} />
       <ImpersonationBannerWrapper />
       {needsAdminStepUp ? <AdminStepUpBanner /> : null}
       <DashboardDataProvider value={dashboardData}>
