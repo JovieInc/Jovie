@@ -50,7 +50,6 @@ export interface CompanyPresencePage {
     Record<CompanyPresenceCheckId, CompanyPresenceCheck>
   >;
 }
-
 export interface CompanyPresenceSourceStatus {
   readonly id: CompanyPresenceCheckId;
   readonly label: string;
@@ -58,14 +57,12 @@ export interface CompanyPresenceSourceStatus {
   /** Why the source is unconfigured; null once connected. */
   readonly reason: string | null;
 }
-
 export interface CompanyPresenceData {
   readonly pages: readonly CompanyPresencePage[];
   readonly sources: readonly CompanyPresenceSourceStatus[];
   /** Owned-profile lookup failed; profile rows are missing, not zero. */
   readonly profilesUnavailable: boolean;
 }
-
 export const COMPANY_PAGE_KIND_LABELS: Readonly<
   Record<CompanyPageKind, string>
 > = {
@@ -75,7 +72,6 @@ export const COMPANY_PAGE_KIND_LABELS: Readonly<
   legal: 'Legal',
   machine: 'Machine',
 };
-
 export function getCompanyPageLastCheckedAt(
   page: CompanyPresencePage
 ): string | null {
@@ -89,7 +85,6 @@ export function getCompanyPageLastCheckedAt(
   }
   return latest;
 }
-
 function measuredChecks(page: CompanyPresencePage) {
   return COMPANY_PRESENCE_CHECK_IDS.flatMap(id => {
     const check = page.checks[id];

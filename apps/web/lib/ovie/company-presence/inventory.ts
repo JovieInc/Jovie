@@ -63,7 +63,6 @@ function unconfiguredChecks(
     ])
   ) as Record<CompanyPresenceCheckId, CompanyPresenceCheck>;
 }
-
 function titleCaseSegment(segment: string): string {
   return segment
     .split('-')
@@ -71,7 +70,6 @@ function titleCaseSegment(segment: string): string {
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
-
 export function labelForCompanyPath(path: string): string {
   if (path === '/') return 'Home';
   const segments = path.split('/').filter(Boolean);
