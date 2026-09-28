@@ -247,6 +247,19 @@ export {
   workflowRunOutcomes,
   workflowRuns,
 } from './connectors';
+// Canonical Contacts (customer lifecycle)
+export {
+  type Contact,
+  type ContactStageTransition,
+  contactStageTransitions,
+  contacts,
+  insertContactSchema,
+  insertContactStageTransitionSchema,
+  type NewContact,
+  type NewContactStageTransition,
+  selectContactSchema,
+  selectContactStageTransitionSchema,
+} from './contacts';
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
@@ -430,6 +443,7 @@ export {
   connectorProviderEnum,
   connectorStatusEnum,
   contactChannelEnum,
+  contactLifecycleStageEnum,
   contactRoleEnum,
   contentSlugTypeEnum,
   contextFactKindEnum,
