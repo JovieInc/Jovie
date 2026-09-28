@@ -1088,6 +1088,30 @@ def repo_prs() -> list[dict]:
 
 _SUMMARY: dict = {"at": 0.0, "prs": []}
 SUMMARY_TTL_S = 60
+SHARED_CACHE_DIR = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "cache"
+
+
+def shared(key: str, ttl: float, fetch):
+    """One GitHub read per `ttl` for every worker on the host. Workers are short-lived processes
+    (re-exec after each unit, respawned every dispatch tick), so an in-process cache never
+    hits; 7 workers re-listing every open PR spent the bot's whole 5000-point GraphQL hour
+    (2026-09-28). A failed read (None) is never cached. Off in tests."""
+    if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
+        return fetch()
+    path = SHARED_CACHE_DIR / f"{key}.json"
+    try:
+        cached = json.loads(path.read_text())
+        if time.time() - cached["at"] < ttl:
+            return cached["value"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    value = fetch()
+    if value is not None:
+        SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(f".{os.getpid()}.tmp")
+        tmp.write_text(json.dumps({"at": time.time(), "value": value}))
+        os.replace(tmp, path)
+    return value
 
 
 def open_prs_summary() -> list[dict]:
@@ -1099,7 +1123,7 @@ def open_prs_summary() -> list[dict]:
     now = time.time()
     if now - _SUMMARY["at"] < SUMMARY_TTL_S:
         return _SUMMARY["prs"]
-    prs = pr_events.open_prs_state(sys.modules[__name__])
+    prs = shared("open-prs", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(sys.modules[__name__]))
     if prs is None:
         return []
     for pr in prs:
@@ -1140,12 +1164,15 @@ def in_flight_issues() -> frozenset[str] | None:
     """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
     lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
     unknown in-flight set is not permission to open a duplicate PR (JOV-6833)."""
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "500",
-                 "--json", "headRefName,body"])
-    if listed.returncode != 0:
+    def fetch():
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "500",
+                     "--json", "headRefName,body"])
+        return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
+    prs = shared("in-flight", SUMMARY_TTL_S, fetch)
+    if prs is None:
         return None
     keys = set()
-    for pr in json.loads(listed.stdout or "[]"):
+    for pr in prs:
         branch = LANE_BRANCH.match(pr.get("headRefName") or "")
         marker = ISSUE_MARKER.search(pr.get("body") or "")
         keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
@@ -1167,14 +1194,18 @@ def last_pushes() -> dict[int, float]:
     """Open PR number -> head commit time, in one paginated query (`gh pr list --json commits`
     over 200 PRs exceeds GitHub's GraphQL node limit). Empty when GitHub cannot be read."""
     owner, name = REPO_SLUG.split("/")
-    listed = sh(["gh", "api", "graphql", "--paginate", "-f", f"owner={owner}", "-f", f"name={name}", "-f",
-                 "query=query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){"
-                 "pullRequests(states:OPEN,first:100,after:$endCursor){pageInfo{hasNextPage endCursor}"
-                 "nodes{number commits(last:1){nodes{commit{committedDate}}}}}}}",
-                 "--jq", ".data.repository.pullRequests.nodes[] | "
-                         "\"\\(.number) \\(.commits.nodes[0].commit.committedDate)\""])
+
+    def fetch():
+        listed = sh(["gh", "api", "graphql", "--paginate", "-f", f"owner={owner}", "-f", f"name={name}", "-f",
+                     "query=query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){"
+                     "pullRequests(states:OPEN,first:100,after:$endCursor){pageInfo{hasNextPage endCursor}"
+                     "nodes{number commits(last:1){nodes{commit{committedDate}}}}}}}",
+                     "--jq", ".data.repository.pullRequests.nodes[] | "
+                             "\"\\(.number) \\(.commits.nodes[0].commit.committedDate)\""])
+        return (listed.stdout or "") if listed.returncode == 0 else None
     pushes = {}
-    for line in (listed.stdout or "").splitlines() if listed.returncode == 0 else []:
+    # The sweep only closes drafts idle for 24 h+, so a 5-minute-old read is exact enough.
+    for line in (shared("last-pushes", 300, fetch) or "").splitlines():
         number, _, date = line.partition(" ")
         if number.isdigit() and created_at_epoch(date) is not None:
             pushes[int(number)] = created_at_epoch(date)
