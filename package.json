@@ -245,6 +245,8 @@
     "design:exception-registry:check": "node scripts/design-exception-registry.mjs",
     "design:shared-ui-visual-arbitrary:check": "node scripts/shared-ui-visual-arbitrary-audit.mjs",
     "design:shared-ui-visual-arbitrary:update": "node scripts/shared-ui-visual-arbitrary-audit.mjs --update-baseline",
+    "quality:gaps": "node scripts/quality-gap-finder.mjs",
+    "quality:gaps:test": "node --test scripts/quality-gap-finder.test.mjs",
     "design:source-count-ratchet": "node scripts/design-system-source-ratchet.mjs",
     "design:authority:check": "node scripts/design-authority-guard.mjs",
     "design:conformance:check": "node scripts/design-conformance-check.mjs",
