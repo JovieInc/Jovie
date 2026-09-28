@@ -71,11 +71,18 @@ const SOURCE_SHA_PROPERTY_PATTERN =
 // ancestor".
 const GIT_ATTEMPTS = 3;
 
+// Every provenance read walks the real object graph, not the commit-graph
+// file. CI checkouts run `git fetch` with auto maintenance enabled, whose
+// detached `git maintenance run --auto` rewrites .git/objects/info/commit-graph
+// while structural lanes run concurrently; a half-written or stale graph can
+// answer --is-ancestor falsely and report a valid receipt as a non-ancestor.
+const GIT_FLAGS = ['-c', 'core.commitGraph=false'];
+
 /** @returns {{ value: boolean, error: string }} Non-empty error = no verdict. */
 function gitVerdict(args) {
   let error = '';
   for (let attempt = 1; attempt <= GIT_ATTEMPTS; attempt += 1) {
-    const result = spawnSync('git', args, {
+    const result = spawnSync('git', [...GIT_FLAGS, ...args], {
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -91,7 +98,7 @@ function gitVerdict(args) {
 }
 
 function gitOutput(args) {
-  const result = spawnSync('git', args, {
+  const result = spawnSync('git', [...GIT_FLAGS, ...args], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],

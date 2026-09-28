@@ -363,7 +363,9 @@ describe('UnifiedSidebar library route', () => {
       section: 'dashboard',
     });
 
-    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -410,7 +412,9 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Switch Workspace' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie' })
+    ).toBeInTheDocument();
   });
 
   it('shows OV as the active admin workspace without changing header height', () => {
