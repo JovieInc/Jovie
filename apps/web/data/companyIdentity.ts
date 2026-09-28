@@ -15,10 +15,10 @@ export const COMPANY_IDENTITY = {
     'One product for artists, founders, authors, creators, and independent experts.',
   definition:
     'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships.',
-  seoTitle: 'Jovie | A living identity for the internet',
+  seoTitle: 'Jovie | Your living identity on the internet',
   seoDescription:
     'Your work, your links, your next chapter. Together in your Jovie profile.',
-  homepageHeadline: 'A living identity for the internet.',
+  homepageHeadline: 'Your living identity on the internet.',
   audiences: [
     'artists',
     'founders',
