@@ -52,6 +52,19 @@ class ExecutionAttemptTest(unittest.TestCase):
         with ThreadPoolExecutor(2) as pool:
             results = list(pool.map(lambda host: self.claim(path=Path(self.tmp.name) / f"host-{host}.jsonl", coordination=coordination), "ab"))
         self.assertEqual(sorted(result.get("admitted", False) for result in results), [False, True])
+    def test_gh_without_a_token_env_uses_gh_own_auth(self):
+        seen = {}
+        def fake_run(args, **kwargs):
+            seen["env"] = kwargs.get("env")
+            return subprocess.CompletedProcess(args, 0, "[[]]", "")
+        real = attempt.subprocess.run, dict(attempt.os.environ)
+        attempt.subprocess.run = fake_run
+        for key in ("GH_TOKEN", "GITHUB_TOKEN"): attempt.os.environ.pop(key, None)
+        try:
+            self.assertEqual(attempt._gh({"tokenEnv": "GH_TOKEN"}, "GET", "repos/x/y/statuses"), [[]])
+            self.assertIsNone(seen["env"], "the lanes' gh shim supplies the token")
+        finally:
+            attempt.subprocess.run = real[0]; attempt.os.environ.clear(); attempt.os.environ.update(real[1])
     def test_crash_restart_and_redelivery_stay_terminal(self):
         first = self.claim()
         self.assertEqual(self.claim(now=101)["reason"], "duplicate_active")

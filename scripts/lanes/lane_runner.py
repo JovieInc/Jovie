@@ -913,6 +913,7 @@ def resolve_lockfile_conflict(worktree: Path, branch: str, log) -> bool:
 
 
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
+    pr = with_checks(pr)
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -1053,10 +1054,13 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list
     names = [name] + [other for other, spec in providers.items() if not spec.get("enabled", True) and other != name]
     prs = []
     for owner in names:
-        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
-                     *(["--limit", "200", "--json", fields] if fields else ["--json", PR_FIELDS])])
         own = re.compile(rf"^{re.escape(owner)}/jov-\d+-\d{{8}}")
-        prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+        if fields:
+            listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"head:{owner}/",
+                         "--limit", "200", "--json", fields])
+            prs += [pr for pr in json.loads(listed.stdout or "[]") if own.match(pr["headRefName"])]
+        else:
+            prs += [pr for pr in open_prs_summary() if own.match(pr["headRefName"])]
     return prs
 
 
@@ -1069,9 +1073,45 @@ LIGHT_PR_FIELDS = "number,url,isDraft,headRefName,mergeStateStatus"
 def repo_prs() -> list[dict]:
     """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
     Tim: no open PR should ever need his action; the fix loop owns them all."""
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "60",
-                 "--search", "draft:false sort:updated-desc", "--json", PR_FIELDS])
-    return [pr for pr in json.loads(listed.stdout or "[]") if not pr.get("isCrossRepository")]
+    ready = [pr for pr in open_prs_summary() if not pr.get("isDraft") and not pr.get("isCrossRepository")]
+    return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)[:60]
+
+
+_SUMMARY: dict = {"at": 0.0, "prs": []}
+SUMMARY_TTL_S = 60
+
+
+def open_prs_summary() -> list[dict]:
+    """Every open PR with its aggregate check state, in a few cheap GraphQL pages, cached for a
+    minute. Per-check rollups over dozens of PRs 504 or trip GitHub's secondary rate limit
+    (2026-09-27: devin had 43 red PRs and saw none of them, so it idled over budget). The
+    aggregate state stands in as one synthetic check; `with_checks` loads the real ones for
+    the single PR a worker claims. Empty when GitHub cannot be read."""
+    now = time.time()
+    if now - _SUMMARY["at"] < SUMMARY_TTL_S:
+        return _SUMMARY["prs"]
+    prs = pr_events.open_prs_state(sys.modules[__name__])
+    if prs is None:
+        return []
+    for pr in prs:
+        rollup = pr.get("rollup")
+        pr["statusCheckRollup"] = [] if rollup is None else [{
+            "name": "rollup", "synthetic": True,
+            "status": "COMPLETED" if rollup in ("SUCCESS", "FAILURE", "ERROR") else "PENDING",
+            "conclusion": {"SUCCESS": "SUCCESS", "FAILURE": "FAILURE", "ERROR": "FAILURE"}.get(rollup)}]
+    _SUMMARY.update(at=now, prs=prs)
+    return prs
+
+
+def with_checks(pr: dict) -> dict:
+    """The claimed PR with its real per-check rollup (names, job URLs) in place of the summary."""
+    if not any(check.get("synthetic") for check in pr.get("statusCheckRollup") or []):
+        return pr
+    viewed = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO_SLUG, "--json", "statusCheckRollup"])
+    try:
+        return {**pr, "statusCheckRollup": json.loads(viewed.stdout)["statusCheckRollup"]}
+    except (ValueError, KeyError, TypeError):
+        return pr
 
 
 def fix_candidates(name: str) -> list[dict]:
@@ -1180,9 +1220,12 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     path = host.state / "verified.json"
     verified = json.loads(path.read_text()) if path.exists() else {}
     pr = unverified_pr(prs, verified)
+    # Another host gating a head skips it, not the whole pass: returning None here idled every
+    # worker behind one claimed PR (2026-09-28, 0 running with 45 eligible PRs).
+    while pr and claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+        prs = [other for other in prs if other["number"] != pr["number"]]
+        pr = unverified_pr(prs, verified)
     if pr:
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
-            return None  # another host is gating this head; we look again next pass
         verified[str(pr["number"])] = pr["headRefOid"]
         path.write_text(json.dumps(verified))
         post_claim(pr["number"], pr["headRefOid"], "gate")
@@ -1198,12 +1241,14 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     order, now = pr_events.cost_order(load_providers()), time.time()
     prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
+    # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
+    while pr and claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+        prs = [other for other in prs if other["number"] != pr["number"]]
+        pr = red_pr(prs, attempts, held)
     if pr:
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
-            return None  # another host is already fixing this head; no attempt is charged
         record = attempts.get(str(pr["number"]), {})
         attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1,
                                        "lane": name, "at": now}
