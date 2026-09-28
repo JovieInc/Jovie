@@ -3,6 +3,7 @@ import 'server-only';
 import { getProfileAndLinks } from '@/app/[username]/_lib/public-profile-loader';
 import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
+import { toISOStringOrNull } from '@/lib/utils/date';
 import type { AskJovieProfileContext } from './answer';
 
 export interface AskJovieProfileLoad {
@@ -46,7 +47,7 @@ export async function loadAskJovieContext(
         ? {
             ...result.latestRelease,
             releaseDate:
-              result.latestRelease.releaseDate?.toISOString() ?? null,
+              toISOStringOrNull(result.latestRelease.releaseDate),
           }
         : null,
       tourDates: tourDates.map(show => ({
