@@ -53,6 +53,9 @@ const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.SUPPORT,
   APP_ROUTES.CLI,
   APP_ROUTES.CARD,
+  APP_ROUTES.ABOUT,
+  APP_ROUTES.AI,
+  APP_ROUTES.PRODUCT,
   // Renders its own MarketingFooterCta with route-specific copy — see
   // isEditorialFooterCtaPath for the blog/changelog-release/engineering
   // routes that own a different (email-signup) bottom-of-page CTA.
