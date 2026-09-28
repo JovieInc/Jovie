@@ -11,6 +11,9 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createGoldenPathLinearIssue } from '../golden-path-intake.mjs';
 import {
+  AUTOFIX_ESCALATION_MARKER,
+  AUTOFIX_LAUNCH_MARKER,
+  AUTOFIX_PR_MARKER,
   autofixBranchPrefix,
   buildAutofixPrompt,
   buildMergeGateReceipt,
@@ -25,8 +28,11 @@ import {
   evaluateProdProbe,
   evaluateStripeWebhookLiveness,
   evaluateWaitlistUnauth,
+  executeAutofix,
+  findFingerprintPrs,
   findOpenAutofixPr,
   findOwnedAgents,
+  GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
   GOLDEN_PATH_LOCK_SCHEMA,
   GOLDEN_PATH_LOCK_SELF_TEST_FILES,
   MERGE_GATE_TEST_FILES,
@@ -758,6 +764,311 @@ describe('golden-path Linear-only intake', () => {
       reason: 'linear_search_429',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('golden-path autofix dedupe planner (JOV-6827)', () => {
+  const fingerprint = 'golden-path-lock:prod:homepage-cta';
+
+  it('dedups when an open PR carries the fingerprint marker', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint,
+      openPrs: [
+        {
+          number: 19016,
+          title: 'fix golden path',
+          body: `repairs probe\n\n${AUTOFIX_PR_MARKER}: ${fingerprint}`,
+        },
+      ],
+    });
+    expect(plan).toMatchObject({
+      action: 'dedup',
+      reason: 'open_pr_owns_fingerprint',
+      openPr: { number: 19016 },
+    });
+  });
+
+  it('caps launches to one per fingerprint per 24h', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint,
+      recentAttemptCount: 1,
+    });
+    expect(plan).toMatchObject({
+      action: 'dedup',
+      reason: 'launch_capped_24h',
+    });
+  });
+
+  it('escalates instead of relaunching after repeated failed attempts', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint,
+      priorAttemptCount: GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
+    });
+    expect(plan).toMatchObject({
+      action: 'escalate',
+      reason: 'max_attempts_exceeded',
+      priorAttemptCount: GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
+    });
+    expect(plan.request).toBeUndefined();
+  });
+
+  it('matches PRs by fingerprint in body or title', () => {
+    expect(
+      findFingerprintPrs(
+        [
+          { number: 1, title: 'unrelated', body: 'nothing' },
+          {
+            number: 2,
+            title: 'fix',
+            body: `${AUTOFIX_PR_MARKER}: ${fingerprint}`,
+          },
+        ],
+        fingerprint
+      ).map(pr => pr.number)
+    ).toEqual([2]);
+  });
+});
+
+describe('golden-path autofix executor contract (JOV-6827)', () => {
+  const fingerprint = 'golden-path-lock:prod:homepage-cta';
+  const failedReceipt = buildProdProbeReceipt({
+    ok: false,
+    checks: [
+      { id: 'homepage-cta', ok: false, reason: 'homepage name search missing' },
+      { id: 'waitlist-after-auth', ok: true, reason: '401' },
+    ],
+  });
+
+  function mockAutofixBackend(state) {
+    const calls = { cursorLaunches: 0, prComments: [], linearComments: 0 };
+    const fetchImpl = async (input, init = {}) => {
+      const url = String(input);
+      const payload =
+        typeof init.body === 'string' ? JSON.parse(init.body) : {};
+      if (url.includes('api.linear.app')) {
+        const query = String(payload.query ?? '');
+        if (query.includes('FindIssueByFingerprint')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                team: { states: { nodes: [{ id: 'todo', name: 'Todo' }] } },
+                issues: {
+                  nodes: [
+                    {
+                      id: 'linear-1',
+                      identifier: 'JOV-7000',
+                      url: 'https://linear.app/jovie/issue/JOV-7000',
+                      title: `P0: golden path broken in prod (${fingerprint})`,
+                      state: { id: 'todo', name: 'Todo', type: 'unstarted' },
+                    },
+                  ],
+                },
+              },
+            })
+          );
+        }
+        if (query.includes('ListLinearIssueComments')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                issue: {
+                  comments: {
+                    nodes: state.linearComments.map((body, index) => ({
+                      id: `c-${index}`,
+                      body,
+                      createdAt: new Date(state.now).toISOString(),
+                    })),
+                  },
+                },
+              },
+            })
+          );
+        }
+        if (query.includes('commentCreate')) {
+          state.linearComments.push(String(payload.variables?.body ?? ''));
+          calls.linearComments += 1;
+          return new Response(
+            JSON.stringify({
+              data: {
+                commentCreate: { success: true, comment: { id: 'cx' } },
+              },
+            })
+          );
+        }
+        if (query.includes('issueUpdate')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                issueUpdate: {
+                  success: true,
+                  issue: { id: 'linear-1', identifier: 'JOV-7000', url: 'u' },
+                },
+              },
+            })
+          );
+        }
+        return new Response(`unexpected linear query: ${query}`, {
+          status: 400,
+        });
+      }
+      if (url.includes('api.github.com/search/issues')) {
+        return new Response(JSON.stringify({ items: state.openPrs }));
+      }
+      if (url.includes('api.github.com/repos/') && url.endsWith('/comments')) {
+        calls.prComments.push(String(payload.body ?? ''));
+        return new Response(JSON.stringify({ id: 1 }), { status: 201 });
+      }
+      if (url.includes('api.cursor.com')) {
+        if ((init.method ?? 'GET') === 'POST') {
+          calls.cursorLaunches += 1;
+          state.cursorAgents.push({
+            id: `bc-${calls.cursorLaunches}`,
+            createdAt: new Date(state.now).toISOString(),
+            prompt: fingerprint,
+          });
+          return new Response(
+            JSON.stringify({ id: `bc-${calls.cursorLaunches}` }),
+            {
+              status: 200,
+            }
+          );
+        }
+        return new Response(JSON.stringify({ agents: state.cursorAgents }));
+      }
+      return new Response(`unexpected url ${url}`, { status: 500 });
+    };
+    return { fetchImpl, calls };
+  }
+
+  it('launches exactly once across two consecutive failing probe runs', async () => {
+    const state = {
+      now: Date.now(),
+      cursorAgents: [],
+      openPrs: [],
+      linearComments: [],
+    };
+    const { fetchImpl, calls } = mockAutofixBackend(state);
+    const deps = {
+      receipt: failedReceipt,
+      cursorApiKey: 'key',
+      linearApiKey: 'linear-key',
+      githubToken: 'gh-token',
+      fetchImpl,
+      now: state.now,
+    };
+
+    const first = await executeAutofix(deps);
+    expect(first.action).toBe('launch');
+    expect(state.linearComments.join('\n')).toContain(
+      `${AUTOFIX_LAUNCH_MARKER}:${fingerprint}`
+    );
+
+    // The launched agent opened a draft PR carrying the fingerprint marker.
+    state.openPrs.push({
+      number: 19016,
+      title: 'fix golden path homepage',
+      body: `autofix\n\n${AUTOFIX_PR_MARKER}: ${fingerprint}`,
+      pull_request: {},
+    });
+
+    const second = await executeAutofix(deps);
+    expect(second.action).toBe('dedup');
+    expect(second.reason).toBe('open_pr_owns_fingerprint');
+    expect(calls.cursorLaunches).toBe(1);
+    expect(calls.prComments).toHaveLength(1);
+    expect(calls.prComments[0]).toContain(fingerprint);
+  });
+
+  it('caps a second failure inside 24h even without a visible agent or PR', async () => {
+    const state = {
+      now: Date.now(),
+      cursorAgents: [],
+      openPrs: [],
+      linearComments: [],
+    };
+    const { fetchImpl, calls } = mockAutofixBackend(state);
+    const deps = {
+      receipt: failedReceipt,
+      cursorApiKey: 'key',
+      linearApiKey: 'linear-key',
+      githubToken: 'gh-token',
+      fetchImpl,
+      now: state.now,
+    };
+
+    expect((await executeAutofix(deps)).action).toBe('launch');
+    // Next probe run sees no listed agent and no PR, but the durable launch
+    // marker on the canonical issue still caps the launch.
+    state.cursorAgents = [];
+    const second = await executeAutofix(deps);
+    expect(second.action).toBe('dedup');
+    expect(second.reason).toBe('launch_capped_24h');
+    expect(calls.cursorLaunches).toBe(1);
+  });
+
+  it('escalates to a Summer signal after the attempt ceiling instead of relaunching', async () => {
+    const staleNow = Date.now();
+    const state = {
+      now: staleNow,
+      cursorAgents: [],
+      openPrs: [],
+      linearComments: Array.from(
+        { length: GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS },
+        (_, index) =>
+          `${AUTOFIX_LAUNCH_MARKER}:${fingerprint} agent=old-${index}`
+      ),
+    };
+    const { fetchImpl, calls } = mockAutofixBackend(state);
+    // Prior launches are older than 24h so the cap no longer applies; seed
+    // stale timestamps by intercepting the comment-list response.
+    const wrappedFetch = async (input, init = {}) => {
+      const url = String(input);
+      const payload =
+        typeof init?.body === 'string' ? JSON.parse(init.body) : {};
+      if (
+        url.includes('api.linear.app') &&
+        String(payload.query ?? '').includes('ListLinearIssueComments')
+      ) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              issue: {
+                comments: {
+                  nodes: state.linearComments.map((body, index) => ({
+                    id: `c-${index}`,
+                    body,
+                    createdAt: new Date(
+                      staleNow - 48 * 60 * 60 * 1000
+                    ).toISOString(),
+                  })),
+                },
+              },
+            },
+          })
+        );
+      }
+      return fetchImpl(input, init);
+    };
+
+    const result = await executeAutofix({
+      receipt: failedReceipt,
+      cursorApiKey: 'key',
+      linearApiKey: 'linear-key',
+      githubToken: 'gh-token',
+      fetchImpl: wrappedFetch,
+      now: staleNow,
+    });
+    expect(result.action).toBe('escalate');
+    expect(result.reason).toBe('max_attempts_exceeded');
+    expect(calls.cursorLaunches).toBe(0);
+    expect(calls.linearComments).toBeGreaterThan(0);
+    expect(state.linearComments.join('\n')).toContain(
+      `${AUTOFIX_ESCALATION_MARKER}:${fingerprint}`
+    );
+    expect(state.linearComments.join('\n')).toContain('Summer signal');
   });
 });
 

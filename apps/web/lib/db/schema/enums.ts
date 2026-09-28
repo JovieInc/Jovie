@@ -521,6 +521,20 @@ export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'assistant',
 ]);
 
+// Conversation Insights Enums (JOV-6784)
+export const conversationFunnelStageEnum = pgEnum('conversation_funnel_stage', [
+  'anonymous',
+  'claimed',
+  'paid',
+]);
+
+export const objectionStatusEnum = pgEnum('objection_status', [
+  'draft',
+  'approved',
+  'published',
+  'rejected',
+]);
+
 export const chatTurnStatusEnum = pgEnum('chat_turn_status', [
   'reserved',
   'running',
