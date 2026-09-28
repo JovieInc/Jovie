@@ -731,7 +731,7 @@ mobile navigation derive from the same ordered item identities.
 |------|--------------------|-----------------------|------------|
 | Inbox / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in home |
 | Conversation | Chat workspace + composer | Focus the composer or the next required prompt; the composer owns the primary action | `/app/chat` and `/app/chat/[id]` |
-| Collection / workspace | `PageShell` + `DashboardWorkspacePanel` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
+| Collection / workspace | `PageShell` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
 | Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |
 | Settings | Settings shell/sidebar + `SettingsSection` | The first editable control begins the flow; one save/confirm action owns primary emphasis | Use the canonical `/app/settings/*` route |
 
