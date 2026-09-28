@@ -32,7 +32,12 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -455,6 +460,13 @@ const LANES = [
     run: runProfileAdmission,
   },
   {
+    id: 'merge-group-guards',
+    name: 'Merge-group unit guards',
+    nextLocalCommand:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts',
+    run: runMergeGroupGuards,
+  },
+  {
     id: 'billing-coverage',
     name: 'Billing and fan-send coverage',
     nextLocalCommand: BILLING_COVERAGE_COMMAND,
@@ -512,7 +524,13 @@ export const LANE_GROUPS = Object.freeze({
   // web commands run. They were the two slowest cheap lanes left in remaining
   // (38s + 35s of a ~150s serial chain that outlasted remaining's structural
   // lane, merge-group run 36270458408); web finished ~100s before remaining.
-  web: Object.freeze(['design-conformance', 'profile-admission']),
+  // merge-group-guards: repo-wide unit guards that used to run only in merge
+  // groups, so PRs green on PR CI poisoned the queue (3 stalls, 2026-09-27).
+  web: Object.freeze([
+    'design-conformance',
+    'profile-admission',
+    'merge-group-guards',
+  ]),
 });
 
 export const LANE_COMMANDS = Object.freeze(
@@ -1451,6 +1469,33 @@ function runProfileAdmission() {
   }
 
   return shell(LANE_COMMANDS['profile-admission']);
+}
+
+/**
+ * Repo-wide source guards (design-system ratchets, metrics layer) plus the
+ * PR's own changed unit tests. The full Unit Tests shards run only in merge
+ * groups, so without this a PR that trips a guard or breaks its own test is
+ * green on PR CI and fails every merge group behind it (JOV-5301, JOV-6904).
+ */
+function runMergeGroupGuards() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Merge-group guards skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  const ownTests = (
+    changedFiles(['apps/web/**/*.test.ts', 'apps/web/**/*.test.tsx']) || []
+  )
+    .filter(
+      file =>
+        !file.startsWith('apps/web/tests/e2e/') &&
+        existsSync(resolve(REPO_ROOT, file))
+    )
+    .map(file => file.replace(/^apps\/web\//, ''));
+  return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
 }
 
 /** Async twin of shell() so structural commands can overlap. */
