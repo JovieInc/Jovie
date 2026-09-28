@@ -24,6 +24,9 @@ const {
   })),
 }));
 
+vi.mock('next/dynamic', () => ({
+  default: () => mockAdminAssetsPageWrapper,
+}));
 vi.mock('@/components/features/admin/AdminPeopleRightPanelProvider', () => ({
   AdminPeopleRightPanelProvider: ({ children }: { children: ReactNode }) =>
     children,

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
 import { AdminPeopleRightPanelProvider } from '@/components/features/admin/AdminPeopleRightPanelProvider';
-import { AdminAssetsPageWrapper } from '@/components/features/admin/admin-assets-table';
 import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
@@ -55,6 +55,12 @@ export const metadata: Metadata = {
 };
 
 export const runtime = 'nodejs';
+
+const AdminAssetsPageWrapper = dynamic(() =>
+  import('@/components/features/admin/admin-assets-table').then(mod => ({
+    default: mod.AdminAssetsPageWrapper,
+  }))
+);
 
 const peopleTabs = adminPeopleViews.map(view => ({
   value: view,
