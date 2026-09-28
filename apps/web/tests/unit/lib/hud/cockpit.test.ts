@@ -20,7 +20,7 @@ function okSource(key: string, label: string) {
   };
 }
 
-function healthyMetrics(overrides: Partial<HudMetrics> = {}): HudMetrics {
+function healthyMetrics(overrides: Record<string, unknown> = {}): HudMetrics {
   return {
     operations: { status: 'ok', dbLatencyMs: 12 },
     reliability: {
@@ -212,7 +212,7 @@ describe('rankOpsBottlenecks', () => {
         ...healthyMetrics().sources,
         stripe: { ...okSource('stripe', 'Stripe'), state: 'unavailable' },
       },
-    } as Partial<HudMetrics>);
+    });
 
     const bottlenecks = rankOpsBottlenecks(metrics, funnel);
     expect(bottlenecks.length).toBe(OPS_BOTTLENECK_LIMIT);

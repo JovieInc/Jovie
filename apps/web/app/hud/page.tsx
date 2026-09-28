@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { forbidden, unauthorized } from 'next/navigation';
-import { HudDashboardClient } from '@/app/app/(shell)/admin/ops/HudDashboardClient';
+import { OpsCockpitClient } from '@/app/app/(shell)/admin/ops/OpsCockpitClient';
 import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
@@ -63,7 +63,7 @@ export default async function HudPage({
       : getFounderFunnelData('30d').catch(() => null),
   ]);
   const dashboard = (
-    <HudDashboardClient
+    <OpsCockpitClient
       initialMetrics={metrics}
       density={tokenOk || fullscreen ? 'kiosk' : 'shell'}
       presentationMode={tokenOk ? 'token' : 'shell'}

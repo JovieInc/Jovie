@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/ops-cockpit.test.tsx
+
 import type { ReactNode } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { computeRatePercent } from '@/lib/analytics/metrics';

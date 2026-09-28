@@ -128,7 +128,7 @@ describe('/hud page auth', () => {
     expect(authorizeHudMock).toHaveBeenCalledWith('test-token');
     expect(getCurrentAdminPageAccessMock).not.toHaveBeenCalled();
     expect(getHudMetricsMock).toHaveBeenCalledWith('kiosk');
-    const dashboardElement = findElementByName(result, 'HudDashboardClient');
+    const dashboardElement = findElementByName(result, 'OpsCockpitClient');
     expect(dashboardElement).not.toBeNull();
     expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
     expect(dashboardElement?.props?.density).toBe('kiosk');
@@ -210,12 +210,12 @@ describe('/hud page auth', () => {
     expect(forbiddenMock).not.toHaveBeenCalled();
     expect(getHudMetricsMock).toHaveBeenCalledWith('admin');
 
-    // Full DOM rendering of HudDashboardClient would require a QueryClient
+    // Full DOM rendering of OpsCockpitClient would require a QueryClient
     // provider and mocks for a dozen nested admin panels/charts -- assert
     // directly on the returned React element tree instead so this stays a
     // fast, focused test of the auth-gate wiring (metrics reach the
     // dashboard) rather than an integration test of dashboard internals.
-    const dashboardElement = findElementByName(result, 'HudDashboardClient');
+    const dashboardElement = findElementByName(result, 'OpsCockpitClient');
     expect(dashboardElement).not.toBeNull();
     expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
     expect(dashboardElement?.props?.density).toBe('shell');
@@ -225,7 +225,7 @@ describe('/hud page auth', () => {
     expect(findElementByName(result, 'AdminPage')).not.toBeNull();
   });
 
-  it('uses kiosk density for fullscreen on the same HudDashboardClient', async () => {
+  it('uses kiosk density for fullscreen on the same OpsCockpitClient', async () => {
     getCurrentAdminPageAccessMock.mockResolvedValue({
       isAuthenticated: true,
       hasAdminRole: true,
@@ -243,7 +243,7 @@ describe('/hud page auth', () => {
       searchParams: Promise.resolve({ fs: '1' }),
     });
 
-    const dashboardElement = findElementByName(result, 'HudDashboardClient');
+    const dashboardElement = findElementByName(result, 'OpsCockpitClient');
     expect(dashboardElement).not.toBeNull();
     expect(dashboardElement?.props?.density).toBe('kiosk');
     expect(dashboardElement?.props?.presentationMode).toBe('shell');
@@ -276,7 +276,7 @@ describe('/hud page auth', () => {
       searchParams: Promise.resolve({ ovie: 'mac' }),
     });
     expect(getHudMetricsMock).not.toHaveBeenCalled();
-    expect(findElementByName(result, 'HudDashboardClient')).toBeNull();
+    expect(findElementByName(result, 'OpsCockpitClient')).toBeNull();
     expect(findElementByName(result, 'OvieMacHud')?.props?.snapshot).toEqual(
       macSnapshot
     );

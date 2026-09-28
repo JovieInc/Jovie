@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/ops-cockpit.test.tsx
+
 import { ArrowRight } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';

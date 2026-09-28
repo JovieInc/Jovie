@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/ops-cockpit.test.tsx
+
 import { CircleAlert } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { deriveOpsExceptions } from '@/lib/hud/cockpit';
@@ -33,7 +35,7 @@ export function HudExceptionsStrip({
           exceptions.map(exception => (
             <span
               key={exception.id}
-              className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-2xs font-medium text-primary-token'
+              className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-3 py-1 text-2xs font-medium text-primary-token'
               title={exception.detail ?? undefined}
             >
               <CircleAlert className='h-3 w-3 text-error' aria-hidden='true' />
