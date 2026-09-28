@@ -79,8 +79,7 @@ async function persistInquiry(
   try {
     await db.insert(profileInquiries).values(input);
   } catch (error) {
-    // Persistence failures must not break the visitor-facing flow; the
-    // inquiry is logged for follow-up rather than surfaced as a 500.
+    // Persistence failures must not break the visitor-facing flow.
     logger.error('[Ask Jovie] Failed to persist profile inquiry', {
       error: error instanceof Error ? error.message : String(error),
       creatorProfileId: input.creatorProfileId,
@@ -117,12 +116,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return json({ success: false, error: 'Profile not found' }, 404);
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ success: false, error: 'Invalid request' }, 400);
-  }
+  const body = await request.json().catch(() => null);
   const parsed = askSchema.safeParse(body);
   if (!parsed.success) {
     return json({ success: false, error: 'Invalid request' }, 400);

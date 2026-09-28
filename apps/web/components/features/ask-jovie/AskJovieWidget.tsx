@@ -108,7 +108,6 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [pending, setPending] = useState(false);
-  // Escalation state: the question Jovie could not answer, if any.
   const [unansweredQuestion, setUnansweredQuestion] = useState<string | null>(
     null
   );
@@ -184,8 +183,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
   };
 
   const sendMessage = async () => {
-    const text = input.trim();
-    const body = text || unansweredQuestion || '';
+    const body = input.trim() || unansweredQuestion || '';
     if (!body || pending) return;
     setPending(true);
     setInput('');
@@ -193,7 +191,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
       const data = await post({
         action: 'message',
         category,
-        message: text || body,
+        message: body,
         name: name || undefined,
         email: email || undefined,
         question: unansweredQuestion ?? undefined,
@@ -276,7 +274,6 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
 
   return (
     <>
-      {/* Trigger: understated icon at rest; hover = one 360° spin + label. */}
       {!open && (
         <Button
           type='button'
@@ -288,7 +285,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
             PROFILE_Z.DRAWER_CONTENT
           )}
         >
-          <JovieIcon size={22} className='ask-jovie-spin-once shrink-0' />
+          <JovieIcon size={22} className='shrink-0' />
           <span className='hidden group-hover:inline'>Ask Jovie</span>
         </Button>
       )}
@@ -407,8 +404,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
               </div>
             )}
 
-            {(flow === 'new_release_alerts' ||
-              flow === 'local_show_alerts') && (
+            {flow !== null && flow !== 'escalate' && (
               <div className={CARD_CLASS}>
                 <Field
                   value={email}

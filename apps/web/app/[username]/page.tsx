@@ -564,10 +564,10 @@ async function ArtistPageContent({
         />
       ) : null}
       {isPublicNoAuthSmoke ? null : (
-        <DesktopQrOverlayClient handle={artist.handle} />
-      )}
-      {isPublicNoAuthSmoke ? null : (
-        <AskJovieWidget username={artist.handle} artistName={artist.name} />
+        <>
+          <DesktopQrOverlayClient handle={artist.handle} />
+          <AskJovieWidget username={artist.handle} artistName={artist.name} />
+        </>
       )}
     </>
   );

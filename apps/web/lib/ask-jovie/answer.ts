@@ -104,12 +104,11 @@ function sortedReleases(ctx: AskJovieProfileContext): AskJovieRelease[] {
 }
 
 function answerAbout(ctx: AskJovieProfileContext): AskJovieAnswer {
-  const parts: string[] = [];
-  if (ctx.bio?.trim()) {
-    parts.push(`${ctx.displayName} — ${ctx.bio.trim()}`);
-  } else {
-    parts.push(`${ctx.displayName} is on Jovie.`);
-  }
+  const parts: string[] = [
+    ctx.bio?.trim()
+      ? `${ctx.displayName} — ${ctx.bio.trim()}`
+      : `${ctx.displayName} is on Jovie.`,
+  ];
   const facts: string[] = [];
   if (ctx.genres?.length) {
     facts.push(`Genres: ${ctx.genres.slice(0, 4).join(', ')}`);
@@ -208,10 +207,7 @@ function answerTourDates(
   }
 
   const list = shows.slice(0, 3).map(describeTourDate).join('; ');
-  const nearIntent = /\b(near|in|at|la|los angeles|nyc|london|around)\b/.test(
-    q
-  );
-  if (nearIntent && /in|near|at|around/.test(q)) {
+  if (/\b(near|in|at|la|los angeles|nyc|london|around)\b/.test(q)) {
     return {
       kind: 'answer',
       text: `Nothing listed there right now. Upcoming shows: ${list}.`,

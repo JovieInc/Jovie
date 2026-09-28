@@ -297,8 +297,7 @@ export const DATA_CLASSES: DataClass[] = [
     deletion: ['fk-cascade', 'unmanaged'],
     export: ['none'],
     notes:
-      'Visitor rows are not covered by account-export — documented gap, ' +
-      'same class as audience members.',
+      'Visitor rows are not covered by account-export — documented gap, same class as audience members.',
   },
   {
     id: 'chat',
