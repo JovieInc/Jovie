@@ -346,7 +346,7 @@ export function FounderReviewRegistry({
         footerSurface='flat'
         data-testid='founder-review-detail-rail'
         footer={
-          <div className='space-y-2.5'>
+          <div className='space-y-2'>
             <label className='block'>
               <span className='mb-1.5 block text-2xs font-medium text-primary-token'>
                 Founder note{' '}
@@ -520,7 +520,7 @@ export function FounderReviewRegistry({
     <div className='space-y-4' data-testid={`${kind}-review-registry`}>
       <div className='grid grid-cols-3 divide-x divide-(--app-shell-border) overflow-hidden rounded-lg border border-(--app-shell-border) bg-surface-1'>
         {metricRows.map(([label, value]) => (
-          <div key={label} className='px-3 py-2.5'>
+          <div key={label} className='px-3 py-2'>
             <p className='text-2xs text-tertiary-token'>{label}</p>
             <p className='mt-0.5 text-base font-semibold tabular-nums text-primary-token'>
               {value}
