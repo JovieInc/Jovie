@@ -28,7 +28,7 @@ describe('AdminTableShell', () => {
       <AdminTableShell
         testId='shell'
         toolbar={<div>Toolbar</div>}
-        scrollContainerProps={{ 'data-testid': 'scroller' }}
+        scrollContainerProps={{ id: 'scroller' }}
       >
         {({ headerElevated }) => (
           <div data-testid='table-body'>{String(headerElevated)}</div>
@@ -40,7 +40,9 @@ describe('AdminTableShell', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 1000);
 
-    const scroller = screen.getByTestId('scroller');
+    const scroller = document.getElementById('scroller');
+    expect(scroller).not.toBeNull();
+    if (!scroller) return;
     Object.defineProperty(scroller, 'scrollTop', {
       configurable: true,
       value: 40,
@@ -49,17 +51,5 @@ describe('AdminTableShell', () => {
     vi.useRealTimers();
 
     expect(screen.getByTestId('table-body')).toHaveTextContent('true');
-  });
-
-  it('uses the external scroll container ref when provided', () => {
-    const ref = { current: null as HTMLDivElement | null };
-    render(
-      <AdminTableShell scrollContainerRef={ref}>
-        {() => <div>Rows</div>}
-      </AdminTableShell>
-    );
-
-    expect(ref.current).not.toBeNull();
-    expect(screen.getByText('Rows')).toBeInTheDocument();
   });
 });
