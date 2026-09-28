@@ -8,12 +8,16 @@ import {
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 
-export const CLI_HEADLINE = 'Artist data, from your terminal.';
+export const CLI_HEADLINE = 'Jovie, for your agents.';
 export const CLI_SUBTITLE =
-  'Read public artist profiles, agent-ready context, and Jovie’s API contract. No account, API key, or writes.';
+  'Give any artist a Jovie profile from their Spotify link, then read public artist data. One package: CLI, MCP server, and agent skill. No account or API key.';
 export const CLI_PRIMARY_CTA_LABEL = 'Install the CLI';
 
 export const CLI_DOCUMENTED_COMMANDS = [
+  {
+    command: 'jovie profile create <spotify-artist-url>',
+    request: 'POST /api/agents/profiles',
+  },
   {
     command: 'jovie artist get <username>',
     request: 'GET /api/v1/{username}',
@@ -34,13 +38,22 @@ export const CLI_DOCUMENTED_COMMANDS = [
     command: 'jovie docs llms --full',
     request: 'GET /llms-full.txt',
   },
+  {
+    command: 'jovie mcp',
+    request: 'The commands above as MCP tools over stdio',
+  },
+  {
+    command: 'jovie init',
+    request:
+      'Installs the Jovie skill into Claude, Codex, OpenClaw, and Hermes',
+  },
 ] as const;
 
 export const CLI_FAQ_ITEMS = [
   {
     question: 'Does the CLI require an account or API key?',
     answer:
-      'No. Every command uses anonymous GET routes. The CLI does not log in, accept API keys or OAuth credentials, write files, cache responses, send telemetry, or mutate Jovie data.',
+      'No. Every command is anonymous. The only write is profile create, which makes an unclaimed profile the artist claims by verifying their Spotify artist. The CLI does not log in, cache responses, or send telemetry.',
   },
   {
     question: 'Which Node.js version does it need?',
@@ -50,7 +63,7 @@ export const CLI_FAQ_ITEMS = [
   {
     question: 'Can I point it at another Jovie deployment?',
     answer:
-      'Yes. Pass --base-url with an http or https origin and no path, credentials, or query parameters. The CLI stays read-only.',
+      'Yes. Pass --base-url with an http or https origin and no path, credentials, or query parameters.',
   },
   {
     question: 'What happens when a command fails?',
@@ -64,6 +77,16 @@ jovie --help
 jovie --version`;
 
 const CLI_JOBS = [
+  {
+    title: 'Give an artist a profile',
+    command: 'jovie profile create <spotify-artist-url>',
+    body: 'Create a Jovie profile from a Spotify artist link. You get the profile URL and a claim link the artist opens to take ownership.',
+  },
+  {
+    title: 'Plug Jovie into an agent',
+    command: 'npx -y @jovie/cli mcp',
+    body: 'Run the same commands as MCP tools, or run jovie init to install the Jovie skill into every agent on this machine.',
+  },
   {
     title: 'Get an artist',
     command: 'jovie artist get <username>',
@@ -103,6 +126,11 @@ export function CliLandingPage() {
           href: APP_ROUTES.DEVELOPERS,
           testId: 'cli-hero-developers',
         }}
+        photo={{
+          src: '/images/marketing-hero/cli.webp',
+          width: 1600,
+          height: 901,
+        }}
         logos={false}
         align='center'
         testId='cli-hero'
@@ -122,8 +150,8 @@ export function CliLandingPage() {
               Install
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              Install globally, then ask Jovie for public artist data from any
-              terminal. The CLI is anonymous and read-only.
+              Install globally, or run it with npx from any agent. The CLI is
+              anonymous.
             </p>
             <pre className='mt-6 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-5 text-sm leading-relaxed text-secondary-token'>
               <code>{INSTALL_COMMANDS}</code>
@@ -131,7 +159,7 @@ export function CliLandingPage() {
             <div className='mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-secondary-token'>
               <span>No account</span>
               <span>No API key</span>
-              <span>Read-only</span>
+              <span>MCP server</span>
               <span>JSON output</span>
             </div>
           </section>
@@ -141,7 +169,7 @@ export function CliLandingPage() {
               id='commands-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              What you can do
+              What You Can Do
             </h2>
             <div className='mt-6 space-y-8'>
               {CLI_JOBS.map(item => (
@@ -149,9 +177,16 @@ export function CliLandingPage() {
                   <h3 className='text-base font-semibold text-primary-token'>
                     {item.title}
                   </h3>
-                  <pre className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-4 text-sm leading-relaxed text-primary-token'>
-                    <code>{item.command}</code>
-                  </pre>
+                  <section
+                    aria-label={`${item.title} command`}
+                    className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                    // biome-ignore lint/a11y/noNoninteractiveTabindex: long commands scroll sideways on narrow screens and need a keyboard entry point (axe scrollable-region-focusable)
+                    tabIndex={0}
+                  >
+                    <pre className='p-4 text-sm leading-relaxed text-primary-token'>
+                      <code>{item.command}</code>
+                    </pre>
+                  </section>
                   <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                     {item.body}
                   </p>
@@ -165,7 +200,7 @@ export function CliLandingPage() {
               id='reference-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              CLI reference
+              CLI Reference
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               Every command accepts <code>--base-url</code> and{' '}
@@ -204,8 +239,8 @@ export function CliLandingPage() {
       />
 
       <MarketingFooterCta
-        title='Artist data, from your terminal.'
-        body='Install the read-only Jovie CLI and start with a public artist username.'
+        title='Jovie, for your agents.'
+        body='Install the Jovie CLI and give an artist a profile from their Spotify link.'
         ctaLabel={CLI_PRIMARY_CTA_LABEL}
         ctaHref='#install'
         ctaAnalyticsEvent='cli_install_cta'

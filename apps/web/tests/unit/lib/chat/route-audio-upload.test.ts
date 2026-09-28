@@ -16,6 +16,14 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('@/lib/cache/tags', () => ({
+  CACHE_TAGS: {
+    PUBLIC_PROFILE: 'profiles-all',
+    SITEMAP_CATALOG: 'sitemap-catalog',
+  },
+  createPublicReleasesTag: (profileId: string) =>
+    `public-releases:${profileId}`,
+  createReleasesTag: (userId: string, profileId: string) =>
+    `releases:${userId}:${profileId}`,
   createSmartLinkContentTag: (profileId: string) =>
     `smart-link-content:${profileId}`,
 }));

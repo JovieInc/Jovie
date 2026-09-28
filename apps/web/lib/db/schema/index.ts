@@ -5,6 +5,15 @@
  * using explicit named exports for deterministic tree-shaking.
  */
 
+// Pixel Tracking (Events, Creator Configs)
+export {
+  type AcquisitionFirstTouch,
+  type AcquisitionJourney,
+  acquisitionJourneys,
+  insertAcquisitionJourneySchema,
+  type NewAcquisitionJourney,
+  selectAcquisitionJourneySchema,
+} from './acquisition';
 // Admin
 export {
   type AdminAuditLog,
@@ -137,6 +146,7 @@ export {
   baOauthConsents,
   baOauthRefreshTokens,
   baOauthResources,
+  baPasskeys,
   baSessions,
   baUsers,
   baVerifications,
@@ -302,6 +312,19 @@ export {
   type TrackArtist,
   trackArtists,
 } from './content';
+// Conversation Insights (JOV-6784)
+export {
+  type ConversationObjection,
+  type ConversationSignal,
+  conversationObjections,
+  conversationSignals,
+  insertConversationObjectionSchema,
+  insertConversationSignalSchema,
+  type NewConversationObjection,
+  type NewConversationSignal,
+  selectConversationObjectionSchema,
+  selectConversationSignalSchema,
+} from './conversation-insights';
 // Private creator documents and exact-revision capture handoffs (JOV-5173)
 export {
   type CreatorDocument,
@@ -410,6 +433,7 @@ export {
   contactRoleEnum,
   contentSlugTypeEnum,
   contextFactKindEnum,
+  conversationFunnelStageEnum,
   creatorDistributionEventTypeEnum,
   creatorDistributionPlatformEnum,
   creatorTypeEnum,
@@ -456,6 +480,7 @@ export {
   metadataSubmissionIssueStatusEnum,
   metadataSubmissionStatusEnum,
   notificationChannelEnum,
+  objectionStatusEnum,
   outreachChannelEnum,
   outreachStatusEnum,
   photoStatusEnum,
@@ -974,7 +999,6 @@ export {
   type OvieOperatingKvRow,
   ovieOperatingKv,
 } from './ovie';
-// Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
   creatorPixels,

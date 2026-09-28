@@ -325,13 +325,6 @@ test.describe('Content Gate — Public Pages', () => {
         readyText: /what(?:'|&apos;)s new/i,
         minLength: 80,
       },
-      {
-        path: '/investors',
-        name: 'Investors redirect',
-        expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
-        minLength: 20,
-        tokenGatedRedirect: true,
-      },
     ] as const;
 
     for (const route of routes) {

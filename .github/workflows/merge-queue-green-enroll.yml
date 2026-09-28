@@ -14,7 +14,7 @@ name: Merge Queue Green Enroll
 # on a PR, or a PR loses a hold label.
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# ponytail: scans 100 open PRs per event; page if open non-draft PRs routinely exceed it.
+# Scans every open PR to main (paginated, newest first) on each event.
 
 on:
   workflow_run:
@@ -61,13 +61,21 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge']);
+            // queue-poison: ejected twice in 24 h (scripts/lanes/pr_events.py, JOV-6904);
+            // the lanes remove it with their fix.
+            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
-            const { repository } = await github.graphql(`
-              query($owner: String!, $repo: String!) {
+            // Page through every open PR: a single first:100 window ordered
+            // UPDATED_AT ASC hid every recently fixed PR once >100 were open.
+            const prs = [];
+            let cursor = null;
+            do {
+              const { repository } = await github.graphql(`
+              query($owner: String!, $repo: String!, $cursor: String) {
                 repository(owner: $owner, name: $repo) {
-                  pullRequests(states: OPEN, baseRefName: "main", first: 100,
-                               orderBy: { field: UPDATED_AT, direction: ASC }) {
+                  pullRequests(states: OPEN, baseRefName: "main", first: 100, after: $cursor,
+                               orderBy: { field: UPDATED_AT, direction: DESC }) {
+                    pageInfo { hasNextPage endCursor }
                     nodes {
                       id number isDraft headRefOid mergeStateStatus
                       isInMergeQueue isCrossRepository
@@ -79,9 +87,14 @@ jobs:
                     }
                   }
                 }
-              }`, { owner, repo });
+              }`, { owner, repo, cursor });
+              prs.push(...repository.pullRequests.nodes);
+              const page = repository.pullRequests.pageInfo;
+              cursor = page.hasNextPage ? page.endCursor : null;
+            } while (cursor);
+            core.info(`scanned=${prs.length}`);
             let enqueued = 0;
-            for (const pr of repository.pullRequests.nodes) {
+            for (const pr of prs) {
               if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) continue;
               if (pr.mergeStateStatus !== 'CLEAN') continue;
               const labels = pr.labels.nodes.map(l => l.name.toLowerCase());

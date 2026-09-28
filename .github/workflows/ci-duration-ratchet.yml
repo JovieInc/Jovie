@@ -34,6 +34,8 @@ on:
 permissions:
   contents: read
   actions: read
+  # JOV-6836: promotion-loss metrics read PR queue timelines.
+  pull-requests: read
 
 concurrency:
   group: ci-duration-ratchet
@@ -66,6 +68,10 @@ jobs:
       - name: Time pre-commit and pre-push rungs
         if: steps.unchanged.outputs.skip != 'true'
         run: node scripts/dev-loop-latency.mjs
+
+      - name: Enforce repeated typecheck performance ratchet
+        if: github.event_name != 'push' && steps.unchanged.outputs.skip != 'true'
+        run: pnpm typecheck:performance -- --scenario ci --samples 3 --enforce --output "$RUNNER_TEMP/typecheck-performance.json"
 
       - name: Slack alert on failure
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
@@ -192,6 +198,14 @@ jobs:
             echo "_Baseline lockfile: \`.github/ci-harness/duration-ratchet.json\`_"
             echo "_Update with: \`node scripts/ci-duration-ratchet.mjs update --p95 <seconds> --sample-size ${SAMPLE_SIZE:-0}\`_"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Promotion-loss metrics (JOV-6836)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Runner-minutes per merged PR is opt-in (`--runner-minutes`): one jobs call per CI run
+        # is too many API calls for this 8-minute job.
+        run: node scripts/promotion-loss-metrics.mjs --since 24h >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when SLO is breached
         if: ${{ steps.measure.outputs.p95_seconds != '' && steps.ratchet.outputs.ratchet_ok != 'true' }}

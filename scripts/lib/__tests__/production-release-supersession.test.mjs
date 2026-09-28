@@ -818,3 +818,21 @@ esac
     expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
   });
 });
+
+describe('controller starvation bound', () => {
+  it('routes every post-coalesce main recheck through the lineage gate', () => {
+    const coalesce = getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production');
+    const authorize = getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production');
+    expect(coalesce).toContain("PRODUCTION_STARVATION_SECONDS: '5400'");
+    expect(coalesce).toContain(
+      'sparse-checkout: .github/scripts/release-lineage-gate.sh'
+    );
+    expect(
+      coalesce.match(/release-lineage-gate\.sh/g)?.length ?? 0
+    ).toBeGreaterThanOrEqual(3);
+    expect(authorize.match(/release-lineage-gate\.sh/g)?.length ?? 0).toBe(2);
+    expect(coalesce).not.toContain(
+      'if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then\n            record_receipt "superseded"'
+    );
+  });
+});

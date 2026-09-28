@@ -1,5 +1,11 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
+import {
+  describeFeatureAccess,
+  getRouteCapability,
+  isPublicationPermitted,
+  ROUTE_CAPABILITY_BINDINGS,
+} from '@/data/marketing/featureAvailability';
 import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import {
   OVIE_MCP_RESOURCE_PATH,
@@ -8,6 +14,27 @@ import {
   OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH,
   OVIE_OAUTH_SCOPES,
 } from '@/lib/ovie/mcp/oauth-contract';
+
+/**
+ * Feature availability lines projected from the shared publication contract
+ * (JOV-6216). Only published capability routes are listed; internal-only or
+ * unauthorized-proof surfaces never leak into machine guidance. Proposed
+ * features are described with their honest access label — interest capture,
+ * never a claim of immediate access.
+ */
+function buildFeatureAvailabilityLines(): string {
+  const lines = Object.keys(ROUTE_CAPABILITY_BINDINGS)
+    .sort((a, b) => a.localeCompare(b))
+    .map(path => {
+      const record = getRouteCapability(path);
+      if (!record || !isPublicationPermitted(record)) return null;
+      return `- ${BASE_URL}${path} — ${describeFeatureAccess(record)}`;
+    })
+    .filter((line): line is string => line !== null);
+  return lines.length === 0
+    ? ''
+    : `\n## Feature availability\n\n${lines.join('\n')}\n`;
+}
 
 /**
  * Agent-facing usage and discovery copy shared by /llms.txt and /llms-full.txt.
@@ -45,8 +72,8 @@ Do not use ${APP_NAME} for:
 - **Founder-only Ovie control**: ${BASE_URL}${OVIE_MCP_RESOURCE_PATH} — OAuth 2.1 MCP with scopes \`${OVIE_OAUTH_SCOPES.join(', ')}\`; not public artist API access
 - **Ovie protected-resource metadata**: ${BASE_URL}${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH}
 - **Ovie authorization-server metadata**: ${BASE_URL}${OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH} — issuer ${BASE_URL}${OVIE_OAUTH_ISSUER_PATH}
-- **Docs**: ${DOCS_URL}
+- **Docs**: ${DOCS_URL}/docs
 - **Sitemap**: ${BASE_URL}/sitemap.xml
 - **Full site guide**: ${BASE_URL}/llms-full.txt
-`;
+${buildFeatureAvailabilityLines()}`;
 }
