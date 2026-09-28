@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { MetaPixel } from '@/components/features/tracking/MetaPixel';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
@@ -14,7 +14,11 @@ import {
   hasSensitiveQueryParams,
   resolveEditorialRetargetingState,
 } from '@/lib/retargeting/editorial';
-import { isMarketingAllowed } from '@/lib/tracking/consent';
+import {
+  ensureFbqStub,
+  type Fbq,
+  useMarketingConsent,
+} from '@/lib/tracking/use-marketing-consent';
 
 interface EditorialRetargetingProps {
   /** Registered approved editorial routes from buildEditorialRetargetingRegistry. */
@@ -22,8 +26,6 @@ interface EditorialRetargetingProps {
   /** Jovie platform pixel id (server env passed in by the page). */
   readonly pixelId?: string;
 }
-
-type Fbq = ((...args: unknown[]) => void) & { queue?: unknown[] };
 
 /**
  * Consented public-article retargeting adapter (JOV-6289).
@@ -48,38 +50,7 @@ export function EditorialRetargeting({
   const isPassive = env.IS_TEST || env.IS_E2E;
   const isDemo = isDemoRecordingClient();
   const skipConsent = !pixelId || isPassive || !entry || isDemo;
-
-  const [allowed, setAllowed] = useState(false);
-
-  useEffect(() => {
-    if (skipConsent) return;
-    if (globalThis.window === undefined) return;
-
-    setAllowed(isMarketingAllowed());
-
-    let unsubConsent: (() => void) | undefined;
-
-    const attach = () => {
-      if (!globalThis.JVConsent) return;
-      unsubConsent = globalThis.JVConsent.onChange(() => {
-        setAllowed(isMarketingAllowed());
-      });
-    };
-
-    if (globalThis.JVConsent) {
-      attach();
-      return () => {
-        unsubConsent?.();
-      };
-    }
-
-    const onReady = () => attach();
-    globalThis.addEventListener('jvconsent:ready', onReady, { once: true });
-    return () => {
-      globalThis.removeEventListener('jvconsent:ready', onReady);
-      unsubConsent?.();
-    };
-  }, [skipConsent]);
+  const allowed = useMarketingConsent(skipConsent);
 
   const state: EditorialRetargetingState = resolveEditorialRetargetingState({
     hasPixelId: Boolean(pixelId),
@@ -113,15 +84,7 @@ export function EditorialRetargeting({
     // which can lag this parent effect by a commit. Install the same queueing
     // stub here so the bounded event is never dropped while fbevents.js loads.
     const metaWindow = globalThis.window as { fbq?: Fbq; _fbq?: Fbq };
-    if (!metaWindow.fbq) {
-      const stub = ((...args: unknown[]) => {
-        stub.queue?.push(args);
-      }) as Fbq;
-      stub.queue = [];
-      metaWindow.fbq = stub;
-      metaWindow._fbq = stub;
-    }
-    metaWindow.fbq?.(
+    ensureFbqStub(metaWindow)?.(
       'trackCustom',
       EDITORIAL_RETARGETING_EVENT,
       buildEditorialRetargetingEventFields(entry)
