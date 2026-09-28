@@ -1,9 +1,7 @@
-import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
-
-/** Shared support copy. Visible FAQs and their JSON-LD use these same answers. */
+/** Shared support copy for the /support contact-and-fallback surface. */
 export const SUPPORT_SEO_COPY = {
   description:
-    'Get help with Jovie. Browse documentation, find answers to common questions, or contact our support team.',
+    'Get help with Jovie. Browse the Help Center for guides and troubleshooting, or contact our support team.',
   keywords: [
     'Jovie support',
     'Jovie help',
@@ -13,24 +11,3 @@ export const SUPPORT_SEO_COPY = {
     'Jovie contact',
   ],
 } as const;
-
-export const SUPPORT_FAQ_ITEMS = [
-  {
-    question: 'How do I get started with Jovie?',
-    answer: `Start with Find yourself and follow the setup steps for your Jovie profile. Full walkthrough at ${DOCS_URL}/docs/jovie-essentials/start-here.`,
-  },
-  {
-    question: 'How do smart links work?',
-    answer:
-      'Add destinations to your Jovie profile. Jovie makes a smart link that sends each visitor to the destination they choose.',
-  },
-  {
-    question: 'How do I upgrade my plan?',
-    answer:
-      'Head to Settings \u2192 Billing to view available plans and manage your subscription.',
-  },
-  {
-    question: 'How do I contact support?',
-    answer: `Email ${SUPPORT_EMAIL}. We typically respond within one business day.`,
-  },
-] as const;

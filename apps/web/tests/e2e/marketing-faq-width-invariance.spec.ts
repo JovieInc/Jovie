@@ -26,10 +26,7 @@ interface MotionState {
   readonly boxShadow: string;
 }
 
-const ROUTES = [
-  { label: 'about', path: '/about' },
-  { label: 'support', path: '/support' },
-] as const;
+const ROUTES = [{ label: 'about', path: '/about' }] as const;
 
 const VIEWPORTS = [
   { label: '1024', width: 1024, height: 1200 },
