@@ -15,7 +15,9 @@
     "majorPinned": [
       "package.json",
       "apps/console/package.json",
-      "apps/web/package.json"
+      "apps/ovie/package.json",
+      "apps/web/package.json",
+      "packages/jovie-cli/package.json"
     ],
     "minimumOnly": [
       "apps/docs/package.json",
@@ -26,15 +28,9 @@
   "compatibility": {
     "candidates": [
       {
-        "major": 24,
+        "major": 26,
         "ring": "candidate",
         "blocking": true,
-        "minimumPromotionStatus": "active_lts"
-      },
-      {
-        "major": 26,
-        "ring": "shadow",
-        "blocking": false,
         "minimumPromotionStatus": "active_lts"
       }
     ],

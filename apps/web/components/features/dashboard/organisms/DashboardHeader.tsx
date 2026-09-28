@@ -1,6 +1,5 @@
 import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { DesktopReleaseIdentity } from '@/components/atoms/DesktopTitlebar';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { VerticalDivider } from '../atoms/VerticalDivider';
@@ -157,11 +156,10 @@ export function DashboardHeader({
             )}
           </div>
           {showInlineSearch ? (
-            <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start max-sm:w-app-control-sm sm:ml-1.5'>
+            <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start p-0.5 max-sm:w-app-control-sm sm:ml-1.5'>
               {searchSurface}
             </div>
           ) : null}
-          <DesktopReleaseIdentity />
           {/* The control must remain visually after title/search even if a
               caller's wrapper changes DOM order. Its fixed footprint prevents
               search or rail state from shifting the workspace title. */}

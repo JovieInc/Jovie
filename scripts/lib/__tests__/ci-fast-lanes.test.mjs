@@ -88,6 +88,7 @@ describe('CI control selector', () => {
       expect(result.status, result.stderr).toBe(0);
       const scriptCommand = readFileSync(capture, 'utf8')
         .split('\n')
+        // The control pool runs commands concurrently, so match the suite, not the order.
         .find(
           command =>
             command.startsWith('exec vitest --root scripts ') &&
@@ -437,18 +438,14 @@ describe('runStructural screenshot contract discovery', () => {
     expect(web).toContain(
       'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
     );
-    // Merge-group-only guards also gate PRs so they cannot poison the queue.
-    expect(
-      web.some(
-        command =>
-          command.includes(
-            'tests/unit/analytics-metrics-layer-guard.test.ts'
-          ) &&
-          command.includes(
-            'tests/unit/design-system/component-family-ratchet.test.ts'
-          )
-      )
-    ).toBe(true);
+    // Merge-group-only guards gate PRs in their own web lane (component-family
+    // ratchet is inside tests/unit/design-system), not a structural command.
+    expect(LANE_COMMANDS['merge-group-guards']).toContain(
+      'tests/unit/analytics-metrics-layer-guard.test.ts'
+    );
+    expect(LANE_COMMANDS['merge-group-guards']).toContain(
+      'tests/unit/design-system'
+    );
     expect(web.every(command => !python.includes(command))).toBe(true);
     // Every @jovie/web Vitest run (shared apps/web coverage lock) is web's.
     for (const command of all) {

@@ -25,6 +25,7 @@ export const MARKETING_CERTIFICATION_STORE_KEY =
 
 import {
   type CertificationRecordBackend,
+  certificationRecordJson,
   CERTIFICATION_CAS_ATTEMPTS as MAX_COMPARE_AND_SET_ATTEMPTS,
   mutateCertificationRecord,
   CERTIFICATION_PERSISTENCE_TTL_SECONDS as PERSISTENCE_TTL_SECONDS,
@@ -751,7 +752,9 @@ function assuranceProfilesBySubject(
   return result;
 }
 
-function isCertificationReviewPacket(value: unknown): boolean {
+export function isCertificationReviewPacket(
+  value: unknown
+): value is CertificationReviewPacket {
   if (
     !isRecord(value) ||
     typeof value.contract !== 'string' ||
@@ -826,7 +829,7 @@ function isCertificationReviewPacket(value: unknown): boolean {
   });
 }
 
-function isPersistedFounderDecision(
+export function isPersistedFounderDecision(
   value: unknown,
   subjectId: string
 ): value is FounderCertificationDecision {
@@ -847,7 +850,7 @@ function isPersistedFounderDecision(
   );
 }
 
-function isPersistedAuditEvent(
+export function isPersistedAuditEvent(
   value: unknown,
   subjectId: string
 ): value is CertificationAuditEvent {
@@ -864,8 +867,9 @@ function isPersistedAuditEvent(
   );
 }
 
-function parseLedger(raw: unknown): MarketingCertificationLedger {
-  if (typeof raw !== 'string') {
+function parseLedger(stored: unknown): MarketingCertificationLedger {
+  const raw = certificationRecordJson(stored);
+  if (raw === null) {
     throw new MarketingCertificationPersistenceError(
       'Certification ledger must be stored as one compare-and-set JSON string.'
     );

@@ -246,6 +246,26 @@ describe('executeChatTurn context cost', () => {
         requestId: 'req-1',
       })
     );
+
+    type Opts = {
+      onAbort: (e: { steps: unknown[] }) => void;
+      onFinish: (e: {
+        steps: { toolCalls: unknown[] }[];
+        text: string;
+        finishReason: string;
+      }) => Promise<void>;
+    };
+    const opts = capturedOptions(turn) as unknown as Opts;
+    opts.onAbort({ steps: [] });
+    expect(consoleError).toHaveBeenCalledWith(
+      '[chat] model stream aborted',
+      expect.objectContaining({ requestId: 'req-1', steps: 0 })
+    );
+    await opts.onFinish({ steps: [], text: '', finishReason: 'stop' });
+    expect(consoleError).toHaveBeenCalledWith(
+      '[chat] model turn produced no output',
+      expect.objectContaining({ requestId: 'req-1', finishReason: 'stop' })
+    );
     consoleError.mockRestore();
   });
 });

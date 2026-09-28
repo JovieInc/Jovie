@@ -80,4 +80,18 @@ describe('TimActionRequiredSection observation states', () => {
     });
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
+
+  it('says admin data is locked when the step-up lock returns 403', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"error":"Forbidden"}', { status: 403 })
+    );
+
+    render(<TimActionRequiredSection />);
+
+    expect(
+      await screen.findByText(
+        'Admin data is locked. Unlock with Touch ID, then retry.'
+      )
+    ).toBeInTheDocument();
+  });
 });

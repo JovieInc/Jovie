@@ -255,11 +255,11 @@ export const typography = {
     app: 'var(--text-app)', // 12px — app default (consolidated 2026-09-27)
     sm: 'var(--text-sm)', // 14px
     base: 'var(--text-base)', // 16px
-    lg: 'var(--text-lg)', // 18px
+    lg: 'var(--text-lg)', // 16px (display ladder)
     xl: 'var(--text-xl)', // 20px
     '2xl': 'var(--text-2xl)', // 24px
-    '3xl': 'var(--text-3xl)', // 30px
-    '4xl': 'var(--text-4xl)', // 36px
+    '3xl': 'var(--text-3xl)', // 32px
+    '4xl': 'var(--text-4xl)', // 40px
     '5xl': 'var(--text-5xl)', // 48px
   },
   weight: {

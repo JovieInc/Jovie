@@ -584,6 +584,39 @@ describe('configured readers', () => {
     expect(calls).toBe(3);
   });
 
+  it('measures the failure TTL from when the read settles, not request start', async () => {
+    let now = NOW;
+    let calls = 0;
+    const resolvers: Array<(response: Response) => void> = [];
+    const readers = createLiveShippingStateReaders(
+      io(
+        () =>
+          new Promise<Response>(resolve => {
+            calls += 1;
+            resolvers.push(resolve);
+          }),
+        { nowMs: () => now }
+      )
+    );
+
+    const pending = readers['lanes-status']();
+    now += 6_000;
+    resolvers.at(-1)?.(json({}, 502));
+    expect((await pending).status).toBe('unavailable');
+
+    now += 3_999;
+    const cachedPoll = readers['lanes-status']();
+    expect(calls).toBe(1);
+    resolvers.at(-1)?.(json(LANES_FEED));
+    await cachedPoll;
+
+    now += 2;
+    const retry = readers['lanes-status']();
+    resolvers.at(-1)?.(json(LANES_FEED));
+    expect((await retry).status).toBe('ok');
+    expect(calls).toBe(2);
+  });
+
   it('fails each source soft: one dead source leaves only its metrics n/a', async () => {
     const reads = Object.fromEntries(
       SHIPPING_SOURCE_IDS.map(id => [id, undefined])
