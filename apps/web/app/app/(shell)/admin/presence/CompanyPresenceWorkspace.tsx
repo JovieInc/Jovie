@@ -11,13 +11,13 @@ import {
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
   PageToolbarTabButton,
   TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { BASE_URL } from '@/constants/domains';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
@@ -301,7 +301,7 @@ export function CompanyPresenceWorkspace({
   );
 
   return (
-    <PageShell
+    <WorkspacePage
       frame='none'
       contentPadding='none'
       data-testid='company-presence-workspace'
@@ -372,6 +372,6 @@ export function CompanyPresenceWorkspace({
           )
         }
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
