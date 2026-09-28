@@ -31,14 +31,9 @@ export function HomepageNoScriptContent() {
         <div key={section.id}>
           <h3>{section.headline}</h3>
           <p>{section.body}</p>
-          {'outcomes' in section
-            ? section.outcomes.map(outcome => (
-                <div key={outcome.id}>
-                  <h4>{outcome.headline}</h4>
-                  <p>{outcome.body}</p>
-                </div>
-              ))
-            : null}
+          {section.steps.map(step => (
+            <p key={step.id}>{step.caption}</p>
+          ))}
         </div>
       ))}
 

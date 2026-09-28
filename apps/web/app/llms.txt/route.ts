@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { DOCS_URL } from '@/constants/domains';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
@@ -89,6 +90,7 @@ Music-native tools stay scoped to artist jobs. They do not define the company:
 - **About**: ${BASE_URL}/about — Company story, founder, and brand information
 - **Pricing**: ${BASE_URL}/pricing — Plans and features
 - **Blog**: ${BASE_URL}/blog — Insights and product updates
+- **Help Center**: ${DOCS_URL}/docs — Guides and troubleshooting
 - **Support**: ${BASE_URL}/support — Help and contact
 - **OpenAPI**: ${BASE_URL}/openapi.json — Public read-only artist API contract (canonical: ${BASE_URL}/api/v1/openapi.json)
 
@@ -97,6 +99,7 @@ ${buildSiteLlmsGuidance()}
 ## Contact
 
 - Website: ${BASE_URL}
+- Help Center: ${DOCS_URL}/docs
 - Support: ${BASE_URL}/support
 `;
 

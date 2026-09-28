@@ -20,6 +20,8 @@ function buildInput(
       mrrGrowth30dUsd: 100,
       isConfigured: true,
       isAvailable: true,
+      excludedInternalSubscribers: 0,
+      excludedInternalMrrUsd: 0,
     },
     mercury: {
       balanceUsd: 5000,
@@ -134,6 +136,8 @@ describe('buildHudMetricSources', () => {
           mrrGrowth30dUsd: 0,
           isConfigured: true,
           isAvailable: false,
+          excludedInternalSubscribers: 0,
+          excludedInternalMrrUsd: 0,
           errorMessage: 'Stripe API error: timeout',
         },
         mercury: {
@@ -187,6 +191,8 @@ describe('buildHudMetricSources', () => {
           mrrGrowth30dUsd: 0,
           isConfigured: true,
           isAvailable: false,
+          excludedInternalSubscribers: 0,
+          excludedInternalMrrUsd: 0,
           errorMessage: 'Stripe API error (401): unauthorized',
         },
       })

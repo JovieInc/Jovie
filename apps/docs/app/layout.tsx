@@ -9,6 +9,7 @@ import { Inter } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
 import { ArticleFeedback } from '@/components/ArticleFeedback';
+import { ContactSupportLink } from '@/components/ContactSupportLink';
 import { HelpCenterAnalytics } from '@/components/HelpCenterAnalytics';
 import { HelpShell } from '@/components/help/HelpShell';
 import {
@@ -80,6 +81,10 @@ export default async function RootLayout({
           <HelpShell nav={nav}>
             {children}
             <ArticleFeedback />
+            <footer className='help-footer'>
+              Copyright {new Date().getFullYear()} Jovie Inc.{' '}
+              <ContactSupportLink />
+            </footer>
           </HelpShell>
           <HelpCenterAnalytics />
         </ThemeProvider>

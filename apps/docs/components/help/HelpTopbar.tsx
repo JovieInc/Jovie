@@ -26,6 +26,12 @@ export function HelpTopbar({ nav }: { nav: HelpNavItem[] }) {
         <HelpSearchTrigger />
       </div>
       <div className='help-topbar-side help-topbar-actions'>
+        <Link
+          className='help-topbar-link help-topbar-link-optional'
+          href='/contact'
+        >
+          Contact support
+        </Link>
         <a
           className='help-topbar-link help-topbar-link-optional'
           href='https://jov.ie/changelog'

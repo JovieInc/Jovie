@@ -318,6 +318,18 @@ body {
   padding: 48px 48px 96px;
 }
 
+.help-footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--help-border);
+  font-size: 13px;
+  color: var(--help-text-muted);
+}
+
+.help-footer a {
+  color: inherit;
+}
+
 /* --- Drawer ------------------------------------------------------------ */
 
 .help-drawer-trigger {
