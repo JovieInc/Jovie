@@ -510,8 +510,11 @@ def execute(job: dict, config: dict, context: str, state: Path, run=subprocess.r
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     slug = decision_slug(job, day)
     if job["decisionType"] == "research":
-        spec = config["research"]
-        out = run_research(spec, research_prompt(job, context), run=run)
+        # Tim 2026-09-28: GLM 5.3 first, Astra when GLM cannot answer; Fable is never a research lane.
+        for spec in filter(None, [config["research"], config.get("researchEscalation")]):
+            out = run_research(spec, research_prompt(job, context), run=run)
+            if out["ok"]:
+                break
         verdict = ({"confidence": "research", "agreement": 0.0, "reasons": [f"memo by {spec['model']}"]}
                    if out["ok"] else {"confidence": "failed", "agreement": 0.0, "reasons": [out["error"]]})
         record = result_record(job, verdict, None, None, spec["name"], None, slug if out["ok"] else None,
