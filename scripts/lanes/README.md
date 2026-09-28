@@ -111,11 +111,18 @@ disk and the HUD heartbeat, and writes `doctor.json` (the HUD's NEEDS ATTENTION 
 Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony doctor:
 <key>") so Summer routes it; when the condition clears the issue is commented and moved
 to Done; a key that fires again within six hours reopens the same issue. Keys:
-`tick-error`, `provider-down:<lane>`, `provider-idle:codex`, `codex-all-banked`, `codex-broken`, `linear-down`,
+`tick-error`, `provider-down:<lane>`, `provider-idle:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
 `pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `disk-critical`,
 `github-quota`, `hud-stale`, `orphan-prs`.
-`provider-idle:codex` is urgent: after five continuous minutes with compatible work, an
-available ChatGPT account, configured slots, and zero Codex workers, capacity is being lost.
+`provider-idle:<lane>` is urgent: after five continuous minutes with compatible work, a
+healthy provider, configured slots, repeated dispatch attempts, and zero workers, capacity
+is being lost. Every alert also produces a generation-deduped
+`jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
+status feed. The receipt carries its owner, affected resources, first observation, source
+freshness, ten-minute escalation deadline, recovery result, next action, and terminal
+health proof. A new generation wakes Summer once through Linear and reopens JOV-6004 when
+that invariant had been closed; unknown Linear/pool state remains degraded evidence in the
+status feed even when Linear cannot carry the escalation itself.
 
 ## Codex lane
 
