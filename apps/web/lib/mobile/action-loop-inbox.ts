@@ -1,8 +1,7 @@
 import { loadOpportunityInboxData } from '@/lib/connectors/opportunity-inbox-data';
 import type { OpportunityInboxEmptyActionCard } from '@/lib/connectors/opportunity-inbox-types';
 
-/** Summer approval-card detail carried inline so the client can render and
- * decide the card without a second fetch. */
+/** Summer approval-card detail carried inline for render + decide. */
 export type MobileInboxSummerCard = {
   readonly id: string;
   readonly kind: 'outbound' | 'spend' | 'taste' | 'decision';

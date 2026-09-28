@@ -54,11 +54,20 @@ protocol APIClientProtocol: Sendable {
   ) async throws -> SummerCardDecisionResult
 }
 
-/// Result of POSTing a Summer card decision. `alreadyDecided` maps the
-/// server's 409 — the decision is final and the card should leave the inbox.
+/// Result of POSTing a Summer card decision; `alreadyDecided` maps the server's 409.
 enum SummerCardDecisionResult: Equatable, Sendable {
   case decided
   case alreadyDecided
+}
+
+extension APIClientProtocol {
+  func decideSummerCard(
+    cardID _: String,
+    decision _: SummerCardDecision,
+    comment _: String?
+  ) async throws -> SummerCardDecisionResult {
+    throw APIClientError.invalidResponse
+  }
 }
 
 struct APIClient: APIClientProtocol, Sendable {
@@ -225,7 +234,11 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.invalidResponse
     }
 
-    if httpResponse.statusCode == 401, !forceRefresh {
+    if httpResponse.statusCode == 401 {
+      if forceRefresh {
+        handleTerminalUnauthorized()
+        throw APIClientError.requestFailed(statusCode: 401)
+      }
       let refreshed = try await retryTokenOrTerminal(after: token)
       return try await sendSummerCardDecisionRequest(
         cardID: cardID,
@@ -234,10 +247,6 @@ struct APIClient: APIClientProtocol, Sendable {
         forceRefresh: true,
         tokenOverride: refreshed
       )
-    }
-    if httpResponse.statusCode == 401, forceRefresh {
-      handleTerminalUnauthorized()
-      throw APIClientError.requestFailed(statusCode: 401)
     }
 
     if httpResponse.statusCode == 409 {

@@ -39,9 +39,8 @@ describe('GET /api/ovie/summer-cards', () => {
 
   it('returns 401 for an unauthenticated caller', async () => {
     hoisted.resolvePrincipal.mockResolvedValue({
+      ...admin,
       authenticated: false,
-      isAdmin: false,
-      scopes: [],
     });
     const response = await call();
     expect(response.status).toBe(401);

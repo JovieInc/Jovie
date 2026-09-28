@@ -525,9 +525,8 @@ private struct AppContentView: View {
     isLoadingInbox = false
   }
 
-  /// Posts a Summer card decision (final on the server). On success — or a
-  /// 409, meaning the card was already decided — the item is removed from the
-  /// local inbox snapshot so the pending count stays truthful.
+  /// Posts a Summer card decision (final on the server; 409 counts as decided)
+  /// and drops the item from the local inbox snapshot.
   @MainActor
   private func decideSummerCard(
     card: MobileSummerCard,
@@ -538,15 +537,11 @@ private struct AppContentView: View {
       baseURL: appState.configuration.apiBaseURL,
       tokenProvider: NativeSessionTokenProvider()
     )
-    do {
-      _ = try await client.decideSummerCard(
-        cardID: card.id,
-        decision: decision,
-        comment: comment
-      )
-    } catch {
-      return false
-    }
+    guard (try? await client.decideSummerCard(
+      cardID: card.id,
+      decision: decision,
+      comment: comment
+    )) != nil else { return false }
 
     if let inbox = inboxResponse {
       let itemID = "summer-card:\(card.id)"

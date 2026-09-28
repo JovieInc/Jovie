@@ -5,8 +5,8 @@ import { type ReactNode, useEffect } from 'react';
 import type { SummerCard } from '@/lib/ovie/summer-cards';
 import { SummerCardReviewPanel } from './SummerCardReviewPanel';
 
-const pendingCards: readonly SummerCard[] = [
-  {
+function card(overrides: Partial<SummerCard>): SummerCard {
+  return {
     id: 'sc_0123456789abcdef0123456789abcdef',
     idempotencyKey: 'outbound-0001',
     kind: 'outbound',
@@ -22,12 +22,16 @@ const pendingCards: readonly SummerCard[] = [
     comment: null,
     createdAt: '2026-09-06T10:00:00.000Z',
     decidedAt: null,
-  },
-  {
+    ...overrides,
+  };
+}
+
+const pendingCards: readonly SummerCard[] = [
+  card({}),
+  card({
     id: 'sc_fedcba9876543210fedcba9876543210',
     idempotencyKey: 'spend-0002',
     kind: 'spend',
-    product: 'jov',
     title: 'Boost release announcement',
     body: 'Paid boost for the release announcement on Instagram.',
     recommendation: 'Approve $400',
@@ -35,27 +39,23 @@ const pendingCards: readonly SummerCard[] = [
     recipient: null,
     amountUsd: 400,
     evidence: [],
-    status: 'pending',
-    comment: null,
     createdAt: '2026-09-07T14:30:00.000Z',
-    decidedAt: null,
-  },
+  }),
 ];
 
-function jsonResponse(body: unknown, init?: ResponseInit): Response {
+type Mode = 'pending' | 'empty' | 'forbidden' | 'loading';
+
+function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status: init?.status ?? 200,
-    headers: { 'content-type': 'application/json', ...init?.headers },
+    status,
+    headers: { 'content-type': 'application/json' },
   });
 }
 
 function MockSummerCardsFetch({
   children,
   mode,
-}: Readonly<{
-  readonly children: ReactNode;
-  readonly mode: 'pending' | 'empty' | 'forbidden' | 'loading';
-}>) {
+}: Readonly<{ readonly children: ReactNode; readonly mode: Mode }>) {
   useEffect(() => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
@@ -70,16 +70,14 @@ function MockSummerCardsFetch({
         : rawUrl;
 
       if (path === '/api/ovie/summer-cards') {
-        if (mode === 'loading') {
-          return new Promise<Response>(() => {});
-        }
+        if (mode === 'loading') return new Promise<Response>(() => {});
         if (mode === 'forbidden') {
           return jsonResponse(
             {
               error:
                 'Use an admin Ovie account or re-open Ovie after re-authentication, then retry.',
             },
-            { status: 403 }
+            403
           );
         }
         const cards = mode === 'pending' ? pendingCards : [];
@@ -93,16 +91,10 @@ function MockSummerCardsFetch({
         return jsonResponse({ ok: true });
       }
 
-      if (typeof originalFetch === 'function') {
+      if (typeof originalFetch === 'function')
         return originalFetch(input, init);
-      }
-
-      return jsonResponse(
-        { error: 'Unhandled story request' },
-        { status: 404 }
-      );
+      return jsonResponse({ error: 'Unhandled story request' }, 404);
     };
-
     return () => {
       globalThis.fetch = originalFetch;
     };
@@ -116,9 +108,7 @@ const meta = {
   component: SummerCardReviewPanel,
   parameters: {
     layout: 'centered',
-    jovie: {
-      uncoveredProps: ['isLoading'],
-    },
+    jovie: { uncoveredProps: ['isLoading'] },
   },
   decorators: [
     Story => (
@@ -132,34 +122,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Pending: Story = {
+const withMode = (mode: Mode): Story => ({
   render: () => (
-    <MockSummerCardsFetch mode='pending'>
+    <MockSummerCardsFetch mode={mode}>
       <SummerCardReviewPanel />
     </MockSummerCardsFetch>
   ),
-};
+});
 
-export const Empty: Story = {
-  render: () => (
-    <MockSummerCardsFetch mode='empty'>
-      <SummerCardReviewPanel />
-    </MockSummerCardsFetch>
-  ),
-};
-
-export const Forbidden: Story = {
-  render: () => (
-    <MockSummerCardsFetch mode='forbidden'>
-      <SummerCardReviewPanel />
-    </MockSummerCardsFetch>
-  ),
-};
-
-export const Loading: Story = {
-  render: () => (
-    <MockSummerCardsFetch mode='loading'>
-      <SummerCardReviewPanel />
-    </MockSummerCardsFetch>
-  ),
-};
+export const Pending = withMode('pending');
+export const Empty = withMode('empty');
+export const Forbidden = withMode('forbidden');
+export const Loading = withMode('loading');

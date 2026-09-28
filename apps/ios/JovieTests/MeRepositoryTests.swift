@@ -39,14 +39,6 @@ actor MutableAPIClient: APIClientProtocol {
     .preview
   }
 
-  func decideSummerCard(
-    cardID _: String,
-    decision _: SummerCardDecision,
-    comment _: String?
-  ) async throws -> SummerCardDecisionResult {
-    .decided
-  }
-
   func updateMode(_ mode: Mode) {
     self.mode = mode
   }

@@ -15,11 +15,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers });
 }
 
-/**
- * Founder-facing card list for the Ovie inbox (web). Summer's own service
- * surface stays on /api/internal/ovie/summer-cards (OIDC); this door is the
- * same admin gate as the decision route.
- */
+/** Founder-facing card list for the Ovie inbox; same admin gate as the decision route. */
 export async function GET(request: Request): Promise<NextResponse> {
   let principal;
   try {

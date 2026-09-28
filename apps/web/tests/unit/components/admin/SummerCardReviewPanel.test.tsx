@@ -6,20 +6,26 @@ import { toast } from '@/components/feedback';
 import type { SummerCard } from '@/lib/ovie/summer-cards';
 
 vi.mock('@/components/feedback', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-function jsonResponse(body: unknown, init?: ResponseInit): Response {
+function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status: init?.status ?? 200,
-    headers: { 'content-type': 'application/json', ...init?.headers },
+    status,
+    headers: { 'content-type': 'application/json' },
   });
 }
 
-function card(overrides: Partial<SummerCard>): SummerCard {
+function mockFetch(...responses: Response[]) {
+  const fetchMock = vi.fn();
+  for (const response of responses) {
+    fetchMock.mockResolvedValueOnce(response);
+  }
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function card(overrides: Partial<SummerCard> = {}): SummerCard {
   return {
     id: 'sc_0123456789abcdef0123456789abcdef',
     idempotencyKey: 'outbound-0001',
@@ -41,32 +47,28 @@ function card(overrides: Partial<SummerCard>): SummerCard {
 }
 
 describe('SummerCardReviewPanel', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  beforeEach(vi.clearAllMocks);
+  afterEach(vi.unstubAllGlobals);
 
   it('renders card detail and posts approve to the decision endpoint', async () => {
     const spendCard = card({ amountUsd: 400 });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ cards: [spendCard], pendingCount: 1 })
-      )
-      .mockResolvedValueOnce(jsonResponse({ card: spendCard }));
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = mockFetch(
+      jsonResponse({ cards: [spendCard], pendingCount: 1 }),
+      jsonResponse({ card: spendCard })
+    );
 
     const user = userEvent.setup();
     render(<SummerCardReviewPanel />);
 
     const cardEl = await screen.findByTestId(`summer-card-${spendCard.id}`);
-    expect(cardEl).toHaveTextContent('Email 12 claimed artists');
-    expect(cardEl).toHaveTextContent('Draft body for the outbound send.');
-    expect(cardEl).toHaveTextContent('claimed artists');
-    expect(cardEl).toHaveTextContent('$400');
+    for (const text of [
+      'Email 12 claimed artists',
+      'Draft body for the outbound send.',
+      'claimed artists',
+      '$400',
+    ]) {
+      expect(cardEl).toHaveTextContent(text);
+    }
     expect(
       within(cardEl).getByRole('link', { name: /example\.com\/list/ })
     ).toHaveAttribute('href', 'https://example.com/list');
@@ -93,12 +95,11 @@ describe('SummerCardReviewPanel', () => {
   });
 
   it('records a comment with the decision from the comment dialog', async () => {
-    const target = card({});
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse({ cards: [target], pendingCount: 1 }))
-      .mockResolvedValueOnce(jsonResponse({ card: target }));
-    vi.stubGlobal('fetch', fetchMock);
+    const target = card();
+    const fetchMock = mockFetch(
+      jsonResponse({ cards: [target], pendingCount: 1 }),
+      jsonResponse({ card: target })
+    );
 
     const user = userEvent.setup();
     render(<SummerCardReviewPanel />);
@@ -131,17 +132,14 @@ describe('SummerCardReviewPanel', () => {
   });
 
   it('drops the card when the server reports the decision is already final', async () => {
-    const target = card({});
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse({ cards: [target], pendingCount: 1 }))
-      .mockResolvedValueOnce(
-        jsonResponse(
-          { error: 'already_decided', card: { ...target, status: 'approved' } },
-          { status: 409 }
-        )
-      );
-    vi.stubGlobal('fetch', fetchMock);
+    const target = card();
+    mockFetch(
+      jsonResponse({ cards: [target], pendingCount: 1 }),
+      jsonResponse(
+        { error: 'already_decided', card: { ...target, status: 'approved' } },
+        409
+      )
+    );
 
     const user = userEvent.setup();
     render(<SummerCardReviewPanel />);
@@ -160,13 +158,10 @@ describe('SummerCardReviewPanel', () => {
   });
 
   it('shows an actionable error and retry when listing fails', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ error: 'forbidden' }, { status: 403 })
-      )
-      .mockResolvedValueOnce(jsonResponse({ cards: [], pendingCount: 0 }));
-    vi.stubGlobal('fetch', fetchMock);
+    mockFetch(
+      jsonResponse({ error: 'forbidden' }, 403),
+      jsonResponse({ cards: [], pendingCount: 0 })
+    );
 
     const user = userEvent.setup();
     render(<SummerCardReviewPanel />);

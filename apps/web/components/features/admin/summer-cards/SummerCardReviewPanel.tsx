@@ -17,23 +17,8 @@ const SUMMER_CARD_KIND_LABELS: Record<SummerCard['kind'], string> = {
   decision: 'Decision',
 };
 
-interface SummerCardsResponse {
-  readonly cards: readonly SummerCard[];
-  readonly pendingCount: number;
-}
-
-interface ApiErrorResponse {
-  readonly error?: string;
-}
-
-interface SummerCardsLoadError {
-  readonly title: string;
-  readonly detail: string;
-}
-
-interface PendingCommentState {
-  readonly card: SummerCard;
-}
+type ApiErrorResponse = { readonly error?: string };
+type SummerCardsLoadError = { readonly title: string; readonly detail: string };
 
 function formatCreatedAt(value: string): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -62,25 +47,20 @@ async function readApiError(response: Response): Promise<ApiErrorResponse> {
   }
 }
 
+const AUTH_ERROR_FALLBACKS: Record<number, readonly [string, string]> = {
+  401: ['Sign In Required', 'Sign in with an admin Ovie account, then retry.'],
+  403: [
+    'Admin Access Required',
+    'Use an admin Ovie account or re-open Ovie after re-authentication, then retry.',
+  ],
+};
+
 function loadErrorFromResponse(
   response: Response,
   payload: ApiErrorResponse
 ): SummerCardsLoadError {
-  if (response.status === 401) {
-    return {
-      title: 'Sign In Required',
-      detail:
-        payload.error ?? 'Sign in with an admin Ovie account, then retry.',
-    };
-  }
-  if (response.status === 403) {
-    return {
-      title: 'Admin Access Required',
-      detail:
-        payload.error ??
-        'Use an admin Ovie account or re-open Ovie after re-authentication, then retry.',
-    };
-  }
+  const known = AUTH_ERROR_FALLBACKS[response.status];
+  if (known) return { title: known[0], detail: payload.error ?? known[1] };
   return {
     title: 'Summer Cards Unavailable',
     detail:
@@ -92,30 +72,26 @@ function decisionErrorMessage(
   response: Response,
   payload: ApiErrorResponse
 ): string {
-  if (response.status === 401) {
-    return payload.error ?? 'Sign in to Ovie, then retry this decision.';
-  }
-  if (response.status === 403) {
-    return (
-      payload.error ??
-      'Admin authorization failed. Re-open Ovie after re-authentication, then retry this decision.'
-    );
-  }
   if (response.status === 409) {
     return 'This card was already decided. Refreshing the inbox.';
+  }
+  if (response.status === 401 || response.status === 403) {
+    return loadErrorFromResponse(response, payload).detail;
   }
   return payload.error ?? `Decision failed (${response.status})`;
 }
 
-function SummerCardMeta({ card }: Readonly<{ readonly card: SummerCard }>) {
+function summerCardMetaLine(card: SummerCard): string {
   const parts: string[] = [SUMMER_CARD_KIND_LABELS[card.kind]];
   if (card.recipient) parts.push(`to ${card.recipient}`);
   if (card.amountUsd !== null) parts.push(formatAmount(card.amountUsd));
-  return (
-    <p className='text-2xs text-tertiary-token'>
-      {parts.join(' · ')} · {formatCreatedAt(card.createdAt)}
-    </p>
-  );
+  return `${parts.join(' · ')} · ${formatCreatedAt(card.createdAt)}`;
+}
+
+interface CardActions {
+  readonly onApprove: (card: SummerCard) => void;
+  readonly onReject: (card: SummerCard) => void;
+  readonly onComment: (card: SummerCard) => void;
 }
 
 function SummerCardItem({
@@ -124,13 +100,9 @@ function SummerCardItem({
   onApprove,
   onReject,
   onComment,
-}: Readonly<{
-  readonly card: SummerCard;
-  readonly isSubmitting: boolean;
-  readonly onApprove: (card: SummerCard) => void;
-  readonly onReject: (card: SummerCard) => void;
-  readonly onComment: (card: SummerCard) => void;
-}>) {
+}: Readonly<
+  { readonly card: SummerCard; readonly isSubmitting: boolean } & CardActions
+>) {
   return (
     <ContentSurfaceCard data-testid={`summer-card-${card.id}`}>
       <div className='space-y-3 p-3'>
@@ -139,7 +111,9 @@ function SummerCardItem({
             <p className='text-app font-[560] text-primary-token'>
               {card.title}
             </p>
-            <SummerCardMeta card={card} />
+            <p className='text-2xs text-tertiary-token'>
+              {summerCardMetaLine(card)}
+            </p>
           </div>
         </div>
 
@@ -174,10 +148,7 @@ function SummerCardItem({
                   className='inline-flex items-center gap-1 break-all text-2xs text-secondary-token underline-offset-2 hover:text-primary-token hover:underline'
                 >
                   {url}
-                  <ExternalLink
-                    className='h-3 w-3 shrink-0'
-                    aria-hidden='true'
-                  />
+                  <ExternalLink className='h-3 w-3 shrink-0' aria-hidden />
                 </a>
               </li>
             ))}
@@ -185,30 +156,23 @@ function SummerCardItem({
         ) : null}
 
         <div className='flex flex-wrap gap-2 border-t border-subtle pt-3'>
-          <DrawerButton
-            type='button'
-            tone='primary'
-            disabled={isSubmitting}
-            onClick={() => onApprove(card)}
-          >
-            Approve
-          </DrawerButton>
-          <DrawerButton
-            type='button'
-            tone='secondary'
-            disabled={isSubmitting}
-            onClick={() => onReject(card)}
-          >
-            Reject
-          </DrawerButton>
-          <DrawerButton
-            type='button'
-            tone='secondary'
-            disabled={isSubmitting}
-            onClick={() => onComment(card)}
-          >
-            Comment
-          </DrawerButton>
+          {(
+            [
+              ['Approve', 'primary', onApprove],
+              ['Reject', 'secondary', onReject],
+              ['Comment', 'secondary', onComment],
+            ] as const
+          ).map(([label, tone, action]) => (
+            <DrawerButton
+              key={label}
+              type='button'
+              tone={tone}
+              disabled={isSubmitting}
+              onClick={() => action(card)}
+            >
+              {label}
+            </DrawerButton>
+          ))}
         </div>
       </div>
     </ContentSurfaceCard>
@@ -224,16 +188,15 @@ function SummerCardsBody({
   onApprove,
   onReject,
   onComment,
-}: Readonly<{
-  readonly isLoading: boolean;
-  readonly loadError: SummerCardsLoadError | null;
-  readonly cards: readonly SummerCard[];
-  readonly submittingId: string | null;
-  readonly onRetry: () => void;
-  readonly onApprove: (card: SummerCard) => void;
-  readonly onReject: (card: SummerCard) => void;
-  readonly onComment: (card: SummerCard) => void;
-}>) {
+}: Readonly<
+  {
+    readonly isLoading: boolean;
+    readonly loadError: SummerCardsLoadError | null;
+    readonly cards: readonly SummerCard[];
+    readonly submittingId: string | null;
+    readonly onRetry: () => void;
+  } & CardActions
+>) {
   if (isLoading) {
     return (
       <div className='flex min-h-20 items-center gap-2 text-app text-secondary-token'>
@@ -256,16 +219,14 @@ function SummerCardsBody({
           </p>
           <p className='text-xs text-secondary-token'>{loadError.detail}</p>
         </div>
-        <div className='flex flex-wrap gap-2'>
-          <DrawerButton
-            type='button'
-            tone='secondary'
-            aria-label='Retry Summer Cards'
-            onClick={onRetry}
-          >
-            Retry
-          </DrawerButton>
-        </div>
+        <DrawerButton
+          type='button'
+          tone='secondary'
+          aria-label='Retry Summer Cards'
+          onClick={onRetry}
+        >
+          Retry
+        </DrawerButton>
       </div>
     );
   }
@@ -297,8 +258,7 @@ export function SummerCardReviewPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<SummerCardsLoadError | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
-  const [pendingComment, setPendingComment] =
-    useState<PendingCommentState | null>(null);
+  const [pendingComment, setPendingComment] = useState<SummerCard | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
 
   const loadCards = useCallback(async () => {
@@ -307,15 +267,15 @@ export function SummerCardReviewPanel() {
     try {
       const response = await fetch(FETCH_URL, { cache: 'no-store' });
       if (!response.ok) {
-        const nextError = loadErrorFromResponse(
-          response,
-          await readApiError(response)
-        );
         setCards([]);
-        setLoadError(nextError);
+        setLoadError(
+          loadErrorFromResponse(response, await readApiError(response))
+        );
         return;
       }
-      const payload = (await response.json()) as SummerCardsResponse;
+      const payload = (await response.json()) as {
+        readonly cards: readonly SummerCard[];
+      };
       setCards(payload.cards.filter(card => card.status === 'pending'));
     } catch (error) {
       setCards([]);
@@ -334,6 +294,11 @@ export function SummerCardReviewPanel() {
   useEffect(() => {
     void loadCards();
   }, [loadCards]);
+
+  const clearComment = useCallback(() => {
+    setPendingComment(null);
+    setCommentDraft('');
+  }, []);
 
   const submitDecision = useCallback(
     async (
@@ -374,12 +339,21 @@ export function SummerCardReviewPanel() {
         );
       } finally {
         setSubmittingId(null);
-        setPendingComment(null);
-        setCommentDraft('');
+        clearComment();
       }
     },
-    []
+    [clearComment]
   );
+
+  const decideCommented = (decision: 'approve' | 'reject') => () => {
+    if (pendingComment) {
+      void submitDecision(
+        pendingComment,
+        decision,
+        commentDraft.trim() || null
+      );
+    }
+  };
 
   return (
     <>
@@ -390,10 +364,7 @@ export function SummerCardReviewPanel() {
         <div className='min-h-36 space-y-3 p-3'>
           <div className='flex items-center justify-between gap-3'>
             <div>
-              <p
-                id='summer-cards-heading'
-                className='text-xs font-[560] text-primary-token'
-              >
+              <p className='text-xs font-[560] text-primary-token'>
                 Summer Approvals
               </p>
               <p className='text-xs text-secondary-token'>
@@ -414,17 +385,11 @@ export function SummerCardReviewPanel() {
             loadError={loadError}
             cards={cards}
             submittingId={submittingId}
-            onRetry={() => {
-              void loadCards();
-            }}
-            onApprove={next => {
-              void submitDecision(next, 'approve', null);
-            }}
-            onReject={next => {
-              void submitDecision(next, 'reject', null);
-            }}
+            onRetry={() => void loadCards()}
+            onApprove={next => void submitDecision(next, 'approve', null)}
+            onReject={next => void submitDecision(next, 'reject', null)}
             onComment={next => {
-              setPendingComment({ card: next });
+              setPendingComment(next);
               setCommentDraft('');
             }}
           />
@@ -443,9 +408,7 @@ export function SummerCardReviewPanel() {
             aria-label='Close Comment Dialog'
             className='absolute inset-0 h-auto w-auto cursor-default rounded-none border-0 bg-transparent p-0'
             onClick={() => {
-              if (submittingId) return;
-              setPendingComment(null);
-              setCommentDraft('');
+              if (!submittingId) clearComment();
             }}
           />
           <ContentSurfaceCard
@@ -455,7 +418,7 @@ export function SummerCardReviewPanel() {
             <div className='space-y-3 p-4'>
               <div className='space-y-1'>
                 <p className='text-sm font-[560] text-primary-token'>
-                  Comment on &ldquo;{pendingComment.card.title}&rdquo;
+                  Comment on &ldquo;{pendingComment.title}&rdquo;
                 </p>
                 <p className='text-xs text-secondary-token'>
                   The comment is recorded with your decision.
@@ -471,45 +434,23 @@ export function SummerCardReviewPanel() {
               />
 
               <div className='flex justify-end gap-2'>
-                <DrawerButton
-                  type='button'
-                  tone='secondary'
-                  disabled={submittingId !== null}
-                  onClick={() => {
-                    setPendingComment(null);
-                    setCommentDraft('');
-                  }}
-                >
-                  Cancel
-                </DrawerButton>
-                <DrawerButton
-                  type='button'
-                  tone='secondary'
-                  disabled={submittingId !== null}
-                  onClick={() => {
-                    void submitDecision(
-                      pendingComment.card,
-                      'reject',
-                      commentDraft.trim() || null
-                    );
-                  }}
-                >
-                  Reject
-                </DrawerButton>
-                <DrawerButton
-                  type='button'
-                  tone='primary'
-                  disabled={submittingId !== null}
-                  onClick={() => {
-                    void submitDecision(
-                      pendingComment.card,
-                      'approve',
-                      commentDraft.trim() || null
-                    );
-                  }}
-                >
-                  Approve
-                </DrawerButton>
+                {(
+                  [
+                    ['Cancel', 'secondary', clearComment],
+                    ['Reject', 'secondary', decideCommented('reject')],
+                    ['Approve', 'primary', decideCommented('approve')],
+                  ] as const
+                ).map(([label, tone, action]) => (
+                  <DrawerButton
+                    key={label}
+                    type='button'
+                    tone={tone}
+                    disabled={submittingId !== null}
+                    onClick={action}
+                  >
+                    {label}
+                  </DrawerButton>
+                ))}
               </div>
             </div>
           </ContentSurfaceCard>

@@ -321,26 +321,22 @@ struct APIClientTests {
     _ = try await client.fetchActionLoopInbox(workspace: .ovie)
   }
 
-  @Test func postsSummerCardDecisionWithBearerToken() async throws {
+  @Test func postsSummerCardDecisionAndMapsRepeatToAlreadyDecided() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in
       #expect(request.url?.path == "/api/ovie/summer-cards/sc_0123456789abcdef0123456789abcdef/decision")
       #expect(request.httpMethod == "POST")
       #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
-      let body = try requestBodyData(request)
       let decoded = try JSONDecoder().decode(
         [String: String].self,
-        from: body
+        from: requestBodyData(request)
       )
       #expect(decoded["decision"] == "reject")
       #expect(decoded["comment"] == "Too expensive.")
-      let response = HTTPURLResponse(
-        url: request.url!,
-        statusCode: 200,
-        httpVersion: nil,
-        headerFields: nil
-      )!
-      return (response, Data("{}".utf8))
+      return (
+        HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+        Data("{}".utf8)
+      )
     }
 
     let client = APIClient(
@@ -349,40 +345,25 @@ struct APIClientTests {
       tokenProvider: tokenProvider
     )
 
-    let result = try await client.decideSummerCard(
+    let decided = try await client.decideSummerCard(
       cardID: "sc_0123456789abcdef0123456789abcdef",
       decision: .reject,
       comment: "Too expensive."
     )
+    #expect(decided == .decided)
 
-    #expect(result == .decided)
-  }
-
-  @Test func mapsRepeatSummerCardDecisionToAlreadyDecided() async throws {
-    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in
-      let response = HTTPURLResponse(
-        url: request.url!,
-        statusCode: 409,
-        httpVersion: nil,
-        headerFields: nil
-      )!
-      return (response, Data("{}".utf8))
+      (
+        HTTPURLResponse(url: request.url!, statusCode: 409, httpVersion: nil, headerFields: nil)!,
+        Data("{}".utf8)
+      )
     }
-
-    let client = APIClient(
-      baseURL: URL(string: "https://jov.ie")!,
-      session: makeSession(),
-      tokenProvider: tokenProvider
-    )
-
-    let result = try await client.decideSummerCard(
+    let repeatResult = try await client.decideSummerCard(
       cardID: "sc_0123456789abcdef0123456789abcdef",
       decision: .approve,
       comment: nil
     )
-
-    #expect(result == .alreadyDecided)
+    #expect(repeatResult == .alreadyDecided)
   }
 
   @Test func fetchesActionLoopCalendarWithBearerToken() async throws {

@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Inbox action-loop surface (JOV-3632) with swipe-to-triage (JOV-3635).
-/// Summer approval cards render full detail and post decisions to Jovie
-/// (JOV-6670): swipe right approves, left rejects, tap opens the card.
+/// Inbox action-loop surface (JOV-3632) with swipe-to-triage (JOV-3635);
+/// Summer approval cards decide via POST to Jovie (JOV-6670).
 struct InboxSurfaceView: View {
   let response: MobileActionLoopInboxResponse?
   let isLoading: Bool
@@ -10,8 +9,7 @@ struct InboxSurfaceView: View {
   var workspaceMode: MobileWorkspaceMode = .jovie
   let onRetry: () async -> Void
   let onAskJovie: (String) -> Void
-  /// Returns true when the decision was recorded (or already decided), so the
-  /// card leaves the inbox. Comment passes through to the decision endpoint.
+  /// True when the decision was recorded (or already decided, 409).
   var onDecideSummerCard: (
     _ card: MobileSummerCard,
     _ decision: SummerCardDecision,
@@ -355,8 +353,7 @@ private func summerCardMeta(_ card: MobileSummerCard) -> String? {
   return parts.isEmpty ? nil : parts.joined(separator: " · ")
 }
 
-/// Full Summer approval card: body, recipient, amount, evidence links, and a
-/// comment field that rides with the approve/reject decision.
+/// Full Summer approval card with an optional comment that rides with the decision.
 private struct SummerCardDetailSheet: View {
   let card: MobileSummerCard
   let onDecide: (SummerCardDecision, String?) async -> Bool
@@ -410,11 +407,7 @@ private struct SummerCardDetailSheet: View {
             }
           }
 
-          TextField(
-            "Comment (optional)",
-            text: $comment,
-            axis: .vertical
-          )
+          TextField("Comment (optional)", text: $comment, axis: .vertical)
           .lineLimit(3 ... 6)
           .font(JovieFont.body(size: 14))
           .foregroundStyle(JovieColor.textPrimary)
