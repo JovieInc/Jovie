@@ -18,6 +18,8 @@ type WalkPhase = 'idle' | 'recording' | 'uploading';
 
 export function FounderMorningWalkCard(props: {
   readonly defaultStatus: string;
+  /** Render as a single action row for the cockpit utility strip. */
+  readonly compact?: boolean;
 }) {
   const { userId } = useAuthSafe();
   const [phase, setPhase] = useState<WalkPhase>('idle');
@@ -76,6 +78,49 @@ export function FounderMorningWalkCard(props: {
     if (!session) return;
     void finishUpload(session);
   }, [finishUpload]);
+
+  if (props.compact) {
+    return (
+      <div
+        className='flex items-center gap-2'
+        data-testid='founder-morning-walk'
+      >
+        {phase === 'recording' ? (
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            onClick={stopRecording}
+          >
+            <Square className='h-3.5 w-3.5' aria-hidden='true' />
+            Stop Walk
+          </Button>
+        ) : (
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            onClick={() => void startRecording()}
+            disabled={phase === 'uploading'}
+            title={props.defaultStatus}
+          >
+            <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
+            {phase === 'uploading' ? 'Storing…' : 'Record walk'}
+          </Button>
+        )}
+        {lastUrl ? (
+          <a
+            href={lastUrl}
+            className='truncate text-2xs text-secondary-token underline'
+            target='_blank'
+            rel='noreferrer'
+          >
+            Last walk
+          </a>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <ContentSurfaceCard className='p-3' data-testid='founder-morning-walk'>
