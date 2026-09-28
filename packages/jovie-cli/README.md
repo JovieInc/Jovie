@@ -72,9 +72,24 @@ The CLI sends no credentials, caches nothing, and sends no telemetry beyond a
 `jovie-cli/<version>` User-Agent. `profile create` and `report` are its only writes. Reports carry only the CLI
 version, platform, runtime, and the fields you pass. `init`
 writes only `jovie/SKILL.md` into existing agent skill directories, or into
-`--dir`. Commands use Node 22 built-ins (`parseArgs`, `fetch`, `readline`) and
+`--dir`. Commands use Node 24 built-ins (`parseArgs`, `fetch`, `readline`) and
 have no runtime dependencies. The MCP server covers tools only; adopt the
 official SDK when resources, prompts, or HTTP transport are needed.
+
+The repo already supplies Node 24's `node:util.parseArgs`, built-in `fetch`,
+`AbortSignal.timeout`, TypeScript, Vitest, and Biome. The existing
+`packages/action-contracts/bindings/cli.md` is only a future contract for
+authenticated owner actions, outside this package's anonymous read-only scope.
+
+We considered Commander/CAC (MIT, no runtime dependency), yargs (MIT but
+larger), oclif (extensible but disproportionate), and Python Click/Typer or
+Homebrew (a second runtime/distribution lane). None fits this fixed-command,
+TypeScript-only surface as well as the native substrate.
+
+Decision: build a dependency-free Node 24 client for Jovie's public GET
+resources without credentials, writes, hidden state, or a new runtime.
+Revisit only for a stable public capability index or extensible authenticated
+owner commands; that requires new approval and security review.
 
 Docs: [Jovie CLI](https://jov.ie/cli), [developer resources](https://jov.ie/developers).
 

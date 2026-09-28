@@ -68,6 +68,12 @@ export interface MarketingCopySectionBrief {
   readonly bodySignals?: readonly (readonly string[])[];
   readonly forbiddenPhrases?: readonly string[];
   readonly literalSequence?: boolean;
+  /**
+   * Concrete brief actions the rendered section must surface. Error and
+   * onboarding states use this to guarantee a real recovery path, not just
+   * an apologetic dead end.
+   */
+  readonly requiredActionIds?: readonly string[];
 }
 
 export interface MarketingCopyPageBrief {
@@ -1509,4 +1515,495 @@ export function applyMarketingCopyTasteDecision(
     appliedDecisionIds: [...profile.appliedDecisionIds, decisionId],
     signals: next,
   };
+}
+
+/**
+ * Rendered-copy verification (JOV-6478).
+ *
+ * The registry audits above certify the *reviewed* words. This layer binds
+ * the certified candidate to the text a surface actually renders: a registry
+ * pass must never certify a route that renders different words or promises
+ * the allowed claims cannot support. A rendered surface is the exact, ordered
+ * set of visible lines captured from one route or UI state at one source
+ * version; certification fingerprints the reviewed digest together with the
+ * rendered text, so any later change invalidates prior receipts.
+ */
+
+export interface RenderedCopyLine {
+  /** Matches the reviewed draft's visible line id (`headline`, `body`, `supporting:N`). */
+  readonly lineId: string;
+  readonly role: MarketingCopyLineRole;
+  /** Exact text as rendered to the visitor. */
+  readonly value: string;
+}
+
+export interface RenderedCopySection {
+  readonly sectionId: string;
+  readonly lines: readonly RenderedCopyLine[];
+}
+
+/**
+ * Exact rendered text for one route or UI state. `sourceVersion` is the
+ * deployed commit/build identity the capture was taken at; `state` names the
+ * runtime state when a route has several (e.g. `default`, `error`).
+ */
+export interface RenderedCopySurface {
+  readonly surfaceId: string;
+  readonly pageId: string;
+  readonly route: string;
+  readonly state: string;
+  readonly sourceVersion: string;
+  readonly sections: readonly RenderedCopySection[];
+}
+
+/**
+ * A taste-approved divergence between reviewed candidate copy and rendered
+ * text. The exception only applies when the rendered value matches `value`
+ * exactly; it never excuses an unsupported claim.
+ */
+export interface RenderedCopyApprovedException {
+  readonly sectionId: string;
+  readonly lineId: string;
+  readonly value: string;
+  readonly approvedBy: string;
+  readonly reference: string;
+}
+
+/** Fingerprint of the exact rendered surface text at one source version. */
+export function createRenderedCopyDigest(surface: RenderedCopySurface): string {
+  const canonical = JSON.stringify({
+    schemaVersion: MARKETING_COPY_SPEC_VERSION,
+    ...surface,
+  });
+  return `rendered-copy/${MARKETING_COPY_SPEC_VERSION}/sha256/${bytesToHex(
+    sha256(new TextEncoder().encode(canonical))
+  )}`;
+}
+
+/**
+ * Quantitative and availability tokens are the mechanically checkable part of
+ * product truth: a rendered price, limit, count, or availability word must
+ * appear verbatim in the section's allowed claim corpus (statement +
+ * evidence). Anything else is an unsupported promise, including invented
+ * success numbers ("10,000 artists") and repriced offers.
+ */
+const RENDERED_MONEY_PATTERN = /[$€£]\s?(\d[\d,]*(?:\.\d{1,2})?)/g;
+const RENDERED_PERCENT_PATTERN = /\b(\d[\d,]*(?:\.\d+)?)\s?%/g;
+const RENDERED_QUANTITY_PATTERN =
+  /\b(\d[\d,]*(?:\.\d+)?)\s?(?:x|times|days?|weeks?|months?|years?|hours?|minutes?|artists?|fans?|users?|members?|downloads?|streams?|emails?|credits?|seats?)\b/gi;
+const RENDERED_AVAILABILITY_TERMS =
+  'free|trial|unlimited|guarantee|guaranteed|refund|lifetime|forever|no credit card'.split(
+    '|'
+  );
+const RENDERED_ERROR_PATTERN =
+  /\b(?:went wrong|error|failed|failure|unavailable|timed out|cannot continue|try again)\b/i;
+
+function renderedQuantityTokens(value: string): string[] {
+  const tokens: string[] = [];
+  for (const pattern of [
+    RENDERED_MONEY_PATTERN,
+    RENDERED_PERCENT_PATTERN,
+    RENDERED_QUANTITY_PATTERN,
+  ]) {
+    pattern.lastIndex = 0;
+    let match = pattern.exec(value);
+    while (match) {
+      tokens.push((match[1] ?? '').replaceAll(',', ''));
+      match = pattern.exec(value);
+    }
+  }
+  return tokens.filter(token => token.length > 0);
+}
+
+function claimCorpus(
+  brief: MarketingCopyPageBrief,
+  sectionBrief: MarketingCopySectionBrief | undefined
+): { readonly words: Set<string>; readonly text: string } {
+  const allowed = new Set(sectionBrief?.allowedClaimIds ?? []);
+  const corpus = new Set<string>();
+  const parts: string[] = [];
+  for (const claim of brief.claims) {
+    if (!allowed.has(claim.id)) continue;
+    parts.push(claim.statement, ...claim.evidence);
+    for (const word of words(claim.statement)) corpus.add(word);
+    for (const evidence of claim.evidence) {
+      for (const word of words(evidence)) corpus.add(word);
+    }
+  }
+  return { words: corpus, text: ` ${normalizeText(parts.join(' '))} ` };
+}
+
+export interface RenderedCopyAuditOptions {
+  readonly exceptions?: readonly RenderedCopyApprovedException[];
+}
+
+/**
+ * Compares the exact rendered surface against the reviewed draft and the
+ * allowed claim registry. Registry-only approval is not certification: any
+ * line that renders differently, promises unsupported availability or
+ * pricing, or drops a required recovery action is an issue.
+ */
+export function auditRenderedMarketingCopy(
+  brief: MarketingCopyPageBrief,
+  draft: MarketingCopyPageDraft,
+  surface: RenderedCopySurface,
+  options: RenderedCopyAuditOptions = {}
+): readonly MarketingCopyAuditIssue[] {
+  const issues: MarketingCopyAuditIssue[] = [];
+  const exceptions = options.exceptions ?? [];
+  const fail = (code: string, sectionId: string | undefined, message: string) =>
+    issues.push(issue(code, sectionId, message));
+
+  if (
+    surface.pageId !== brief.pageId ||
+    surface.pageId !== draft.pageId ||
+    surface.route !== brief.route ||
+    surface.route !== draft.route ||
+    !surface.surfaceId.trim() ||
+    !surface.state.trim() ||
+    !surface.sourceVersion.trim()
+  ) {
+    fail(
+      'rendered-surface-mismatch',
+      undefined,
+      `Rendered surface ${surface.surfaceId || '(unnamed)'} must identify the same page and route as the reviewed brief and draft, with a state and source version.`
+    );
+  }
+
+  const briefSections = new Map(
+    brief.sections.map(section => [section.sectionId, section])
+  );
+  const draftSections = new Map(
+    draft.sections.map(section => [section.sectionId, section])
+  );
+  const renderedSections = new Map(
+    surface.sections.map(section => [section.sectionId, section])
+  );
+  const actionsById = new Map(
+    (brief.actions ?? []).map(action => [action.id, action])
+  );
+
+  for (const rendered of surface.sections) {
+    if (!draftSections.has(rendered.sectionId)) {
+      fail(
+        'unexpected-rendered-section',
+        rendered.sectionId,
+        `Rendered section ${rendered.sectionId} has no reviewed draft section.`
+      );
+    }
+  }
+
+  for (const exception of exceptions) {
+    const renderedLine = renderedSections
+      .get(exception.sectionId)
+      ?.lines.find(line => line.lineId === exception.lineId);
+    if (
+      !exception.sectionId.trim() ||
+      !exception.lineId.trim() ||
+      !exception.value.trim() ||
+      !exception.approvedBy.trim() ||
+      !exception.reference.trim() ||
+      !renderedLine
+    ) {
+      fail(
+        'stale-approved-exception',
+        exception.sectionId || undefined,
+        `Approved exception ${exception.reference || exception.lineId} does not resolve to a rendered line.`
+      );
+      continue;
+    }
+  }
+
+  for (const section of draft.sections) {
+    const rendered = renderedSections.get(section.sectionId);
+    if (!rendered) {
+      fail(
+        'missing-rendered-section',
+        section.sectionId,
+        `Reviewed section ${section.sectionId} produced no rendered copy.`
+      );
+      continue;
+    }
+
+    const expected = visibleLines(section);
+    const expectedIds = new Set(expected.map(line => line.lineId));
+    const renderedById = new Map<string, RenderedCopyLine>();
+    for (const line of rendered.lines) {
+      if (renderedById.has(line.lineId)) {
+        fail(
+          'duplicate-rendered-line',
+          section.sectionId,
+          `Rendered line ${line.lineId} appears more than once.`
+        );
+      }
+      renderedById.set(line.lineId, line);
+    }
+
+    const exceptionFor = (lineId: string, renderedValue: string): boolean =>
+      exceptions.some(
+        exception =>
+          exception.sectionId === section.sectionId &&
+          exception.lineId === lineId &&
+          normalizeText(exception.value) === normalizeText(renderedValue)
+      );
+
+    for (const line of rendered.lines) {
+      if (
+        !expectedIds.has(line.lineId) &&
+        !exceptionFor(line.lineId, line.value)
+      ) {
+        fail(
+          'unbound-rendered-line',
+          section.sectionId,
+          `Rendered ${line.role} line ${line.lineId} has no reviewed draft line: "${line.value}".`
+        );
+      }
+    }
+
+    for (const line of expected) {
+      const renderedLine = renderedById.get(line.lineId);
+      if (!renderedLine) {
+        fail(
+          'missing-rendered-line',
+          section.sectionId,
+          `Reviewed ${line.role} line ${line.lineId} is not rendered: "${line.value}".`
+        );
+        continue;
+      }
+      if (renderedLine.role !== line.role) {
+        fail(
+          'rendered-line-role-mismatch',
+          section.sectionId,
+          `Rendered line ${line.lineId} uses role ${renderedLine.role} but was reviewed as ${line.role}.`
+        );
+      }
+      if (
+        normalizeText(renderedLine.value) !== normalizeText(line.value) &&
+        !exceptionFor(line.lineId, renderedLine.value)
+      ) {
+        fail(
+          'rendered-text-mismatch',
+          section.sectionId,
+          `Rendered ${line.role} differs from the reviewed words: "${renderedLine.value}" vs "${line.value}".`
+        );
+      }
+    }
+
+    const sectionBrief = briefSections.get(section.sectionId);
+    const corpus = claimCorpus(brief, sectionBrief);
+    const corpusWords = corpus.words;
+    const corpusText = corpus.text;
+
+    for (const line of rendered.lines) {
+      for (const token of renderedQuantityTokens(line.value)) {
+        if (!corpusWords.has(token)) {
+          fail(
+            'unsupported-rendered-claim',
+            section.sectionId,
+            `Rendered ${line.role} asserts an unsupported quantity "${token}" in "${line.value}".`
+          );
+        }
+      }
+      const normalizedLine = ` ${normalizeText(line.value)} `;
+      for (const term of RENDERED_AVAILABILITY_TERMS) {
+        if (
+          normalizedLine.includes(` ${normalizeText(term)} `) &&
+          !corpusText.includes(` ${normalizeText(term)} `)
+        ) {
+          fail(
+            'unsupported-rendered-claim',
+            section.sectionId,
+            `Rendered ${line.role} asserts unsupported availability "${term}" in "${line.value}".`
+          );
+        }
+      }
+    }
+
+    const bindings = section.lineBindings ?? [];
+    const boundActionLineIds = new Set(
+      bindings
+        .filter(
+          binding => binding.actionId && actionsById.has(binding.actionId)
+        )
+        .map(binding => binding.lineId)
+    );
+    for (const actionId of sectionBrief?.requiredActionIds ?? []) {
+      const bound = bindings.filter(binding => binding.actionId === actionId);
+      if (!actionsById.has(actionId)) {
+        fail(
+          'unknown-required-action',
+          section.sectionId,
+          `Section requires unknown action ${actionId}.`
+        );
+      } else if (bound.length === 0) {
+        fail(
+          'missing-recovery-action',
+          section.sectionId,
+          `Required action ${actionId} is not bound to any reviewed line.`
+        );
+      } else {
+        for (const binding of bound) {
+          const renderedLine = renderedById.get(binding.lineId);
+          if (!renderedLine || !renderedLine.value.trim()) {
+            fail(
+              'missing-recovery-action',
+              section.sectionId,
+              `Required action ${actionId} is not rendered; there is no concrete recovery path.`
+            );
+          }
+        }
+      }
+    }
+    if (
+      boundActionLineIds.size === 0 &&
+      rendered.lines.some(line => RENDERED_ERROR_PATTERN.test(line.value))
+    ) {
+      fail(
+        'missing-recovery-action',
+        section.sectionId,
+        'An error-facing section renders no concrete action for the reader.'
+      );
+    }
+  }
+  return issues;
+}
+
+/**
+ * Certification record: the exact route/state, source version, reviewed-text
+ * digest, and rendered-text digest this surface was verified at. Any change
+ * to the claim registry, reviewed candidate, rendered output, or deployed
+ * source version makes the receipt stale.
+ */
+export interface RenderedCopyCertification {
+  readonly schemaVersion: typeof MARKETING_COPY_SPEC_VERSION;
+  readonly kind: 'rendered-marketing-copy';
+  readonly surfaceId: string;
+  readonly pageId: string;
+  readonly route: string;
+  readonly state: string;
+  readonly sourceVersion: string;
+  readonly reviewDigest: string;
+  readonly renderedDigest: string;
+  readonly certifiedAt: string;
+  readonly reviews: readonly MarketingCopyPanelReview[];
+  readonly exceptions: readonly RenderedCopyApprovedException[];
+}
+
+export interface RenderedCopyCertificationInput {
+  readonly brief: MarketingCopyPageBrief;
+  readonly draft: MarketingCopyPageDraft;
+  readonly surface: RenderedCopySurface;
+  readonly reviews?: readonly MarketingCopyPanelReview[];
+  readonly exceptions?: readonly RenderedCopyApprovedException[];
+  readonly certifiedAt: string;
+}
+
+/**
+ * Runs the full chain — structural audit, delta semantic audit, the
+ * independent panel when receipts are supplied, and the rendered-text audit —
+ * then issues a certification bound to the exact rendered words. Throws when
+ * any layer reports an issue; a registry-only pass cannot certify.
+ */
+export function createRenderedCopyCertification(
+  input: RenderedCopyCertificationInput
+): RenderedCopyCertification {
+  const issues = [
+    ...auditMarketingCopyPage(input.brief, input.draft),
+    ...auditMarketingCopySemantics(input.brief, input.draft, {
+      enforcement: 'delta',
+    }).issues,
+    ...(input.reviews
+      ? auditMarketingCopyPanel(input.reviews, input.brief, input.draft)
+      : []),
+    ...auditRenderedMarketingCopy(input.brief, input.draft, input.surface, {
+      exceptions: input.exceptions,
+    }),
+  ];
+  if (issues.length > 0) {
+    throw new Error(
+      `Rendered copy cannot be certified:\n${issues.map(issue => `- ${issue.code}: ${issue.message}`).join('\n')}`
+    );
+  }
+  const certifiedAt = new Date(input.certifiedAt);
+  if (
+    Number.isNaN(certifiedAt.getTime()) ||
+    certifiedAt.toISOString() !== input.certifiedAt
+  ) {
+    throw new Error('Rendered copy certification requires a valid timestamp.');
+  }
+  return {
+    schemaVersion: MARKETING_COPY_SPEC_VERSION,
+    kind: 'rendered-marketing-copy',
+    surfaceId: input.surface.surfaceId,
+    pageId: input.surface.pageId,
+    route: input.surface.route,
+    state: input.surface.state,
+    sourceVersion: input.surface.sourceVersion,
+    reviewDigest: createMarketingCopyReviewDigest(input.brief, input.draft),
+    renderedDigest: createRenderedCopyDigest(input.surface),
+    certifiedAt: input.certifiedAt,
+    reviews: input.reviews ?? [],
+    exceptions: input.exceptions ?? [],
+  };
+}
+
+/**
+ * Re-checks a stored certification against the current brief, draft, and
+ * rendered surface. Changed reviewed words, changed rendered output, or a
+ * different deployed source version each invalidate the receipt.
+ */
+export function auditRenderedCopyCertification(
+  certification: RenderedCopyCertification,
+  input: {
+    readonly brief: MarketingCopyPageBrief;
+    readonly draft: MarketingCopyPageDraft;
+    readonly surface: RenderedCopySurface;
+  }
+): readonly MarketingCopyAuditIssue[] {
+  const issues: MarketingCopyAuditIssue[] = [];
+  const { brief, draft, surface } = input;
+  const fail = (code: string, message: string) =>
+    issues.push(issue(code, undefined, message));
+  if (
+    certification.schemaVersion !== MARKETING_COPY_SPEC_VERSION ||
+    certification.kind !== 'rendered-marketing-copy'
+  ) {
+    fail(
+      'unsupported-certification',
+      'The rendered copy certification has an unknown schema or kind.'
+    );
+  }
+  if (
+    certification.surfaceId !== surface.surfaceId ||
+    certification.pageId !== brief.pageId ||
+    certification.pageId !== draft.pageId ||
+    certification.route !== surface.route ||
+    certification.state !== surface.state
+  ) {
+    fail(
+      'certification-target-mismatch',
+      'The certification does not identify this surface, route, and state.'
+    );
+  }
+  if (certification.sourceVersion !== surface.sourceVersion) {
+    fail(
+      'stale-source-version',
+      `Certified at source ${certification.sourceVersion} but the surface reports ${surface.sourceVersion}.`
+    );
+  }
+  if (
+    certification.reviewDigest !== createMarketingCopyReviewDigest(brief, draft)
+  ) {
+    fail(
+      'stale-review-digest',
+      'The reviewed brief or candidate changed after certification.'
+    );
+  }
+  if (certification.renderedDigest !== createRenderedCopyDigest(surface)) {
+    fail(
+      'stale-rendered-copy',
+      'The rendered text changed after certification.'
+    );
+  }
+  return issues;
 }

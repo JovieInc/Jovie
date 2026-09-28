@@ -79,6 +79,17 @@ export type PenParitySource =
       readonly exportRef: string;
       readonly utility: string;
     }
+  /**
+   * Rendered height of a flex container holding one child: the larger of
+   * the container's `min-h` and the child's `h` plus the container's
+   * vertical padding (`py`). Both refs resolve like `class-export`.
+   */
+  | {
+      readonly kind: 'rendered-height';
+      readonly file: string;
+      readonly containerRef: string;
+      readonly childRef: string;
+    }
   /** A numeric `export const NAME = <n>` in `file`. */
   | {
       readonly kind: 'numeric-export';
@@ -172,7 +183,7 @@ export const APP_SCREEN_PEN_PARITY_CHECKS: readonly PenParityCheck[] = [
     property: 'radius',
     source: CSS('--app-shell-radius'),
   },
-  // Shell children that the frame instances.
+  // Shell masters AppShellFrame composes in code (see APP_SCREEN_PEN_COMPOSED_MASTERS).
   {
     id: 'app-header.height',
     masterId: 'xLyVs',
@@ -241,7 +252,12 @@ export const APP_SCREEN_PEN_PARITY_CHECKS: readonly PenParityCheck[] = [
     masterId: 'ftsrB',
     slotId: null,
     property: 'height',
-    source: pageToolbar('PAGE_TOOLBAR_CONTAINER_CLASS', 'min-h'),
+    source: {
+      kind: 'rendered-height',
+      file: PAGE_TOOLBAR,
+      containerRef: 'PAGE_TOOLBAR_CONTAINER_CLASS',
+      childRef: 'PAGE_TOOLBAR_TAB_BUTTON_CLASS',
+    },
   },
   {
     id: 'page-toolbar.table-shell-height',
@@ -373,6 +389,15 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
   },
   {
     decisionId: 'D3',
+    checkId: 'page-toolbar.height',
+    recordedOn: '2026-09-27',
+    penValue: 40,
+    sourceValue: 42,
+    summary:
+      'ftsrB is 40; a PageToolbar holding a 30px tab button (h-7.5) plus py-1.5 renders at 42 despite min-h-10.',
+  },
+  {
+    decisionId: 'D3',
     checkId: 'page-toolbar.table-shell-height',
     recordedOn: '2026-09-27',
     penValue: 40,
@@ -407,6 +432,30 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
   },
 ];
 
+/**
+ * Masters whose pending decisions also block a bound root's reference
+ * eligibility, because the root's source component composes them in code
+ * (AppShellFrame hosts the app header and sidebar; EntitySidebarShell
+ * renders the entity header). This is a code-composition map, not a claim
+ * about Pen instancing.
+ */
+export const APP_SCREEN_PEN_COMPOSED_MASTERS: Readonly<
+  Record<string, readonly string[]>
+> = {
+  JwsdW: ['xLyVs', 'VgcZb'],
+  RosMb: ['odpZ8'],
+};
+
+/** The bound root plus every master it composes. */
+export function penRootEligibilityScope(
+  rootId: string,
+  composed: Readonly<
+    Record<string, readonly string[]>
+  > = APP_SCREEN_PEN_COMPOSED_MASTERS
+): ReadonlySet<string> {
+  return new Set([rootId, ...(composed[rootId] ?? [])]);
+}
+
 export interface PenReferenceHold {
   readonly decisionId: `D${number}`;
   /** Pen master whose reference eligibility waits on the decision. */
@@ -428,6 +477,7 @@ export const APP_SCREEN_PEN_REFERENCE_HOLDS: readonly PenReferenceHold[] = [
       'One entity header: Pen odpZ8 vs five code header variants. RosMb instances odpZ8, so its anatomy waits on that owner decision.',
   },
 ];
+
 /** Reads one property of a master or slot from the committed export. */
 export function penParityValue(
   exported: AppScreenPenGeometryExport,
