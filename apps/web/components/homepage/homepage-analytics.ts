@@ -3,6 +3,8 @@ export function trackHomepageEvent(
   properties?: Record<string, unknown>
 ) {
   void import('../../lib/analytics')
-    .then(({ track }) => track(event, properties))
+    .then(({ track }) => {
+      track(event, properties);
+    })
     .catch(() => {});
 }

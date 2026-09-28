@@ -210,9 +210,7 @@ export function PaySection({
     return (
       <div className={cn('w-full max-w-sm', className)}>
         <div className={CARD_CLASSES}>
-          <h3 className='text-mid font-semibold tracking-tight text-center text-primary-token mb-1'>
-            Pay {handle}
-          </h3>
+          {/* Hosts (drawer title, intent page) already name the recipient. */}
           <p className='text-center text-xs text-secondary-token mb-5'>
             Choose an amount and a payment method
           </p>

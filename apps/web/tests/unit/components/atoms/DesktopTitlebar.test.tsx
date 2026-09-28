@@ -187,6 +187,45 @@ describe('DesktopTitlebar', () => {
     );
   });
 
+  it('renders release identity as secondary diagnostics without a badge chip', () => {
+    renderTitlebar();
+
+    const identity = screen.getByTestId('electron-release-identity');
+    expect(identity).toHaveClass(
+      'pointer-events-none',
+      'max-w-64',
+      'truncate',
+      'text-2xs',
+      'text-tertiary-token'
+    );
+    expect(identity.className).not.toContain('hidden');
+    expect(identity.className).not.toContain('lg:inline-block');
+    expect(identity.className).not.toContain('rounded-md');
+    expect(identity.className).not.toContain('bg-surface-1');
+  });
+
+  it('merges a className override onto the release identity', () => {
+    render(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <DesktopReleaseIdentity className='max-w-40' />
+      </SidebarContext.Provider>
+    );
+
+    const identity = screen.getByTestId('electron-release-identity');
+    expect(identity).toHaveClass('max-w-40', 'text-tertiary-token');
+    expect(identity.className).not.toContain('max-w-64');
+  });
+
   it.each([
     ['production', 'Stable'],
     ['staging', 'Canary'],
