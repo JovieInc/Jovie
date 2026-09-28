@@ -39,6 +39,7 @@ export type AdminWorkspaceId =
   | 'platform_connections'
   | 'activity'
   | 'investors'
+  | 'feature_registry'
   | 'screenshots'
   | 'costs'
   | 'revenue_lift'
@@ -67,6 +68,7 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
   'investors',
+  'feature_registry',
   'screenshots',
   'share_studio',
   'costs',
@@ -141,6 +143,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Investors',
     href: APP_ROUTES.ADMIN_INVESTORS,
     description: 'Fundraising links and investor pipeline utility',
+    section: 'utilities',
+  },
+  {
+    id: 'feature_registry',
+    label: 'Feature Registry',
+    href: APP_ROUTES.ADMIN_FEATURE_REGISTRY,
+    description: 'Founder review packets for canonical product capabilities',
     section: 'utilities',
   },
   {
