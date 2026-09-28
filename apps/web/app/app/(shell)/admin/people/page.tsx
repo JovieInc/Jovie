@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { AdminPeopleRightPanelProvider } from '@/components/features/admin/AdminPeopleRightPanelProvider';
+import { AdminAssetsPageWrapper } from '@/components/features/admin/admin-assets-table';
 import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
@@ -18,6 +19,11 @@ import {
   isAdminPeopleView,
 } from '@/constants/admin-navigation';
 import { getCanonicalContacts } from '@/lib/admin/contacts';
+import {
+  type AdminAssetSort,
+  adminAssetSortFields,
+  getAdminAssets,
+} from '@/lib/admin/assets';
 import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getAdminReleases } from '@/lib/admin/releases';
@@ -75,6 +81,12 @@ function resolveReleaseSort(sort: AdminPeopleSort): AdminReleasesSort {
   return adminReleasesSortFields.includes(sort as AdminReleasesSort)
     ? (sort as AdminReleasesSort)
     : 'release_date_desc';
+}
+
+function resolveAssetSort(sort: AdminPeopleSort): AdminAssetSort {
+  return adminAssetSortFields.includes(sort as AdminAssetSort)
+    ? (sort as AdminAssetSort)
+    : 'created_desc';
 }
 
 async function renderPeopleView(
@@ -218,6 +230,35 @@ async function renderPeopleView(
         />
       );
     }
+    case 'assets': {
+      const sort = resolveAssetSort(params.sort);
+      const {
+        assets,
+        pageSize: resolvedPageSize,
+        total,
+      } = await getAdminAssets({
+        page,
+        pageSize,
+        search,
+        sort,
+        type: params.type,
+        issues: params.issues,
+        verified: params.verified,
+      });
+
+      return (
+        <AdminAssetsPageWrapper
+          assets={assets}
+          pageSize={resolvedPageSize}
+          total={total}
+          search={search}
+          sort={sort}
+          type={params.type}
+          issues={params.issues}
+          verified={params.verified}
+        />
+      );
+    }
     case 'feedback':
     default: {
       const { items, error } = await getAdminFeedbackItemsResult(200);
@@ -258,6 +299,7 @@ export default async function AdminPeoplePage({
         param: 'view',
         value: view,
         options: peopleTabs,
+        clearOnPrimaryChange: ['type', 'issues', 'verified'],
       }}
       testId='admin-people-page'
       viewTestId={`admin-people-view-${view}`}
