@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import {
   type WorkspaceTabOption,
   WorkspaceTabsSurface,
@@ -48,9 +49,9 @@ export interface AdminPageProps<
  * Canonical shell for every admin page.
  *
  * Provides:
- * - Description + actions only when needed. Route title lives in the shell
- *   breadcrumb (`DashboardHeader`) — never re-rendered here (avoids the
- *   double-"Ops" regression class).
+ * - Route title lives in the shell breadcrumb (`DashboardHeader`) and actions
+ *   live in the page toolbar. Descriptions remain metadata unless a page has
+ *   a specific disclosure need.
  * - Optional `hero` slot for primary metrics.
  * - Optional `tabs` slot that delegates to `WorkspaceTabsSurface`. The parent
  *   owns the route title in the shell breadcrumb, so the tabs surface renders
@@ -72,9 +73,6 @@ export function AdminPage<
   className,
 }: Readonly<AdminPageProps<TPrimary, TSecondary>>) {
   const tabsHeaderless = Boolean(tabs);
-  // Breadcrumb owns the page title; only surface description + actions here.
-  const showMetaHeader = Boolean(description || actions);
-
   return (
     <PageShell frame='none' contentPadding='none'>
       <PageContent noPadding>
@@ -85,24 +83,12 @@ export function AdminPage<
           )}
           data-testid={testId}
         >
-          {showMetaHeader ? (
-            <div
-              className='flex min-w-0 items-start justify-between gap-2'
-              data-testid='admin-page-meta'
-            >
-              {description ? (
-                <p className='min-w-0 flex-1 text-2xs leading-[15px] text-tertiary-token'>
-                  {description}
-                </p>
-              ) : (
-                <span className='min-w-0 flex-1' aria-hidden='true' />
-              )}
-              {actions ? (
-                <div className='ml-auto flex shrink-0 items-center justify-end gap-1'>
-                  {actions}
-                </div>
-              ) : null}
-            </div>
+          {actions ? (
+            <PageToolbar
+              start={null}
+              end={actions}
+              data-testid='admin-page-toolbar'
+            />
           ) : null}
 
           {hero ? <div data-testid='admin-page-hero'>{hero}</div> : null}

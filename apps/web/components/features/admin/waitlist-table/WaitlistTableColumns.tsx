@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import { useMemo } from 'react';
+import { SpotifyAccountIdentity } from '@/components/features/admin/SpotifyAccountIdentity';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import {
   PLATFORM_LABELS,
@@ -108,14 +109,10 @@ export function useWaitlistColumns({
         header: 'Spotify',
         cell: entry =>
           entry.spotifyUrlNormalized ? (
-            <a
+            <SpotifyAccountIdentity
+              displayName={entry.spotifyArtistName}
               href={entry.spotifyUrlNormalized}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-accent hover:underline text-xs line-clamp-1 overflow-hidden text-ellipsis max-w-55 block'
-            >
-              {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
-            </a>
+            />
           ) : (
             <span className='text-tertiary-token'>—</span>
           ),

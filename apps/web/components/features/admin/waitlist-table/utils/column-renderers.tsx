@@ -6,6 +6,7 @@ import type { RefObject } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { SpotifyAccountIdentity } from '@/components/features/admin/SpotifyAccountIdentity';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
@@ -111,14 +112,10 @@ export function renderSpotifyCell(entry: WaitlistEntryRow) {
     return <EmptyCell />;
   }
 
-  const displayName = entry.spotifyArtistName || 'Spotify';
-
   return (
-    <PlatformPill
-      platformIcon='spotify'
-      platformName='Spotify'
-      primaryText={displayName}
-      onClick={() => globalThis.open(spotifyUrl, '_blank')}
+    <SpotifyAccountIdentity
+      displayName={entry.spotifyArtistName}
+      href={spotifyUrl}
     />
   );
 }

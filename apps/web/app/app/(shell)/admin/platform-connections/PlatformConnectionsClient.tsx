@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
+import { SpotifyAccountIdentity } from '@/components/features/admin/SpotifyAccountIdentity';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { useUserSafe } from '@/hooks/useClerkSafe';
@@ -270,11 +271,16 @@ function SpotifyTabContent({
       <div className='grid gap-3 px-4 py-4 text-app sm:grid-cols-2'>
         <div>
           <p className='font-medium text-primary-token'>Active Publisher</p>
-          <p className='mt-1 text-secondary-token'>
-            {spotifyStatus.accountLabel ??
-              spotifyStatus.clerkUserId ??
-              'Not set'}
-          </p>
+          <div className='mt-1'>
+            {spotifyStatus.accountLabel || spotifyStatus.clerkUserId ? (
+              <SpotifyAccountIdentity
+                displayName={spotifyStatus.accountLabel}
+                accountId={spotifyStatus.clerkUserId}
+              />
+            ) : (
+              <span className='text-secondary-token'>Not set</span>
+            )}
+          </div>
           <p className='mt-1 text-xs text-tertiary-token'>
             {spotifyStatus.updatedAt
               ? `Updated ${formatDate(spotifyStatus.updatedAt)}`
@@ -285,11 +291,15 @@ function SpotifyTabContent({
           <p className='font-medium text-primary-token'>
             Current Admin Account
           </p>
-          <p className='mt-1 text-secondary-token'>
-            {currentUser.hasSpotify
-              ? (currentUser.label ?? 'Spotify connected')
-              : 'Spotify is not connected'}
-          </p>
+          <div className='mt-1'>
+            {currentUser.hasSpotify ? (
+              <SpotifyAccountIdentity displayName={currentUser.label} />
+            ) : (
+              <span className='text-secondary-token'>
+                Spotify is not connected
+              </span>
+            )}
+          </div>
           <MissingScopesList scopes={currentUser.missingScopes} />
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { Mail } from 'lucide-react';
+import { SpotifyAccountIdentity } from '@/components/features/admin/SpotifyAccountIdentity';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DateCell } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
@@ -97,17 +98,10 @@ export function WaitlistKanbanCard({
         )}
 
         {entry.spotifyUrlNormalized && (
-          <div>
-            <span className='text-tertiary-token'>Spotify: </span>
-            <a
-              href={entry.spotifyUrlNormalized}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-(--linear-accent) hover:underline'
-            >
-              Profile
-            </a>
-          </div>
+          <SpotifyAccountIdentity
+            displayName={entry.spotifyArtistName}
+            href={entry.spotifyUrlNormalized}
+          />
         )}
 
         <div className='text-tertiary-token'>

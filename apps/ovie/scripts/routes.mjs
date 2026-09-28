@@ -151,18 +151,19 @@ export async function materialize(
   const inventory = [];
   for (const [from, to] of ROUTE_ROOTS) {
     for (const entry of await entries(path.join(sourceRoot, from))) {
+      const relativeEntry = path.relative(path.join(sourceRoot, from), entry);
       if (
         from === 'app/(shell)/admin' &&
         path.basename(entry) === 'layout.tsx' &&
         path.dirname(entry) === path.join(sourceRoot, from)
       )
         continue;
-      const target = path.join(
-        destination,
-        'app',
-        to,
-        path.relative(path.join(sourceRoot, from), entry)
-      );
+      // Wiki is projected through its shell-owned admin adapters. A second
+      // direct /hud/wiki tree would bypass the one Ovie app shell.
+      if (from === 'hud' && relativeEntry.startsWith(`wiki${path.sep}`)) {
+        continue;
+      }
+      const target = path.join(destination, 'app', to, relativeEntry);
       const modulePath = `@/app/${path.relative(sourceRoot, entry).replace(/\.tsx?$/, '')}`;
       await mkdir(path.dirname(target), { recursive: true });
       await writeFile(

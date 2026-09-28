@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
+import { SpotifyAccountIdentity } from '@/components/features/admin/SpotifyAccountIdentity';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
@@ -122,9 +123,16 @@ export function AdminIngestContent({ history }: AdminIngestPageClientProps) {
                     >
                       {config.label}
                     </span>
-                    <span className='col-span-2 min-w-0 truncate text-primary-token sm:col-auto sm:flex-1'>
-                      {row.handle ? `@${row.handle}` : (row.spotifyId ?? '--')}
-                    </span>
+                    <div className='col-span-2 min-w-0 sm:col-auto sm:flex-1'>
+                      {row.handle || row.spotifyId ? (
+                        <SpotifyAccountIdentity
+                          handle={row.handle}
+                          accountId={row.spotifyId}
+                        />
+                      ) : (
+                        <span className='text-tertiary-token'>--</span>
+                      )}
+                    </div>
                     {row.failureReason && (
                       <span
                         className='col-span-3 text-wrap break-words text-error sm:col-auto sm:max-w-50 sm:truncate'
