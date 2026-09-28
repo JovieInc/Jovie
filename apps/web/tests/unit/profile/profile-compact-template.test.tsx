@@ -639,6 +639,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await waitFor(() => {
+      expect(mockProfileInlineNotificationsCTA).toHaveBeenCalled();
+    });
+
     fireEvent.click(screen.getByRole('button', { name: 'Get Updates' }));
 
     await waitFor(() => {
