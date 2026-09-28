@@ -21,8 +21,8 @@ importers:
         specifier: 3.35.0
         version: 3.35.0(zod@4.6.5)
       eve:
-        specifier: 0.63.0
-        version: 0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4)
+        specifier: 0.66.1
+        version: 0.66.1(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4)
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -1865,14 +1865,15 @@ packages:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
 
-  eve@0.63.0:
-    resolution: {integrity: sha512-iDv0S4MXvZimaXNTJnyB2THumRQLWQSAgpMcZsGtMNquYQpSKB1+i8sxX4KJOHHCLd04lwD+06xnh+ja7rlZIw==}
+  eve@0.66.1:
+    resolution: {integrity: sha512-oOZo4ERpMwQbHxVtmhz224mHfN84TCRcC9sIhnCNliW+BVmWiEXjU8VRrlT5joiJA0cI3cedUC6yXl239qHh0Q==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.0.0
       ai: ^7.0.105
       braintrust: ^3.0.0
+      chat: ^4.41.0
       dd-trace: ^6.13.0
       just-bash: ^3.1.0
       microsandbox: ^0.5.0
@@ -1880,6 +1881,8 @@ packages:
       '@opentelemetry/api':
         optional: true
       braintrust:
+        optional: true
+      chat:
         optional: true
       dd-trace:
         optional: true
@@ -4865,7 +4868,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.63.0(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4):
+  eve@0.66.1(@opentelemetry/api@1.9.1)(ai@7.0.107(zod@4.6.5))(braintrust@3.35.0(zod@4.6.5))(just-bash@3.4.2)(microsandbox@0.7.4):
     dependencies:
       ai: 7.0.107(zod@4.6.5)
       nitro: 3.0.260903-beta
