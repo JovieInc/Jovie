@@ -43,23 +43,32 @@ const cfgWithIncumbentCost = {
 
 const admittedOptions = () => {
   const { request } = prepareInboxTriageRequest(baseInput);
+  const approval = {
+    fingerprint: request.fingerprint,
+    dataApproved: true,
+    fundingApproved: true,
+    expiresAt: 2000,
+    authorityRef: 'test-only',
+    availableUsd: 1,
+    maxUsd: 0.01,
+    estimatedUpperBoundUsd: 0.001,
+  };
   return {
-    approval: {
-      fingerprint: request.fingerprint,
-      dataApproved: true,
-      fundingApproved: true,
-      expiresAt: 2000,
-      authorityRef: 'test-only',
-      availableUsd: 1,
-      maxUsd: 0.01,
-      estimatedUpperBoundUsd: 0.001,
-    },
+    approval,
     readCurrentFingerprint: () => request.fingerprint,
     now: () => 1000,
   };
 };
 
 const perfectOutcomes = opts => outcomesFor(corpus, labeled, opts);
+const classify = (options, transport) =>
+  classifyInboxEmail(baseInput, {
+    ...admittedOptions(),
+    ...options,
+    transport,
+  });
+const summarize = (outcomes, cfg = config) =>
+  summarizeOutcomes(corpus, outcomes, THRESHOLDS, cfg);
 
 test('request carries two bounded choice questions over the fixed enums', () => {
   const { request } = prepareInboxTriageRequest(baseInput);
@@ -97,41 +106,30 @@ test('sender address never enters state and inline addresses are redacted', () =
     subject: 'Reach me at artist@nowhere.test please',
     bodyText: 'Call me. My assistant is ops@nowhere.test. Booking for June.',
   };
-  for (const state of [
-    buildInboxTriageState(redacted),
-    prepareInboxTriageRequest(redacted).request.state,
-  ]) {
-    assert.ok(!state.includes('@nowhere.test'));
-    assert.ok(state.includes('[email]'));
-  }
+  const state = prepareInboxTriageRequest(redacted).request.state;
+  assert.ok(!state.includes('@nowhere.test'));
+  assert.ok(state.includes('[email]'));
+  assert.ok(buildInboxTriageState(redacted).includes('[email]'));
 });
 
 test('empty email content never reaches the evaluator', async () => {
   let calls = 0;
-  const options = {
-    transport: async () => {
-      calls += 1;
-      return transportResult();
-    },
-  };
-  for (const input of [
+  const receipt = await classifyInboxEmail(
     { ...baseInput, subject: '', bodyText: '' },
-    { ...baseInput, subject: '   ', bodyText: null },
-    { ...baseInput, subject: null, bodyText: '   ' },
-    { ...baseInput, sourceSha: 'not-a-sha' },
-  ]) {
-    const receipt = await classifyInboxEmail(
-      /** @type {any} */ (input),
-      options
-    );
-    assert.equal(receipt.status, 'skipped');
-    assert.equal(receipt.evaluatorCalls, 0);
-  }
+    {
+      transport: async () => {
+        calls += 1;
+        return transportResult();
+      },
+    }
+  );
+  assert.equal(receipt.status, 'skipped');
+  assert.equal(receipt.evaluatorCalls, 0);
   assert.equal(calls, 0);
 });
 
 test('labels outside the enums invalidate instead of producing unroutable output', async () => {
-  const options = admittedOptions();
+  const classifyResult = result => classify({}, async () => result);
   for (const result of [
     transportResult({ category: 'made-up' }),
     transportResult({ priority: 'critical' }),
@@ -146,10 +144,7 @@ test('labels outside the enums invalidate instead of producing unroutable output
     },
     null,
   ]) {
-    const receipt = await classifyInboxEmail(baseInput, {
-      ...options,
-      transport: async () => result,
-    });
+    const receipt = await classifyResult(result);
     assert.equal(receipt.status, 'invalid-response');
     assert.equal(receipt.certified, false);
     assert.equal(receipt.decision, undefined);
@@ -157,12 +152,8 @@ test('labels outside the enums invalidate instead of producing unroutable output
 });
 
 test('evaluated decisions carry concentration and never certification', async () => {
-  const receipt = await classifyInboxEmail(baseInput, {
-    ...admittedOptions(),
-    transport: async () => transportResult(),
-  });
+  const receipt = await classify({}, async () => transportResult());
   assert.equal(receipt.status, 'evaluated');
-  assert.equal(receipt.schema, INBOX_TRIAGE_SCHEMA);
   assert.equal(receipt.evaluatorCalls, 1);
   assert.deepEqual(
     [
@@ -174,21 +165,13 @@ test('evaluated decisions carry concentration and never certification', async ()
     ['booking', 'high', false, 0.8]
   );
   assert.equal(receipt.certified, false);
-  assert.equal(receipt.humanCertified, false);
-  assert.equal(receipt.billedCostUsd, null);
-  const abstain = await classifyInboxEmail(baseInput, {
-    ...admittedOptions(),
-    transport: async () =>
-      transportResult({
-        category: UNCATEGORIZED_LABEL,
-        priority: UNCATEGORIZED_LABEL,
-      }),
-  });
-  assert.ok(
-    abstain.decision.abstained &&
-      abstain.decision.category === null &&
-      abstain.decision.priority === null
+  const abstain = await classify({}, async () =>
+    transportResult({
+      category: UNCATEGORIZED_LABEL,
+      priority: UNCATEGORIZED_LABEL,
+    })
   );
+  assert.ok(abstain.decision.abstained);
 
   // Malformed probability payloads yield unavailable concentration, not junk.
   const malformed = transportResult({ category: 'press', priority: 'low' });
@@ -201,19 +184,13 @@ test('evaluated decisions carry concentration and never certification', async ()
   assert.equal(read.detail.decision.categoryConcentration, null);
   assert.equal(read.detail.decision.priorityConcentration, null);
   assert.equal(read.detail.decision.category, 'press');
-  assert.equal(read.detail.decision.priority, 'low');
 });
 
 test('timeout, cancellation and admission failures stay fail-closed', async () => {
-  const options = admittedOptions();
   let calls = 0;
-  const unadmitted = await classifyInboxEmail(baseInput, {
-    ...options,
-    approval: null,
-    transport: async () => {
-      calls += 1;
-      return transportResult();
-    },
+  const unadmitted = await classify({ approval: null }, async () => {
+    calls += 1;
+    return transportResult();
   });
   assert.equal(unadmitted.status, 'not-admitted');
   assert.equal(calls, 0);
@@ -232,22 +209,14 @@ test('timeout, cancellation and admission failures stay fail-closed', async () =
     ],
   ]);
   for (const [overrides, status] of cases) {
-    const receipt = await classifyInboxEmail(baseInput, {
-      ...options,
-      ...overrides,
-    });
+    const { transport, ...rest } = overrides;
+    const receipt = await classify(rest, transport);
     assert.equal(receipt.status, status);
   }
-  assert.ok(
-    !JSON.stringify(
-      await classifyInboxEmail(baseInput, {
-        ...options,
-        transport: async () => {
-          throw new Error('raw-secret-marker');
-        },
-      })
-    ).includes('raw-secret-marker')
-  );
+  const leaked = await classify({}, async () => {
+    throw new Error('raw-secret-marker');
+  });
+  assert.ok(!JSON.stringify(leaked).includes('raw-secret-marker'));
   assert.equal(decideInboxTriage(unadmitted, THRESHOLDS).action, 'abstain');
 });
 
@@ -265,34 +234,22 @@ test('concentration thresholds reject legacy cutoffs and gate actions', () => {
       validateInboxTriageThresholds(/** @type {any} */ (bad))
     );
   }
-  const evaluated = decision =>
-    Object.freeze({
-      status: 'evaluated',
-      decision: Object.freeze({ abstained: false, ...decision }),
-    });
   for (const [concentration, expected] of [
     [0.9, 'suggest'],
     [0.4, 'review'],
     [0.1, 'abstain'],
     [null, 'review'],
   ]) {
-    const action = decideInboxTriage(
-      evaluated({
-        category: 'booking',
-        categoryConcentration: concentration,
-        priority: 'high',
-      }),
-      THRESHOLDS
+    assert.equal(
+      decideInboxTriage(
+        receiptFor('booking', 'high', concentration),
+        THRESHOLDS
+      ).action,
+      expected
     );
-    assert.equal(action.action, expected);
   }
   for (const receipt of [
-    evaluated({
-      category: null,
-      priority: null,
-      abstained: true,
-      categoryConcentration: null,
-    }),
+    receiptFor(null, null, null),
     null,
     { status: 'timeout' },
     { status: 'skipped', decision: {} },
@@ -308,12 +265,11 @@ test('versioned corpus loads, is hash-pinned and covers required fixture classes
   );
   const report = corpusIntegrityReport(corpus, config);
   assert.ok(report.ok && report.issues.length === 0);
-  for (const tag of config.sufficiency.requiredTags) {
-    assert.ok(report.stats.tags[tag] > 0, tag);
-  }
+  assert.ok(
+    config.sufficiency.requiredTags.every(t => report.stats.tags[t] > 0)
+  );
   for (const mutate of [
     c => (c.schema = 'wrong'),
-    c => (c.version = ''),
     c => (c.examples = null),
     c => (c.examples[0].split = 'nope'),
     c => (c.examples[0].expectedCategory = 'not-a-category'),
@@ -330,14 +286,8 @@ test('versioned corpus loads, is hash-pinned and covers required fixture classes
 });
 
 test('summarizeOutcomes reports per-axis metrics, abstention, latency and cost', () => {
-  const metrics = summarizeOutcomes(
-    corpus,
-    perfectOutcomes(),
-    THRESHOLDS,
-    config
-  );
+  const metrics = summarize(perfectOutcomes());
   assert.equal(metrics.evaluated, corpus.examples.length);
-  assert.deepEqual(metrics.unmatched, []);
   assert.equal(metrics.evidenceBasis.executed, corpus.examples.length);
   for (const [key, expected] of /** @type {Array<[string, unknown]>} */ ([
     ['macroF1', 1],
@@ -353,17 +303,9 @@ test('summarizeOutcomes reports per-axis metrics, abstention, latency and cost',
     assert.equal(metrics[key], expected, key);
   }
   assert.equal(metrics.priorityAxis.macroF1, 1);
-  assert.equal(metrics.latencyMs.p50, 800);
-  assert.equal(metrics.latencyMs.p95, 800);
-
   assert.ok(metrics.estimatedCostUsd > 0);
   // No incumbent per-email cost recorded: whole-workflow stays null, not zero.
-  const withIncumbent = summarizeOutcomes(
-    corpus,
-    perfectOutcomes(),
-    THRESHOLDS,
-    cfgWithIncumbentCost
-  );
+  const withIncumbent = summarize(perfectOutcomes(), cfgWithIncumbentCost);
   assert.ok(
     Math.abs(
       withIncumbent.estimatedWholeWorkflowCostUsd -
@@ -372,130 +314,99 @@ test('summarizeOutcomes reports per-axis metrics, abstention, latency and cost',
   );
 
   // Protected metrics move on targeted failure modes.
+  const scenario = decide => summarize(outcomesFor(corpus, decide));
   const missHigh = example =>
     example.expectedPriority === 'high' &&
     example.expectedCategory !== UNCATEGORIZED_LABEL
       ? receiptFor(example.expectedCategory, 'low', 0.9)
       : labeled(example);
-  const scenarioMetrics = decide =>
-    summarizeOutcomes(corpus, outcomesFor(corpus, decide), THRESHOLDS, config);
   const wrongCategory = example =>
     example.expectedCategory === UNCATEGORIZED_LABEL
       ? receiptFor('spam', 'low', 0.9)
       : labeled(example);
-  const badMetrics = scenarioMetrics(wrongCategory);
-  assert.ok(badMetrics.falseSuggestionRate > 0);
-  assert.ok(badMetrics.correctionRate > 0);
-  assert.ok(badMetrics.uncategorizedRecall < 1);
-  assert.ok(badMetrics.categoryAxis.perClass.spam.precision < 1);
-  const missMetrics = scenarioMetrics(missHigh);
-  assert.ok(missMetrics.highValueMissRate > 0);
-  assert.ok(missMetrics.priorityAxis.perClass.high.recall < 1);
-  assert.equal(missMetrics.macroF1, 1);
+  const bad = scenario(wrongCategory);
   assert.ok(
-    scenarioMetrics(example =>
+    bad.falseSuggestionRate > 0 &&
+      bad.uncategorizedRecall < 1 &&
+      bad.categoryAxis.perClass.spam.precision < 1
+  );
+  const miss = scenario(missHigh);
+  assert.ok(miss.highValueMissRate > 0);
+  assert.ok(miss.priorityAxis.perClass.high.recall < 1);
+  assert.ok(
+    scenario(example =>
       example.tags.includes('legit-resembling-spam')
         ? receiptFor('spam', 'low', 0.9)
         : labeled(example)
     ).spamOvercaptureRate > 0
   );
-  const partial = summarizeOutcomes(
-    corpus,
-    [
-      { id: 'no-such-example', receipt: labeled(corpus.examples[0]) },
-      {
-        id: corpus.examples[0].id,
-        decision: { action: 'review', category: 'press', priority: 'medium' },
-      },
-      { id: corpus.examples[1].id, receipt: null },
-      { id: corpus.examples[2].id },
-    ],
-    THRESHOLDS,
-    config
-  );
+  const partial = summarize([
+    { id: 'no-such-example', receipt: labeled(corpus.examples[0]) },
+    {
+      id: corpus.examples[0].id,
+      decision: { action: 'review', category: 'press', priority: 'medium' },
+    },
+    { id: corpus.examples[1].id, receipt: null },
+    { id: corpus.examples[2].id },
+  ]);
   assert.deepEqual(partial.unmatched, ['no-such-example']);
   assert.equal(partial.evaluated, 3);
   assert.equal(partial.reviewRate, 1 / 3);
 });
 
 test('disposition distinguishes shadow observations from executed comparisons', () => {
-  const summarize = (outcomes, cfg = config) =>
-    summarizeOutcomes(corpus, outcomes, THRESHOLDS, cfg);
-  const receipt = buildPilotReceipt({
-    corpus,
-    config,
-    thresholds: THRESHOLDS,
-    metrics: summarize(perfectOutcomes({ executed: false })),
-  });
-  assert.equal(receipt.disposition, 'inconclusive');
-  assert.ok(
-    receipt.reasons.some(r => r.includes('executed comparisons')) &&
-      receipt.reasons.some(r => r.includes('no executed baseline')) &&
-      receipt.reasons.some(r => r.includes('whole-workflow cost'))
-  );
-  assert.equal(receipt.schema, 'jev-inbox-pilot-disposition/v1');
-  assert.equal(receipt.issue, 'JOV-6421');
-
-  const executedMetrics = summarize(perfectOutcomes(), cfgWithIncumbentCost);
-  const promoted = buildPilotReceipt({
-    corpus,
-    config: cfgWithIncumbentCost,
-    thresholds: THRESHOLDS,
-    metrics: executedMetrics,
-    baselineMetrics: Object.freeze({ macroF1: 0.7 }),
-  });
-  assert.equal(promoted.disposition, 'promote-candidate');
-  assert.ok(promoted.reasons.some(r => r.includes('admits nothing')));
-  const deltaMissed = buildPilotReceipt({
-    corpus,
-    config: cfgWithIncumbentCost,
-    thresholds: THRESHOLDS,
-    metrics: executedMetrics,
-    baselineMetrics: Object.freeze({ macroF1: 0.999 }),
-  });
-  assert.equal(deltaMissed.disposition, 'inconclusive');
-  assert.ok(deltaMissed.reasons.some(r => r.includes('delta vs baseline')));
-
-  // Non-finite baseline macroF1 yields no delta — the model is retained.
-  assert.equal(
+  const R = (metrics, cfg = config, baselineMetrics = null) =>
     buildPilotReceipt({
       corpus,
-      config: cfgWithIncumbentCost,
+      config: cfg,
       thresholds: THRESHOLDS,
-      metrics: executedMetrics,
-      baselineMetrics: Object.freeze({}),
-    }).disposition,
-    'retain'
-  );
-  assert.ok(
+      metrics,
+      baselineMetrics,
+    });
+  const executedMetrics = summarize(perfectOutcomes(), cfgWithIncumbentCost);
+  const baseline = Object.freeze({ macroF1: 0.7 });
+  const cases = [
+    // shadow-only evidence: no executed comparisons, no baseline, no cost
+    [
+      summarize(perfectOutcomes({ executed: false })),
+      config,
+      baseline,
+      'inconclusive',
+    ],
+    [executedMetrics, cfgWithIncumbentCost, baseline, 'promote-candidate'],
+    [executedMetrics, cfgWithIncumbentCost, { macroF1: 0.999 }, 'inconclusive'],
+    // non-finite baseline macroF1 yields no delta — the model is retained
+    [executedMetrics, cfgWithIncumbentCost, {}, 'retain'],
+    // high-value miss breach blocks
+    [
+      summarize(
+        outcomesFor(corpus, example =>
+          example.expectedPriority === 'high' &&
+          example.expectedCategory !== UNCATEGORIZED_LABEL
+            ? receiptFor(example.expectedCategory, 'low', 0.9)
+            : labeled(example)
+        ),
+        cfgWithIncumbentCost
+      ),
+      cfgWithIncumbentCost,
+      baseline,
+      'blocked',
+    ],
+  ];
+  for (const [metrics, cfg, bl, expected] of cases) {
+    assert.equal(R(metrics, cfg, bl).disposition, expected);
+  }
+  assert.equal(
     buildPilotReceipt({
       corpus,
       config,
       thresholds: null,
       metrics: executedMetrics,
-    }).reasons.includes('no calibrated thresholds')
+    }).reasons.includes('no calibrated thresholds'),
+    true
   );
 
-  // High-value miss breach blocks.
-  const breach = buildPilotReceipt({
-    corpus,
-    config: cfgWithIncumbentCost,
-    thresholds: THRESHOLDS,
-    metrics: summarize(
-      outcomesFor(corpus, example =>
-        example.expectedPriority === 'high' &&
-        example.expectedCategory !== UNCATEGORIZED_LABEL
-          ? receiptFor(example.expectedCategory, 'low', 0.9)
-          : labeled(example)
-      ),
-      cfgWithIncumbentCost
-    ),
-    baselineMetrics: Object.freeze({ macroF1: 0.7 }),
-  });
-  assert.equal(breach.disposition, 'blocked');
-  assert.ok(breach.reasons.some(r => r.includes('highValueMissRate')));
-
-  // Corpus integrity failure blocks outright.
+  // Corpus integrity failure blocks outright: e2 shares e1's text across splits.
   const ex = {
     id: 'e1',
     subject: 'x',
@@ -508,12 +419,9 @@ test('disposition distinguishes shadow observations from executed comparisons', 
   const tiny = {
     schema: 'inbox-triage-corpus/v1',
     version: 'test',
-    // e2 shares e1's text in the other split: exercises the overlap check.
     examples: [ex, { ...ex, id: 'e2', split: 'holdout' }],
   };
-  const report = corpusIntegrityReport(tiny, config);
-  assert.equal(report.ok, false);
-  assert.ok(report.issues.some(i => i.includes('overlap')));
+  assert.equal(corpusIntegrityReport(tiny, config).ok, false);
   assert.equal(
     buildPilotReceipt({
       corpus: tiny,

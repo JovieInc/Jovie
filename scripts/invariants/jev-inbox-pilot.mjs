@@ -6,21 +6,8 @@
  * precision/recall on both axes, high-value miss rate, correction rate,
  * abstention, p50/p95 latency and attributable cost. Executed Gateway
  * comparisons are distinguished from fixture/shadow observations; the
- * exact-version disposition receipt is retain | promote-candidate |
- * blocked | inconclusive. Nothing here changes a production decision;
- * promotion still requires the existing admission controls, monitoring,
- * rollback and authorized funding.
- *
- * Cost honesty: the incumbent Haiku call still runs for free-form summary
- * and extraction whenever Jev supplies only the bounded labels, so
- * `estimatedWholeWorkflowCostUsd` counts BOTH calls once
- * `incumbentCostPerEmailUsd` is filled from recorded baseline usage; it
- * stays null (not zero) until then.
- *
- * Consumes recorded decision rows {"id","receipt"|"decision","latencyMs",
- * "executed":bool}; baseline rows (Haiku path) carry {"id","category",
- * "priority","confidence"?}. Shadow producers call classifyInboxEmail over
- * the corpus under an authorized approval envelope and record the receipts.
+ * disposition receipt is retain | promote-candidate | blocked | inconclusive.
+ * Nothing here changes a production decision.
  */
 
 import { createHash } from 'node:crypto';
@@ -74,26 +61,23 @@ export function loadInboxCorpus(raw) {
       throw new Error(`invalid corpus example: ${String(example?.id)}`);
     }
     ids.add(example.id);
-    if (!VALID_CATEGORIES.has(example.expectedCategory)) {
-      throw new Error(
-        `expected category not in enum for ${example.id}: ${String(example.expectedCategory)}`
-      );
-    }
-    if (!VALID_PRIORITIES.has(example.expectedPriority)) {
-      throw new Error(
-        `expected priority not in enum for ${example.id}: ${String(example.expectedPriority)}`
-      );
+    for (const [axis, valid, value] of [
+      ['category', VALID_CATEGORIES, example.expectedCategory],
+      ['priority', VALID_PRIORITIES, example.expectedPriority],
+    ]) {
+      if (!valid.has(value)) {
+        throw new Error(
+          `expected ${axis} not in enum for ${example.id}: ${String(value)}`
+        );
+      }
     }
     const key = textKey(example);
-    if (texts.has(key)) {
-      throw new Error(`duplicate text: ${example.id}`);
-    }
+    if (texts.has(key)) throw new Error(`duplicate text: ${example.id}`);
     texts.add(key);
   }
   return corpus;
 }
 
-/** Corpus statistics and sufficiency check against the predeclared config. */
 export function corpusIntegrityReport(corpus, config) {
   const stats = {
     total: 0,
@@ -107,12 +91,10 @@ export function corpusIntegrityReport(corpus, config) {
   for (const example of corpus.examples) {
     stats.total += 1;
     stats[example.split] += 1;
-    for (const [key, expected] of [
-      ['perCategory', example.expectedCategory],
-      ['perPriority', example.expectedPriority],
-    ]) {
-      stats[key][expected] = (stats[key][expected] ?? 0) + 1;
-    }
+    stats.perCategory[example.expectedCategory] =
+      (stats.perCategory[example.expectedCategory] ?? 0) + 1;
+    stats.perPriority[example.expectedPriority] =
+      (stats.perPriority[example.expectedPriority] ?? 0) + 1;
     for (const tag of example.tags ?? []) {
       stats.tags[tag] = (stats.tags[tag] ?? 0) + 1;
     }
@@ -137,9 +119,8 @@ export function corpusIntegrityReport(corpus, config) {
     ['priority', stats.perPriority, s.minExamplesPerExpectedPriority ?? 0],
   ]) {
     for (const [expected, count] of Object.entries(counts)) {
-      if (count < min) {
+      if (count < min)
         issues.push(`${axis} ${expected} has only ${count} examples`);
-      }
     }
   }
   const overlap = [...splitText.tuning].filter(k => splitText.holdout.has(k));
@@ -156,10 +137,6 @@ function percentile(sorted, p) {
   ];
 }
 
-/**
- * @param {Record<string, {support:number,tp:number,fp:number,fn:number}>} perClass
- * @returns {{perClass: Readonly<Record<string, {support:number,precision:number,recall:number,f1:number}>>, macroF1: number}}
- */
 function finalizeClassMetrics(perClass) {
   const metrics = {};
   let f1Sum = 0;
@@ -195,31 +172,15 @@ function bumpAxis(perClass, expected, pred) {
   }
 }
 
-/**
- * Summarize outcomes against corpus expectations on both bounded axes.
- * @param {Array<{id: string, receipt?: object, decision?: object, latencyMs?: number, executed?: boolean}>} outcomes
- */
 export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
   const byId = new Map(corpus.examples.map(e => [e.id, e]));
-  /** @type {Record<string, {support:number,tp:number,fp:number,fn:number}>} */
   const perCategory = {};
-  /** @type {Record<string, {support:number,tp:number,fp:number,fn:number}>} */
   const perPriority = {};
-  const c = {
-    suggested: 0,
-    wrongSuggest: 0,
-    abstained: 0,
-    review: 0,
-    uncategorizedSupport: 0,
-    uncategorizedCorrect: 0,
-    highValueSupport: 0,
-    highValueMissed: 0,
-    spamOvercapture: 0,
-    executed: 0,
-    shadow: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-  };
+  const c = Object.fromEntries(
+    'suggested wrongSuggest abstained review uncategorizedSupport uncategorizedCorrect highValueSupport highValueMissed spamOvercapture executed shadow inputTokens outputTokens'
+      .split(' ')
+      .map(k => [k, 0])
+  );
   const latencies = [];
   const unmatched = [];
 
@@ -230,7 +191,7 @@ export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
       continue;
     }
     // `executed` marks a real authorized Gateway comparison; fixture/shadow
-    // transports stay shadow-only. Recorded `decision` rows pass through.
+    // transports stay shadow-only. Recorded decision rows pass through.
     const action =
       isObject(outcome.receipt) && typeof outcome.receipt.status === 'string'
         ? decideInboxTriage(outcome.receipt, thresholds)
@@ -245,11 +206,11 @@ export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
             });
     const { expectedCategory, expectedPriority } = example;
     const receipt = outcome.receipt;
-    if (outcome.executed === true && receipt?.status === 'evaluated') {
-      c.executed += 1;
-    } else {
-      c.shadow += 1;
-    }
+    c[
+      outcome.executed === true && receipt?.status === 'evaluated'
+        ? 'executed'
+        : 'shadow'
+    ] += 1;
     for (const key of ['inputTokens', 'outputTokens']) {
       if (Number.isFinite(receipt?.[key])) c[key] += receipt[key];
     }
@@ -258,11 +219,8 @@ export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
     if (action.action === 'suggest') {
       c.suggested += 1;
       if (action.category !== expectedCategory) c.wrongSuggest += 1;
-    } else if (action.action === 'review') {
-      c.review += 1;
-    } else {
-      c.abstained += 1;
-    }
+    } else if (action.action === 'review') c.review += 1;
+    else c.abstained += 1;
 
     // Category axis: a non-suggestion counts as predicting uncategorized.
     const predCategory =
@@ -272,9 +230,8 @@ export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
       c.uncategorizedSupport += 1;
       if (predCategory === UNCATEGORIZED_LABEL) c.uncategorizedCorrect += 1;
     }
-    if (expectedCategory !== 'spam' && predCategory === 'spam') {
+    if (expectedCategory !== 'spam' && predCategory === 'spam')
       c.spamOvercapture += 1;
-    }
 
     // Priority axis: only a suggestion carries a predicted priority; review
     // and abstain resolve to uncategorized.
@@ -293,16 +250,13 @@ export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
   const total = outcomes.length - unmatched.length;
   const categoryMetrics = finalizeClassMetrics(perCategory);
   const pricing = config?.pricingEstimate ?? {};
+  const cost = (tokens, perMillion) =>
+    Number.isFinite(perMillion) ? (tokens / 1e6) * perMillion : 0;
   const estimatedCostUsd =
-    (Number.isFinite(pricing.jevInputPerMillionUsd)
-      ? (c.inputTokens / 1e6) * pricing.jevInputPerMillionUsd
-      : 0) +
-    (Number.isFinite(pricing.jevOutputPerMillionUsd)
-      ? (c.outputTokens / 1e6) * pricing.jevOutputPerMillionUsd
-      : 0);
+    cost(c.inputTokens, pricing.jevInputPerMillionUsd) +
+    cost(c.outputTokens, pricing.jevOutputPerMillionUsd);
   // Whole-workflow honesty: the incumbent call still runs for extraction and
-  // summary, so total workflow cost counts both calls once baseline pricing
-  // is supplied. Null — never zero — while that input is unknown.
+  // summary — null, never zero, while incumbent pricing is unrecorded.
   const estimatedWholeWorkflowCostUsd = Number.isFinite(
     pricing.incumbentCostPerEmailUsd
   )
@@ -344,7 +298,6 @@ export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
   });
 }
 
-/** Collect "name value cmp limit" breach strings from [name,value,limit,cmp] rows. */
 function breaches(rows) {
   const out = [];
   for (const [name, value, limit, cmp = '>'] of rows) {
