@@ -957,7 +957,7 @@ export function ProfileCompactTemplate({
             data-public-profile-nav={publicProfileNavIds}
           >
             <ReleaseCreditsDrawer
-              open={creditsOpen}
+              open={creditsOpen && !isDesktopLayout}
               onOpenChange={setCreditsOpen}
               credits={visibleReleaseCredits}
               presentation={drawerPresentation}
@@ -1051,53 +1051,64 @@ export function ProfileCompactTemplate({
         }
         desktopSurface={
           PROFILE_DESKTOP_SURFACE_ENABLED ? (
-            <ProfileDesktopSurface
-              presentation='modal'
-              overlaysEnabled={isDesktopLayout}
-              onReady={handleDesktopSurfaceReady}
-              artist={artist}
-              socialLinks={socialLinks}
-              contacts={contacts}
-              showPayButton={showPayButton}
-              latestRelease={latestRelease}
-              profileSettings={profileSettings}
-              alertOptInVariant={resolvedAlertOptInVariant}
-              allowFanCapture={allowFanCapture}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-              creditSegments={creditSegments}
-              photoDownloadSizes={photoDownloadSizes}
-              tourDates={tourDates}
-              viewerCountryCode={resolvedViewerCountryCode}
-              visitorAssignmentResolved={visitorAssignmentResolved}
-              releases={releases}
-              catalogLoadFailed={catalogLoadFailed}
-              drawerOpen={drawerOpen}
-              drawerView={drawerView}
-              activeMode={requestedMode}
-              onModeSelect={nextMode => {
-                clearCloseResetTimer();
-                setRequestedMode(nextMode);
-              }}
-              onAlertsModalClose={() => setRequestedMode('profile')}
-              onDrawerOpenChange={handleDrawerOpenChange}
-              onDrawerViewChange={handleDrawerViewChange}
-              onOpenMenu={() => openDrawerMode('menu')}
-              onPlayClick={handlePlayClick}
-              onBack={handleBack}
-              profileHref={profileHref}
-              isSubscribed={isSubscribed}
-              contentPrefs={contentPrefs}
-              onTogglePref={handleTogglePref}
-              onUnsubscribe={handleUnsubscribe}
-              isUnsubscribing={unsubMutation.isPending}
-              onOpenReleaseCredits={
-                visibleReleaseCredits.length > 0
-                  ? () => setCreditsOpen(true)
-                  : undefined
-              }
-            />
+            <div
+              className='relative flex min-h-0 w-full flex-1 flex-col'
+              data-sheet-container
+            >
+              <ProfileDesktopSurface
+                presentation='modal'
+                overlaysEnabled={isDesktopLayout}
+                onReady={handleDesktopSurfaceReady}
+                artist={artist}
+                socialLinks={socialLinks}
+                contacts={contacts}
+                showPayButton={showPayButton}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                alertOptInVariant={resolvedAlertOptInVariant}
+                allowFanCapture={allowFanCapture}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                photoDownloadSizes={photoDownloadSizes}
+                tourDates={tourDates}
+                viewerCountryCode={resolvedViewerCountryCode}
+                visitorAssignmentResolved={visitorAssignmentResolved}
+                releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
+                drawerOpen={drawerOpen}
+                drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
+                onAlertsModalClose={() => setRequestedMode('profile')}
+                onDrawerOpenChange={handleDrawerOpenChange}
+                onDrawerViewChange={handleDrawerViewChange}
+                onOpenMenu={() => openDrawerMode('menu')}
+                onPlayClick={handlePlayClick}
+                onBack={handleBack}
+                profileHref={profileHref}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={handleTogglePref}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubMutation.isPending}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
+              />
+              <ReleaseCreditsDrawer
+                open={creditsOpen && isDesktopLayout}
+                onOpenChange={setCreditsOpen}
+                credits={visibleReleaseCredits}
+                presentation='modal'
+              />
+            </div>
           ) : null
         }
       />

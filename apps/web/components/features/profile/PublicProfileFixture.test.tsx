@@ -25,16 +25,22 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     embeddedPreview,
     profileBanner,
     tourDates,
+    showPayButton,
+    releaseCredits,
   }: {
     artist: { name: string };
     embeddedPreview: boolean;
     profileBanner: ReactNode;
     tourDates: readonly TourDateViewModel[];
+    showPayButton?: boolean;
+    releaseCredits?: readonly unknown[];
   }) => (
     <div
       data-preview={String(embeddedPreview)}
       data-testid='profile-template'
       data-tour-dates={String(tourDates.length)}
+      data-show-pay={String(Boolean(showPayButton))}
+      data-release-credits={String(releaseCredits?.length ?? 0)}
     >
       <h1>{artist.name}</h1>
       {profileBanner}
@@ -59,6 +65,14 @@ describe('PublicProfileFixture', () => {
     expect(screen.getByTestId('public-claim-banner')).toHaveAttribute(
       'data-prefetch',
       'false'
+    );
+    expect(screen.getByTestId('profile-template')).toHaveAttribute(
+      'data-show-pay',
+      'true'
+    );
+    expect(screen.getByTestId('profile-template')).toHaveAttribute(
+      'data-release-credits',
+      '1'
     );
   });
 

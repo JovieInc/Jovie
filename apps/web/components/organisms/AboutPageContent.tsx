@@ -39,8 +39,8 @@ export function AboutPageContent() {
       </div>
 
       <MarketingContainer width='page' className='pb-16'>
-        <section className='grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-16'>
-          <div className='max-w-prose'>
+        <section className='flex flex-col items-start gap-10 lg:flex-row lg:gap-16'>
+          <div className='min-w-0 max-w-prose flex-1'>
             <h2 className='text-2xl font-semibold text-primary-token'>
               {ABOUT_COPY.origin.heading}
             </h2>
@@ -50,7 +50,7 @@ export function AboutPageContent() {
               ))}
             </div>
           </div>
-          <figure className='overflow-hidden rounded-3xl border border-subtle bg-surface-1/20'>
+          <figure className='w-full overflow-hidden rounded-3xl border border-subtle bg-surface-1/20 lg:w-72 lg:shrink-0'>
             <Image
               alt='Tim White, founder of Jovie'
               className='aspect-square h-auto w-full object-cover'

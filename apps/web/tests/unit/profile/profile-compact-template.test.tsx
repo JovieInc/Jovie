@@ -776,6 +776,16 @@ describe('ProfileCompactTemplate', () => {
     const drawer = await screen.findByRole('dialog', { name: 'Credits' });
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
+
+    // The desktop surface slot owns a sheet container that anchors modal
+    // drawers to the desktop shell (route DOM certification, JOV-6915).
+    const sheetContainer = document.querySelector('[data-sheet-container]');
+    expect(sheetContainer).not.toBeNull();
+    expect(
+      sheetContainer?.querySelector(
+        '[data-testid="mock-profile-desktop-surface"]'
+      )
+    ).not.toBeNull();
   });
 
   it('hides the release credits menu entry when every credit group is empty', () => {
