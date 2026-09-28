@@ -660,6 +660,23 @@ jobs:
               PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
               mkdir -p "$PRODUCT_LANE_DIR"
               : > "$PRODUCT_LANE_DIR/changed-paths.txt"
+              TRUSTED_PRODUCT_LANE_CLASSIFIER="$PRODUCT_LANE_DIR/product-lane-classifier.mjs"
+              git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/product-lane-classifier.mjs" \
+                > "$TRUSTED_PRODUCT_LANE_CLASSIFIER"
+              node "$TRUSTED_PRODUCT_LANE_CLASSIFIER" \
+                --files-from "$PRODUCT_LANE_DIR/changed-paths.txt" \
+                --json-out "$PRODUCT_LANE_DIR/receipt.json" \
+                --summary-out "$PRODUCT_LANE_DIR/summary.md" \
+                --base-ref "$MERGE_GROUP_BASE_SHA" \
+                --head-ref "$MERGE_GROUP_HEAD_SHA"
+              jq \
+                --arg sha "$GITHUB_SHA" \
+                --arg run_id "$GITHUB_RUN_ID" \
+                --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+                '. + {provenance: {sha: $sha, runId: $run_id, runAttempt: $run_attempt}}' \
+                "$PRODUCT_LANE_DIR/receipt.json" > "$PRODUCT_LANE_DIR/sealed.json"
+              mv "$PRODUCT_LANE_DIR/sealed.json" "$PRODUCT_LANE_DIR/receipt.json"
+              cat "$PRODUCT_LANE_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
               for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
@@ -974,7 +991,7 @@ jobs:
           fi
 
       - name: Preserve intake product-lane receipt
-        if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
@@ -3283,7 +3300,6 @@ jobs:
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
-      needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
       needs.ci-merge-group-admission.result == 'success' &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true') &&
       (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
@@ -6787,9 +6803,7 @@ jobs:
             fi
           done
 
-          if [[ "$NOOP_GROUP" == "true" ]]; then
-            [ "$LANE_RECEIPT_RESULT" = skipped ] || { echo "::error::No-op receipt must skip."; exit 1; }
-          elif [[ "$LANE_RECEIPT_RESULT" != success ]]; then
+          if [[ "$LANE_RECEIPT_RESULT" != success ]]; then
             echo "::error::Final product-lane receipt did not pass ($LANE_RECEIPT_RESULT)."
             exit 1
           fi

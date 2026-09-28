@@ -1357,7 +1357,7 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('materializes an empty path artifact for typed no-op merge groups', () => {
+  it('seals a release-routable receipt for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(
       pathChanges.indexOf('Detect path changes for all job types')
@@ -1374,6 +1374,27 @@ describe('merge_group workflow contract', () => {
     );
     expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
     expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+    expect(noopBranch).toContain(
+      'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/product-lane-classifier.mjs"'
+    );
+    expect(noopBranch).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
+    expect(noopBranch).toContain('--json-out "$PRODUCT_LANE_DIR/receipt.json"');
+    expect(noopBranch).toContain(
+      '. + {provenance: {sha: $sha, runId: $run_id, runAttempt: $run_attempt}}'
+    );
+
+    expect(pathChanges).not.toContain(
+      "steps.detect.outputs.is_noop_merge_group != 'true'"
+    );
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+    expect(receipt).not.toContain(
+      "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
+    );
+    const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    expect(aggregate).not.toContain('No-op receipt must skip.');
+    expect(aggregate).toContain(
+      'if [[ "$LANE_RECEIPT_RESULT" != success ]]; then'
+    );
 
     const homepageVisualScript = getStepRunScript(
       pathChanges,
