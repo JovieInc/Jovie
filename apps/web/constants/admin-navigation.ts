@@ -125,7 +125,7 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_SHIPPING,
     description:
       'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'chat',
