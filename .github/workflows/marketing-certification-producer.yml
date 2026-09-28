@@ -1,11 +1,18 @@
 name: Marketing Certification Producer
+# clock-class: temporal-resource
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted clock and main pushes run read-only evidence checks and post machine certification evidence to the production ledger with CRON_SECRET only; it never records founder decisions, merges, deploys or writes to GitHub.
+# removal-trigger: Remove the schedule when Production Controller emits the marketing evidence packets after each deploy, making the daily missed-event heartbeat redundant.
 # JOV-6928 Canary A: event-driven machine evidence for the marketing
 # certification ledger. A push to main that changes a registry entry's
 # canonical source re-evaluates exactly those entries and posts one
 # jovie.certification/v1 packet each to /api/internal/ovie/certification-evidence.
 # Evidence only: founder decisions never pass through this workflow.
 # workflow_dispatch with all=true reconciles every source-backed entry
-# (discovery of entries the ledger has never evaluated).
+# (discovery of entries the ledger has never evaluated). The daily schedule is
+# the missed-event heartbeat: it re-evaluates everything once, so a dropped push
+# event cannot leave a certificate stale for more than a day.
 
 on:
   push:
@@ -13,6 +20,10 @@ on:
     paths:
       - 'apps/web/components/**'
       - 'apps/web/data/marketing/**'
+      # @coverage-via targets: a declared test changing invalidates its entry.
+      - 'apps/web/tests/unit/marketing/**'
+  schedule:
+    - cron: '41 4 * * *'
   workflow_dispatch:
     inputs:
       all:
@@ -69,8 +80,10 @@ jobs:
       - name: Produce and post evidence
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          # Real defects (failed evidence) upsert one fingerprinted Linear issue.
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           CHANGED: ${{ steps.changed.outputs.path }}
-          ALL: ${{ inputs.all && '--all' || '' }}
+          ALL: ${{ (github.event_name == 'schedule' || inputs.all) && '--all' || '' }}
           RUN_REF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail

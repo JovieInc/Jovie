@@ -24,12 +24,12 @@ const PANEL_MAX_WIDTH_CLASSNAME = {
   form: 'max-w-(--app-shell-content-max-form)',
 } as const;
 
-const PANEL_OUTER_INSET_CLASSNAME = 'px-2.5 py-2.5 sm:px-3 sm:py-3';
+const PANEL_OUTER_INSET_CLASSNAME = '';
 const PANEL_TABLE_SURFACE_CLASSNAME = 'p-0 bg-(--app-shell-content-surface)';
 
 const PANEL_CONTENT_PADDING_CLASSNAME = {
   none: '',
-  compact: 'px-3 py-3 sm:px-3.5 sm:py-3.5',
+  compact: 'p-(--app-shell-content-inset)',
   default:
     'px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
 } as const;
