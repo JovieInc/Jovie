@@ -6002,7 +6002,7 @@ jobs:
           # the artifact secret guard) and a reviewer-only gateway key.
           GOLDEN_PATH_KEYFRAME_DIR: ${{ github.workspace }}/apps/web/test-results/golden-path-keyframes/first
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
-          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}

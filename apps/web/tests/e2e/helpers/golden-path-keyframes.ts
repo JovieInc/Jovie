@@ -121,6 +121,8 @@ export async function captureKeyframe(page: Page, id: string): Promise<void> {
     animations: 'disabled',
     caret: 'hide',
     fullPage: false,
+    // The dev toolbar is CI chrome, not product; reviewers must not judge it.
+    style: '[data-testid="dev-toolbar"]{display:none!important}',
   });
   const record: KeyframeRecord = {
     schema: GOLDEN_PATH_KEYFRAME_SCHEMA,
