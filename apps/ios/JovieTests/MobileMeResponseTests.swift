@@ -250,13 +250,16 @@ struct MobileMeResponseTests {
   @Test func appleWalletFlowCoversLoadingFailureRetryAndDuplicateRequests() {
     var state = AppleWalletFlowState.available
 
-    #expect(state.beginRequest())
+    let firstRequest = state.beginRequest()
+    #expect(firstRequest)
     #expect(state == .loading)
-    #expect(!state.beginRequest())
+    let duplicateRequest = state.beginRequest()
+    #expect(!duplicateRequest)
 
     state.requestFailed()
     #expect(state == .failed)
-    #expect(state.beginRequest())
+    let retryRequest = state.beginRequest()
+    #expect(retryRequest)
   }
 
   @Test func appleWalletAvailabilityKeepsServerAndDeviceFailuresTruthful() {
@@ -284,23 +287,27 @@ struct MobileMeResponseTests {
     var state = AppleWalletFlowState.loading
     state.preparedPass(isInstalled: false)
     #expect(state == .presenting)
-    #expect(!state.beginRequest())
+    let presentingRequest = state.beginRequest()
+    #expect(!presentingRequest)
 
     state.presentationFinished(isInstalled: false)
     #expect(state == .available)
-    #expect(state.beginRequest())
+    let retryAfterCancel = state.beginRequest()
+    #expect(retryAfterCancel)
   }
 
   @Test func appleWalletFlowCoversInstalledAndUnavailableControllerPaths() {
     var state = AppleWalletFlowState.loading
     state.preparedPass(isInstalled: true)
     #expect(state == .installed)
-    #expect(!state.beginRequest())
+    let installedRequest = state.beginRequest()
+    #expect(!installedRequest)
 
     state = .loading
     state.preparedPass(isInstalled: false, controllerAvailable: false)
     #expect(state == .controllerUnavailable)
-    #expect(state.beginRequest())
+    let unavailableRequest = state.beginRequest()
+    #expect(unavailableRequest)
 
     state.preparedPass(isInstalled: false)
     state.presentationFinished(isInstalled: true)
