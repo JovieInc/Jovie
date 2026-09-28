@@ -27,15 +27,6 @@ vi.mock('@/lib/chat/knowledge/router', () => ({
     text.includes('royalties') ? 'ROYALTY-KNOWLEDGE' : '',
 }));
 
-const loggerError = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/utils/logger', async () => {
-  const actual =
-    await vi.importActual<typeof import('@/lib/utils/logger')>(
-      '@/lib/utils/logger'
-    );
-  return { ...actual, logger: { ...actual.logger, error: loggerError } };
-});
-
 vi.mock('@ai-sdk/gateway', () => ({
   createGateway: vi.fn(() =>
     vi.fn((modelId: string) => ({ __model: modelId }))
@@ -238,6 +229,9 @@ describe('executeChatTurn context cost', () => {
         { id: 'a', role: 'user', parts: [{ type: 'text', text: 'hi' }] },
       ] as UIMessage[],
     });
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     const boom = new Error('provider rejected the request');
     await (
       capturedOptions(turn) as unknown as {
@@ -245,9 +239,33 @@ describe('executeChatTurn context cost', () => {
       }
     ).onError({ error: boom });
 
-    expect(loggerError).toHaveBeenCalledWith(
+    expect(consoleError).toHaveBeenCalledWith(
       '[chat] model stream error',
-      expect.objectContaining({ error: boom, requestId: 'req-1' })
+      expect.objectContaining({
+        message: 'provider rejected the request',
+        requestId: 'req-1',
+      })
     );
+
+    type Opts = {
+      onAbort: (e: { steps: unknown[] }) => void;
+      onFinish: (e: {
+        steps: { toolCalls: unknown[] }[];
+        text: string;
+        finishReason: string;
+      }) => Promise<void>;
+    };
+    const opts = capturedOptions(turn) as unknown as Opts;
+    opts.onAbort({ steps: [] });
+    expect(consoleError).toHaveBeenCalledWith(
+      '[chat] model stream aborted',
+      expect.objectContaining({ requestId: 'req-1', steps: 0 })
+    );
+    await opts.onFinish({ steps: [], text: '', finishReason: 'stop' });
+    expect(consoleError).toHaveBeenCalledWith(
+      '[chat] model turn produced no output',
+      expect.objectContaining({ requestId: 'req-1', finishReason: 'stop' })
+    );
+    consoleError.mockRestore();
   });
 });
