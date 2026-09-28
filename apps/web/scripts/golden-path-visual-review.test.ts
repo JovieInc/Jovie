@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   confirmedBlockers,
@@ -5,6 +8,7 @@ import {
   type KeyframeVerdict,
   parseModelVerdict,
   pathOf,
+  readManifest,
   reviewLayout,
   reviewWithModel,
 } from './golden-path-visual-review';
@@ -93,6 +97,10 @@ describe('golden path visual review', () => {
     ).toMatchObject({ verdict: 'unknown' });
     expect(parseModelVerdict('{"verdict":"maybe"}')).toMatchObject({
       verdict: 'unknown',
+    });
+    expect(parseModelVerdict('{oops}')).toMatchObject({
+      verdict: 'unknown',
+      reason: 'invalid JSON',
     });
   });
 
@@ -183,5 +191,15 @@ describe('golden path visual review', () => {
 
   it('records only the URL path so query tokens never reach the model', () => {
     expect(pathOf('https://jov.ie/tim?mode=listen&token=secret')).toBe('/tim');
+    expect(pathOf('not a url')).toBe('not a url');
+  });
+
+  it('reads the manifest.jsonl written by the keyframe capture', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'golden-path-review-'));
+    writeFileSync(
+      join(dir, 'manifest.jsonl'),
+      `${JSON.stringify(record())}\n${JSON.stringify(record({ overflowPx: 9 }))}\n`
+    );
+    expect(readManifest(dir)).toEqual([record(), record({ overflowPx: 9 })]);
   });
 });
