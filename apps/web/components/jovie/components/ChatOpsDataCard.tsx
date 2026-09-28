@@ -50,14 +50,14 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
   return (
     <ChatToolSurface>
       <section
-        className='w-full max-w-3xl px-4 py-3.5'
+        className='w-full max-w-3xl px-4 py-4'
         aria-label={card.title}
         data-testid='chat-ops-data-card'
         data-card-kind={card.kind}
         data-card-state={card.state}
       >
         <div className='flex items-start justify-between gap-3'>
-          <div className='flex min-w-0 items-start gap-2.5'>
+          <div className='flex min-w-0 items-start gap-2'>
             <div className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
               <Activity className='h-3.5 w-3.5' strokeWidth={2} />
             </div>
@@ -120,14 +120,11 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
                 .join(', ')}`}
             >
               {card.series.points.map(point => (
-                <li
-                  key={point.label}
-                  className='grid grid-cols-[7rem_minmax(0,1fr)_3rem] items-center gap-2'
-                >
-                  <span className='truncate text-2xs leading-4 text-tertiary-token'>
+                <li key={point.label} className='flex items-center gap-2'>
+                  <span className='w-28 shrink-0 truncate text-2xs leading-4 text-tertiary-token'>
                     {point.label}
                   </span>
-                  <span className='h-1.5 overflow-hidden rounded-full bg-surface-0'>
+                  <span className='h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-0'>
                     <span
                       className='block h-full rounded-full bg-primary-token/60'
                       style={{
@@ -135,7 +132,7 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
                       }}
                     />
                   </span>
-                  <span className='text-right text-2xs font-medium leading-4 text-primary-token tabular-nums'>
+                  <span className='w-12 shrink-0 text-right text-2xs font-medium leading-4 text-primary-token tabular-nums'>
                     {point.value}
                   </span>
                 </li>

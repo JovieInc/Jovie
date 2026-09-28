@@ -149,7 +149,7 @@ export function buildShippingOpsCard(
   projection: ShippingStateProjection
 ): SummerOpsCard {
   const mergeQueue = sourceObservation(projection, 'github-native-merge-queue');
-  const runtime = sourceObservation(projection, 'symphony-runtime');
+  const runtime = sourceObservation(projection, 'summer-runtime');
   const ci = sourceObservation(projection, 'exact-sha-ci');
 
   const state: SummerOpsCardState = (

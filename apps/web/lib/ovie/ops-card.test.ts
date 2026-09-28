@@ -35,10 +35,10 @@ function projectionFixture(): ShippingStateProjection {
           openPullRequests: measuredCount(5),
         },
       },
-      'symphony-runtime': {
-        ...projection.sources['symphony-runtime'],
+      'summer-runtime': {
+        ...projection.sources['summer-runtime'],
         counts: {
-          ...projection.sources['symphony-runtime'].counts,
+          ...projection.sources['summer-runtime'].counts,
           running: measuredCount(2),
           blocked: measuredCount(0),
         },
