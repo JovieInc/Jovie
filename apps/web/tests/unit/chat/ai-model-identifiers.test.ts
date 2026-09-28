@@ -5,6 +5,7 @@ import {
   CHAT_MODEL_LIGHT,
   CHAT_MODEL_ROTATION_CHAIN,
   GATEWAY_ALLOWED_MODELS,
+  GATEWAY_ALLOWLIST_NAME,
   INSIGHT_MODEL,
   PACKAGING_INTELLIGENCE_MODEL,
   PITCH_MODEL,
@@ -56,6 +57,10 @@ describe('AI Gateway model identifiers', () => {
     ]) {
       expect(GATEWAY_ALLOWED_MODELS).toContain(model);
     }
+  });
+
+  it('names the founder allowlist for production health receipts', () => {
+    expect(GATEWAY_ALLOWLIST_NAME).toBe('founder-strict-2026-09-17');
   });
 
   it('album art uses the cheap spacexai image model', () => {
