@@ -1,6 +1,6 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
+import { Button, Switch } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { type ReactNode, startTransition } from 'react';
@@ -105,13 +105,13 @@ export function GrowthStatusPanel() {
           ) : (
             <div className='px-1 py-3 text-sm text-destructive'>
               Unable to load Growth status.{' '}
-              <button
+              <Button
                 type='button'
-                className='underline underline-offset-2 hover:text-primary-token'
+                variant='link'
                 onClick={() => void settingsQuery.refetch()}
               >
                 Retry
-              </button>
+              </Button>
             </div>
           )
         ) : (
