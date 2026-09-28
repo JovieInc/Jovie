@@ -17,6 +17,7 @@ The harness, not the model, owns:
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | Open-PR budget: a lane holding `slots × 2` open non-green PRs only fixes/adopts until it drains | `over_budget()` |
 | Sweep (every 30 min per lane): close duplicate PRs as superseded, close drafts with no green run and no push for 24 h, issue back to Todo | `sweep_lane_prs()` |
+| Lockfile-only conflicts: merge main, take its `pnpm-lock.yaml`, `pnpm install --lockfile-only`, push; no model, no force-push | `resolve_lockfile_conflict()` |
 | Slot locks that die with their holder | `Locked` |
 | Fresh worktree from `origin/main`, `pnpm install --prefer-offline`, removal after | `run_issue()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -33,6 +34,7 @@ The harness, not the model, owns:
 | Disabled-lane drafts: closed when superseded or done, else adopted; closed and the issue returned to Todo once their fix attempts run out | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
+| Disk-pressure guard on the tick and each worker spawn: under 15% free it sweeps idle DerivedData (>5h), clean idle worktrees (>12h, branches kept), `.next`/`test-results`, dead simulators and the pnpm store; under 5% the doctor pages Summer | `disk_guard.py`, `dispatch()`, `worker()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash) hands the same worktree to the next enabled, healthy, uncooled lane, up to 2 handoffs; the receipt records `handoffs` and `finishedBy` | `run_issue()`, `next_provider()` |
@@ -75,6 +77,31 @@ Held reason codes (`held.json`): `secret-file`, `fix-exhausted`, `empty-diff`, `
 Green CI overrides only `gate-check-failed` and `gate-timeout`, which are verdicts from the local
 gate. The other codes are diff policy or unknown, and the PR stays a draft.
 
+## Reason lane (Summer's tier-3 decisions)
+
+Ranking, prioritization and strategy decisions are not made on Summer's flash model. Summer
+files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
+(question, decision type, context refs, deadline). The label is excluded from the shipping lanes.
+Each dispatch tick checks for queued jobs and starts one detached `reason_lane.py drain` per host
+(flock `reason.lock`), so a job starts within a minute. Per job:
+
+1. The lane gathers the context itself: `JOV-123` issues, `gbrain:<slug>` pages,
+   `linear:open-p0-p1` (open JOV P0/P1 list); URLs are listed, not fetched. Models get no tools.
+2. Proposer: `claude -p` on Opus 5.5 (subscription login; `~/.config/jovie-lanes/claude.env` may
+   hold `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`), structured JSON, `--max-budget-usd`.
+3. Adversarial reviewer, first healthy of: `grok` CLI on grok-4.7 (subscription), then the
+   Hyperagent "Grok 4.7 Reviewer" agent (Hyperagent credits, through `~/.local/bin/hyperagent`).
+   A 402/quota answer cools that reviewer for 6h.
+4. `reconcile()`: high confidence only when a reviewer ran, kept the #1, shares two of the top
+   three, did not reject, and the proposer is at or above 0.6. Anything else is low.
+5. A comment with a `summer.reasoning-result/v1` block, the GBrain page
+   `ops/summer/decisions/<date>-<jov-n>-<slug>`, then Done. That state change is the Linear
+   webhook that wakes Summer. A failed job retries once, then goes to Canceled with a `failed` block.
+
+`decisionType: research` (tier 4) runs the Hyperagent research backend instead and posts the memo.
+Budgets and models live in `reason.json` (jobs/day, research/day, context cap, per-job spend cap).
+Operator: `python3 reason_lane.py run JOV-123` runs one job now.
+
 ## Nothing fails silently
 
 `doctor.py` runs at the end of every dispatch tick. It judges the tick receipt
@@ -84,8 +111,8 @@ Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony d
 <key>") so Summer routes it; when the condition clears the issue is commented and moved
 to Done; a key that fires again within six hours reopens the same issue. Keys:
 `tick-error`, `provider-down:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
-`pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `github-quota`,
-`hud-stale`, `orphan-prs`.
+`pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `disk-critical`,
+`github-quota`, `hud-stale`, `orphan-prs`.
 
 ## Codex lane
 
@@ -122,7 +149,8 @@ State and receipts live under `~/.local/state/jovie-lanes`.
 
 ```sh
 python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
-  scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py
+  scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py \
+  scripts/tests/test_reason_lane.py scripts/tests/test_disk_guard.py
 ```
 
 The same files run inside `update()` before a release is installed anywhere.

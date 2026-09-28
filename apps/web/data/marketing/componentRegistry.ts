@@ -270,7 +270,7 @@ const SECTION_RESOLUTIONS = {
     occurrenceProofs: [
       {
         variantId: 'centered-none',
-        componentPath: 'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        componentPath: 'apps/web/components/homepage/HomepageIdentityHero.tsx',
         rootBinding: "data-testid='marketing-section-hero'",
       },
       {

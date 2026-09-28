@@ -35,7 +35,8 @@ interface ServerAnalyticsEventDefinition {
     | 'tour'
     | 'notification'
     | 'entitlement'
-    | 'funnel';
+    | 'funnel'
+    | 'billing';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -188,6 +189,27 @@ export const SERVER_ANALYTICS_EVENTS = {
     category: 'funnel',
     properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason'],
   },
+  /**
+   * Artist Presence ($199/mo) upgrade offer presented once per claimed
+   * artist after first profile claim (JOV-6675). Keyed by creator profile so
+   * the offer state survives sessions and the funnel resolves
+   * seen → accepted → checkout → paid.
+   */
+  onboarding_upgrade_offer_seen: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  onboarding_upgrade_offer_accepted: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  onboarding_upgrade_offer_dismissed: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
 } as const satisfies Record<string, ServerAnalyticsEventDefinition>;
 
 export type ServerAnalyticsEventName = keyof typeof SERVER_ANALYTICS_EVENTS;
@@ -257,6 +279,15 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['releases_synced'],
   },
   {
+    path: 'lib/onboarding/upgrade-offer.ts',
+    invocations: 1,
+    events: [
+      'onboarding_upgrade_offer_seen',
+      'onboarding_upgrade_offer_accepted',
+      'onboarding_upgrade_offer_dismissed',
+    ],
+  },
+  {
     path: 'app/r/[slug]/page.tsx',
     invocations: 1,
     events: ['smart_link_clicked'],
@@ -302,6 +333,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'code',
   'error_type',
   'gate',
+  'plan',
   'planRequired',
   'provider',
   'reason',

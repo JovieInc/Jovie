@@ -77,6 +77,13 @@ describe('CLI landing page', () => {
     }
   });
 
+  it('docks the hero over its own abstract photo', () => {
+    const { container } = render(<CliLandingPage />);
+    const photo = container.querySelector('.marketing-hero-photo img');
+    expect(photo?.getAttribute('src')).toContain('marketing-hero%2Fcli.webp');
+    expect(photo).toHaveAttribute('alt', '');
+  });
+
   it('composes shared hero, prose, FAQ, and footer CTA primitives', () => {
     const source = readWebSource('components/marketing/CliLandingPage.tsx');
     const route = readWebSource('app/(marketing)/cli/page.tsx');
@@ -156,5 +163,17 @@ describe('CLI landing page', () => {
     expect(cliSource).toContain('-v, --version');
     expect(cliSource).toContain('No login or API key');
     expect(isReservedUsername('cli')).toBe(true);
+  });
+
+  it('keeps every scrollable command block reachable by keyboard', () => {
+    render(<CliLandingPage />);
+    const blocks = document.querySelectorAll('article pre');
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const block of blocks) {
+      const scroller = block.closest('section');
+      expect(scroller).toHaveAttribute('tabindex', '0');
+      expect(scroller?.getAttribute('aria-label')).toMatch(/ command$/);
+      expect(scroller?.className).toContain('overflow-x-auto');
+    }
   });
 });

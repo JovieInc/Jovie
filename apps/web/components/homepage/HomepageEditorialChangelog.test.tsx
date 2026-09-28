@@ -45,4 +45,12 @@ describe('HomepageEditorialChangelog', () => {
       ).toHaveClass(`homepage-editorial-card__media--${card.theme}`);
     }
   });
+
+  it('rotates card accents blue, purple, pink in visual order (JOV-6946)', () => {
+    expect(HOMEPAGE_EDITORIAL_CARDS.map(card => card.theme)).toEqual([
+      'blue',
+      'purple',
+      'pink',
+    ]);
+  });
 });

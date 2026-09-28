@@ -236,8 +236,8 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py -q',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py" --fail-under=85',
     ].join(' && ')
   ),
   ...STRUCTURAL_PYTEST_PARTS,
@@ -264,6 +264,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
+  'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/gtm-lead-copy.test.mjs',
@@ -275,6 +276,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
+  'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
@@ -283,6 +285,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/logo-asset-normalization.test.mjs',
   'scripts/observability-issue-github.test.mjs',
   'scripts/observability-issue-sync.test.mjs',
+  'scripts/ops/firecrawl-crawl.test.mjs',
   'scripts/performance-artifact-retention.test.mjs',
   'scripts/postmortem-linkage-check.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
@@ -290,12 +293,14 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/company-registry.test.mjs',
   'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/impact-forecast.test.mjs',
   'scripts/summer-commissioning/product-quality-governor.test.mjs',
   'scripts/summer-commissioning/project-creation-policy.test.mjs',
   'scripts/summer-commissioning/receipt-trust.test.mjs',
   'scripts/upstash-production-operator.test.mjs',
   'scripts/vercel-source-contract.test.mjs',
   'scripts/verify-workflow-references.test.mjs',
+  'scripts/visual-baseline-adopt.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([

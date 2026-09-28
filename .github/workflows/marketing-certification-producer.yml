@@ -1,0 +1,81 @@
+name: Marketing Certification Producer
+# JOV-6928 Canary A: event-driven machine evidence for the marketing
+# certification ledger. A push to main that changes a registry entry's
+# canonical source re-evaluates exactly those entries and posts one
+# jovie.certification/v1 packet each to /api/internal/ovie/certification-evidence.
+# Evidence only: founder decisions never pass through this workflow.
+# workflow_dispatch with all=true reconciles every source-backed entry
+# (discovery of entries the ledger has never evaluated).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/components/**'
+      - 'apps/web/data/marketing/**'
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Evaluate every source-backed marketing registry entry
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketing-certification-producer
+  cancel-in-progress: false
+
+jobs:
+  produce:
+    name: Marketing certification evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Changed files in this push
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/changed.txt"
+          if [ -n "${BEFORE:-}" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            git diff --name-only "$BEFORE" "$GITHUB_SHA" > "$out"
+          else
+            git diff --name-only HEAD~1 HEAD > "$out"
+          fi
+          echo "path=$out" >> "$GITHUB_OUTPUT"
+          wc -l < "$out"
+
+      - name: Install Playwright Chromium for Storybook render proof
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Doppler CLI
+        run: |
+          curl -sLf --retry 3 --tlsv1.2 --proto "=https" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+          sudo apt-get update && sudo apt-get install -y doppler
+
+      - name: Produce and post evidence
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CHANGED: ${{ steps.changed.outputs.path }}
+          ALL: ${{ inputs.all && '--all' || '' }}
+          RUN_REF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ -n "$ALL" ]; then extra+=(--all); fi
+          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+            env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec tsx scripts/marketing-certification-producer.ts \
+              --sha "$GITHUB_SHA" --changed "$CHANGED" --run-ref "$RUN_REF" "${extra[@]}"
