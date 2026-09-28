@@ -98,7 +98,7 @@ function AskJoviePanel({ pathname }: AskJoviePanelProps) {
 
   return (
     <div
-      className='flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-3'
+      className='ask-jovie-panel flex w-80 flex-col gap-3'
       data-testid='ask-jovie-panel'
     >
       <div className='flex flex-col gap-1'>
@@ -233,14 +233,8 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
               aria-hidden
             />
           </span>
-          <span
-            className={cn(
-              'grid grid-cols-[0fr] transition-[grid-template-columns] duration-subtle ease-interactive',
-              'group-hover:grid-cols-[1fr] group-focus-visible:grid-cols-[1fr]',
-              'motion-reduce:transition-none'
-            )}
-          >
-            <span className='overflow-hidden whitespace-nowrap text-app tracking-tight [font-weight:var(--font-weight-nav)]'>
+          <span className='ask-jovie-wordmark'>
+            <span className='overflow-hidden whitespace-nowrap text-app tracking-tight'>
               Jovie
             </span>
           </span>

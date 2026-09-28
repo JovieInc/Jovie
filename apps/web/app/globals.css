@@ -2246,6 +2246,29 @@ body {
   }
 }
 
+.ask-jovie-mark .ask-jovie-wordmark {
+  display: grid;
+  grid-template-columns: 0fr;
+  font-weight: var(--font-weight-nav);
+  transition: grid-template-columns var(--duration-subtle)
+    var(--ease-interactive);
+}
+
+.ask-jovie-mark:hover .ask-jovie-wordmark,
+.ask-jovie-mark:focus-visible .ask-jovie-wordmark {
+  grid-template-columns: 1fr;
+}
+
+.ask-jovie-panel {
+  max-inline-size: calc(100vw - 2rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-jovie-mark .ask-jovie-wordmark {
+    transition: none;
+  }
+}
+
 /* Keyframes */
 
 @keyframes mobile-nav-item-in {
