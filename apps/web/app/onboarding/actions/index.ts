@@ -39,6 +39,10 @@ import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { isTokenBackedClaimFixture } from '@/lib/profile/public-profile-identity-policy';
+import {
+  type ServerAnalyticsDelivery,
+  trackServerEventTx,
+} from '@/lib/server-analytics';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -98,6 +102,88 @@ async function recoverConcurrentProfileClaim(
       profileId: existingProfile.id,
     };
   });
+}
+
+async function recordFunnelDelivery(
+  event: string,
+  delivery: ServerAnalyticsDelivery
+): Promise<void> {
+  if (delivery.ok) return;
+  // Contract/prepare failures are deterministic bugs, not transient loss: a
+  // database failure throws inside the transaction and rolls the state write
+  // back with it, so an undelivered event here means our contract is wrong.
+  const error = new Error(
+    `Onboarding funnel event rejected: ${event} (${delivery.error})`
+  );
+  await captureError(`onboarding funnel event rejected: ${event}`, error, {
+    route: 'onboarding',
+    event,
+  });
+  throw error;
+}
+
+/**
+ * Revenue-critical funnel events emitted atomically inside the onboarding
+ * serializable transaction. If the transaction commits, the durable event
+ * exists; if the insert fails, the whole claim/signup rolls back so a
+ * successful state transition can never go unmeasured. Stable
+ * `eventIdentity` values deduplicate retries, double submissions, and
+ * multi-tab races.
+ */
+async function emitOnboardingFunnelEventsTx(
+  tx: DbOrTransaction,
+  params: {
+    pendingClaim: PendingClaimContext | null;
+    result: CompletionResult;
+  }
+): Promise<void> {
+  const { pendingClaim, result } = params;
+  if (!result.profileId) return;
+
+  // Direct-profile onboarding only reserves the profile here. Spotify
+  // ownership verification and the actual claim happen later in
+  // connectOnboardingSpotifyArtist, which atomically emits claim completion
+  // and activation. Recording either event at reservation time would count
+  // abandoned or mismatched claims as successful and consume their durable
+  // identities before the verified transaction runs.
+  const completesClaim = pendingClaim?.mode !== 'direct_profile';
+
+  if (pendingClaim && completesClaim) {
+    await recordFunnelDelivery(
+      'claim_completed',
+      await trackServerEventTx(
+        tx,
+        'claim_completed',
+        { profileId: result.profileId, source: pendingClaim.mode },
+        { eventIdentity: `claim_completed:${result.profileId}` }
+      )
+    );
+  }
+
+  await recordFunnelDelivery(
+    'signup_completed',
+    await trackServerEventTx(
+      tx,
+      'signup_completed',
+      { profileId: result.profileId, source: pendingClaim?.mode ?? 'organic' },
+      { eventIdentity: `signup_completed:${result.profileId}` }
+    )
+  );
+
+  if (completesClaim) {
+    // Canonical self-serve activation: onboarding completed on the claimed
+    // profile. Durable and queryable without GA4; the client magic_moment
+    // marker remains supplemental telemetry.
+    await recordFunnelDelivery(
+      'activation_achieved',
+      await trackServerEventTx(
+        tx,
+        'activation_achieved',
+        { profileId: result.profileId, source: 'onboarding_completed' },
+        { eventIdentity: `activation_achieved:${result.profileId}` }
+      )
+    );
+  }
 }
 
 async function applyPendingClaimTx(
@@ -345,6 +431,10 @@ export async function completeOnboarding({
               if (pendingClaim.mode !== 'direct_profile') {
                 await markWaitlistSignedUpInTx(tx, clerkUserId);
               }
+              await emitOnboardingFunnelEventsTx(tx, {
+                pendingClaim,
+                result,
+              });
               return result;
             }
 
@@ -362,6 +452,10 @@ export async function completeOnboarding({
                 trimmedDisplayName
               );
               await markWaitlistSignedUpInTx(tx, clerkUserId);
+              await emitOnboardingFunnelEventsTx(tx, {
+                pendingClaim,
+                result,
+              });
               return result;
             }
 
@@ -375,6 +469,10 @@ export async function completeOnboarding({
               username
             );
             await markWaitlistSignedUpInTx(tx, clerkUserId);
+            await emitOnboardingFunnelEventsTx(tx, {
+              pendingClaim,
+              result,
+            });
             return result;
           },
           { isolationLevel: 'serializable' }

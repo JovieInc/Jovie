@@ -602,11 +602,17 @@ export function ProfileCompactSurface({
     },
     [handleTabSelect, renderMode]
   );
+  const handleGetUpdatesClick = useCallback(() => {
+    if (renderMode !== 'interactive') return;
+    openNotifications();
+  }, [openNotifications, renderMode]);
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
     renderMode === 'interactive' && renderInteractiveOverlays && canGetUpdates;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
+  const hasListenDestination =
+    mergedDSPs.length > 0 || Boolean(homeLatestRelease) || releases.length > 0;
   // Founder accent rotation across the mode cards. The featured Listen card
   // shows artwork (release art or the profile photo), so it anchors the
   // rotation and the other mode cards continue from it.
@@ -769,6 +775,11 @@ export function ProfileCompactSurface({
               listenHref={`/${artist.handle}/listen`}
               isListenActive={isMusicMode}
               onListenClick={handleListenClick}
+              onGetUpdatesClick={
+                canGetUpdates ? handleGetUpdatesClick : undefined
+              }
+              isSubscribed={homeAlertsSubscribed}
+              hasListenDestination={hasListenDestination}
               socialLinks={visibleSocialLinks}
               onSocialClick={handleSocialClick}
               headingAs={IdentityHeading}

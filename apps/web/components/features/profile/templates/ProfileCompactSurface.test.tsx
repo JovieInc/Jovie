@@ -335,6 +335,33 @@ describe('ProfileCompactSurface', () => {
     expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
   });
 
+  it('leads the identity header with Get Updates and opens the subscribe flow', () => {
+    const onModeSelect = vi.fn();
+    renderSurface({
+      allowFanCapture: true,
+      renderMode: 'interactive',
+      onModeSelect,
+    });
+
+    const identity = screen.getByTestId('profile-identity-header');
+    expect(
+      within(identity).queryByTestId('profile-identity-listen')
+    ).toBeNull();
+    fireEvent.click(
+      within(identity).getByRole('button', { name: 'Get Updates' })
+    );
+    expect(onModeSelect).toHaveBeenCalledWith('subscribe');
+  });
+
+  it('reads Updates On for a subscribed viewer', () => {
+    renderSurface({ allowFanCapture: true, isSubscribed: true });
+
+    expect(screen.getByRole('button', { name: 'Updates On' })).toHaveAttribute(
+      'data-subscribed',
+      'true'
+    );
+  });
+
   it('marks only the active public home surface for mobile overflow scoping', () => {
     const { unmount } = renderSurface();
     const homeSurface = screen.getByTestId('profile-compact-surface');
