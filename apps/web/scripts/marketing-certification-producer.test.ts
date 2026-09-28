@@ -4,6 +4,7 @@ import { MARKETING_COMPONENT_REGISTRY } from '../data/marketing/componentRegistr
 import {
   affectedEntries,
   buildPacket,
+  certificationPlans,
   storyFileFor,
   testFilesFor,
 } from './marketing-certification-producer';
@@ -98,6 +99,37 @@ describe('marketing certification producer', () => {
     );
   });
 
+  it('plans each entry with source+test+story dependencies and re-runs on any hit', () => {
+    const via = 'apps/web/tests/unit/marketing/footer-links.test.ts';
+    const storyFiles = [
+      { path: 'shells.stories.tsx', title: footer!.storybookTitle },
+    ];
+    const base = {
+      entries: [footer!],
+      storyFiles,
+      exists: (path: string) => path === via,
+      readSource: () => `// @coverage-via ${via}\nexport {};`,
+    };
+    const all = certificationPlans({ ...base, all: true, changed: [] });
+    expect(all).toHaveLength(1);
+    expect(all[0].dependencies).toEqual([
+      footer!.resolvedSource,
+      via,
+      'apps/web/shells.stories.tsx',
+    ]);
+    expect(all[0].ownTestFiles).toEqual([
+      'tests/unit/marketing/footer-links.test.ts',
+    ]);
+    const selected = (changed: string[]) =>
+      certificationPlans({ ...base, all: false, changed }).map(
+        plan => plan.entry.id
+      );
+    expect(selected(['README.md'])).toEqual([]);
+    expect(selected([via])).toEqual(['shell.footer']);
+    expect(selected(['apps/web/shells.stories.tsx'])).toEqual(['shell.footer']);
+    expect(selected([footer!.resolvedSource!])).toEqual(['shell.footer']);
+  });
+
   it('resolves a story from its meta title plus story name', () => {
     const files = [
       { path: 'shells.stories.tsx', title: 'Marketing/Shells' },
@@ -121,6 +153,42 @@ describe('marketing certification producer', () => {
     });
     expect(admission.blockers).toEqual([]);
     expect(admission.state).toBe('review_ready');
+  });
+
+  it('aggregates multiple certifying test files: any failure fails, any gap reports', () => {
+    const twoFiles = [
+      'components/site/MarketingFooter.test.tsx',
+      'tests/unit/marketing/footer-links.test.ts',
+    ];
+    const failed = packetFor({
+      ownTests: {
+        testResults: [
+          {
+            name: '/repo/apps/web/components/site/MarketingFooter.test.tsx',
+            status: 'passed',
+            assertionResults: [{ title: 'renders', status: 'passed' }],
+          },
+          {
+            name: '/repo/apps/web/tests/unit/marketing/footer-links.test.ts',
+            status: 'failed',
+            assertionResults: [{ title: 'links resolve', status: 'failed' }],
+          },
+        ],
+      },
+      ownTestFiles: twoFiles,
+    });
+    expect(failed.testsCoverage[0].status).toBe('failed');
+    const missingAndFailed = packetFor({
+      ownTests: report(
+        'tests/unit/marketing/footer-links.test.ts',
+        'links resolve',
+        'failed'
+      ),
+      ownTestFiles: twoFiles,
+    });
+    expect(missingAndFailed.testsCoverage[0].status).toBe('failed');
+    const partialMissing = packetFor({ ownTestFiles: twoFiles });
+    expect(partialMissing.testsCoverage[0].status).toBe('missing');
   });
 
   it('never reports missing or failed evidence as passed', () => {

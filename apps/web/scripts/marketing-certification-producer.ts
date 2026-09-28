@@ -116,6 +116,53 @@ export function testFilesFor(
   );
 }
 
+interface CertificationPlanItem {
+  readonly entry: MarketingRegistryEntry;
+  readonly story: { readonly path: string; readonly storyName: string } | null;
+  readonly ownTestFiles: readonly string[];
+  readonly dependencies: readonly string[];
+}
+
+/**
+ * Resolves each source-backed entry's certifying tests, story and dependency
+ * set, then selects the entries to re-certify: all of them under `--all`,
+ * otherwise only those a changed repo path invalidates.
+ */
+export function certificationPlans(input: {
+  readonly entries: readonly MarketingRegistryEntry[];
+  readonly storyFiles: readonly {
+    readonly path: string;
+    readonly title: string;
+  }[];
+  readonly all: boolean;
+  readonly changed: readonly string[];
+  readonly exists: (repoPath: string) => boolean;
+  readonly readSource: (repoPath: string) => string | null;
+}): CertificationPlanItem[] {
+  const plans = input.entries.flatMap(entry => {
+    if (!entry.resolvedSource) return [];
+    const tests = testFilesFor(
+      entry.resolvedSource,
+      input.readSource(entry.resolvedSource) ?? '',
+      input.exists
+    );
+    const story = storyFileFor(entry.storybookTitle, input.storyFiles);
+    return [
+      {
+        entry,
+        story,
+        ownTestFiles: tests.map(webRelative),
+        dependencies: [
+          entry.resolvedSource,
+          ...tests,
+          ...(story ? [`apps/web/${story.path}`] : []),
+        ],
+      },
+    ];
+  });
+  return input.all ? plans : affectedEntries(plans, input.changed);
+}
+
 function listStoryFiles(dir: string, found: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
@@ -336,29 +383,17 @@ async function main() {
     path: relative(WEB_ROOT, path),
     title: /title:\s*'([^']+)'/u.exec(readFileSync(path, 'utf8'))?.[1] ?? '',
   }));
-  const plans = MARKETING_COMPONENT_REGISTRY.flatMap(entry => {
-    if (!entry.resolvedSource) return [];
-    const sourcePath = join(REPO_ROOT, entry.resolvedSource);
-    const tests = testFilesFor(
-      entry.resolvedSource,
-      existsSync(sourcePath) ? readFileSync(sourcePath, 'utf8') : '',
-      path => existsSync(join(REPO_ROOT, path))
-    );
-    const story = storyFileFor(entry.storybookTitle, storyFiles);
-    return [
-      {
-        entry,
-        story,
-        ownTestFiles: tests.map(webRelative),
-        dependencies: [
-          entry.resolvedSource,
-          ...tests,
-          ...(story ? [`apps/web/${story.path}`] : []),
-        ],
-      },
-    ];
+  const plan = certificationPlans({
+    entries: MARKETING_COMPONENT_REGISTRY,
+    storyFiles,
+    all: values.all ?? false,
+    changed,
+    exists: path => existsSync(join(REPO_ROOT, path)),
+    readSource: path => {
+      const sourcePath = join(REPO_ROOT, path);
+      return existsSync(sourcePath) ? readFileSync(sourcePath, 'utf8') : null;
+    },
   });
-  const plan = values.all ? plans : affectedEntries(plans, changed);
   if (plan.length === 0) {
     console.log('[marketing-cert] no registry entry affected');
     return;
