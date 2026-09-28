@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import { SegmentedDigitBox } from './SegmentedDigitBox';
 
+// Canonical size tokens (not the arbitrary rem values OtpInput uses for
+// pixel-exact production sizing) — plenty for demonstrating the atom itself.
 const BOX_SIZE_CLASSNAME = 'h-12 w-11 sm:h-12 sm:w-12';
 const TEXT_SIZE_CLASSNAME = 'text-lg sm:text-xl';
 
