@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { act, fireEvent } from '@testing-library/react';
 import {
   afterAll,
   afterEach,
@@ -11,7 +12,41 @@ import {
 } from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
+
+const virtualizerSpy = vi.hoisted(() => ({
+  options: null as null | {
+    initialOffset?: () => number;
+    measureElement?: (el: Element) => number;
+  },
+  measure: vi.fn(),
+  scrollToIndex: vi.fn(),
+}));
+
+const resizeObserverCallbacks = vi.hoisted(
+  () => [] as ResizeObserverCallback[]
+);
+
+vi.mock('@tanstack/react-virtual', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@tanstack/react-virtual')>();
+  return {
+    ...actual,
+    useVirtualizer: (options: never) => {
+      virtualizerSpy.options = options;
+      const virtualizer = actual.useVirtualizer(options);
+      return new Proxy(virtualizer, {
+        get(target, prop) {
+          if (prop === 'measure') return virtualizerSpy.measure;
+          if (prop === 'scrollToIndex') return virtualizerSpy.scrollToIndex;
+          const value = Reflect.get(target, prop);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    },
+  };
+});
 
 const mockChatState = vi.hoisted(() => ({
   isLoadingConversation: false,
@@ -19,6 +54,8 @@ const mockChatState = vi.hoisted(() => ({
   isLoading: true,
   isSubmitting: false,
   status: 'streaming' as 'ready' | 'streaming',
+  collapsedSummerFailureCount: 0,
+  showCollapsedSummerFailures: vi.fn(),
   messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
 }));
 
@@ -63,6 +100,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       isLoading: mockChatState.isLoading,
       isSubmitting: mockChatState.isSubmitting,
       hasMessages: mockChatState.hasMessages,
+      collapsedSummerFailureCount: mockChatState.collapsedSummerFailureCount,
+      showCollapsedSummerFailures: mockChatState.showCollapsedSummerFailures,
       isLoadingConversation: mockChatState.isLoadingConversation,
       conversationTitle: null,
       status: mockChatState.status,
@@ -147,20 +186,36 @@ const originalScrollIntoView = Object.getOwnPropertyDescriptor(
   globalThis.HTMLElement.prototype,
   'scrollIntoView'
 );
+const originalResizeObserver = globalThis.ResizeObserver;
 
 beforeAll(() => {
   Object.defineProperty(globalThis.HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
     value: vi.fn(),
   });
+  globalThis.ResizeObserver = vi.fn().mockImplementation(function (
+    this: ResizeObserver,
+    callback: ResizeObserverCallback
+  ) {
+    resizeObserverCallbacks.push(callback);
+    this.observe = vi.fn();
+    this.unobserve = vi.fn();
+    this.disconnect = vi.fn();
+  }) as unknown as typeof ResizeObserver;
 });
 
 afterEach(() => {
+  resizeObserverCallbacks.length = 0;
+  virtualizerSpy.options = null;
+  virtualizerSpy.measure.mockClear();
+  virtualizerSpy.scrollToIndex.mockClear();
   mockChatState.isLoadingConversation = false;
   mockChatState.hasMessages = true;
   mockChatState.isLoading = true;
   mockChatState.isSubmitting = false;
   mockChatState.status = 'streaming';
+  mockChatState.collapsedSummerFailureCount = 0;
+  mockChatState.showCollapsedSummerFailures = vi.fn();
   mockChatState.messages = [
     { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
   ];
@@ -176,6 +231,11 @@ afterAll(() => {
   } else {
     delete (globalThis.HTMLElement.prototype as { scrollIntoView?: unknown })
       .scrollIntoView;
+  }
+  if (originalResizeObserver) {
+    globalThis.ResizeObserver = originalResizeObserver;
+  } else {
+    delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
   }
 });
 
@@ -263,6 +323,11 @@ describe('JovieChat styling regressions', () => {
     expect(jovieChatSource).toContain('CHAT_TRANSCRIPT_WINDOW');
     expect(jovieChatSource).toContain('virtualizeAfterMessageCount');
     expect(jovieChatSource).toContain('overscanRowCount');
+    // The virtualizer owner stays out of React Compiler memoization, or the
+    // window freezes on its first rows and the thread renders blank (JOV-6702).
+    expect(jovieChatSource).toMatch(
+      /export function JovieChat\([\s\S]*?\}: JovieChatProps\) \{[\s\S]{0,400}?'use no memo';/
+    );
   });
 
   it('marks an empty conversation-load shell as busy for assistive technology', () => {
@@ -283,5 +348,87 @@ describe('JovieChat styling regressions', () => {
 
     expect(loadingShell?.getAttribute('aria-busy')).toBe('true');
     expect(loadingShell?.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('re-measures and re-anchors a pinned transcript when a hidden viewport gains layout (JOV-6702)', () => {
+    mockChatState.messages = Array.from({ length: 9 }, (_, i) => ({
+      id: `m${i}`,
+      role: i % 2 ? 'assistant' : 'user',
+      parts: [{ type: 'text', text: `message ${i}` }],
+    }));
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    // The virtualizer seeds its offset from the live scrollTop and measures
+    // rows through the shared transcript-window guard.
+    expect(typeof virtualizerSpy.options?.initialOffset).toBe('function');
+    const collapsedRow = {
+      getBoundingClientRect: () => ({ height: 1 }),
+    } as unknown as Element;
+    expect(virtualizerSpy.options?.measureElement?.(collapsedRow)).toBe(
+      CHAT_TRANSCRIPT_ROW_ESTIMATE_PX
+    );
+
+    const scrollContainer = container.querySelector(
+      '[data-testid="chat-message-scroll"]'
+    );
+    expect(scrollContainer).toBeTruthy();
+    expect(resizeObserverCallbacks.length).toBeGreaterThan(0);
+
+    // Hidden-mount state: viewport read 0px when the observer attached.
+    // Simulate the workspace surface becoming visible (0 -> real height).
+    let viewportHeight = 0;
+    Object.defineProperty(scrollContainer, 'clientHeight', {
+      configurable: true,
+      get: () => viewportHeight,
+    });
+    viewportHeight = 640;
+
+    act(() => {
+      for (const callback of resizeObserverCallbacks) {
+        callback([], {} as ResizeObserver);
+      }
+    });
+
+    // Stale ~0px row cache dropped, and the pinned transcript re-anchored to
+    // the live tail rather than staying scrolled to a stale offset.
+    expect(virtualizerSpy.measure).toHaveBeenCalled();
+    expect(virtualizerSpy.scrollToIndex).toHaveBeenCalledWith(
+      8,
+      expect.objectContaining({ align: 'end', behavior: 'auto' })
+    );
+  });
+
+  it('surfaces the collapsed unanswered-turns control when the hook reports them', () => {
+    mockChatState.collapsedSummerFailureCount = 2;
+    mockChatState.isLoading = false;
+    mockChatState.status = 'ready';
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const control = container.querySelector(
+      '[data-testid="chat-collapsed-failures"]'
+    );
+    expect(control).toBeTruthy();
+    expect(control?.textContent).toContain(
+      '2 earlier messages went unanswered'
+    );
+
+    fireEvent.click(control as HTMLElement);
+    expect(mockChatState.showCollapsedSummerFailures).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the collapsed unanswered-turns control hidden when there are none', () => {
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(
+      container.querySelector('[data-testid="chat-collapsed-failures"]')
+    ).toBeNull();
   });
 });
