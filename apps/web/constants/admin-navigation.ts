@@ -11,6 +11,7 @@ export const adminPeopleViews = [
   'creators',
   'users',
   'releases',
+  'assets',
   'feedback',
 ] as const;
 
@@ -233,6 +234,7 @@ export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
   creators: 'Creators',
   users: 'Users',
   releases: 'Releases',
+  assets: 'Assets',
   feedback: 'Feedback',
 };
 
