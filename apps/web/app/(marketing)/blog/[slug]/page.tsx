@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
+import { EditorialRetargeting } from '@/components/features/tracking/EditorialRetargeting';
 import { BlogPostPage } from '@/components/organisms/BlogPostPage';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { INVESTOR_ANSWER_REUSE_PACK } from '@/data/investorAnswerReuseCopy';
 import {
   getBlogPost,
   getBlogPostSlugs,
@@ -11,6 +13,8 @@ import {
   buildArticleSchema,
   buildBreadcrumbSchema,
 } from '@/lib/constants/schemas';
+import { env } from '@/lib/env-server';
+import { buildEditorialRetargetingRegistry } from '@/lib/retargeting/editorial';
 import type { ProfileData } from '@/lib/services/profile';
 import {
   getProfileByUsername,
@@ -29,6 +33,12 @@ interface BlogPostPageProps {
 
 // Fully static - blog posts are pre-generated at build time
 export const revalidate = false;
+
+// JOV-6289: consented retargeting is limited to explicitly approved public
+// answer-article canonical paths. Every other blog post resolves to nothing.
+const EDITORIAL_RETARGETING_ENTRIES = buildEditorialRetargetingRegistry(
+  INVESTOR_ANSWER_REUSE_PACK
+);
 
 export async function generateStaticParams() {
   const slugs = await getBlogPostSlugs();
@@ -144,6 +154,10 @@ export default async function BlogPostRoute({
       <>
         <script type='application/ld+json'>{articleSchema}</script>
         <script type='application/ld+json'>{breadcrumbSchema}</script>
+        <EditorialRetargeting
+          entries={EDITORIAL_RETARGETING_ENTRIES}
+          pixelId={env.JOVIE_FACEBOOK_PIXEL_ID}
+        />
         <BlogPostPage
           post={post}
           author={author}
