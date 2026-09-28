@@ -28,6 +28,8 @@ import {
   LANE_GROUPS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
+  NODE_RUNTIME_CONTRACT_COMMAND,
+  NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
   STRUCTURAL_PYTEST_FILES,
   STRUCTURAL_PYTEST_SHARD_COMMANDS,
@@ -35,6 +37,7 @@ import {
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   selectBillingCoverageCommands,
   selectLanes,
+  selectNodeRuntimeContractCommands,
   structuralLocks,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
@@ -412,6 +415,7 @@ describe('ci-fast bounded parallel workflow', () => {
         spotify: 'false',
         kbd: 'false',
         crawler: 'true',
+        overlay: 'false',
       });
 
       const runner = remaining
@@ -431,6 +435,7 @@ describe('ci-fast bounded parallel workflow', () => {
             RUN_SPOTIFY: 'false',
             RUN_KBD: 'false',
             RUN_CRAWLER: 'true',
+            RUN_OVERLAY: 'false',
           },
         }
       );
@@ -441,6 +446,63 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('selects the overlay collision proof when overlay primitives change', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/OVERLAY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'packages/ui/atoms/dialog.tsx',
+      'packages/ui/atoms/dropdown-menu.tsx',
+      'packages/ui/lib/overlay-styles.ts',
+      'apps/web/styles/tailwind-foundation.css',
+      'apps/web/.storybook/stories/overlay-collisions.stories.tsx',
+      'apps/web/tests/e2e/storybook-overlay-collisions.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'packages/ui/atoms/badge.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const runner = remaining
+      .split('id: storybook-browser-test')[1]
+      .split('      - name: Upload Storybook browser evidence')[0];
+    const selection = runner.slice(
+      runner.indexOf('          specs=()'),
+      runner.indexOf('          pnpm exec storybook dev')
+    );
+    const chosen = spawnSync(
+      'bash',
+      ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUN_SPOTIFY: 'false',
+          RUN_KBD: 'false',
+          RUN_CRAWLER: 'false',
+          RUN_OVERLAY: 'true',
+        },
+      }
+    );
+    expect(chosen.status, chosen.stderr).toBe(0);
+    expect(chosen.stdout.trim().split('\n')).toEqual([
+      'tests/e2e/storybook-overlay-collisions.spec.ts',
+    ]);
   });
 
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
@@ -562,6 +624,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'guardrails',
       'ios-fast',
       'merge-group-guards',
+      'node-runtime-contracts',
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
@@ -1090,6 +1153,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'merge-group-guards',
       'billing-coverage',
       'copy-gate',
+      'node-runtime-contracts',
       'structural',
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
@@ -1126,6 +1190,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
       'copy-gate': COPY_GATE_COMMAND,
+      'node-runtime-contracts': NODE_RUNTIME_CONTRACT_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -1236,6 +1301,82 @@ describe('ci-fast bounded parallel workflow', () => {
 
     expect(commands).toEqual([BILLING_PROVENANCE_COVERAGE_COMMAND]);
   });
+
+  it('runs the focused Node runtime contract suite only for relevant changes', () => {
+    expect(LANE_GROUPS.remaining).toContain('node-runtime-contracts');
+    expect(LANE_COMMANDS['node-runtime-contracts']).toBe(
+      NODE_RUNTIME_CONTRACT_COMMAND
+    );
+    for (const testFile of [
+      'tests/unit/ci/node-runtime-policy.test.ts',
+      'tests/unit/ci/node-runtime-contract.test.ts',
+      'tests/unit/ci/runner-setup-action.test.ts',
+    ]) {
+      expect(NODE_RUNTIME_CONTRACT_COMMAND).toContain(testFile);
+    }
+    expect(NODE_RUNTIME_CONTRACT_PATHS).toEqual(
+      expect.arrayContaining([
+        '.nvmrc',
+        '.node-version',
+        'config/node-runtime-policy.json',
+        'apps/ovie/package.json',
+        'packages/jovie-cli/package.json',
+        '.github/actions/setup-node-pnpm/**',
+        '.github/runner-image/**',
+        '.github/workflows/fleet-gate-refresh.yml',
+        '.github/workflows/rolling-ci-dispatch.yml',
+        'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
+      ])
+    );
+    expect(
+      selectNodeRuntimeContractCommands({
+        event: 'pull_request',
+        runtimeFiles: ['.nvmrc'],
+      })
+    ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
+    expect(
+      selectNodeRuntimeContractCommands({
+        event: 'pull_request',
+        runtimeFiles: [],
+      })
+    ).toEqual([]);
+    expect(
+      selectNodeRuntimeContractCommands({
+        event: 'pull_request',
+        runtimeFiles: null,
+      })
+    ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
+    expect(
+      selectNodeRuntimeContractCommands({
+        event: 'workflow_dispatch',
+        runtimeFiles: [],
+      })
+    ).toEqual([NODE_RUNTIME_CONTRACT_COMMAND]);
+  });
+
+  it('executes the selected Node runtime lane and its three contract suites', () => {
+    const previousEvent = process.env.GITHUB_EVENT_NAME;
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+    try {
+      const lane = selectLanes('remaining').find(
+        candidate => candidate.id === 'node-runtime-contracts'
+      );
+      expect(lane).toBeDefined();
+      if (!lane) throw new Error('Node runtime lane is missing');
+      const result = lane.run();
+      expect(result.code).toBe(0);
+      expect(result.skipped).not.toBe(true);
+      // Lane output is turborepo-prefixed and excerpted on failure; the
+      // contract is a green exit, not a frozen vitest summary line.
+      expect(result.output).toContain('passed');
+    } finally {
+      if (previousEvent === undefined) {
+        delete process.env.GITHUB_EVENT_NAME;
+      } else {
+        process.env.GITHUB_EVENT_NAME = previousEvent;
+      }
+    }
+  }, 30000);
 
   it('fails closed onto structural UI gates for every web UI source and guard', () => {
     const remaining = jobBlock(

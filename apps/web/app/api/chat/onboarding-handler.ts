@@ -603,6 +603,7 @@ export async function tryHandleAnonymousOnboardingChat(
       return await serveScriptedFallback(forcedFallbackReason);
     }
 
+    let streamFailed = false;
     const turn = await executeChatTurn({
       uiMessages,
       artistContext: null,
@@ -621,6 +622,9 @@ export async function tryHandleAnonymousOnboardingChat(
       requestId,
       telemetry,
       mode: 'onboarding',
+      onStreamError: async () => {
+        streamFailed = true;
+      },
     });
 
     Sentry.addBreadcrumb({
@@ -638,7 +642,10 @@ export async function tryHandleAnonymousOnboardingChat(
 
     return turn.streamResult.toUIMessageStreamResponse({
       headers: responseHeaders,
-      onFinish: async ({ responseMessage }) => {
+      onFinish: async ({ responseMessage, outcome }) => {
+        if (streamFailed || outcome.status === 'failed') {
+          return;
+        }
         await persistAnonymousAssistantMessage({
           conversationId,
           latestUserClientMessageId: latestUserMessage.clientMessageId,
@@ -831,11 +838,15 @@ async function persistAnonymousAssistantMessage({
   const assistantText = sanitizeAssistantResponse(
     extractUIMessageText(responseMessage.parts)
   ).text;
+  const toolCalls = encodeToolEvents(responseMessage.parts);
+  if (!assistantText.trim() && (!toolCalls || toolCalls.length === 0)) {
+    return;
+  }
   await persistAnonymousAssistantRecord({
     conversationId,
     latestUserClientMessageId,
     content: assistantText,
-    toolCalls: encodeToolEvents(responseMessage.parts),
+    toolCalls,
     assistantSource: 'llm',
     scriptLineKey: null,
   });
@@ -857,6 +868,9 @@ async function persistAnonymousAssistantRecord({
   readonly assistantSource: 'llm' | 'script';
   readonly scriptLineKey: string | null;
 }): Promise<void> {
+  if (!content.trim() && (!toolCalls || toolCalls.length === 0)) {
+    return;
+  }
   const now = new Date();
   await db
     .insert(chatMessages)
@@ -864,11 +878,7 @@ async function persistAnonymousAssistantRecord({
       conversationId,
       clientMessageId: `assistant:${latestUserClientMessageId}`,
       role: 'assistant',
-      content:
-        content ||
-        (toolCalls && toolCalls.length > 0
-          ? ''
-          : 'Done. What would you like to do next?'),
+      content,
       toolCalls,
       assistantSource,
       scriptLineKey,
@@ -878,11 +888,7 @@ async function persistAnonymousAssistantRecord({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
       targetWhere: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
       set: {
-        content:
-          content ||
-          (toolCalls && toolCalls.length > 0
-            ? ''
-            : 'Done. What would you like to do next?'),
+        content,
         toolCalls,
         assistantSource,
         scriptLineKey,

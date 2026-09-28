@@ -82,13 +82,28 @@ describe('admin nav IA copy (JOV-2098)', () => {
     const source = readFileSync(ADMIN_NAV, 'utf8');
 
     expect(source).toContain(
+      'Company pulse, ranked signals, health, and freshness'
+    );
+    expect(source).toContain(
+      'Visited through expanded, with people behind every stage'
+    );
+    expect(source).toContain(
+      'Certified, deployed, exposed, and observed customer reality'
+    );
+    expect(source).toContain(
+      'Autonomous execution outcomes, exceptions, costs, and queues'
+    );
+    expect(source).toContain(
+      'Founder judgments that automation cannot safely make'
+    );
+    expect(source).not.toContain(
       'Canonical company Ops — decisions, survival, bottleneck, delivery'
     );
     expect(source).not.toContain(
       'Health dashboard — one signal per area linking to detail screens'
     );
     expect(source).not.toContain('One operator HUD — need first, noise below');
-    expect(source).toContain(
+    expect(source).not.toContain(
       'Acquisition funnel, referral, outreach, and conversion'
     );
     expect(source).toContain(

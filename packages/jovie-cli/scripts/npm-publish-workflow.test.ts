@@ -28,7 +28,7 @@ function assertPublishWorkflowContract(source: string): void {
   );
   expect(source).toMatch(/node-version-file: .nvmrc/);
   expect(source).toContain('registry-url: https://registry.npmjs.org');
-  expect(source).toMatch(/node --version.*v22\.23\.2/s);
+  expect(source).toMatch(/node --version.*v24\.21\.0/s);
   expect(source).toContain('pnpm install --frozen-lockfile');
   expect(source).toContain('pnpm --filter @jovie/cli run test:coverage');
   expect(source).toContain('pnpm --filter @jovie/cli run typecheck');

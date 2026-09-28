@@ -150,6 +150,19 @@ describe('ImageWithFallback', () => {
     expect(fallback).not.toHaveClass('w-full');
   });
 
+  it('treats the fallback as decorative when alt is empty', () => {
+    render(
+      <ImageWithFallback
+        src={null as unknown as string}
+        alt=''
+        fill
+        fallbackVariant='avatar'
+      />
+    );
+
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('calls onLoadError when image fails to load', () => {
     const onLoadError = vi.fn();
     render(

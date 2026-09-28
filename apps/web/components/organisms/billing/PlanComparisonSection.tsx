@@ -10,6 +10,7 @@ import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import type { PricingOption } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatAmountNoCents } from '@/lib/utils/format-number';
+import { Money } from '@/lib/workspace-lock/money-visibility';
 import {
   LINEAR_EASE,
   PLAN_FEATURES,
@@ -171,7 +172,7 @@ export function PlanComparisonSection({
                   ) : (
                     <>
                       <span className='text-3xl font-[620] tracking-[-0.03em] text-primary-token'>
-                        {priceDisplay}
+                        <Money>{priceDisplay}</Money>
                       </span>
                       <span className='text-app text-secondary-token'>
                         {intervalLabel}

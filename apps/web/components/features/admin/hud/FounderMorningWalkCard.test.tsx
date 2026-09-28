@@ -30,4 +30,14 @@ describe('FounderMorningWalkCard', () => {
     expect(screen.getByTestId('founder-morning-walk')).toBeInTheDocument();
     expect(screen.queryByText('Stop')).toBeNull();
   });
+
+  it('compact renders the record action without card chrome', () => {
+    fastRender(<FounderMorningWalkCard compact defaultStatus='Idle' />);
+
+    expect(screen.getByTestId('founder-morning-walk')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Record walk' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Morning walk')).toBeNull();
+  });
 });

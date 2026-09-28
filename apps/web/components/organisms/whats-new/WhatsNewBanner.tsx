@@ -83,7 +83,7 @@ export function WhatsNewBannerView({
       aria-live='polite'
       data-testid='whats-new-banner'
       data-electron-no-drag='true'
-      className='fixed bottom-4 left-4 z-40 w-72 max-sm:hidden animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
+      className='fixed bottom-4 left-4 z-banner w-72 max-sm:hidden animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
     >
       <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-4 pr-10 shadow-card'>
         <p className='flex items-center gap-1.5 text-2xs font-caption text-tertiary-token'>

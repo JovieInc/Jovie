@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/features/connectors/ConnectorCard.test.tsx
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
@@ -79,10 +80,9 @@ export function ConnectorCard({
   className,
 }: ConnectorCardProps) {
   const definition = getConnectorDefinition(provider);
-  const Icon =
-    definition.iconKey === 'youtube'
-      ? null
-      : CONNECTOR_ICONS[definition.iconKey];
+  const isSocialIcon =
+    definition.iconKey === 'youtube' || definition.iconKey === 'spotify';
+  const Icon = isSocialIcon ? null : CONNECTOR_ICONS[definition.iconKey];
   const {
     label: statusLabel,
     variant: statusVariant,
@@ -113,9 +113,13 @@ export function ConnectorCard({
       aria-busy={status === 'syncing' ? true : undefined}
     >
       <div className='flex min-w-0 flex-1 gap-3'>
-        {provider === 'youtube' ? (
+        {isSocialIcon ? (
           <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center'>
-            <SocialIcon platform='youtube' className='h-4 w-4' aria-hidden />
+            <SocialIcon
+              platform={definition.iconKey}
+              className='h-4 w-4'
+              aria-hidden
+            />
           </div>
         ) : (
           <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center'>

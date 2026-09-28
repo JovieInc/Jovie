@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
-import { SCREENSHOT_SCENARIOS } from '../../../lib/screenshots/registry';
+import {
+  SCREENSHOT_MOBILE_SAFE_AREA,
+  SCREENSHOT_SCENARIOS,
+} from '../../../lib/screenshots/registry';
 
 const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
   'tim-white-profile-tour-mobile',
@@ -196,5 +201,38 @@ describe('screenshot registry', () => {
     );
 
     expect(scenario?.reducedMotion).toBe(true);
+  });
+
+  it('waits for the empty Events card on the events-empty capture', () => {
+    // The tour list only mounts when dates exist, so the capture must wait
+    // for the empty branch that ProfileEventsCard actually renders.
+    const waitTargets = new Map(
+      SCREENSHOT_SCENARIOS.map(({ id, waitFor }) => [id, waitFor])
+    );
+    const cardSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/profile/ProfileEventsCard.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(cardSource).toContain(
+      "dataTestId='profile-primary-tab-events-empty'"
+    );
+    expect(waitTargets.get('tim-white-profile-events-empty-mobile')).toBe(
+      '[data-testid="profile-primary-tab-events-empty"]'
+    );
+  });
+
+  it('captures mobile screens below the phone frame island', () => {
+    expect(SCREENSHOT_MOBILE_SAFE_AREA.top).toBe(59);
+    expect(SCREENSHOT_MOBILE_SAFE_AREA.bottom).toBe(0);
+    const spec = readFileSync(
+      resolve(__dirname, '../../product-screenshots/catalog.spec.ts'),
+      'utf8'
+    );
+    expect(spec).toContain('Emulation.setSafeAreaInsetsOverride');
+    expect(spec).toContain('insets: SCREENSHOT_MOBILE_SAFE_AREA');
   });
 });

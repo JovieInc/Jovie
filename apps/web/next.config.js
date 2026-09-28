@@ -75,6 +75,8 @@ const nextConfig = {
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],
+    '/api/ovie/certifications': ['runtime-data/docs/certification/**/*'],
+    '/api/ovie/certifications/**': ['runtime-data/docs/certification/**/*'],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
     // Gated investor deck PDF: kept out of public/ so no CDN URL serves it.

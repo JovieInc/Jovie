@@ -38,11 +38,12 @@ describe('connector provider registry', () => {
     }
   });
 
-  it('registers Google and YouTube providers', () => {
+  it('registers Google, Spotify, and YouTube providers', () => {
     const definitions = getConnectorDefinitions();
     expect(definitions.map(definition => definition.id)).toEqual([
       CONNECTOR_PROVIDERS.gmail,
       CONNECTOR_PROVIDERS.google_calendar,
+      CONNECTOR_PROVIDERS.spotify,
       CONNECTOR_PROVIDERS.youtube,
     ]);
   });
@@ -79,6 +80,17 @@ describe('connector provider registry', () => {
 
     const youtube = getConnectorDefinition(CONNECTOR_PROVIDERS.youtube);
     expect(youtube.syncRunner).toBe(CONNECTOR_PROVIDERS.youtube);
+
+    const spotify = getConnectorDefinition(CONNECTOR_PROVIDERS.spotify);
+    expect(spotify.tokenHandler).toBe('shared_token_vault');
+    expect(spotify.oauthBundle).toBe('spotify');
+    expect(spotify.oauthScopes).toEqual(
+      expect.arrayContaining([
+        'playlist-modify-public',
+        'playlist-read-private',
+        'ugc-image-upload',
+      ])
+    );
   });
 
   it('unions Google OAuth scopes for the combined authorize flow', () => {
@@ -106,8 +118,9 @@ describe('connector provider registry', () => {
   it('validates provider ids', () => {
     expect(isConnectorProviderId('gmail')).toBe(true);
     expect(isConnectorProviderId('youtube')).toBe(true);
-    expect(isConnectorProviderId('spotify')).toBe(false);
-    expect(() => assertConnectorProviderId('spotify')).toThrow(
+    expect(isConnectorProviderId('spotify')).toBe(true);
+    expect(isConnectorProviderId('instagram')).toBe(false);
+    expect(() => assertConnectorProviderId('instagram')).toThrow(
       'Unknown connector provider'
     );
   });

@@ -5,6 +5,7 @@ import {
   type UIMessage,
 } from 'ai';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
+import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
 import type { ChatInsightSummary } from '@/types/insights';
 import type { FeatureIntroCatalog } from './feature-intro-contract';
 import {
@@ -67,6 +68,8 @@ export interface JovieChatProps {
    * Omitted = customer (artist) mode, byte-identical to previous behavior.
    */
   readonly chatMode?: 'ov';
+  /** Ranked founder briefing shown before the first Ovie message. */
+  readonly ovieHomeBriefing?: OvieHomeBriefing;
   /** Whether profile setup is complete, used to suppress setup quick actions. */
   readonly isProfileComplete?: boolean;
   /** Contextual, production-backed actions surfaced in an empty thread */

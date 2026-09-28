@@ -7,7 +7,7 @@ import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { AdminActivitySkeleton } from './loading';
 
 export const metadata: Metadata = {
-  title: 'Admin activity',
+  title: 'Company timeline',
 };
 
 export const runtime = 'nodejs';
@@ -24,8 +24,8 @@ export default async function AdminActivityPage() {
 
   return (
     <AdminPage
-      title='Activity'
-      description='Recent admin interventions, creator events, and system outcomes.'
+      title='Timeline'
+      description='Semantic company events with their source evidence and observed outcomes.'
       tabs={{
         param: 'view',
         value: 'activity',

@@ -580,7 +580,7 @@ test.describe('Public profile CTA and identity evidence', () => {
         .poll(() =>
           canonicalCta.evaluate(element => getComputedStyle(element).boxShadow)
         )
-        .toContain('rgb(37, 99, 255)');
+        .toContain('rgb(17, 175, 255)');
       await assertCta();
       await capture(`${viewport.id}-events-focus.png`);
 

@@ -93,9 +93,17 @@ function WhatShippedSkeleton() {
 
 export interface WhatShippedProps {
   readonly kioskToken?: string | null;
+  /** Card heading — "What's New" changelog framing on the cockpit. */
+  readonly title?: string;
+  /** Cap rendered rows so the card stays compact on the cockpit. */
+  readonly limit?: number;
 }
 
-export function WhatShipped({ kioskToken = null }: Readonly<WhatShippedProps>) {
+export function WhatShipped({
+  kioskToken = null,
+  title = "What's New",
+  limit,
+}: Readonly<WhatShippedProps>) {
   const { data, isLoading, isError, refetch } = useQuery<WhatShippedResponse>({
     queryKey: ['ops', 'what-shipped', kioskToken],
     queryFn: ({ signal }) => fetchWhatShipped(kioskToken, signal),
@@ -106,7 +114,7 @@ export function WhatShipped({ kioskToken = null }: Readonly<WhatShippedProps>) {
     refetchOnWindowFocus: false,
   });
 
-  const items = data?.items ?? [];
+  const items = (data?.items ?? []).slice(0, limit ?? Number.MAX_SAFE_INTEGER);
   const observation = resolveWhatShippedObservation({
     isLoading,
     isError,
@@ -117,14 +125,12 @@ export function WhatShipped({ kioskToken = null }: Readonly<WhatShippedProps>) {
   return (
     <ContentSurfaceCard
       surface='details'
-      className='p-3'
+      className='overflow-hidden'
       data-testid='what-shipped-card'
     >
-      <div className='space-y-2.5'>
+      <div className='space-y-2.5 p-3'>
         <div className='flex items-center gap-2'>
-          <p className='text-xs font-caption text-tertiary-token'>
-            What Shipped
-          </p>
+          <p className='text-xs font-caption text-tertiary-token'>{title}</p>
           {showRows ? (
             <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
               {items.length}

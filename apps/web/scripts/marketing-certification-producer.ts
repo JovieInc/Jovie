@@ -83,15 +83,84 @@ export function runVitest(args: readonly string[]): VitestJson | null {
     : null;
 }
 
-/** Entries whose canonical source is among the changed repo paths. */
-export function affectedEntries(
-  entries: readonly MarketingRegistryEntry[],
-  changedRepoPaths: readonly string[]
-): MarketingRegistryEntry[] {
+/**
+ * An entry's evidence depends on its canonical source, its declared tests and
+ * its story. A change to any of them invalidates the certificate, so all of
+ * them select the entry for re-evaluation (repo-relative paths).
+ */
+export function affectedEntries<
+  T extends { readonly dependencies: readonly string[] },
+>(plans: readonly T[], changedRepoPaths: readonly string[]): T[] {
   const changed = new Set(changedRepoPaths);
-  return entries.filter(
-    entry => entry.resolvedSource && changed.has(entry.resolvedSource)
+  return plans.filter(plan =>
+    plan.dependencies.some(path => changed.has(path))
   );
+}
+
+/**
+ * Tests that certify an entry: its sibling `.test.tsx` and every existing
+ * `@coverage-via <path>` target the source declares (the convention the
+ * component ship gate already honors). Repo-relative.
+ */
+export function testFilesFor(
+  resolvedSource: string,
+  source: string,
+  exists: (repoPath: string) => boolean
+): string[] {
+  const sibling = resolvedSource.replace(/\.tsx?$/u, '.test.tsx');
+  const declared = [...source.matchAll(/@coverage-via\s+(\S+)/gu)].map(
+    match => match[1] ?? ''
+  );
+  return [...new Set([sibling, ...declared])].filter(
+    path => path.length > 0 && exists(path)
+  );
+}
+
+interface CertificationPlanItem {
+  readonly entry: MarketingRegistryEntry;
+  readonly story: { readonly path: string; readonly storyName: string } | null;
+  readonly ownTestFiles: readonly string[];
+  readonly dependencies: readonly string[];
+}
+
+/**
+ * Resolves each source-backed entry's certifying tests, story and dependency
+ * set, then selects the entries to re-certify: all of them under `--all`,
+ * otherwise only those a changed repo path invalidates.
+ */
+export function certificationPlans(input: {
+  readonly entries: readonly MarketingRegistryEntry[];
+  readonly storyFiles: readonly {
+    readonly path: string;
+    readonly title: string;
+  }[];
+  readonly all: boolean;
+  readonly changed: readonly string[];
+  readonly exists: (repoPath: string) => boolean;
+  readonly readSource: (repoPath: string) => string | null;
+}): CertificationPlanItem[] {
+  const plans = input.entries.flatMap(entry => {
+    if (!entry.resolvedSource) return [];
+    const tests = testFilesFor(
+      entry.resolvedSource,
+      input.readSource(entry.resolvedSource) ?? '',
+      input.exists
+    );
+    const story = storyFileFor(entry.storybookTitle, input.storyFiles);
+    return [
+      {
+        entry,
+        story,
+        ownTestFiles: tests.map(webRelative),
+        dependencies: [
+          entry.resolvedSource,
+          ...tests,
+          ...(story ? [`apps/web/${story.path}`] : []),
+        ],
+      },
+    ];
+  });
+  return input.all ? plans : affectedEntries(plans, input.changed);
 }
 
 function listStoryFiles(dir: string, found: string[] = []): string[] {
@@ -174,7 +243,7 @@ export function buildPacket(input: {
   readonly penIssueIds: ReadonlySet<string>;
   readonly invariants: VitestJson | null;
   readonly ownTests: VitestJson | null;
-  readonly ownTestFile: string | null;
+  readonly ownTestFiles: readonly string[];
   readonly stories: VitestJson | null;
   readonly story: { readonly path: string; readonly storyName: string } | null;
   readonly sourceDigest: string | null;
@@ -195,9 +264,23 @@ export function buildPacket(input: {
     : invariantStatuses.includes('failed')
       ? 'failed'
       : 'missing';
-  const tests = input.ownTestFile
-    ? vitestEvidence(input.ownTests, input.ownTestFile)
-    : { status: 'missing' as const, evidence: null };
+  const testResults = input.ownTestFiles.map(file =>
+    vitestEvidence(input.ownTests, file)
+  );
+  const tests: { status: CertificationEvidenceStatus; evidence: unknown } =
+    testResults.length === 0 || testResults.some(r => r.status === 'missing')
+      ? {
+          status: testResults.some(r => r.status === 'failed')
+            ? 'failed'
+            : 'missing',
+          evidence: null,
+        }
+      : {
+          status: testResults.every(r => r.status === 'passed')
+            ? 'passed'
+            : 'failed',
+          evidence: testResults.map(r => r.evidence),
+        };
   const visual = input.story
     ? vitestEvidence(
         input.stories,
@@ -255,9 +338,9 @@ export function buildPacket(input: {
         testsStatus,
         sha,
         runRef,
-        input.ownTestFile
-          ? `${input.ownTestFile}: ${testsStatus}.`
-          : 'No sibling unit test for the canonical source.',
+        input.ownTestFiles.length > 0
+          ? `${input.ownTestFiles.join(', ')}: ${testsStatus}.`
+          : 'No sibling or @coverage-via unit test for the canonical source.',
         tests.evidence
       ),
     ],
@@ -279,6 +362,77 @@ export function buildPacket(input: {
   };
 }
 
+/**
+ * Real defects only: a `failed` receipt means the evidence ran and found a
+ * problem. `missing` is registry state (not yet certifiable), never an issue.
+ * One fingerprint per entry+tier, so repeated observations update one issue.
+ */
+export function defectReceipts(packet: CertificationReviewPacket) {
+  return [
+    ...packet.canonicalReferences,
+    ...packet.invariantEvaluation,
+    ...packet.testsCoverage,
+    ...packet.visualProof,
+  ]
+    .filter(receipt => receipt.status === 'failed')
+    .map(receipt => ({
+      fingerprint: `marketing-cert:${packet.subject.id}:${receipt.tier}`,
+      tier: receipt.tier,
+      summary: receipt.summary,
+      ref: receipt.ref,
+    }));
+}
+
+type UpsertIssue = (input: {
+  fingerprint: string;
+  title: string;
+  description: string;
+  priority: number;
+}) => Promise<{ ok: boolean; action?: string; reason?: string }>;
+
+async function linearUpsert(): Promise<UpsertIssue> {
+  const { upsertLinearIssueByTitleFingerprint } = await import(
+    '../../../scripts/lib/linear-issue-intake.mjs'
+  );
+  return upsertLinearIssueByTitleFingerprint as UpsertIssue;
+}
+
+export async function fileDefects(
+  packet: CertificationReviewPacket,
+  sha: string,
+  loadUpsert: () => Promise<UpsertIssue> = linearUpsert
+): Promise<number> {
+  const defects = defectReceipts(packet);
+  if (defects.length === 0 || !process.env.LINEAR_API_KEY) return 0;
+  const upsertLinearIssueByTitleFingerprint = await loadUpsert();
+  for (const defect of defects) {
+    const result = await upsertLinearIssueByTitleFingerprint({
+      fingerprint: defect.fingerprint,
+      title: `Certification defect: ${packet.subject.id} ${defect.tier} (${defect.fingerprint})`,
+      description: [
+        '## Source',
+        '- Workflow: marketing-certification-producer.yml (JOV-6928)',
+        `- Subject: ${packet.subject.id} (${packet.subject.title})`,
+        `- Source SHA: ${sha}`,
+        `- Evidence: ${defect.ref}`,
+        '',
+        '## Failure',
+        defect.summary,
+        '',
+        '## Acceptance',
+        'Fix the defect on main; the next push that touches the source re-evaluates it automatically.',
+        '',
+        `Fingerprint: \`${defect.fingerprint}\``,
+      ].join('\n'),
+      priority: 3,
+    });
+    console.log(
+      `[marketing-cert] ${packet.subject.id} defect ${defect.fingerprint} -> ${result.ok ? ('action' in result ? result.action : 'ok') : result.reason}`
+    );
+  }
+  return defects.length;
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -296,40 +450,31 @@ async function main() {
   const changed = values.changed
     ? readFileSync(values.changed, 'utf8').split('\n').filter(Boolean)
     : [];
-  const entries = values.all
-    ? MARKETING_COMPONENT_REGISTRY.filter(entry => entry.resolvedSource)
-    : affectedEntries(MARKETING_COMPONENT_REGISTRY, changed);
-  if (entries.length === 0) {
-    console.log('[marketing-cert] no registry entry affected');
-    return;
-  }
-
   const storyFiles = listStoryFiles(join(WEB_ROOT, 'components')).map(path => ({
     path: relative(WEB_ROOT, path),
     title: /title:\s*'([^']+)'/u.exec(readFileSync(path, 'utf8'))?.[1] ?? '',
   }));
-  const plan = entries.map(entry => {
-    const ownTest =
-      entry.resolvedSource?.replace(/\.tsx?$/u, '.test.tsx') ?? null;
-    return {
-      entry,
-      story: storyFileFor(entry.storybookTitle, storyFiles),
-      ownTestFile:
-        ownTest && existsSync(join(REPO_ROOT, ownTest))
-          ? webRelative(ownTest)
-          : null,
-    };
+  const plan = certificationPlans({
+    entries: MARKETING_COMPONENT_REGISTRY,
+    storyFiles,
+    all: values.all ?? false,
+    changed,
+    exists: path => existsSync(join(REPO_ROOT, path)),
+    readSource: path => {
+      const sourcePath = join(REPO_ROOT, path);
+      return existsSync(sourcePath) ? readFileSync(sourcePath, 'utf8') : null;
+    },
   });
+  if (plan.length === 0) {
+    console.log('[marketing-cert] no registry entry affected');
+    return;
+  }
 
   const penIssueIds = new Set(
     validateMarketingPenRegistry().map(issue => issue.id)
   );
   const invariants = runVitest(INVARIANT_SUITES);
-  const ownTestFiles = [
-    ...new Set(
-      plan.flatMap(item => (item.ownTestFile ? [item.ownTestFile] : []))
-    ),
-  ];
+  const ownTestFiles = [...new Set(plan.flatMap(item => item.ownTestFiles))];
   const ownTests = ownTestFiles.length > 0 ? runVitest(ownTestFiles) : null;
   const storyPaths = [
     ...new Set(plan.flatMap(item => (item.story ? [item.story.path] : []))),
@@ -382,6 +527,7 @@ async function main() {
       `[marketing-cert] ${item.entry.id} -> ${response.status} ${body.slice(0, 300)}`
     );
     if (!response.ok) failures += 1;
+    await fileDefects(packet, sha);
   }
   if (failures > 0) process.exit(1);
 }
