@@ -88,6 +88,21 @@ describe('isolated UI/docs promotion policy', () => {
     expect(result.allowed).toBe(true);
     expect(result.authority.labelsUsed).toBe(false);
     expect(result.authority.deploymentAllowed).toBe(false);
+
+    // JOV-5340: a bound-GREEN fleet admits the same isolated delta.
+    const green = evaluateIsolatedUiDocsDelta({
+      prNumber: 15810,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files: atomFiles(),
+      checks: greenChecks(),
+      fleetGate: fleetGate({
+        state: 'GREEN',
+        signals: { ...fleetGate().signals, production: { status: 'green' } },
+      }),
+    });
+    expect(green.allowed).toBe(true);
     expect(result.pinned).toMatchObject({
       baseSha: BASE,
       headSha: HEAD,
@@ -133,7 +148,7 @@ describe('isolated UI/docs promotion policy', () => {
       fleetGate({
         signals: { ...fleetGate().signals, production: { status: 'unknown' } },
       }),
-      'production is not explicitly red',
+      'production is not explicitly red and fleet is not GREEN',
     ],
     [
       'integrity unknown',
@@ -438,6 +453,12 @@ describe('isolated UI/docs promotion policy', () => {
       resolve(REPO_ROOT, 'scripts/lib/isolated-ui-docs-policy.mjs'),
       'utf8'
     );
+    const evaluateFleetGate = readFileSync(
+      resolve(REPO_ROOT, 'scripts/fleet-gate/evaluate-fleet-gate.sh'),
+      'utf8'
+    );
+
+    expect(evaluateFleetGate).toContain('.promotionMode');
     expect(productionWorkflow).toContain('fleet-promotion:');
     expect(productionWorkflow).toContain(
       "needs.fleet-promotion.outputs.deployment_allowed == 'true'"

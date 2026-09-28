@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { test } from 'node:test';
 
-import { canonical } from '../../lib/canonical-json.mjs';
 import {
+  canonical,
   requestSummerAssessment,
   summerAssessmentConfig,
   TRIAGE_ASSESSMENT_DOMAIN,

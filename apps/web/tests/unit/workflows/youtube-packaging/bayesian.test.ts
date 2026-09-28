@@ -2,9 +2,9 @@
  * Tests for the packaging swap experiment Bayesian engine (JovieInc/Jovie#10919).
  *
  * Covers:
- * - probTreatmentBeatsControl: core statistical property (symmetry, monotonicity)
+ * - probTreatmentBeatsControl: always insufficient-evidence (JOV-6469), input validation, units invariance
  * - checkGuardrails: each guardrail in isolation
- * - selectWinner: correct outcome classification
+ * - selectWinner: correct outcome classification (always holds at 'inconclusive' today)
  */
 
 import { describe, expect, it } from 'vitest';
@@ -44,75 +44,129 @@ function makeMetrics(
 // ---------------------------------------------------------------------------
 
 describe('probTreatmentBeatsControl', () => {
-  it('returns 0.5 when rates are equal', () => {
+  it('returns null (insufficient evidence) even when rates are equal', () => {
     const a = makeMetrics('control', { impressions: 1000, watchMinutes: 500 });
     const b = makeMetrics('treatment', {
       impressions: 1000,
       watchMinutes: 500,
     });
-    const p = probTreatmentBeatsControl(a, b);
-    expect(p).toBeCloseTo(0.5, 1);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
   });
 
-  it('returns > 0.95 when treatment is clearly better with large sample', () => {
+  it('returns null even when treatment is clearly better with a large sample (JOV-6469: reject unsupported high confidence)', () => {
     // Control: 0.5 min/impression; Treatment: 0.7 min/impression; n=2000 each
     const a = makeMetrics('control', { impressions: 2000, watchMinutes: 1000 });
     const b = makeMetrics('treatment', {
       impressions: 2000,
       watchMinutes: 1400,
     });
-    const p = probTreatmentBeatsControl(a, b);
-    expect(p).toBeGreaterThan(0.95);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
   });
 
-  it('returns < 0.05 when control is clearly better', () => {
+  it('returns null even when control is clearly better', () => {
     const a = makeMetrics('control', { impressions: 2000, watchMinutes: 1400 });
     const b = makeMetrics('treatment', {
       impressions: 2000,
       watchMinutes: 1000,
     });
-    const p = probTreatmentBeatsControl(a, b);
-    expect(p).toBeLessThan(0.05);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
   });
 
-  it('is symmetric (P(B>A) = 1 - P(A>B))', () => {
-    const a = makeMetrics('control', { impressions: 1500, watchMinutes: 900 });
-    const b = makeMetrics('treatment', {
-      impressions: 1500,
-      watchMinutes: 1050,
-    });
-    const pBA = probTreatmentBeatsControl(a, b);
-    const pAB = probTreatmentBeatsControl(b, a);
-    expect(pBA + pAB).toBeCloseTo(1.0, 5);
-  });
-
-  it('returns 0.5 when either impressions = 0', () => {
+  it('returns null when either impressions = 0', () => {
     const a = makeMetrics('control', { impressions: 0, watchMinutes: 0 });
     const b = makeMetrics('treatment', {
       impressions: 1000,
       watchMinutes: 500,
     });
-    expect(probTreatmentBeatsControl(a, b)).toBe(0.5);
-    expect(probTreatmentBeatsControl(b, a)).toBe(0.5);
+    expect(probTreatmentBeatsControl(a, b)).toBeNull();
+    expect(probTreatmentBeatsControl(b, a)).toBeNull();
   });
 
-  it('probability increases monotonically as treatment rate improves', () => {
-    const control = makeMetrics('control', {
+  it('returns null for NaN, negative, or non-finite inputs (red test: never fabricate a confidence from corrupt data)', () => {
+    const good = makeMetrics('treatment', {
       impressions: 1000,
       watchMinutes: 500,
     });
-    const rates = [0.45, 0.5, 0.55, 0.6, 0.65].map(r =>
+    expect(
       probTreatmentBeatsControl(
-        control,
-        makeMetrics('treatment', {
-          impressions: 1000,
-          watchMinutes: Math.round(r * 1000),
-        })
+        makeMetrics('control', { impressions: Number.NaN, watchMinutes: 100 }),
+        good
       )
+    ).toBeNull();
+    expect(
+      probTreatmentBeatsControl(
+        makeMetrics('control', { impressions: -5, watchMinutes: 100 }),
+        good
+      )
+    ).toBeNull();
+    expect(
+      probTreatmentBeatsControl(
+        makeMetrics('control', {
+          impressions: 100,
+          watchMinutes: Number.POSITIVE_INFINITY,
+        }),
+        good
+      )
+    ).toBeNull();
+  });
+
+  it('is invariant to whether watch time is expressed in minutes or seconds (JOV-6469 units-invariance)', () => {
+    const controlMin = makeMetrics('control', {
+      impressions: 2000,
+      watchMinutes: 1000,
+    });
+    const treatmentMin = makeMetrics('treatment', {
+      impressions: 2000,
+      watchMinutes: 1400,
+    });
+    // Same underlying observations, watch time mislabeled/expressed in seconds.
+    const controlSec = {
+      ...controlMin,
+      watchMinutes: controlMin.watchMinutes * 60,
+    };
+    const treatmentSec = {
+      ...treatmentMin,
+      watchMinutes: treatmentMin.watchMinutes * 60,
+    };
+
+    expect(probTreatmentBeatsControl(controlMin, treatmentMin)).toBe(
+      probTreatmentBeatsControl(controlSec, treatmentSec)
     );
-    for (let i = 1; i < rates.length; i++) {
-      expect(rates[i]).toBeGreaterThan(rates[i - 1]);
-    }
+  });
+
+  it('documents why the retired Poisson-rate approximation was NOT unit invariant', () => {
+    // Historical bug (JOV-6469): the module used to model the continuous,
+    // aggregate watch-minutes total as if it were a Poisson event count
+    // (Var[rate] = rate / impressions). Re-deriving that retired formula
+    // here proves the same underlying observations, read in different but
+    // consistent time units, produced different z-scores (and therefore
+    // different confidence) purely from the arbitrary unit choice.
+    const rate = (m: { watchMinutes: number; impressions: number }) =>
+      m.watchMinutes / m.impressions;
+    const retiredZ = (
+      a: { watchMinutes: number; impressions: number },
+      b: { watchMinutes: number; impressions: number }
+    ) => {
+      const rateA = rate(a);
+      const rateB = rate(b);
+      const se = Math.sqrt(rateA / a.impressions + rateB / b.impressions);
+      return (rateB - rateA) / se;
+    };
+    const controlMin = { impressions: 2000, watchMinutes: 1000 };
+    const treatmentMin = { impressions: 2000, watchMinutes: 1400 };
+    const controlSec = { impressions: 2000, watchMinutes: 1000 * 60 };
+    const treatmentSec = { impressions: 2000, watchMinutes: 1400 * 60 };
+
+    const zMin = retiredZ(controlMin, treatmentMin);
+    const zSec = retiredZ(controlSec, treatmentSec);
+
+    // Same relative lift, same impressions — but the retired formula's
+    // z-score scaled by sqrt(60) purely from expressing duration in
+    // seconds instead of minutes. This non-invariance is exactly the bug
+    // JOV-6469 exists to fix; the current estimator sidesteps it by never
+    // computing a confidence from this data at all (see tests above).
+    expect(zSec / zMin).toBeCloseTo(Math.sqrt(60), 5);
+    expect(zMin).not.toBeCloseTo(zSec, 1);
   });
 });
 
@@ -231,8 +285,9 @@ describe('checkGuardrails', () => {
 // ---------------------------------------------------------------------------
 
 describe('selectWinner', () => {
-  it('declares treatment winner when confidence >= threshold', () => {
-    // Treatment is clearly better — P(B>A) will be very high
+  it('holds at inconclusive (retains control) even when treatment is clearly better (JOV-6469: no validated estimator exists yet)', () => {
+    // Treatment is clearly better by the raw rate — but VariantMetrics
+    // carries no watch-time variance, so no confidence can be validated.
     const control = makeMetrics('control', {
       impressions: 2000,
       watchMinutes: 1000,
@@ -242,11 +297,12 @@ describe('selectWinner', () => {
       watchMinutes: 1500,
     });
     const decision = selectWinner(control, treatment, MIN_BAYESIAN_CONFIDENCE);
-    expect(decision.winner).toBe('treatment');
-    expect(decision.confidence).toBeGreaterThanOrEqual(MIN_BAYESIAN_CONFIDENCE);
+    expect(decision.winner).toBe('inconclusive');
+    expect(decision.confidence).toBeNull();
+    expect(decision.reason).toMatch(/insufficient|no statistically valid/i);
   });
 
-  it('declares control winner when P(A>B) >= threshold', () => {
+  it('holds at inconclusive even when control is clearly better', () => {
     const control = makeMetrics('control', {
       impressions: 2000,
       watchMinutes: 1500,
@@ -256,7 +312,8 @@ describe('selectWinner', () => {
       watchMinutes: 1000,
     });
     const decision = selectWinner(control, treatment, MIN_BAYESIAN_CONFIDENCE);
-    expect(decision.winner).toBe('control');
+    expect(decision.winner).toBe('inconclusive');
+    expect(decision.confidence).toBeNull();
   });
 
   it('returns inconclusive when neither variant clears threshold', () => {

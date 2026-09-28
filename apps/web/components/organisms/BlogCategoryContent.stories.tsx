@@ -16,7 +16,7 @@ export const BLOG_CATEGORY_STORY_CATEGORY: BlogCategory = {
   name: 'Artist Management',
   slug: 'artist-management',
   description:
-    'Insights on navigating the business side of music — managers, agents, and the systems that connect artists to opportunities.',
+    'Insights on navigating the business side of music: managers, agents, and the systems that connect artists to opportunities.',
 };
 
 /** Exact public fields parsed from the checked-in blog post. */

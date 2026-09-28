@@ -28,6 +28,7 @@ const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
+const prefetch = vi.fn();
 let pathname = '/app';
 let searchParams = new URLSearchParams();
 
@@ -73,7 +74,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useSearchParams: () => searchParams,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, prefetch }),
 }));
 
 let mockPrefersReducedMotion = false;
@@ -149,6 +150,7 @@ describe('PersistentAudioBar', () => {
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
+    prefetch.mockClear();
     pathname = '/app';
     searchParams = new URLSearchParams();
     mockPlaybackState = { ...basePlaybackState };
@@ -226,6 +228,32 @@ describe('PersistentAudioBar', () => {
     ).toBeInTheDocument();
     for (const artwork of screen.getAllByTestId('artwork-img')) {
       expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/art.jpg');
+    }
+  });
+
+  it('converges rendered metadata when the playing release is mutated', () => {
+    setPlaying({
+      releaseTitle: 'Old Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/old.jpg',
+    });
+    const { rerender } = render(<PersistentAudioBar />);
+
+    setPlaying({
+      releaseTitle: 'New Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/new.jpg',
+      trackTitle: 'Renamed Track',
+    });
+    rerender(<PersistentAudioBar />);
+
+    expect(screen.queryByText('Old Title')).toBeNull();
+    expect(screen.getAllByText('Renamed Track').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DJ Cool · New Title').length).toBeGreaterThan(
+      0
+    );
+    for (const artwork of screen.getAllByTestId('artwork-img')) {
+      expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/new.jpg');
     }
   });
 
@@ -392,6 +420,22 @@ describe('PersistentAudioBar', () => {
     );
   });
 
+  it('keeps track identity out of the desktop controls and timeline dock', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar />);
+
+    const desktopDock = screen.getByTestId('audio-surface-expanded-shell');
+    expect(within(desktopDock).queryByText('Midnight Drive')).toBeNull();
+    expect(within(desktopDock).queryByText('DJ Cool')).toBeNull();
+    expect(
+      within(desktopDock).getByRole('button', { name: 'Pause (space)' })
+    ).toBeInTheDocument();
+    expect(
+      within(desktopDock).getByRole('button', { name: 'Show waveform' })
+    ).toBeInTheDocument();
+  });
+
   it('expands to show the waveform and BPM · key facts only when known', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', bpm: 118, musicalKey: '8A' });
@@ -496,6 +540,37 @@ describe('PersistentAudioBar', () => {
     );
   });
 
+  it('prefetches the lyrics route on pointer and keyboard intent', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    const lyricsButton = screen.getByRole('button', { name: 'Lyrics' });
+    fireEvent.pointerEnter(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    prefetch.mockClear();
+    fireEvent.focus(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+  });
+
+  it('does not prefetch the lyrics route when the track has no lyrics', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
+    expect(prefetch).not.toHaveBeenCalled();
+  });
+
   it('closes the canonical lyrics button back to the last non-lyrics route', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
@@ -546,6 +621,58 @@ describe('PersistentAudioBar', () => {
     await user.click(screen.getByRole('button', { name: 'Close lyrics' }));
 
     expect(push).toHaveBeenCalledWith('/app/releases?tab=scheduled');
+  });
+
+  it('prefetches the lyrics route once when a track with lyrics activates', () => {
+    setPlaying({ hasLyrics: true });
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    expect(prefetch).toHaveBeenCalledTimes(1);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    // Re-rendering with the same track must not re-prefetch.
+    rerender(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).toHaveBeenCalledTimes(1);
+
+    // A new active track is a new intent — prefetch its lyrics route.
+    setPlaying({ hasLyrics: true, activeTrackId: 'track-2' });
+    rerender(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).toHaveBeenCalledTimes(2);
+    expect(prefetch).toHaveBeenLastCalledWith(buildLyricsRoute('track-2'));
+  });
+
+  it('does not prefetch the lyrics route for tracks without lyrics or with none active', () => {
+    setPlaying({ hasLyrics: false });
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).not.toHaveBeenCalled();
+  });
+
+  it('does not prefetch the lyrics route while already on it', () => {
+    setPlaying({ hasLyrics: true });
+    pathname = buildLyricsRoute('track-1');
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+    expect(prefetch).not.toHaveBeenCalled();
   });
 
   it('keeps the canonical lyrics button hidden when the active track has no lyrics', () => {

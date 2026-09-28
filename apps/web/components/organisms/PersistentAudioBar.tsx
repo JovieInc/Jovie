@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/PersistentAudioBar.test.tsx
 import { ChevronDown, ChevronUp, Play } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -14,7 +15,6 @@ import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
-import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
   APP_ROUTES,
   buildLyricsRoute,
@@ -34,9 +34,6 @@ const SHELL_AUDIO_BAR_TRANSITION =
 // Flat player (founder spec 2026-09-25 #1): no border to transition anymore.
 const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
   'transition-[max-height,opacity,transform,background-color] duration-cinematic ease-cinematic';
-/** Docked now-playing chip — flat, no elevation into the content canvas (JOV-3511). */
-const SHELL_NOW_PLAYING_CARD_CLASSNAME =
-  'max-w-56 border-0 bg-transparent px-1 py-1 shadow-none transition-[opacity] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
@@ -178,6 +175,11 @@ export function PersistentAudioBar() {
     );
   }, [router, searchParams]);
 
+  const prefetchLyricsRoute = useCallback(() => {
+    if (!playbackState.activeTrackId || !playbackState.hasLyrics) return;
+    router.prefetch(buildLyricsRoute(playbackState.activeTrackId));
+  }, [playbackState.activeTrackId, playbackState.hasLyrics, router]);
+
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
     const lyricsBasePath = buildLyricsRoute(playbackState.activeTrackId);
@@ -203,6 +205,24 @@ export function PersistentAudioBar() {
   // Idle (nothing loaded): the player is absent entirely — zero reserved
   // space, no layout shift of main content (founder spec 2026-09-25 #5).
   const compactPlayerVisible = hasActiveTrack && !playerOpen;
+
+  // An active track with lyrics is the intent signal for the lyrics
+  // surface (lyrics button and the `l` shortcut both land there). Warm the
+  // route once per track so opening lyrics feels immediate; skipped while
+  // already on a lyrics route. Bounded to one prefetch per track id.
+  const prefetchedLyricsTrackRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !activeTrackId ||
+      !playbackState.hasLyrics ||
+      isLyricsRoutePath(pathname) ||
+      prefetchedLyricsTrackRef.current === activeTrackId
+    ) {
+      return;
+    }
+    prefetchedLyricsTrackRef.current = activeTrackId;
+    router.prefetch(buildLyricsRoute(activeTrackId));
+  }, [activeTrackId, pathname, playbackState.hasLyrics, router]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -402,12 +422,6 @@ export function PersistentAudioBar() {
     musicalKey: playbackState.musicalKey,
   };
   const lyricsPath = buildLyricsRoute(activeTrackId);
-  const nowPlayingTrack = {
-    trackTitle: playbackState.trackTitle,
-    artistName: playbackState.artistName,
-    artworkUrl: playbackState.artworkUrl,
-  };
-
   return (
     <>
       {/* Desktop player host — sits below main content, sharing its surface
@@ -449,14 +463,7 @@ export function PersistentAudioBar() {
               : SHELL_AUDIO_BAR_TRANSITION,
           }}
         >
-          <div className='grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] items-center gap-3 px-4 py-1.5 lg:px-6'>
-            <SidebarNowPlaying
-              track={nowPlayingTrack}
-              isPlaying={playbackState.isPlaying}
-              onPlay={handleToggle}
-              playOverlayVisible={false}
-              className={SHELL_NOW_PLAYING_CARD_CLASSNAME}
-            />
+          <div className='px-4 py-1.5 lg:px-6'>
             <AudioBar
               isPlaying={playbackState.isPlaying}
               onPlay={handleToggle}
@@ -479,6 +486,7 @@ export function PersistentAudioBar() {
               onOpenLyrics={
                 playbackState.hasLyrics ? handleOpenLyrics : undefined
               }
+              onLyricsIntent={prefetchLyricsRoute}
               track={shellTrack}
               className='min-w-0 px-0 py-0'
             />

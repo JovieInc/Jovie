@@ -35,10 +35,10 @@ vi.mock('@/lib/utils/logger', () => ({
 import admissionsFixture from '@/lib/ovie/fixtures/summer-admissions-v1.json';
 import ciAuditV2Fixture from '@/lib/ovie/fixtures/summer-ci-audit-v2.json';
 import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
+import publisherSnapshots from '@/lib/ovie/fixtures/summer-publisher-snapshots-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { SummerPinInvalidError } from '@/lib/ovie/summer-production-pin';
 import * as summerShadowClient from '@/lib/ovie/summer-shadow-client';
-import publisherGolden from './__fixtures__/summer-publisher-snapshots.json';
 import { POST } from './route';
 
 const NOW = '2026-09-04T20:00:00.000Z';
@@ -160,24 +160,18 @@ function request(body: unknown) {
   });
 }
 
-// Exercise the actual publisher composition, using only its synthetic test inputs.
-// No host observation, credential access, or submission runs in this subprocess.
-// Golden outputs of the Symphony publisher (JovieInc/symphony-control
-// scripts/symphony/tests/summer-publisher-admissions.test.py). symphony-control's
-// summer-publisher-golden test regenerates them and fails on any contract drift.
-const PUBLISHER_SNAPSHOTS = publisherGolden.snapshots as Record<
-  string,
-  unknown
->;
-
+// Frozen composition of the retired Gem publisher (now JovieInc/symphony-control)
+// over its synthetic test inputs. The Symphony Elixir control plane no longer
+// ships in Jovie, so the route contract pins these snapshots.
 function publisherSnapshot(
   providerState?: 'ALLOWED' | 'HELD' | 'UNKNOWN',
   ciAuditV2 = false
 ) {
-  const key = providerState ?? (ciAuditV2 ? 'ciAuditV2' : 'default');
-  return structuredClone(PUBLISHER_SNAPSHOTS[key]) as ReturnType<
-    typeof JSON.parse
-  >;
+  const key = `${providerState ?? ''}:${ciAuditV2 ? 'v2' : ''}`;
+  const snapshot = (publisherSnapshots as Record<string, unknown>)[key];
+  if (!snapshot) throw new Error(`Missing publisher snapshot ${key}`);
+  // JSON round-trip keeps the untyped fixture shape the route contract mutates.
+  return JSON.parse(JSON.stringify(snapshot));
 }
 
 function fixtureProjection(

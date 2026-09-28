@@ -121,6 +121,64 @@ describe('JOV-INV-033 done sprint invariants', () => {
     assert.deepEqual(errors, []);
   });
 
+  it('sends the Vercel protection bypass to the immutable deployment when the release provides it', async () => {
+    const seen = [];
+    const errors = await rescanProduction({
+      env: {
+        DONE_INVARIANT_PRODUCTION_BASE_URL:
+          'https://jovie-abc123-jovie.vercel.app',
+        VERCEL_AUTOMATION_BYPASS_SECRET: 'bypass-secret',
+      },
+      fetchImpl: async (url, init) => {
+        seen.push(init.headers['x-vercel-protection-bypass']);
+        const path = new URL(url).pathname;
+        return {
+          ok: true,
+          status: 200,
+          url,
+          text: async () =>
+            path === '/pricing'
+              ? '<main data-offer-contract="artist-visibility-offer-contract-v1">Artist Visibility Pro is $199/month. <a href="/waitlist">Request access</a></main>'
+              : '<html></html>',
+        };
+      },
+    });
+    assert.deepEqual(errors, []);
+    assert.ok(seen.length > 0);
+    assert.ok(seen.every(value => value === 'bypass-secret'));
+
+    const unset = [];
+    await rescanProduction({
+      env: { DONE_INVARIANT_PRODUCTION_BASE_URL: 'https://jov.ie' },
+      fetchImpl: async (_url, init) => {
+        unset.push('x-vercel-protection-bypass' in init.headers);
+        return { ok: true, status: 200, text: async () => '<html></html>' };
+      },
+    });
+    assert.ok(unset.every(value => value === false));
+  });
+
+  it('deliberate red: a followed redirect onto the SSO host fails closed instead of reading markers as missing', async () => {
+    const errors = await rescanProduction({
+      env: {
+        DONE_INVARIANT_PRODUCTION_BASE_URL:
+          'https://jovie-abc123-jovie.vercel.app',
+      },
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        url: 'https://vercel.com/sso-api?url=https%3A%2F%2Fjovie-abc123-jovie.vercel.app%2Fpricing',
+        text: async () => '<html>Authentication required</html>',
+      }),
+    });
+    assert.ok(
+      errors.some(error =>
+        error.includes('deployment protection without a bypass secret')
+      )
+    );
+    assert.ok(!errors.some(error => error.includes('missing $199')));
+  });
+
   it('deliberate red: production pricing that still shows Max $149 is a release blocker', async () => {
     const errors = await rescanProduction({
       env: { DONE_INVARIANT_PRODUCTION_BASE_URL: 'https://jov.ie' },

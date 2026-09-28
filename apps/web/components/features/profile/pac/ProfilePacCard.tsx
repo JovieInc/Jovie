@@ -46,13 +46,21 @@ import {
   handleCaptureDismissalResponse,
 } from '@/lib/profile/capture-dismissal-client';
 import { PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME } from '@/lib/profile/composition';
+import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PacState as PacEventState } from '@/lib/tracking/pac-events-shared';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import type { Artist } from '@/types/db';
+import { ProfileModeCard } from '../ProfileModeCard';
 import { usePacEvents } from '../usePacEvents';
+
+const FEATURED_FALLBACK_ACCENT: ProfileCardAccentAssignment = {
+  accent: 'ion',
+  strength: 'text',
+};
+
 import {
   hasReachedListenThreshold,
   type PacContext,
@@ -129,6 +137,14 @@ interface ProfilePacCardProps {
    * hero photo — then this card's art is the page LCP and must not lazy-load.
    */
   readonly artPriority?: boolean;
+  /**
+   * `featured` renders the Pen D14lo6 mode card (eyebrow, centered art,
+   * title, artist, full-width neutral CTA) on the rotating accent below.
+   * `rail` (default) is the compact carousel card.
+   */
+  readonly presentation?: 'rail' | 'featured';
+  /** Rotating background accent for the featured presentation. */
+  readonly accent?: ProfileCardAccentAssignment;
 }
 
 interface CaptureCopy {
@@ -155,6 +171,25 @@ function getCaptureCopy(
   };
 }
 
+/**
+ * `glass` is the listen slot (Listen / Play / Pause): a flat liquid-glass pill
+ * that shares the bottom tab bar's lens material (`profile-glass-pill` in
+ * design-system.css), so the two read as one family. Conversion actions keep
+ * the solid primary pill. Geometry, hit area and behaviour are identical.
+ */
+type PrimaryPillTone = 'solid' | 'glass';
+
+/**
+ * `card` is the featured mode-card CTA (Pen D14lo6): a full-width neutral
+ * high-contrast pill with a 28px face inside a 44px hit area. Tone is ignored.
+ */
+type PrimaryPillShape = 'compact' | 'card';
+
+const CARD_PILL_HIT_CLASS_NAME =
+  'group flex h-11 w-full touch-manipulation items-center focus-visible:outline-none disabled:cursor-not-allowed';
+const CARD_PILL_FACE_CLASS_NAME =
+  'flex h-7 w-full items-center justify-center gap-1.5 rounded-full bg-(--profile-mode-card-cta-bg) px-4 text-mid font-medium leading-none text-(--profile-mode-card-cta-fg) transition-opacity duration-subtle group-hover:opacity-90 group-focus-visible:ring-2 group-focus-visible:ring-focus group-disabled:opacity-60';
+
 function PrimaryPill({
   children,
   onClick,
@@ -163,6 +198,8 @@ function PrimaryPill({
   type = 'button',
   disabled,
   ariaLabel,
+  tone = 'solid',
+  shape = 'compact',
 }: Readonly<{
   children: ReactNode;
   onClick?: (event: MouseEvent<HTMLElement>) => void;
@@ -171,9 +208,22 @@ function PrimaryPill({
   type?: 'button' | 'submit';
   disabled?: boolean;
   ariaLabel?: string;
+  tone?: PrimaryPillTone;
+  shape?: PrimaryPillShape;
 }>) {
-  const className = cn(
-    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground shadow-sm transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
+  const isCard = shape === 'card';
+  const className = isCard
+    ? CARD_PILL_HIT_CLASS_NAME
+    : cn(
+        'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-2xs font-[590] leading-none transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60',
+        tone === 'glass'
+          ? 'profile-glass-pill'
+          : 'bg-btn-primary text-btn-primary-foreground shadow-sm'
+      );
+  const content = isCard ? (
+    <span className={CARD_PILL_FACE_CLASS_NAME}>{children}</span>
+  ) : (
+    children
   );
 
   if (href && href.startsWith('/')) {
@@ -185,7 +235,7 @@ function PrimaryPill({
         onClick={onClick}
         aria-label={ariaLabel}
       >
-        {children}
+        {content}
       </Link>
     );
   }
@@ -200,7 +250,7 @@ function PrimaryPill({
         onClick={onClick}
         aria-label={ariaLabel}
       >
-        {children}
+        {content}
       </a>
     );
   }
@@ -213,7 +263,7 @@ function PrimaryPill({
       className={className}
       aria-label={ariaLabel}
     >
-      {children}
+      {content}
     </button>
   );
 }
@@ -251,7 +301,11 @@ export function ProfilePacCard({
   className,
   layout = 'portrait',
   artPriority = false,
+  presentation = 'rail',
+  accent = FEATURED_FALLBACK_ACCENT,
 }: Readonly<ProfilePacCardProps>) {
+  const isFeatured = presentation === 'featured';
+  const pillShape = isFeatured ? 'card' : 'compact';
   const isProfileLandscape = layout === 'profile-landscape';
   const isInteractive = renderMode === 'interactive';
   const previewUrl = release?.previewUrl ?? null;
@@ -558,18 +612,19 @@ export function ProfilePacCard({
     : `/${artist.handle}/listen`;
 
   let contextLabel = 'Latest';
-  let subject: ReactNode = null;
+  let subjectTitle = '';
+  let subjectMeta = '';
   let action: ReactNode = null;
   let status: ReactNode = null;
   let contextAside: ReactNode = null;
   let ContextIcon = Music2;
 
-  const releaseSubject = (
-    <SubjectText
-      title={release?.title ?? artist.name}
-      meta={formatPacReleaseMeta(release, artist.name)}
-    />
-  );
+  const releaseTitle = release?.title ?? artist.name;
+  // The featured card reads "{title} / {artist}" (Pen D14lo6); the rail keeps
+  // the release type and year.
+  const releaseMeta = isFeatured
+    ? artist.name
+    : formatPacReleaseMeta(release, artist.name);
 
   switch (state.kind) {
     case 'idle':
@@ -578,13 +633,18 @@ export function ProfilePacCard({
       contextLabel =
         state.kind === 'playing'
           ? 'Now Playing'
-          : release
-            ? 'Latest'
-            : 'Listen';
-      subject = releaseSubject;
+          : isFeatured
+            ? 'Featured'
+            : release
+              ? 'Latest'
+              : 'Listen';
+      subjectTitle = releaseTitle;
+      subjectMeta = releaseMeta;
       if (ctx.inventory.hasPreview) {
         action = (
           <PrimaryPill
+            shape={pillShape}
+            tone='glass'
             href={listenHref}
             onClick={handlePlayClick}
             ariaLabel={
@@ -603,7 +663,11 @@ export function ProfilePacCard({
         );
       } else if (release || hasPlayableDestinations) {
         // Degraded ladder: no inline preview — link out to listen.
-        action = <PrimaryPill href={listenHref}>Listen</PrimaryPill>;
+        action = (
+          <PrimaryPill shape={pillShape} tone='glass' href={listenHref}>
+            {isFeatured ? 'Listen now' : 'Listen'}
+          </PrimaryPill>
+        );
       }
       if (isPacTrackActive && playbackState.duration > 0) {
         status = (
@@ -653,11 +717,15 @@ export function ProfilePacCard({
           )}
         </button>
       );
-      subject = <SubjectText title={copy.title} meta={copy.body} />;
+      subjectTitle = copy.title;
+      subjectMeta = copy.body;
       action = (
         <form
           onSubmit={handleCaptureSubmit}
-          className='flex w-full items-center gap-2'
+          className={cn(
+            'flex w-full gap-2',
+            isFeatured ? 'flex-col' : 'items-center'
+          )}
         >
           <input
             ref={emailRef}
@@ -676,7 +744,11 @@ export function ProfilePacCard({
             aria-invalid={Boolean(fieldError) || state.kind === 'error'}
             className='h-11 min-w-0 flex-1 rounded-full border border-white/15 bg-white/10 px-4 text-sm text-white dark:text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
           />
-          <PrimaryPill type='submit' disabled={state.kind === 'submitting'}>
+          <PrimaryPill
+            shape={pillShape}
+            type='submit'
+            disabled={state.kind === 'submitting'}
+          >
             {state.kind === 'submitting'
               ? 'Sending…'
               : state.kind === 'error'
@@ -698,28 +770,21 @@ export function ProfilePacCard({
     case 'success': {
       contextLabel = 'Stay In The Loop';
       ContextIcon = Bell;
-      subject = (
-        <SubjectText
-          title={"You're in"}
-          meta={`Watch your inbox for ${artist.name} updates.`}
-        />
-      );
+      subjectTitle = "You're in";
+      subjectMeta = `Watch your inbox for ${artist.name} updates.`;
       break;
     }
 
     case 'merch': {
       contextLabel = 'Merch';
       ContextIcon = ShoppingBag;
-      subject = (
-        <SubjectText
-          title={merchCard?.title ?? `${artist.name} merch`}
-          meta={
-            merchCard ? formatAmount(merchCard.retailPriceCents) : artist.name
-          }
-        />
-      );
+      subjectTitle = merchCard?.title ?? `${artist.name} merch`;
+      subjectMeta = merchCard
+        ? formatAmount(merchCard.retailPriceCents)
+        : artist.name;
       action = (
         <PrimaryPill
+          shape={pillShape}
           href={`/${artist.handle}/shop`}
           onClick={() => handleSecondaryClick('merch')}
         >
@@ -732,14 +797,11 @@ export function ProfilePacCard({
     case 'tip': {
       contextLabel = 'Support';
       ContextIcon = HandHeart;
-      subject = (
-        <SubjectText
-          title={`Support ${artist.name}`}
-          meta='Tips go straight to the artist.'
-        />
-      );
+      subjectTitle = `Support ${artist.name}`;
+      subjectMeta = 'Tips go straight to the artist.';
       action = (
         <PrimaryPill
+          shape={pillShape}
           href={`/${artist.handle}/tip`}
           onClick={() => handleSecondaryClick('tip')}
         >
@@ -752,20 +814,17 @@ export function ProfilePacCard({
 
     case 'tickets':
     case 'rsvp': {
-      contextLabel = 'On Tour';
+      contextLabel = 'Upcoming Events';
       ContextIcon = Ticket;
       const showMeta = [nextShow?.venueName, nextShow?.city]
         .filter(Boolean)
         .join(' · ');
-      subject = (
-        <SubjectText
-          title={nextShow?.title ?? `${artist.name} live`}
-          meta={showMeta || 'Upcoming show'}
-        />
-      );
+      subjectTitle = nextShow?.title ?? `${artist.name} live`;
+      subjectMeta = showMeta || 'Upcoming show';
       action =
         state.kind === 'tickets' && nextShow?.ticketUrl ? (
           <PrimaryPill
+            shape={pillShape}
             href={nextShow.ticketUrl}
             external
             onClick={() => handleSecondaryClick('tickets')}
@@ -774,6 +833,7 @@ export function ProfilePacCard({
           </PrimaryPill>
         ) : (
           <PrimaryPill
+            shape={pillShape}
             href={`/${artist.handle}/tour`}
             onClick={() => handleSecondaryClick('rsvp')}
           >
@@ -786,14 +846,11 @@ export function ProfilePacCard({
     case 'following': {
       contextLabel = 'Following';
       ContextIcon = Bell;
-      subject = (
-        <SubjectText
-          title={`You follow ${artist.name}`}
-          meta="You'll hear about new drops first."
-        />
-      );
+      subjectTitle = `You follow ${artist.name}`;
+      subjectMeta = "You'll hear about new drops first.";
       action = (
         <PrimaryPill
+          shape={pillShape}
           href={`/${artist.handle}?mode=subscribe`}
           onClick={() => handleSecondaryClick('following')}
         >
@@ -836,6 +893,79 @@ export function ProfilePacCard({
     },
     [exposureRef]
   );
+
+  if (isFeatured) {
+    return (
+      <div
+        ref={sectionRef}
+        className={cn('min-w-0', className)}
+        data-testid='profile-pac'
+        data-state={state.kind}
+        data-stage={state.stage}
+        data-degraded={state.degraded ? 'true' : undefined}
+        data-dismiss-affordance={assignment.dismissAffordance}
+        data-presentation='featured'
+      >
+        <ProfileModeCard
+          accent={accent}
+          eyebrow={contextLabel}
+          eyebrowAside={contextAside}
+          ariaLabel={
+            state.kind === 'tip'
+              ? `Support ${artist.name}`
+              : `${artist.name} primary action`
+          }
+          // Reserved height covers every PAC state (art + CTA, the capture
+          // form, the playing seek bar) so state swaps never move the page.
+          className='min-h-80'
+          title={subjectTitle}
+          description={subjectMeta}
+          media={
+            isCaptureState || state.kind === 'success' ? null : (
+              <div
+                className={cn(
+                  'relative h-26 w-26 overflow-hidden bg-surface-2',
+                  isReleaseArtwork
+                    ? getArtworkRadiusClassName('default')
+                    : 'rounded-(--profile-action-radius)'
+                )}
+                data-testid='profile-pac-featured-art'
+              >
+                {artImageUrl ? (
+                  <ImageWithFallback
+                    src={artImageUrl}
+                    alt={artImageAlt}
+                    fill
+                    priority={artPriority}
+                    loading={artPriority ? undefined : 'eager'}
+                    sizes='104px'
+                    className={
+                      isReleaseArtwork
+                        ? ARTWORK_FIT_CLASSNAME
+                        : getArtworkFitClassName(
+                            state.kind === 'merch' ? 'merch' : 'avatar'
+                          )
+                    }
+                    fallbackVariant='release'
+                    fallbackClassName='bg-transparent'
+                  />
+                ) : (
+                  <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
+                    <Play className='h-7 w-7 fill-current' aria-hidden='true' />
+                  </div>
+                )}
+              </div>
+            )
+          }
+        >
+          {action}
+          <div aria-live='polite' className='min-h-5 min-w-0'>
+            {status}
+          </div>
+        </ProfileModeCard>
+      </div>
+    );
+  }
 
   return (
     <section
@@ -922,7 +1052,7 @@ export function ProfilePacCard({
             {contextAside}
           </div>
 
-          {subject}
+          <SubjectText title={subjectTitle} meta={subjectMeta} />
         </div>
 
         <div

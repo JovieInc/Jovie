@@ -1,5 +1,7 @@
 # AgentOS Architecture
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 > **Retirement notice (2026-09-02):** Hermes and Trigger.dev are retired Jovie tooling. The v1 design below is historical and is not an active deployment or fallback plan. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md).
 
 > Issue: JOV-1922
@@ -53,6 +55,21 @@ Minimum fields:
 - `verificationGates`
 - `costEstimateUsd`
 - `blockedReason`
+
+### Routing pattern: audit-expensive → implement-cheap
+
+For fleet-scale quality programs (tables, forms, dialogs), split the work by
+model tier instead of paying frontier prices for mechanical edits:
+
+1. **Audit on the expensive model** — one deep pass produces a strict,
+   machine-checkable eval written into the repo (what PASS looks like, ranked
+   gaps, CI-enforceable gates). Example: `docs/TABLE_QUALITY_EVAL.md`.
+2. **Cook on the cheap model** — implement against the eval in ordered slices
+   (one PR per slice); loop until every gate is green. Correctness is verified
+   by the eval's tests and ratchets, not by model tier.
+3. **Router rule** — when a task references a checked-in eval, the router must
+   dispatch the implement lane, not re-audit. The eval file is the contract;
+   new audits only run when no eval exists or the eval is stale.
 
 Gate evidence names are stable strings:
 
@@ -146,7 +163,7 @@ A dedicated 16 GB MacBook Air runs the Hermes gateway service 24/7 as the always
 
 - Operating contract: [`.claude/rules/hermes-air.md`](../.claude/rules/hermes-air.md)
 - Operator runbook: [`docs/HERMES_AIR.md`](./HERMES_AIR.md)
-- Bootstrap: `scripts/symphony/bootstrap-air.sh`
+- Bootstrap: `symphony-control/bootstrap-air.sh`
 - Cost target: $0/mo via OpenRouter free-model rotation + local Ollama Qwen 3 4B fallback. Sentinel kill switch trips on any paid spend.
 - `HermesAiOpsSource` includes the value `'hermes-air'` so the HUD attributes dispatches that originate from the Air separately from product/CI sources.
 

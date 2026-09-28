@@ -24,7 +24,7 @@ const EXPECTATIONS = [
     ],
   },
   {
-    path: 'scripts/symphony/gem-priority-gate.py',
+    path: 'scripts/fleet-gate/gem-priority-gate.py',
     includes: [
       'LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"',
       '"repositories": {repo: {"ready": len(green_ready), "budget": repository_budget}}',
@@ -96,7 +96,7 @@ const EXPECTATIONS = [
     ],
   },
   {
-    path: 'scripts/symphony/closure_health.py',
+    path: 'scripts/fleet-gate/closure_health.py',
     includes: [
       '"repository": repository',
       '"repository": repository if repository_valid else None',

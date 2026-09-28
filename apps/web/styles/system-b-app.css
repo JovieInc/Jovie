@@ -4885,13 +4885,14 @@
 }
 
 :root.dark {
-  /* Sidebar tokens — Noir Ion shell; active uses Ion selection tint */
+  /* Sidebar tokens — Noir Ion shell. Founder lock 2026-09-25: active/selected
+     rows use a neutral hover-level tint, not the ion accent (no blue bg). */
   --sidebar-background: var(--app-shell-sidebar-background-rgb);
   --sidebar-foreground: 245 247 251;
   --sidebar-primary: 245 247 251;
   --sidebar-primary-foreground: 2 3 7;
   --sidebar-accent: 168 176 195 / 0.06;
-  --sidebar-accent-active: 17 175 255 / 0.1;
+  --sidebar-accent-active: 168 176 195 / 0.1;
   --sidebar-accent-foreground: 245 247 251;
   --sidebar-border: 168 176 195 / 0.1;
   --sidebar-ring: 17 175 255 / 0.72;
@@ -5936,15 +5937,20 @@
   --system-b-release-provider-accent-hover: var(--color-accent-hover);
 }
 
-:where(.system-b-spotify-connect-card) {
+:where(.system-b-spotify-connect-card),
+:where([data-spotify-connect-surface="card"]) {
   overflow: visible;
   background: var(--system-b-app-content-surface);
+  padding: calc(var(--space-3) + var(--space-0-5));
 }
 
-:where(.system-b-spotify-connect-status-card) {
+:where(.system-b-spotify-connect-status-card),
+:where([data-spotify-connect-surface="status"]) {
   display: flex;
   min-height: calc(var(--space-10) + var(--space-4));
   align-items: center;
+  gap: var(--space-2-5);
+  padding-inline: var(--space-2-5);
   background: color-mix(
     in oklab,
     var(--system-b-app-content-surface) 88%,

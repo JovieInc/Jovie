@@ -23,6 +23,7 @@ import {
   changedFiles,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   FAN_SEND_SAFETY_COVERAGE_COMMAND,
+  formatLaneDuration,
   LANE_COMMANDS,
   LANE_GROUPS,
   listAllChangedFiles,
@@ -53,10 +54,20 @@ const PACKAGE_JSON = JSON.parse(
 );
 
 const HOSTED_GROUP_JOBS = [
-  { jobId: 'ci-fast-typecheck', nextJobId: 'ci-fast-remaining' },
+  {
+    jobId: 'ci-fast-typecheck',
+    nextJobId: 'ci-fast-remaining',
+    jobName: 'ci-fast (typecheck)',
+  },
   {
     jobId: 'ci-fast-remaining',
     nextJobId: 'ci-profile-admission-browser',
+    jobName: 'ci-fast (remaining)',
+  },
+  {
+    jobId: 'ci-fast-structural-web',
+    nextJobId: 'ci-knip',
+    jobName: 'ci-fast (structural web)',
   },
 ];
 
@@ -296,6 +307,33 @@ describe('ci-fast bounded parallel workflow', () => {
     }
     expect(CI_FAST_SOURCE).toContain(
       "...(selected.has('mac') ? macParts : [])"
+    );
+  });
+
+  it('path-selects and runs the DeepSec policy and closed-loop tests', () => {
+    const initial = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    const additions = [
+      ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
+    ].map(match => match[1]);
+    expect(initial).toBeTruthy();
+    const pattern = initial + additions.join('');
+    for (const path of [
+      'scripts/security/deepsec-policy.mjs',
+      'scripts/security/deepsec-policy.test.mjs',
+      'scripts/security/deepsec/policy.json',
+      'scripts/security/deepsec/targets.json',
+      'scripts/security/deepsec-loop.mjs',
+    ]) {
+      expect(
+        spawnSync('grep', ['-Eq', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs'"
     );
   });
 
@@ -920,6 +958,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(warm).toContain("github.ref == 'refs/heads/main' &&");
     expect(warm).not.toMatch(/secrets\.|TURBO_TOKEN|continue-on-error/);
     expect(warm).toContain('persist-credentials: false');
+    // JOV-6835: the only main-scoped node_modules writer must not be gated
+    // on the tsc key, or main's dependency cache goes stale after manifests move.
+    expect(warm).toMatch(
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n {6}- name:/
+    );
     const keys = body =>
       body.split('\n').filter(line => line.includes('jovie-web-tsbuildinfo'));
     const [ciKey, ...ciFallbacks] = keys(restore).map(line => line.trim());
@@ -981,23 +1024,38 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
-    const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
-      const block = jobBlock(jobId, nextJobId);
-      const selector = block.match(/CI_FAST_LANE_GROUP:\s*([^\s]+)/)?.[1];
-      expect(selector, `missing hosted selector in ${jobId}`).toBeDefined();
-      expect(block).toContain(`name: ci-fast (${selector})`);
-      expect(block).toMatch(
-        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
-      );
-      expect(block).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
-      expect(block).not.toContain('always()');
-      expect(block).toMatch(/needs\.ci-path-changes\.result == 'success'/);
-      expect(block).toMatch(/github\.event_name != 'merge_group'/);
-      expect(block).toMatch(
-        /needs\.ci-merge-group-admission\.result == 'success'/
-      );
-      return selector;
-    });
+    const hostedSelectors = HOSTED_GROUP_JOBS.map(
+      ({ jobId, nextJobId, jobName }) => {
+        const block = jobBlock(jobId, nextJobId);
+        const selectors = [
+          ...new Set(
+            [...block.matchAll(/CI_FAST_LANE_GROUP:\s*([^\s]+)/g)].map(
+              match => match[1]
+            )
+          ),
+        ];
+        // One hosted group per job (web's structural step uses the aliased
+        // remaining structural env, which never appears textually here).
+        expect(selectors, `hosted selectors in ${jobId}`).toHaveLength(1);
+        const [selector] = selectors;
+        expect(block).toContain(`name: ${jobName}`);
+        expect(block).toMatch(
+          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
+        );
+        expect(block).not.toContain('always()');
+        // Aliased gate jobs share remaining's anchored condition verbatim.
+        const gate = block.includes('if: *ci-fast-gate\n')
+          ? WORKFLOW.slice(WORKFLOW.indexOf('if: &ci-fast-gate >-'))
+          : block;
+        expect(gate).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
+        expect(gate).toMatch(/needs\.ci-path-changes\.result == 'success'/);
+        expect(gate).toMatch(/github\.event_name != 'merge_group'/);
+        expect(gate).toMatch(
+          /needs\.ci-merge-group-admission\.result == 'success'/
+        );
+        return selector;
+      }
+    );
 
     expect(new Set(hostedSelectors).size).toBe(hostedSelectors.length);
     expect([...hostedSelectors].sort()).toEqual(
@@ -1053,7 +1111,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
       'copy-gate': COPY_GATE_COMMAND,
       structural:
@@ -1081,10 +1139,10 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Run actionlint (structural)')
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
 
-    expect(LANE_GROUPS.remaining).toContain('design-conformance');
+    expect(LANE_GROUPS.web).toContain('design-conformance');
     expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
     expect(LANE_GROUPS.remaining).toContain('shadcn-lint-contracts');
@@ -1132,10 +1190,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).not.toContain('apps/ios/');
     expect(structuralDecision).toContain('echo "skip=true"');
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))'
+      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))'
     );
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))\\.test\\.mjs$'
+      'scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))\\.test\\.mjs$'
     );
     expect(structuralDecision).toContain('canon/invariants\\.jsonl');
     expect(structuralDecision).toContain('scripts/invariants/');
@@ -1174,7 +1232,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Run actionlint (structural)')
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
 
     for (const requiredPath of [
@@ -1287,7 +1345,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
-        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
       );
     }
   });
@@ -1393,6 +1451,33 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('enforces fleet gate and backlog-orchestrator coverage in structural CI', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+
+    expect(remaining).toContain('scripts/fleet-gate/');
+    expect(CI_FAST_SOURCE).toContain('elif [ "\\${CI:-}" = "true" ]');
+    expect(CI_FAST_SOURCE).not.toContain('elif [[');
+    for (const command of [
+      'python3 -m coverage run --branch scripts/fleet-gate/tests/closure-health.test.py',
+      'coverage report --include="*/scripts/fleet-gate/closure_health.py"',
+      'python3 -m coverage run --branch scripts/fleet-gate/tests/gem-priority-gate.test.py',
+      'coverage report --include="*/scripts/fleet-gate/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
+      'python3 -m coverage run --branch scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
+      'coverage report --include="*/scripts/fleet-gate/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
+      'python3 scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/summer-shipping-lead-contract.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/summer-shipping-lead-contract.test.mjs',
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73',
+      'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
+      'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
+      'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
+    ]) {
+      expect(CI_FAST_SOURCE).toContain(command);
+    }
+  });
+
   it('always materializes ci-fast-lanes.json even when setup fails (JOV-4446)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ci-fast-lanes-'));
     const outPath = join(dir, 'ci-fast-lanes.json');
@@ -1442,7 +1527,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('overlaps structural setup with cheap lanes; structural awaits them', () => {
+  it('overlaps structural setup and the structural lane with cheap lanes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -1467,7 +1552,7 @@ describe('ci-fast bounded parallel workflow', () => {
           '-c',
           remaining
             .split(`name: ${name}`)[1]
-            .split('run: |\n')[1]
+            .split(/run: (?:&[\w-]+ )?\|\n/)[1]
             .split('\n      - ')[0],
         ],
         { env, encoding: 'utf8', timeout: 9000 }
@@ -1479,11 +1564,28 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(at('Setup Playwright (Chromium)')).toBeGreaterThan(
       at('- name: Start ci-fast lanes')
     );
-    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
-      at('- name: Restore Symphony selector cache')
-    );
     expect(at('- name: Run structural ci-fast lane')).toBeGreaterThan(
+      at('- name: Install pytest (structural regression tests)')
+    );
+    // Structural runs while the cheap lanes finish; the await follows it and
+    // runs even after a structural failure, so both results gate the job.
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Run structural ci-fast lane')
+    );
+    expect(at('- name: Run selected Storybook browser proof')).toBeGreaterThan(
       at('- name: Await ci-fast lanes')
+    );
+    const stepBody = name =>
+      remaining.split(`- name: ${name}\n`)[1].split('\n      - ')[0];
+    expect(stepBody('Await ci-fast lanes')).toContain(
+      "if: ${{ !cancelled() && steps.lanes-start.outcome == 'success' }}"
+    );
+    // Fail-fast: a red cheap-lane status stops new structural commands.
+    expect(stepBody('Run structural ci-fast lane')).toContain(
+      'CI_FAST_STRUCTURAL_ABORT_STATUS_FILE: ${{ runner.temp }}/ci-fast-lanes-bg/status'
+    );
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'LANES_DIR: ${{ runner.temp }}/ci-fast-lanes-bg\n'
     );
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
@@ -1574,6 +1676,12 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(failed.length).toBeGreaterThan(1);
       expect(skippedByFailFast.map(lane => lane.id)).toEqual(['structural']);
       expect(payload.lanes.at(-1).id).toBe('structural');
+      // Per-lane wall time is in the job log, not only the artifact.
+      for (const lane of payload.lanes) {
+        expect(result.stdout).toContain(
+          `[ci-fast] ${lane.id}: ${lane.status} (${formatLaneDuration(lane.durationMs)})`
+        );
+      }
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -1630,16 +1738,19 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(typecheck).not.toMatch(
       /run-actionlint\.sh|rhysd\/actionlint|actions\/setup-python|python -m pip install/
     );
+    // actionlint reads only checked-out workflows, so it runs unconditionally
+    // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- name: Run actionlint \(structural\)\n\s+if: \$\{\{ success\(\) && steps\.structural\.outputs\.skip != 'true' \}\}\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
+    expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
     expect(remaining).toMatch(/python -m pip install/);
     expect(typecheck).not.toContain('ci-fast-remaining');
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -1658,7 +1769,10 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \]\]/
+    );
+    expect(aggregate).toMatch(
+      /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
     );
     expect(aggregate).not.toContain('GROUP_RESULT');
     expect(aggregate).toMatch(/exit 1/);
@@ -1669,16 +1783,113 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const python = jobBlock('ci-fast-structural-python', 'ci-knip');
+    const python = jobBlock(
+      'ci-fast-structural-python',
+      'ci-fast-structural-web'
+    );
     const aliases = python.match(/(?<= \*)[\w-]+/g);
     expect(aliases).toHaveLength(10);
     for (const name of aliases) expect(remaining).toContain(`&${name}`);
     expect(remaining).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
     expect(python).toContain('CI_FAST_STRUCTURAL_PYTEST: only');
+    expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
+  });
+
+  it('runs the structural web commands in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    expect(web).toMatch(
+      /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
+    );
+    const aliases = web.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(11);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_WEB: skip');
+    expect(web).toContain('CI_FAST_STRUCTURAL_WEB: only');
+    expect(web).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
+    // tests/unit/ci runs a real Chromium Playwright capture.
+    expect(web).toContain('uses: ./.github/actions/setup-playwright');
+    expect(web.indexOf('setup-playwright')).toBeLessThan(
+      web.indexOf('run: node scripts/ci-fast-lanes.mjs')
+    );
+  });
+
+  it('moves the slowest cheap lanes into a background web group without dropping any', () => {
+    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const at = marker => web.indexOf(marker);
+    const stepBody = name =>
+      web.split(`- name: ${name}\n`)[1].split('\n      - ')[0];
+
+    // Partition: every lane runs in exactly one hosted group.
+    expect(LANE_GROUPS.web).toEqual([
+      'design-conformance',
+      'profile-admission',
+    ]);
+    for (const laneId of LANE_GROUPS.web) {
+      expect(LANE_GROUPS.remaining).not.toContain(laneId);
+      expect(LANE_GROUPS.typecheck).not.toContain(laneId);
+    }
+    const hosted = [
+      ...LANE_GROUPS.typecheck,
+      ...LANE_GROUPS.remaining,
+      ...LANE_GROUPS.web,
+    ];
+    expect(hosted).toHaveLength(selectLanes().length);
+    expect([...hosted].sort()).toEqual(
+      selectLanes()
+        .map(lane => lane.id)
+        .sort()
+    );
+    expect(selectLanes('web').map(lane => lane.id)).toEqual(LANE_GROUPS.web);
+    expect(LANE_GROUPS.web).not.toContain('structural');
+
+    // Unconditional background start once history exists, awaited after the
+    // structural web step even when it fails, and gated like remaining.
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'CI_FAST_LANE_GROUP: web'
+    );
+    expect(stepBody('Start ci-fast lanes')).not.toContain('if:');
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'run: *ci-fast-lanes-start'
+    );
+    expect(remaining).toContain('run: &ci-fast-lanes-start |');
+    expect(remaining).toContain('run: &ci-fast-lanes-await |');
+    expect(at('- name: Start ci-fast lanes')).toBeGreaterThan(
+      at('- name: Fetch base-branch history')
+    );
+    expect(at('- name: Start ci-fast lanes')).toBeLessThan(
+      at('- name: Setup Playwright (Chromium)')
+    );
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Run structural web commands')
+    );
+    expect(stepBody('Await ci-fast lanes')).toContain(
+      "if: ${{ !cancelled() && steps.lanes-start.outcome == 'success' }}"
+    );
+    expect(stepBody('Await ci-fast lanes')).toContain(
+      'run: *ci-fast-lanes-await'
+    );
+    // Fail-fast: the aliased structural env reads this job's lane status.
+    expect(stepBody('Start ci-fast lanes')).toContain(
+      'LANES_DIR: ${{ runner.temp }}/ci-fast-lanes-bg\n'
+    );
+    expect(stepBody('Run structural web commands')).toContain(
+      'env: *structural-run-env'
+    );
+    expect(web).toContain(
+      'name: ci-fast-lanes-web-${{ github.run_id }}-${{ github.run_attempt }}'
+    );
   });
 
   it('runs a bounded public-profile admission subset on source and merge-group heads', () => {
-    expect(LANE_GROUPS.remaining).toContain('profile-admission');
+    expect(LANE_GROUPS.web).toContain('profile-admission');
     expect(LANE_COMMANDS['profile-admission']).toContain(
       'tests/unit/api/profile/capture-dismissal.test.ts'
     );
@@ -1836,48 +2047,15 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/lib/__tests__/pr-check-failures.test.mjs',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_runner_routing.py',
-      'scripts/tests/test_symphony_ui_pilot_runtime.py',
-      'scripts/tests/test_symphony_reconciler_runtime.py',
-      'scripts/symphony/closure_health.py',
-      'scripts/symphony/control-bundle-manifest.mjs',
-      'scripts/symphony/config/gem-repo-registry.json',
-      'scripts/backlog-orchestrator/config/model-registry.json',
-      'scripts/symphony/evaluate-fleet-gate.sh',
-      'scripts/symphony/fleet_admission_receipt.py',
-      'scripts/symphony/gem-disk-reclaim.py',
-      'scripts/symphony/gem-workspace-migrate.py',
-      'scripts/symphony/install-gem-symphony-storage.sh',
-      'scripts/symphony/jovie-symphony-workspace',
-      'scripts/symphony/install-gem-fleet-controller.sh',
-      'scripts/symphony/install-symphony-ui-pilot.sh',
-      'scripts/symphony/model-router.py',
-      'scripts/symphony/symphony-nvme-package-cache.sh',
-      'scripts/symphony/symphony-reconciler.py',
-      'scripts/symphony/summer-symphony-outbox-consumer.mjs',
-      'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
-      'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
-      'scripts/symphony/summer-shipping-lead-contract.mjs',
-      'scripts/symphony/summer-shipping-lead-contract.test.mjs',
-      'scripts/symphony/native-queue-starvation-execute.test.mjs',
-      'scripts/symphony/systemd/gem-disk-reclaim.service',
-      'scripts/symphony/systemd/gem-disk-reclaim.timer',
-      'scripts/symphony/systemd/gem-pr-drain.service',
-      'scripts/symphony/systemd/gem-pr-drain.timer',
-      'scripts/symphony/tests/closure-health.test.py',
-      'scripts/symphony/tests/control-bundle-manifest.test.mjs',
-      'scripts/symphony/tests/gem-pr-drain.test.py',
-      'scripts/symphony/tests/gem-ops-hud.test.py',
-      'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-      'scripts/symphony/tests/gem-priority-gate.test.py',
-      'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
-      'scripts/symphony/tests/symphony-nvme-package-cache.test.py',
-      'scripts/symphony/tests/symphony-reconciler.test.py',
-      'scripts/symphony/tests/test_gem_disk_reclaim.py',
-      'scripts/symphony/tests/jovie-symphony-workspace.test.py',
-      'scripts/symphony/tests/test_gem_workspace_migrate.py',
-      'scripts/symphony/tests/test-model-router.py',
-      'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'scripts/symphony/tests/test_fleet_admission_receipt.py',
+      'scripts/fleet-gate/closure_health.py',
+      'scripts/fleet-gate/evaluate-fleet-gate.sh',
+      'scripts/fleet-gate/fleet_admission_receipt.py',
+      'scripts/backlog-orchestrator/summer-shipping-lead-contract.mjs',
+      'scripts/backlog-orchestrator/__tests__/summer-shipping-lead-contract.test.mjs',
+      'scripts/fleet-gate/tests/closure-health.test.py',
+      'scripts/fleet-gate/tests/gem-priority-gate.test.py',
+      'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+      'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
       expect(
@@ -1974,7 +2152,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     const structuralDecision = remaining.slice(
       remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Run actionlint (structural)')
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
     const controlPattern = remaining.match(
       /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
@@ -2214,7 +2392,7 @@ describe('new scripts test PR structural selection', () => {
     const selects = path =>
       spawnSync('grep', ['-qE', ere], { input: `${path}\n` }).status === 0;
     expect(selects('scripts/ops/firecrawl-crawl.test.mjs')).toBe(true);
-    expect(selects('scripts/symphony/lib/__tests__/typed.test.ts')).toBe(true);
+    expect(selects('scripts/gate-ladder/typed.test.ts')).toBe(true);
     expect(selects('scripts/ops/firecrawl-crawl.mjs')).toBe(false);
     expect(selects('apps/web/tests/unit/a.test.ts')).toBe(false);
   });

@@ -15,6 +15,13 @@ import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+// This lock covers the flagged desktop surface journey too; the shipped
+// default (flag off) keeps desktop on the compact column and is covered in
+// profile-compact-template.test.tsx.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE = '1';
+});
+
 vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: vi.fn().mockResolvedValue(undefined),
 }));
@@ -227,11 +234,15 @@ describe('live public profile lock', () => {
         .getByTestId('public-profile-layout-shell')
         .querySelector('.public-profile-layout-compact-slot') as HTMLElement
     );
-    for (const label of ['Home', 'Music', 'Shows', 'About', 'Menu']) {
+    for (const label of ['Home', 'Music', 'Events', 'About', 'Menu']) {
       expect(compact.getByRole('button', { name: label })).toBeInTheDocument();
     }
 
-    fireEvent.click(compact.getByRole('button', { name: 'Release credits' }));
+    // Credits live in the overflow menu, not as a raw control in the shell.
+    fireEvent.click(compact.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Release credits' })
+    );
     expect(
       await screen.findByRole('heading', { name: 'Credits' })
     ).toBeInTheDocument();
@@ -297,7 +308,7 @@ describe('live public profile lock', () => {
         'desktop'
       );
       expect(screen.getAllByText('Get updates').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Shows').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
       expect(screen.getAllByText('About').length).toBeGreaterThan(0);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
