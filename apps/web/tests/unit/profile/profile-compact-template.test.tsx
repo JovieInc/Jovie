@@ -225,7 +225,7 @@ const mockArtist: Artist = {
 const mockContacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,
@@ -1316,6 +1316,36 @@ describe('ProfileCompactTemplate', () => {
         })
       );
     });
+
+    pushStateSpy.mockRestore();
+  });
+
+  it('does not push a source-less URL before the source param hydrates', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    expect(window.location.search).toBe('?source=qr');
+    for (const call of pushStateSpy.mock.calls) {
+      expect(String(call[2])).toContain('source=qr');
+    }
 
     pushStateSpy.mockRestore();
   });
