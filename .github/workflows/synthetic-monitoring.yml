@@ -222,7 +222,7 @@ jobs:
                     },
                     {
                       "title": "Failed Tests",
-                      "value": "```\n${{ steps.test-results.outputs.failed_tests }}\n```",
+                      "value": ${{ toJSON(format('```{0}```', steps.test-results.outputs.failed_tests)) }},
                       "short": false
                     },
                     {

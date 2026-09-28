@@ -67,7 +67,11 @@ struct MobileChatMessageRow: View {
         return true
       }
     }
-    let showsThinking = displayText.isEmpty && !hasRenderableSegments && isStreamingAssistant
+    let showsThinking = MobileChatThinkingIndicator.shouldDisplay(
+      role: item.role,
+      status: item.status,
+      hasRenderableContent: !displayText.isEmpty || hasRenderableSegments
+    )
 
     if showsThinking {
       // Same padding/background/corner-radius/frame as the assistant prose
@@ -136,51 +140,83 @@ struct MobileChatMessageRow: View {
   }
 }
 
+/// Decision layer for the streaming "Thinking" dots (JOV-6000). The indicator
+/// is bound to authoritative assistant state and app lifecycle: it renders only
+/// while an assistant turn is genuinely in flight with nothing renderable, and
+/// it animates only while the scene is active — so completion, error, cancel,
+/// navigation, backgrounding, or a replaced stream always stops it, and
+/// foreground/reconnect resumes only because the row still exists.
+enum MobileChatThinkingIndicator {
+  /// One calm, synchronized opacity cycle — opacity-only constant motion per
+  /// motion.md §3 (`linear`), no phase staggering, no scale/translate.
+  static let pulseDuration = JovieMotion.calmDuration
+  static let dimmedOpacity = 0.35
+  static let litOpacity = 0.9
+  /// Pinned to a 16pt body line so thinking → content/error never shifts layout.
+  static let reservedHeight: CGFloat = 20
+
+  static func shouldDisplay(
+    role: MobileChatTimelineRole,
+    status: MobileChatTimelineStatus,
+    hasRenderableContent: Bool
+  ) -> Bool {
+    role == .assistant && status.isInFlight && !hasRenderableContent
+  }
+
+  static func shouldAnimate(reduceMotion: Bool, scenePhase: ScenePhase) -> Bool {
+    !reduceMotion && scenePhase == .active
+  }
+
+  static func pulseAnimation(reduceMotion: Bool) -> Animation? {
+    reduceMotion ? nil : Animation.linear(duration: pulseDuration).repeatForever(autoreverses: true)
+  }
+}
+
 /// Three-dot streaming indicator that replaces the old "Thinking…" text.
-/// Dots pulse in sequence (staggered `.delay`) via `repeatForever`; under
-/// Reduce Motion they render static (no movement/opacity animation) per
-/// `.claude/rules/motion.md` §6. The row height is pinned to match a 16pt
-/// body line so it reserves the same footprint the text bubble used.
+/// The whole row breathes as one slow opacity pulse (no stagger, no spatial
+/// motion); under Reduce Motion it renders static. `scenePhase` stops the
+/// pulse on background/inactive and `onDisappear` stops it on removal, so the
+/// animation can never outlive the authoritative streaming state. VoiceOver
+/// sees a single "Thinking" element — one announcement, no per-dot noise.
 private struct MobileChatThinkingDotsView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var isPulsing = false
+  @Environment(\.scenePhase) private var scenePhase
+  @State private var isLit = false
 
   private static let dotSize: CGFloat = 6
   private static let dotSpacing: CGFloat = 4
-  private static let rowHeight: CGFloat = 20
+
+  private var isAnimating: Bool {
+    MobileChatThinkingIndicator.shouldAnimate(reduceMotion: reduceMotion, scenePhase: scenePhase)
+  }
 
   var body: some View {
     HStack(spacing: Self.dotSpacing) {
-      ForEach(0..<3, id: \.self) { index in
+      ForEach(0..<3, id: \.self) { _ in
         Circle()
           .fill(JovieColor.textTertiary)
           .frame(width: Self.dotSize, height: Self.dotSize)
-          .opacity(dotOpacity)
-          .animation(dotAnimation(delayIndex: index), value: isPulsing)
       }
     }
-    .frame(height: Self.rowHeight, alignment: .center)
-    .onAppear {
-      guard !reduceMotion else { return }
-      isPulsing = true
+    .opacity(
+      isLit && isAnimating
+        ? MobileChatThinkingIndicator.litOpacity
+        : MobileChatThinkingIndicator.dimmedOpacity
+    )
+    .animation(
+      isAnimating ? MobileChatThinkingIndicator.pulseAnimation(reduceMotion: reduceMotion) : nil,
+      value: isLit
+    )
+    .frame(height: MobileChatThinkingIndicator.reservedHeight, alignment: .center)
+    .onAppear { isLit = isAnimating }
+    .onDisappear { isLit = false }
+    .onChange(of: isAnimating) { _, animating in
+      // Resuming only restarts while this row is still on screen; if the
+      // stream ended while away the parent removed the view entirely.
+      isLit = animating
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Thinking")
-  }
-
-  private var dotOpacity: Double {
-    guard !reduceMotion else { return 0.6 }
-    return isPulsing ? 1 : 0.3
-  }
-
-  private func dotAnimation(delayIndex: Int) -> Animation? {
-    guard !reduceMotion else { return nil }
-    // Constant/ambient motion uses `linear` per motion.md §3, not an
-    // eased token -- durations still come from JovieMotion so nothing here
-    // is a raw hardcoded ms value.
-    return Animation.linear(duration: JovieMotion.slowDuration)
-      .repeatForever(autoreverses: true)
-      .delay(JovieMotion.subtleDuration * Double(delayIndex))
   }
 }
 

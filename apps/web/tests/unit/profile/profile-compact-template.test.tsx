@@ -16,6 +16,20 @@ import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
 import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
 
+// The desktop surface ships behind a build-time flag (default off). Most of
+// this suite pins it ON to keep covering the flagged desktop surface; the
+// flag-off describe below stubs it back to the shipped default.
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE = '1';
+});
+
+vi.mock('@/lib/profile/desktop-surface-flag', () => ({
+  get PROFILE_DESKTOP_SURFACE_ENABLED() {
+    const value = process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE;
+    return value === '1' || value === 'true';
+  },
+}));
+
 const {
   mockCanonicalProfileDSPs,
   mockUseProfileShell,
@@ -44,7 +58,7 @@ const {
         { 'aria-label': 'Profile Navigation' },
         React.createElement('button', { type: 'button' }, 'Home'),
         React.createElement('button', { type: 'button' }, 'Music'),
-        React.createElement('button', { type: 'button' }, 'Shows'),
+        React.createElement('button', { type: 'button' }, 'Events'),
         React.createElement('button', { type: 'button' }, 'About')
       )
     );
@@ -354,11 +368,23 @@ describe('ProfileCompactTemplate', () => {
       },
     }));
     window.history.replaceState(null, '', '/test-artist');
+    // AnonCookieBootstrap fetches the per-user variant on mount; resolve it
+    // deterministically so tests exercise the post-resolution state.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'button' }),
+      })
+    );
   });
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
+    vi.unstubAllGlobals();
     vi.useRealTimers();
+    document.cookie =
+      'jv_country=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   });
 
   it('keeps the signed-in escape hatch on a live tablet profile that uses embedded presentation', async () => {
@@ -461,7 +487,7 @@ describe('ProfileCompactTemplate', () => {
 
   // Regression: JOV-4103 — public profile hero must show social media icons
   // when the artist has Instagram/Twitter links (missed-ship recovery).
-  it('renders hero social icons for Instagram and Twitter profile links', async () => {
+  it('renders identity social icons for Instagram and Twitter profile links', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -488,7 +514,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const socialRow = await screen.findByTestId('profile-hero-social-row');
+    const socialRow = await screen.findByTestId('profile-identity-social-row');
     expect(socialRow).toBeInTheDocument();
 
     const instagram = within(socialRow).getByRole('link', {
@@ -504,7 +530,7 @@ describe('ProfileCompactTemplate', () => {
     expect(twitter).toHaveAttribute('href', 'https://x.com/test-artist');
   });
 
-  it('uses registry brand casing for hero social aria labels', async () => {
+  it('uses registry brand casing for identity social aria labels', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -523,7 +549,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const socialRow = await screen.findByTestId('profile-hero-social-row');
+    const socialRow = await screen.findByTestId('profile-identity-social-row');
     // Registry casing ('TikTok'), not naive title case ('Tiktok').
     expect(
       within(socialRow).getByRole('link', {
@@ -553,7 +579,7 @@ describe('ProfileCompactTemplate', () => {
     );
   });
 
-  it('keeps the home identity grid tight without shrinking interaction targets', () => {
+  it('keeps the identity header on 44px targets with the handle under the name', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -572,41 +598,74 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const identity = screen.getByTestId('profile-hero-identity-block');
-    expect(identity).toHaveClass('py-1');
-    expect(screen.getByTestId('profile-hero-identity-content')).toHaveClass(
-      'gap-1'
-    );
-    expect(screen.getByRole('link', { name: mockArtist.name })).toHaveClass(
-      'min-h-11',
-      'items-center',
-      'py-0'
-    );
-    expect(screen.getByTestId('profile-hero-metadata-row')).not.toHaveClass(
-      'min-h-11'
-    );
-    expect(screen.getByTestId('profile-hero-metadata-row')).toHaveClass(
-      'self-start'
-    );
-    expect(screen.getByText('Los Angeles')).toBeVisible();
+    const identity = screen.getByTestId('profile-identity-header');
     expect(
-      within(screen.getByTestId('profile-hero-social-row')).getByRole('link')
+      within(identity).getByTestId('profile-identity-handle')
+    ).toHaveTextContent(`jov.ie/${mockArtist.handle}`);
+    // Location lives in About, not in the identity header.
+    expect(within(identity).queryByText('Los Angeles')).toBeNull();
+    // Get Updates is the only identity action; songs carry their own Listen.
+    expect(
+      within(identity).queryByTestId('profile-identity-listen')
+    ).toBeNull();
+    const getUpdates = within(identity).getByRole('button', {
+      name: 'Get Updates',
+    });
+    expect(getUpdates.parentElement).toHaveClass('h-11');
+    expect(
+      getUpdates.parentElement?.querySelector('.profile-glass-pill')
+    ).toHaveClass('profile-glass-pill', 'profile-glass-pill--flat', 'h-7');
+    expect(
+      within(screen.getByTestId('profile-identity-social-row')).getByRole(
+        'link'
+      )
     ).toHaveClass('h-11', 'w-11');
   });
 
-  it('keeps identity metadata compact when optional location is absent', () => {
+  it('opens the existing subscribe flow from the identity Get Updates action', async () => {
+    const revealNotifications = vi.fn();
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: { readonly onRegisterReveal?: (reveal: () => void) => void }) => {
+        props.onRegisterReveal?.(revealNotifications);
+        return null;
+      }
+    );
     render(
       <ProfileCompactTemplate
         mode='profile'
-        artist={{ ...mockArtist, location: null }}
+        artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
       />
     );
 
-    const metadata = screen.getByTestId('profile-hero-metadata-row');
-    expect(metadata).not.toHaveClass('min-h-11');
-    expect(metadata.querySelector('svg')).toBeNull();
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await waitFor(() => {
+      expect(mockProfileInlineNotificationsCTA).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Get Updates' }));
+
+    await waitFor(() => {
+      expect(revealNotifications).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('shows no Get Updates action when the profile cannot take fans', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        allowFanCapture={false}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Get Updates' })
+    ).not.toBeInTheDocument();
   });
 
   it('scopes the mobile overflow contract to the active home surface slot', () => {
@@ -630,31 +689,37 @@ describe('ProfileCompactTemplate', () => {
     );
   });
 
-  it('keeps the artist photo in color with profile text over the image', async () => {
+  it('shows the artist photo as an 80px portrait with only the verified glyph over it', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
         artist={{
           ...mockArtist,
           image_url: 'https://example.com/artist.jpg',
-          location: 'Los Angeles',
+          is_verified: true,
         }}
         socialLinks={[]}
         contacts={[]}
       />
     );
 
-    // Hero photo is decorative (empty alt) so the H1 name is not duplicated.
-    const cover = screen.getByTestId('profile-cover');
-    const artistPhoto = cover.querySelector(
+    // Portrait is decorative (empty alt) so the H1 name is not duplicated.
+    const identity = screen.getByTestId('profile-identity-header');
+    const artistPhoto = identity.querySelector(
       'img[src="https://example.com/artist.jpg"]'
     );
     expect(artistPhoto).not.toBeNull();
     expect(artistPhoto?.getAttribute('alt') ?? '').toBe('');
     expect(artistPhoto?.className).not.toContain('grayscale');
-    expect(
-      cover.querySelector('[data-testid="profile-hero-identity-block"]')
-    ).not.toBeNull();
+    expect(artistPhoto?.closest('.h-20.w-20')).not.toBeNull();
+    // Verified is a glyph with a tooltip, never the visible word.
+    const verified = within(identity).getByRole('img', {
+      name: 'Verified Jovie Profile',
+    });
+    expect(verified).toHaveAttribute('title', 'Verified Jovie Profile');
+    expect(identity).not.toHaveTextContent(/verified/i);
+    // The cover no longer hosts a photo; it is floating chrome only.
+    expect(screen.getByTestId('profile-cover').querySelector('img')).toBeNull();
   });
 
   it('names the document identity heading after the artist', () => {
@@ -698,14 +763,22 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    // No raw credits control in the shell; the entry lives in the menu.
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+    const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toBeTypeOf('function');
+    act(() => drawerProps.onOpenReleaseCredits?.());
 
     const drawer = await screen.findByRole('dialog', { name: 'Credits' });
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
   });
 
-  it('hides the release credits trigger when every credit group is empty', () => {
+  it('hides the release credits menu entry when every credit group is empty', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -716,12 +789,13 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.queryByRole('button', { name: 'Release credits' })
-    ).toBeNull();
+    const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toBeUndefined();
   });
 
-  it('uses the compact no-media hero geometry when a profile has no real image', () => {
+  it('keeps the identity header without a portrait image when a profile has no real photo', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -731,9 +805,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-cover')).toHaveClass(
-      'profile-home-fluid-hero--no-media'
-    );
+    const identity = screen.getByTestId('profile-identity-header');
+    expect(identity.querySelector('.h-20.w-20')).not.toBeNull();
+    expect(screen.queryByTestId('profile-identity-verified')).toBeNull();
   });
 
   it('renders the Jovie menu trigger instead of a duplicate alerts trigger in the compact profile header', async () => {
@@ -868,7 +942,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Shows', 'About']) {
+    for (const label of ['Home', 'Music', 'Events', 'About']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
@@ -1369,11 +1443,13 @@ describe('ProfileCompactTemplate', () => {
 
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
     const carousel = screen.getByTestId('profile-home-carousel');
+    const pacCard = screen.getByTestId('profile-pac');
 
     expect(alertsCard).toHaveTextContent('Alerts');
-    expect(carousel).toHaveTextContent('Listen');
-    // The alerts card is the LAST card of the single home carousel — no
-    // stacked sections outside the track.
+    // The featured mode card carries the release and its Listen CTA; the
+    // alerts card stays last, inside the carousel below it.
+    expect(pacCard).toHaveTextContent("Don't Look Down");
+    expect(pacCard).toHaveTextContent('Listen now');
     expect(carousel.contains(alertsCard)).toBe(true);
     expect(
       screen.getByTestId('profile-pac').compareDocumentPosition(alertsCard)
@@ -1394,9 +1470,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const homeCard = screen.getByTestId('profile-home-carousel');
-    expect(homeCard).toHaveTextContent("Don't Look Down");
-    expect(homeCard).toHaveTextContent('Holding On');
+    const homeRail = screen.getByTestId('profile-home-rail');
+    expect(homeRail).toHaveTextContent("Don't Look Down");
+    expect(homeRail).toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {
@@ -1452,6 +1528,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await screen.findByTestId('mock-inline-notifications-cta');
+
     fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
 
     await waitFor(() => {
@@ -1460,6 +1540,190 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.queryByTestId('mock-primary-tab-panel')
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the fan-capture CTA unmounted until the visitor assignment resolves', async () => {
+    let resolveAssignment:
+      | ((value: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveAssignment = resolve;
+          })
+      )
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    // While the assignment fetch is in flight the interactive capture CTA
+    // must not exist — a control that would morph post-paint stays absent.
+    expect(
+      screen.queryByTestId('mock-inline-notifications-cta')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-compact-shell')).not.toHaveAttribute(
+      'data-visitor-assignment-resolved'
+    );
+    expect(mockProfileInlineNotificationsCTA).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveAssignment?.({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'toggle' }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+    });
+    // The CTA mounts exactly once, with the assigned variant — never the
+    // ISR default that would later morph.
+    expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+      'data-alert-opt-in-variant',
+      'toggle'
+    );
+    expect(mockProfileInlineNotificationsCTA).toHaveBeenCalledWith(
+      expect.objectContaining({ experimentVariant: 'toggle' })
+    );
+    expect(
+      mockProfileInlineNotificationsCTA.mock.calls.filter(
+        ([props]) =>
+          (props as { experimentVariant?: string }).experimentVariant ===
+          'button'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('keeps the ISR default variant when assignment resolution fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network down'))
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+    });
+    expect(mockProfileInlineNotificationsCTA).toHaveBeenCalledWith(
+      expect.objectContaining({ experimentVariant: 'button' })
+    );
+  });
+
+  it('routes a cold-load alerts click to the capture flow under the assigned variant', async () => {
+    let resolveAssignment:
+      | ((value: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveAssignment = resolve;
+          })
+      )
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    // Early click: the visitor lands on the subscribe tab before the
+    // assignment resolves; the panel receives the unresolved flag so its
+    // capture control stays inert.
+    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+          visitorAssignmentResolved: false,
+        })
+      );
+    });
+
+    await act(async () => {
+      resolveAssignment?.({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'toggle' }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+          visitorAssignmentResolved: true,
+          alertOptInVariant: 'toggle',
+        })
+      );
+    });
+  });
+
+  it('geo-sorts DSPs from the readable jv_country cookie after mount', async () => {
+    document.cookie = 'jv_country=DE; path=/';
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({ viewerCountryCode: 'DE' })
+      );
+    });
+  });
+
+  it('prefers an explicit viewerCountryCode prop over the jv_country cookie', async () => {
+    document.cookie = 'jv_country=DE; path=/';
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        viewerCountryCode='US'
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({ viewerCountryCode: 'US' })
+      );
+    });
   });
 
   it('hides the compact hero alerts card for returning subscribers', async () => {
@@ -1517,7 +1781,7 @@ describe('ProfileCompactTemplate', () => {
 
     const view = render(renderProfile());
 
-    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+    fireEvent.click(await screen.findByTestId('mock-inline-notifications-cta'));
 
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
@@ -1661,7 +1925,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+    fireEvent.click(await screen.findByTestId('mock-inline-notifications-cta'));
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
@@ -2339,6 +2603,112 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
+  describe('with the desktop surface flag off (shipped default)', () => {
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('server-renders only the compact surface, with no desktop hand-off class', () => {
+      const html = renderToString(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+          profileBanner={<div data-testid='mock-banner'>Banner</div>}
+        />
+      );
+
+      expect(html).toContain('data-testid="profile-compact-shell"');
+      expect(html).not.toContain('mock-profile-desktop-surface');
+      expect(html).not.toContain('data-testid="profile-desktop-shell"');
+      expect(html).not.toContain('data-testid="profile-desktop-banner"');
+      expect(html).not.toContain('profile-viewport--desktop-surface');
+      expect(html).toContain('data-layout="compact"');
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+    });
+
+    it('keeps desktop widths on the compact surface in the centered phone column', async () => {
+      const restoreViewport = mockViewport('desktop');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+          profileBanner={<div data-testid='mock-banner'>Banner</div>}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+          'data-interactive-ready',
+          'true'
+        );
+      });
+
+      const viewport = screen.getByTestId('public-profile-layout-shell');
+      expect(viewport).toHaveAttribute('data-layout', 'compact');
+      expect(viewport).not.toHaveAttribute('data-desktop-ready');
+      expect(viewport).not.toHaveClass('profile-viewport--desktop-surface');
+      // The compact shell keeps the centered phone-column contract
+      // (max-width: --profile-shell-max-width, md:mx-auto card framing).
+      const compactShell = screen.getByTestId('profile-compact-shell');
+      expect(compactShell).toHaveClass('public-profile-compact-shell');
+      expect(compactShell).toHaveClass('md:mx-auto');
+      expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+      // The banner stays inside the column instead of the desktop shell.
+      expect(
+        within(compactShell).getByTestId('profile-shell-banner')
+      ).toHaveTextContent('Banner');
+      // Drawers and sheets stay inside the column (embedded presentation),
+      // never the viewport-wide desktop modal.
+      const lastDrawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+        | { presentation?: string }
+        | undefined;
+      expect(lastDrawerCall?.presentation).toBe('embedded');
+      expect(
+        screen.getByRole('navigation', { name: 'Profile Navigation' })
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+
+      restoreViewport();
+    });
+
+    it('keeps mobile widths on the standalone compact presentation', async () => {
+      const restoreViewport = mockViewport('mobile');
+
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+          'data-interactive-ready',
+          'true'
+        );
+      });
+      const lastDrawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+        | { presentation?: string }
+        | undefined;
+      expect(lastDrawerCall?.presentation).toBe('standalone');
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+
+      restoreViewport();
+    });
+  });
+
   it('forwards the proof-to-claim footer onto the public layout shell', () => {
     render(
       <ProfileCompactTemplate
@@ -2357,5 +2727,36 @@ describe('ProfileCompactTemplate', () => {
     expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
     expect(cta).toHaveTextContent('Request access');
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
+  });
+
+  it('routes selected credits into the About destination surfaces (JOV-6199)', () => {
+    const creditSegments = [
+      { type: 'text' as const, text: 'Credited on "' },
+      {
+        type: 'release' as const,
+        text: 'Neon Circuit',
+        href: '/timwhite/neon-circuit',
+      },
+      { type: 'text' as const, text: '".' },
+    ];
+
+    render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        creditSegments={creditSegments}
+      />
+    );
+
+    const panelCall = mockProfilePrimaryTabPanel.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(panelCall?.creditSegments).toBe(creditSegments);
+    const drawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(drawerCall?.creditSegments).toBe(creditSegments);
   });
 });

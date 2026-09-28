@@ -21,7 +21,6 @@ import {
   LANE_GROUPS,
   laneFailureExcerpt,
   MARKETING_CERTIFICATION_COMMAND,
-  ROUTE_PREP_COVERAGE_COMMAND,
   runCommandPool,
   runDesignConformance,
   runStructural,
@@ -91,7 +90,14 @@ describe('CI control selector', () => {
       expect(result.status, result.stderr).toBe(0);
       const scriptCommand = readFileSync(capture, 'utf8')
         .split('\n')
-        .find(command => command.startsWith('exec vitest --root scripts '));
+        // The control pool runs commands concurrently, so match the suite, not the order.
+        .find(
+          command =>
+            command.startsWith('exec vitest --root scripts ') &&
+            command.includes(
+              'lib/__tests__/native-queue-group-evidence.test.mjs'
+            )
+        );
       expect(scriptCommand).toBeDefined();
       expect(scriptCommand.split(' ')).toContain(
         'lib/__tests__/ci-fast-lanes.test.mjs'
@@ -392,20 +398,6 @@ describe('runStructural screenshot contract discovery', () => {
     ]);
   });
 
-  it('runs route-prep behavior coverage for the operations structural lane', async () => {
-    process.env.GITHUB_EVENT_NAME = 'merge_group';
-    process.env.CI_PRODUCT_LANES = 'operations';
-    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
-    const execute = vi.fn().mockReturnValue({ code: 0, output: 'executed\n' });
-
-    expect((await runStructural({ execute })).code).toBe(0);
-    expect(
-      execute.mock.calls.some(
-        ([command]) => command === ROUTE_PREP_COVERAGE_COMMAND
-      )
-    ).toBe(true);
-  });
-
   it('splits the structural python job parts between two hosted jobs', async () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
     vi.stubEnv('CI_PRODUCT_LANES', 'web,operations,mac');
@@ -448,6 +440,14 @@ describe('runStructural screenshot contract discovery', () => {
     expect(web).toContain(
       'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
     );
+    // Merge-group-only guards gate PRs in their own web lane (component-family
+    // ratchet is inside tests/unit/design-system), not a structural command.
+    expect(LANE_COMMANDS['merge-group-guards']).toContain(
+      'tests/unit/analytics-metrics-layer-guard.test.ts'
+    );
+    expect(LANE_COMMANDS['merge-group-guards']).toContain(
+      'tests/unit/design-system'
+    );
     expect(web.every(command => !python.includes(command))).toBe(true);
     // Every @jovie/web Vitest run (shared apps/web coverage lock) is web's.
     for (const command of all) {
@@ -457,7 +457,6 @@ describe('runStructural screenshot contract discovery', () => {
         expect(web).toContain(command);
       }
     }
-    expect(remaining).toContain(ROUTE_PREP_COVERAGE_COMMAND);
     expect(remaining.some(command => command.includes('@jovie/web'))).toBe(
       false
     );
@@ -490,7 +489,7 @@ describe('Summer bridge structural coverage selection', () => {
   it.each([
     ['web', 'apps/web/app/api/internal/ovie/summer-bottleneck/route.ts'],
     ['web', 'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts'],
-    ['operations', 'scripts/symphony/summer_bottleneck_producer.py'],
+    ['operations', 'scripts/fleet-gate/gem-priority-gate.py'],
     [
       'web,operations',
       'apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts',
@@ -969,7 +968,6 @@ describe('structural command pool', () => {
     const parallel = await startOrder(3);
     const head = parallel.slice(0, 3).join('\n');
     expect(head).toContain('pnpm invariants:check');
-    expect(head).toContain('run-governor-bounded-codex-selector.sh');
     expect(head).toContain('python3 -m pytest ');
     // Both complementary pytest shards are long poles.
     expect(
@@ -1612,7 +1610,7 @@ describe('failing test identities in lane excerpts', () => {
 
   it('names node:test failures with Subtest ancestry and assertion fields', async () => {
     const { header, annotation } = await structuralFailure(
-      'summer-symphony-outbox-consumer.test.mjs',
+      'summer-shipping-lead-contract.test.mjs',
       NODE_FAILURE
     );
     expect(header.slice(1)).toEqual([

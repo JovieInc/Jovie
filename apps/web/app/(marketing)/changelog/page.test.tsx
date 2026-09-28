@@ -6,6 +6,7 @@ const SNAPSHOT: ChangelogParseResult = {
   releases: [
     {
       version: '26.8.2',
+      kind: 'release',
       date: '2026-08-31',
       summary: '',
       sections: {
@@ -20,6 +21,7 @@ const SNAPSHOT: ChangelogParseResult = {
   sourceReleases: [
     {
       version: '26.9.0',
+      kind: 'release',
       date: '2026-09-19',
       summary: '',
       sections: {
@@ -34,6 +36,7 @@ const SNAPSHOT: ChangelogParseResult = {
   unpublishedReleases: [
     {
       version: '26.9.0',
+      kind: 'release',
       date: '2026-09-19',
       summary: '',
       sections: {
@@ -70,8 +73,8 @@ vi.mock('@/components/marketing/changelog/ChangelogSubscribeColumn', () => ({
   ChangelogSubscribeColumn: () => <div data-testid='changelog-subscribe' />,
 }));
 
-vi.mock('@/components/site/MarketingFinalCTA', () => ({
-  MarketingFinalCTA: () => <div data-testid='marketing-final-cta' />,
+vi.mock('@/components/site/MarketingFooterCta', () => ({
+  MarketingFooterCta: () => <div data-testid='marketing-footer-cta' />,
 }));
 
 import ChangelogPage, { metadata } from './page';
@@ -97,5 +100,18 @@ describe('public changelog page', () => {
     expect(metadata.title).toBe(
       'Jovie Changelog: Product Updates & New Features'
     );
+  });
+
+  it('renders the unique docked hero photo and exactly one footer CTA', async () => {
+    render(await ChangelogPage());
+
+    const heroPhoto = screen.getByTestId('changelog-hero-photo');
+    expect(heroPhoto).toBeInTheDocument();
+    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
+      'changelog-index.webp'
+    );
+    // Route owns its final CTA (MarketingFooterCta) instead of stacking
+    // the generic footer request-access banner on top of it (spec rule 2).
+    expect(screen.getAllByTestId('marketing-footer-cta')).toHaveLength(1);
   });
 });

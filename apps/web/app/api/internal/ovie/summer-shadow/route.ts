@@ -27,7 +27,7 @@ const ovieSummerShadowInputSchema = z
     // Eve owns strict snapshot validation; this bridge only forwards bounded reports.
     commercialSnapshot: z
       .object({
-        schema: z.literal('jovie.summer-commercial.snapshot/v1'),
+        schema: z.literal('jovie.summer-commercial.snapshot/v2'),
       })
       .passthrough()
       .optional(),

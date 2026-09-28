@@ -10,12 +10,12 @@ By using Jovie, you agree to these Terms of Service. If you disagree with any pa
 
 ## What Jovie Provides
 
-Jovie is a modern profile and link management platform for musicians. Our core features include:
+Jovie is a modern profile and link management platform. Our core features include:
 
-- Publishable artist profiles that showcase content, tour dates, and digital links
+- Publishable Jovie profiles that showcase your content and digital links
 - Connections to your Spotify metadata so your audience sees the latest information
 - Dashboard analytics that highlight engagement and conversion insight
-- Social link management so every call-to-action always points fans where you want
+- Social link management so every call-to-action always points people where you want
 
 We deliver Jovie through a secure web app that respects your brand and creative control.
 
@@ -45,9 +45,9 @@ If your account is terminated, your public profile may be disabled, and we will 
 
 You may use Jovie to:
 
-- Showcase your music and creative work
-- Share authentic updates with fans
-- Direct traffic to streaming services, merch, or booking contacts
+- Showcase your content and creative work
+- Share authentic updates with your audience
+- Direct traffic to the links, offers, or contacts you choose
 
 ### Prohibited Activities
 
@@ -112,7 +112,7 @@ New accounts start with a 14-day Pro trial at no charge and no credit card requi
 
 ### Billing and Cancellation
 
-Paid subscriptions renew automatically at the end of each billing cycle. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period — you retain access to paid features until then.
+Paid subscriptions renew automatically at the end of each billing cycle. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period. You retain access to paid features until then.
 
 ## Disclaimers and Liability
 

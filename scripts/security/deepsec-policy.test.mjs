@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DeepsecPolicyError,
   SECURITY_TARGETS,
-  validateOfflinePolicy,
+  validatePolicy,
 } from './deepsec-policy.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -38,17 +38,18 @@ function assertCode(code, run) {
   });
 }
 
-test('accepts only the pinned disabled local-subscription policy and nine targets', () => {
-  const result = validateOfflinePolicy(policyBytes, targetsBytes);
-  assert.equal(result.policy.modelAuth, 'local');
-  assert.equal(result.policy.agent, 'codex');
-  assert.equal(result.policy.model, 'gpt-5.5');
+test('accepts only the pinned capped advisory gateway policy and nine targets', () => {
+  const result = validatePolicy(policyBytes, targetsBytes);
+  assert.equal(result.policy.modelAuth, 'gateway');
   assert.equal(result.policy.providerFallback, false);
-  assert.equal(result.policy.billing.route, 'prepaid-codex-subscription');
-  assert.equal(result.policy.billing.dollarBudgetUsd, null);
-  assert.equal(result.policy.billing.stopOnExhaustion, true);
-  assert.equal(result.policy.execution.status, 'disabled');
-  assert.equal(result.policy.execution.scanEnabled, false);
+  assert.ok(result.policy.gatewayTags.includes('security-scan'));
+  assert.equal(result.policy.billing.route, 'ai-gateway');
+  assert.equal(result.policy.billing.hardCap, true);
+  assert.ok(result.policy.billing.monthlyCapUsd > 0);
+  assert.equal(result.policy.billing.onUnknownPrice, 'skip');
+  assert.equal(result.policy.execution.status, 'advisory');
+  assert.equal(result.policy.execution.blocking, false);
+  assert.equal(result.policy.execution.prCodeExecution, 'none');
   assert.deepEqual(result.targets, SECURITY_TARGETS);
   assert.equal(result.targets.length, 9);
   assert.equal(Object.isFrozen(result), true);
@@ -57,20 +58,20 @@ test('accepts only the pinned disabled local-subscription policy and nine target
 
 test('holds malformed UTF-8 and malformed JSON for either input', () => {
   assertCode('invalid-json', () =>
-    validateOfflinePolicy(Buffer.from([0xff]), targetsBytes)
+    validatePolicy(Buffer.from([0xff]), targetsBytes)
   );
   assertCode('invalid-json', () =>
-    validateOfflinePolicy(Buffer.from('{'), targetsBytes)
+    validatePolicy(Buffer.from('{'), targetsBytes)
   );
   assertCode('invalid-json', () =>
-    validateOfflinePolicy(policyBytes, Buffer.from('{'))
+    validatePolicy(policyBytes, Buffer.from('{'))
   );
 });
 
-test('holds unsafe auth, model, billing, or enabled policy values before hash comparison', () => {
+test('holds uncapped, blocking, fallback, or code-executing policy values before hash comparison', () => {
   const cases = [
     policy => {
-      policy.schemaVersion = 2;
+      policy.schemaVersion = 1;
     },
     policy => {
       policy.projectId = 'other';
@@ -79,42 +80,101 @@ test('holds unsafe auth, model, billing, or enabled policy values before hash co
       policy.maxTargets = 10;
     },
     policy => {
-      policy.modelAuth = 'api';
-    },
-    policy => {
-      policy.agent = 'other';
-    },
-    policy => {
-      policy.model = 'other';
+      policy.modelAuth = 'local';
     },
     policy => {
       policy.providerFallback = true;
     },
     policy => {
-      policy.billing.route = 'gateway';
+      policy.gatewayTags = [];
     },
     policy => {
-      policy.billing.stopOnExhaustion = false;
+      delete policy.gatewayTags;
+    },
+    policy => {
+      policy.billing.route = 'direct';
+    },
+    policy => {
+      policy.billing.hardCap = false;
+    },
+    policy => {
+      policy.billing.monthlyCapUsd = 0;
+    },
+    policy => {
+      policy.billing.monthlyCapUsd = Number.POSITIVE_INFINITY;
+    },
+    policy => {
+      delete policy.billing.runCapUsd;
+    },
+    policy => {
+      policy.billing.runCapUsd.pr = -1;
+    },
+    policy => {
+      policy.billing.runCapUsd.frontier = policy.billing.monthlyCapUsd + 1;
+    },
+    policy => {
+      delete policy.billing.runCapUsd.weekly;
+    },
+    policy => {
+      policy.billing.minRunUsd = 0;
+    },
+    policy => {
+      policy.billing.costSafetyFactor = 0.9;
+    },
+    policy => {
+      policy.billing.prMaxFiles = 0;
+    },
+    policy => {
+      policy.billing.prMaxFiles = 1.5;
+    },
+    policy => {
+      policy.billing.onUnknownPrice = 'estimate';
+    },
+    policy => {
+      delete policy.billing;
     },
     policy => {
       policy.execution.status = 'enabled';
     },
     policy => {
-      policy.execution.scanEnabled = true;
+      delete policy.execution;
+    },
+    policy => {
+      policy.execution.blocking = true;
+    },
+    policy => {
+      policy.execution.prSources = 'any';
+    },
+    policy => {
+      policy.execution.prCodeExecution = 'install';
+    },
+    policy => {
+      policy.execution.dotenv = true;
     },
   ];
   for (const change of cases) {
     assertCode('policy-held', () =>
-      validateOfflinePolicy(changedPolicy(change), targetsBytes)
+      validatePolicy(changedPolicy(change), targetsBytes)
     );
   }
 });
 
-test('rejects other policy-byte changes even when scan remains disabled', () => {
+test('accepts the disabled kill-switch state only as a reviewed policy change', () => {
   assertCode('policy-drift', () =>
-    validateOfflinePolicy(
+    validatePolicy(
       changedPolicy(policy => {
-        policy.execution.toolNetwork = 'enabled';
+        policy.execution.status = 'disabled';
+      }),
+      targetsBytes
+    )
+  );
+});
+
+test('rejects budget changes that were not reviewed into the pinned hash', () => {
+  assertCode('policy-drift', () =>
+    validatePolicy(
+      changedPolicy(policy => {
+        policy.billing.runCapUsd.pr = 1;
       }),
       targetsBytes
     )
@@ -152,7 +212,7 @@ test('holds wrong target-manifest shape, repository, bounds, or target count', (
     }),
   ];
   for (const bytes of invalidManifests) {
-    assertCode('targets-held', () => validateOfflinePolicy(policyBytes, bytes));
+    assertCode('targets-held', () => validatePolicy(policyBytes, bytes));
   }
 });
 
@@ -174,7 +234,7 @@ test('rejects unsafe or unsupported target paths before exact-list comparison', 
   ];
   for (const path of unsafePaths) {
     assertCode('targets-held', () =>
-      validateOfflinePolicy(
+      validatePolicy(
         policyBytes,
         changedTargets(manifest => {
           manifest.targets[0] = path;
@@ -184,11 +244,12 @@ test('rejects unsafe or unsupported target paths before exact-list comparison', 
   }
 });
 
-test('DeepSec config cannot invoke a model while isolation proofs are outstanding', () => {
+test('DeepSec config refuses to load unless the policy is advisory', () => {
   const config = readFileSync(
     resolve(ROOT, 'scripts/security/deepsec/deepsec.config.ts'),
     'utf8'
   );
-  assert.match(config, /^throw new Error\(/);
-  assert.match(config, /DeepSec is disabled/);
+  assert.match(config, /execution\.status !== 'advisory'/);
+  assert.match(config, /mode: 'gateway'/);
+  assert.match(config, /DEEPSEC_SOURCE_ROOT/);
 });

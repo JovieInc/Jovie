@@ -85,15 +85,26 @@ export type {
   MarketingCopyTasteSignal,
   MarketingCopyTasteTag,
   MarketingCopyVisibleCopy,
+  RenderedCopyApprovedException,
+  RenderedCopyAuditOptions,
+  RenderedCopyCertification,
+  RenderedCopyCertificationInput,
+  RenderedCopyLine,
+  RenderedCopySection,
+  RenderedCopySurface,
 } from './copy';
 export {
   applyMarketingCopyTasteDecision,
   auditMarketingCopyPage,
   auditMarketingCopyPanel,
   auditMarketingCopySemantics,
+  auditRenderedCopyCertification,
+  auditRenderedMarketingCopy,
   createEmptyMarketingCopyTasteProfile,
   createMarketingCopyReviewDigest,
   createMarketingCopyTasteInboxItem,
+  createRenderedCopyCertification,
+  createRenderedCopyDigest,
   MARKETING_COPY_LINE_ROLES,
   MARKETING_COPY_REVIEW_ROLES,
   MARKETING_COPY_SEMANTIC_ENFORCEMENTS,
@@ -110,6 +121,30 @@ export type {
   RegistryTaskContract,
 } from './designGaps';
 export { getProposedSection, PROPOSED_SECTIONS } from './designGaps';
+export type {
+  MarketingEditorialBackgroundAccent,
+  MarketingEditorialBackgroundComposition,
+  MarketingEditorialBackgroundCurve,
+  MarketingEditorialBackgroundDecision,
+  MarketingEditorialBackgroundFinding,
+  MarketingEditorialBackgroundFindingCode,
+  MarketingEditorialBackgroundPoint,
+  MarketingEditorialBackgroundRect,
+  MarketingEditorialBackgroundVariant,
+  MarketingEditorialBackgroundVariantId,
+} from './editorialBackgrounds';
+export {
+  auditMarketingEditorialBackgroundDecision,
+  EDITORIAL_BACKGROUND_FLOW,
+  EDITORIAL_BACKGROUND_SOFT,
+  formatMarketingEditorialBackgroundsForPrompt,
+  getMarketingEditorialBackground,
+  isMarketingEditorialBackgroundVariantId,
+  JOVIE_EDITORIAL_BACKGROUND_SCHEMA,
+  JOVIE_EDITORIAL_BACKGROUND_VERSION,
+  MARKETING_EDITORIAL_BACKGROUND_VARIANT_IDS,
+  MARKETING_EDITORIAL_BACKGROUNDS,
+} from './editorialBackgrounds';
 export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
@@ -212,6 +247,28 @@ export {
   resolveJovieSceneColorRole,
 } from './imageColorPolicy';
 export type {
+  LandingPageCandidate,
+  LandingPageCertificationCode,
+  LandingPageCertificationFinding,
+  LandingPageFamilyId,
+  LandingPagePipelineStage,
+  LandingPageSectionCandidate,
+  LandingPageStageReceipt,
+} from './landingPageGrammar';
+export {
+  certifyLandingPageComposition,
+  getLandingPageRouteType,
+  getLandingPageSlots,
+  getLandingPageVariantIds,
+  LANDING_PAGE_FAMILIES,
+  LANDING_PAGE_FAMILY_IDS,
+  LANDING_PAGE_GRAMMAR_SCHEMA,
+  LANDING_PAGE_HOMEPAGE_LOCK,
+  LANDING_PAGE_PEN_WORKSPACE,
+  LANDING_PAGE_PIPELINE_STAGES,
+  LANDING_PAGE_ROUTE_TYPES,
+} from './landingPageGrammar';
+export type {
   MarketingMediaExportApprovalEvidence,
   MarketingMediaExportApprovalResult,
   MarketingMediaExportExecutionInput,
@@ -242,13 +299,26 @@ export {
   validateMarketingMediaExportRequest,
 } from './mediaExport';
 export type {
+  MarketingMediaAccentReference,
+  MarketingMediaGeneratedArtworkSource,
+  MarketingMediaMotionFallbackId,
+  MarketingMediaMotionPolicy,
+  MarketingMediaOutputProfile,
+  MarketingMediaOutputProfileId,
+  MarketingMediaRealCaptureSource,
   MarketingMediaRecipeDecision,
   MarketingMediaRecipeFinding,
   MarketingMediaRecipeFindingCode,
   MarketingMediaRecipeId,
+  MarketingMediaRecipeInput,
+  MarketingMediaRecipeKind,
+  MarketingMediaRegisteredLivePresentationSource,
+  MarketingMediaSafeAreaPolicyId,
+  MarketingMediaSource,
 } from './mediaRecipes';
 export {
   auditMarketingMediaRecipeDecision,
+  COMPACT_GLASS_MEDIA_RECIPE,
   DARK_GLASS_MEDIA_RECIPE,
   FLOWING_ACCENT_MEDIA_RECIPE,
   formatMarketingMediaRecipesForPrompt,
@@ -256,10 +326,18 @@ export {
   isApprovedMarketingMediaRecipeId,
   JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
   JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  MARKETING_MEDIA_RECIPE_ACCENTS,
   MARKETING_MEDIA_RECIPE_FOUNDER_LOCK,
   MARKETING_MEDIA_RECIPE_IDS,
+  MARKETING_MEDIA_RECIPE_MOTION_FALLBACKS,
+  MARKETING_MEDIA_RECIPE_OUTPUT_PROFILES,
+  MARKETING_MEDIA_RECIPE_SAFE_AREAS,
+  MARKETING_MEDIA_RECIPE_SOURCE_MATRIX,
   MARKETING_MEDIA_RECIPES,
+  MARKETING_MEDIA_SAFE_AREA_POLICIES,
   resolveMarketingMediaRecipeForExport,
+  SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE,
+  validateMarketingMediaRecipeInput,
 } from './mediaRecipes';
 export type {
   MarketingPageContract,

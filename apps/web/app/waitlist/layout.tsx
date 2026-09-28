@@ -1,7 +1,15 @@
+import type { Metadata } from 'next';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+// Gated access-state pages (like /signup): named in the tab, never indexed.
+export const metadata: Metadata = {
+  title: 'Join the waitlist',
+  robots: NOINDEX_ROBOTS,
+};
 
 /**
  * Waitlist layout - NO MORE REDIRECTS!

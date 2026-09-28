@@ -36,6 +36,8 @@ export interface HudOverviewMetrics {
   defaultStatusDetail: string;
   /** True when Stripe and Mercury data are available; false means financial fields are partial or stubs */
   financialDataAvailable: boolean;
+  /** Stripe baseline 7 days ago (net of churn); absent when Stripe is unavailable. */
+  weekAgo?: { mrrUsd: number; activeSubscribers: number };
 }
 
 export interface HudOperationsStatus {
@@ -92,6 +94,12 @@ export interface HudTestingQuarantineMetrics {
   readonly ledgerPath: string;
 }
 
+export interface HudGbrainHealth {
+  readonly status: 'ok' | 'down' | 'unknown';
+  readonly version: string | null;
+  readonly checkedAtIso: string;
+}
+
 export interface HudMetrics {
   accessMode: HudAccessMode;
   branding: HudBranding;
@@ -115,5 +123,7 @@ export interface HudMetrics {
   agentRuns: AgentRunArtifact[];
   /** Per-source fetch metadata for ops metric cards (freshness + failure states). */
   sources: Record<HudMetricSourceKey, HudMetricSourceTrust>;
+  /** Company-memory health; absent when GBRAIN_HEALTH_URL is not configured. */
+  gbrain?: HudGbrainHealth;
   generatedAtIso: string;
 }

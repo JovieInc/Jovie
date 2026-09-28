@@ -27,6 +27,9 @@ const h = vi.hoisted(() => ({
   store: vi.fn(),
   session: vi.fn(),
   admin: vi.fn(),
+  onFinish: undefined as
+    | undefined
+    | ((event: { message: Record<string, unknown> }) => void),
 }));
 vi.mock('@/lib/auth/session', () => ({ getSessionContext: h.session }));
 vi.mock('@/lib/chat/ov-mode', () => ({ canUseOvChatMode: h.admin }));
@@ -37,7 +40,8 @@ vi.mock('@/lib/env-server', () => ({
   env: { OVIE_SUMMER_FOUNDER_APP_USER_ID: 'founder' },
 }));
 vi.mock('@ai-sdk/react', () => ({
-  useChat: () => ({
+  useChat: (options: { onFinish?: typeof h.onFinish }) => ({
+    ...((h.onFinish = options.onFinish), {}),
     messages: h.messages,
     sendMessage: h.send,
     stop: h.stop,
@@ -80,6 +84,14 @@ function Transcript({
       <button type='button' onClick={() => chat.submitMessage('Unsafe resend')}>
         Send
       </button>
+      <button type='button' onClick={chat.handleRetry}>
+        Retry
+      </button>
+      {chat.collapsedSummerFailureCount > 0 && (
+        <button type='button' onClick={chat.showCollapsedSummerFailures}>
+          {`Show ${chat.collapsedSummerFailureCount} unanswered`}
+        </button>
+      )}
     </section>
   );
 }
@@ -210,8 +222,10 @@ describe('Summer history restoration', () => {
       });
     }
     const view = mount('ov');
-    await screen.findByText(/Summer turn status: failed/);
-    expect(screen.getByText('Question 12')).toBeTruthy();
+    // The empty failed turn collapses into one summary row instead of a
+    // permanent "do not resend" bubble.
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
+    expect(screen.queryByText('Question 12')).toBeNull();
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(
       Array.from(
@@ -228,7 +242,7 @@ describe('Summer history restoration', () => {
     view.unmount();
     resetChatTimelineStateCacheForTests();
     mount('ov');
-    await screen.findByText(/Summer turn status: failed/);
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(h.send).not.toHaveBeenCalled();
   });
@@ -248,7 +262,7 @@ describe('Summer history restoration', () => {
     const cas = vi.spyOn(store, 'putDecisionIfUnchanged');
     mount('ov');
     expect((await screen.findByRole('alert')).textContent).toContain(
-      'could not be verified'
+      'couldn’t be verified'
     );
     expect(cas).not.toHaveBeenCalled();
     expect(h.send).not.toHaveBeenCalled();
@@ -287,6 +301,88 @@ describe('Summer history restoration', () => {
     );
     expect(h.send).not.toHaveBeenCalled();
   });
+
+  async function appendFailed(index: number) {
+    // A non-empty answer keeps the turn out of the server's silent-failure
+    // collapse so the client-side superseded-failure collapse is exercised.
+    await appendSummerTurn(store, {
+      clientTurnId: `failed-${index}`,
+      userText: `hello ${index}`,
+      assistantText: `partial ${index}`,
+      eveWorkId: null,
+      eveAcks: [],
+      correlationId: `failed-correlation-${index}`,
+      state: 'failure',
+      toolReceipt: null,
+      createdAt: '2026-09-20T00:00:00.000Z',
+    });
+  }
+
+  it('collapses unanswered turns an answer has superseded and keeps the latest failure visible', async () => {
+    store = new MemoryOperatingStore();
+    h.store.mockReturnValue(store);
+    await appendFailed(1);
+    await appendFailed(2);
+    await appendSummerTurn(store, {
+      clientTurnId: 'answered',
+      userText: 'what shipped?',
+      assistantText: '62 PRs landed.',
+      eveWorkId: null,
+      eveAcks: [],
+      correlationId: 'answered-correlation',
+      state: 'completed',
+      toolReceipt: null,
+      createdAt: '2026-09-20T00:00:00.000Z',
+    });
+    await appendFailed(3);
+    mount('ov');
+    await screen.findByText('62 PRs landed.');
+    expect(screen.queryByText('hello 1')).toBeNull();
+    expect(screen.queryByText('hello 2')).toBeNull();
+    expect(screen.getByText('hello 3')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Show 2 unanswered' }));
+    expect(screen.getByText('hello 1')).toBeTruthy();
+    expect(screen.getByText('hello 2')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /unanswered/ })).toBeNull();
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['same-turn', true],
+    ['new-turn', false],
+  ] as const)(
+    'Retry after a %s Summer failure reuses the turn id only when nothing was recorded',
+    async (retry, reuses) => {
+      mount('ov');
+      await screen.findByText('Keep the existing owner.');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      expect(h.send).toHaveBeenCalledTimes(1);
+      const firstTurnId = h.send.mock.calls[0][1].body.clientTurnId;
+      act(() =>
+        h.onFinish?.({
+          message: {
+            id: 'failed-assistant',
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'Summer didn’t answer.' }],
+            metadata: {
+              summerFailure: { hop: 'summer_result_pending', retry },
+            },
+          },
+        })
+      );
+      expect((await screen.findByRole('alert')).textContent).toBe(
+        reuses
+          ? 'Retry checks for Summer’s answer. It won’t start a second run.'
+          : 'Retry sends your message again.'
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(h.send).toHaveBeenCalledTimes(2);
+      const retryTurnId = h.send.mock.calls[1][1].body.clientTurnId;
+      expect(h.send.mock.calls[1][0]).toEqual({ text: 'Unsafe resend' });
+      if (reuses) expect(retryTurnId).toBe(firstTurnId);
+      else expect(retryTurnId).not.toBe(firstTurnId);
+    }
+  );
 
   it.each(['missing', 'unavailable', 'unauthorized'] as const)(
     'shows %s history failure without starting or replaying a turn',

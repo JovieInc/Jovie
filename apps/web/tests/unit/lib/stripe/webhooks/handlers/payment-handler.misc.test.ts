@@ -1,6 +1,19 @@
 /**
  * Payment Handler Tests - Misc
  */
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: vi.fn(async () => ({
+    ok: true as const,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  })),
+  trackServerEventTx: vi.fn(async () => ({
+    ok: true as const,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  })),
+}));
+
 import type Stripe from 'stripe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,6 +65,7 @@ vi.mock('@/lib/stripe/config', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
+  captureWarning: vi.fn(),
   logFallback: mockLogFallback,
 }));
 

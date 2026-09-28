@@ -338,6 +338,35 @@ export const baVerifications = pgTable(
   })
 );
 
+/**
+ * WebAuthn passkeys (`@better-auth/passkey@1.7.5`). A passkey authentication
+ * is the admin step-up factor for Ovie (JOV-4806); see `lib/admin/mfa.ts`.
+ */
+export const baPasskeys = pgTable(
+  'ba_passkeys',
+  {
+    id: text('id').primaryKey(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => baUsers.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull(),
+    counter: integer('counter').notNull(),
+    deviceType: text('device_type').notNull(),
+    backedUp: boolean('backed_up').notNull(),
+    transports: text('transports'),
+    createdAt: timestamp('created_at').defaultNow(),
+    aaguid: text('aaguid'),
+  },
+  table => ({
+    userIdIdx: index('idx_ba_passkeys_user_id').on(table.userId),
+    credentialIdIdx: uniqueIndex('idx_ba_passkeys_credential_id').on(
+      table.credentialID
+    ),
+  })
+);
+
 // Types
 export type BaUser = typeof baUsers.$inferSelect;
 export type NewBaUser = typeof baUsers.$inferInsert;

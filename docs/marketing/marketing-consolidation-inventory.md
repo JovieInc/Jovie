@@ -24,8 +24,9 @@ historical screenshots are not treated as proof of current behavior.
   provenance remains a separate source gate, and route `bindingEvidence` stays
   `unverified` until the actual route passes the exact-head observer.
 - The terminal CTA on both acquisition routes has truthful source ownership
-  under JOV-5356 (#17477): `section.cta` resolves to `MarketingCtaSection` with
-  an explicitly unknown Pen identity (zero Pen roots, recorded reason), and
+  under JOV-5356 (#17477): `section.cta` resolves to `MarketingCtaSection`.
+  JOV-6853 binds it to the canonical Pen registry entry `y8oKXI`, which points
+  at design owner `K4ar1`; every marketing registry identity is now Pen-bound.
   HomepageClose (`editorial-search`) plus the YouTube inline CTA
   (`included-single`) are source-bound variant occurrences — never aliases of
   MarketingTerminalCta. No footer/final-shell Pen ID or metadata alias may be
