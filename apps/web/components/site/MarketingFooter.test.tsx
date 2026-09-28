@@ -84,6 +84,10 @@ describe('MarketingFooter', () => {
     expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
       'line-clamp-2'
     );
+    // DETAILS.md text casing: never ALL CAPS for column headings.
+    expect(screen.getByRole('heading', { name: 'Product' })).not.toHaveClass(
+      'mf-eyebrow--caps'
+    );
     expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
       'href',
       'https://status.jov.ie'

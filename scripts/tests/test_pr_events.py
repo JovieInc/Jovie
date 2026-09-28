@@ -116,6 +116,11 @@ class RelayTest(unittest.TestCase):
     def test_queue_removal_and_review_feedback_are_relayed(self):
         base = {"pull_request": {"number": 7, "head": {"sha": "h7"}}}
         self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued"}), [(7, "dequeued", "h7")])
+        for reason in ("MANUAL", "manual", "ALREADY_MERGED", "merged", "BRANCH_REMOVED"):
+            self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": reason}),
+                             [], f"{reason} removal is not a code failure")
+        self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": "CI_FAILURE"}),
+                         [(7, "dequeued", "h7")])
         review = {**base, "action": "submitted", "review": {"state": "CHANGES_REQUESTED", "user": {"type": "Bot"}}}
         self.assertEqual(events.relay_targets("pull_request_review", review), [(7, "review", None)])
         comment = {**review, "review": {"state": "commented", "body": "rename this", "user": {"login": "tim", "type": "User"}}}
