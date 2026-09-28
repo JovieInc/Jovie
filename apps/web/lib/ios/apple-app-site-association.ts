@@ -6,8 +6,15 @@ export const JOVIE_APPLE_TEAM_ID = 'G24T327LXT';
 /** iOS bundle identifier for the native Jovie app. */
 export const JOVIE_IOS_BUNDLE_ID = 'ie.jov.Jovie';
 
+/** Team-prefixed app ID shared by the iOS app and the Swift-native Mac app. */
+export const JOVIE_APPLE_APP_ID = `${JOVIE_APPLE_TEAM_ID}.${JOVIE_IOS_BUNDLE_ID}`;
+
 /**
- * Canonical Apple App Site Association payload for jov.ie Universal Links.
+ * Canonical Apple App Site Association payload for jov.ie Universal Links
+ * and shared web credentials. `webcredentials` lets the native apps use
+ * jov.ie passkeys (iCloud Keychain, 1Password) through AuthenticationServices;
+ * each app still needs a matching `webcredentials:` Associated Domains
+ * entitlement (docs/macos/ADR-swift-native-mac.md).
  *
  * Served at both:
  * - /.well-known/apple-app-site-association (canonical per Apple)
@@ -18,7 +25,7 @@ export const JOVIE_APPLE_APP_SITE_ASSOCIATION = {
     apps: [] as string[],
     details: [
       {
-        appID: `${JOVIE_APPLE_TEAM_ID}.${JOVIE_IOS_BUNDLE_ID}`,
+        appID: JOVIE_APPLE_APP_ID,
         paths: [
           '/app/*',
           '/auth/ios/complete',
@@ -28,6 +35,9 @@ export const JOVIE_APPLE_APP_SITE_ASSOCIATION = {
         ],
       },
     ],
+  },
+  webcredentials: {
+    apps: [JOVIE_APPLE_APP_ID],
   },
 } as const;
 

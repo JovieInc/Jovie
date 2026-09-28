@@ -33,6 +33,12 @@ describe('apple-app-site-association routes', () => {
     );
   });
 
+  it('shares jov.ie web credentials with the native app for passkeys', () => {
+    expect(JOVIE_APPLE_APP_SITE_ASSOCIATION.webcredentials).toEqual({
+      apps: [`${JOVIE_APPLE_TEAM_ID}.${JOVIE_IOS_BUNDLE_ID}`],
+    });
+  });
+
   it.each([
     ['/.well-known/apple-app-site-association', getWellKnown],
     ['/apple-app-site-association', getLegacy],

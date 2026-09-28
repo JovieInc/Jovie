@@ -1,41 +1,47 @@
 ---
-paths: ["apps/desktop/**", "apps/macos/**", "docs/macos/**"]
+paths: ["apps/desktop/**", "apps/macos/**", "apps/ios/JovieMac/**", "docs/macos/**"]
 ---
 
-# Mac (Electron product + Swift MenuMonitor)
+# Mac (Swift-native target, Electron until parity, MenuMonitor)
 
-Read this before touching `apps/desktop`, `apps/macos`, or any proposed Mac
-Swift/WKWebView shell. Detail and evidence:
+Read this before touching `apps/desktop`, `apps/macos`, `apps/ios/JovieMac`, or
+any Mac Swift/WKWebView code. Direction and phases:
+[`docs/macos/ADR-swift-native-mac.md`](../../docs/macos/ADR-swift-native-mac.md)
+(EVENT 2026-09-27, supersedes the Electron-only ADR). Control slugs:
 [`docs/macos/swift-control-invariants.md`](../../docs/macos/swift-control-invariants.md).
-Ops-receipt sibling: [`docs/MACOS_SWIFT_CONTROL_ADR.md`](../../docs/MACOS_SWIFT_CONTROL_ADR.md).
 
-The Mac product is **Electron**, not Swift. iOS SwiftUI is not a Mac rewrite
-template. Standalone Swift Ovie (`JovieInc/ovie`) is deprecated (JOV-3854).
+The Mac app is going **Swift-native**, and it shares one SwiftUI codebase with
+iOS. Electron (`apps/desktop`) stays the shipped Mac app until the native app
+passes the ADR parity checklist.
 
 ## Current stack
 
 | Surface | Owner | Not |
 | --- | --- | --- |
-| Packaged Mac / Ovie door | `apps/desktop` Electron `BrowserWindow` | Swift app, WKWebView product shell |
-| Ops HUD | hosted `/hud?ovie=mac` | A second native HUD |
-| Operator shipping menu | `apps/macos/MenuMonitor` SwiftUI `MenuBarExtra` | Product UI, iOS-parity SwiftUI |
-| iOS WKWebView | public-profile browser only | Precedent for a Mac webview shell |
+| Native Mac app (spike, pre-parity) | `apps/ios/JovieMac` target in `apps/ios/JovieMac.xcodeproj`, sharing iOS sources | A separate repo, Catalyst, or a second Mac Swift app |
+| Shipped Mac app / Ovie door | `apps/desktop` Electron, until Phase 4 cutover | Target for new product surfaces |
+| Operator shipping menu | `apps/macos/MenuMonitor` `MenuBarExtra` | Product UI |
+| WKWebView | Registered, time-boxed bridges only (ADR bridge register) | A permanent product shell |
 
-## Proposed Swift-control invariants (JOV-5359)
+## Do
 
-Proposed slugs, not adopted into `canon/invariants.jsonl`:
-
-| Slug | Rule |
-| --- | --- |
-| `JOV-INV-013` | Packaged Mac Ovie is `apps/desktop` Chromium `BrowserWindow` loading hosted `/hud?ovie=mac`; do not start a Swift or WKWebView Mac product shell or revive `JovieInc/ovie`. |
-| `JOV-INV-014` | `apps/macos/MenuMonitor` stays a menu-bar shipping accessory; do not expand it into product UI, Ovie HUD, or iOS-parity SwiftUI. |
-| `JOV-INV-015` | iOS Swift extends `JovieTheme` and existing organisms; Mac Swift stays inside MenuMonitor presentation owners; do not invent a parallel token or atom family. |
-| `JOV-INV-016` | iOS and Mac Swift UI land with the existing path-selected lint/unit/MenuMonitor gates; do not require full Xcode, device, or E2E suites as a merge condition for a UI change. |
+- Build new Mac product surfaces native in `JovieMac`, reusing iOS shared code
+  (`JovieTheme`, `APIClient`, models, `NativeSessionTokenStore`).
+- Keep shared files Foundation/SwiftUI-only. Put UIKit/AppKit in platform
+  shells. Add a shared file to `apps/ios/scripts/generate-mac-project.rb` and
+  regenerate. Do not hand-edit `JovieMac.xcodeproj`.
+- Authenticate with platform passkeys (`ASAuthorizationPlatformPublicKeyCredentialProvider`)
+  against Better Auth, with the PKCE browser flow as fallback.
+- Finish in-flight Electron auth, update, and what's-new work. After that,
+  Electron takes bug and security fixes only.
 
 ## Do not
 
-- Rewrite Mac Ovie or the artist app in Swift.
-- Host `/hud`, `/app/ov/chat`, or `/app/chat` in WKWebView.
-- Add a second macOS Swift target or Xcode Mac app.
-- Copy iOS atoms, themes, or shells onto MenuMonitor.
-- Treat MenuMonitor CI as a reason to run full iOS device or E2E suites.
+- Add a parallel Mac token, atom, or font family. `JovieTheme` is the one
+  source for both platforms.
+- Host a product surface in WKWebView without a bridge-register row and an
+  exit issue.
+- Start another Mac Swift app, revive `JovieInc/ovie` as Swift, or grow
+  MenuMonitor into product UI.
+- Require device or full E2E suites to land Swift UI. The path-selected lint
+  and unit gates apply (`JOV-INV-016`).

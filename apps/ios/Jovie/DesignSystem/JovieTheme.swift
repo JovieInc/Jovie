@@ -1,5 +1,15 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+
+private typealias PlatformFont = UIFont
+private typealias PlatformFontDescriptor = UIFontDescriptor
+#else
+import AppKit
+
+private typealias PlatformFont = NSFont
+private typealias PlatformFontDescriptor = NSFontDescriptor
+#endif
 
 /// System B dark tokens. Hexes match the Noir Ion table in DESIGN.md and
 /// `--noir-ion-*` anchors in apps/web/styles/design-system.css. Do not invent
@@ -44,15 +54,6 @@ enum JovieColor {
     static let track = Color(hex: 0x11AFFF)
     /// event -> --color-accent-orange
     static let event = Color(hex: 0xFFC857)
-
-    static func color(for kind: MobileChatEntityKind) -> Color {
-      switch kind {
-      case .release: return release
-      case .artist: return artist
-      case .track: return track
-      case .event: return event
-      }
-    }
   }
 }
 
@@ -80,11 +81,11 @@ enum JovieFont {
   }
 
   private static func font(size: CGFloat, weight: Font.Weight) -> Font {
-    if UIFont(name: "Inter Variable", size: size) != nil {
+    if PlatformFont(name: "Inter Variable", size: size) != nil {
       return .custom("Inter Variable", size: size).weight(weight)
     }
 
-    if UIFont(name: "Inter", size: size) != nil {
+    if PlatformFont(name: "Inter", size: size) != nil {
       return .custom("Inter", size: size).weight(weight)
     }
 
@@ -92,15 +93,17 @@ enum JovieFont {
   }
 
   private static func font(size: CGFloat, numericWeight: CGFloat) -> Font {
-    let uiWeight = UIFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
+    let uiWeight = PlatformFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
     let descriptorBase =
-      UIFont(name: "Inter Variable", size: size)
-      ?? UIFont(name: "Inter", size: size)
-      ?? UIFont.systemFont(ofSize: size)
+      PlatformFont(name: "Inter Variable", size: size)
+      ?? PlatformFont(name: "Inter", size: size)
+      ?? PlatformFont.systemFont(ofSize: size)
     let descriptor = descriptorBase.fontDescriptor.addingAttributes([
-      .traits: [UIFontDescriptor.TraitKey.weight: uiWeight.rawValue]
+      .traits: [PlatformFontDescriptor.TraitKey.weight: uiWeight.rawValue]
     ])
-    return Font(UIFont(descriptor: descriptor, size: size))
+    // NSFont(descriptor:size:) is optional on macOS; UIFont's is not.
+    let resolved: PlatformFont? = PlatformFont(descriptor: descriptor, size: size)
+    return Font((resolved ?? descriptorBase) as CTFont)
   }
 
   /// Maps CSS/Satoshi weights onto UIFont.Weight raw values.
@@ -198,7 +201,7 @@ private struct JovieSurfaceModifier: ViewModifier {
 
   @ViewBuilder
   func body(content: Content) -> some View {
-    if #available(iOS 26.0, *) {
+    if #available(iOS 26.0, macOS 26.0, *) {
       if interactive {
         content
           .glassEffect(

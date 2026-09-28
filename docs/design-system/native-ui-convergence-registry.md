@@ -157,9 +157,10 @@ Profile is historical ledger drift, not a reason to change the current code.
 
 ## macOS screen and state registry
 
-The checkout contains one macOS **Swift** target: `MenuMonitor`, a
-menu-bar-only operator tool. The Mac product / Ovie shell is Electron in
-`apps/desktop`, not this Swift package. MenuMonitor is not a public artist
+`apps/macos` contains one Swift target: `MenuMonitor`, a menu-bar-only
+operator tool. The shipped Mac product / Ovie shell is Electron in
+`apps/desktop` until the Swift-native `JovieMac` target (`apps/ios/JovieMac`,
+[ADR](../macos/ADR-swift-native-mac.md)) reaches parity. MenuMonitor is not a public artist
 profile, a creator app shell, or a macOS rendering of the iOS product surface.
 See [`docs/macos/swift-control-invariants.md`](../macos/swift-control-invariants.md).
 
