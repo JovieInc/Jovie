@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/PersistentAudioBar.test.tsx
 import { ChevronDown, ChevronUp, Play } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
