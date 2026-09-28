@@ -722,7 +722,7 @@ describe('marketing route manifest integrity', () => {
   it('keeps source-verified route bodies explicit even when recipe parity is incomplete', () => {
     for (const [url, expectedParity] of [
       ['/pay', false],
-      ['/support', true],
+      ['/support', false],
       ['/waitlist', false],
     ] as const) {
       const entry = MARKETING_ROUTE_MANIFEST.find(item => item.url === url);
@@ -1553,7 +1553,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       'cta',
     ]);
     expect(bindings.map(binding => binding.componentPath)).toEqual([
-      'apps/web/components/homepage/HomepageEditorialHero.tsx',
+      'apps/web/components/homepage/HomepageIdentityHero.tsx',
       ...Array(rows.length).fill(
         'apps/web/components/homepage/HomepageCertifiedSections.tsx'
       ),

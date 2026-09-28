@@ -31,9 +31,9 @@ export const FAQ_VARIANTS: readonly SectionVariant[] = [
     category: 'faq',
     label: 'FAQ — accordion',
     description:
-      'Standard collapsible accordion FAQ. Used on artist-profile and support pages.',
+      'Standard collapsible accordion FAQ. Used on the artist-profile page.',
     componentPath: 'components/marketing/FaqSection.tsx',
-    usedIn: ['/artist-profile', '/support'],
+    usedIn: ['/artist-profile'],
     status: 'canonical',
     canonical: true,
     render: () => <FaqSection items={DEMO_FAQ_ITEMS} />,

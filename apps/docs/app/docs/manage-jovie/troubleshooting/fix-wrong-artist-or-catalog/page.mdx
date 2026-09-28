@@ -1,0 +1,85 @@
+---
+id: fix-wrong-artist-or-catalog
+title: Fix the wrong artist or catalog
+description: Reject an incorrect suggestion or report an attached artist and catalog mismatch with the evidence support needs.
+documentType: guide
+category: manage-jovie
+productBacked: false
+productRoute: /support
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - wrong music
+  - wrong artist
+  - wrong catalog
+  - incorrect releases
+redirectAliases: []
+visualProofRefs:
+  - proof/wrong-artist-not-me.png
+  - proof/wrong-artist-support.png
+uiLabels:
+  - Suggested
+  - Not me
+  - Artist
+  - Contact Support
+  - Send email
+productSourceRefs:
+  - apps/web/app/app/(shell)/profiles/ProfilesWorkspace.tsx
+  - apps/web/app/app/(shell)/settings/artist-profile/ArtistProfileContent.tsx
+  - apps/web/app/(marketing)/support/SupportContent.tsx
+  - apps/web/components/organisms/SupportPageContent.tsx
+launchPath: true
+---
+
+<HelpArticle id="fix-wrong-artist-or-catalog">
+
+# Fix the wrong artist or catalog
+
+<HelpOutcome>Stop a bad artist match before it is added, or send a reproducible catalog mismatch to support for review.</HelpOutcome>
+
+<HelpSteps>
+
+<HelpStep title="Confirm what is mismatched">
+Compare the Jovie profile with the provider page. Treat another artist's image, biography, provider URL, or releases as a mismatch even when the artist names are identical.
+</HelpStep>
+
+<HelpStep title="Reject an unconfirmed suggestion">
+In **Presence → Suggested**, choose **Not me** beside an incorrect identity. This is the safe self-service correction before a suggestion is attached.
+
+<HelpScreenshot src="/proof/wrong-artist-not-me.png" alt="Suggested Connections row with the Not me action for an incorrect artist identity" caption="Reject an incorrect suggestion instead of adding it." />
+</HelpStep>
+
+<HelpStep title="Separate editable profile details from provider data">
+For your claimed profile, you may edit your own display name, image, location, bio, and links under **Artist**. Do not rewrite those fields to disguise a wrong provider identity, release, or catalog owner; those require review.
+</HelpStep>
+
+<HelpStep title="Send the mismatch to support">
+Open [Support](https://jov.ie/support), choose **Send email**, and include the Jovie profile URL, incorrect provider URL, expected artist URL, affected release title, and a screenshot. Include UPC or ISRC only when it is visible to you.
+
+<HelpScreenshot src="/proof/wrong-artist-support.png" alt="Jovie Support page showing the Email Support card and Send email action" caption="Send both the incorrect and expected identities so support can reproduce the mismatch." />
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Support reviews the supplied identity and catalog evidence. Keep the incorrect URLs available until the review is complete; no fixed resolution time is promised.
+
+<HelpTroubleshooting>
+
+### The wrong suggestion was already added
+
+Do not add a second identity as a workaround. Send the attached provider URL and expected provider URL through **Contact Support**.
+
+### Another person has claimed the profile
+
+Do not edit or attempt repeated claims. Include the claimed Jovie URL, your correct Spotify artist URL, and proof context in the support email.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="fix-wrong-artist-or-catalog" ids={['find-your-profile', 'claim-your-profile', 'connect-music-accounts']} />
+
+<HelpFeedback articleId="fix-wrong-artist-or-catalog" />
+
+</HelpArticle>

@@ -542,6 +542,84 @@ export async function attributeLeadPaidConversionByAppUserId(
   }
 }
 
+const APP_USER_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Record a `checkout_abandoned` funnel event for the lead behind an expired
+ * Stripe checkout session. This is the recovery touchpoint for checkout
+ * abandonment: it marks the lead's funnel state so re-engagement and
+ * reporting can pick the user up instead of the expiry passing silently.
+ *
+ * Resolves the user across auth generations: `userIdentity` may be a legacy
+ * Clerk id or the Better Auth app `users.id` UUID stored in the same
+ * `clerk_user_id` session metadata field, with `stripeCustomerId` as a
+ * fallback when metadata is absent.
+ *
+ * @returns Whether an abandonment event was recorded, and why not if skipped
+ */
+export async function attributeLeadCheckoutAbandonment(options: {
+  userIdentity?: string | null;
+  stripeCustomerId?: string | null;
+  stripeSessionId: string;
+  correlation?: CheckoutCorrelation;
+}): Promise<{ recorded: boolean; reason?: string }> {
+  const { userIdentity, stripeCustomerId, stripeSessionId, correlation } =
+    options;
+
+  const identityPredicates = [];
+  if (userIdentity) {
+    identityPredicates.push(eq(users.clerkId, userIdentity));
+    if (APP_USER_UUID_PATTERN.test(userIdentity)) {
+      identityPredicates.push(eq(users.id, userIdentity));
+    }
+  }
+  if (stripeCustomerId) {
+    identityPredicates.push(eq(users.stripeCustomerId, stripeCustomerId));
+  }
+  if (identityPredicates.length === 0) {
+    return { recorded: false, reason: 'unidentified_checkout_session' };
+  }
+
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(or(...identityPredicates))
+    .limit(1);
+
+  if (!user) {
+    return { recorded: false, reason: 'user_not_found' };
+  }
+
+  const [lead] = await db
+    .select({ id: leads.id })
+    .from(leads)
+    .where(eq(leads.signupUserId, user.id))
+    .limit(1);
+
+  if (!lead) {
+    return { recorded: false, reason: 'no_attributed_lead' };
+  }
+
+  const correlationFields = hasCheckoutCorrelation(correlation)
+    ? toCheckoutCorrelationReceiptFields(correlation)
+    : {};
+  await recordLeadFunnelEvent(
+    {
+      leadId: lead.id,
+      eventType: 'checkout_abandoned',
+      metadata: {
+        signupUserId: user.id,
+        stripeSessionId,
+        ...correlationFields,
+      },
+    },
+    { idempotent: true, required: true }
+  );
+
+  return { recorded: true };
+}
+
 export async function countLeadEventsSince(
   eventTypes: string[],
   since: Date

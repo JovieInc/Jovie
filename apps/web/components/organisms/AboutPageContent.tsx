@@ -2,25 +2,40 @@ import {
   FaqSection,
   MarketingContainer,
   MarketingHero,
+  MarketingHeroPhoto,
 } from '@/components/marketing';
+import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
 
 export { ABOUT_FAQ_ITEMS };
 
+const ABOUT_HERO_PHOTO = {
+  src: '/images/marketing-hero/about.webp',
+  width: 1600,
+  height: 600,
+} as const;
+
 export function AboutPageContent() {
   return (
     <>
-      <MarketingHero variant='left'>
-        <p className='text-sm font-medium text-tertiary-token'>
-          {ABOUT_COPY.kicker}
-        </p>
-        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
-          {ABOUT_COPY.headline}
-        </h1>
-        <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
-          {ABOUT_COPY.support}
-        </p>
-      </MarketingHero>
+      <div className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
+        <MarketingHeroPhoto {...ABOUT_HERO_PHOTO} />
+        <div
+          aria-hidden='true'
+          className='marketing-hero-backdrop pointer-events-none absolute inset-0'
+        />
+        <MarketingHero variant='left'>
+          <p className='text-sm font-medium text-tertiary-token'>
+            {ABOUT_COPY.kicker}
+          </p>
+          <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
+            {ABOUT_COPY.headline}
+          </h1>
+          <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
+            {ABOUT_COPY.support}
+          </p>
+        </MarketingHero>
+      </div>
 
       <MarketingContainer width='prose' className='pb-16'>
         <section>
@@ -59,6 +74,13 @@ export function AboutPageContent() {
       <FaqSection
         items={ABOUT_FAQ_ITEMS}
         headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
+      />
+
+      <MarketingFooterCta
+        title='Ready to build your Jovie profile?'
+        ctaAnalyticsEvent='about_footer_cta_start'
+        ctaAnalyticsSource='about_page_footer'
+        prefetch={false}
       />
     </>
   );

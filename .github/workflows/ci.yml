@@ -299,6 +299,36 @@ jobs:
           assert_executable 'Chromium headless shell' /opt/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
           assert_executable 'FFmpeg' /opt/ms-playwright/ffmpeg-1011/ffmpeg-linux
 
+  # Start before path selection and queue admission. On a warm exact cache this
+  # finishes inside their existing latency; on a miss, only this job fetches,
+  # installs, validates, and saves the dependency workspace for every isolated
+  # Linux build/test consumer in the synthetic-head run.
+  ci-merge-group-workspace:
+    name: Merge-group Dependency Workspace
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact merge-group head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.merge_group.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify exact merge-group head
+        env:
+          EXPECTED_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Prepare validated dependency workspace
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          save_merge_group_workspace: 'true'
+      - name: Revalidate published workspace receipt
+        run: node scripts/lib/ci-dependency-workspace.mjs validate
+
   # Successful root for every CI event, with one-shot proof only for push:main.
   # Queue-proven SHAs reuse their exact merge_group gate and skip every duplicate
   # fallback lane. Direct/admin main commits run the complete fallback contract
@@ -1283,9 +1313,12 @@ jobs:
   ci-golden-path-lock:
     name: Golden Path Lock
     # JOV-5085: cheap focused Vitest; no Neon/Playwright/signup secrets.
+    needs: [ci-merge-group-workspace]
     if: >-
-      github.event_name == 'pull_request' ||
-      github.event_name == 'merge_group'
+      always() &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'merge_group' &&
+      needs.ci-merge-group-workspace.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1294,6 +1327,8 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Fail-closed golden path lock
         run: node scripts/golden-path-lock.mjs merge-gate
       - name: Upload golden-path lock helper coverage
@@ -1312,18 +1347,29 @@ jobs:
     # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. Snapshot refresh
     # stays on visual-regression.yml. JOV-5960: changed homepage source also
     # renders and compares the committed homepage baselines on the source lane.
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-workspace]
     if: >-
-      github.event_name == 'merge_group' ||
+      always() &&
       (
-        github.event_name == 'pull_request' &&
-        needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        (github.event_name == 'merge_group' &&
+        needs.ci-merge-group-workspace.result == 'success') ||
+        (github.event_name == 'pull_request' &&
+        needs.ci-path-changes.outputs.run_homepage_visual == 'true')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      # The homepage render uses mock keys only, so its screenshots are public.
+      # Without this the producer guard omits every image and a failed compare
+      # uploads no -actual.png, leaving an intentional homepage change no
+      # CI-rendered baseline to adopt (scripts/visual-baseline-adopt.mjs).
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      # A failed compare also writes Playwright's error-context.md. Without
+      # this the guard blocks it as an unknown binary and uploads nothing
+      # (run 36347764603). Markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1336,6 +1382,8 @@ jobs:
         run: node scripts/visual-snapshot-compare.mjs compare
       - uses: ./.github/actions/setup-node-pnpm
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
       - uses: ./.github/actions/setup-playwright
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
       # The build below spent 3.2 of its ~4.2 min in a cold Turbopack compile
@@ -1438,12 +1486,13 @@ jobs:
           retention-days: 14
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
 
   ci-fast-typecheck:
     name: ci-fast (typecheck)
     # JOV-4477: dedicated jobs keep structural Docker/Python action setup out of
     # the typecheck path while preserving parallel hosted fan-out.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     if: >-
@@ -1453,6 +1502,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -1466,6 +1516,8 @@ jobs:
         if: >-
           github.event_name != 'pull_request' ||
           needs.ci-path-changes.outputs.run_jovie_typecheck == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
@@ -1553,7 +1605,7 @@ jobs:
     # remaining group, where their path-gated lane can actually run.
     # JOV-5454: live Storybook certification needs Chromium plus bounded
     # build/serve budget inside the structural lane.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     if: &ci-fast-gate >-
@@ -1563,6 +1615,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -1609,6 +1662,8 @@ jobs:
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       # Checksum-pinned actionlint/shellcheck/pyflakes binaries identical to
       # the former rhysd/actionlint Docker action, whose image was rebuilt at
       # every job start (~30s) even when this step was skipped. It reads only
@@ -1950,7 +2005,7 @@ jobs:
     # Secret-free browser proof for public-profile visual, accessibility, and
     # runtime behavior. The aggregate makes this required on PR and merge-group
     # heads whenever the bounded profile surface selector matches.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: >-
@@ -1960,6 +2015,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2034,6 +2090,8 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.profile-browser.outputs.run == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Setup Playwright (Chromium)
         if: steps.profile-browser.outputs.run == 'true'
         uses: ./.github/actions/setup-playwright
@@ -2118,7 +2176,7 @@ jobs:
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     # Model-free semantic gate: path-selected only on the exact combined head
     # and direct-main fallback. Manual dispatch may run it exhaustively.
     runs-on: ubuntu-latest
@@ -2129,6 +2187,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2155,6 +2214,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Validate Promptfoo config
         run: pnpm --filter @jovie/web run evals:validate
       - name: Run deterministic Promptfoo evals
@@ -2162,7 +2223,7 @@ jobs:
 
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     # Model-free semantic gate with the same combined-head/fallback contract.
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2172,6 +2233,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2195,13 +2257,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Run golden eval-set CI gate
         run: pnpm run evals:golden
 
   ci-fast-structural-python:
     name: ci-fast (structural python)
     # Pytest shards + invariants/control suites off remaining's CPU-bound pool.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: *ci-fast-gate
@@ -2214,6 +2278,8 @@ jobs:
         env: *base-fetch-start-env
         run: *base-fetch-start
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Fetch base-branch history
         shell: bash
         timeout-minutes: 10
@@ -2237,7 +2303,7 @@ jobs:
     # Web product lane + every @jovie/web Vitest run (~200s of the ~445s
     # CPU-bound structural sum) off remaining's pool. Chromium serves the
     # tests/unit/ci Playwright contracts; no Python/Elixir command runs here.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: *ci-fast-gate
@@ -2250,6 +2316,8 @@ jobs:
         env: *base-fetch-start-env
         run: *base-fetch-start
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Fetch base-branch history
         shell: bash
         timeout-minutes: 10
@@ -2470,9 +2538,15 @@ jobs:
 
   drizzle-migration-guard:
     name: Migration Guard
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-workspace]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
+    if: >-
+      always() && needs.ci-path-changes.result == 'success' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'merge_group' &&
+      needs.ci-merge-group-workspace.result == 'success') ||
+      (github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')))
     runs-on: ubuntu-latest
     timeout-minutes: 6
     permissions:
@@ -2495,6 +2569,8 @@ jobs:
         run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
 
       # Skip notification (updated condition)
       - name: Skip notification
@@ -2617,13 +2693,14 @@ jobs:
   # split stays fail-closed.
   ci-build-layout:
     name: Build + Layout (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2648,6 +2725,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Turbopack's persistent build cache (Next 16 default) lives under
@@ -2790,13 +2869,14 @@ jobs:
 
   ci-build-ovie:
     name: Ovie Build (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2821,6 +2901,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
         if: hashFiles('apps/ovie/package.json') != ''
+        with:
+          reuse_merge_group_workspace: 'true'
       # This guard permits the trusted-classifier prerequisite to land before
       # the app. Once present, Ovie must independently build and typecheck.
       # ci-typecheck-ovie checks the same tsconfig program that `next build`
@@ -2844,13 +2926,14 @@ jobs:
 
   ci-typecheck-ovie:
     name: Ovie Typecheck (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2875,6 +2958,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
         if: hashFiles('apps/ovie/package.json') != ''
+        with:
+          reuse_merge_group_workspace: 'true'
       # Split from ci-build-ovie so tsc runs beside `next build` instead of
       # before it. Same command as before: routes.mjs, next typegen, then
       # tsc --noEmit over the full Ovie tsconfig.
@@ -2884,13 +2969,14 @@ jobs:
 
   ci-storybook-surfaces:
     name: Storybook Surface Matrix (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2919,6 +3005,8 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       # Boot Storybook before the independent checks and Playwright setup so
       # its ~12s startup and Vite dependency scan/bundle overlap them instead
       # of running serially inside the matrix step. Output goes to a file: a
@@ -3150,7 +3238,7 @@ jobs:
   ci-cross-product-integration:
     name: Cross-Product Integration (combined)
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos]
+      [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3158,6 +3246,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -3191,6 +3280,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Run model-free shared contracts
         run: |
           pnpm --filter @jovie/auth-routing test
@@ -4598,7 +4689,7 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       !cancelled() &&
@@ -4606,6 +4697,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -4709,6 +4801,8 @@ jobs:
       - name: Setup Node.js and pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
 
       - name: Setup Playwright warm path
         if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
@@ -4840,7 +4934,7 @@ jobs:
 
   ci-exact-head-coverage-shard:
     name: Exact-head Coverage shard ${{ matrix.shard }}/4
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-workspace]
     # V8 coverage for the planned related tests is CPU-bound on one 4-vCPU
     # runner (merge_group run 36260335136: 331 files, 313s step). Four
     # `vitest --shard` runners each take a disjoint quarter of the same
@@ -4852,7 +4946,13 @@ jobs:
       always() &&
       needs.ci-path-changes.result == 'success' &&
       needs.ci-path-changes.outputs.has_web_coverage_changes == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+      (
+        github.event_name == 'pull_request' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-merge-group-workspace.result == 'success'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 18
     permissions:
@@ -4913,6 +5013,8 @@ jobs:
           git cat-file -e "${COVERAGE_BASE}^{commit}"
 
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
 
       - name: Run exact-head coverage shard
         id: coverage-shard

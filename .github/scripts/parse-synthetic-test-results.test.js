@@ -328,3 +328,28 @@ test('parseSyntheticTestResults ignores optional legacy OTP results when absent'
   assert.equal(result.testStatus, 'passed');
   assert.equal(result.totalTests, 4);
 });
+
+test('formatGithubOutput emits a JSON-safe failed_tests_slack line', () => {
+  const { formatGithubOutput } = require('./parse-synthetic-test-results');
+
+  const output = formatGithubOutput({
+    totalTests: 2,
+    passedTests: 0,
+    flakyTests: 0,
+    skippedTests: 0,
+    warningCount: 0,
+    testStatus: 'failed',
+    failedTests: ['suite: "quoted" title', 'suite: second\nline'],
+    testWarnings: [],
+  });
+
+  const slackLine = output
+    .split('\n')
+    .find(line => line.startsWith('failed_tests_slack='));
+  assert.ok(slackLine, 'failed_tests_slack output is present');
+
+  const escaped = slackLine.slice('failed_tests_slack='.length);
+  // Must not contain raw newlines; must be valid inside a JSON string.
+  const parsed = JSON.parse(`"${escaped}"`);
+  assert.equal(parsed, 'suite: "quoted" title\nsuite: second\nline');
+});
