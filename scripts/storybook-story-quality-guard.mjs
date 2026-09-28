@@ -133,6 +133,50 @@ function checkoutContext() {
   return { shallow, summary };
 }
 
+// A shallow boundary can appear mid-run: a concurrent depth-limited fetch
+// re-cuts history under this gate even after the job verified the checkout
+// was unshallowed (JOV-6623, JOV-5820). Before reporting a receipt as bad
+// data, repair once — a bounded `fetch --unshallow` restores full ancestry —
+// then re-run the verdict on healed history. GH_TOKEN/GITHUB_TOKEN, when the
+// caller provides one, authenticates the fetch like the job's base-fetch step.
+let shallowRepair;
+function healShallowCheckout() {
+  if (shallowRepair !== undefined) return shallowRepair;
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
+  const authArgs = token
+    ? [
+        '-c',
+        `http.https://github.com/.extraheader=AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+      ]
+    : [];
+  spawnSync(
+    'git',
+    [...authArgs, 'fetch', '--no-tags', '--unshallow', 'origin'],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] }
+  );
+  // Trust the post-fetch state, not the fetch exit: a concurrent unshallow can
+  // finish first, in which case this fetch errors but the checkout is healed.
+  shallowRepair =
+    gitOutput(['rev-parse', '--is-shallow-repository']) === 'false';
+  return shallowRepair;
+}
+
+// A negative verdict in a shallow checkout proves nothing about the receipt,
+// so try the repair before returning it; callers still fail closed (as
+// story-provenance-shallow) when the history stays cut.
+function verdictOrHeal(args) {
+  const verdict = gitVerdict(args);
+  if (
+    !verdict.error &&
+    !verdict.value &&
+    checkoutContext().shallow &&
+    healShallowCheckout()
+  ) {
+    return gitVerdict(args);
+  }
+  return verdict;
+}
+
 function stringConstants(text) {
   return new Map(
     [...text.matchAll(STRING_CONSTANT_PATTERN)].map(match => [
@@ -177,7 +221,7 @@ async function checkStoryProvenance(files, texts) {
       for (const story of stories) add(story.file, rule, detail);
     };
 
-    const exists = gitVerdict([
+    const exists = verdictOrHeal([
       'rev-parse',
       '--verify',
       '--quiet',
@@ -203,7 +247,12 @@ async function checkStoryProvenance(files, texts) {
       continue;
     }
 
-    const ancestor = gitVerdict(['merge-base', '--is-ancestor', sha, 'HEAD']);
+    const ancestor = verdictOrHeal([
+      'merge-base',
+      '--is-ancestor',
+      sha,
+      'HEAD',
+    ]);
     if (ancestor.error) {
       reportAll('story-provenance-git-error', ancestor.error);
       continue;

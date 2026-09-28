@@ -1903,6 +1903,9 @@ jobs:
       - name: Run structural ci-fast lane
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: &structural-run-env
+          # Lets the story-quality guard repair a checkout a concurrent
+          # depth-limited fetch re-shallowed mid-lane (JOV-6623).
+          GH_TOKEN: ${{ github.token }}
           CI_FAST_LANE_GROUP: remaining
           CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
