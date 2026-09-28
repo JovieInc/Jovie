@@ -11,14 +11,35 @@ export interface AdminStripeOverviewMetrics {
   activeSubscribers: number;
   mrrUsd30dAgo: number;
   mrrGrowth30dUsd: number;
+  /** Net MRR 7 days ago, including subscriptions that have since churned. */
+  mrrUsd7dAgo?: number;
+  /** Paying subscriptions active 7 days ago, including since-churned ones. */
+  activeSubscribers7dAgo?: number;
   /** Indicates whether Stripe credentials are configured */
   isConfigured: boolean;
   /** Indicates whether the Stripe API call succeeded */
   isAvailable: boolean;
+  /** Active subscriptions excluded as internal/test accounts (JOV-6673). */
+  excludedInternalSubscribers: number;
+  /** MRR excluded as internal/test accounts (JOV-6673). */
+  excludedInternalMrrUsd: number;
   /** Provider observation time for source provenance. */
   observedAtIso?: string;
   /** Error message if Stripe API call failed */
   errorMessage?: string;
+}
+
+/**
+ * Optional classifier for internal/test Stripe customers (JOV-6673). When
+ * provided, the subscription list expands `data.customer` so each active
+ * subscription can be attributed to a customer id/email and excluded from the
+ * reported MRR/subscriber totals while still being counted separately.
+ */
+export interface StripeMetricsFilter {
+  isInternalCustomer?: (customer: {
+    id: string | null;
+    email: string | null;
+  }) => boolean;
 }
 
 function isStripeConfigured(): boolean {
@@ -147,6 +168,25 @@ interface SubscriptionMetricsAccumulator {
   mrrCents: number;
   activeSubscribers: number;
   pastMrrCents: number;
+  excludedInternalSubscribers: number;
+  excludedInternalMrrCents: number;
+  weekAgoMrrCents: number;
+  weekAgoSubscribers: number;
+}
+
+function resolveCustomerIdentity(sub: Stripe.Subscription): {
+  id: string | null;
+  email: string | null;
+} {
+  const customer = sub.customer;
+  if (customer && typeof customer === 'object') {
+    // DeletedCustomer has no email and sets `deleted: true`
+    if ('deleted' in customer && customer.deleted) {
+      return { id: customer.id, email: null };
+    }
+    return { id: customer.id, email: customer.email ?? null };
+  }
+  return { id: customer ?? null, email: null };
 }
 
 // Process a single subscription and accumulate metrics.
@@ -154,13 +194,39 @@ interface SubscriptionMetricsAccumulator {
 function processSubscription(
   sub: Stripe.Subscription,
   thirtyDaysAgoSeconds: number,
-  accumulator: SubscriptionMetricsAccumulator
+  accumulator: SubscriptionMetricsAccumulator,
+  weekAgoSeconds = thirtyDaysAgoSeconds,
+  filter?: StripeMetricsFilter
 ): void {
-  if (!isActiveSubscription(sub.status)) return;
   if (!Array.isArray(sub.items.data) || sub.items.data.length === 0) return;
+  const netMrrCents = netMonthlyCents(sub);
 
+  // Internal/test subscriptions must not leak into either the current totals or
+  // historical baselines. The excluded counters intentionally describe only
+  // subscriptions that are active now, matching the public response contract.
+  if (filter?.isInternalCustomer?.(resolveCustomerIdentity(sub))) {
+    if (isActiveSubscription(sub.status)) {
+      accumulator.excludedInternalSubscribers += 1;
+      accumulator.excludedInternalMrrCents += netMrrCents;
+    }
+    return;
+  }
+
+  // Week-ago baseline counts churned subscriptions too, so WoW is net of churn.
+  if (isSubscriptionActiveAt(sub, weekAgoSeconds)) {
+    accumulator.weekAgoMrrCents += netMrrCents;
+    accumulator.weekAgoSubscribers += 1;
+  }
+
+  if (!isActiveSubscription(sub.status)) return;
   accumulator.activeSubscribers += 1;
+  accumulator.mrrCents += netMrrCents;
+  if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
+    accumulator.pastMrrCents += netMrrCents;
+  }
+}
 
+function netMonthlyCents(sub: Stripe.Subscription): number {
   // Sum gross MRR across all line items
   let grossMrrCents = 0;
   for (const item of sub.items.data) {
@@ -170,15 +236,10 @@ function processSubscription(
   // Apply discount: percentage coupons scale the total, fixed coupons subtract
   const discountMultiplier = getDiscountMultiplier(sub);
   const fixedDiscountCents = getFixedDiscountCentsPerMonth(sub);
-  const netMrrCents = Math.max(
+  return Math.max(
     0,
     Math.round(grossMrrCents * discountMultiplier) - fixedDiscountCents
   );
-
-  accumulator.mrrCents += netMrrCents;
-  if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
-    accumulator.pastMrrCents += netMrrCents;
-  }
 }
 
 // Build the success response from accumulated metrics
@@ -190,8 +251,12 @@ function buildSuccessResponse(
     activeSubscribers: accumulator.activeSubscribers,
     mrrUsd30dAgo: accumulator.pastMrrCents / 100,
     mrrGrowth30dUsd: (accumulator.mrrCents - accumulator.pastMrrCents) / 100,
+    mrrUsd7dAgo: accumulator.weekAgoMrrCents / 100,
+    activeSubscribers7dAgo: accumulator.weekAgoSubscribers,
     isConfigured: true,
     isAvailable: true,
+    excludedInternalSubscribers: accumulator.excludedInternalSubscribers,
+    excludedInternalMrrUsd: accumulator.excludedInternalMrrCents / 100,
     observedAtIso: new Date().toISOString(),
   };
 }
@@ -205,6 +270,8 @@ function buildUnconfiguredResponse(): AdminStripeOverviewMetrics {
     mrrGrowth30dUsd: 0,
     isConfigured: false,
     isAvailable: false,
+    excludedInternalSubscribers: 0,
+    excludedInternalMrrUsd: 0,
     observedAtIso: new Date().toISOString(),
     errorMessage:
       'Stripe credentials not configured (STRIPE_SECRET_KEY required)',
@@ -220,12 +287,16 @@ function buildErrorResponse(message: string): AdminStripeOverviewMetrics {
     mrrGrowth30dUsd: 0,
     isConfigured: true,
     isAvailable: false,
+    excludedInternalSubscribers: 0,
+    excludedInternalMrrUsd: 0,
     observedAtIso: new Date().toISOString(),
     errorMessage: `Stripe API error: ${message}`,
   };
 }
 
-export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOverviewMetrics> {
+export async function getAdminStripeOverviewMetrics(
+  filter?: StripeMetricsFilter
+): Promise<AdminStripeOverviewMetrics> {
   if (!isStripeConfigured()) {
     return buildUnconfiguredResponse();
   }
@@ -235,22 +306,38 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
       mrrCents: 0,
       activeSubscribers: 0,
       pastMrrCents: 0,
+      excludedInternalSubscribers: 0,
+      excludedInternalMrrCents: 0,
+      weekAgoMrrCents: 0,
+      weekAgoSubscribers: 0,
     };
     let startingAfter: string | undefined;
     const thirtyDaysAgoSeconds = Math.floor(
       (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
     );
+    const weekAgoSeconds = Math.floor(
+      (Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000
+    );
 
     for (;;) {
       const page = await stripe.subscriptions.list({
         status: 'all',
-        expand: ['data.items.data.price'],
+        expand: [
+          'data.items.data.price',
+          ...(filter?.isInternalCustomer ? ['data.customer'] : []),
+        ],
         limit: 100,
         ...(startingAfter ? { starting_after: startingAfter } : {}),
       });
 
       for (const sub of page.data) {
-        processSubscription(sub, thirtyDaysAgoSeconds, accumulator);
+        processSubscription(
+          sub,
+          thirtyDaysAgoSeconds,
+          accumulator,
+          weekAgoSeconds,
+          filter
+        );
       }
 
       if (!page.has_more || page.data.length === 0) break;

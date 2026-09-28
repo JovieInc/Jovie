@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 /**
@@ -13,7 +14,8 @@ import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
  * `<noscript>` content.
  */
 export function HomepageNoScriptContent() {
-  const { hero, certified } = HOMEPAGE_LAUNCH_COPY;
+  const { hero } = HOMEPAGE_IDENTITY_COPY;
+  const { certified } = HOMEPAGE_LAUNCH_COPY;
 
   return (
     <section

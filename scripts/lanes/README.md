@@ -76,6 +76,31 @@ Held reason codes (`held.json`): `secret-file`, `fix-exhausted`, `empty-diff`, `
 Green CI overrides only `gate-check-failed` and `gate-timeout`, which are verdicts from the local
 gate. The other codes are diff policy or unknown, and the PR stays a draft.
 
+## Reason lane (Summer's tier-3 decisions)
+
+Ranking, prioritization and strategy decisions are not made on Summer's flash model. Summer
+files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
+(question, decision type, context refs, deadline). The label is excluded from the shipping lanes.
+Each dispatch tick checks for queued jobs and starts one detached `reason_lane.py drain` per host
+(flock `reason.lock`), so a job starts within a minute. Per job:
+
+1. The lane gathers the context itself: `JOV-123` issues, `gbrain:<slug>` pages,
+   `linear:open-p0-p1` (open JOV P0/P1 list); URLs are listed, not fetched. Models get no tools.
+2. Proposer: `claude -p` on Opus 5.5 (subscription login; `~/.config/jovie-lanes/claude.env` may
+   hold `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`), structured JSON, `--max-budget-usd`.
+3. Adversarial reviewer, first healthy of: `grok` CLI on grok-4.7 (subscription), then the
+   Hyperagent "Grok 4.7 Reviewer" agent (Hyperagent credits, through `~/.local/bin/hyperagent`).
+   A 402/quota answer cools that reviewer for 6h.
+4. `reconcile()`: high confidence only when a reviewer ran, kept the #1, shares two of the top
+   three, did not reject, and the proposer is at or above 0.6. Anything else is low.
+5. A comment with a `summer.reasoning-result/v1` block, the GBrain page
+   `ops/summer/decisions/<date>-<jov-n>-<slug>`, then Done. That state change is the Linear
+   webhook that wakes Summer. A failed job retries once, then goes to Canceled with a `failed` block.
+
+`decisionType: research` (tier 4) runs the Hyperagent research backend instead and posts the memo.
+Budgets and models live in `reason.json` (jobs/day, research/day, context cap, per-job spend cap).
+Operator: `python3 reason_lane.py run JOV-123` runs one job now.
+
 ## Nothing fails silently
 
 `doctor.py` runs at the end of every dispatch tick. It judges the tick receipt
@@ -123,7 +148,8 @@ State and receipts live under `~/.local/state/jovie-lanes`.
 
 ```sh
 python3 -m unittest scripts/tests/test_lane_runner.py scripts/tests/test_codex_lane.py \
-  scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py
+  scripts/tests/test_hud.py scripts/tests/test_doctor.py scripts/tests/test_pr_events.py \
+  scripts/tests/test_reason_lane.py
 ```
 
 The same files run inside `update()` before a release is installed anywhere.

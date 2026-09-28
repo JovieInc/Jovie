@@ -39,13 +39,20 @@ function toolDefinition(command: CommandSpec) {
   if (command.acceptsFull) {
     properties.full = { type: 'boolean', description: 'Fetch the full guide' };
   }
+  for (const flag of command.flags ?? []) {
+    properties[flag.name] = { type: 'string', description: flag.description };
+  }
+  const required = [
+    ...(command.arg ? [command.arg.name] : []),
+    ...(command.flags ?? []).filter(flag => flag.required).map(f => f.name),
+  ];
   return {
     name: command.tool,
     description: command.summary,
     inputSchema: {
       type: 'object',
       properties,
-      ...(command.arg ? { required: [command.arg.name] } : {}),
+      ...(required.length ? { required } : {}),
       additionalProperties: false,
     },
     annotations: {
@@ -91,6 +98,15 @@ async function callTool(
       {
         arg: command.arg ? String(args[command.arg.name] ?? '') : undefined,
         full: args.full === true,
+        flags: Object.fromEntries(
+          (command.flags ?? []).map(flag => [
+            flag.name,
+            typeof args[flag.name] === 'string'
+              ? (args[flag.name] as string)
+              : undefined,
+          ])
+        ),
+        meta: { channel: 'mcp', version: context.version },
       },
       {
         baseUrl: context.baseUrl,

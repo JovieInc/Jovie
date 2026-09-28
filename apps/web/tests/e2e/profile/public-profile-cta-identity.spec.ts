@@ -267,7 +267,7 @@ test.describe('Public profile CTA and identity evidence', () => {
       const emptyEvents = page.getByTestId('profile-primary-tab-events-empty');
       await expect(emptyEvents).toBeVisible();
       await expect(
-        emptyEvents.getByRole('heading', { name: 'No upcoming shows' })
+        emptyEvents.getByRole('heading', { name: 'No upcoming events' })
       ).toBeVisible();
       const canonicalCta = emptyEvents.getByRole('button', {
         name: 'Turn On Event Alerts',

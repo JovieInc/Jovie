@@ -173,12 +173,12 @@ test.describe('pricing visual regression', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
-    expect(response?.status(), 'pricing document must succeed').toBe(200);
-
     if (isClerkRedirect(page.url())) {
       test.skip(true, 'Clerk handshake redirect');
       return;
     }
+
+    expect(response?.status(), 'pricing document must succeed').toBe(200);
 
     await expect(page.locator('h1, h2').first()).toBeVisible({
       timeout: 15_000,
@@ -197,12 +197,12 @@ test.describe('pricing visual regression', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
-    expect(response?.status(), 'pricing document must succeed').toBe(200);
-
     if (isClerkRedirect(page.url())) {
       test.skip(true, 'Clerk handshake redirect');
       return;
     }
+
+    expect(response?.status(), 'pricing document must succeed').toBe(200);
 
     await expect(page.locator('h1, h2').first()).toBeVisible({
       timeout: 15_000,

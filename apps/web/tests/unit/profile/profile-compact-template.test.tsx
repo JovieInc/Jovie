@@ -1418,11 +1418,13 @@ describe('ProfileCompactTemplate', () => {
 
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
     const carousel = screen.getByTestId('profile-home-carousel');
+    const pacCard = screen.getByTestId('profile-pac');
 
     expect(alertsCard).toHaveTextContent('Alerts');
-    expect(carousel).toHaveTextContent('Listen');
-    // The alerts card is the LAST card of the single home carousel — no
-    // stacked sections outside the track.
+    // The featured mode card carries the release and its Listen CTA; the
+    // alerts card stays last, inside the carousel below it.
+    expect(pacCard).toHaveTextContent("Don't Look Down");
+    expect(pacCard).toHaveTextContent('Listen now');
     expect(carousel.contains(alertsCard)).toBe(true);
     expect(
       screen.getByTestId('profile-pac').compareDocumentPosition(alertsCard)
@@ -1443,9 +1445,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const homeCard = screen.getByTestId('profile-home-carousel');
-    expect(homeCard).toHaveTextContent("Don't Look Down");
-    expect(homeCard).toHaveTextContent('Holding On');
+    const homeRail = screen.getByTestId('profile-home-rail');
+    expect(homeRail).toHaveTextContent("Don't Look Down");
+    expect(homeRail).toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {
@@ -2512,5 +2514,36 @@ describe('ProfileCompactTemplate', () => {
     expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
     expect(cta).toHaveTextContent('Request access');
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
+  });
+
+  it('routes selected credits into the About destination surfaces (JOV-6199)', () => {
+    const creditSegments = [
+      { type: 'text' as const, text: 'Credited on "' },
+      {
+        type: 'release' as const,
+        text: 'Neon Circuit',
+        href: '/timwhite/neon-circuit',
+      },
+      { type: 'text' as const, text: '".' },
+    ];
+
+    render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        creditSegments={creditSegments}
+      />
+    );
+
+    const panelCall = mockProfilePrimaryTabPanel.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(panelCall?.creditSegments).toBe(creditSegments);
+    const drawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(drawerCall?.creditSegments).toBe(creditSegments);
   });
 });

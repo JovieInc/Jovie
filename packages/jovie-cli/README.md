@@ -28,6 +28,7 @@ automated install. A repository build is not proof that npm has the package.
 | `artist llms <username>` | `GET /{username}/llms.txt` |
 | `api openapi` | `GET /api/v1/openapi.json` |
 | `docs llms` | `GET /llms.txt` (`--full` for `/llms-full.txt`) |
+| `report bug\|feedback --title <text> --details <text>` | `POST /api/agents/feedback`; returns `reportId` |
 | `mcp` | Serve the commands above as MCP tools over stdio |
 | `init` | Install `jovie/SKILL.md` into each installed agent (Claude, Codex, OpenClaw, Hermes) |
 | `skill` | Print the skill |
@@ -54,7 +55,7 @@ query parameters.
 ```
 
 Tools: `create_profile`, `get_artist`, `get_artist_guide`, `get_openapi`,
-`get_docs`. `server.json` describes the package for the MCP registry.
+`get_docs`, `report_issue`, `report_feedback`. `server.json` describes the package for the MCP registry.
 
 ## JavaScript client
 
@@ -68,7 +69,8 @@ const artist = await fetchArtist('artist-username');
 ## Boundary
 
 The CLI sends no credentials, caches nothing, and sends no telemetry beyond a
-`jovie-cli/<version>` User-Agent. `profile create` is its only write. `init`
+`jovie-cli/<version>` User-Agent. `profile create` and `report` are its only writes. Reports carry only the CLI
+version, platform, runtime, and the fields you pass. `init`
 writes only `jovie/SKILL.md` into existing agent skill directories, or into
 `--dir`. Commands use Node 22 built-ins (`parseArgs`, `fetch`, `readline`) and
 have no runtime dependencies. The MCP server covers tools only; adopt the
