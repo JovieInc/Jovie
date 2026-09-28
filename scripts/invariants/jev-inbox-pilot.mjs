@@ -74,16 +74,15 @@ export function loadInboxCorpus(raw) {
       throw new Error(`invalid corpus example: ${String(example?.id)}`);
     }
     ids.add(example.id);
-    for (const [axis, valid] of [
-      ['Category', VALID_CATEGORIES],
-      ['Priority', VALID_PRIORITIES],
-    ]) {
-      const expected = example[`expected${axis}`];
-      if (!valid.has(expected)) {
-        throw new Error(
-          `expected ${axis.toLowerCase()} not in enum for ${example.id}: ${String(expected)}`
-        );
-      }
+    if (!VALID_CATEGORIES.has(example.expectedCategory)) {
+      throw new Error(
+        `expected category not in enum for ${example.id}: ${String(example.expectedCategory)}`
+      );
+    }
+    if (!VALID_PRIORITIES.has(example.expectedPriority)) {
+      throw new Error(
+        `expected priority not in enum for ${example.id}: ${String(example.expectedPriority)}`
+      );
     }
     const key = textKey(example);
     if (texts.has(key)) {
@@ -157,6 +156,10 @@ function percentile(sorted, p) {
   ];
 }
 
+/**
+ * @param {Record<string, {support:number,tp:number,fp:number,fn:number}>} perClass
+ * @returns {{perClass: Readonly<Record<string, {support:number,precision:number,recall:number,f1:number}>>, macroF1: number}}
+ */
 function finalizeClassMetrics(perClass) {
   const metrics = {};
   let f1Sum = 0;
@@ -198,7 +201,9 @@ function bumpAxis(perClass, expected, pred) {
  */
 export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
   const byId = new Map(corpus.examples.map(e => [e.id, e]));
+  /** @type {Record<string, {support:number,tp:number,fp:number,fn:number}>} */
   const perCategory = {};
+  /** @type {Record<string, {support:number,tp:number,fp:number,fn:number}>} */
   const perPriority = {};
   const c = {
     suggested: 0,

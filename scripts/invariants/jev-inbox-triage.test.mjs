@@ -65,13 +65,13 @@ test('request carries two bounded choice questions over the fixed enums', () => 
   const { request } = prepareInboxTriageRequest(baseInput);
   assert.equal(request.schema, INBOX_TRIAGE_SCHEMA);
   assert.equal(request.stage, INBOX_TRIAGE_STAGE);
-  for (const [axis, labels] of [
-    ['category', INBOX_CATEGORIES],
-    ['priority', INBOX_PRIORITIES],
+  for (const [question, labels] of [
+    [request.questions.category, INBOX_CATEGORIES],
+    [request.questions.priority, INBOX_PRIORITIES],
   ]) {
-    assert.equal(request.questions[axis].type, 'choice');
+    assert.equal(question.type, 'choice');
     assert.deepEqual(
-      Object.keys(request.questions[axis].criteria).sort(),
+      Object.keys(question.criteria).sort(),
       [...labels, UNCATEGORIZED_LABEL].sort()
     );
   }
@@ -192,8 +192,10 @@ test('evaluated decisions carry concentration and never certification', async ()
 
   // Malformed probability payloads yield unavailable concentration, not junk.
   const malformed = transportResult({ category: 'press', priority: 'low' });
-  malformed.answers.category.probabilities = 'nope';
-  malformed.answers.priority.probabilities = { low: 'high' };
+  malformed.answers.category.probabilities = /** @type {any} */ ('nope');
+  malformed.answers.priority.probabilities = /** @type {any} */ ({
+    low: 'high',
+  });
   const read = interpretInboxTriage(malformed);
   assert.equal(read.invalid, undefined);
   assert.equal(read.detail.decision.categoryConcentration, null);
@@ -217,7 +219,7 @@ test('timeout, cancellation and admission failures stay fail-closed', async () =
   assert.equal(calls, 0);
   const pre = new AbortController();
   pre.abort();
-  const cases = [
+  const cases = /** @type {Array<[Record<string, unknown>, string]>} */ ([
     [{ signal: pre.signal }, 'cancelled'],
     [{ timeoutMs: 5, transport: () => new Promise(() => {}) }, 'timeout'],
     [
@@ -228,7 +230,7 @@ test('timeout, cancellation and admission failures stay fail-closed', async () =
       },
       'provider-error',
     ],
-  ];
+  ]);
   for (const [overrides, status] of cases) {
     const receipt = await classifyInboxEmail(baseInput, {
       ...options,
@@ -337,7 +339,7 @@ test('summarizeOutcomes reports per-axis metrics, abstention, latency and cost',
   assert.equal(metrics.evaluated, corpus.examples.length);
   assert.deepEqual(metrics.unmatched, []);
   assert.equal(metrics.evidenceBasis.executed, corpus.examples.length);
-  for (const [key, expected] of [
+  for (const [key, expected] of /** @type {Array<[string, unknown]>} */ ([
     ['macroF1', 1],
     ['falseSuggestionRate', 0],
     ['correctionRate', 0],
@@ -347,7 +349,7 @@ test('summarizeOutcomes reports per-axis metrics, abstention, latency and cost',
     ['billedCostUsd', null],
     ['incumbentCallRetained', true],
     ['estimatedWholeWorkflowCostUsd', null],
-  ]) {
+  ])) {
     assert.equal(metrics[key], expected, key);
   }
   assert.equal(metrics.priorityAxis.macroF1, 1);
