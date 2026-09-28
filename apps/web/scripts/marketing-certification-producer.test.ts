@@ -100,9 +100,7 @@ describe('marketing certification producer', () => {
       packet: packetFor(),
       evaluatedAt: '2026-09-28T01:00:00.000Z',
     });
-    expect(
-      admission.blockers.map(b => `${b.code}:${b.tier}:${b.field ?? ''}`)
-    ).toEqual([]);
+    expect(admission.blockers).toEqual([]);
     expect(admission.state).toBe('review_ready');
   });
 
