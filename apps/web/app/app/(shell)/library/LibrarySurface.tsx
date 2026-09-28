@@ -72,7 +72,7 @@ import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-sh
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
-import { EntityHeaderCard } from '@/components/molecules/drawer';
+import { EntityHeader } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
@@ -2119,8 +2119,8 @@ function AssetDrawer({
       tabsAriaLabel='Inspector tabs'
       objectHeader={
         current ? (
-          <EntityHeaderCard
-            image={
+          <EntityHeader
+            thumbnail={
               <div className='h-12 w-12 shrink-0 overflow-hidden'>
                 <LibraryMediaThumbnail asset={current} size='drawer' />
               </div>

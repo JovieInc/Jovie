@@ -3,7 +3,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { cloneElement, isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { PreviewPanel } from '@/features/dashboard/layout/PreviewPanel';
+import { PreviewPanel } from '@/components/features/dashboard/layout/PreviewPanel';
 
 const closeMock = vi.fn();
 let currentPreviewData: PreviewPanelData | null = null;
@@ -49,7 +49,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     </button>
   ),
   DrawerInlineNote: ({ message }: { message: string }) => <div>{message}</div>,
-  DrawerHeader: ({
+  EntityHeader: ({
     title,
     actions,
   }: {

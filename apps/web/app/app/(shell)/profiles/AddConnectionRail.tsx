@@ -17,7 +17,7 @@ import {
 import { PLATFORM_OPTIONS } from '@/components/features/dashboard/molecules/universalLinkInput.constants';
 import {
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -354,8 +354,8 @@ export function AddConnectionRail({
       }
       footerSurface='flat'
       entityHeader={
-        <EntityHeaderCard
-          image={
+        <EntityHeader
+          thumbnail={
             <div className='flex h-9 w-9 items-center justify-center rounded-md bg-surface-2 text-accent'>
               <Plus className='h-4 w-4' aria-hidden />
             </div>

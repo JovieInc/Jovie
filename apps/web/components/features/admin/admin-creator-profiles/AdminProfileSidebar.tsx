@@ -9,7 +9,7 @@ import {
   DrawerCardActionBar,
   DrawerTabbedCard,
   DrawerTabs,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -181,7 +181,7 @@ export function AdminProfileSidebar({
       entityHeaderSurface='flat'
       entityHeader={
         <>
-          <EntityHeaderCard
+          <EntityHeader
             title={profile.displayName ?? profile.username}
             subtitle={`@${profile.username}`}
             stableLayout
@@ -190,7 +190,7 @@ export function AdminProfileSidebar({
             reserveSubtitleSlot
             reserveMetaSlot
             metaOverflow='scroll'
-            image={
+            thumbnail={
               <AvatarUploadable
                 src={profile.avatarUrl}
                 alt={`${profile.displayName ?? profile.username} avatar`}

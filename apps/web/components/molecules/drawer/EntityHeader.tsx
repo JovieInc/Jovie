@@ -5,6 +5,13 @@ import { getAvatarArtworkRadiusClassName, getInitials } from '@jovie/ui';
 import Image from 'next/image';
 import type { ComponentType, ReactNode } from 'react';
 import { useState } from 'react';
+import {
+  STABLE_HEADER_LINE_CLAMP_CLASSNAME,
+  STABLE_HEADER_TITLE_HEIGHT_CLASSNAME,
+  StableHeaderChipRail,
+  type StableHeaderLineCount,
+  StableHeaderTextSlot,
+} from '@/components/atoms/StableHeaderSlots';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +25,11 @@ import { cn } from '@/lib/utils';
  * in the tooltip + aria-label, never as visible text), and a trailing
  * actions slot. Detail rows below this header are the compressed tail —
  * they must never repeat a fact this header already states.
+ *
+ * JOV-6842: single owner of rail header anatomy. EntityHeaderCard,
+ * DrawerHeader, AudienceMemberHeader, and ContactDetailHeader call sites are
+ * folded onto it; the retired files are removed by the follow-up deletion PR.
+ * `layout='chrome'` = utility title bar; variants fail CI (JOV-6777).
  */
 
 export const ENTITY_HEADER_THUMBNAIL_SIZE_PX = 56;
@@ -26,9 +38,8 @@ const ENTITY_HEADER_THUMBNAIL_SIZE_CLASSNAME = 'size-14';
 export type EntityHeaderThumbnailVariant = 'artwork' | 'person' | 'connection';
 
 export interface EntityHeaderThumbnailProps {
-  /** `artwork` = release/song art (rounded square, never cropped). `person` =
-   * contact/fan avatar (circle). `connection` = DSP/provider glyph on a
-   * subtle tint (circle). */
+  /** `artwork` = release/song art (rounded square, never cropped); `person` =
+   * contact/fan avatar (circle); `connection` = provider glyph (circle). */
   readonly variant: EntityHeaderThumbnailVariant;
   readonly src?: string | null;
   readonly alt?: string;
@@ -42,11 +53,7 @@ export interface EntityHeaderThumbnailProps {
   readonly 'data-testid'?: string;
 }
 
-/**
- * Canonical 56px identity thumbnail. Shape and crop behavior follow the
- * entity kind, not the call site — release art is never cropped
- * (`object-contain`, rounded square); people are circles.
- */
+/** Canonical 56px identity thumbnail — release art never crops; people are circles. */
 export function EntityHeaderThumbnail({
   variant,
   src,
@@ -142,9 +149,8 @@ const STATUS_GLYPH_TONE_CLASSNAME: Record<EntityHeaderStatusTone, string> = {
 };
 
 /**
- * Icon-only entity status indicator. The state name is never printed as a
- * visible word — it is exposed through the hover tooltip and `aria-label`
- * only. Non-color cue: each state must use a distinct icon, not just a tint.
+ * Icon-only status indicator — the state name lives in tooltip + aria-label,
+ * never visible text. Each state needs a distinct icon, not just a tint.
  */
 export function EntityHeaderStatusGlyph({
   icon: StatusIcon,
@@ -170,85 +176,264 @@ export function EntityHeaderStatusGlyph({
   );
 }
 
+export type EntityHeaderMetaOverflow = 'wrap' | 'scroll';
+
+/**
+ * `inline` = compact flow; `grid` = explicit media/identity/metadata/actions
+ * cells; `chrome` = utility title bar (title left, actions right).
+ */
+export type EntityHeaderLayout = 'inline' | 'grid' | 'chrome';
+
 export interface EntityHeaderProps {
-  /** 56px identity thumbnail — pass an `EntityHeaderThumbnail`. */
-  readonly thumbnail: ReactNode;
+  /** Identity media slot — EntityHeaderThumbnail, avatar, artwork, etc. */
+  readonly thumbnail?: ReactNode;
+  /** Optional small label above the title */
+  readonly eyebrow?: ReactNode;
   /** The only 100%-strength text in the rail. */
-  readonly title: string;
+  readonly title: ReactNode;
   /** One quiet line, e.g. "Tim White · Single" or "Maya Vale · DSP". */
-  readonly details?: ReactNode;
+  readonly subtitle?: ReactNode;
   /** Icon-only state indicator — pass an `EntityHeaderStatusGlyph`. */
   readonly statusGlyph?: ReactNode;
-  /** Trailing actions slot (typically an overflow "…" menu). */
+  /** Optional badge rendered inline after the title (e.g. verified icon) */
+  readonly badge?: ReactNode;
+  /** Optional tertiary metadata block rendered beneath subtitle */
+  readonly meta?: ReactNode;
+  /** Trailing actions slot (overflow menu, header actions, close button). */
   readonly actions?: ReactNode;
+  /** Optional footer rendered below the meta block */
+  readonly footer?: ReactNode;
+  readonly layout?: EntityHeaderLayout;
+  /** Reserve slots so entity selection changes do not resize the header. */
+  readonly stableLayout?: boolean;
+  /** Max title/subtitle lines; stable layouts reserve this line count. */
+  readonly titleLineClamp?: StableHeaderLineCount;
+  readonly subtitleLineClamp?: StableHeaderLineCount;
+  /** Reserve the subtitle/meta/footer row even when empty. */
+  readonly reserveSubtitleSlot?: boolean;
+  readonly reserveMetaSlot?: boolean;
+  readonly reserveFooterSlot?: boolean;
+  /** Metadata can either wrap or stay in a one-line horizontal rail. */
+  readonly metaOverflow?: EntityHeaderMetaOverflow;
   readonly className?: string;
+  readonly bodyClassName?: string;
   readonly titleClassName?: string;
-  readonly detailsClassName?: string;
+  readonly footerClassName?: string;
   readonly 'data-testid'?: string;
 }
 
-/**
- * The shared right-rail Entity Header. Every inspector (release, contact,
- * audience member, event, DSP connection) opens with this — see the module
- * doc comment for the founder-locked contract. Composition only: this
- * component owns layout, not surface chrome (the rail's elevated surface,
- * hairline border, and shadow belong to the shell that mounts it).
- */
+/** The shared right-rail header — see module doc for the founder contract. */
 export function EntityHeader({
   thumbnail,
+  eyebrow,
   title,
-  details,
+  subtitle,
   statusGlyph,
+  badge,
+  meta,
   actions,
+  footer,
+  layout = 'inline',
+  stableLayout = false,
+  titleLineClamp,
+  subtitleLineClamp,
+  reserveSubtitleSlot,
+  reserveMetaSlot,
+  reserveFooterSlot,
+  metaOverflow,
   className,
+  bodyClassName,
   titleClassName,
-  detailsClassName,
+  footerClassName,
   'data-testid': testId = 'entity-header',
 }: EntityHeaderProps) {
-  const hasDetailsRow = Boolean(details || statusGlyph);
+  if (layout === 'chrome') {
+    return (
+      <div
+        className={cn(
+          'flex min-h-10 shrink-0 items-center justify-between gap-3 px-3 py-1.5',
+          className
+        )}
+        data-layout='chrome'
+        data-testid={testId}
+      >
+        <div className='min-w-0 flex-1'>
+          {typeof title === 'string' ? (
+            <p className='truncate text-xs font-semibold tracking-[-0.012em] text-primary-token'>
+              {title}
+            </p>
+          ) : (
+            (title ?? <div aria-hidden='true' className='h-4' />)
+          )}
+        </div>
+        {actions && <div className='flex items-center gap-1'>{actions}</div>}
+      </div>
+    );
+  }
 
-  return (
-    <div
-      className={cn('relative flex items-start gap-3', className)}
-      data-testid={testId}
-    >
-      {thumbnail}
-      <div className={cn('min-w-0 flex-1 space-y-0.5', actions && 'pr-7')}>
+  const resolvedTitleLineClamp =
+    titleLineClamp ?? (stableLayout ? 1 : undefined);
+  const shouldReserveSubtitle = reserveSubtitleSlot ?? stableLayout;
+  const shouldReserveMeta = reserveMetaSlot ?? stableLayout;
+  const shouldReserveFooter = reserveFooterSlot ?? false;
+  const resolvedSubtitleLineClamp =
+    subtitleLineClamp ?? (shouldReserveSubtitle ? 1 : undefined);
+  const resolvedMetaOverflow: EntityHeaderMetaOverflow =
+    metaOverflow ?? (stableLayout ? 'scroll' : 'wrap');
+
+  const identityContent = (
+    <>
+      {eyebrow ? (
+        <StableHeaderTextSlot
+          lineCount={1}
+          size='xs'
+          className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
+        >
+          {eyebrow}
+        </StableHeaderTextSlot>
+      ) : null}
+      <div className='flex items-start gap-1'>
         <h2
-          title={title}
+          title={typeof title === 'string' ? title : undefined}
           data-testid='entity-header-title'
           className={cn(
-            'truncate text-sm font-semibold leading-tight tracking-tight text-primary-token',
+            'min-w-0 flex-1 text-sm font-semibold leading-[18px] tracking-[-0.015em] text-primary-token',
+            resolvedTitleLineClamp
+              ? STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp]
+              : 'truncate',
+            stableLayout &&
+              resolvedTitleLineClamp &&
+              STABLE_HEADER_TITLE_HEIGHT_CLASSNAME[resolvedTitleLineClamp],
             titleClassName
           )}
         >
           {title}
         </h2>
-        {hasDetailsRow ? (
-          <div
-            className='flex min-w-0 items-center gap-1.5'
-            data-testid='entity-header-details-row'
+        {badge}
+      </div>
+      {subtitle || statusGlyph || shouldReserveSubtitle ? (
+        <StableHeaderTextSlot
+          reserve={shouldReserveSubtitle}
+          lineCount={resolvedSubtitleLineClamp}
+          size='xs'
+          className='text-xs leading-4 tracking-[-0.005em] text-secondary-token'
+          testId='entity-header-details-row'
+        >
+          {statusGlyph ? (
+            <span className='flex min-w-0 items-center gap-1.5'>
+              {subtitle && <span className='min-w-0 truncate'>{subtitle}</span>}
+              {statusGlyph}
+            </span>
+          ) : (
+            subtitle
+          )}
+        </StableHeaderTextSlot>
+      ) : null}
+    </>
+  );
+
+  const metadataContent = (
+    <>
+      {meta || shouldReserveMeta ? (
+        resolvedMetaOverflow === 'scroll' ? (
+          <StableHeaderChipRail
+            reserve={shouldReserveMeta}
+            className='pt-0.5'
+            testId='entity-header-meta-slot'
           >
-            {details ? (
-              <span
-                className={cn(
-                  'min-w-0 truncate text-xs leading-4 text-secondary-token',
-                  detailsClassName
-                )}
-                data-testid='entity-header-details'
-              >
-                {details}
-              </span>
-            ) : null}
-            {statusGlyph}
+            {meta}
+          </StableHeaderChipRail>
+        ) : (
+          <div
+            aria-hidden={meta ? undefined : true}
+            className={cn(
+              'flex min-h-6 flex-wrap items-center gap-1 pt-0.5',
+              !meta && 'invisible'
+            )}
+            data-testid='entity-header-meta-slot'
+          >
+            {meta ?? ' '}
+          </div>
+        )
+      ) : null}
+      {footer || shouldReserveFooter ? (
+        <div
+          aria-hidden={footer ? undefined : true}
+          className={cn(
+            'min-h-7 pt-1',
+            !footer && 'invisible',
+            footerClassName
+          )}
+        >
+          {footer ?? ' '}
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (layout === 'grid') {
+    return (
+      <div
+        className={cn(
+          'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-1.5',
+          className
+        )}
+        data-layout='grid'
+        data-testid={testId}
+      >
+        {thumbnail ? (
+          <div
+            className='col-start-1 row-span-2 row-start-1'
+            data-entity-header-image
+          >
+            {thumbnail}
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            'col-start-2 row-start-1 min-w-0 space-y-1',
+            bodyClassName
+          )}
+          data-entity-header-identity
+        >
+          {identityContent}
+        </div>
+        {actions ? (
+          <div
+            className='col-start-3 row-start-1 justify-self-end'
+            data-entity-header-actions
+          >
+            {actions}
+          </div>
+        ) : null}
+        {meta || shouldReserveMeta || footer || shouldReserveFooter ? (
+          <div
+            className='col-span-2 col-start-2 row-start-2 min-w-0'
+            data-entity-header-metadata
+          >
+            {metadataContent}
           </div>
         ) : null}
       </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn('relative flex items-start gap-3', className)}
+      data-layout='inline'
+      data-testid={testId}
+    >
       {actions ? (
         <div className='absolute right-0 top-0' data-entity-header-actions>
           {actions}
         </div>
       ) : null}
+      {thumbnail ?? null}
+      <div className={cn('min-w-0 flex-1 space-y-1', bodyClassName)}>
+        {identityContent}
+        {metadataContent}
+      </div>
     </div>
   );
 }
