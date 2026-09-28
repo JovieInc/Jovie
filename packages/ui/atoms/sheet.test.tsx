@@ -372,7 +372,7 @@ describe('Sheet', () => {
   });
 });
 
-describe('Sheet overlay layer contract (JOV-INV-036)', () => {
+describe('Sheet overlay layer contract', () => {
   it('keeps its scrim and surface on the sheet layer, below modal dialogs', () => {
     render(
       <Sheet open>

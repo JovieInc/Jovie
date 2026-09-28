@@ -328,7 +328,7 @@ describe('AlertDialog', () => {
   });
 });
 
-describe('AlertDialog overlay layer contract (JOV-INV-036)', () => {
+describe('AlertDialog overlay layer contract', () => {
   it('paints on the modal layer above sheets', () => {
     render(
       <AlertDialog open>

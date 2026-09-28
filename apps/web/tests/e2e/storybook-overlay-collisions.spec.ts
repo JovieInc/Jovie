@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 /**
- * Overlay collision stress suite (JOV-INV-036).
+ * Overlay collision stress suite.
  *
  * Drives `Guardrails/Overlay Collisions` stories built from the canonical
  * @jovie/ui primitives and asserts the overlay layer contract:

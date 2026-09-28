@@ -20,7 +20,7 @@ const PopoverAnchorRegistryContext =
 /**
  * Popover root. Closes itself when every trigger/anchor it is positioned
  * against unmounts, so content never floats detached at a stale position
- * after its row, card, or button disappears (JOV-INV-036).
+ * after its row, card, or button disappears.
  */
 function Popover({
   open: openProp,

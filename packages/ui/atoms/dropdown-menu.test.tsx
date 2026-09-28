@@ -361,7 +361,7 @@ describe('DropdownMenu', () => {
   });
 });
 
-describe('DropdownMenu submenu viewport fit (JOV-INV-036)', () => {
+describe('DropdownMenu submenu viewport fit', () => {
   it('narrows submenus into the width Radix reports as available', () => {
     render(
       <DropdownMenu open>

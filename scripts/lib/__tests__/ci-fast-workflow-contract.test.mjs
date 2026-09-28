@@ -437,7 +437,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('selects the overlay collision proof when overlay primitives change (JOV-INV-036)', () => {
+  it('selects the overlay collision proof when overlay primitives change', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'

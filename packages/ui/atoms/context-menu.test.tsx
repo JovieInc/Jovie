@@ -606,7 +606,7 @@ describe('ContextMenu', () => {
   });
 });
 
-describe('ContextMenu submenu viewport fit (JOV-INV-036)', () => {
+describe('ContextMenu submenu viewport fit', () => {
   it('narrows submenus into the width Radix reports as available', async () => {
     render(
       <ContextMenu>

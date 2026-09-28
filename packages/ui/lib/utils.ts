@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
-/** Semantic overlay layers from the z-index contract (JOV-INV-036). */
+/** Semantic overlay layers from the shared z-index contract. */
 export const OVERLAY_Z_LAYERS = [
   'banner',
   'sheet',
