@@ -15,6 +15,17 @@ const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
 const includeMobileMatrix =
   process.env.E2E_MOBILE_MATRIX === '1' || isFullMatrix;
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
+const usesManagedWebServer = !(
+  shouldSkipManagedWebServer ||
+  (isCI && process.env.BASE_URL)
+);
+// The managed server builds with theme switching on so light mode stays under
+// test. Specs import the same route policy (isThemeRoute), which reads this
+// flag at module load in the worker process; workers inherit this process's
+// env, so mirror the flag here or light-mode scans silently skip every route.
+if (usesManagedWebServer) {
+  process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = '1';
+}
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
@@ -173,7 +184,7 @@ export default defineConfig({
   ],
 
   // Only start web server if not in CI (when BASE_URL is not set)
-  ...(shouldSkipManagedWebServer || (isCI && process.env.BASE_URL)
+  ...(!usesManagedWebServer
     ? {}
     : {
         webServer: {
