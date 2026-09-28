@@ -33,6 +33,7 @@ export type AdminWorkspaceId =
   | 'chat'
   | 'certifications'
   | 'ops'
+  | 'shipping'
   | 'people'
   | 'growth'
   | 'platform_connections'
@@ -96,6 +97,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_CERTIFICATIONS,
     description:
       'Founder review of certification evidence, with certify and reject',
+    section: 'workspaces',
+  },
+  {
+    id: 'shipping',
+    label: 'Shipping',
+    href: APP_ROUTES.ADMIN_SHIPPING,
+    description:
+      'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
     section: 'workspaces',
   },
   {
