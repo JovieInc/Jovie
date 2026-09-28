@@ -112,15 +112,15 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     render(<ProductLanding />);
 
     expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Your living identity on the internet.'
+      'Be found. Be understood.'
     );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Be found. Be understood.'
+      'Your living identity on the internet.'
     );
     expect(
       screen.queryByRole('heading', {
         level: 1,
-        name: 'Your living identity on the internet.',
+        name: 'Be found. Be understood.',
       })
     ).toBeNull();
   });
