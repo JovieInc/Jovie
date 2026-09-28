@@ -4,13 +4,13 @@ not ok 1 - verifies the new signed contract without inheriting repair authority
   ---
   duration_ms: 22.954803
   type: 'test'
-  location: '/home/runner/work/Jovie/Jovie/scripts/symphony/summer-shipping-lead-contract.test.mjs:132:1'
+  location: '/home/runner/work/Jovie/Jovie/scripts/fleet-gate/summer-shipping-lead-contract.test.mjs:132:1'
   failureType: 'testCodeFailure'
   error: 'shipping-lead-task-invalid'
   code: 'ERR_TEST_FAILURE'
   stack: |-
-    validateShippingTask (file:///home/runner/work/Jovie/Jovie/scripts/symphony/summer-shipping-lead-contract.mjs:112:11)
-    TestContext.<anonymous> (file:///home/runner/work/Jovie/Jovie/scripts/symphony/summer-shipping-lead-contract.test.mjs:135:3)
+    validateShippingTask (file:///home/runner/work/Jovie/Jovie/scripts/fleet-gate/summer-shipping-lead-contract.mjs:112:11)
+    TestContext.<anonymous> (file:///home/runner/work/Jovie/Jovie/scripts/fleet-gate/summer-shipping-lead-contract.test.mjs:135:3)
     Test.runInAsyncScope (node:async_hooks:214:14)
     Test.run (node:internal/test_runner/test:1047:25)
     Test.start (node:internal/test_runner/test:944:17)
@@ -209,7 +209,7 @@ ok 29 - Summer Symphony authenticated transport
       ---
       duration_ms: 3.681447
       type: 'test'
-      location: '/home/runner/work/Jovie/Jovie/scripts/symphony/summer-symphony-outbox-consumer.test.mjs:255:3'
+      location: '/home/runner/work/Jovie/Jovie/scripts/fleet-gate/summer-symphony-outbox-consumer.test.mjs:255:3'
       failureType: 'testCodeFailure'
       error: |-
         Expected values to be strictly equal:
@@ -224,7 +224,7 @@ ok 29 - Summer Symphony authenticated transport
       actual: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
       operator: 'strictEqual'
       stack: |-
-        TestContext.<anonymous> (file:///home/runner/work/Jovie/Jovie/scripts/symphony/summer-symphony-outbox-consumer.test.mjs:256:12)
+        TestContext.<anonymous> (file:///home/runner/work/Jovie/Jovie/scripts/fleet-gate/summer-symphony-outbox-consumer.test.mjs:256:12)
         Test.runInAsyncScope (node:async_hooks:214:14)
         Test.run (node:internal/test_runner/test:1047:25)
         Test.start (node:internal/test_runner/test:944:17)
@@ -282,7 +282,7 @@ not ok 30 - Summer outbox record authority
   ---
   duration_ms: 120.898866
   type: 'suite'
-  location: '/home/runner/work/Jovie/Jovie/scripts/symphony/summer-symphony-outbox-consumer.test.mjs:254:1'
+  location: '/home/runner/work/Jovie/Jovie/scripts/fleet-gate/summer-symphony-outbox-consumer.test.mjs:254:1'
   failureType: 'subtestsFailed'
   error: '1 subtest failed'
   code: 'ERR_TEST_FAILURE'
