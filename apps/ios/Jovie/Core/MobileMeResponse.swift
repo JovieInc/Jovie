@@ -323,20 +323,23 @@ enum MobileWorkspaceMode: String, Codable, Equatable, Sendable, CaseIterable {
 }
 
 enum MobileWorkspaceStore {
-  static let defaultsKey = "ie.jov.Jovie.workspaceMode"
+  /// Ovie is an explicit per-session admin choice. Persisting it across
+  /// launches let a stale Ovie selection re-enter ops mode on cold start, so
+  /// the artist Inbox rendered Taste/ops copy ("pending approvals", "Ask
+  /// Summer") while the rest of the app read as Jovie (JOV-5358).
+  private static var sessionMode: MobileWorkspaceMode?
 
-  static func load(isAdmin: Bool, defaults: UserDefaults = .standard) -> MobileWorkspaceMode {
+  static func load(isAdmin: Bool) -> MobileWorkspaceMode {
     guard isAdmin else { return .jovie }
-    guard
-      let raw = defaults.string(forKey: defaultsKey),
-      let mode = MobileWorkspaceMode(rawValue: raw)
-    else {
-      return .jovie
-    }
-    return mode
+    return sessionMode ?? .jovie
   }
 
-  static func save(_ mode: MobileWorkspaceMode, isAdmin: Bool, defaults: UserDefaults = .standard) {
-    defaults.set((isAdmin ? mode : .jovie).rawValue, forKey: defaultsKey)
+  static func save(_ mode: MobileWorkspaceMode, isAdmin: Bool) {
+    sessionMode = isAdmin ? mode : .jovie
+  }
+
+  /// Test hook: simulate a cold start by dropping the session selection.
+  static func resetSessionForTesting() {
+    sessionMode = nil
   }
 }

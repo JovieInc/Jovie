@@ -1,6 +1,10 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryClient,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   deleteRelease,
   formatReleaseLyrics,
@@ -17,6 +21,123 @@ import {
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from './keys';
+
+/**
+ * Keep the release detail cache (`useReleaseEntityQuery`) aligned with matrix
+ * writes. The detail query seeds from the matrix row via initialData, which
+ * only applies at query creation — without this, an already-mounted detail
+ * view keeps serving the stale title/artwork after a mutation updates the row.
+ */
+function syncReleaseDetailCache(
+  queryClient: QueryClient,
+  profileId: string,
+  release: ReleaseViewModel
+): void {
+  queryClient.setQueryData<ReleaseViewModel>(
+    queryKeys.releases.detail(profileId, release.id),
+    release
+  );
+}
+
+/**
+ * After a matrix refetch settles, copy the authoritative row into the detail
+ * cache so optimistic edits converge to the server result.
+ */
+function convergeReleaseDetailCache(
+  queryClient: QueryClient,
+  profileId: string,
+  releaseId: string
+): void {
+  const row = queryClient
+    .getQueryData<ReleaseViewModel[]>(queryKeys.releases.matrix(profileId))
+    ?.find(r => r.id === releaseId);
+  if (row) {
+    syncReleaseDetailCache(queryClient, profileId, row);
+  }
+}
+
+interface ReleaseMutationContext {
+  previousReleases?: ReleaseViewModel[];
+  previousDetail?: ReleaseViewModel;
+}
+
+interface ReleaseVariables {
+  profileId: string;
+  releaseId: string;
+}
+
+/**
+ * Snapshot the matrix and detail caches, then apply an optimistic matrix
+ * update and mirror the touched row into the detail cache.
+ */
+function optimisticReleaseUpdate(
+  queryClient: QueryClient,
+  variables: ReleaseVariables,
+  update: (releases: ReleaseViewModel[]) => ReleaseViewModel[]
+): ReleaseMutationContext {
+  const previousReleases = queryClient.getQueryData<ReleaseViewModel[]>(
+    queryKeys.releases.matrix(variables.profileId)
+  );
+  const previousDetail = queryClient.getQueryData<ReleaseViewModel>(
+    queryKeys.releases.detail(variables.profileId, variables.releaseId)
+  );
+
+  if (previousReleases) {
+    const optimisticReleases = update(previousReleases);
+    queryClient.setQueryData(
+      queryKeys.releases.matrix(variables.profileId),
+      optimisticReleases
+    );
+    const optimisticRelease = optimisticReleases.find(
+      r => r.id === variables.releaseId
+    );
+    if (optimisticRelease) {
+      syncReleaseDetailCache(
+        queryClient,
+        variables.profileId,
+        optimisticRelease
+      );
+    }
+  }
+
+  return { previousReleases, previousDetail };
+}
+
+/** Restore the snapshotted matrix/detail caches after a failed mutation. */
+function rollbackReleaseCaches(
+  queryClient: QueryClient,
+  variables: ReleaseVariables,
+  context?: ReleaseMutationContext
+): void {
+  if (context?.previousReleases) {
+    queryClient.setQueryData(
+      queryKeys.releases.matrix(variables.profileId),
+      context.previousReleases
+    );
+  }
+  if (context?.previousDetail) {
+    syncReleaseDetailCache(
+      queryClient,
+      variables.profileId,
+      context.previousDetail
+    );
+  }
+}
+
+/** Invalidate the matrix and converge the detail cache once a mutation settles. */
+async function settleReleaseMutation(
+  queryClient: QueryClient,
+  variables: ReleaseVariables
+): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: queryKeys.releases.matrix(variables.profileId),
+  });
+  convergeReleaseDetailCache(
+    queryClient,
+    variables.profileId,
+    variables.releaseId
+  );
+}
 
 /**
  * Optimistically update a release's provider URL in the cache.
@@ -85,45 +206,25 @@ export function useSaveProviderOverrideMutation() {
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
 
-      // Snapshot the previous value for rollback on error
-      const previousReleases = queryClient.getQueryData<ReleaseViewModel[]>(
-        queryKeys.releases.matrix(variables.profileId)
-      );
-
-      // Optimistically update the cache
-      if (previousReleases) {
-        const optimisticReleases = updateReleaseProvider(
-          previousReleases,
+      // Snapshot the previous value for rollback on error, then apply the optimistic cache update
+      return optimisticReleaseUpdate(queryClient, variables, releases =>
+        updateReleaseProvider(
+          releases,
           variables.releaseId,
           variables.provider,
           variables.url
-        );
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(variables.profileId),
-          optimisticReleases
-        );
-      }
-
-      // Return context with the snapshotted value
-      return { previousReleases };
+        )
+      );
     },
 
     // On error, rollback to the previous value
     onError: (_err, variables, context) => {
-      if (context?.previousReleases) {
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(variables.profileId),
-          context.previousReleases
-        );
-      }
+      rollbackReleaseCaches(queryClient, variables, context);
     },
 
     // Always refetch after error or success to ensure cache consistency
-    onSettled: async (_data, _error, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.matrix(variables.profileId),
-      });
-    },
+    onSettled: (_data, _error, variables) =>
+      settleReleaseMutation(queryClient, variables),
   });
 }
 
@@ -142,48 +243,30 @@ export function useResetProviderOverrideMutation() {
         queryKey: queryKeys.releases.matrix(variables.profileId),
       });
 
-      const previousReleases = queryClient.getQueryData<ReleaseViewModel[]>(
-        queryKeys.releases.matrix(variables.profileId)
-      );
-
       // For reset, we can't know the original ingested URL optimistically,
       // so we just mark the source as 'ingested' to show the UI state change
-      if (previousReleases) {
-        const optimisticReleases = previousReleases.map(release => {
-          if (release.id !== variables.releaseId) return release;
-
-          return {
-            ...release,
-            providers: release.providers.map(p =>
-              p.key === variables.provider
-                ? { ...p, source: 'ingested' as const }
-                : p
-            ),
-          };
-        });
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(variables.profileId),
-          optimisticReleases
-        );
-      }
-
-      return { previousReleases };
+      return optimisticReleaseUpdate(queryClient, variables, releases =>
+        releases.map(release =>
+          release.id !== variables.releaseId
+            ? release
+            : {
+                ...release,
+                providers: release.providers.map(p =>
+                  p.key === variables.provider
+                    ? { ...p, source: 'ingested' as const }
+                    : p
+                ),
+              }
+        )
+      );
     },
 
     onError: (_err, variables, context) => {
-      if (context?.previousReleases) {
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(variables.profileId),
-          context.previousReleases
-        );
-      }
+      rollbackReleaseCaches(queryClient, variables, context);
     },
 
-    onSettled: async (_data, _error, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releases.matrix(variables.profileId),
-      });
-    },
+    onSettled: (_data, _error, variables) =>
+      settleReleaseMutation(queryClient, variables),
   });
 }
 
@@ -222,6 +305,7 @@ export function useRefreshReleaseMutation(profileId: string) {
             current.map(r => (r.id === result.release.id ? result.release : r))
           );
         }
+        syncReleaseDetailCache(queryClient, profileId, result.release);
       }
     },
   });
@@ -247,6 +331,7 @@ export function useRescanIsrcLinksMutation(profileId: string) {
             current.map(r => (r.id === result.release.id ? result.release : r))
           );
         }
+        syncReleaseDetailCache(queryClient, profileId, result.release);
       }
     },
   });
@@ -289,7 +374,12 @@ export function useDeleteReleaseMutation(profileId: string) {
       }
     },
 
-    onSettled: async () => {
+    onSettled: async (_data, error, variables) => {
+      if (!error) {
+        queryClient.removeQueries({
+          queryKey: queryKeys.releases.detail(profileId, variables.releaseId),
+        });
+      }
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(profileId),
       });
@@ -316,6 +406,7 @@ function useReleaseMutation<T>(
           current.map(r => (r.id === updated.id ? updated : r))
         );
       }
+      syncReleaseDetailCache(queryClient, profileId, updated);
     },
   });
 }
@@ -355,6 +446,7 @@ export function useFormatReleaseLyricsMutation(profileId: string) {
           current.map(r => (r.id === release.id ? release : r))
         );
       }
+      syncReleaseDetailCache(queryClient, profileId, release);
     },
   });
 }

@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Canonical Pen homepage v3 hero (dark launch): the blue technical texture (hero only, 20s CSS drift, still under reduced motion, header scrim), one headline, one support line, Request access while gated or name search when open, and the illustrative Avery Chen Jovie profile specimen.',
+          'Canonical Pen homepage hero: the blue technical texture (hero only, 20s CSS drift, still under reduced motion, header scrim), one headline, one support line, Request access while gated or name search when open, and the illustrative Avery Chen Jovie profile specimen.',
       },
     },
   },

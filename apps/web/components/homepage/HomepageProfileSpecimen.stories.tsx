@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Illustrative Jovie profile specimen for the v3 homepage hero. Avery Chen is fictional example content; the caption labels it as a preview and the action pill is non-interactive.',
+          'Illustrative Jovie profile specimen for the homepage hero. Avery Chen is fictional example content; the caption labels it as a preview and the action pill is non-interactive.',
       },
     },
   },

@@ -61,7 +61,7 @@ async function readProfileGeometry(page: Page) {
     return {
       shell: rect('[data-testid="profile-compact-shell"]'),
       cover: rect('[data-testid="profile-cover"]'),
-      media: rect('.profile-cover-home-media'),
+      media: rect('[data-testid="profile-identity-portrait"]'),
       overflowX: document.documentElement.scrollWidth - innerWidth,
     };
   });
@@ -164,11 +164,13 @@ test.describe('public profile resilience', () => {
         waitForHydration(brokenMediaPage),
       ]);
 
-      const brokenHero = brokenMediaPage.locator('.profile-cover-home-media');
+      const brokenHero = brokenMediaPage.getByTestId(
+        'profile-identity-portrait'
+      );
       await expect(brokenHero.locator('img')).toHaveCount(0);
       await expect(brokenHero.locator('[role="img"]')).toBeVisible();
       await expect(
-        brokenMediaPage.getByTestId('profile-hero-identity-block')
+        brokenMediaPage.getByTestId('profile-identity-header')
       ).toBeVisible();
       await expect(
         brokenMediaPage.getByRole('button', { name: 'Menu' })

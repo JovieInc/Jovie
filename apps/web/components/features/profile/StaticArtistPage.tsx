@@ -9,6 +9,7 @@ import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ProfilePacAssignment } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -61,6 +62,8 @@ export interface StaticArtistPageProps {
   readonly claimFooterLabel?: string;
   readonly proofClaim?: boolean;
   readonly releaseCredits?: readonly SmartLinkCreditGroup[];
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
 }
 
 export function StaticArtistPage({
@@ -102,6 +105,7 @@ export function StaticArtistPage({
   claimFooterLabel,
   proofClaim = false,
   releaseCredits,
+  creditSegments,
 }: StaticArtistPageProps) {
   assertLiveProfileRoute();
   const viewModel = buildProfilePublicViewModel({
@@ -172,6 +176,7 @@ export function StaticArtistPage({
       claimFooterLabel={claimFooterLabel}
       proofClaim={proofClaim}
       releaseCredits={releaseCredits}
+      creditSegments={creditSegments}
       embeddedPreview={presentation === 'compact-preview'}
     />
   );

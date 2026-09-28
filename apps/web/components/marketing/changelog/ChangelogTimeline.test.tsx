@@ -95,20 +95,20 @@ describe('ChangelogTimeline', () => {
 
     expect(container.querySelectorAll('article')).toHaveLength(25);
     expect(
-      screen.getByRole('button', { name: 'Read More — 25 Updates' })
+      screen.getByRole('button', { name: 'Show 25 More Updates' })
     ).toBeVisible();
     expect(screen.queryByText('v26.8.1')).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Read More — 25 Updates' })
+      screen.getByRole('button', { name: 'Show 25 More Updates' })
     );
     expect(container.querySelectorAll('article')).toHaveLength(50);
     expect(
-      screen.getByRole('button', { name: 'Read More — 2 Updates' })
+      screen.getByRole('button', { name: 'Show 2 More Updates' })
     ).toBeVisible();
 
     const finalButton = screen.getByRole('button', {
-      name: 'Read More — 2 Updates',
+      name: 'Show 2 More Updates',
     });
     finalButton.focus();
     fireEvent.click(finalButton);
@@ -116,7 +116,7 @@ describe('ChangelogTimeline', () => {
     expect(screen.getByText('v26.8.1')).toBeVisible();
     expect(screen.getByText('Showing 52 of 52 updates')).toBeVisible();
     expect(screen.getByText('Showing 52 of 52 updates')).toHaveFocus();
-    expect(screen.queryByRole('button', { name: /Read More/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Show \d+ More/ })).toBeNull();
   });
 
   it('shows all 25 entries without unnecessary pagination', () => {
@@ -126,7 +126,7 @@ describe('ChangelogTimeline', () => {
     }));
     const { container } = render(<ChangelogTimeline releases={releases} />);
     expect(container.querySelectorAll('article')).toHaveLength(25);
-    expect(screen.queryByRole('button', { name: /Read More/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Show \d+ More/ })).toBeNull();
   });
 });
 

@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { isNavigationEligiblePath } from '@/data/marketing/featureAvailability';
 
 export interface MarketingNavLink {
   readonly href: string;
@@ -28,6 +29,16 @@ export const MARKETING_CLI_LINK: MarketingFooterLink = {
   label: 'CLI',
 };
 
+/**
+ * Header/footer destinations consume the shared feature-availability policy
+ * (JOV-6216): internal-only or unauthorized-proof routes never appear in
+ * navigation even if the route exists. External links bypass the check.
+ */
+const eligibleLinks = <T extends { href: string; external?: boolean }>(
+  links: readonly T[]
+): readonly T[] =>
+  links.filter(link => link.external || isNavigationEligiblePath(link.href));
+
 export interface MarketingNavFlyoutMenu {
   readonly id: string;
   readonly label: string;
@@ -36,24 +47,25 @@ export interface MarketingNavFlyoutMenu {
 }
 
 // Canonical Pen header (2026-09-26): Customers flyout, Product, Pricing.
-export const MARKETING_NAV_LINKS = [
+export const MARKETING_NAV_LINKS = eligibleLinks([
   { href: APP_ROUTES.PRODUCT, label: 'Product' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
-] as const satisfies readonly MarketingNavLink[];
+] as const satisfies readonly MarketingNavLink[]);
 
 /**
  * Customers flyout (Pen vWrhR). Each audience routes to its own existing
  * landing page. Audiences without one (Founders, Authors, Creators) are
  * omitted until their page ships; never substitute an unrelated page.
+ * Investors is omitted too: investor pages are private (investor link or
+ * admin only) and never linked from public navigation.
  */
 export const MARKETING_CUSTOMERS_FLYOUT = {
   id: 'customers',
   label: 'Customers',
   heading: 'Customers',
-  links: [
-    { href: APP_ROUTES.INVESTORS, label: 'Investors' },
-    { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artists' },
-  ],
+  links: eligibleLinks([
+    { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
+  ] as const satisfies readonly MarketingNavLink[]),
 } as const satisfies MarketingNavFlyoutMenu;
 
 export const MARKETING_NAV_UTILITIES = [
@@ -61,7 +73,7 @@ export const MARKETING_NAV_UTILITIES = [
   { href: APP_ROUTES.START, label: 'Find yourself' },
 ] as const satisfies readonly MarketingNavLink[];
 
-export const MARKETING_TOOLS_FLYOUT_LINKS = [
+export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
   {
     href: APP_ROUTES.SMART_LINKS,
     label: 'Music Smart Links',
@@ -87,9 +99,9 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = [
     label: 'CLI',
     description: 'Read public artist data from the command line.',
   },
-] as const satisfies readonly MarketingNavFlyoutLink[];
+] as const satisfies readonly MarketingNavFlyoutLink[]);
 
-export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
+const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
     links: [
@@ -124,8 +136,6 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.ABOUT, label: 'About' },
       { href: APP_ROUTES.BLOG, label: 'Blog' },
       { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
-      { href: APP_ROUTES.INVESTORS, label: 'Investors' },
-      { href: APP_ROUTES.PITCH, label: 'Pitch' },
     ],
   },
   {
@@ -152,6 +162,12 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     ],
   },
 ] as const;
+
+export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
+  RAW_MARKETING_FOOTER_COLUMNS.map(column => ({
+    ...column,
+    links: eligibleLinks(column.links),
+  }));
 
 export const MARKETING_LEGAL_LINKS: readonly MarketingFooterLink[] = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },

@@ -475,7 +475,7 @@ describe('ProfileCompactTemplate', () => {
 
   // Regression: JOV-4103 — public profile hero must show social media icons
   // when the artist has Instagram/Twitter links (missed-ship recovery).
-  it('renders hero social icons for Instagram and Twitter profile links', async () => {
+  it('renders identity social icons for Instagram and Twitter profile links', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -502,7 +502,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const socialRow = await screen.findByTestId('profile-hero-social-row');
+    const socialRow = await screen.findByTestId('profile-identity-social-row');
     expect(socialRow).toBeInTheDocument();
 
     const instagram = within(socialRow).getByRole('link', {
@@ -518,7 +518,7 @@ describe('ProfileCompactTemplate', () => {
     expect(twitter).toHaveAttribute('href', 'https://x.com/test-artist');
   });
 
-  it('uses registry brand casing for hero social aria labels', async () => {
+  it('uses registry brand casing for identity social aria labels', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -537,7 +537,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const socialRow = await screen.findByTestId('profile-hero-social-row');
+    const socialRow = await screen.findByTestId('profile-identity-social-row');
     // Registry casing ('TikTok'), not naive title case ('Tiktok').
     expect(
       within(socialRow).getByRole('link', {
@@ -567,7 +567,7 @@ describe('ProfileCompactTemplate', () => {
     );
   });
 
-  it('keeps the home identity grid tight without shrinking interaction targets', () => {
+  it('keeps the identity header on 44px targets with the handle under the name', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -586,41 +586,49 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const identity = screen.getByTestId('profile-hero-identity-block');
-    expect(identity).toHaveClass('py-1');
-    expect(screen.getByTestId('profile-hero-identity-content')).toHaveClass(
-      'gap-1'
-    );
-    expect(screen.getByRole('link', { name: mockArtist.name })).toHaveClass(
-      'min-h-11',
-      'items-center',
-      'py-0'
-    );
-    expect(screen.getByTestId('profile-hero-metadata-row')).not.toHaveClass(
-      'min-h-11'
-    );
-    expect(screen.getByTestId('profile-hero-metadata-row')).toHaveClass(
-      'self-start'
-    );
-    expect(screen.getByText('Los Angeles')).toBeVisible();
+    const identity = screen.getByTestId('profile-identity-header');
     expect(
-      within(screen.getByTestId('profile-hero-social-row')).getByRole('link')
+      within(identity).getByTestId('profile-identity-handle')
+    ).toHaveTextContent(`jov.ie/${mockArtist.handle}`);
+    // Location lives in About, not in the identity header.
+    expect(within(identity).queryByText('Los Angeles')).toBeNull();
+    const listen = within(identity).getByTestId('profile-identity-listen');
+    expect(listen).toHaveClass('h-11');
+    expect(listen).toHaveAttribute('href', `/${mockArtist.handle}/listen`);
+    expect(listen.firstElementChild).toHaveClass(
+      'profile-glass-pill',
+      'profile-glass-pill--flat',
+      'h-7'
+    );
+    expect(
+      within(screen.getByTestId('profile-identity-social-row')).getByRole(
+        'link'
+      )
     ).toHaveClass('h-11', 'w-11');
   });
 
-  it('keeps identity metadata compact when optional location is absent', () => {
+  it('opens Music from the identity Listen action without a page load', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
-        artist={{ ...mockArtist, location: null }}
+        artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
       />
     );
 
-    const metadata = screen.getByTestId('profile-hero-metadata-row');
-    expect(metadata).not.toHaveClass('min-h-11');
-    expect(metadata.querySelector('svg')).toBeNull();
+    fireEvent.click(screen.getByTestId('profile-identity-listen'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'listen'
+      );
+    });
+    expect(screen.getByTestId('profile-identity-listen')).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('scopes the mobile overflow contract to the active home surface slot', () => {
@@ -644,31 +652,37 @@ describe('ProfileCompactTemplate', () => {
     );
   });
 
-  it('keeps the artist photo in color with profile text over the image', async () => {
+  it('shows the artist photo as an 80px portrait with only the verified glyph over it', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
         artist={{
           ...mockArtist,
           image_url: 'https://example.com/artist.jpg',
-          location: 'Los Angeles',
+          is_verified: true,
         }}
         socialLinks={[]}
         contacts={[]}
       />
     );
 
-    // Hero photo is decorative (empty alt) so the H1 name is not duplicated.
-    const cover = screen.getByTestId('profile-cover');
-    const artistPhoto = cover.querySelector(
+    // Portrait is decorative (empty alt) so the H1 name is not duplicated.
+    const identity = screen.getByTestId('profile-identity-header');
+    const artistPhoto = identity.querySelector(
       'img[src="https://example.com/artist.jpg"]'
     );
     expect(artistPhoto).not.toBeNull();
     expect(artistPhoto?.getAttribute('alt') ?? '').toBe('');
     expect(artistPhoto?.className).not.toContain('grayscale');
-    expect(
-      cover.querySelector('[data-testid="profile-hero-identity-block"]')
-    ).not.toBeNull();
+    expect(artistPhoto?.closest('.h-20.w-20')).not.toBeNull();
+    // Verified is a glyph with a tooltip, never the visible word.
+    const verified = within(identity).getByRole('img', {
+      name: 'Verified Jovie Profile',
+    });
+    expect(verified).toHaveAttribute('title', 'Verified Jovie Profile');
+    expect(identity).not.toHaveTextContent(/verified/i);
+    // The cover no longer hosts a photo; it is floating chrome only.
+    expect(screen.getByTestId('profile-cover').querySelector('img')).toBeNull();
   });
 
   it('names the document identity heading after the artist', () => {
@@ -735,7 +749,7 @@ describe('ProfileCompactTemplate', () => {
     ).toBeNull();
   });
 
-  it('uses the compact no-media hero geometry when a profile has no real image', () => {
+  it('keeps the identity header without a portrait image when a profile has no real photo', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -745,9 +759,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-cover')).toHaveClass(
-      'profile-home-fluid-hero--no-media'
-    );
+    const identity = screen.getByTestId('profile-identity-header');
+    expect(identity.querySelector('.h-20.w-20')).not.toBeNull();
+    expect(screen.queryByTestId('profile-identity-verified')).toBeNull();
   });
 
   it('renders the Jovie menu trigger instead of a duplicate alerts trigger in the compact profile header', async () => {
@@ -1383,11 +1397,13 @@ describe('ProfileCompactTemplate', () => {
 
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
     const carousel = screen.getByTestId('profile-home-carousel');
+    const pacCard = screen.getByTestId('profile-pac');
 
     expect(alertsCard).toHaveTextContent('Alerts');
-    expect(carousel).toHaveTextContent('Listen');
-    // The alerts card is the LAST card of the single home carousel — no
-    // stacked sections outside the track.
+    // The featured mode card carries the release and its Listen CTA; the
+    // alerts card stays last, inside the carousel below it.
+    expect(pacCard).toHaveTextContent("Don't Look Down");
+    expect(pacCard).toHaveTextContent('Listen now');
     expect(carousel.contains(alertsCard)).toBe(true);
     expect(
       screen.getByTestId('profile-pac').compareDocumentPosition(alertsCard)
@@ -1408,9 +1424,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const homeCard = screen.getByTestId('profile-home-carousel');
-    expect(homeCard).toHaveTextContent("Don't Look Down");
-    expect(homeCard).toHaveTextContent('Holding On');
+    const homeRail = screen.getByTestId('profile-home-rail');
+    expect(homeRail).toHaveTextContent("Don't Look Down");
+    expect(homeRail).toHaveTextContent('Holding On');
   });
 
   it('opens the alerts tab from the compact hero alerts row', async () => {
@@ -2477,5 +2493,36 @@ describe('ProfileCompactTemplate', () => {
     expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
     expect(cta).toHaveTextContent('Request access');
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
+  });
+
+  it('routes selected credits into the About destination surfaces (JOV-6199)', () => {
+    const creditSegments = [
+      { type: 'text' as const, text: 'Credited on "' },
+      {
+        type: 'release' as const,
+        text: 'Neon Circuit',
+        href: '/timwhite/neon-circuit',
+      },
+      { type: 'text' as const, text: '".' },
+    ];
+
+    render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        creditSegments={creditSegments}
+      />
+    );
+
+    const panelCall = mockProfilePrimaryTabPanel.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(panelCall?.creditSegments).toBe(creditSegments);
+    const drawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
+      | { creditSegments?: unknown }
+      | undefined;
+    expect(drawerCall?.creditSegments).toBe(creditSegments);
   });
 });

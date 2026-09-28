@@ -1,14 +1,13 @@
-// Canonical Pen homepage v3 hero (dark launch behind HOMEPAGE_V3_ENABLED).
+// Canonical Pen homepage hero (Tim direction 2026-09-26).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HOMEPAGE_HERO_TEXTURE,
   HomepageIdentityHero,
 } from '@/components/homepage/HomepageIdentityHero';
 import { HomepageProfileSpecimen } from '@/components/homepage/HomepageProfileSpecimen';
-import { HOMEPAGE_CERTIFIED_EVENTS } from '@/data/homepageCertifiedOptimization';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 
 const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
@@ -60,7 +59,7 @@ function css(): string {
 }
 
 describe('HomepageIdentityHero', () => {
-  it('renders the canonical copy with one Request access action when gated', () => {
+  it('renders the canonical copy with the certified name search even when gated (JOV-5085)', () => {
     render(<HomepageIdentityHero headingId='home-hero-heading' />);
 
     const hero = screen.getByTestId('marketing-section-hero');
@@ -74,18 +73,15 @@ describe('HomepageIdentityHero', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Jovie / Identity, connected')).toBeInTheDocument();
 
-    const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAccessibleName('Request access');
-    expect(links[0]).toHaveAttribute('href', '/signup');
-    links[0].addEventListener('click', event => event.preventDefault());
-    fireEvent.click(links[0]);
-    expect(trackAction).toHaveBeenCalledWith(
-      HOMEPAGE_CERTIFIED_EVENTS.ACCESS_REQUESTED,
-      expect.objectContaining({ placement: 'hero' })
+    expect(screen.getByRole('combobox')).toHaveAttribute(
+      'placeholder',
+      'Search your name'
     );
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+      'Find me'
+    );
+    expect(screen.queryByText('Request access')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
   });
 
   it('keeps the name search as the only control while the waitlist is off', () => {

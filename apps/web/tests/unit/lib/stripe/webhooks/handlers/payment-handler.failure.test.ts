@@ -13,6 +13,7 @@ const {
   mockUpdateUserBillingStatus,
   mockGetPlanFromPriceId,
   mockCaptureCriticalError,
+  mockCaptureWarning,
   mockLogFallback,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
@@ -21,6 +22,7 @@ const {
   mockUpdateUserBillingStatus: vi.fn(),
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
+  mockCaptureWarning: vi.fn(),
   mockLogFallback: vi.fn(),
 }));
 
@@ -54,6 +56,7 @@ vi.mock('@/lib/stripe/config', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
+  captureWarning: mockCaptureWarning,
   logFallback: mockLogFallback,
 }));
 
@@ -115,7 +118,8 @@ describe('@critical PaymentHandler - payment failed', () => {
     expect(result.skipped).toBe(true);
     expect(result.reason).toBe('subscription_not_in_failure_status');
 
-    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+    // Dunning attempts are expected — logged at warning, never critical.
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
       'Payment failed for invoice',
       expect.any(Error),
       expect.objectContaining({
@@ -123,6 +127,11 @@ describe('@critical PaymentHandler - payment failed', () => {
         amountDue: 2000,
         attemptCount: 1,
       })
+    );
+    expect(mockCaptureCriticalError).not.toHaveBeenCalledWith(
+      'Payment failed for invoice',
+      expect.anything(),
+      expect.anything()
     );
 
     expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
@@ -334,7 +343,7 @@ describe('@critical PaymentHandler - payment failed', () => {
     expect(result.skipped).toBe(true);
     expect(result.reason).toBe('invoice_has_no_subscription');
 
-    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
       'Payment failed for invoice',
       expect.any(Error),
       expect.objectContaining({

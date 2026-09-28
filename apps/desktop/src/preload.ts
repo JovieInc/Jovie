@@ -11,6 +11,8 @@ const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
+const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
+  'redeem-desktop-auth-return-code';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
@@ -147,6 +149,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /** Close the dedicated handoff window without exposing window controls. */
+  redeemDesktopAuthReturnCode: (returnCode: string) => {
+    return ipcRenderer.invoke(
+      REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,
+      returnCode
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
   closeDesktopAuthWindow: () => {
     return ipcRenderer.invoke(CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL) as Promise<{
       ok: boolean;

@@ -1,18 +1,18 @@
 import type { Metadata } from 'next';
+import { SignupFunnelBeacon } from '@/components/features/tracking/SignupFunnelBeacon';
 import {
   type HomepageCertifiedPreviews,
   HomepageCertifiedSections,
 } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditorialChangelog';
-import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
 import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
 import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
-import { HERO_COPY } from '@/components/homepage/intent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -21,32 +21,25 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import { HOMEPAGE_V3_ENABLED } from '@/lib/flags/homepage-v3';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
-// Real public-profile exports (jov.ie/timwhite) for the two sections that
-// show product. Every other section is type only.
 const CERTIFIED_PREVIEWS = {
-  connected: getMarketingExportImage('tim-white-profile-listen-mobile'),
-  relationships: [
-    getMarketingExportImage('tim-white-profile-subscribe-mobile'),
-    getMarketingExportImage('tim-white-profile-pay-mobile'),
-    getMarketingExportImage('tim-white-profile-tour-mobile'),
-  ],
+  connected: HOMEPAGE_MEDIA_MAP.connected.asset,
+  relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
 } as const satisfies HomepageCertifiedPreviews;
 
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = {
-    absolute: HOMEPAGE_LAUNCH_COPY.seo.title,
+    absolute: HOMEPAGE_IDENTITY_COPY.seo.title,
   };
-  const description = HOMEPAGE_LAUNCH_COPY.seo.description;
+  const description = HOMEPAGE_IDENTITY_COPY.seo.description;
   const keywords = [
+    'Jovie profile',
+    'online identity',
     'public profile',
     'personal website',
-    'control your presence',
-    'name search',
   ];
 
   return {
@@ -61,7 +54,7 @@ export async function generateMetadata(): Promise<Metadata> {
     ],
     creator: APP_NAME,
     publisher: APP_NAME,
-    category: 'Music',
+    category: 'Technology',
     classification: 'Business',
     formatDetection: {
       email: false,
@@ -91,7 +84,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Control how the world sees you.`,
+          alt: `${APP_NAME}: ${HOMEPAGE_IDENTITY_COPY.hero.headline}`,
           type: 'image/png',
         },
       ],
@@ -103,7 +96,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${BASE_URL}/og/default.png`,
-          alt: `${APP_NAME} - Control how the world sees you.`,
+          alt: `${APP_NAME}: ${HOMEPAGE_IDENTITY_COPY.hero.headline}`,
           width: 1200,
           height: 630,
         },
@@ -138,32 +131,20 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
-  description: HOMEPAGE_LAUNCH_COPY.seo.description,
+  description: HOMEPAGE_IDENTITY_COPY.seo.description,
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  HOMEPAGE_LAUNCH_COPY.seo.description
+  HOMEPAGE_IDENTITY_COPY.seo.description
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: LEGAL_ENTITY_NAME,
-  description: HOMEPAGE_LAUNCH_COPY.seo.description,
+  description: HOMEPAGE_IDENTITY_COPY.seo.description,
 });
 
 function HomepageHero() {
-  // Canonical Pen v3 dark launch; the live hero is unchanged while off.
-  if (HOMEPAGE_V3_ENABLED) {
-    return <HomepageIdentityHero headingId='home-hero-heading' />;
-  }
-
-  return (
-    <HomepageEditorialHero
-      headingId='home-hero-heading'
-      headline={HERO_COPY.headline}
-      support={HERO_COPY.subhead}
-      search={HERO_COPY.search}
-    />
-  );
+  return <HomepageIdentityHero headingId='home-hero-heading' />;
 }
 
 function HomepageUnlockedSections() {
@@ -204,6 +185,7 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+      <SignupFunnelBeacon surface='homepage' />
       {children}
       <HomepageNoScriptContent />
     </>

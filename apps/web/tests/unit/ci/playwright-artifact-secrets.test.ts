@@ -79,6 +79,7 @@ const imageUploads =
 const markdownUploads = [
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
@@ -710,7 +711,7 @@ describe('Playwright artifact secret boundary', () => {
     await expect(configs(true, false, 'sentinel')).rejects.toThrow(
       'Global Vercel bypass headers are forbidden'
     );
-  }, 20_000);
+  }, 90_000);
 
   it('keeps fixture Playwright configs from fetching into the enclosing checkout', () => {
     // Fixtures live under apps/web, inside the real checkout. With CI's

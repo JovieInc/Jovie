@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   ALBUM_ART_GATEWAY_IMAGE_MODEL,
   CHAT_MODEL,
+  CHAT_MODEL_LIGHT,
   CHAT_MODEL_ROTATION_CHAIN,
+  GATEWAY_ALLOWED_MODELS,
+  INSIGHT_MODEL,
+  PACKAGING_INTELLIGENCE_MODEL,
+  PITCH_MODEL,
   TITLE_MODEL,
 } from '@/lib/constants/ai-models';
 
@@ -37,12 +42,20 @@ describe('AI Gateway model identifiers', () => {
     expect(identifier).not.toContain(':');
   });
 
-  it('CHAT_MODEL specifies the anthropic provider', () => {
-    expect(CHAT_MODEL.split('/')[0]).toBe('anthropic');
-  });
-
-  it('TITLE_MODEL specifies the google provider', () => {
-    expect(TITLE_MODEL.split('/')[0]).toBe('google');
+  it('every runtime text model is on the founder gateway allowlist (JOV-6533)', () => {
+    // The gateway rejects anything else as `forbidden`; that surfaced as empty
+    // chat turns for two weeks. Adding a model here needs the gateway rule updated.
+    for (const model of [
+      CHAT_MODEL,
+      CHAT_MODEL_LIGHT,
+      ...CHAT_MODEL_ROTATION_CHAIN,
+      INSIGHT_MODEL,
+      PITCH_MODEL,
+      TITLE_MODEL,
+      PACKAGING_INTELLIGENCE_MODEL,
+    ]) {
+      expect(GATEWAY_ALLOWED_MODELS).toContain(model);
+    }
   });
 
   it('album art uses the cheap spacexai image model', () => {

@@ -2,7 +2,7 @@
  * Canonical Pen homepage v3 copy (Tim direction 2026-09-26): the generic,
  * lab-grade identity homepage for founders and investors. The product is
  * "your Jovie profile". No single-ICP wording and no em dashes
- * (canon/VOICE.md). Rendered only behind HOMEPAGE_V3_ENABLED until the flip.
+ * (canon/VOICE.md).
  */
 export const HOMEPAGE_IDENTITY_COPY = {
   seo: {
@@ -15,8 +15,8 @@ export const HOMEPAGE_IDENTITY_COPY = {
     headline: 'A living identity for the internet.',
     subhead:
       'Your work, your links, your next chapter. Together in your Jovie profile.',
-    // Waitlist-off fallback: the hero action returns to the existing name
-    // search. Waitlist-on renders the one Request access action instead.
+    // Certified conversion (JOV-5085): the hero action is always the name
+    // search, even while the waitlist gate is on.
     search: {
       placeholder: 'Search your name',
       action: 'Find me',

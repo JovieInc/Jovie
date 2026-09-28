@@ -22,7 +22,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
-import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
+import {
+  notifySlackCancellation,
+  notifySlackUpgrade,
+} from '@/lib/notifications/providers/slack';
 import { expireReferralOnChurn } from '@/lib/referrals/service';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -219,7 +222,37 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     appUserId: string,
     plan: string
   ): Promise<void> {
-    // Fetch user's display name from database
+    const displayName = await this.getUserDisplayName(appUserId);
+    const planName = plan === 'max' || plan === 'growth' ? 'Max' : 'Pro';
+
+    await notifySlackUpgrade(displayName, planName);
+  }
+
+  /**
+   * Send a Slack notification for a subscription cancellation/downgrade.
+   * Fetches user name from database and sends notification.
+   *
+   * @private
+   */
+  private async sendCancellationNotification(
+    appUserId: string | undefined
+  ): Promise<void> {
+    const displayName = await this.getUserDisplayName(appUserId);
+    await notifySlackCancellation(displayName);
+  }
+
+  /**
+   * Fetch a user's display name for founder-facing notifications.
+   *
+   * @private
+   */
+  private async getUserDisplayName(
+    appUserId: string | undefined
+  ): Promise<string> {
+    if (!appUserId) {
+      return 'A user';
+    }
+
     const [userData] = await db
       .select({
         email: users.email,
@@ -230,10 +263,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       .where(eq(users.id, appUserId))
       .limit(1);
 
-    const displayName = userData?.displayName ?? userData?.email ?? 'A user';
-    const planName = plan === 'max' || plan === 'growth' ? 'Max' : 'Pro';
-
-    await notifySlackUpgrade(displayName, planName);
+    return userData?.displayName ?? userData?.email ?? 'A user';
   }
 
   /**
@@ -263,6 +293,17 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       stripeEventTimestamp,
       eventType: 'subscription_updated',
     });
+
+    // Notify founders when an update downgrades the user off a paid plan
+    // (fire-and-forget — the alert must not fail the webhook).
+    if (result.success && !result.skipped && result.isActive === false) {
+      this.sendCancellationNotification(result.appUserId).catch(err => {
+        logger.warn(
+          '[subscription-handler] Slack cancellation notification failed',
+          err
+        );
+      });
+    }
 
     await invalidateBillingCache(result.appUserId ?? userId);
 
@@ -359,6 +400,17 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       // Log but don't fail the webhook — referral churn tracking is secondary
       logger.warn('Failed to expire referral on subscription deletion', {
         error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
+    // Notify founders of the cancellation (fire-and-forget — the alert must
+    // not fail the webhook or block entitlement revocation).
+    if (!result.skipped) {
+      this.sendCancellationNotification(result.appUserId).catch(err => {
+        logger.warn(
+          '[subscription-handler] Slack cancellation notification failed',
+          err
+        );
       });
     }
 
