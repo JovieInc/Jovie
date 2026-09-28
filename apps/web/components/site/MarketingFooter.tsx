@@ -196,9 +196,7 @@ export function MarketingFooter({
             >
               {footerColumns.map(column => (
                 <section key={column.title}>
-                  <h2 className='mf-eyebrow mf-eyebrow--caps line-clamp-2'>
-                    {column.title}
-                  </h2>
+                  <h2 className='mf-eyebrow line-clamp-2'>{column.title}</h2>
                   <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
