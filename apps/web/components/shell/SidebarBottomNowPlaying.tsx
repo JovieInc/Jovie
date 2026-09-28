@@ -39,6 +39,7 @@ export const SidebarBottomNowPlaying = React.memo(
     isPlaying,
     onPlay,
     onDismiss,
+    onExpand,
     collapsed = false,
     className,
   }: {
@@ -46,6 +47,8 @@ export const SidebarBottomNowPlaying = React.memo(
     readonly isPlaying: boolean;
     readonly onPlay: () => void;
     readonly onDismiss?: () => void;
+    /** Reopen the full docked player (JOV-6680). Tapping the track info expands. */
+    readonly onExpand?: () => void;
     readonly collapsed?: boolean;
     readonly className?: string;
   }) {
@@ -137,17 +140,40 @@ export const SidebarBottomNowPlaying = React.memo(
             </Button>
           </div>
         </div>
-        <div className='min-w-0 flex-1'>
-          <div
-            className='truncate text-xs font-caption text-primary-token leading-tight'
-            style={{ letterSpacing: '-0.005em' }}
+        {onExpand ? (
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={onExpand}
+            aria-label='Show Player'
+            className='min-w-0 flex-1 justify-start'
           >
-            {trackTitle}
+            <div className='min-w-0 flex-1'>
+              <div
+                className='truncate text-xs font-caption text-primary-token leading-tight'
+                style={{ letterSpacing: '-0.005em' }}
+              >
+                {trackTitle}
+              </div>
+              <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
+                {artistName}
+              </div>
+            </div>
+          </Button>
+        ) : (
+          <div className='min-w-0 flex-1'>
+            <div
+              className='truncate text-xs font-caption text-primary-token leading-tight'
+              style={{ letterSpacing: '-0.005em' }}
+            >
+              {trackTitle}
+            </div>
+            <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
+              {artistName}
+            </div>
           </div>
-          <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
-            {artistName}
-          </div>
-        </div>
+        )}
         {onDismiss ? (
           <IconBtn
             label='Dismiss Player'
