@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ArtistsDirectory } from '@/components/organisms/ArtistsDirectory';
@@ -29,6 +30,12 @@ export default async function ArtistsPage({
 
   if (catalog.status === 'unavailable') {
     return renderFallback();
+  }
+
+  // A stale or exhausted cursor must never render a "0 PUBLIC PROFILES"
+  // dead end (JOV-6939). Empty results are only a valid state on page 1.
+  if (cursor && catalog.profiles.length === 0) {
+    redirect('/artists');
   }
 
   return (
