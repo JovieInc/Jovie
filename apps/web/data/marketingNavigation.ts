@@ -56,13 +56,14 @@ export const MARKETING_NAV_LINKS = eligibleLinks([
  * Customers flyout (Pen vWrhR). Each audience routes to its own existing
  * landing page. Audiences without one (Founders, Authors, Creators) are
  * omitted until their page ships; never substitute an unrelated page.
+ * Investors is omitted too: investor pages are private (investor link or
+ * admin only) and never linked from public navigation.
  */
 export const MARKETING_CUSTOMERS_FLYOUT = {
   id: 'customers',
   label: 'Customers',
   heading: 'Customers',
   links: eligibleLinks([
-    { href: APP_ROUTES.INVESTORS, label: 'Investors' },
     { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
   ] as const satisfies readonly MarketingNavLink[]),
 } as const satisfies MarketingNavFlyoutMenu;
@@ -135,8 +136,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.ABOUT, label: 'About' },
       { href: APP_ROUTES.BLOG, label: 'Blog' },
       { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
-      { href: APP_ROUTES.INVESTORS, label: 'Investors' },
-      { href: APP_ROUTES.PITCH, label: 'Pitch' },
     ],
   },
   {

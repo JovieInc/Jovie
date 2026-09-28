@@ -75,11 +75,15 @@ export async function upsertLinearIssueByTitleFingerprint({
   const found = await linearGraphql(
     {
       query: `
-        query FindIssueByFingerprint($teamId: String!, $fingerprint: String!) {
+        query FindIssueByFingerprint(
+          $teamId: String!
+          $teamFilterId: ID!
+          $fingerprint: String!
+        ) {
           team(id: $teamId) { states { nodes { id name type } } }
           issues(
             filter: {
-              team: { id: { eq: $teamId } }
+              team: { id: { eq: $teamFilterId } }
               title: { contains: $fingerprint }
             }
             first: 25
@@ -88,7 +92,11 @@ export async function upsertLinearIssueByTitleFingerprint({
           }
         }
       `,
-      variables: { teamId: JOVIE_TEAM_ID, fingerprint },
+      variables: {
+        teamId: JOVIE_TEAM_ID,
+        teamFilterId: JOVIE_TEAM_ID,
+        fingerprint,
+      },
       apiKey,
       fetchImpl,
     },

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { env } from '@/lib/env-server';
+import { resolveHudGithubToken } from '@/lib/github/hud-token.server';
 import type { ShippingClock, ShippingStateProjection } from './contract';
 import { systemClock } from './envelope';
 import { createLiveShippingStateReaders, defaultLiveIo } from './live';
@@ -16,6 +17,7 @@ export const CONFIGURED_SHIPPING_STATE_MAX_AGE_MS = 6_000;
 const configuredReaders = createLiveShippingStateReaders(
   defaultLiveIo({
     githubToken: env.HUD_GITHUB_TOKEN,
+    getGithubToken: () => resolveHudGithubToken(),
     githubOwner: env.HUD_GITHUB_OWNER,
     githubRepo: env.HUD_GITHUB_REPO,
   })
@@ -36,6 +38,19 @@ export function publishConfiguredShippingState(
     ...(clock ? { clock } : {}),
     maxAgeMs: CONFIGURED_SHIPPING_STATE_MAX_AGE_MS,
   });
+}
+
+/**
+ * Org merge counts through the shared configured reader, so the Mac door and
+ * the Delivery card share one 60s cache and one GitHub rate-limit backoff.
+ */
+export function readConfiguredMerges() {
+  return configuredReaders['github-merges']();
+}
+
+/** A warm instance has a projection to serve before reconciling. */
+export function hasCachedConfiguredShippingState(): boolean {
+  return getLastKnownShippingState() != null;
 }
 
 /**

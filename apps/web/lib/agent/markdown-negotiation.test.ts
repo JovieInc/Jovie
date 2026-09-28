@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import {
   negotiateAgentMarkdown,
   shouldPassThroughMarkdownNegotiation,
@@ -60,7 +60,7 @@ describe('negotiateAgentMarkdown', () => {
     expect(res?.headers.get('link')).toBe(HOMEPAGE_HTML_ALTERNATE_LINK);
 
     const body = await res?.text();
-    expect(body).toContain(`# ${HOMEPAGE_LAUNCH_COPY.hero.headline}`);
+    expect(body).toContain(`# ${HOMEPAGE_IDENTITY_COPY.hero.headline}`);
     expect(body).toContain('## When to use Jovie');
     expect(body).toContain('/openapi.json');
   });
