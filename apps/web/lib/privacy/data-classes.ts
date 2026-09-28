@@ -418,6 +418,26 @@ export const DATA_CLASSES: DataClass[] = [
     notes: 'Lead/waitlist row retention is a documented gap — see audit doc.',
   },
   {
+    id: 'canonical-contacts',
+    title: 'Canonical customer contacts',
+    purpose:
+      'Canonical prospect/customer identity for the admin lifecycle surface: ' +
+      'one deduped row per person across waitlist, lead, creator-profile, and ' +
+      'user sources, plus its stage-transition history.',
+    owner: 'ops/growth',
+    classification: 'personal-data',
+    tables: ['contacts', 'contact_stage_transitions'],
+    retention:
+      'For the life of the underlying source record; no dedicated retention ' +
+      'job today.',
+    deletion: ['fk-cascade', 'unmanaged'],
+    export: ['admin-export'],
+    notes:
+      'contact_stage_transitions cascades on contact delete; source links use ' +
+      'set-null so deleting a user/lead/profile severs the link but keeps the ' +
+      'contact row. Erasure propagation into contacts is a documented gap.',
+  },
+  {
     id: 'finance',
     title: 'Connected finance data',
     purpose:
