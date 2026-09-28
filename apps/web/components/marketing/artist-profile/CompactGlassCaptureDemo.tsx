@@ -10,6 +10,7 @@
  * confirmed state.
  */
 
+import { Button } from '@jovie/ui';
 import { Play, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -109,11 +110,7 @@ export function CompactGlassCaptureDemo({
       <div className='compact-glass-module__demo'>
         <CaptureActionPill capture={capture} phase={phase} />
         <div className='compact-glass-module__controls'>
-          <button
-            type='button'
-            className='compact-glass-module__button'
-            onClick={replay}
-          >
+          <Button variant='ghost' size='sm' onClick={replay}>
             {phase === 'idle' ? (
               <Play className='h-4 w-4' strokeWidth={1.9} aria-hidden='true' />
             ) : (
@@ -124,15 +121,11 @@ export function CompactGlassCaptureDemo({
               />
             )}
             {phase === 'idle' ? 'Play demo' : 'Replay'}
-          </button>
+          </Button>
           {phase !== 'idle' ? (
-            <button
-              type='button'
-              className='compact-glass-module__button'
-              onClick={reset}
-            >
+            <Button variant='ghost' size='sm' onClick={reset}>
               Reset
-            </button>
+            </Button>
           ) : null}
         </div>
         <p className='compact-glass-module__status' aria-live='polite'>

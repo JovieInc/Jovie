@@ -102,42 +102,6 @@
   gap: var(--space-2);
 }
 
-.compact-glass-module__button {
-  display: inline-flex;
-  min-height: 2.75rem;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
-  border-radius: 9999px;
-  padding: 0 var(--space-4);
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 3.5%,
-    transparent
-  );
-  color: var(--color-text-primary-token);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 160ms ease-out;
-}
-
-.compact-glass-module__button:hover {
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 6%,
-    transparent
-  );
-}
-
-.compact-glass-module__button:focus-visible {
-  outline: 2px solid
-    color-mix(in oklab, var(--color-text-primary-token) 35%, transparent);
-  outline-offset: 2px;
-}
-
 .compact-glass-module__status {
   font-size: 12.5px;
   line-height: 1.3;
