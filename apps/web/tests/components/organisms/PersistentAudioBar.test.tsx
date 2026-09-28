@@ -231,6 +231,32 @@ describe('PersistentAudioBar', () => {
     }
   });
 
+  it('converges rendered metadata when the playing release is mutated', () => {
+    setPlaying({
+      releaseTitle: 'Old Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/old.jpg',
+    });
+    const { rerender } = render(<PersistentAudioBar />);
+
+    setPlaying({
+      releaseTitle: 'New Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/new.jpg',
+      trackTitle: 'Renamed Track',
+    });
+    rerender(<PersistentAudioBar />);
+
+    expect(screen.queryByText('Old Title')).toBeNull();
+    expect(screen.getAllByText('Renamed Track').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DJ Cool · New Title').length).toBeGreaterThan(
+      0
+    );
+    for (const artwork of screen.getAllByTestId('artwork-img')) {
+      expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/new.jpg');
+    }
+  });
+
   it('never renders a collapse/minimize or dismiss control', () => {
     setPlaying({ artistName: 'DJ Cool' });
     render(<PersistentAudioBar />);
