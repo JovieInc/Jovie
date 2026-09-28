@@ -278,11 +278,17 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
 def queued_prs(lane, kinds) -> list[dict]:
     """Open PRs carrying any of these queue labels: one search, never a scan."""
     search = "label:" + ",".join(PREFIX + kind for kind in kinds)
-    listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
-                      "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
-    if listed.returncode != 0:
+
+    def fetch():
+        listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
+                          "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
+        return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
+    # Per-check rollups over 100 PRs are the costliest GraphQL read the lanes make, and every
+    # worker pass asked for them; one read per minute per host serves them all.
+    shared = getattr(lane, "shared", None)
+    prs = shared("queued-" + "-".join(sorted(kinds)), 60, fetch) if shared else fetch()
+    if prs is None:
         return []
-    prs = json.loads(listed.stdout or "[]")
     for pr in prs:
         pr["eventKinds"] = [name[len(PREFIX):] for name in label_names(pr)
                             if name.startswith(PREFIX) and name[len(PREFIX):] in kinds]
