@@ -1,115 +1,64 @@
 /**
- * Single need-then-noise composition for every Ovie Ops presentation.
+ * Single executive-cockpit composition for every Ovie Ops presentation.
  *
- * Need is what an operator must see before walking away. Noise is after-action
- * disclosure. Admin-shell and kiosk/fullscreen both call
- * `composeHudForPresentation` so the two densities cannot drift.
+ * Ops is one scan-first screen, not an accordion of subsystem panels. Every
+ * presentation (shell, signed-in fullscreen, kiosk token) renders the same
+ * ordered sections via `composeHudForPresentation` so the densities cannot
+ * drift. Section bodies decide for themselves whether their data is
+ * meaningful — empty subsystems render nothing instead of empty chrome.
  */
 
-export const HUD_NEED_SECTION_IDS = [
-  'cash-mrr',
+export const HUD_SECTION_IDS = [
+  'company-metrics',
+  'shipping',
+  'exceptions',
   'action-required',
-  'shipper',
-  'factory-health',
+  'whats-new',
+  'bottlenecks',
 ] as const;
 
-export const HUD_NOISE_SECTION_IDS = [
-  'bottleneck',
-  'morning-walk',
-  'design-jury',
-  'velocity',
-  'agent-runs',
-  'what-shipped',
-  'dispatch-details',
-  'env-exceptions',
-] as const;
-
-export type HudNeedSectionId = (typeof HUD_NEED_SECTION_IDS)[number];
-export type HudNoiseSectionId = (typeof HUD_NOISE_SECTION_IDS)[number];
-export type HudSectionId = HudNeedSectionId | HudNoiseSectionId;
+export type HudSectionId = (typeof HUD_SECTION_IDS)[number];
 
 export type HudPresentation = 'shell' | 'kiosk' | 'token';
-export type HudBandKind = 'need' | 'noise';
 
 export const HUD_SECTION_TEST_IDS = {
+  'company-metrics': 'hud-company-metrics',
+  shipping: 'hud-shipping-strip',
+  exceptions: 'hud-exceptions',
   'action-required': 'tim-action-required',
-  'cash-mrr': 'hud-cash-mrr',
-  bottleneck: 'hud-bottleneck',
-  shipper: 'hud-shipper-status-panel',
-  'factory-health': 'hud-system-health-strip',
-  'morning-walk': 'founder-morning-walk',
-  'design-jury': 'hud-design-jury',
-  velocity: 'hud-shipping-velocity',
-  'agent-runs': 'hud-agent-runs',
-  'what-shipped': 'what-shipped-card',
-  'dispatch-details': 'hud-dispatch-details',
-  'env-exceptions': 'hud-section-env-exceptions',
+  'whats-new': 'what-shipped-card',
+  bottlenecks: 'hud-bottlenecks',
 } as const satisfies Record<HudSectionId, string>;
 
 export const HUD_SECTION_LABELS = {
+  'company-metrics': 'Company',
+  shipping: 'Shipping',
+  exceptions: 'Needs attention',
   'action-required': 'Needs Tim',
-  'cash-mrr': 'Company Now',
-  bottleneck: 'Bottleneck',
-  shipper: 'Delivery',
-  'factory-health': 'Operating chain',
-  'morning-walk': 'Morning walk',
-  'design-jury': 'Design jury',
-  velocity: 'Velocity',
-  'agent-runs': 'Agent runs',
-  'what-shipped': 'What shipped',
-  'dispatch-details': 'Dispatch and diagnostics',
-  'env-exceptions': 'Env exceptions',
+  'whats-new': "What's New",
+  bottlenecks: 'Bottlenecks',
 } as const satisfies Record<HudSectionId, string>;
 
 export interface HudComposedSection {
   readonly id: HudSectionId;
-  readonly band: HudBandKind;
   readonly testId: (typeof HUD_SECTION_TEST_IDS)[HudSectionId];
   readonly label: (typeof HUD_SECTION_LABELS)[HudSectionId];
 }
 
-function section(
-  id: HudNeedSectionId | HudNoiseSectionId,
-  band: HudBandKind
-): HudComposedSection {
-  return {
+const HUD_COMPOSED_SECTIONS: readonly HudComposedSection[] =
+  HUD_SECTION_IDS.map(id => ({
     id,
-    band,
     testId: HUD_SECTION_TEST_IDS[id],
     label: HUD_SECTION_LABELS[id],
-  };
-}
-
-const HUD_COMPOSED_SECTIONS: readonly HudComposedSection[] = [
-  ...HUD_NEED_SECTION_IDS.map(id => section(id, 'need')),
-  ...HUD_NOISE_SECTION_IDS.map(id => section(id, 'noise')),
-];
+  }));
 
 /**
  * Shipped HUD composition used by shell, signed-in fullscreen, and kiosk token.
- * Presentation may change chrome and fetch sources; it must not reorder bands
- * or duplicate a need signal.
+ * Presentation may change chrome and fetch sources; it must not reorder
+ * sections or duplicate a signal.
  */
 export function composeHudForPresentation(
   _presentation: HudPresentation
 ): readonly HudComposedSection[] {
   return HUD_COMPOSED_SECTIONS;
-}
-
-export function getHudNeedBand(
-  sections: readonly HudComposedSection[]
-): readonly HudComposedSection[] {
-  return sections.filter(entry => entry.band === 'need');
-}
-
-export function getHudNoiseBand(
-  sections: readonly HudComposedSection[]
-): readonly HudComposedSection[] {
-  return sections.filter(entry => entry.band === 'noise');
-}
-
-export function needSignalIds(
-  sections: readonly HudComposedSection[]
-): readonly HudNeedSectionId[] {
-  return getHudNeedBand(sections).map(entry => entry.id as HudNeedSectionId);
 }

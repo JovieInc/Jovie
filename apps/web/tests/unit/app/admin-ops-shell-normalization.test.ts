@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   composeHudForPresentation,
-  HUD_NEED_SECTION_IDS,
   type HudPresentation,
 } from '@/lib/hud/compose-hud-bands';
 
@@ -99,51 +98,38 @@ describe('admin ops shell normalization', () => {
     );
   });
 
-  it('mounts system health before WhatShipped', () => {
+  it("mounts the exceptions strip before the What's New card", () => {
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
 
     expect(hudSource).toContain('import { WhatShipped }');
-    expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
-    expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
-      hudSource.indexOf("case 'what-shipped'")
+    expect(hudSource).toContain('kioskToken={kioskToken}');
+    expect(hudSource.indexOf("case 'exceptions'")).toBeLessThan(
+      hudSource.indexOf("case 'whats-new'")
     );
-    expect(hudSource.indexOf('<HudSystemHealthStrip')).toBeLessThan(
+    expect(hudSource.indexOf('<HudExceptionsStrip')).toBeLessThan(
       hudSource.indexOf('<WhatShipped')
     );
   });
 
-  it('does not mount WhatShipped or ShippingVelocityChart above the need band', () => {
+  it('keeps the cockpit one screen: metric cards first, subsystem charts gone', () => {
     const presentations: readonly HudPresentation[] = [
       'shell',
       'kiosk',
       'token',
     ];
     for (const presentation of presentations) {
-      const sections = composeHudForPresentation(presentation);
-      const ids = sections.map(section => section.id);
-      const lastNeedIndex = Math.max(
-        ...HUD_NEED_SECTION_IDS.map(id => ids.indexOf(id))
+      const ids = composeHudForPresentation(presentation).map(
+        section => section.id
       );
-      expect(ids.indexOf('what-shipped')).toBeGreaterThan(lastNeedIndex);
-      expect(ids.indexOf('velocity')).toBeGreaterThan(lastNeedIndex);
-      expect(ids.indexOf('what-shipped')).toBeGreaterThan(
-        ids.indexOf('morning-walk')
-      );
-      expect(ids.indexOf('velocity')).toBeGreaterThan(ids.indexOf('cash-mrr'));
+      expect(ids[0]).toBe('company-metrics');
+      expect(ids.indexOf('shipping')).toBeLessThan(ids.indexOf('whats-new'));
+      expect(ids.indexOf('exceptions')).toBeLessThan(ids.indexOf('whats-new'));
     }
 
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
     expect(hudSource).toContain('composeHudForPresentation(presentation)');
     expect(hudSource).not.toMatch(/if \(isShell\) \{/);
-    expect(hudSource.indexOf("case 'morning-walk'")).toBeLessThan(
-      hudSource.indexOf("case 'what-shipped'")
-    );
-    expect(hudSource.indexOf("case 'cash-mrr'")).toBeLessThan(
-      hudSource.indexOf("case 'velocity'")
-    );
-    expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
-      hudSource.indexOf('<ShippingVelocityChart')
-    );
+    expect(hudSource).not.toContain('ShippingVelocityChart');
   });
 
   it('uses the shared shell row frame for what shipped rows', () => {
@@ -156,20 +142,19 @@ describe('admin ops shell normalization', () => {
   });
 
   it('normalizes admin ops list rows onto the shared shell row frame', () => {
-    const hudSource = readSource(HUD_DASHBOARD_CLIENT);
+    const bottleneckSource = readSource(
+      join(
+        TEST_DIR,
+        '../../../components/features/admin/hud/HudBottlenecksCard.tsx'
+      )
+    );
     const actionSource = readSource(TIM_ACTION_REQUIRED_SECTION);
 
-    expect(hudSource).toContain(
+    expect(bottleneckSource).toContain(
       "import { ShellListRowFrame } from '@/components/organisms/table';"
     );
     expect(actionSource).toContain(
       "import { ShellListRowFrame } from '@/components/organisms/table';"
-    );
-    expect(hudSource).not.toContain(
-      'grid gap-1.5 border-subtle border-b py-2.5 last:border-b-0'
-    );
-    expect(hudSource).not.toContain(
-      'rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'
     );
     expect(actionSource).not.toContain(
       'rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'

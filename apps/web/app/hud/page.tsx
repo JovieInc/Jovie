@@ -9,7 +9,6 @@ import { OperationalControlPanel } from '@/components/features/admin/Operational
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { authorizeHud } from '@/lib/auth/hud';
-import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { getOvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud.server';
 import { OVIE_OPS_PRODUCT_NAME } from '@/lib/ovie/ops-entrypoint';
@@ -69,7 +68,6 @@ export default async function HudPage({
       density={tokenOk || fullscreen ? 'kiosk' : 'shell'}
       presentationMode={tokenOk ? 'token' : 'shell'}
       kioskToken={tokenOk ? kioskToken : null}
-      useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
       initialFunnel={funnel}
     />
   );
@@ -90,7 +88,7 @@ export default async function HudPage({
   return (
     <AdminPage
       title={OVIE_OPS_PRODUCT_NAME}
-      description='Decisions, survival, bottleneck, delivery, operating chain.'
+      description='Company operating state at a glance.'
       testId='hud-admin-page'
       actions={<HudFullscreenControl />}
     >
