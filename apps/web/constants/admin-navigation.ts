@@ -120,6 +120,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'workspaces',
   },
   {
+    id: 'shipping',
+    label: 'Shipping',
+    href: APP_ROUTES.ADMIN_SHIPPING,
+    description:
+      'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
+    section: 'workspaces',
+  },
+  {
     id: 'chat',
     label: 'Chat',
     href: APP_ROUTES.ADMIN_CHAT,
@@ -133,14 +141,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     description:
       'Founder review of certification evidence, with certify and reject',
     section: 'utilities',
-  },
-  {
-    id: 'shipping',
-    label: 'Shipping',
-    href: APP_ROUTES.ADMIN_SHIPPING,
-    description:
-      'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
-    section: 'workspaces',
   },
   {
     id: 'people',
