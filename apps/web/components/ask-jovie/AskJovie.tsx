@@ -120,7 +120,7 @@ function AskJoviePanel({ pathname }: AskJoviePanelProps) {
               type='button'
               onClick={() => send(suggestion.label, suggestion.intent)}
               className={cn(
-                'rounded-full border border-subtle px-2.5 py-1 text-xs text-secondary-token',
+                'rounded-full border border-subtle px-3 py-1 text-xs text-secondary-token',
                 'transition-colors duration-subtle hover:bg-white/[0.06] hover:text-primary-token',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
               )}
@@ -140,7 +140,7 @@ function AskJoviePanel({ pathname }: AskJoviePanelProps) {
             <li
               key={message.id}
               className={cn(
-                'rounded-lg px-2.5 py-1.5 text-xs',
+                'rounded-lg px-3 py-1.5 text-xs',
                 message.role === 'user'
                   ? 'self-end bg-white/[0.08] text-primary-token'
                   : 'self-start bg-white/[0.04] text-secondary-token'
