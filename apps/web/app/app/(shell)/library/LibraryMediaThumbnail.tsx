@@ -11,6 +11,14 @@ import type { LibraryReleaseAsset } from './library-data';
 
 export type LibraryThumbnailSize = 'card' | 'row' | 'drawer';
 
+function libraryArtworkFrameSize(
+  size: LibraryThumbnailSize
+): 'thumbnail' | 'hero' | 'default' {
+  if (size === 'row') return 'thumbnail';
+  if (size === 'drawer') return 'hero';
+  return 'default';
+}
+
 export interface LibraryMediaThumbnailProps {
   readonly asset: LibraryReleaseAsset;
   readonly size?: LibraryThumbnailSize;
@@ -47,9 +55,7 @@ function LibraryArtworkImage({
   return (
     <ArtworkFallbackTile
       seed={asset.title}
-      size={
-        size === 'row' ? 'thumbnail' : size === 'drawer' ? 'hero' : 'default'
-      }
+      size={libraryArtworkFrameSize(size)}
       iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[36%] w-[36%]'}
     />
   );
@@ -60,8 +66,7 @@ export function LibraryMediaThumbnail({
   size = 'card',
   className,
 }: LibraryMediaThumbnailProps) {
-  const artworkFrameSize =
-    size === 'row' ? 'thumbnail' : size === 'drawer' ? 'hero' : 'default';
+  const artworkFrameSize = libraryArtworkFrameSize(size);
 
   return (
     <ArtworkFrame

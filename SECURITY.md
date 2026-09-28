@@ -15,7 +15,11 @@ If you discover a security vulnerability, please **do not** open a public issue.
 
 Instead, report it privately by email:
 
-- **security@jov.ie**
+- **security@jov.ie** — vulnerabilities and security issues
+- **abuse@jov.ie** — phishing and other abuse of Jovie-hosted pages
+
+Or report a page via its "Report" link, or at `https://jov.ie/report`.
+Canonical contact file (RFC 9116): `https://jov.ie/.well-known/security.txt`
 
 Include as much detail as possible:
 

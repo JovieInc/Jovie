@@ -14,28 +14,33 @@ export function pipelineRows(
   now: number
 ) {
   const definitions = [
-    ['Running', 'symphony-runtime', 'running'],
-    ['Retrying', 'symphony-runtime', 'retrying'],
-    ['Blocked', 'symphony-runtime', 'blocked'],
+    ['Running', 'lanes-status', 'running'],
+    ['Retrying', 'lanes-status', 'retrying'],
+    ['Blocked', 'lane-pull-requests', 'blocked'],
     ['Open Pull Requests', 'github-native-merge-queue', 'openPullRequests'],
     ['Native merge queue', 'github-native-merge-queue', 'queued'],
   ] as const;
   return definitions.map(([label, id, field]) => {
     const source = projection?.sources[id];
+    const count = source?.counts[field];
     const deadline = source ? Date.parse(source.freshnessDeadline) : Number.NaN;
     const fresh =
       source?.state === 'fresh' && Number.isFinite(deadline) && now <= deadline;
+    const measured =
+      count?.state === 'measured-zero' || count?.state === 'measured-nonzero';
     const state = !source
       ? 'UNKNOWN'
-      : fresh
+      : fresh && measured
         ? source.state
-        : source.state === 'unknown' || source.state === 'not-measured'
+        : fresh
           ? 'UNKNOWN'
-          : 'stale / unavailable';
+          : source.state === 'unknown' || source.state === 'not-measured'
+            ? 'UNKNOWN'
+            : 'stale / unavailable';
     return {
       label,
       source: id,
-      value: fresh ? source.counts[field].value : null,
+      value: fresh && measured ? count.value : null,
       state,
       timestamp: source?.sourceTimestamp ?? 'UNKNOWN',
     };

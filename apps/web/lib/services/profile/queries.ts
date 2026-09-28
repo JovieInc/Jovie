@@ -365,12 +365,18 @@ export async function getProfileWithLinks(
     }
   }
 
-  // Cache miss - query database with parallel fetches and timeout
+  // Cache miss - query database with parallel fetches and timeout.
+  // Concurrent misses for the same username share one in-flight fetch so a
+  // stampede cannot multiply origin load. skipCache callers bypass coalescing
+  // to guarantee post-mutation freshness.
   // Timeout ensures we fail fast (5s) rather than blocking on Neon retry backoff (15s)
+  const fetchPromise = options?.skipCache
+    ? fetchProfileFromDatabase(normalizedUsername)
+    : fetchProfileFromDatabaseDeduped(normalizedUsername);
   let result: ProfileWithLinks | null;
   try {
     result = await Promise.race([
-      fetchProfileFromDatabase(normalizedUsername),
+      fetchPromise,
       new Promise<null>((_, reject) =>
         setTimeout(
           () => reject(new Error('Profile query timeout')),
@@ -561,6 +567,35 @@ async function selectProfileWithLegacyFallback(
 
     return legacyProfile ? buildProfileFallbackDefaults(legacyProfile) : null;
   }
+}
+
+/**
+ * In-flight profile fetches keyed by normalized username.
+ *
+ * Single-flight (request coalescing): a Redis cache miss on a hot profile would
+ * otherwise let every concurrent request issue its own multi-query Neon fetch.
+ * Coalescing collapses a per-instance cache stampede into one origin fetch; all
+ * waiters share the same promise, which is removed once it settles.
+ *
+ * `skipCache` callers (post-mutation readers) bypass this so they never observe
+ * a fetch that started before their write.
+ */
+const profileFetchInflight = new Map<
+  string,
+  Promise<ProfileWithLinks | null>
+>();
+
+function fetchProfileFromDatabaseDeduped(
+  normalizedUsername: string
+): Promise<ProfileWithLinks | null> {
+  const existing = profileFetchInflight.get(normalizedUsername);
+  if (existing) return existing;
+
+  const promise = fetchProfileFromDatabase(normalizedUsername).finally(() => {
+    profileFetchInflight.delete(normalizedUsername);
+  });
+  profileFetchInflight.set(normalizedUsername, promise);
+  return promise;
 }
 
 /**

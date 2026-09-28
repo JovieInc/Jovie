@@ -1,17 +1,21 @@
 const TEST_FILE_PATTERN = /\.(test|spec)\.[cm]?[jt]sx?$/i;
 
-const BUG_FIX_COMMIT_PATTERN = /^fix(\(|:)/i;
+const BUG_FIX_COMMIT_PATTERN = /^fix[(:]/i;
 const BUG_FIX_BRANCH_PATTERN = /^(fix\/|.*\/fix-)/i;
-const BUG_FIX_TITLE_PATTERN = /^fix(\(|:)/i;
+const BUG_FIX_TITLE_PATTERN = /^fix[(:]/i;
 const BUG_FIX_PR_BODY_CHECKED_PATTERN =
   /- \[[xX]\] Bug fix \(non-breaking change which fixes an issue\)/;
 
-const BUG_TO_TEST_WAIVER_PATTERN =
-  /bug-to-test:\s*(waived|n\/a|not applicable)\b/i;
-const BUG_TO_TEST_SATISFIED_PATTERN =
-  /bug-to-test:\s*(satisfied|pass|passed)\b/i;
 const REGRESSION_TEST_REFERENCE_PATTERN =
-  /Regression test:\s*[`']?[\w./-]+\.(test|spec)\./i;
+  /Regression test:\s*[`']?([\w./-]+\.(?:test|spec)\.[cm]?[jt]sx?)/i;
+const EXCEPTION_FIELD_PATTERNS = {
+  scope: /Bug-to-test exception scope:\s*\S.+/i,
+  rationale: /Bug-to-test exception rationale:\s*\S.+/i,
+  approvedBy: /Bug-to-test exception approved-by:\s*\S.+/i,
+  expires: /Bug-to-test exception expires:\s*\d{4}-\d{2}-\d{2}\b/i,
+  reviewTrigger: /Bug-to-test exception review-trigger:\s*\S.+/i,
+  residualCount: /Bug-to-test exception residual-count:\s*\d+\b/i,
+} as const;
 
 export interface BugToTestInput {
   readonly changedFiles: readonly string[];
@@ -19,6 +23,9 @@ export interface BugToTestInput {
   readonly branchName?: string;
   readonly prTitle?: string;
   readonly prBody?: string;
+  readonly today?: string;
+  readonly prAuthor?: string;
+  readonly approvedBy?: string;
 }
 
 export interface BugToTestEvaluation {
@@ -73,20 +80,48 @@ function collectRegressionTestSignals(input: BugToTestInput): string[] {
   }
 
   if (input.prBody) {
-    if (BUG_TO_TEST_SATISFIED_PATTERN.test(input.prBody)) {
-      signals.push('PR body bug-to-test: satisfied');
-    }
-
-    if (REGRESSION_TEST_REFERENCE_PATTERN.test(input.prBody)) {
-      signals.push('PR body regression test reference');
+    const reference = input.prBody.match(
+      REGRESSION_TEST_REFERENCE_PATTERN
+    )?.[1];
+    if (reference && input.changedFiles.includes(reference)) {
+      signals.push(`PR body references changed regression test: ${reference}`);
     }
   }
 
   return signals;
 }
 
-function hasDocumentedWaiver(prBody: string | undefined): boolean {
-  return Boolean(prBody && BUG_TO_TEST_WAIVER_PATTERN.test(prBody));
+function hasDocumentedWaiver(input: BugToTestInput): boolean {
+  if (
+    !input.prBody ||
+    !Object.values(EXCEPTION_FIELD_PATTERNS).every(pattern =>
+      pattern.test(input.prBody ?? '')
+    )
+  ) {
+    return false;
+  }
+
+  const expiry = input.prBody
+    .match(EXCEPTION_FIELD_PATTERNS.expires)?.[0]
+    .match(/\d{4}-\d{2}-\d{2}/)?.[0];
+  const today = input.today ?? new Date().toISOString().slice(0, 10);
+  const documentedApprover = input.prBody
+    .match(/Bug-to-test exception approved-by:\s*(\S.+)/i)?.[1]
+    ?.trim();
+  const normalizeIdentity = (identity: string) =>
+    identity.replace(/^@/, '').trim().toLowerCase();
+  if (!expiry) return false;
+  const expiryDate = new Date(`${expiry}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(expiryDate.valueOf()) &&
+    expiryDate.toISOString().slice(0, 10) === expiry &&
+    expiry > today &&
+    Boolean(input.prAuthor && input.approvedBy && documentedApprover) &&
+    normalizeIdentity(input.approvedBy ?? '') ===
+      normalizeIdentity(documentedApprover ?? '') &&
+    normalizeIdentity(input.approvedBy ?? '') !==
+      normalizeIdentity(input.prAuthor ?? '')
+  );
 }
 
 export function evaluateBugToTestRule(
@@ -109,7 +144,7 @@ export function evaluateBugToTestRule(
 
   const regressionTestSignals = collectRegressionTestSignals(input);
   const hasRegressionTestEvidence = regressionTestSignals.length > 0;
-  const waived = hasDocumentedWaiver(input.prBody);
+  const waived = hasDocumentedWaiver(input);
 
   if (hasRegressionTestEvidence) {
     return {
@@ -148,7 +183,7 @@ export function evaluateBugToTestRule(
     passed: false,
     summary: `Bug fix detected (${bugFixSignals.join(
       '; '
-    )}) but no regression test evidence found. Add or update a *.test.* / *.spec.* file, or document \`bug-to-test: waived — <reason>\` in the PR body.`,
+    )}) but no executable regression test evidence found. Add or update a *.test.* / *.spec.* file. A valid exception requires bounded scope, rationale, independent approval, expiry, review trigger, and residual count.`,
   };
 }
 
@@ -167,5 +202,5 @@ export function buildBugToTestPrSection(
     return 'bug-to-test: waived — documented in PR template';
   }
 
-  return 'bug-to-test: MISSING — add regression test or waiver before ship';
+  return 'bug-to-test: MISSING — add executable regression proof or a bounded exception before ship';
 }

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { auditLiveHomepageSource } from '@/data/marketing';
 import {
   auditHomepagePublicProof,
@@ -55,10 +55,10 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(auditLiveHomepageSource(liveHomepageSource)).toEqual([]);
     expect(liveHomepageSource).not.toContain('MarketingShippedSitesShowcase');
     expect(liveHomepageSource).not.toContain('MarketingPlatformSpecBento');
-    expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Control how the world sees you.'
+    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
+      'Your living identity on the internet.'
     );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe('/tim');
+    expect(liveHomepageSource).toContain('<HomepageIdentityHero');
   });
 
   it('keeps verified public proof, routes, and System B visual lock on `/`', () => {
@@ -80,6 +80,27 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(homepageArtistProfilesSource).toContain('Explore Artist Profiles');
     expect(artistProfilesSource).toContain('MarketingShippedSitesShowcase');
     expect(artistProfilesSource).toContain('MarketingPlatformSpecBento');
+  });
+
+  it('allows hash and exact start destinations on public proof', () => {
+    const tile = {
+      id: 'proof',
+      name: 'Tim',
+      handle: 'tim',
+      scenarioId: 'live',
+      label: 'Live',
+    };
+    expect(auditHomepagePublicProof([{ ...tile, href: '#pricing' }])).toEqual(
+      []
+    );
+    expect(
+      auditHomepagePublicProof([{ ...tile, href: '/start?plan=pro' }])
+    ).toEqual([]);
+    expect(
+      auditHomepagePublicProof([{ ...tile, href: '/starting' }]).map(
+        finding => finding.code
+      )
+    ).toContain('homepage-claimed-destination-not-public');
   });
 
   it('rejects the JOV-5333 deliberate-red homepage regression', () => {

@@ -32,6 +32,23 @@ describe('NavLink', () => {
     expect(link).toHaveClass('text-btn-primary-foreground');
   });
 
+  it('offsets the focus ring against the defined base surface token', () => {
+    render(
+      <>
+        <NavLink href='/default'>Default</NavLink>
+        <NavLink href='/primary' variant='primary'>
+          Primary
+        </NavLink>
+      </>
+    );
+
+    for (const name of ['Default', 'Primary']) {
+      const link = screen.getByRole('link', { name });
+      expect(link).toHaveClass('focus-visible:ring-offset-base');
+      expect(link).not.toHaveClass('focus-visible:ring-offset-background');
+    }
+  });
+
   it('applies custom className', () => {
     render(
       <NavLink href='/test' className='custom-class'>

@@ -35,16 +35,9 @@
     "apps/web/lib/eval/calibration.ts": {
       "readFileSync": 1
     },
-    "apps/web/lib/hud/ovie-mac-hud.server.ts": {
-      "existsSync": 1,
-      "readFileSync": 1
-    },
     "apps/web/lib/hud/shipper-state.ts": {
       "existsSync": 5,
       "readFileSync": 3
-    },
-    "apps/web/lib/hud/symphony-codex-accounts.server.ts": {
-      "readFileSync": 1
     },
     "apps/web/lib/library-share/passphrase.ts": {
       "scryptSync": 2

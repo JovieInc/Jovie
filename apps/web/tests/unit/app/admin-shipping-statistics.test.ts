@@ -37,15 +37,25 @@ function projectionWithCounts() {
       lastError: null,
     })
   );
-  const runtime = projection.sources['symphony-runtime'];
-  Object.assign(runtime, {
+  const lanes = projection.sources['lanes-status'];
+  Object.assign(lanes, {
     state: 'fresh',
     freshnessDeadline: FRESH_UNTIL,
     sourceTimestamp: OBSERVED_AT,
     counts: {
-      ...runtime.counts,
+      ...lanes.counts,
       running: { state: 'measured-nonzero', value: 3 },
       retrying: { state: 'measured-zero', value: 0 },
+    },
+  });
+
+  const lanePullRequests = projection.sources['lane-pull-requests'];
+  Object.assign(lanePullRequests, {
+    state: 'fresh',
+    freshnessDeadline: FRESH_UNTIL,
+    sourceTimestamp: OBSERVED_AT,
+    counts: {
+      ...lanePullRequests.counts,
       blocked: { state: 'measured-nonzero', value: 2 },
     },
   });
@@ -117,6 +127,35 @@ describe('pipelineRows', () => {
     expect(rows.every(row => row.value === null)).toBe(true);
     expect(rows.every(row => row.state === 'UNKNOWN')).toBe(true);
     expect(rows.every(row => row.timestamp === 'UNKNOWN')).toBe(true);
+  });
+
+  it('keeps an unmeasured count UNKNOWN even when its source is fresh', () => {
+    const projection = unknownProjection({
+      sequence: 1,
+      observationTimestamp: OBSERVED_AT,
+      emissionTimestamp: OBSERVED_AT,
+      latencyMs: 10,
+      publishing: true,
+      lastError: null,
+    });
+    Object.assign(projection.sources['lanes-status'], {
+      state: 'fresh',
+      freshnessDeadline: FRESH_UNTIL,
+      sourceTimestamp: OBSERVED_AT,
+    });
+
+    const rows = pipelineRows(
+      parseShippingCockpitProjection(projection) ?? undefined,
+      Date.parse(OBSERVED_AT) + 5_000
+    );
+
+    expect(rows[1]).toMatchObject({
+      label: 'Retrying',
+      source: 'lanes-status',
+      value: null,
+      state: 'UNKNOWN',
+      timestamp: OBSERVED_AT,
+    });
   });
 
   it('does not display retained counts after their freshness deadline', () => {

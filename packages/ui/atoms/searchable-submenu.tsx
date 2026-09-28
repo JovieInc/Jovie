@@ -130,7 +130,7 @@ function nextEnabledIndex(
   currentIndex: number,
   direction: 1 | -1
 ): number {
-  if (items.length === 0 || items.every(item => item.disabled)) return 0;
+  if (items.every(item => item.disabled)) return 0;
 
   let candidate = currentIndex;
   do {

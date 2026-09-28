@@ -184,6 +184,50 @@ describe('LibraryPage private document boundary', () => {
     expect(mocks.fetchQuery).toHaveBeenCalled();
   });
 
+  it('runs the private-document load concurrently with the release/asset loaders', async () => {
+    let resolveDocuments: (value: {
+      documents: (typeof privateDocument)[];
+      nextCursor: string | null;
+    }) => void = () => {};
+    mocks.listCreatorDocuments.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveDocuments = resolve;
+        })
+    );
+
+    const render = renderLibraryPage();
+
+    // The release/asset loaders must start without waiting for the document
+    // list; serializing behind it would leave this expectation unsatisfied.
+    await vi.waitFor(() => {
+      expect(mocks.fetchQuery).toHaveBeenCalled();
+      expect(mocks.getLibraryMerchCardsForProfile).toHaveBeenCalled();
+    });
+
+    resolveDocuments({ documents: [privateDocument], nextCursor: null });
+    const result = await render;
+    expect(getClientProps(result)).toMatchObject({
+      creatorDocuments: [privateDocument],
+      creatorDocumentsLoadFailed: false,
+    });
+  });
+
+  it('keeps loaded private documents when the release/asset batch fails', async () => {
+    mocks.fetchQuery.mockRejectedValueOnce(new Error('matrix failed'));
+    mocks.listLibraryPostReleaseBundle.mockRejectedValueOnce(
+      new Error('post-release failed')
+    );
+
+    const result = await renderLibraryPage();
+
+    expect(getClientProps(result)).toMatchObject({
+      creatorDocuments: [privateDocument],
+      creatorDocumentsNextCursor: 'older-documents',
+      creatorDocumentsLoadFailed: false,
+    });
+  });
+
   it('loads the uncapped YouTube projection and graph slices together', async () => {
     await renderLibraryPage();
 

@@ -22,7 +22,6 @@ export const REQUIRED_PHASES = Object.freeze([
 ]);
 
 const REQUIRED_BINDINGS = Object.freeze([
-  ['scripts/symphony/WORKFLOW.md', 'jovie-pr-lifecycle/v1'],
   ['scripts/backlog-orchestrator/delivery-state-machine.mjs', 'JOV-INV-029'],
   ['scripts/lib/writer-owned-pr-promotion.mjs', 'JOV-INV-029'],
   ['scripts/native-merge-intent.mjs', 'JOV-INV-029'],

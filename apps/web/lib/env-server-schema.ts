@@ -230,11 +230,17 @@ export const ServerEnvSchema = z.object({
   HUD_STARTUP_NAME: z.string().optional(),
   HUD_STARTUP_LOGO_URL: z.string().url().optional(),
   HUD_GITHUB_TOKEN: z.string().optional(),
+  JOVIE_BOT_APP_ID: z.string().optional(),
+  JOVIE_BOT_INSTALLATION_ID: z.string().optional(),
+  JOVIE_BOT_PRIVATE_KEY: z.string().optional(),
   HUD_GITHUB_OWNER: z.string().optional(),
   HUD_GITHUB_REPO: z.string().optional(),
   HUD_GITHUB_WORKFLOW: z.string().optional(),
+  HUD_GEM_BRIDGE_URL: z.string().url().optional(),
+  HUD_GEM_BRIDGE_TOKEN: z.string().optional(),
   GBRAIN_API_URL: z.string().optional(),
   GBRAIN_API_KEY: z.string().optional(),
+  GBRAIN_HEALTH_URL: z.string().trim().url().optional(),
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
@@ -354,8 +360,11 @@ export const ServerEnvSchema = z.object({
   EVE_CORE_CHAT_URL: z.string().url().optional(),
   EVE_CORE_CHAT_AUTH_TOKEN: z.string().optional(),
 
-  // xAI / Grok image generation
+  // Direct xAI key for voice bake-off and video scripts. Album art does not
+  // read this; it authenticates through the AI Gateway (OIDC or
+  // AI_GATEWAY_API_KEY).
   XAI_API_KEY: z.string().optional(),
+  /** Optional Gateway image-model override (`provider/model`). Bare ids are ignored. */
   ALBUM_ART_IMAGE_MODEL: z.string().optional(),
   ALBUM_ART_GENERATION_DAILY_LIMIT: z.string().optional(),
   ALBUM_ART_GENERATION_BURST_LIMIT: z.string().optional(),
@@ -556,11 +565,17 @@ export const ENV_KEYS = [
   'HUD_STARTUP_NAME',
   'HUD_STARTUP_LOGO_URL',
   'HUD_GITHUB_TOKEN',
+  'JOVIE_BOT_APP_ID',
+  'JOVIE_BOT_INSTALLATION_ID',
+  'JOVIE_BOT_PRIVATE_KEY',
   'HUD_GITHUB_OWNER',
   'HUD_GITHUB_REPO',
   'HUD_GITHUB_WORKFLOW',
+  'HUD_GEM_BRIDGE_URL',
+  'HUD_GEM_BRIDGE_TOKEN',
   'GBRAIN_API_URL',
   'GBRAIN_API_KEY',
+  'GBRAIN_HEALTH_URL',
   'REVALIDATE_SECRET',
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',

@@ -33,7 +33,7 @@ This repo vendors a Jovie-customized fork of [gstack](https://github.com/garryta
 | Lavish | `/lavish` | Turn agent responses into rich HTML artifacts the user can annotate and send targeted feedback on (design comps, reports, dashboards, review surfaces) |
 | Upgrade | `/gstack-upgrade` | Upgrade gstack to latest version |
 | Last 30 Days | `/last30days` | Multi-source signal search (Reddit/HN/X/YouTube/TikTok/Polymarket/GitHub) scored by real engagement; synthesized to one brief. Use for idea discovery and market research. (mvanhorn) |
-| Idea Radar | `/idea-radar` | Weekly discovery sweep — calls /last30days across creator/music/SaaS signals, evaluates via 10x→MVP→MRR-score pipeline, delivers Slack cards, reconciles reactions. (Jovie AgentOS) |
+| Idea Radar | `/idea-radar` | Event-driven external opportunity-signal producer — normalizes observations into JOV-5916 and routes bounded benchmark work to JOV-2966. (Jovie AgentOS) |
 
 ## Setup
 
@@ -75,7 +75,7 @@ Key routing rules:
 - A shared link/tool/product with no context expecting an opinion or evaluation → invoke `tool-discovery` instead of asking the human to research it first
 - HTML artifact, design comp, review surface, dashboard, deck, report for human annotation → invoke `lavish` to open it in the browser-based review loop instead of embedding a screenshot
 - Market research, competitor complaints, "what are people saying about X", ICP pain points, RP-clone/pep-AI research → invoke `last30days` for multi-source signal gathering
-- Idea Radar sweep, weekly idea discovery, "find new product ideas", SaaS signal discovery → invoke `idea-radar`
+- Idea Radar signals, pending-decision research, "find new product ideas", SaaS signal discovery → invoke `idea-radar`
 - "find complaints about app X", "what do users hate about Y", "App Store reviews for Z" → invoke `market-research` command (calls `/last30days` internally)
 
 ## gbrain (long-term memory layer)
@@ -97,6 +97,7 @@ gstack skill files are part of the agent control plane. Keep them fast, stable, 
 - Put repeatable commands in scripts. Long copied shell/prose blocks increase latency and drift.
 - Keep stable shared text before variable request details so provider prompt caching can work.
 - Run `bun run skill:size-check` after skill-template changes. It is a ratchet, not the final target; new work should reduce skill size when practical.
+- Writing/prompt/template authoring follows the writing-surface contract in `docs/writing/SURFACE_COVERAGE.md` (JOV-6475). Do not copy word lists or rubrics into skills: policy is `canon/VOICE.md`, executable rules are `packages/copy`, per-surface coverage is `scripts/invariants/writing-surfaces-registry.json`. Agent-authored GBrain pages retain source/date and distinguish proposals from observed facts.
 
 ## External Skill Governance
 

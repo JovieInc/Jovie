@@ -39,6 +39,11 @@ describe('isGatewayBudgetExceededError', () => {
     );
   });
 
+  it('does not treat a non-object failure as a budget wall', () => {
+    expect(isGatewayBudgetExceededError('model not found')).toBe(false);
+    expect(isGatewayBudgetExceededError(null)).toBe(false);
+  });
+
   it('ignores unrelated provider failures', () => {
     expect(
       isGatewayBudgetExceededError(
@@ -93,7 +98,7 @@ describe('buildGatewayRetryChain', () => {
   it('keeps the selected model first and appends the rotation chain', () => {
     expect(buildGatewayRetryChain(CHAT_MODEL_LIGHT)).toEqual([
       CHAT_MODEL_LIGHT,
-      ...CHAT_MODEL_ROTATION_CHAIN,
+      ...CHAT_MODEL_ROTATION_CHAIN.filter(model => model !== CHAT_MODEL_LIGHT),
     ]);
     expect(buildGatewayRetryChain(CHAT_MODEL)).toEqual([
       ...CHAT_MODEL_ROTATION_CHAIN,
@@ -114,7 +119,7 @@ describe('createRotatingGatewayLanguageModel', () => {
     };
 
     const rotating = createRotatingGatewayLanguageModel({
-      models: [CHAT_MODEL_LIGHT, CHAT_MODEL_ROTATION_CHAIN[1]!],
+      models: [CHAT_MODEL_LIGHT, CHAT_MODEL],
       resolveModel: modelId => (modelId === CHAT_MODEL_LIGHT ? haiku : gemini),
       onRotate,
     });
@@ -127,7 +132,7 @@ describe('createRotatingGatewayLanguageModel', () => {
     expect(onRotate).toHaveBeenCalledWith(
       expect.objectContaining({
         from: CHAT_MODEL_LIGHT,
-        to: CHAT_MODEL_ROTATION_CHAIN[1],
+        to: CHAT_MODEL,
       })
     );
   });

@@ -205,9 +205,7 @@ export function createPacPlayMilestoneTracker(
         startFired = true;
         emit('pac_play_start');
       }
-      if (playingSince === null) {
-        playingSince = nowFn();
-      }
+      playingSince ??= nowFn();
       checkMilestone();
     },
     onPause() {

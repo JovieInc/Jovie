@@ -29,7 +29,11 @@ Clean-behind updates and true-conflict FX share one adaptive trigger budget, so 
 
 ## Conflict handling policy
 
-Clean `BEHIND` branches use GitHub's exact-head Update Branch rebase. A true conflict starts an ephemeral merge of the exact current base into the exact PR head so the resulting commit is a fast-forward child of the PR head. FX may edit only the original unmerged file set. The job rejects FX-created commits, unresolved paths, unexpected files, stale source/base reads, and an unverified model response. It runs affected tests, rereads the live PR head and base immediately before delivery, and uses the Jovie App token for one push with an explicit lease on the validated source head. The ancestry guard still requires a fast-forward child; a changed or deleted remote head rejects the push without retry.
+Clean `BEHIND` branches use GitHub's exact-head Update Branch rebase; this deterministic path never requires a model and is unaffected by paid-FX authorization. A true conflict starts an ephemeral merge of the exact current base into the exact PR head so the resulting commit is a fast-forward child of the PR head. A clean mechanical merge (no leftover conflict markers) is delivered without any model call. Only a real textual conflict needs FX, and FX may edit only the original unmerged file set.
+
+### Paid-model escalation requires explicit manual authorization (JOV-6233)
+
+`decideAction` denies `escalate_conflict_fx` by default (`action: 'deny_conflict_fx_unauthorized'`, no CI trigger) unless the caller passes `allowPaidEscalation: true` through `buildPlan`/`--allow-paid-escalation`. The hosted workflow sets that flag only when `github.event_name == 'workflow_dispatch'` and the run applies — i.e. an explicit human/queue-owner dispatch. Automatic `push`, `workflow_run` (CI-completion), and `pull_request_target` events always plan a true conflict as denied instead of silently escalating to the paid AI Gateway model, even if `FX_HOSTED_REMEDIATION_ENABLED` is on. This does not change the already-existing `FX_HOSTED_REMEDIATION_ENABLED`/`FX_HOSTED_REMEDIATION_CANARY_PR`/live pre-spend-guard checks inside the FX job; it adds an upstream authorization gate so those checks are only ever reachable from a deliberate manual run. The job rejects FX-created commits, unresolved paths, unexpected files, stale source/base reads, and an unverified model response. It runs affected tests, rereads the live PR head and base immediately before delivery, and uses the Jovie App token for one push with an explicit lease on the validated source head. The ancestry guard still requires a fast-forward child; a changed or deleted remote head rejects the push without retry.
 
 Every attempt writes a trusted status receipt on the exact head. A cohort becomes clean only after the exact repaired heads pass `PR Ready`, `Migration Guard`, and `Fork PR Gate`; its durable issue receipt records those runs' p95 latency and drives ramp/backoff after PRs merge. Human taste and steering happen before a shipping PR opens or in a separate follow-up PR; they never add a hold to the current shipping PR.
 
@@ -49,10 +53,10 @@ Emit the structured JSON plan too:
 node scripts/pr-conflict-handler.mjs --dry-run --json
 ```
 
-Apply safe mechanical updates and emit a machine-readable FX matrix for the hosted workflow:
+Apply safe mechanical updates and emit a machine-readable FX matrix for the hosted workflow. Add `--allow-paid-escalation` only for an explicit manual/queue-owner run; without it, true conflicts plan as `deny_conflict_fx_unauthorized` instead of escalating:
 
 ```bash
-node scripts/pr-conflict-handler.mjs --apply --max-concurrent 40 --plan-file /tmp/conflict-plan.json
+node scripts/pr-conflict-handler.mjs --apply --max-concurrent 40 --plan-file /tmp/conflict-plan.json --allow-paid-escalation
 ```
 
 Every decision is logged as structured JSON with PR number, state, action, reason, base/head refs, whether the branch is internal, and whether the action triggers CI.

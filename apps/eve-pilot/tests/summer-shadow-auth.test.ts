@@ -49,10 +49,13 @@ describe('Summer shadow OIDC boundary', () => {
     'owner:jovie:project:other:environment:production',
     'owner:jovie:project:jovie:environment:preview',
     'owner:jovie:project:jovie-eve-shadow:environment:production',
-  ])('rejects verifier-approved caller outside the exact boundary: %s', async subject => {
-    verify.mockResolvedValue(accepted(subject));
-    await expect(ovieSummerShadowOidcAuth(request())).resolves.toBeNull();
-  });
+  ])(
+    'rejects verifier-approved caller outside the exact boundary: %s',
+    async subject => {
+      verify.mockResolvedValue(accepted(subject));
+      await expect(ovieSummerShadowOidcAuth(request())).resolves.toBeNull();
+    }
+  );
   it('rejects unsigned or failed verification', async () => {
     verify.mockResolvedValue({
       ok: false,

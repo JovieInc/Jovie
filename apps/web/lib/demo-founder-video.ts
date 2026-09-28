@@ -139,5 +139,5 @@ export function getFounderDemoSceneAt(seconds: number): FounderDemoScene {
     item => seconds >= item.startsAt && seconds < item.endsAt
   );
 
-  return scene ?? FOUNDER_DEMO_SCENES[FOUNDER_DEMO_SCENES.length - 1]!;
+  return scene ?? FOUNDER_DEMO_SCENES.at(-1)!;
 }

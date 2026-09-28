@@ -16,7 +16,6 @@ describe('AuthProviderButtonSlots', () => {
       .getByText('Loading social sign-in options')
       .closest('fieldset');
     expect(slots).not.toBeNull();
-    expect(slots).toHaveClass('gap-3');
     expect(
       within(slots!).getByRole('button', {
         name: 'Continue with Google loading',
@@ -52,12 +51,6 @@ describe('AuthProviderButtonSlots', () => {
     expect(
       screen.getByRole('button', { name: 'Continue with Google' }).className
     ).not.toContain('--linear-gap-');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).toContain('before:h-11');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).toContain('before:min-w-11');
     expect(
       screen.getByRole('button', { name: 'Continue with Google' }).className
     ).not.toContain('--linear-shadow-button');

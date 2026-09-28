@@ -9,6 +9,15 @@ import {
   type CreatorAssetDescriptor,
 } from '@/lib/aeo/asset-visibility';
 
+type AssetRecordResult = ReturnType<typeof aeo.recordAssetObservation>;
+
+function rejected(
+  result: AssetRecordResult
+): Extract<AssetRecordResult, { ok: false }> {
+  if (result.ok) throw new Error('expected recordAssetObservation to reject');
+  return result;
+}
+
 const asset = (
   kind: CreatorAssetDescriptor['kind'] = 'video',
   patch: Partial<CreatorAssetDescriptor> = {}
@@ -237,24 +246,27 @@ describe('asset visibility', () => {
     ['up', ranked(2), oldRanked(5), 0],
     ['down', ranked(5), oldRanked(2), 0],
     ['steady', ranked(5), oldRanked(5), 0],
-  ] as const)('classifies a comparable %s trend', (status, current, previous, rate) => {
-    const report = buildAssetVisibilityReport({
-      asset: asset(),
-      current: [current],
-      previous: [previous],
-    });
-    expect(report.trend).toMatchObject({
-      comparable: true,
-      status,
-      appearanceRateDelta: rate,
-    });
-    if (status === 'down')
-      expect(
-        report.actions.some(
-          action => action.code === 'investigate_visibility_decline'
-        )
-      ).toBe(true);
-  });
+  ] as const)(
+    'classifies a comparable %s trend',
+    (status, current, previous, rate) => {
+      const report = buildAssetVisibilityReport({
+        asset: asset(),
+        current: [current],
+        previous: [previous],
+      });
+      expect(report.trend).toMatchObject({
+        comparable: true,
+        status,
+        appearanceRateDelta: rate,
+      });
+      if (status === 'down')
+        expect(
+          report.actions.some(
+            action => action.code === 'investigate_visibility_decline'
+          )
+        ).toBe(true);
+    }
+  );
 
   it('uses rank movement inside the appearance-rate noise band', () => {
     const observations = Array.from({ length: 20 }, (_, index) => ({
@@ -784,10 +796,12 @@ it('covers the AEO asset visibility contract regressions', () => {
         '{"competitors":{"status":"known","items":[{"name":"Rival","email":"fan@example.com"}]}}'
       )
     ),
-    aeo.recordAssetObservation({
-      observation: row('{"presence":{"status":"unknown","fanId":"fan-99"}}'),
-      consent: null,
-    }).reason,
+    rejected(
+      aeo.recordAssetObservation({
+        observation: row('{"presence":{"status":"unknown","fanId":"fan-99"}}'),
+        consent: null,
+      })
+    ).reason,
     out(
       '{"asset":{"assetId":"m1","kind":"music","creatorScopeId":"c1","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"private"}}'
     ).rejected[0]?.reason,
@@ -849,4 +863,57 @@ it('covers the AEO asset visibility contract regressions', () => {
   expect(JSON.stringify(values)).toBe(
     '[true,true,true,"asset_observation_contains_disallowed_identifier","private_asset_requires_explicit_consent","no_comparable_prior_run",[["c1","up"],["c2","down"]],["c1:m1:prepare_asset_for_recommendation","c2:m1:prepare_asset_for_recommendation"],{"bestPosition":1,"context":"cited_source"},["querySetVersion","market"],[["Rival"],["Other"]],{"appeared":true,"appearanceCount":1,"observationCount":2,"appearanceRate":1},0.2,0,"no_current_presence_measurement",[{"runId":"absent","field":"presence"},{"runId":"absent","field":"competitors"}],null,[{"runId":"ranked","field":"competitors"}],"steady","no_comparable_prior_run",{"url":"https://jov.ie/x","platform":null},"up",true,[{"runId":"dup-absent","field":"presence"},{"runId":"dup-absent","field":"competitors"}],{"bestPosition":null,"context":"unknown"},false,["creatorLifecycle"]]'
   );
+});
+
+describe('recordAssetObservation asset id', () => {
+  it('reads an asset id before a profile url and ignores a non-object', () => {
+    expect(
+      aeo.recordAssetObservation({
+        observation: {
+          presence: { fanId: 'fan-1' },
+          asset: { assetId: 'track-9' },
+          profileUrl: 'https://jov.ie/ignored',
+        },
+        consent: null,
+      })
+    ).toMatchObject({
+      ok: false,
+      reason: 'asset_observation_contains_disallowed_identifier',
+      assetId: 'track-9',
+    });
+    expect(
+      aeo.recordAssetObservation({
+        observation: {
+          presence: { fanId: 'fan-1' },
+          profileUrl: 'https://jov.ie/tim',
+        },
+        consent: null,
+      })
+    ).toMatchObject({
+      ok: false,
+      reason: 'asset_observation_contains_disallowed_identifier',
+      assetId: 'https://jov.ie/tim',
+    });
+    expect(
+      aeo.recordAssetObservation({
+        observation: {
+          presence: { fanId: 'fan-1' },
+          asset: {},
+          profileUrl: 'https://jov.ie/tim',
+        },
+        consent: null,
+      })
+    ).toMatchObject({
+      ok: false,
+      assetId: null,
+    });
+    expect(
+      rejected(
+        aeo.recordAssetObservation({
+          observation: 'fan-1',
+          consent: null,
+        })
+      ).assetId
+    ).toBeNull();
+  });
 });

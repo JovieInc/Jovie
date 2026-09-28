@@ -2,6 +2,10 @@ import 'server-only';
 
 import { JOVIE_AGENT_DISPLAY_NAME } from '@/lib/brand/agent-display-name';
 import { env } from '@/lib/env-server';
+import {
+  hasHudGithubAuth,
+  resolveHudGithubToken,
+} from '@/lib/github/hud-token.server';
 import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
 import { serverFetch } from '@/lib/http/server-fetch';
 import type {
@@ -56,7 +60,7 @@ function isAgentBranch(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return (
     /^(codex|claude|codegen-bot|linear)\//.test(value) ||
-    /(^|\/)jov-[0-9]+/i.test(value)
+    /(^|\/)jov-\d+/i.test(value)
   );
 }
 
@@ -119,7 +123,7 @@ async function fetchGitHubJson(
   | { ok: true; payload: unknown }
   | { ok: false; errorMessage: string; status?: number }
 > {
-  const token = env.HUD_GITHUB_TOKEN;
+  const token = await resolveHudGithubToken();
   const owner = env.HUD_GITHUB_OWNER;
   const repo = env.HUD_GITHUB_REPO;
 
@@ -235,12 +239,12 @@ function sourceStatus(
   itemCount: number,
   errorMessage?: string
 ): HermesAiOpsSourceStatus {
+  let availability: HermesAiOpsSourceStatus['availability'] = 'available';
+  if (!configured) availability = 'not_configured';
+  else if (errorMessage) availability = 'error';
+
   return {
-    availability: !configured
-      ? 'not_configured'
-      : errorMessage
-        ? 'error'
-        : 'available',
+    availability,
     configured,
     itemCount,
     ...(errorMessage ? { errorMessage } : {}),
@@ -328,7 +332,7 @@ export async function getHudAiOpsSummary(
   const generatedAtIso = now.toISOString();
   const dispatch = getHermesDispatchAvailability();
   const githubConfigured = Boolean(
-    env.HUD_GITHUB_TOKEN && env.HUD_GITHUB_OWNER && env.HUD_GITHUB_REPO
+    hasHudGithubAuth() && env.HUD_GITHUB_OWNER && env.HUD_GITHUB_REPO
   );
 
   if (!githubConfigured) {
@@ -391,12 +395,11 @@ export async function getHudAiOpsSummary(
   );
 
   const openAgentPrs = prItems.length;
-  const pressure =
-    openAgentPrs >= AGENT_PR_THRESHOLD
-      ? 'high'
-      : openAgentPrs >= Math.ceil(AGENT_PR_THRESHOLD * 0.7)
-        ? 'elevated'
-        : 'normal';
+  let pressure: 'normal' | 'elevated' | 'high' = 'normal';
+  if (openAgentPrs >= AGENT_PR_THRESHOLD) pressure = 'high';
+  else if (openAgentPrs >= Math.ceil(AGENT_PR_THRESHOLD * 0.7)) {
+    pressure = 'elevated';
+  }
 
   const recommendations = buildRecommendations({
     blockers,
@@ -411,12 +414,9 @@ export async function getHudAiOpsSummary(
     prsResult.ok ? null : prsResult.errorMessage,
     runsResult.ok ? null : runsResult.errorMessage,
   ].filter((message): message is string => Boolean(message));
-  const availability =
-    errorMessages.length === 0
-      ? 'available'
-      : errorMessages.length === 2
-        ? 'error'
-        : 'partial';
+  let availability: 'available' | 'error' | 'partial' = 'partial';
+  if (errorMessages.length === 0) availability = 'available';
+  else if (errorMessages.length === 2) availability = 'error';
 
   return {
     availability,

@@ -379,7 +379,12 @@ function queueResponse(nodes = []) {
 }
 
 /** @param {unknown} queueResult */
-function runEvent(payload, rest = detail(), queueResult = queueResponse()) {
+function runEvent(
+  payload,
+  rest = detail(),
+  queueResult = queueResponse(),
+  extraArgs = []
+) {
   const dir = mkdtempSync(join(tmpdir(), 'jovie-conflict-event-'));
   try {
     const eventPath = join(dir, 'event.json');
@@ -434,6 +439,7 @@ process.stdout.write(JSON.stringify(result));
         '--dry-run',
         '--plan-file',
         planPath,
+        ...extraArgs,
       ],
       {
         encoding: 'utf8',
@@ -592,6 +598,7 @@ describe('single configured conflict canary boundary', () => {
         await runConflictCli(
           [
             '--apply',
+            '--allow-paid-escalation',
             '--repo',
             REPO,
             '--max-concurrent',
@@ -1021,8 +1028,30 @@ else process.exit(2);
       rmSync(dir, { recursive: true, force: true });
     }
   });
-  it('binds the FX matrix to the exact dirty event PR while reading shared capacity', () => {
+  it('JOV-6233: denies paid FX for the automatic pull_request_target event instead of escalating', () => {
+    // pull_request_target (opened/reopened/synchronize) is the automatic
+    // event path the JOV-6232 cost audit flagged: it must never reach paid
+    // model spend on its own. Only an explicit workflow_dispatch apply may
+    // set --allow-paid-escalation (see .github/workflows/pr-conflict-handler.yml).
     const { result, plan, calls } = runEvent(event());
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls.some(args => args.includes(`repos/${REPO}/pulls/42`))).toBe(
+      true
+    );
+    expect(
+      calls.some(args => args.some(arg => arg.includes('pulls?state=open')))
+    ).toBe(true);
+    expect(calls.some(args => args.includes('-X'))).toBe(false);
+    expect(plan.items).toHaveLength(1);
+    expect(plan.items[0].state).toBe('DIRTY');
+    expect(plan.items[0].action).toBe('deny_conflict_fx_unauthorized');
+    expect(plan.fxMatrix).toEqual([]);
+  });
+
+  it('binds the FX matrix to the exact dirty event PR once paid escalation is explicitly authorized', () => {
+    const { result, plan, calls } = runEvent(event(), detail(), undefined, [
+      '--allow-paid-escalation',
+    ]);
     expect(result.status, result.stderr).toBe(0);
     expect(calls.some(args => args.includes(`repos/${REPO}/pulls/42`))).toBe(
       true
@@ -1183,12 +1212,11 @@ else process.exit(2);
             )
           ).toBe(['dirty', 'transientUnknown'].includes(scenario));
           if (['dirty', 'transientUnknown'].includes(scenario)) {
+            // pull_request_target is an automatic event: it must deny paid
+            // FX escalation (JOV-6233), not silently reach the AI Gateway.
             expect(plan.items).toHaveLength(1);
-            expect(plan.fxMatrix[0]).toMatchObject({
-              prNumber: 42,
-              headRefOid: HEAD,
-              baseRefOid: BASE,
-            });
+            expect(plan.items[0].action).toBe('deny_conflict_fx_unauthorized');
+            expect(plan.fxMatrix).toEqual([]);
           } else {
             expect(plan.fxMatrix).toEqual([]);
             expect(plan.eventNonAction).toBe(
@@ -1328,6 +1356,7 @@ else process.exit(2);
           '--repo',
           REPO,
           '--dry-run',
+          '--allow-paid-escalation',
           '--plan-file',
           planPath,
         ],

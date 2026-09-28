@@ -275,6 +275,7 @@ describe('live base-ref binding', () => {
       runnerCapacity: 120,
       maxConcurrent: 40,
       cohortId: 'live-base',
+      allowPaidEscalation: true,
     });
     expect(plan.fxMatrix[0].baseRefOid).toBe(LIVE_BASE);
     expect(plan.fxMatrix[0].baseRefOid).not.toBe(BASE);
@@ -528,7 +529,7 @@ describe('dependency-aware ordering and Neon capacity', () => {
           statusCheckRollup: greenRequired,
         }),
       ],
-      { maxConcurrent: 40, runnerCapacity: 120 }
+      { maxConcurrent: 40, runnerCapacity: 120, allowPaidEscalation: true }
     );
 
     expect(plan.capacity.availableCiSlots).toBe(2);
@@ -574,7 +575,7 @@ describe('conflict mutation policy', () => {
     expect(plan.fxMatrix).toEqual([]);
   });
 
-  it('routes same-repository conflicts to bounded smarter-model FX', () => {
+  it('denies paid FX escalation by default with no fallback, even when otherwise eligible', () => {
     const plan = buildPlan(
       [
         pr({
@@ -589,6 +590,35 @@ describe('conflict mutation policy', () => {
         activeCi: 0,
         queuedCi: 0,
         cohortId: 'cohort-2-a',
+        // allowPaidEscalation intentionally omitted: automatic runs (push,
+        // workflow_run, pull_request_target) never set this, so a true
+        // conflict must deny rather than silently reach paid FX.
+      }
+    );
+
+    expect(plan.items[0]).toMatchObject({
+      action: 'deny_conflict_fx_unauthorized',
+      triggersCi: false,
+    });
+    expect(plan.fxMatrix).toEqual([]);
+  });
+
+  it('routes same-repository conflicts to bounded smarter-model FX only when paid escalation is explicitly authorized', () => {
+    const plan = buildPlan(
+      [
+        pr({
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          statusCheckRollup: greenRequired,
+        }),
+      ],
+      {
+        maxConcurrent: 40,
+        runnerCapacity: 120,
+        activeCi: 0,
+        queuedCi: 0,
+        cohortId: 'cohort-2-a',
+        allowPaidEscalation: true,
       }
     );
 
@@ -647,7 +677,12 @@ describe('conflict mutation policy', () => {
           ],
         }),
       ],
-      { now: NOW, runnerCapacity: 120, maxConcurrent: 40 }
+      {
+        now: NOW,
+        runnerCapacity: 120,
+        maxConcurrent: 40,
+        allowPaidEscalation: true,
+      }
     );
     expect(plan.items[0]).toMatchObject({
       action: 'escalate_conflict_fx',
@@ -784,7 +819,12 @@ describe('trusted exact-head conflict receipts', () => {
           ],
         }),
       ],
-      { now: NOW, runnerCapacity: 120, maxConcurrent: 40 }
+      {
+        now: NOW,
+        runnerCapacity: 120,
+        maxConcurrent: 40,
+        allowPaidEscalation: true,
+      }
     );
     expect(plan.items[0]).toMatchObject({
       action: 'escalate_conflict_fx',

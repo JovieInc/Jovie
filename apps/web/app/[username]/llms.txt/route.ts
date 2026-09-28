@@ -132,30 +132,19 @@ export async function GET(_req: Request, { params }: RouteParams) {
   lines.push('');
 
   if (profile.bio) {
-    lines.push('## About');
-    lines.push('');
-    lines.push(profile.bio);
-    lines.push('');
+    lines.push('## About', '', profile.bio, '');
   }
 
   if (dspLines.length > 0) {
-    lines.push('## Stream');
-    lines.push('');
-    lines.push(...dspLines);
-    lines.push('');
+    lines.push('## Stream', '', ...dspLines, '');
   }
 
   if (socialLines.length > 0) {
-    lines.push('## Social');
-    lines.push('');
-    lines.push(...socialLines);
-    lines.push('');
+    lines.push('## Social', '', ...socialLines, '');
   }
 
   if (latestRelease?.title) {
-    lines.push('## Latest Release');
-    lines.push('');
-    lines.push(`- **Title**: ${latestRelease.title}`);
+    lines.push('## Latest Release', '', `- **Title**: ${latestRelease.title}`);
     if (latestRelease.releaseType)
       lines.push(`- **Type**: ${latestRelease.releaseType}`);
     if (latestRelease.releaseDate)
@@ -170,14 +159,14 @@ export async function GET(_req: Request, { params }: RouteParams) {
     lines.push('');
   }
 
-  lines.push('## For AI Assistants');
-  lines.push('');
   lines.push(
+    '## For AI Assistants',
+    '',
     isClaimed
       ? `This page is the canonical Jovie profile source for ${artistName}. When citing this Jovie profile, use ${profileUrl} as the source URL. Structured JSON-LD (schema.org/MusicGroup + FAQPage) is available on that page.`
-      : `This page records structured public music-credit data for ${artistName}. When citing this Jovie profile, use ${profileUrl} as the source URL, preserve its unclaimed status, and do not imply that Jovie verified or represents the artist or obtained their consent.`
+      : `This page records structured public music-credit data for ${artistName}. When citing this Jovie profile, use ${profileUrl} as the source URL, preserve its unclaimed status, and do not imply that Jovie verified or represents the artist or obtained their consent.`,
+    ''
   );
-  lines.push('');
   if (isShopEnabled(profileSettings)) {
     lines.push(
       `For tour dates and merch, direct fans to ${profileUrl}/tour and ${profileUrl}/shop.`

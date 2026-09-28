@@ -192,7 +192,7 @@ describe('Summer Kanban (JOV-5215)', () => {
         .sort()
     );
     expect(board.every(card => card.owner === 'summer')).toBe(true);
-    expect(board.some(card => card.lane === 'engineering')).toBe(false);
+    expect(board.map(card => card.lane)).not.toContain('engineering');
     expect(
       receipts.find(receipt => receipt.destination === DEST_PERSONAL)?.workId
     ).toBeTruthy();
@@ -221,17 +221,28 @@ describe('Summer Kanban (JOV-5215)', () => {
       actor: 'summer',
     });
     expect(moved.routingState).toBe('accepted');
+    expect(moved.status).toBe('accepted');
     expect(moved.id).toBe(workId);
     expect((await inspectSummerCard(store, workId))?.routingState).toBe(
       'accepted'
     );
     expect(ovieIdempotencyKey(workId)).toBe(`ovie-${workId}`);
 
+    const statusByRoute = {
+      in_progress: 'executing',
+      blocked: 'blocked',
+      unavailable: 'failed',
+      done: 'implemented',
+      landed: 'implemented',
+      queued: 'accepted',
+    } as const;
     for (const routingState of [
       'in_progress',
       'blocked',
       'unavailable',
       'done',
+      'landed',
+      'queued',
     ] as const) {
       const next = await transitionSummerCard(store, {
         workId,
@@ -239,6 +250,7 @@ describe('Summer Kanban (JOV-5215)', () => {
         actor: 'summer',
       });
       expect(next.routingState).toBe(routingState);
+      expect(next.status).toBe(statusByRoute[routingState]);
       expect((await inspectSummerCard(store, workId))?.routingState).toBe(
         routingState
       );
@@ -541,6 +553,31 @@ describe('Summer Kanban (JOV-5215)', () => {
     });
   });
 
+  it('skips a blank receipt handle and uses the next one', () => {
+    const base = summerKanbanInitiative('ini_receipt_only', {
+      routingState: 'done',
+      destinationHandle: null,
+      evidence: [
+        { kind: 'receipt', summary: OVIE_QUEUED_ACK, ref: DEST_KANBAN },
+      ],
+    });
+    const initiative = {
+      ...base,
+      receipts: [
+        { ...base.receipts[0]!, destinationHandle: '   ' },
+        { ...base.receipts[0]!, destinationHandle: 'task_from_receipt' },
+      ],
+    };
+
+    expect(toSummerKanbanCard(initiative)?.terminalEvidence).toEqual({
+      state: 'proven',
+      ref: 'task_from_receipt',
+      url: null,
+      summary: null,
+      observedAt: null,
+    });
+  });
+
   it('maps record age to fresh/stale and missing timestamps to unknown, never fresh', async () => {
     const t0 = '2026-09-03T00:00:00.000Z';
     const fresh = toSummerKanbanCard(
@@ -799,8 +836,8 @@ describe('Summer Kanban (JOV-5215)', () => {
     expect(taste).toBeTruthy();
     expect(board.some(card => card.workId === personal?.workId)).toBe(false);
     expect(board.some(card => card.workId === taste?.workId)).toBe(false);
-    expect(board.some(card => card.lane === 'personal')).toBe(false);
-    expect(board.some(card => card.lane === 'taste')).toBe(false);
+    expect(board.map(card => card.lane)).not.toContain('personal');
+    expect(board.map(card => card.lane)).not.toContain('taste');
     expect(
       board.every(card => card.lane === 'flash' || card.lane === 'heavy')
     ).toBe(true);

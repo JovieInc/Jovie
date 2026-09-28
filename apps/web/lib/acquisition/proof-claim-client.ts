@@ -14,7 +14,7 @@ import {
 const STORAGE_KEY = 'jovie_proof_claim';
 
 export function rememberProofClaimAttribution(): boolean {
-  if (typeof globalThis.window === 'undefined') return false;
+  if (globalThis.window === undefined) return false;
   try {
     const params = new URLSearchParams(globalThis.window.location.search);
     const fromUrl = params.get('campaign') === PROOF_CLAIM_CAMPAIGN_KEY;
@@ -30,7 +30,7 @@ export function rememberProofClaimAttribution(): boolean {
 }
 
 export function hasStoredProofClaimAttribution(): boolean {
-  if (typeof globalThis.window === 'undefined') return false;
+  if (globalThis.window === undefined) return false;
   try {
     return (
       globalThis.window.sessionStorage.getItem(STORAGE_KEY) === '1' ||

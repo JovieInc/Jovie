@@ -24,4 +24,19 @@ describe('KanbanBoard', () => {
     expect(screen.getByText('First card')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
   });
+
+  it('draws each column on the approved nested surface', () => {
+    const { container } = render(
+      <KanbanBoard
+        columns={[{ id: 'new', title: 'New', items: [], count: 0 }]}
+        renderCard={() => null}
+        getItemId={(item: { id: string }) => item.id}
+        enableVirtualization={false}
+      />
+    );
+
+    const column = screen.getByText('New').closest('.bg-surface-0');
+    expect(column).not.toBeNull();
+    expect(container.innerHTML).not.toContain('color-mix');
+  });
 });

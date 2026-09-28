@@ -6603,10 +6603,20 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
       ? vars.albumArtProviderCase
       : 'xai-provider-source-contract';
   const providerSourcePath = 'lib/services/album-art/provider-xai.ts';
+  const gatewayAuthSourcePath = 'lib/ai/gateway-availability.ts';
+  const modelSourcePath = 'lib/constants/ai-models.ts';
   const chatRouteSourcePath = 'app/api/chat/route.ts';
   const storageSourcePath = 'lib/services/album-art/storage.ts';
   const providerSource = readFileSync(
     resolve(process.cwd(), providerSourcePath),
+    'utf8'
+  );
+  const gatewayAuthSource = readFileSync(
+    resolve(process.cwd(), gatewayAuthSourcePath),
+    'utf8'
+  );
+  const modelSource = readFileSync(
+    resolve(process.cwd(), modelSourcePath),
     'utf8'
   );
   const chatRouteSource = readFileSync(
@@ -6624,27 +6634,37 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
       "import { env } from '@/lib/env-server';"
     ),
     exposesStableMissingKeyError: textIncludesAll(providerSource, [
-      "readonly code = 'XAI_API_KEY_MISSING' as const",
-      "this.name = 'XaiApiKeyMissingError'",
+      "readonly code = 'ALBUM_ART_GATEWAY_UNCONFIGURED' as const",
+      "this.name = 'AlbumArtGatewayUnconfiguredError'",
     ]),
-    trimsApiKeyForCapability: /Boolean\(env\.XAI_API_KEY\?\.trim\(\)\)/.test(
-      providerSource
+    trimsApiKeyForCapability: gatewayAuthSource.includes('apiKey?.trim()'),
+    treatsVercelRuntimeAsConfigured:
+      gatewayAuthSource.includes("vercel === '1'"),
+    doesNotProbeOidcToken: !gatewayAuthSource.includes(
+      'process.env.VERCEL_OIDC_TOKEN'
     ),
-    declaresDefaultImagineModel: providerSource.includes(
-      "const DEFAULT_MODEL = 'grok-imagine-image';"
+    declaresDefaultImagineModel: modelSource.includes(
+      "export const ALBUM_ART_GATEWAY_IMAGE_MODEL = 'spacexai/grok-imagine-image'"
     ),
-    allowsEnvModelOverride: providerSource.includes(
-      'return env.ALBUM_ART_IMAGE_MODEL ?? DEFAULT_MODEL;'
-    ),
+    allowsEnvModelOverride: sourceHasOrderedFragments(providerSource, [
+      'const override = env.ALBUM_ART_IMAGE_MODEL?.trim();',
+      "if (override?.includes('/'))",
+      'return override;',
+      'return ALBUM_ART_GATEWAY_IMAGE_MODEL;',
+    ]),
     failsBeforeProviderCallWhenKeyMissing: sourceHasOrderedFragments(
       providerSource,
       [
-        'if (!isXaiConfigured())',
-        'throw new XaiApiKeyMissingError()',
+        'if (!isAlbumArtGatewayConfigured())',
+        'throw new AlbumArtGatewayUnconfiguredError()',
         'const result = await generateImage',
       ]
     ),
-    usesXaiImageModel: providerSource.includes('model: xai.image(model)'),
+    usesGatewayImageModel: providerSource.includes(
+      'model: gateway.image(model)'
+    ),
+    doesNotImportDirectXaiProvider: !providerSource.includes('@ai-sdk/xai'),
+    doesNotReadXaiApiKey: !providerSource.includes('XAI_API_KEY'),
     forwardsOnlyPromptText: providerSource.includes('prompt: params.prompt'),
     requestsSquareImages: providerSource.includes("aspectRatio: '1:1'"),
     requestsThreeImages: providerSource.includes('n: 3'),
@@ -6657,7 +6677,7 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
       "Buffer.from(candidate.base64, 'base64')",
     ]),
     rejectsMissingImageBytes: providerSource.includes(
-      "throw new TypeError('xAI image result did not include image bytes')"
+      "throw new TypeError('Gateway image result did not include image bytes')"
     ),
     returnsModelAndBuffers: textIncludesAll(providerSource, [
       'model,',
@@ -6689,7 +6709,7 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
     checksProviderBeforeReleaseFetchAndRateLimits: sourceHasOrderedFragments(
       chatRouteSource,
       [
-        'if (!isXaiConfigured())',
+        'if (!isAlbumArtGatewayConfigured())',
         'const target = resolveAlbumArtReleaseTarget(params.releases, {',
         'const burstLimit = await albumArtGenerationBurstLimiter.limit',
         'const generated = await generateAlbumArtBackgrounds',
@@ -6726,7 +6746,7 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
     treatsMissingKeyAsUnavailableWithoutSentry: sourceHasOrderedFragments(
       chatRouteSource,
       [
-        'if (error instanceof XaiApiKeyMissingError)',
+        'if (error instanceof AlbumArtGatewayUnconfiguredError)',
         "error: 'Album art generation is temporarily unavailable.'",
         'Sentry.captureException(error',
       ]
@@ -7752,8 +7772,10 @@ function evaluateChatTitleContract(vars: EvalVars) {
       "import { gateway, generateText } from '@/lib/ai/sdk'",
       "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
     ]),
+    // Titles stay on the light (low-cost) tier; the vendor model is owned by
+    // lib/constants/ai-models (JOV-6533 moved it onto the gateway allowlist).
     usesTitleModelConstant:
-      TITLE_MODEL === 'google/gemini-2.0-flash' &&
+      TITLE_MODEL === CHAT_MODEL_LIGHT &&
       routeSource.includes('gateway(TITLE_MODEL)'),
     keepsTitleOnlyPrompt: textIncludesAll(systemPrompt, [
       'Generate a short, descriptive title',
@@ -7822,6 +7844,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
     networkAttempted: false,
     titleCase,
     titleModel: TITLE_MODEL,
+    lightModel: CHAT_MODEL_LIGHT,
     routeSourcePath,
     routeSourceLength: routeSource.length,
     systemPrompt,

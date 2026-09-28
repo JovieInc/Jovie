@@ -1025,6 +1025,7 @@ export function decideAction(classification, context = {}) {
     availableFxSlots = availableCiSlots,
     plannedRebaseTriggers = plannedCiTriggers,
     plannedFxTriggers = plannedCiTriggers,
+    allowPaidEscalation = false,
     now = Date.now(),
   } = context;
   const pr = classification.pr;
@@ -1148,6 +1149,14 @@ export function decideAction(classification, context = {}) {
           'bounded smarter-model attempts are exhausted; emit a structured steering exception without adding a merge-blocking human label',
       };
     }
+    if (!allowPaidEscalation) {
+      return {
+        action: 'deny_conflict_fx_unauthorized',
+        triggersCi: false,
+        reason:
+          'paid-model FX escalation requires an explicit manual authorization (workflow_dispatch); automatic push/CI-completion events never authorize spend, and no fallback to paid execution is configured',
+      };
+    }
     if (plannedFxTriggers >= availableFxSlots) {
       return {
         action: 'wait_capacity',
@@ -1186,6 +1195,7 @@ export function buildPlan(
     cohortId = 'local',
     cohortHistory = [],
     capacityPrs = [],
+    allowPaidEscalation = false,
     now = Date.now(),
   } = {}
 ) {
@@ -1234,6 +1244,7 @@ export function buildPlan(
       availableFxSlots: availableRemediationSlots,
       plannedRebaseTriggers: plannedRebaseTriggers + plannedFxTriggers,
       plannedFxTriggers: plannedRebaseTriggers + plannedFxTriggers,
+      allowPaidEscalation,
       now,
     });
     if (decision.action === 'request_github_rebase') {

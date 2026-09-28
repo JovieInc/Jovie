@@ -483,14 +483,14 @@ describe('aggregate required checks', () => {
     expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
-  it('runs required Storybook geometry contracts in the combined layout gate', () => {
+  it('runs required Storybook geometry contracts in the combined Storybook gate', () => {
     const ciWorkflowYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
       'utf8'
     );
     const combinedLayoutBlock = extractWorkflowJobBlock(
       ciWorkflowYaml,
-      'ci-build-layout'
+      'ci-storybook-surfaces'
     );
 
     expect(combinedLayoutBlock).toMatch(

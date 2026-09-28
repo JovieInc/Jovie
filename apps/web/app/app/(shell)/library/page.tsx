@@ -79,24 +79,33 @@ export default async function LibraryPage({
   let postReleaseBundle: LibraryPostReleaseBundle =
     EMPTY_LIBRARY_POST_RELEASE_BUNDLE;
   if (profileId && selectedProfile) {
-    {
+    // Private-document access + listing are independent of the release/asset
+    // loaders, so they run concurrently instead of serializing ahead of them.
+    const creatorDocumentsPromise = (async () => {
       try {
         await requireCreatorDocumentAccess({
           userId: routeContext.userId,
           profileId,
         });
         const privateDocuments = await listCreatorDocuments(profileId);
-        creatorDocuments = [...privateDocuments.documents];
-        creatorDocumentsNextCursor = privateDocuments.nextCursor;
+        return {
+          documents: [...privateDocuments.documents],
+          nextCursor: privateDocuments.nextCursor,
+          loadFailed: false,
+        };
       } catch (error) {
         void captureError(
           'Private creator documents load failed on library page',
           error,
           { route: APP_ROUTES.LIBRARY }
         );
-        creatorDocumentsLoadFailed = true;
+        return {
+          documents: [] as CreatorDocumentListItem[],
+          nextCursor: null,
+          loadFailed: true,
+        };
       }
-    }
+    })();
     {
       const queryClient = getQueryClient();
       try {
@@ -197,6 +206,12 @@ export default async function LibraryPage({
         );
       }
     }
+    // Apply the document result even when the release/asset batch failed so a
+    // degraded page still shows successfully loaded private documents.
+    const creatorDocumentsResult = await creatorDocumentsPromise;
+    creatorDocuments = creatorDocumentsResult.documents;
+    creatorDocumentsNextCursor = creatorDocumentsResult.nextCursor;
+    creatorDocumentsLoadFailed = creatorDocumentsResult.loadFailed;
   }
 
   return (

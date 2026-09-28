@@ -82,6 +82,13 @@ describe('parseSocialLinkInput', () => {
       expect(x.platform).toBe('x');
       expect(x.url).toBe('https://x.com/artist');
     }
+
+    const underscored = parseSocialLinkInput('https://x.com/artist_1');
+    expect(underscored.ok).toBe(true);
+    if (underscored.ok) {
+      expect(underscored.url).toBe('https://x.com/artist_1');
+    }
+    expect(parseSocialLinkInput('https://x.com/artist-name').ok).toBe(false);
   });
 
   it('isCompleteSocialUrl mirrors parse success', () => {

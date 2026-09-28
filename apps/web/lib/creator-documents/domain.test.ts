@@ -85,6 +85,15 @@ describe('creator document domain', () => {
         { kind: 'opinion', evidenceState: 'unresolved', sourceRecordId: null },
       ])
     ).not.toThrow();
+    expect(() =>
+      assertScriptCanBeApproved([
+        {
+          kind: 'fact',
+          evidenceState: 'supported',
+          sourceRecordId: 'record-1',
+        },
+      ])
+    ).not.toThrow();
   });
 
   it('advances revisions only from a valid optimistic version', () => {

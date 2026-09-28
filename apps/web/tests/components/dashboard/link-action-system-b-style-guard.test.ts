@@ -32,15 +32,16 @@ describe('dashboard link action System B style guard', () => {
     expect(source).not.toMatch(forbiddenMotionClasses);
   });
 
-  it.each(
-    linkRowSources
-  )('%s keeps swipe edit and visibility actions neutral', (_name, filePath) => {
-    const source = readFileSync(filePath, 'utf8');
+  it.each(linkRowSources)(
+    '%s keeps swipe edit and visibility actions neutral',
+    (_name, filePath) => {
+      const source = readFileSync(filePath, 'utf8');
 
-    expect(source).not.toMatch(forbiddenNonDestructiveSwipeFillClasses);
-    expect(source).toContain('NEUTRAL_SWIPE_ACTION_CLASS');
-    expect(source).toContain('bg-surface-2 text-primary-token');
-    expect(source).toContain('DESTRUCTIVE_SWIPE_ACTION_CLASS');
-    expect(source).toContain('bg-red-500 text-white');
-  });
+      expect(source).not.toMatch(forbiddenNonDestructiveSwipeFillClasses);
+      expect(source).toContain('NEUTRAL_SWIPE_ACTION_CLASS');
+      expect(source).toContain('bg-surface-2 text-primary-token');
+      expect(source).toContain('DESTRUCTIVE_SWIPE_ACTION_CLASS');
+      expect(source).toContain('bg-red-500 text-white');
+    }
+  );
 });

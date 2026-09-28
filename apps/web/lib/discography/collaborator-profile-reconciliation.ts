@@ -8,8 +8,10 @@ import {
   isNotNull,
   isNull,
   ne,
+  or,
 } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import { admitCreatorUsername } from '@/lib/canonical/creator-username';
 import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
 import {
@@ -23,7 +25,11 @@ import { captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { lockSpotifyProfileIdentity } from '@/lib/profile/spotify-profile-identity';
-import { buildStructuredCreditProfileMarker } from '@/lib/profile/unclaimed-artist-profile';
+import {
+  buildStructuredCreditProfileMarker,
+  readStructuredCreditProfileMarker,
+  withIdentityEnrichmentReceipt,
+} from '@/lib/profile/unclaimed-artist-profile';
 import { buildSpotifyArtistUrl, getSpotifyArtistsBatch } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 import { PUBLIC_ARTIST_COLLABORATOR_ROLES } from './artist-credit-policy';
@@ -33,6 +39,14 @@ import {
   type CreditedArtistCandidate,
   type SpotifyArtistProfileData,
 } from './collaborator-profile-plan';
+import { composeFriendlyArtistHandleCandidates } from './friendly-artist-handle';
+import {
+  buildUnclaimedEnrichmentReceipt,
+  discoverUnclaimedArtistIdentity,
+  extractEvidenceHandles,
+  persistUnclaimedDestinations,
+  type UnclaimedIdentityDiscovery,
+} from './unclaimed-artist-enrichment';
 
 export interface CollaboratorProfileReconciliationResult {
   readonly candidates: number;
@@ -90,17 +104,28 @@ async function getCreditedArtistCandidates(
       name: artists.name,
       spotifyId: artists.spotifyId,
       imageUrl: artists.imageUrl,
+      musicbrainzId: artists.musicbrainzId,
     })
     .from(releaseArtists)
     .innerJoin(discogReleases, eq(releaseArtists.releaseId, discogReleases.id))
     .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
+    .leftJoin(creatorProfiles, eq(artists.creatorProfileId, creatorProfiles.id))
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
         inArray(releaseArtists.role, PUBLIC_ARTIST_COLLABORATOR_ROLES),
         isNotNull(artists.spotifyId),
         ne(artists.spotifyId, ownerSpotifyId),
-        isNull(artists.creatorProfileId),
+        // Unbound artists, plus bound-but-still-unclaimed profiles missing a
+        // JOV-6529 enrichment receipt — that second leg is the idempotent
+        // backfill path for profiles materialized before this stage existed.
+        or(
+          isNull(artists.creatorProfileId),
+          and(
+            drizzleSql`${creatorProfiles.settings}->'unclaimedArtistProfile'->>'state' = 'unclaimed'`,
+            drizzleSql`${creatorProfiles.settings}->'unclaimedArtistProfile'->'identityEnrichment' IS NULL`
+          )
+        ),
         drizzleSql`COALESCE(${artists.metadata}->${PROFILE_RECONCILIATION_CONFLICT_KEY}->>'status', '') <> 'conflicted'`,
         publicReleaseEligibilitySqlPredicate()
       )
@@ -173,7 +198,11 @@ async function bindOwnerRegistryArtist(
 async function markArtistProfileConflict(
   tx: DbOrTransaction,
   artist: LockedRegistryArtist,
-  reason: 'duplicate_profiles' | 'handle_collision' | 'profile_insert'
+  reason:
+    | 'duplicate_profiles'
+    | 'handle_collision'
+    | 'profile_insert'
+    | 'implausible_username'
 ): Promise<void> {
   await tx
     .update(artists)
@@ -192,9 +221,55 @@ async function markArtistProfileConflict(
     .where(eq(artists.id, artist.id));
 }
 
+/** JOV-6529: backfill receipt + destinations on an existing unclaimed profile. */
+async function applyEnrichmentToExistingProfile(
+  tx: DbOrTransaction,
+  creatorProfileId: string,
+  discovery: UnclaimedIdentityDiscovery | undefined
+): Promise<void> {
+  if (!discovery) return;
+
+  const [profile] = await tx
+    .select({
+      settings: creatorProfiles.settings,
+      isClaimed: creatorProfiles.isClaimed,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, creatorProfileId))
+    .limit(1);
+
+  // Never add destinations or rewrite settings on a claimed profile — its
+  // links and fields are user-owned.
+  if (
+    !profile ||
+    profile.isClaimed ||
+    readStructuredCreditProfileMarker(profile.settings)?.state !== 'unclaimed'
+  ) {
+    return;
+  }
+
+  await persistUnclaimedDestinations(tx, creatorProfileId, discovery);
+
+  const settings = withIdentityEnrichmentReceipt(
+    profile.settings ?? {},
+    buildUnclaimedEnrichmentReceipt(discovery)
+  );
+
+  await tx
+    .update(creatorProfiles)
+    .set({ settings, updatedAt: new Date() })
+    .where(
+      and(
+        eq(creatorProfiles.id, creatorProfileId),
+        eq(creatorProfiles.isClaimed, false)
+      )
+    );
+}
+
 async function reconcileCandidate(
   candidate: CreditedArtistCandidate,
-  spotifyArtist: SpotifyArtistProfileData | undefined
+  spotifyArtist: SpotifyArtistProfileData | undefined,
+  discovery?: UnclaimedIdentityDiscovery
 ): Promise<CandidateOutcome> {
   return withSystemIngestionSession(
     async tx => {
@@ -221,6 +296,11 @@ async function reconcileCandidate(
         return { status: 'conflicted' };
       }
       if (lockedArtist.creatorProfileId) {
+        await applyEnrichmentToExistingProfile(
+          tx,
+          lockedArtist.creatorProfileId,
+          discovery
+        );
         return { status: 'reused' };
       }
 
@@ -254,21 +334,76 @@ async function reconcileCandidate(
               isNull(artists.creatorProfileId)
             )
           );
+        await applyEnrichmentToExistingProfile(tx, exactProfile.id, discovery);
         return {
           status: 'reused',
           handle: exactProfile.usernameNormalized,
         };
       }
 
-      const handle = buildUnclaimedArtistHandle(candidate.artistId);
+      // JOV-6528: compose friendly candidates from the identity signals the
+      // exact-ID match already validated, then take the first one that is
+      // free. The deterministic opaque `a_*` handle is the last-resort
+      // fallback so ingest can never fail closed for lack of a friendly
+      // candidate. Handles are resolved in-rank inside the same serializable
+      // transaction that inserts the profile — no name-only identity is ever
+      // established here.
+      const composed = composeFriendlyArtistHandleCandidates({
+        registryName: lockedArtist.name,
+        providerArtist: spotifyArtist,
+        evidenceHandles: discovery
+          ? extractEvidenceHandles(discovery)
+          : undefined,
+      });
+
+      let handle: string | null = null;
+      if (composed.accepted.length > 0) {
+        const candidateHandles = composed.accepted.map(c => c.handle);
+        const takenHandles = await tx
+          .select({
+            usernameNormalized: creatorProfiles.usernameNormalized,
+          })
+          .from(creatorProfiles)
+          .where(inArray(creatorProfiles.usernameNormalized, candidateHandles));
+        const takenSet = new Set(
+          takenHandles.map(row => row.usernameNormalized)
+        );
+        handle =
+          candidateHandles.find(candidate => !takenSet.has(candidate)) ?? null;
+      }
+      if (!handle) {
+        handle = buildUnclaimedArtistHandle(candidate.artistId);
+      }
+
+      // JOV-5922: the chosen handle must satisfy the versioned semantic
+      // contract before it becomes `creator_profiles.username`. An
+      // implausible value (serialized list, URL, delimiter-joined
+      // candidates, whitespace fragment) is quarantined as a conflict —
+      // never coerced or written to canon.
+      const admission = admitCreatorUsername(handle, {
+        producer: 'collaborator-profile-reconciliation',
+        source: 'spotify_release_credit',
+        confidence: 'inferred',
+      });
+      if (admission.status !== 'accepted' || !admission.canonical) {
+        await markArtistProfileConflict(
+          tx,
+          lockedArtist,
+          'implausible_username'
+        );
+        return { status: 'conflicted' };
+      }
+      const canonicalHandle = admission.canonical;
+
       const [handleOwner] = await tx
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.usernameNormalized, handle))
         .limit(1);
 
-      // The handle encodes the full registry UUID, so an occupied handle with
-      // no exact Spotify-ID match indicates corrupted or manually forged data.
+      // An occupied fallback handle (the encoded full registry UUID) with
+      // no exact Spotify-ID match indicates corrupted or manually forged
+      // data. An occupied friendly candidate was already skipped above.
       if (handleOwner) {
         await markArtistProfileConflict(tx, lockedArtist, 'handle_collision');
         return { status: 'conflicted' };
@@ -285,8 +420,8 @@ async function reconcileCandidate(
         .insert(creatorProfiles)
         .values({
           creatorType: 'creator',
-          username: handle,
-          usernameNormalized: handle,
+          username: canonicalHandle,
+          usernameNormalized: canonicalHandle,
           displayName,
           avatarUrl,
           spotifyId: candidate.spotifyId,
@@ -303,10 +438,19 @@ async function reconcileCandidate(
           ingestionStatus: 'idle',
           ingestionSourcePlatform: 'spotify_release_credit',
           settings: {
-            unclaimedArtistProfile: buildStructuredCreditProfileMarker({
-              artistRegistryId: candidate.artistId,
-              providerArtistId: candidate.spotifyId,
-            }),
+            unclaimedArtistProfile: {
+              ...buildStructuredCreditProfileMarker({
+                artistRegistryId: candidate.artistId,
+                providerArtistId: candidate.spotifyId,
+              }),
+              // JOV-6529 evidence receipt, recorded before share-ready.
+              ...(discovery
+                ? {
+                    identityEnrichment:
+                      buildUnclaimedEnrichmentReceipt(discovery),
+                  }
+                : {}),
+            },
           },
           theme: {},
           createdAt: now,
@@ -345,6 +489,11 @@ async function reconcileCandidate(
           updatedAt: now,
         })
         .onConflictDoNothing();
+
+      // JOV-6529: artist-controlled destinations found before publication.
+      if (discovery) {
+        await persistUnclaimedDestinations(tx, createdProfile.id, discovery);
+      }
 
       const [boundArtist] = await tx
         .update(artists)
@@ -388,6 +537,7 @@ export async function ensureUnclaimedArtistProfileForEntity(
       name: artists.name,
       spotifyId: artists.spotifyId,
       imageUrl: artists.imageUrl,
+      musicbrainzId: artists.musicbrainzId,
       creatorProfileId: artists.creatorProfileId,
     })
     .from(releaseArtists)
@@ -414,6 +564,10 @@ export async function ensureUnclaimedArtistProfileForEntity(
   }
 
   const [spotifyArtist] = await getSpotifyArtistsBatch([candidate.spotifyId]);
+  const discovery = await runIdentityDiscovery({
+    spotifyId: candidate.spotifyId,
+    musicbrainzId: candidate.musicbrainzId,
+  });
   let outcome: CandidateOutcome;
   try {
     outcome = await reconcileCandidate(
@@ -422,8 +576,10 @@ export async function ensureUnclaimedArtistProfileForEntity(
         name: candidate.name,
         spotifyId: candidate.spotifyId,
         imageUrl: candidate.imageUrl,
+        musicbrainzId: candidate.musicbrainzId,
       },
-      spotifyArtist
+      spotifyArtist,
+      discovery
     );
   } catch (error) {
     await captureWarning(
@@ -481,6 +637,24 @@ function recordCandidateOutcome(
   if (outcome.handle) state.handlesToInvalidate.add(outcome.handle);
 }
 
+/**
+ * JOV-6529: enrichment keyed on exact provider IDs, run outside the
+ * serializable transaction; failures degrade to `undefined` (old behavior).
+ */
+async function runIdentityDiscovery(input: {
+  readonly spotifyId: string | null;
+  readonly musicbrainzId?: string | null;
+}): Promise<UnclaimedIdentityDiscovery | undefined> {
+  try {
+    return await discoverUnclaimedArtistIdentity(input);
+  } catch (error) {
+    await captureWarning('Unclaimed artist identity discovery failed', error, {
+      spotifyId: input.spotifyId,
+    });
+    return undefined;
+  }
+}
+
 async function reconcileCandidatePlan(
   creatorProfileId: string,
   plan: ReturnType<typeof buildCreditedArtistReconciliationPlan>
@@ -493,13 +667,23 @@ async function reconcileCandidatePlan(
     handlesToInvalidate: new Set<string>(),
   };
 
-  for (const { candidate, spotifyArtist } of plan) {
+  // Bounded by the same per-run cap; provider-keyed lookups only.
+  const discoveries = await Promise.all(
+    plan.map(({ candidate }) =>
+      runIdentityDiscovery({
+        spotifyId: candidate.spotifyId,
+        musicbrainzId: candidate.musicbrainzId,
+      })
+    )
+  );
+
+  for (const [index, { candidate, spotifyArtist }] of plan.entries()) {
     if (!spotifyArtist) state.metadataUnavailable += 1;
 
     try {
       recordCandidateOutcome(
         state,
-        await reconcileCandidate(candidate, spotifyArtist)
+        await reconcileCandidate(candidate, spotifyArtist, discoveries[index])
       );
     } catch (error) {
       state.conflicted += 1;

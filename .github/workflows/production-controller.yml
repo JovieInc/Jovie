@@ -37,6 +37,10 @@ jobs:
   # queue, and waits only a bounded queue-derived window when a newer
   # generation is already approaching, so no staging deploy, migration,
   # canary, promotion, or rollback mutation can start for a stale SHA.
+  # A stale-but-ancestor SHA yields only to a generation already queued behind
+  # it, and never once main has carried unshipped commits past the starvation
+  # bound (release-lineage-gate.sh), so a continuous merge stream cannot starve
+  # production the way exact-SHA yields did on 2026-09-26.
   coalesce-production:
     name: Coalesce release wave
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
@@ -47,12 +51,22 @@ jobs:
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts/release-lineage-gate.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Evaluate event-driven supersession
         id: coalesce
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
           REPOSITORY: ${{ github.repository }}
+          # Starvation bound for the forward-only lineage gate: once main has
+          # carried unshipped commits this long, an ancestor generation keeps
+          # the lease even though a newer generation is queued behind it.
+          PRODUCTION_STARVATION_SECONDS: '5400'
           # The bounded window derives from queue state, never a universal
           # constant: one increment per newer generation already validating in
           # the merge queue, capped well inside the 5-minute job budget.
@@ -133,7 +147,17 @@ jobs:
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            record_receipt "superseded" "newer main landed before evaluation" "$current_main_sha" 0 "yield the production lease to controller generation $current_main_sha"
+            # Forward-only starvation bound: yield only to a generation that is
+            # already queued behind this one, and never once main has carried
+            # unshipped commits past PRODUCTION_STARVATION_SECONDS.
+            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
+              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+            if [ "$gate_decision" != "decision=proceed" ]; then
+              record_receipt "superseded" "newer main landed before evaluation" "$current_main_sha" 0 "yield the production lease to controller generation $current_main_sha"
+              exit 0
+            fi
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+            record_receipt "proceed" "main advanced to $current_main_sha but this ancestor generation keeps the lease (forward-only starvation bound)" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
             exit 0
           fi
 
@@ -181,7 +205,14 @@ jobs:
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            record_receipt "superseded" "newer main landed during the bounded coalescing window" "$current_main_sha" "$wait_seconds" "yield the production lease to controller generation $current_main_sha"
+            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="at the coalescing deadline" \
+              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+            if [ "$gate_decision" != "decision=proceed" ]; then
+              record_receipt "superseded" "newer main landed during the bounded coalescing window" "$current_main_sha" "$wait_seconds" "yield the production lease to controller generation $current_main_sha"
+              exit 0
+            fi
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+            record_receipt "proceed" "main advanced to $current_main_sha during the window but this ancestor generation keeps the lease (forward-only starvation bound)" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
             exit 0
           fi
 
@@ -318,8 +349,10 @@ jobs:
             echo "::error::Could not resolve exact current main while authorizing production."
             exit 1
           }
-          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha before production authorization."
+          if [ "$current_main_sha" != "$EXPECTED_SHA" ] &&
+            [ "$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" \
+              bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
+            echo "::notice::Controller generation $EXPECTED_SHA yielded to $current_main_sha before production authorization."
             exit 0
           fi
           echo "is_current=true" >> "$GITHUB_OUTPUT"
@@ -564,8 +597,10 @@ jobs:
               echo "::error::Could not resolve exact main at the production authorization boundary."
               exit 1
             }
-            if [ "$final_main_sha" != "$EXPECTED_SHA" ]; then
-              echo "::notice::Controller generation $EXPECTED_SHA was superseded by $final_main_sha at authorization."
+            if [ "$final_main_sha" != "$EXPECTED_SHA" ] &&
+              [ "$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" \
+                bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
+              echo "::notice::Controller generation $EXPECTED_SHA yielded to $final_main_sha at authorization."
               echo "is_current=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
@@ -960,6 +995,10 @@ jobs:
           PRODUCTION_ALIAS_RETRY_SECONDS: '5'
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          # The JOV-INV-033 rescan reads the immutable deployment URL, which
+          # sits behind deployment protection; without the bypass it follows
+          # the SSO redirect and reports every marker as missing.
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
           {

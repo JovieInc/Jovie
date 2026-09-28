@@ -11,6 +11,8 @@ const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
+const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
+  'redeem-desktop-auth-return-code';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
@@ -19,6 +21,11 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
+const DESKTOP_UPDATE_STATE_CHANNEL = 'desktop-update-state';
+const DESKTOP_UPDATE_GET_STATE_CHANNEL = 'desktop-update-get-state';
+const DESKTOP_UPDATE_CHECK_CHANNEL = 'desktop-update-check';
+const DESKTOP_UPDATE_DOWNLOAD_CHANNEL = 'desktop-update-download';
+const DESKTOP_UPDATE_INSTALL_CHANNEL = 'desktop-update-install';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -147,6 +154,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /** Close the dedicated handoff window without exposing window controls. */
+  redeemDesktopAuthReturnCode: (returnCode: string) => {
+    return ipcRenderer.invoke(
+      REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,
+      returnCode
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
   closeDesktopAuthWindow: () => {
     return ipcRenderer.invoke(CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL) as Promise<{
       ok: boolean;
@@ -215,4 +231,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ok: boolean;
       reason?: string;
     }>,
+});
+
+// Typed updater surface (JOV-6683). Separate namespace so a stale binary
+// leaves `window.jovieDesktop` undefined and the renderer renders nothing.
+contextBridge.exposeInMainWorld('jovieDesktop', {
+  updates: {
+    getState: () => ipcRenderer.invoke(DESKTOP_UPDATE_GET_STATE_CHANNEL),
+    check: () => ipcRenderer.invoke(DESKTOP_UPDATE_CHECK_CHANNEL),
+    download: () => ipcRenderer.invoke(DESKTOP_UPDATE_DOWNLOAD_CHANNEL),
+    install: () => ipcRenderer.invoke(DESKTOP_UPDATE_INSTALL_CHANNEL),
+    onState: (cb: (phase: unknown) => void): (() => void) => {
+      if (typeof cb !== 'function') return () => undefined;
+      const listener = (_: unknown, phase: unknown) => cb(phase);
+      ipcRenderer.on(DESKTOP_UPDATE_STATE_CHANNEL, listener);
+      return () =>
+        ipcRenderer.removeListener(DESKTOP_UPDATE_STATE_CHANNEL, listener);
+    },
+  },
 });

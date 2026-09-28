@@ -1,3 +1,4 @@
+import { isIndexableCapabilityPath } from '@/data/marketing/featureAvailability';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import { isOpaqueInternalProfileHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { isRenderFixturePathname } from '@/lib/render-fixture-policy';
@@ -52,8 +53,7 @@ export function toContentRevisionDate(
   value: Date | string | number | null | undefined
 ): Date | undefined {
   if (value == null || value === '') return undefined;
-  const date =
-    value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date;
 }
@@ -87,6 +87,9 @@ export function isSitemapIndexableMarketingRoute(
     return false;
   }
   if (AUTH_PRIVATE_PATHS.has(entry.url)) return false;
+  // Capability-bearing routes keep indexing eligibility as a distinct
+  // decision (JOV-6216): publication ≠ indexing ≠ access.
+  if (!isIndexableCapabilityPath(entry.url)) return false;
   if (
     !entry.url.includes('*') &&
     (entry.healthCheck?.expected ?? 'page') !== 'page'
@@ -177,7 +180,7 @@ export function collectSitemapInventoryViolations(
     ) {
       violations.push(`request-time lastmod on unchanged page: ${path}`);
     }
-    const handle = path.split('/').filter(Boolean)[0];
+    const handle = path.split('/').find(segment => segment.length > 0);
     if (handle && isOpaqueInternalProfileHandle(handle)) {
       violations.push(`QA identity included: ${path}`);
     }

@@ -26,7 +26,7 @@ export async function handleOvieMcpRequest(input: {
 }): Promise<OvieMcpHandleResult> {
   const store = input.store ?? getDefaultOperatingStore();
   const parsed = parseJsonRpc(input.body);
-  if (!parsed || !parsed.method) {
+  if (!parsed?.method) {
     return { status: 200, body: rpcError(null, -32700, 'Parse error') };
   }
 

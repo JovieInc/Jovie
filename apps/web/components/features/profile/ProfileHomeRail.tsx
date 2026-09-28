@@ -26,6 +26,7 @@ import {
 } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
@@ -61,6 +62,8 @@ interface ProfileHomeRailProps {
    * the LCP image, so it must load with priority instead of lazy.
    */
   readonly pacArtPriority?: boolean;
+  /** Rotating accent for the featured Listen card (mode-card-accent.ts). */
+  readonly featuredAccent?: ProfileCardAccentAssignment;
 }
 
 function getUpcomingTourDates(
@@ -167,6 +170,15 @@ export const __profileHomeRailTestUtils = {
   getS2OrderedItems,
 };
 
+/**
+ * Editorial cap (JOV-6199): Home is curated, not a catalog dump. At most one
+ * featured card (the PAC leading slot) plus at most two secondary cards. The
+ * fan-capture ("Get Updates") card counts toward the secondary cap, so when
+ * it renders, only one other secondary item is shown. The full catalog lives
+ * on the Music destination.
+ */
+const SECONDARY_ITEM_CAP = 2;
+
 export const ProfileHomeRail = memo(function ProfileHomeRail({
   artist,
   latestRelease,
@@ -186,6 +198,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   releases = [],
   hasTip = false,
   pacArtPriority = false,
+  featuredAccent,
 }: Readonly<ProfileHomeRailProps>) {
   // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
@@ -224,9 +237,15 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   );
   const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
 
-  // One ordered card list — back catalog, merch, and shows. The featured
-  // latest release is NOT an entity card here: it lives in the carousel's
-  // leading slot as the PAC card below, so it never renders twice.
+  // The capture card renders as the carousel's trailing secondary slot, so it
+  // consumes one of the two secondary slots under the editorial cap.
+  const showCaptureCard = showAlertsCard && !isSubscribed;
+  const secondaryItemLimit = SECONDARY_ITEM_CAP - (showCaptureCard ? 1 : 0);
+
+  // One ordered card list — merch, shows, then back-catalog fills any
+  // remaining secondary slots. The featured latest release is NOT an entity
+  // card here: it lives in the carousel's leading slot as the PAC card below,
+  // so it never renders twice.
   const carouselItems = useMemo<EntityCardModel[]>(() => {
     const featuredItems: EntityCardModel[] = [];
     const releaseItems: EntityCardModel[] = [];
@@ -306,6 +325,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
           venueName: show.venueName,
           city: show.city,
           startDate: show.startDate,
+          timezone: show.timezone,
           ticketUrl: show.ticketUrl,
           ticketStatus: show.ticketStatus,
         })
@@ -320,7 +340,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
         showItems,
       }),
       ...releaseItems,
-    ];
+    ].slice(0, secondaryItemLimit);
   }, [
     artist.handle,
     featuredPlaylistFallback,
@@ -330,6 +350,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     now,
     profilePacAssignment.s2Slot,
     releases,
+    secondaryItemLimit,
     releaseVisibility?.show,
     upcomingTourDates,
   ]);
@@ -375,58 +396,60 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       hasPlayableDestinations
   );
 
-  const alertsCard =
-    !showAlertsCard || isSubscribed ? null : (
-      <HomeAlertsCard
-        artist={artist}
-        onAlertsClick={onAlertsClick}
-        renderMode={renderMode}
-        sourceContext={{
-          artistId: artist.id,
-          profileId: artist.id,
-          profileSlug: artist.handle,
-          currentTab: 'home',
-          ctaLocation: 'home_alerts_card',
-          intent: 'general_alerts',
-        }}
-      />
-    );
+  const alertsCard = !showCaptureCard ? null : (
+    <HomeAlertsCard
+      artist={artist}
+      onAlertsClick={onAlertsClick}
+      renderMode={renderMode}
+      sourceContext={{
+        artistId: artist.id,
+        profileId: artist.id,
+        profileSlug: artist.handle,
+        currentTab: 'home',
+        ctaLocation: 'home_alerts_card',
+        intent: 'general_alerts',
+      }}
+    />
+  );
 
-  // One screen, one primary focus: the carousel IS the home surface. The PAC
-  // card is the featured first card; the alerts card is the last card. Both
-  // render inside the same fixed card geometry — no stacked sections.
+  // Pen parity (Tim, 2026-09-26): the PAC is the featured Listen mode card
+  // under the identity header. The rest of the highlights (back catalog,
+  // merch, shows, alerts) follow in the same carousel as before.
+  const hasCarouselContent = carouselItems.length > 0 || alertsCard !== null;
   return (
     <div
       ref={exposureRef}
-      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full'
+      className='flex min-h-0 min-w-0 flex-1 flex-col gap-4 md:mx-auto md:w-full'
       data-testid='profile-home-rail'
     >
       <h2 className='sr-only'>Profile Highlights From {artist.name}</h2>
-      <ReleaseCatalogCarousel
-        items={carouselItems}
-        artistHandle={artist.handle}
-        artistId={artist.id}
-        analyticsEnabled={renderMode !== 'preview'}
-        leading={
-          hasPacSubject ? (
-            <ProfilePacCard
-              artist={artist}
-              release={pacRelease}
-              merchCard={merchCards[0] ?? null}
-              nextShow={pacNextShow}
-              hasTip={hasTip}
-              assignment={profilePacAssignment}
-              isSubscribed={isSubscribed}
-              renderMode={renderMode}
-              layout='profile-landscape'
-              artPriority={pacArtPriority}
-              hasPlayableDestinations={hasPlayableDestinations}
-              captureEnabled={captureEnabled}
-            />
-          ) : null
-        }
-        trailing={alertsCard}
-      />
+      {hasPacSubject ? (
+        <ProfilePacCard
+          artist={artist}
+          release={pacRelease}
+          merchCard={merchCards[0] ?? null}
+          nextShow={pacNextShow}
+          hasTip={hasTip}
+          assignment={profilePacAssignment}
+          isSubscribed={isSubscribed}
+          renderMode={renderMode}
+          layout='profile-landscape'
+          presentation='featured'
+          accent={featuredAccent}
+          artPriority={pacArtPriority}
+          hasPlayableDestinations={hasPlayableDestinations}
+          captureEnabled={captureEnabled}
+        />
+      ) : null}
+      {hasCarouselContent ? (
+        <ReleaseCatalogCarousel
+          items={carouselItems}
+          artistHandle={artist.handle}
+          artistId={artist.id}
+          analyticsEnabled={renderMode !== 'preview'}
+          trailing={alertsCard}
+        />
+      ) : null}
     </div>
   );
 });

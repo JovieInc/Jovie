@@ -53,7 +53,7 @@ function getModalBackgroundElements(modal: HTMLElement): HTMLElement[] {
       if (
         sibling !== current &&
         sibling instanceof HTMLElement &&
-        !sibling.hasAttribute('data-modal-backdrop')
+        sibling.dataset.modalBackdrop === undefined
       ) {
         background.push(sibling);
       }
@@ -225,7 +225,7 @@ export function useModalFocusBoundary(
       if (!(target instanceof Node) || modal.contains(target)) return;
       if (
         target instanceof HTMLElement &&
-        target.hasAttribute('data-modal-backdrop')
+        target.dataset.modalBackdrop !== undefined
       ) {
         return;
       }

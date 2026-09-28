@@ -9,6 +9,10 @@ import type {
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
+import {
+  ContentChartFrame,
+  ContentChartSkeleton,
+} from '@/components/molecules/ContentChartState';
 import type { HudObservationState } from '@/lib/hud/observation';
 import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
 
@@ -54,12 +58,12 @@ function formatCachedAgo(cachedTimestamp: number, nowMs: number): string {
   return `${hours} hrs ago`;
 }
 
-function ChartSkeleton() {
+function ShippingVelocityChartSkeleton() {
   return (
-    <div
-      className='h-50 w-full rounded-lg bg-surface-0'
-      role='status'
-      aria-label='Loading Shipping Chart'
+    <ContentChartSkeleton
+      heightClassName='h-50'
+      label='Loading Shipping Velocity Chart'
+      testId='shipping-velocity-loading'
     />
   );
 }
@@ -69,7 +73,7 @@ const LazyVelocityChart = dynamic(
     import('./ShippingVelocityCanvas').then(
       module => module.ShippingVelocityCanvas
     ),
-  { ssr: false, loading: () => <ChartSkeleton /> }
+  { ssr: false, loading: () => <ShippingVelocityChartSkeleton /> }
 );
 
 export function ShippingVelocityChart({
@@ -374,9 +378,9 @@ export function ShippingVelocityChart({
       {/* Stable observation viewport across asynchronous states. */}
       <div className='min-h-72'>
         {isLoading && data.length === 0 ? (
-          <ChartSkeleton />
+          <ShippingVelocityChartSkeleton />
         ) : observation === 'not_configured' ? (
-          <div className='flex h-50 items-center'>
+          <ContentChartFrame heightClassName='h-50'>
             <HudObservationStatus
               state='not_configured'
               message={
@@ -384,18 +388,18 @@ export function ShippingVelocityChart({
               }
               testId='hud-shipping-velocity-observation'
             />
-          </div>
+          </ContentChartFrame>
         ) : observation === 'empty' ? (
-          <div className='flex h-50 items-center'>
+          <ContentChartFrame heightClassName='h-50'>
             <HudObservationStatus
               state='empty'
               message='No Pull Requests in this period. Zero is shown only after a successful observation.'
               freshnessLabel={freshnessLabel}
               testId='hud-shipping-velocity-observation'
             />
-          </div>
+          </ContentChartFrame>
         ) : observation === 'unavailable' && data.length === 0 ? (
-          <div className='flex h-50 items-center'>
+          <ContentChartFrame heightClassName='h-50'>
             <HudObservationStatus
               state='unavailable'
               message={error ?? 'Shipping velocity is unavailable.'}
@@ -403,7 +407,7 @@ export function ShippingVelocityChart({
               onRetry={handleRetry}
               testId='hud-shipping-velocity-observation'
             />
-          </div>
+          </ContentChartFrame>
         ) : showChart ? (
           <>
             <div
@@ -443,7 +447,7 @@ export function ShippingVelocityChart({
             </figure>
           </>
         ) : (
-          <ChartSkeleton />
+          <ShippingVelocityChartSkeleton />
         )}
       </div>
       <p className='mt-2 text-xs text-secondary-token'>

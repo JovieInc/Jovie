@@ -32,6 +32,16 @@ describe('proof-claim client attribution', () => {
     window.history.replaceState({}, '', '/');
   });
 
+  it('returns false when the window binding is missing', () => {
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(rememberProofClaimAttribution()).toBe(false);
+      expect(hasStoredProofClaimAttribution()).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('remembers attribution from the campaign query and session storage', () => {
     expect(rememberProofClaimAttribution()).toBe(false);
     expect(hasStoredProofClaimAttribution()).toBe(false);

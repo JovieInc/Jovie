@@ -156,7 +156,7 @@ describe('public artist OpenAPI contract', () => {
       { url: 'https://jov.ie', description: 'Production API origin' },
     ]);
     expect(ARTIST_OPENAPI_DOCUMENT.externalDocs.url).toBe(
-      'https://docs.jov.ie/docs/api-reference'
+      'https://docs.jov.ie/docs/developers/api-reference'
     );
     expect(ARTIST_OPENAPI_DOCUMENT.externalDocs.description).toContain(
       'lifecycle policy'
@@ -233,17 +233,20 @@ describe('OpenAPI discovery routes', () => {
   it.each([
     ['/api/v1/openapi.json', getCanonical],
     ['/openapi.json', getDiscovery],
-  ] as const)('%s returns 200 JSON with CORS and cache headers', async (_path, handler) => {
-    const { body, cacheControl, contentType, corsOrigin, link, status } =
-      await readOpenApiResponse(handler());
+  ] as const)(
+    '%s returns 200 JSON with CORS and cache headers',
+    async (_path, handler) => {
+      const { body, cacheControl, contentType, corsOrigin, link, status } =
+        await readOpenApiResponse(handler());
 
-    expect(status).toBe(200);
-    expect(contentType).toContain('application/json');
-    expect(corsOrigin).toBe('*');
-    expect(link).toBe(PUBLIC_ARTIST_API_POLICY_LINK);
-    expect(cacheControl).toBe(ARTIST_OPENAPI_CACHE_CONTROL);
-    expect(body).toEqual(ARTIST_OPENAPI_DOCUMENT);
-  });
+      expect(status).toBe(200);
+      expect(contentType).toContain('application/json');
+      expect(corsOrigin).toBe('*');
+      expect(link).toBe(PUBLIC_ARTIST_API_POLICY_LINK);
+      expect(cacheControl).toBe(ARTIST_OPENAPI_CACHE_CONTROL);
+      expect(body).toEqual(ARTIST_OPENAPI_DOCUMENT);
+    }
+  );
 
   it('root discovery surface equals the canonical contract', async () => {
     const [canonical, discovery] = await Promise.all([

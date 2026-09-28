@@ -51,6 +51,20 @@ describe('recordSkillRunEvent', () => {
       })
     );
     expect(mockOnConflictDoUpdate).toHaveBeenCalled();
+    expect(mockValues.mock.calls[0]?.[0].metadata).toEqual({});
+  });
+
+  it('copies supplied metadata and ignores a missing bag', async () => {
+    await recordSkillRunEvent({
+      invocationId: 'inv-meta',
+      skillId: 'retouch',
+      status: 'completed',
+      metadata: { source: 'release' },
+    });
+
+    expect(mockValues.mock.calls[0]?.[0].metadata).toEqual({
+      source: 'release',
+    });
   });
 
   it('is fail-open: DB failures never throw', async () => {

@@ -1,6 +1,12 @@
+import {
+  AUDIO_FILE_ACCEPT,
+  SUPPORTED_AUDIO_MIME_TYPES_SET,
+} from '@jovie/audio-contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  ALLOWED_AUDIO_MIME_TYPES,
+  AUDIO_ACCEPT,
   AUDIO_MAX_FILE_SIZE_BYTES,
   isSupportedAudioFile,
   parseAudioTitleFromFileName,
@@ -10,6 +16,15 @@ import {
 } from '@/lib/audio/constants';
 
 describe('audio constants', () => {
+  it('keeps the deprecated accept string and mime set', () => {
+    expect(AUDIO_ACCEPT).toBe(AUDIO_FILE_ACCEPT);
+    expect(AUDIO_ACCEPT).toContain('audio/mpeg');
+    expect(AUDIO_ACCEPT).toContain('.wav');
+    expect(ALLOWED_AUDIO_MIME_TYPES).toBe(SUPPORTED_AUDIO_MIME_TYPES_SET);
+    expect(ALLOWED_AUDIO_MIME_TYPES.has('audio/mpeg')).toBe(true);
+    expect(ALLOWED_AUDIO_MIME_TYPES.has('text/plain')).toBe(false);
+  });
+
   it('accepts common audio mime types and extensions', () => {
     expect(
       isSupportedAudioFile({ name: 'track.mp3', type: 'audio/mpeg' })

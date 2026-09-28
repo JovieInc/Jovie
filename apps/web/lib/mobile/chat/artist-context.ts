@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { readAuthorizedProfileViews } from '@/lib/analytics/authorized-read';
 import type { ArtistContext } from '@/lib/chat/types';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -44,9 +45,11 @@ export function artistContextFromAuthorizedProfile(
   };
 }
 
-async function loadMobileArtistContextRow(
-  profileId: string
-): Promise<ArtistContext | null> {
+async function loadMobileArtistContextRow(input: {
+  readonly profileId: string;
+  readonly userId: string;
+}): Promise<ArtistContext | null> {
+  const { profileId, userId } = input;
   const [result] = await db
     .select({
       displayName: creatorProfiles.displayName,
@@ -57,7 +60,6 @@ async function loadMobileArtistContextRow(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       spotifyUrl: creatorProfiles.spotifyUrl,
       appleMusicUrl: creatorProfiles.appleMusicUrl,
-      profileViews: creatorProfiles.profileViews,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, profileId))
@@ -72,43 +74,56 @@ async function loadMobileArtistContextRow(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
+  const profileViewsPromise = readAuthorizedProfileViews(userId).catch(
+    error => {
+      logger.warn('Authorized analytics unavailable for mobile chat context', {
+        profileId,
+        error,
+      });
+      return 0;
+    }
+  );
+
   try {
-    const [linkCounts, tipTotals, clickStats] = await Promise.all([
-      db
-        .select({
-          totalActive: count(),
-          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-        })
-        .from(socialLinks)
-        .where(
-          and(
-            eq(socialLinks.creatorProfileId, profileId),
-            eq(socialLinks.state, 'active')
+    const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all(
+      [
+        db
+          .select({
+            totalActive: count(),
+            musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+          })
+          .from(socialLinks)
+          .where(
+            and(
+              eq(socialLinks.creatorProfileId, profileId),
+              eq(socialLinks.state, 'active')
+            )
           )
-        )
-        .then(rows => rows[0]),
-      db
-        .select({
-          totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-          monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-          tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-        })
-        .from(tips)
-        .where(eq(tips.creatorProfileId, profileId))
-        .then(rows => rows[0]),
-      db
-        .select({
-          total: drizzleSql<number>`count(*)`,
-        })
-        .from(clickEvents)
-        .where(
-          and(
-            eq(clickEvents.creatorProfileId, profileId),
-            eq(clickEvents.linkType, 'tip')
+          .then(rows => rows[0]),
+        db
+          .select({
+            totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
+            monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
+            tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
+          })
+          .from(tips)
+          .where(eq(tips.creatorProfileId, profileId))
+          .then(rows => rows[0]),
+        db
+          .select({
+            total: drizzleSql<number>`count(*)`,
+          })
+          .from(clickEvents)
+          .where(
+            and(
+              eq(clickEvents.creatorProfileId, profileId),
+              eq(clickEvents.linkType, 'tip')
+            )
           )
-        )
-        .then(rows => rows[0]),
-    ]);
+          .then(rows => rows[0]),
+        profileViewsPromise,
+      ]
+    );
 
     return {
       displayName: result.displayName ?? result.username,
@@ -119,7 +134,7 @@ async function loadMobileArtistContextRow(
       spotifyPopularity: result.spotifyPopularity,
       spotifyUrl: result.spotifyUrl,
       appleMusicUrl: result.appleMusicUrl,
-      profileViews: result.profileViews ?? 0,
+      profileViews,
       hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
       hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
       tippingStats: {
@@ -143,7 +158,7 @@ async function loadMobileArtistContextRow(
       spotifyPopularity: result.spotifyPopularity,
       spotifyUrl: result.spotifyUrl,
       appleMusicUrl: result.appleMusicUrl,
-      profileViews: result.profileViews ?? 0,
+      profileViews: await profileViewsPromise,
       hasSocialLinks: false,
       hasMusicLinks: false,
       tippingStats: EMPTY_TIPPING_STATS,
@@ -153,6 +168,7 @@ async function loadMobileArtistContextRow(
 
 export async function fetchMobileArtistContext(input: {
   readonly profileId: string;
+  readonly userId: string;
   readonly authorizedProfile?: AuthorizedArtistIdentity;
 }): Promise<ArtistContext | null> {
   // Auth is the caller's job. handleMobileChatTurn already required a
@@ -161,7 +177,10 @@ export async function fetchMobileArtistContext(input: {
   // through activeProfileId but user_profile_claims lagged. If this extra
   // lookup misses, keep chatting with the session-authorized identity.
   try {
-    const loaded = await loadMobileArtistContextRow(input.profileId);
+    const loaded = await loadMobileArtistContextRow({
+      profileId: input.profileId,
+      userId: input.userId,
+    });
     if (loaded) {
       return loaded;
     }

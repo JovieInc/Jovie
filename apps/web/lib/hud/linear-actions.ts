@@ -58,7 +58,7 @@ interface LinearGraphQLResponse {
   errors?: Array<{ message: string }>;
 }
 
-const ACTIVE_STATE_TYPES = ['triage', 'unstarted', 'started'];
+const ACTIVE_STATE_TYPES = new Set(['triage', 'unstarted', 'started']);
 
 function computeDaysOld(createdAt: string): number {
   const created = new Date(createdAt).getTime();
@@ -163,7 +163,7 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
     const nodes = payload.data?.issues?.nodes ?? [];
 
     // Filter to active states defensively (Linear filter may not be perfect)
-    const active = nodes.filter(n => ACTIVE_STATE_TYPES.includes(n.state.type));
+    const active = nodes.filter(n => ACTIVE_STATE_TYPES.has(n.state.type));
 
     // Sort: priority ASC (1=urgent is best) then createdAt ASC (oldest first = most urgent)
     // In the UI this renders as: most-urgent priority at top, oldest within same priority at top

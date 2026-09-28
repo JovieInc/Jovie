@@ -5,6 +5,8 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "outDir": "dist",
+    "rootDir": "src",
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts"],

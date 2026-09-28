@@ -4,6 +4,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Globe, HelpCircle, Link2, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
@@ -38,11 +40,7 @@ function formatLinkType(linkType: string): string {
   return typeMap[linkType] || linkType;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Stat card — compact metric with definition tooltip                 */
-/* ------------------------------------------------------------------ */
-
-function StatCard({
+function DashboardAnalyticsMetricCard({
   label,
   value,
   meta,
@@ -62,57 +60,47 @@ function StatCard({
   readonly 'data-testid'?: string;
 }) {
   if (loading) {
-    return (
-      <ContentSurfaceCard className='p-4 lg:p-5'>
-        <LoadingSkeleton
-          height='h-3'
-          width='w-20'
-          rounded='sm'
-          className='mb-3'
-        />
-        <LoadingSkeleton height='h-7' width='w-16' rounded='sm' />
-      </ContentSurfaceCard>
-    );
+    return <ContentMetricCardSkeleton showIcon={false} showSubtitle={false} />;
   }
 
-  return (
-    <ContentSurfaceCard className='p-4 lg:p-5' data-testid={testId}>
-      <div className='flex items-center gap-1'>
-        <p className='text-app text-secondary-token'>{label}</p>
-        {definition ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type='button'
-                className='text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
-                aria-label={`About ${label}`}
-              >
-                <HelpCircle className='h-3 w-3' />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side='top' className='max-w-50'>
-              <p className='text-app'>{definition}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
-      </div>
-      {suspect ? (
-        <p
-          className='mt-1 text-2xl font-semibold tracking-[-0.011em] text-tertiary-token'
-          title='Value may be inaccurate'
-          data-testid={testId ? `${testId}-suspect` : undefined}
+  const definitionTooltip = definition ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type='button'
+          className='flex text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+          aria-label={`About ${label}`}
         >
-          —
-        </p>
-      ) : (
-        <p className='mt-1 text-2xl font-semibold tracking-[-0.011em] text-primary-token tabular-nums'>
-          {value}
-        </p>
-      )}
-      {!suspect && meta ? (
-        <p className='mt-1 text-2xs text-tertiary-token tabular-nums'>{meta}</p>
-      ) : null}
-    </ContentSurfaceCard>
+          <HelpCircle className='h-3 w-3' />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side='top' className='max-w-50'>
+        <p className='text-app'>{definition}</p>
+      </TooltipContent>
+    </Tooltip>
+  ) : null;
+
+  return (
+    <ContentMetricCard
+      label={
+        <span className='block text-app text-secondary-token'>{label}</span>
+      }
+      value={
+        suspect ? (
+          <span
+            title='Value may be inaccurate'
+            data-testid={testId ? `${testId}-suspect` : undefined}
+          >
+            —
+          </span>
+        ) : (
+          value
+        )
+      }
+      subtitle={!suspect && meta ? meta : undefined}
+      headerRight={definitionTooltip}
+      data-testid={testId}
+    />
   );
 }
 
@@ -140,49 +128,53 @@ function ListSection({
   readonly emptyMessage: string;
 }) {
   return (
-    <ContentSurfaceCard className='p-4 lg:p-5'>
-      <div className='mb-3 flex items-center gap-2'>
-        <Icon className='h-4 w-4 text-tertiary-token' />
-        <h3 className='text-app font-caption text-secondary-token'>{title}</h3>
-      </div>
+    <ContentSurfaceCard>
+      <div className='p-4 lg:p-5'>
+        <div className='mb-3 flex items-center gap-2'>
+          <Icon className='h-4 w-4 text-tertiary-token' />
+          <h3 className='text-app font-caption text-secondary-token'>
+            {title}
+          </h3>
+        </div>
 
-      {loading && (
-        <ul className='space-y-3' aria-hidden='true'>
-          {LOADING_SKELETON_KEYS.map(key => (
-            <li key={key} className='flex items-center justify-between'>
-              <LoadingSkeleton height='h-4' width='w-28' rounded='sm' />
-              <LoadingSkeleton height='h-4' width='w-10' rounded='sm' />
-            </li>
-          ))}
-        </ul>
-      )}
-      {!loading && items.length > 0 && (
-        <ul className='space-y-3'>
-          {items.map((item, index) => (
-            <li
-              key={item.key}
-              className='flex items-center justify-between group'
-            >
-              <div className='flex items-center gap-2 min-w-0 flex-1'>
-                <span className='w-4 text-2xs font-caption text-tertiary-token tabular-nums'>
-                  {index + 1}
+        {loading && (
+          <ul className='space-y-3' aria-hidden='true'>
+            {LOADING_SKELETON_KEYS.map(key => (
+              <li key={key} className='flex items-center justify-between'>
+                <LoadingSkeleton height='h-4' width='w-28' rounded='sm' />
+                <LoadingSkeleton height='h-4' width='w-10' rounded='sm' />
+              </li>
+            ))}
+          </ul>
+        )}
+        {!loading && items.length > 0 && (
+          <ul className='space-y-3'>
+            {items.map((item, index) => (
+              <li
+                key={item.key}
+                className='flex items-center justify-between group'
+              >
+                <div className='flex items-center gap-2 min-w-0 flex-1'>
+                  <span className='w-4 text-2xs font-caption text-tertiary-token tabular-nums'>
+                    {index + 1}
+                  </span>
+                  <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
+                    {item.label}
+                  </span>
+                </div>
+                <span className='ml-2 text-app font-caption text-primary-token tabular-nums'>
+                  {item.value}
                 </span>
-                <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
-                  {item.label}
-                </span>
-              </div>
-              <span className='ml-2 text-app font-caption text-primary-token tabular-nums'>
-                {item.value}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {!loading && items.length === 0 && (
-        <p className='py-4 text-center text-app text-tertiary-token'>
-          {emptyMessage}
-        </p>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {!loading && items.length === 0 && (
+          <p className='py-4 text-center text-app text-tertiary-token'>
+            {emptyMessage}
+          </p>
+        )}
+      </div>
     </ContentSurfaceCard>
   );
 }
@@ -281,14 +273,14 @@ export function DashboardAnalytics() {
       >
         {/* Primary metrics — conversion funnel */}
         <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
-          <StatCard
+          <DashboardAnalyticsMetricCard
             label={METRIC_DEFINITIONS.profile_views.label}
             definition={METRIC_DEFINITIONS.profile_views.definition}
             value={displayValue('profile_views', data?.profile_views)}
             loading={loading}
             data-testid='stat-profile-views'
           />
-          <StatCard
+          <DashboardAnalyticsMetricCard
             label={METRIC_DEFINITIONS.unique_users.label}
             definition={METRIC_DEFINITIONS.unique_users.definition}
             value={displayValue('unique_users', data?.unique_users)}
@@ -303,7 +295,7 @@ export function DashboardAnalytics() {
             suspect={contradictory.has('unique_users')}
             data-testid='stat-unique-users'
           />
-          <StatCard
+          <DashboardAnalyticsMetricCard
             label={METRIC_DEFINITIONS.subscribers.label}
             definition={METRIC_DEFINITIONS.subscribers.definition}
             value={displayValue('subscribers', data?.subscribers)}
@@ -330,7 +322,7 @@ export function DashboardAnalytics() {
                 showTipLinkVisits ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
               )}
             >
-              <StatCard
+              <DashboardAnalyticsMetricCard
                 label={METRIC_DEFINITIONS.capture_rate.label}
                 definition={METRIC_DEFINITIONS.capture_rate.definition}
                 value={
@@ -341,28 +333,28 @@ export function DashboardAnalytics() {
                 suspect={contradictory.has('capture_rate')}
                 data-testid='stat-capture-rate'
               />
-              <StatCard
+              <DashboardAnalyticsMetricCard
                 label={METRIC_DEFINITIONS.listen_clicks.label}
                 definition={METRIC_DEFINITIONS.listen_clicks.definition}
                 value={displayValue('listen_clicks', data.listen_clicks)}
                 suspect={contradictory.has('listen_clicks')}
                 data-testid='stat-listen-clicks'
               />
-              <StatCard
+              <DashboardAnalyticsMetricCard
                 label={METRIC_DEFINITIONS.identified_users.label}
                 definition={METRIC_DEFINITIONS.identified_users.definition}
                 value={displayValue('identified_users', data.identified_users)}
                 suspect={contradictory.has('identified_users')}
                 data-testid='stat-identified-users'
               />
-              <StatCard
+              <DashboardAnalyticsMetricCard
                 label={METRIC_DEFINITIONS.total_clicks.label}
                 definition={METRIC_DEFINITIONS.total_clicks.definition}
                 value={displayValue('total_clicks', data.total_clicks)}
                 data-testid='stat-total-clicks'
               />
               {showTipLinkVisits ? (
-                <StatCard
+                <DashboardAnalyticsMetricCard
                   label={METRIC_DEFINITIONS.tip_link_visits.label}
                   definition={METRIC_DEFINITIONS.tip_link_visits.definition}
                   value={displayValue('tip_link_visits', data.tip_link_visits)}
@@ -373,8 +365,10 @@ export function DashboardAnalytics() {
           )}
 
         {error && (
-          <ContentSurfaceCard className='px-4 py-3 text-center'>
-            <p className='text-app text-destructive'>{error}</p>
+          <ContentSurfaceCard>
+            <p className='px-4 py-3 text-center text-app text-destructive'>
+              {error}
+            </p>
           </ContentSurfaceCard>
         )}
 
