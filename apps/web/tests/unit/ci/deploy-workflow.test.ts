@@ -335,6 +335,7 @@ describe('source PR path-output reachability contract', () => {
       'ci-integration-ready',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-build-public',
@@ -963,6 +964,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
     const migrationJob = getJobBlock(workflow, 'migrate-production');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const stagingOnlineIndexStep = getStepBlock(
+      stagingJob,
+      'DB migrate (staging - online indexes)'
+    );
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const resultJob = getJobBlock(workflow, 'release-result');
     const credentialStep = getStepBlock(
@@ -976,6 +981,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const migrateStep = getStepBlock(
       migrationJob,
       'DB migrate (production - Drizzle)'
+    );
+    const onlineIndexStep = getStepBlock(
+      migrationJob,
+      'DB migrate (production - online indexes)'
     );
     const verifyStep = getStepBlock(
       migrationJob,
@@ -1019,12 +1028,27 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrationIndex).toBeGreaterThan(productionHeadIndex);
     expect(stagingJob).toContain('needs: [release-head]');
     expect(stagingJob).not.toContain('migrate-production');
+    expect(stagingJob).toContain('DB migrate (staging - online indexes)');
+    expect(stagingJob.indexOf('staging - Drizzle')).toBeLessThan(
+      stagingJob.indexOf('staging - online indexes')
+    );
+    expect(stagingOnlineIndexStep).toContain('timeout-minutes: 12');
+    expect(stagingOnlineIndexStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}'
+    );
+    expect(stagingOnlineIndexStep).toContain('--config stg');
+    expect(stagingOnlineIndexStep).not.toContain('DOPPLER_TOKEN_PRD');
     expect(promotionJob).toContain('migrate-production');
     expect(promotionJob).toContain(
       "needs.migrate-production.result == 'success'"
     );
 
-    for (const step of [preflightStep, migrateStep, verifyStep]) {
+    for (const step of [
+      preflightStep,
+      migrateStep,
+      onlineIndexStep,
+      verifyStep,
+    ]) {
       expect(step).toContain('DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}');
       expect(step).not.toContain('if:');
       expect(step).toContain('doppler run --project jovie-web --config prd');
@@ -1036,11 +1060,18 @@ describe('deploy workflow Vercel env resolution', () => {
     }
     expect(preflightStep).toContain('scripts/drizzle-migrate-preflight.ts');
     expect(migrateStep).toContain('drizzle:migrate:ci');
+    expect(onlineIndexStep).toContain("ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'");
+    expect(onlineIndexStep).toContain('drizzle:migrate:online-indexes:ci');
+    expect(onlineIndexStep).toContain('timeout-minutes: 12');
+    expect(migrationJob).toContain('timeout-minutes: 30');
     expect(verifyStep).toContain('drizzle:verify:ci');
     expect(migrationJob.indexOf('production preflight')).toBeLessThan(
       migrationJob.indexOf('production - Drizzle')
     );
     expect(migrationJob.indexOf('production - Drizzle')).toBeLessThan(
+      migrationJob.indexOf('production - online indexes')
+    );
+    expect(migrationJob.indexOf('production - online indexes')).toBeLessThan(
       migrationJob.indexOf('production schema check')
     );
     expect(resultJob).toContain(
@@ -1218,6 +1249,10 @@ describe('deploy workflow Vercel env resolution', () => {
       'Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT'
     );
     expect(readinessJob).toContain('Ovie Build:$OVIE_BUILD_RESULT');
+    expect(readinessJob).toContain(
+      'Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT'
+    );
+    expect(readinessJob).toContain('Ovie Typecheck:$OVIE_TYPECHECK_RESULT');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
     expect(readinessJob).toContain('RUN_PROMPTFOO');
@@ -5180,8 +5215,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
     expect(evaluator).toContain("default: '5'");
     expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('failingRunAttempt < 2');
-    expect(evaluator).toContain('repair_state_unavailable');
+    expect(evaluator).toContain('attemptEvidenceTrusted');
+    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {

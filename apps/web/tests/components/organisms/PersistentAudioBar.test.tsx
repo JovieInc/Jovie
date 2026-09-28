@@ -231,6 +231,32 @@ describe('PersistentAudioBar', () => {
     }
   });
 
+  it('converges rendered metadata when the playing release is mutated', () => {
+    setPlaying({
+      releaseTitle: 'Old Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/old.jpg',
+    });
+    const { rerender } = render(<PersistentAudioBar />);
+
+    setPlaying({
+      releaseTitle: 'New Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/new.jpg',
+      trackTitle: 'Renamed Track',
+    });
+    rerender(<PersistentAudioBar />);
+
+    expect(screen.queryByText('Old Title')).toBeNull();
+    expect(screen.getAllByText('Renamed Track').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DJ Cool · New Title').length).toBeGreaterThan(
+      0
+    );
+    for (const artwork of screen.getAllByTestId('artwork-img')) {
+      expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/new.jpg');
+    }
+  });
+
   it('never renders a collapse/minimize or dismiss control', () => {
     setPlaying({ artistName: 'DJ Cool' });
     render(<PersistentAudioBar />);
@@ -394,6 +420,22 @@ describe('PersistentAudioBar', () => {
     );
   });
 
+  it('keeps track identity out of the desktop controls and timeline dock', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar />);
+
+    const desktopDock = screen.getByTestId('audio-surface-expanded-shell');
+    expect(within(desktopDock).queryByText('Midnight Drive')).toBeNull();
+    expect(within(desktopDock).queryByText('DJ Cool')).toBeNull();
+    expect(
+      within(desktopDock).getByRole('button', { name: 'Pause (space)' })
+    ).toBeInTheDocument();
+    expect(
+      within(desktopDock).getByRole('button', { name: 'Show waveform' })
+    ).toBeInTheDocument();
+  });
+
   it('expands to show the waveform and BPM · key facts only when known', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', bpm: 118, musicalKey: '8A' });
@@ -496,6 +538,37 @@ describe('PersistentAudioBar', () => {
         from: '/app/chat/thread-1?panel=profile',
       })
     );
+  });
+
+  it('prefetches the lyrics route on pointer and keyboard intent', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    const lyricsButton = screen.getByRole('button', { name: 'Lyrics' });
+    fireEvent.pointerEnter(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    prefetch.mockClear();
+    fireEvent.focus(lyricsButton);
+    expect(prefetch).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+  });
+
+  it('does not prefetch the lyrics route when the track has no lyrics', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <PersistentAudioBar />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
+    expect(prefetch).not.toHaveBeenCalled();
   });
 
   it('closes the canonical lyrics button back to the last non-lyrics route', async () => {

@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
 import {
   ensureBaseHistory,
   runMergeGroupStorybookCertification,
@@ -34,6 +35,10 @@ import {
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+  'utf8'
+);
+const SETUP_NODE_PNPM_ACTION = readFileSync(
+  resolve(REPO_ROOT, '.github/actions/setup-node-pnpm/action.yml'),
   'utf8'
 );
 const IOS_CI_WORKFLOW = readFileSync(
@@ -256,6 +261,33 @@ describe('merge_group workflow contract', () => {
     expect(EVENT.merge_group.head_ref).toContain('gh-readonly-queue/main/');
   });
 
+  it('reuses one validated dependency workspace across isolated merge-group jobs', () => {
+    const producer = getJobBlock(CI_WORKFLOW, 'ci-merge-group-workspace');
+    expect(producer).toContain("github.event_name == 'merge_group'");
+    expect(producer).toContain('github.event.merge_group.head_sha');
+    expect(producer).toContain('save_merge_group_workspace:');
+    expect(producer).toContain(
+      'node scripts/lib/ci-dependency-workspace.mjs validate'
+    );
+
+    const consumers =
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+    for (const jobId of consumers.split(' ')) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job, jobId).toContain('ci-merge-group-workspace');
+      expect(job, jobId).toContain("reuse_merge_group_workspace: 'true'");
+    }
+
+    for (const fragment of [
+      'key: pnpm-node-modules-v4-',
+      "github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true'",
+      'Prepared merge-group dependency workspace was not restored.',
+      'node scripts/lib/ci-dependency-workspace.mjs prepare',
+      'node scripts/lib/ci-dependency-workspace.mjs validate',
+    ])
+      expect(SETUP_NODE_PNPM_ACTION).toContain(fragment);
+  });
+
   it('runs deterministic CI against the synthetic base-to-head diff', () => {
     expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
     expect(CI_WORKFLOW).toContain(
@@ -412,7 +444,22 @@ describe('merge_group workflow contract', () => {
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
     expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
-    expect(sizeGuard).toContain('timeout-minutes: 1');
+    // External admission producers: the job clock includes runner
+    // provisioning (observed 69s), so a sub-3-minute budget can cancel a
+    // passing run and fail admission closed on a CANCELLED required check.
+    // Each producer must still conclude before admission stops polling.
+    for (const [producerName, producer] of [
+      ['PR Size Guard', sizeGuard],
+      ['Fork PR Gate', getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')],
+    ]) {
+      const producerTimeoutMinutes = Number(
+        producer.match(/timeout-minutes:\s*(\d+)/)?.[1]
+      );
+      expect(producerTimeoutMinutes, producerName).toBeGreaterThanOrEqual(3);
+      expect(producerTimeoutMinutes * 60_000, producerName).toBeLessThanOrEqual(
+        MERGE_GROUP_ADMISSION_WAIT_MS / 2
+      );
+    }
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
     expect(sizeGuard).toContain('--policy=size');
     expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
@@ -460,6 +507,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -505,6 +553,7 @@ describe('merge_group workflow contract', () => {
     for (const jobId of [
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
     ]) {
       expect(getJobBlock(CI_WORKFLOW, jobId), jobId).toMatch(
@@ -530,13 +579,63 @@ describe('merge_group workflow contract', () => {
       units.indexOf('- name: Run quarantined unit tests (retries)'),
       units.indexOf('- name: Run Ovie route')
     );
-    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/10'\n/);
+    expect(step).toMatch(/has_unit == 'true' && matrix\.shard == '7\/14'\n/);
     expect(step).not.toContain('--shard');
+  });
+
+  it('reserves sequencer capacity only on the shards that run pinned CI work', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1];
+    const shards = [...(matrix ?? '').matchAll(/'(\d+\/\d+)'/g)].map(m => m[1]);
+    expect(shards.length).toBeGreaterThan(1);
+    expect(new Set(shards).size).toBe(shards.length);
+    shards.forEach((shard, i) =>
+      expect(shard).toBe(`${i + 1}/${shards.length}`)
+    );
+    const pinned = [
+      ...new Set(
+        [...units.matchAll(/matrix\.shard == '(\d+\/\d+)'/g)].map(m => m[1])
+      ),
+    ].sort();
+    for (const shard of pinned) expect(shards).toContain(shard);
+    expect(Object.keys(CI_RESERVED_MS).sort()).toEqual(pinned);
+  });
+
+  it('runs packages/ui in its own unit matrix entry, off the web shards', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const matrix = units.match(/^ {8}shard: \[(.+)\]$/m)?.[1] ?? '';
+    const entries = [...matrix.matchAll(/'([^']+)'/g)].map(m => m[1]);
+    expect(entries.filter(entry => !/^\d+\/\d+$/.test(entry))).toEqual([
+      'packages/ui',
+    ]);
+    const stepIf = name => {
+      const start = units.indexOf(`- name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      return units.slice(start).match(/\n\s+if: (.+)\n/)?.[1];
+    };
+    // The web Vitest and its web-only setup never run on the ui entry, so
+    // `--shard=packages/ui` is never handed to Vitest.
+    for (const name of [
+      'Setup Playwright warm path',
+      'Load quarantined unit tests',
+      'Run unit tests',
+    ]) {
+      expect(stepIf(name), name).toContain("matrix.shard != 'packages/ui'");
+    }
+    expect(stepIf('Run packages/ui unit tests')).toBe(
+      "steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'"
+    );
+    // Parallel, not pinned: no web shard carries a packages/ui reservation.
+    expect(units).not.toMatch(
+      /matrix\.shard == '\d+\/\d+'\n\s+run: pnpm turbo test --filter=@jovie\/ui/
+    );
+    expect(Object.keys(CI_RESERVED_MS)).not.toContain('packages/ui');
   });
 
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
+    const typecheck = getJobBlock(CI_WORKFLOW, 'ci-typecheck-ovie');
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     const ovieTests = units.slice(
       units.indexOf(
@@ -544,7 +643,7 @@ describe('merge_group workflow contract', () => {
       ),
       units.indexOf('      - name: Preserve Ovie coverage evidence')
     );
-    expect(ovieTests).toContain("matrix.shard == '1/10'");
+    expect(ovieTests).toContain("matrix.shard == '1/14'");
     expect(ovieTests).toContain('pnpm --filter @jovie/ovie test');
     expect(ovieTests).not.toContain('continue-on-error');
     const ovieBuild = build.slice(
@@ -558,20 +657,54 @@ describe('merge_group workflow contract', () => {
       build.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
     ).toHaveLength(2);
     expect(buildLayout).not.toContain('@jovie/ovie');
-    expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
-    // The build may skip Next's duplicate type pass only because the
-    // standalone typecheck runs first, fail-fast, in the same step.
     expect(ovieBuild).toContain('set -euo pipefail');
-    expect(
-      ovieBuild.indexOf('pnpm --filter @jovie/ovie typecheck')
-    ).toBeLessThan(
-      ovieBuild.indexOf(
-        'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
-      )
+    expect(ovieBuild).toContain(
+      'NEXT_IGNORE_TYPECHECK=1 TURBO_ENGINE_READ_ONLY=1 pnpm --filter @jovie/ovie build'
     );
     expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
-    expect(ovieBuild).not.toMatch(/typecheck[^\n]*\|\|/);
+    // The build may skip Next's duplicate type pass only because the
+    // standalone typecheck runs the full command, fail-closed, in a parallel
+    // job with the same trigger and absent-app guards.
+    expect(typecheck).toContain('name: Ovie Typecheck (combined)');
+    expect(typecheck.slice(0, typecheck.indexOf('    runs-on:'))).toBe(
+      build
+        .slice(0, build.indexOf('    runs-on:'))
+        .replace('ci-build-ovie:', 'ci-typecheck-ovie:')
+        .replace('Ovie Build (combined)', 'Ovie Typecheck (combined)')
+    );
+    expect(
+      typecheck.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
+    ).toHaveLength(2);
+    expect(typecheck).toContain('run: pnpm --filter @jovie/ovie typecheck');
+    expect(typecheck).not.toContain('continue-on-error');
+    expect(typecheck).not.toContain('NEXT_IGNORE_TYPECHECK');
+    expect(typecheck).not.toMatch(/typecheck[^\n]*\|\|/);
+    // Every job that consumes the build result must consume the typecheck
+    // result too, so skipping Next's type pass never weakens a gate.
+    const jobIds = [...CI_WORKFLOW.matchAll(/^  ([a-z0-9-]+):\n/gm)].map(
+      match => match[1]
+    );
+    const consumers = jobIds.filter(jobId => {
+      if (jobId === 'ci-build-ovie') return false;
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      return job
+        .slice(0, job.indexOf('    runs-on:'))
+        .includes('ci-build-ovie');
+    });
+    expect(consumers).toEqual([
+      'ci-cross-product-integration',
+      'ci-product-lane-receipt',
+      'ci-merge-group-ready',
+      'main-release-ready',
+    ]);
+    for (const jobId of consumers) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job.slice(0, job.indexOf('    runs-on:')), jobId).toContain(
+        'ci-typecheck-ovie'
+      );
+      expect(job, jobId).toContain('needs.ci-typecheck-ovie.result');
+    }
     expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
     expect(ovieBuild).toContain(
       'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
@@ -584,7 +717,7 @@ describe('merge_group workflow contract', () => {
     );
     // Both checks remain inside jobs already required by the merge-group
     // aggregate; neither allocates a heavy source-PR lane.
-    for (const job of [units, build]) {
+    for (const job of [units, build, typecheck]) {
       const header = job.slice(0, job.indexOf('    runs-on:'));
       expect(header).toContain(
         "needs.ci-path-changes.outputs.run_web == 'true'"
@@ -614,6 +747,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-exact-head-coverage');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-build-ovie');
+    expect(aggregate).toContain('ci-typecheck-ovie');
     expect(aggregate).toContain('ci-storybook-surfaces');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');
@@ -639,6 +773,12 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain(
       'OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"'
+    );
+    expect(aggregate).toContain(
+      'OVIE_TYPECHECK_RESULT="${{ needs.ci-typecheck-ovie.result }}"'
+    );
+    expect(aggregate).toContain(
+      '"Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT"'
     );
     expect(aggregate).toContain(
       'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
@@ -712,6 +852,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -728,7 +869,7 @@ describe('merge_group workflow contract', () => {
     expect(migrationGuard).toMatch(
       /- uses: actions\/checkout@[^\n]+\n\s+if: needs\.ci-path-changes\.outputs\.run_drizzle == 'true'\n\s+with:\n\s+fetch-depth: 0/
     );
-    expect(migrationGuard).toContain('timeout-minutes: 3');
+    expect(migrationGuard).toContain('timeout-minutes: 6');
     expect(migrationGuard).toContain(
       'run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}'
     );
@@ -740,6 +881,9 @@ describe('merge_group workflow contract', () => {
     );
     expect(migrationGuard).toContain('./scripts/check-migrations.sh');
     expect(migrationGuard).toContain('./scripts/validate-migrations.sh');
+    expect(migrationGuard).toContain(
+      'pnpm exec tsx scripts/online-index-migrate.ts --validate-only'
+    );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     expect(buildLayout).toContain('runs-on: ubuntu-latest');
     expect(buildLayout).toContain('Build exact combined head');
@@ -763,7 +907,7 @@ describe('merge_group workflow contract', () => {
       expect(surfaces).toContain(`pnpm --filter ${check}`);
     }
     expect(unitTests).toContain(
-      "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
+      `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}, 'packages/ui']`
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
@@ -812,7 +956,7 @@ describe('merge_group workflow contract', () => {
     ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
-      "run_full_ci == 'true' && matrix.shard == '4/10'\n        run: pnpm turbo test --filter=@jovie/ui"
+      "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
     expect(
       unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
@@ -1398,20 +1542,32 @@ describe('merge_group workflow contract', () => {
       .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
-    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped
-unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped
-unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped
-unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success
-healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success
-selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped
-selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success
-selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success
-selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success
-selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped
-deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped`;
+    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped|skipped
+unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped|skipped
+unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped|skipped
+unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success|skipped
+healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success|success
+selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped|skipped
+selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success|success
+selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success|success
+selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success|success
+selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped|success
+unselected Web rejects Ovie typecheck execution|false|skipped|skipped|false|skipped|1|skipped|skipped|success
+selected Web rejects failed Ovie typecheck|true|success|success|false|skipped|1|success|success|failure
+deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped|skipped`;
     for (const testCase of cases.split('\n')) {
-      const [name, web, unit, build, runIos, iosResult, status, ovie, story] =
-        testCase.split('|');
+      const [
+        name,
+        web,
+        unit,
+        build,
+        runIos,
+        iosResult,
+        status,
+        ovie,
+        story,
+        ovieTypecheck,
+      ] = testCase.split('|');
       const result = spawnSync(
         'bash',
         [
@@ -1425,6 +1581,7 @@ RUN_IOS="$4"
 IOS_RESULT="$5"
 OVIE_BUILD_RESULT="$6"
 STORYBOOK_SURFACES_RESULT="$7"
+OVIE_TYPECHECK_RESULT="$8"
 RUN_MACOS=false
 MACOS_RESULT=skipped
 RUN_CROSS_PRODUCT=false
@@ -1438,6 +1595,7 @@ ${selectedGateScript}`,
           iosResult,
           ovie,
           story,
+          ovieTypecheck,
         ],
         { encoding: 'utf8' }
       );
@@ -2470,6 +2628,7 @@ ${selectedGateScript}`,
       'ci-fast',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
@@ -3444,5 +3603,25 @@ describe('merge-group Playwright artifact guard', () => {
       expect(step).toContain('guard-playwright-artifacts.mjs" --run --');
       expect(step).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/u);
     }
+  });
+});
+
+describe('merge-queue green enroll scan window (JOV-6831)', () => {
+  const ENROLL = readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
+    'utf8'
+  );
+
+  it('pages through every open PR instead of one oldest-first window', () => {
+    expect(ENROLL).toContain('after: $cursor');
+    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
+    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).not.toMatch(/direction:\s*ASC/);
+  });
+
+  it('keeps the rejected-head rule: no re-enqueue without a new push', () => {
+    expect(ENROLL).toContain(
+      'if (removedAt && committedAt && removedAt > committedAt) continue;'
+    );
   });
 });

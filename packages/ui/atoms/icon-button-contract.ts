@@ -35,3 +35,15 @@ export const ICON_BUTTON_VISIBLE_CLASSNAME =
 /** Modifier for inline affordances revealed on parent hover/focus. */
 export const ICON_BUTTON_FADE_CLASSNAME =
   'p-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100';
+
+/**
+ * Canonical Pen master for the icon-button family: `XYhft` on the founder's
+ * canonical Pen file (live-canvas skill PASS 2026-08-14 — JOV-5095). One
+ * master for the whole family; no descendant override slots are verified yet,
+ * so content/icon overrides fail closed until the Pen lane returns same-root
+ * receipts.
+ */
+export const ICON_BUTTON_PEN_CONTRACT = {
+  rootId: 'XYhft',
+  descendants: {},
+} as const;

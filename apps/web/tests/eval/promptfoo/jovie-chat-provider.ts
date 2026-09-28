@@ -7772,8 +7772,10 @@ function evaluateChatTitleContract(vars: EvalVars) {
       "import { gateway, generateText } from '@/lib/ai/sdk'",
       "import { TITLE_MODEL } from '@/lib/constants/ai-models'",
     ]),
+    // Titles stay on the light (low-cost) tier; the vendor model is owned by
+    // lib/constants/ai-models (JOV-6533 moved it onto the gateway allowlist).
     usesTitleModelConstant:
-      TITLE_MODEL === 'google/gemini-2.0-flash' &&
+      TITLE_MODEL === CHAT_MODEL_LIGHT &&
       routeSource.includes('gateway(TITLE_MODEL)'),
     keepsTitleOnlyPrompt: textIncludesAll(systemPrompt, [
       'Generate a short, descriptive title',
@@ -7842,6 +7844,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
     networkAttempted: false,
     titleCase,
     titleModel: TITLE_MODEL,
+    lightModel: CHAT_MODEL_LIGHT,
     routeSourcePath,
     routeSourceLength: routeSource.length,
     systemPrompt,

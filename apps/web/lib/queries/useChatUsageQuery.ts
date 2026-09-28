@@ -3,8 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PlanId } from '@/lib/entitlements/registry';
 import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
-import { createQueryFn, FetchError } from './fetch';
+import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
+import { classifiedRetryDelay, createClassifiedRetry } from './retry-policy';
 
 export interface ChatUsageData {
   plan: PlanId;
@@ -25,13 +26,8 @@ export const chatUsageQueryOptions = {
   queryKey: queryKeys.chat.usage(),
   queryFn: fetchChatUsage,
   ...FREQUENT_BACKGROUND_CACHE,
-  retry: (failureCount: number, error: Error) => {
-    if (error instanceof FetchError && !error.isRetryable()) {
-      return false;
-    }
-    return failureCount < 1;
-  },
-  retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+  retry: createClassifiedRetry(1),
+  retryDelay: classifiedRetryDelay,
 } as const;
 
 export function useChatUsageQuery(options?: { enabled?: boolean }) {

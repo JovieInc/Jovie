@@ -102,6 +102,28 @@ export function createSmartLinkContentTag(profileId: string): string {
 }
 
 /**
+ * Public release projections embedded in profile pages and release feeds.
+ * Keyed by profile ID so release mutations can invalidate them without
+ * resolving a mutable profile handle.
+ */
+export function createPublicReleasesTag(profileId: string): string {
+  return `public-releases:${profileId}`;
+}
+
+/**
+ * Release matrix / entity server-cache tag (JOV-6272).
+ *
+ * One query-key family: release lists and entities are keyed by
+ * (userId, profileId) only — the profile handle never participates, so a
+ * handle rename never forks the cache. Every mutation site must build this
+ * tag through this helper; inline `releases:${...}` template strings are
+ * banned (pinned by the JOV-6272 contract test).
+ */
+export function createReleasesTag(userId: string, profileId: string): string {
+  return `releases:${userId}:${profileId}`;
+}
+
+/**
  * Characters invalid in HTTP header field values (RFC 7230 §3.2.6).
  * Strips control characters except tab (0x09) that would crash response headers.
  * Cache tags with user-provided input (usernames, slugs) must be sanitized.

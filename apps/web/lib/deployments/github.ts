@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { env } from '@/lib/env-server';
+import { resolveHudGithubToken } from '@/lib/github/hud-token.server';
 import { serverFetch } from '@/lib/http/server-fetch';
 import type {
   HudDeploymentRun,
@@ -53,7 +54,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function getHudDeployments(): Promise<HudDeployments> {
-  const token = env.HUD_GITHUB_TOKEN;
+  const token = await resolveHudGithubToken();
   const owner = env.HUD_GITHUB_OWNER;
   const repo = env.HUD_GITHUB_REPO;
   const workflow = env.HUD_GITHUB_WORKFLOW;

@@ -19,6 +19,7 @@
  * ```
  */
 
+import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
 // ============================================================================
@@ -106,13 +107,28 @@ async function acquireLock(
   const lockKey = `idempotency:${key}`;
   const redis = getRedis();
 
+  // In-process mutual exclusion across backend flaps: a live memory lock means
+  // this process is already running the operation, even if Redis has since
+  // recovered and would hand out a fresh distributed lock.
+  const now = Date.now();
+  const expiresAt = memoryLocks.get(lockKey);
+  if (expiresAt && now < expiresAt) {
+    return 'locked';
+  }
+
   if (redis) {
     try {
       const result = await redis.set(lockKey, '1', {
         nx: true,
         ex: ttlSeconds,
       });
-      return result === 'OK' ? 'acquired' : 'locked';
+      if (result === 'OK') {
+        // Mirror in memory so a mid-operation Redis flap cannot hand the same
+        // key to a fallback acquire in this process.
+        memoryLocks.set(lockKey, now + ttlSeconds * 1000);
+        return 'acquired';
+      }
+      return 'locked';
     } catch {
       if (options.requireBackend) {
         return 'backend_unavailable';
@@ -122,15 +138,14 @@ async function acquireLock(
     return 'backend_unavailable';
   }
 
-  // Fallback to memory-based locking
-  const now = Date.now();
-  const expiresAt = memoryLocks.get(lockKey);
-
-  if (expiresAt && now < expiresAt) {
+  // Fallback to memory-based locking. Re-check after the awaited Redis attempt:
+  // a concurrent in-process caller may have acquired the fallback lock in the
+  // meantime.
+  const fallbackExpiresAt = memoryLocks.get(lockKey);
+  if (fallbackExpiresAt && fallbackExpiresAt > Date.now()) {
     return 'locked';
   }
-
-  memoryLocks.set(lockKey, now + ttlSeconds * 1000);
+  memoryLocks.set(lockKey, Date.now() + ttlSeconds * 1000);
   return 'acquired';
 }
 
@@ -143,10 +158,23 @@ async function releaseLock(key: string): Promise<void> {
   const lockKey = `idempotency:${key}`;
   const redis = getRedis();
 
+  // Always clear the in-process fallback lock: acquire may have used it while
+  // Redis was erroring, and a leaked entry would falsely report "in progress"
+  // until its TTL. Deleting is a no-op when the lock lives only in Redis.
+  memoryLocks.delete(lockKey);
+
   if (redis) {
-    await redis.del(lockKey);
-  } else {
-    memoryLocks.delete(lockKey);
+    try {
+      await redis.del(lockKey);
+    } catch (error) {
+      // A failed release must not mask the wrapped operation's outcome —
+      // the lock still expires via its TTL. Report so the outage stays
+      // observable without turning successful work into a failure.
+      captureWarning('Idempotency lock release failed', error, {
+        context: 'idempotency.releaseLock',
+        key,
+      }).catch(() => {});
+    }
   }
 }
 
@@ -161,13 +189,18 @@ export async function isLocked(key: string): Promise<boolean> {
   const redis = getRedis();
 
   if (redis) {
-    const result = await redis.exists(lockKey);
-    return result === 1;
+    try {
+      if ((await redis.exists(lockKey)) === 1) {
+        return true;
+      }
+    } catch {
+      // Redis unreachable — fall back to the in-process lock state so callers
+      // still get a truthful answer during a cache outage.
+    }
   }
 
-  const now = Date.now();
   const expiresAt = memoryLocks.get(lockKey);
-  return !!expiresAt && now < expiresAt;
+  return !!expiresAt && Date.now() < expiresAt;
 }
 
 // ============================================================================

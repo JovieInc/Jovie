@@ -22,7 +22,7 @@ import { resolveUserState } from '@/lib/auth/gate';
 import ChatLoading from './chat/ChatLoadingState';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
-import { LibraryLoadingState } from './library/LibrarySurface';
+import { LibraryLoadingState } from './library/LibraryLoadingState';
 import { requireAppShellModeAccess } from './shell-mode';
 import {
   isChatShellRoute,

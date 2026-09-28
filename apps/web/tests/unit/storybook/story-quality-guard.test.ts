@@ -95,4 +95,85 @@ export const Fixture = {};
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
+  it('reports a receipt below a shallow boundary as shallow, not a non-ancestor', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'jovie-story-shallow-'));
+    const storyRelative = 'apps/web/components/Fixture.stories.tsx';
+    const storyPath = join(fixtureRoot, storyRelative);
+    const commit = (content: string, message: string) => {
+      writeFileSync(storyPath, content);
+      fixtureGit(fixtureRoot, ['add', storyRelative]);
+      fixtureGit(fixtureRoot, ['commit', '-m', message]);
+      return fixtureGit(fixtureRoot, ['rev-parse', 'HEAD']);
+    };
+
+    try {
+      mkdirSync(dirname(storyPath), { recursive: true });
+      fixtureGit(fixtureRoot, ['init', '-b', 'main']);
+      fixtureGit(fixtureRoot, ['config', 'user.email', 'fixture@example.com']);
+      fixtureGit(fixtureRoot, ['config', 'user.name', 'Story Fixture']);
+      const receiptSha = commit('export default {};\n', 'seed story');
+      const boundarySha = commit('export default {};\n// v2\n', 'middle');
+      commit(
+        `export default {};
+export const Fixture = { parameters: { pen: { sourceSha: '${receiptSha}' } } };
+`,
+        'record receipt'
+      );
+      expect(runGuard(fixtureRoot).status).toBe(0);
+
+      // The receipt object stays present, but the boundary hides it from HEAD:
+      // the state a checkout is in when its history was cut after unshallowing.
+      writeFileSync(join(fixtureRoot, '.git/shallow'), `${boundarySha}\n`);
+      const result = runGuard(fixtureRoot);
+      const output = `${result.stdout}${result.stderr}`;
+      expect(result.status).toBe(1);
+      expect(output).toContain('story-provenance-shallow');
+      expect(output).toContain('2 commits reachable, 1 shallow boundaries');
+      expect(output).toContain(`boundary ${boundarySha}`);
+      expect(output).toContain('last fetch: none');
+      expect(output).not.toContain('story-provenance-ancestor');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed with the git error instead of a false provenance verdict', () => {
+    // Not a git repository: every provenance git call exits 128. That is an
+    // execution error, never "missing commit" or "not an ancestor".
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'jovie-story-git-error-'));
+    const storyPath = join(
+      fixtureRoot,
+      'apps/web/components/Fixture.stories.tsx'
+    );
+    const sha = 'a'.repeat(40);
+
+    try {
+      mkdirSync(dirname(storyPath), { recursive: true });
+      writeFileSync(
+        storyPath,
+        `export default {};
+export const Fixture = { parameters: { pen: { sourceSha: '${sha}' } } };
+`
+      );
+      const result = spawnSync(process.execPath, [guardPath], {
+        cwd: fixtureRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_CEILING_DIRECTORIES: dirname(fixtureRoot),
+          STORYBOOK_QUALITY_ROOT: fixtureRoot,
+        },
+      });
+      const output = `${result.stdout}${result.stderr}`;
+      expect(result.status).toBe(1);
+      expect(output).toContain('story-provenance-git-error');
+      expect(output).toContain(
+        `git rev-parse --verify --quiet ${sha}^{commit}`
+      );
+      expect(output).not.toContain('story-provenance-commit');
+      expect(output).not.toContain('story-provenance-ancestor');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
 });

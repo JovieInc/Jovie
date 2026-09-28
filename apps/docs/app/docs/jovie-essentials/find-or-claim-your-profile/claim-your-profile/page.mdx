@@ -1,0 +1,97 @@
+---
+id: claim-your-profile
+title: Claim your profile
+description: Prove ownership of an eligible artist profile, finish sign-in, and recover from interrupted or mismatched claims.
+documentType: guide
+category: jovie-essentials
+productBacked: true
+featureId: public-profile-pages
+productRoute: /start
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - claim artist
+  - claim my profile
+  - verify profile
+  - profile already claimed
+redirectAliases: []
+visualProofRefs:
+  - proof/claim-your-profile-banner.png
+  - proof/claim-your-profile-auth.png
+uiLabels:
+  - Claim Profile
+  - Continue Claim
+  - Verify & Claim
+  - Continue to Jovie
+  - Pick the exact Spotify artist
+productSourceRefs:
+  - apps/web/components/features/profile/ClaimBanner.tsx
+  - apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx
+  - apps/web/app/[username]/claim/route.ts
+  - apps/web/app/onboarding/actions/connect-spotify.ts
+  - apps/web/lib/auth/auth-shell-intent.ts
+launchPath: true
+---
+
+<HelpArticle id="claim-your-profile">
+
+# Claim your profile
+
+<HelpOutcome>Verify the Spotify identity attached to an eligible, unclaimed profile and take ownership of it.</HelpOutcome>
+
+<HelpPrerequisites>
+
+- The correct public profile must show **Claim Profile**, **Continue Claim**, or **Verify & Claim**. A profile without a claim action is not eligible for this self-service flow.
+
+</HelpPrerequisites>
+
+<HelpSteps>
+
+<HelpStep title="Start on the correct public profile">
+Check the profile name, image, and releases, then choose its claim action. Do not continue from a same-name artist you cannot verify.
+
+<HelpScreenshot src="/proof/claim-your-profile-banner.png" alt="An unclaimed Jovie artist page showing the Claim Profile action" caption="A claim starts from the public profile banner." />
+</HelpStep>
+
+<HelpStep title="Sign in when asked">
+If you are signed out, Jovie sends you to **Continue to Jovie**. Use Apple, Google, or the one-time email code; Jovie returns the claim context after authentication.
+
+<HelpScreenshot src="/proof/claim-your-profile-auth.png" alt="Continue to Jovie authentication with Apple, Google, and email code choices" caption="Authentication preserves the profile claim context." />
+</HelpStep>
+
+<HelpStep title="Prove the matching Spotify identity">
+At **Pick the exact Spotify artist**, select the Spotify artist already attached to the public profile. This match is the ownership proof; a similar name is not enough.
+</HelpStep>
+
+<HelpStep title="Finish the claim">
+Complete the Start flow. When verification succeeds, Jovie imports the matching artist data and opens your account workspace.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+You can edit your display name, username, image, location, bio, and links under [Artist Profile](https://jov.ie/app/settings/artist-profile). Provider identity and catalog ownership mismatches still require review.
+
+<HelpTroubleshooting>
+
+### The claim is interrupted or still in progress
+
+Return to the same public profile and choose **Continue Claim**. Do not begin from a different artist page.
+
+### Verification rejects the selected artist
+
+If Jovie says to choose the Spotify artist already attached to the profile, go back and select that exact identity. If it says the artist is linked to another account, sign in to the original account instead of retrying.
+
+### The profile is already claimed or belongs to the wrong artist
+
+An already-owned profile may have no claim action. Sign in to the original account; if ownership or catalog data is wrong, use [Fix the wrong artist or catalog](/docs/manage-jovie/troubleshooting/fix-wrong-artist-or-catalog) with both profile URLs as evidence.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="claim-your-profile" ids={['find-your-profile', 'create-account-or-log-in', 'fix-wrong-artist-or-catalog']} />
+
+<HelpFeedback articleId="claim-your-profile" />
+
+</HelpArticle>

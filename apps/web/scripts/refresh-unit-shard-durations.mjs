@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Refreshes tests/unit-shard-durations.json (read by vitest-duration-sequencer)
-// from green merge-queue "Unit Tests (n/10)" job logs:
+// from green merge-queue "Unit Tests (n/N)" job logs:
 //   NODE_USE_ENV_PROXY=1 GITHUB_TOKEN=... node scripts/refresh-unit-shard-durations.mjs [--runs 8]
 //   node scripts/refresh-unit-shard-durations.mjs --logs <dir of job .log files>
 // Logs only show per-file test ms; environment/setup/import time (~80% of a

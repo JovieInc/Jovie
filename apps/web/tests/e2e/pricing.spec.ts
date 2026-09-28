@@ -43,7 +43,7 @@ test.describe('Pricing Page', () => {
     await expect(page.locator('h1')).toHaveText('Pricing');
     await expect(
       page.getByRole('heading', {
-        name: 'Public artist profile and audience capture',
+        name: 'Public Jovie profile and audience capture',
       })
     ).toBeVisible();
 
@@ -132,7 +132,7 @@ test.describe('Pricing Page', () => {
       );
     expect(pricingCardCtasAreCentered).toEqual([true, true, true]);
     await expect(
-      page.getByRole('link', { name: 'Explore Artist Profiles' }).first()
+      page.getByRole('link', { name: 'Explore Jovie Profiles' }).first()
     ).toBeVisible();
 
     await expect(page.getByText('Compare all features').first()).toBeVisible();

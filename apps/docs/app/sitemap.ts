@@ -1,11 +1,9 @@
 import type { MetadataRoute } from 'next';
 import { loadArticleRegistry } from '@/lib/article-registry.mjs';
+import { buildSitemapEntries } from '@/lib/help-center-seo.mjs';
 
-const DOCS_ORIGIN = 'https://docs.jov.ie';
+export const dynamic = 'force-static';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const { consumers } = loadArticleRegistry();
-  return consumers.sitemap.map((article: { route: string }) => ({
-    url: new URL(article.route, DOCS_ORIGIN).toString(),
-  }));
+  return buildSitemapEntries(loadArticleRegistry());
 }

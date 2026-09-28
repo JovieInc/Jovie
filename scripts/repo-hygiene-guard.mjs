@@ -837,6 +837,17 @@ function gitPaths(args) {
     .filter(Boolean);
 }
 
+function gitPathsRevParse(ref) {
+  try {
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', ref], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 const REGULAR_GIT_MODES = new Set(['100644', '100755']);
 function gitPathModes(args, indexFormat) {
   const modes = new Map();
@@ -883,14 +894,23 @@ export function collectGitPaths(args) {
     throw new Error(
       'usage: repo-hygiene-guard.mjs --staged | --diff-base <rev>'
     );
-  const baseRef = diffBaseIndex >= 0 ? args[diffBaseIndex + 1] : 'HEAD';
+  // During a merge commit the index delta against HEAD is the entire
+  // incoming branch, which mismeasures the change the committer introduces.
+  // Diff against MERGE_HEAD instead so the guard measures this branch's
+  // contribution plus the conflict resolution, matching --diff-base semantics.
+  const mergeHead =
+    staged && diffBaseIndex < 0
+      ? gitPathsRevParse('MERGE_HEAD')
+      : null;
+  const baseRef =
+    diffBaseIndex >= 0 ? args[diffBaseIndex + 1] : mergeHead ?? 'HEAD';
   if (!baseRef) throw new Error('--diff-base requires a Git revision');
   const base = gitPathModes(['ls-tree', '-r', '-z', baseRef], false);
   const current = staged
     ? gitPathModes(['ls-files', '-s', '-z'], true)
     : gitPathModes(['ls-tree', '-r', '-z', 'HEAD'], false);
   const diffArgs = staged
-    ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']
+    ? ['diff', '--cached', baseRef, '--name-only', '--diff-filter=ACMR', '-z']
     : ['diff', '--name-only', '--diff-filter=ACMR', '-z', `${baseRef}..HEAD`];
   return {
     baseRef,
