@@ -138,27 +138,13 @@ if (typeof window !== 'undefined') {
       urlObj.origin === window.location.origin &&
       urlObj.pathname.startsWith('/api/')
     ) {
-      // Auth-backed account stories need a signed-in fixture after the
-      // Better Auth migration; the old Clerk mock no longer supplies it.
-      if (
-        urlObj.pathname === '/api/auth/get-session' &&
-        new URLSearchParams(window.location.search)
-          .get('id')
-          ?.match(/^organisms-(sidebaridentitygroup|unifiedsidebar)--/)
-      ) {
-        return Response.json({
-          user: {
-            id: 'story-user',
-            name: 'Tim White',
-            email: 'tim@example.com',
-            image: null,
-          },
-          session: {
-            id: 'story-session',
-            userId: 'story-user',
-            expiresAt: '2099-01-01T00:00:00Z',
-          },
-        });
+      // Better Auth's get-session returns null when signed out. Stories that
+      // need a signed-in session use the shared `withSignedInSession`
+      // decorator (.storybook/signed-in-session.tsx), which intercepts this
+      // fetch before the auth provider mounts — a `?id=` query check cannot
+      // work under the vitest browser runner, which owns the page URL.
+      if (urlObj.pathname === '/api/auth/get-session') {
+        return Response.json(null);
       }
       return new Response(JSON.stringify({}), {
         status: 200,

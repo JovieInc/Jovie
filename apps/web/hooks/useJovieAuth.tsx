@@ -168,7 +168,7 @@ export function JovieAuthValuesProvider({
         isLoaded,
         isSignedIn,
         userId: user?.id ?? null,
-        sessionId: data?.session.id ?? null,
+        sessionId: data?.session?.id ?? null,
         getToken,
         signOut,
       },
