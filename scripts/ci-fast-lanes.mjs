@@ -1888,6 +1888,10 @@ export async function runStructural(opts = {}) {
     // is FAIL, not advisory).
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts tests/unit/design-system/single-column-one-width-v1.test.ts tests/unit/design-system/one-chrome-layer-v1.test.ts tests/unit/design-system/one-notification-v1.test.ts tests/unit/design-system/one-modal-layer-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
+    // Merge-group-only unit guards, run on PRs too: a PR green on PR CI that
+    // trips them poisons every merge group behind it (three ~2h zero-merge
+    // stalls on 2026-09-27: #19124, #18985 metrics layer; #18960 retirement gate).
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/design-system/component-family-ratchet.test.ts',
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
   const allParts = [
