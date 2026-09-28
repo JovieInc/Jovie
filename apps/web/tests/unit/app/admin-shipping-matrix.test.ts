@@ -172,7 +172,10 @@ describe('lane pull request detail (JOV-6893)', () => {
 });
 
 describe('buildMatrixRows (JOV-6893)', () => {
-  const feedBase = {
+  type MatrixFeed = Parameters<typeof buildMatrixRows>[0];
+  type MatrixTask = MatrixFeed['tasks'][number];
+
+  const feedBase: Omit<MatrixFeed, 'tasks'> = {
     canonicalSource: 'linear',
     cacheMode: 'local-reconciled',
     syncState: 'fresh',
@@ -181,16 +184,16 @@ describe('buildMatrixRows (JOV-6893)', () => {
     lastSyncedAt: null,
     freshnessDeadline: null,
     deltas: [],
-  } as const;
+  };
 
-  function task(overrides: Record<string, unknown> = {}) {
+  function task(overrides: Partial<MatrixTask> = {}): MatrixTask {
     return {
-      id: 'linear:JOV-1' as const,
+      id: 'linear:JOV-1',
       linearIdentifier: 'JOV-1',
       linearUrl: 'https://linear.app/jovie/issue/jov-1',
       title: 'Lane work',
-      workflowState: 'in-review' as const,
-      priority: 'none' as const,
+      workflowState: 'in-review',
+      priority: 'none',
       attempt: null,
       retryAt: null,
       sourceRevision: SHA,
@@ -269,41 +272,45 @@ describe('buildMatrixRows (JOV-6893)', () => {
 
 describe('client projection parse', () => {
   it('retains pullRequest detail through the cockpit schema', () => {
-    const projection = structuredClone(
-      unknownProjection({
-        sequence: 1,
-        observationTimestamp: new Date(NOW).toISOString(),
-        emissionTimestamp: new Date(NOW).toISOString(),
-        latencyMs: 10,
-        publishing: true,
-        lastError: null,
-      })
-    );
-    projection.operationalTasks.tasks = [
-      {
-        id: 'linear:JOV-1',
-        linearIdentifier: 'JOV-1',
-        linearUrl: 'https://linear.app/jovie/issue/jov-1',
-        title: 'Lane work',
-        workflowState: 'merge-queued',
-        priority: 'none',
-        attempt: null,
-        retryAt: null,
-        sourceRevision: SHA,
-        updatedAt: '2026-09-27T01:30:00.000Z',
-        pullRequest: {
-          number: 7,
-          url: 'https://github.com/JovieInc/Jovie/pull/7',
-          branch: 'devin/jov-1-x',
-          agent: 'devin',
-          isDraft: false,
-          checks: { rollup: 'failure', failing: ['biome'] },
-          queuePosition: 2,
-          queueState: 'QUEUED',
-          createdAt: '2026-09-26T00:00:00.000Z',
-        },
+    const baseProjection = unknownProjection({
+      sequence: 1,
+      observationTimestamp: new Date(NOW).toISOString(),
+      emissionTimestamp: new Date(NOW).toISOString(),
+      latencyMs: 10,
+      publishing: true,
+      lastError: null,
+    });
+    const projection = {
+      ...baseProjection,
+      operationalTasks: {
+        ...baseProjection.operationalTasks,
+        tasks: [
+          {
+            id: 'linear:JOV-1',
+            linearIdentifier: 'JOV-1',
+            linearUrl: 'https://linear.app/jovie/issue/jov-1',
+            title: 'Lane work',
+            workflowState: 'merge-queued',
+            priority: 'none',
+            attempt: null,
+            retryAt: null,
+            sourceRevision: SHA,
+            updatedAt: '2026-09-27T01:30:00.000Z',
+            pullRequest: {
+              number: 7,
+              url: 'https://github.com/JovieInc/Jovie/pull/7',
+              branch: 'devin/jov-1-x',
+              agent: 'devin',
+              isDraft: false,
+              checks: { rollup: 'failure', failing: ['biome'] },
+              queuePosition: 2,
+              queueState: 'QUEUED',
+              createdAt: '2026-09-26T00:00:00.000Z',
+            },
+          },
+        ],
       },
-    ];
+    } as const;
     const parsed = parseShippingCockpitProjection(projection);
     expect(
       parsed?.operationalTasks.tasks[0]?.pullRequest?.checks.failing

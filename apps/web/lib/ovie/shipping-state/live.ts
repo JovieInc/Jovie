@@ -953,6 +953,47 @@ function boundedCheckName(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+function checkRollupState(
+  value: unknown
+): 'success' | 'failure' | 'pending' | 'unknown' {
+  if (typeof value !== 'string') return 'unknown';
+  switch (value.toUpperCase()) {
+    case 'SUCCESS':
+      return 'success';
+    case 'FAILURE':
+    case 'ERROR':
+      return 'failure';
+    case 'PENDING':
+    case 'EXPECTED':
+      return 'pending';
+    default:
+      return 'unknown';
+  }
+}
+
+function failingContextName(context: unknown): string | null {
+  if (!isRecord(context)) return null;
+  if (context.__typename === 'CheckRun') {
+    if (
+      typeof context.conclusion !== 'string' ||
+      !CHECK_RUN_FAILURE_CONCLUSIONS.has(context.conclusion)
+    ) {
+      return null;
+    }
+    return boundedCheckName(context.name);
+  }
+  if (context.__typename === 'StatusContext') {
+    if (
+      typeof context.state !== 'string' ||
+      !STATUS_CONTEXT_FAILURE_STATES.has(context.state)
+    ) {
+      return null;
+    }
+    return boundedCheckName(context.context);
+  }
+  return null;
+}
+
 /**
  * Per-PR check rollup: GitHub's `StatusCheckRollup.state` plus the names of
  * the failing runs so the shipping matrix can say *what* is red without a
@@ -969,31 +1010,12 @@ function laneChecksSummary(node: Record<string, unknown>): {
     commit && isRecord(commit.statusCheckRollup)
       ? commit.statusCheckRollup
       : null;
-  const state =
-    typeof rollup?.state === 'string' ? rollup.state.toUpperCase() : null;
-  const summary =
-    state === 'SUCCESS'
-      ? 'success'
-      : state === 'FAILURE' || state === 'ERROR'
-        ? 'failure'
-        : state === 'PENDING' || state === 'EXPECTED'
-          ? 'pending'
-          : 'unknown';
+  const summary = checkRollupState(rollup?.state);
   const failing: string[] = [];
   const contexts =
     rollup && isRecord(rollup.contexts) ? rollup.contexts.nodes : null;
   for (const ctx of Array.isArray(contexts) ? contexts : []) {
-    if (!isRecord(ctx)) continue;
-    const failed =
-      ctx.__typename === 'CheckRun'
-        ? CHECK_RUN_FAILURE_CONCLUSIONS.has(String(ctx.conclusion ?? ''))
-        : ctx.__typename === 'StatusContext'
-          ? STATUS_CONTEXT_FAILURE_STATES.has(String(ctx.state ?? ''))
-          : false;
-    if (!failed) continue;
-    const name = boundedCheckName(
-      ctx.__typename === 'CheckRun' ? ctx.name : ctx.context
-    );
+    const name = failingContextName(ctx);
     if (name && failing.length < MAX_FAILING_CHECK_NAMES) failing.push(name);
   }
   return { rollup: summary, failing };

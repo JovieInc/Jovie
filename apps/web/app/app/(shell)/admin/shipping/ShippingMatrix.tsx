@@ -154,13 +154,7 @@ const ATTENTION_LABELS: Record<Exclude<MatrixAttention, 'ok'>, string> = {
 
 function ChecksCell({ row }: Readonly<{ readonly row: MatrixRow }>) {
   if (row.checksRollup === 'failure') {
-    const names =
-      row.failingChecks.length > 0
-        ? row.failingChecks.slice(0, 2).join(', ') +
-          (row.failingChecks.length > 2
-            ? ` +${row.failingChecks.length - 2}`
-            : '')
-        : 'checks failing';
+    const names = failingChecksLabel(row.failingChecks);
     return (
       <span
         className='text-error'
@@ -179,6 +173,13 @@ function ChecksCell({ row }: Readonly<{ readonly row: MatrixRow }>) {
   return <span className='text-tertiary-token'>UNKNOWN</span>;
 }
 
+function failingChecksLabel(failingChecks: readonly string[]): string {
+  if (failingChecks.length === 0) return 'checks failing';
+  const visible = failingChecks.slice(0, 2).join(', ');
+  const remaining = failingChecks.length - 2;
+  return remaining > 0 ? `${visible} +${remaining}` : visible;
+}
+
 function QueueCell({ row }: Readonly<{ readonly row: MatrixRow }>) {
   if (row.queuePosition != null) {
     return (
@@ -194,14 +195,121 @@ function QueueCell({ row }: Readonly<{ readonly row: MatrixRow }>) {
 }
 
 const ROW_ATTENTION_CLASS: Record<MatrixAttention, string> = {
-  blocked:
-    'border-l-2 border-l-[var(--color-error)] bg-[color-mix(in_oklab,var(--color-error)_6%,transparent)]',
-  failing:
-    'border-l-2 border-l-[var(--color-error)] bg-[color-mix(in_oklab,var(--color-error)_6%,transparent)]',
-  stalled: 'border-l-2 border-l-[var(--color-warning)]',
-  queued: 'border-l-2 border-l-[var(--color-success)]',
+  blocked: 'border-l-2 border-l-error bg-error-subtle',
+  failing: 'border-l-2 border-l-error bg-error-subtle',
+  stalled: 'border-l-2 border-l-warning',
+  queued: 'border-l-2 border-l-success',
   ok: 'border-l-2 border-l-transparent',
 };
+
+function railAttentionTone(row: MatrixRow): 'good' | 'warning' | 'bad' {
+  if (row.attention === 'queued' && row.stage === 'merge-queued') return 'good';
+  if (row.attention === 'stalled') return 'warning';
+  return 'bad';
+}
+
+function ShippingRowRailHeader({ row }: Readonly<{ row: MatrixRow }>) {
+  const subtitle =
+    row.prNumber == null
+      ? row.identifier
+      : `${row.identifier} · PR #${row.prNumber}`;
+  const badge =
+    row.attention === 'ok' ? undefined : (
+      <HudStatusPill
+        label={ATTENTION_LABELS[row.attention]}
+        tone={railAttentionTone(row)}
+      />
+    );
+  return (
+    <div className='px-3 pt-3'>
+      <EntityHeader
+        thumbnail={
+          <EntityHeaderThumbnail
+            variant='connection'
+            name={row.identifier}
+            icon={<GitPullRequest className='h-5 w-5' aria-hidden='true' />}
+          />
+        }
+        title={row.title}
+        subtitle={subtitle}
+        badge={badge}
+      />
+    </div>
+  );
+}
+
+function ShippingRowRailContent({ row }: Readonly<{ row: MatrixRow }>) {
+  const headSha = row.sha ? row.sha.slice(0, 7) : 'UNKNOWN';
+  const opened = row.createdAt ? formatTimeAgo(row.createdAt) : 'UNKNOWN';
+  const lastTransition =
+    row.transition ??
+    (row.updatedAt ? formatTimeAgo(row.updatedAt) : 'UNKNOWN');
+
+  return (
+    <>
+      <DrawerSection title='Status' sectionKind='status'>
+        <DrawerPropertyRow label='Stage' value={STAGE_LABELS[row.stage]} />
+        <DrawerPropertyRow label='Checks' value={<ChecksCell row={row} />} />
+        <DrawerPropertyRow label='Queue' value={<QueueCell row={row} />} />
+        <DrawerPropertyRow label='Owner' value={row.agent ?? 'UNKNOWN'} />
+        <DrawerPropertyRow label='Branch' value={row.branch ?? 'UNKNOWN'} />
+        <DrawerPropertyRow label='Head SHA' value={headSha} />
+        <DrawerPropertyRow label='Opened' value={opened} />
+        <DrawerPropertyRow label='Last Transition' value={lastTransition} />
+      </DrawerSection>
+      {row.failingChecks.length > 0 ? (
+        <DrawerSection title='Failing checks' sectionKind='details'>
+          <ul className='space-y-1 px-1 text-xs text-error'>
+            {row.failingChecks.map(name => (
+              <li key={name} className='truncate' title={name}>
+                {name}
+              </li>
+            ))}
+          </ul>
+        </DrawerSection>
+      ) : null}
+      <DrawerSection title='Evidence' sectionKind='links'>
+        {row.prUrl ? (
+          <DrawerPropertyRow
+            label='Pull Request'
+            value={
+              <a
+                href={row.prUrl}
+                target='_blank'
+                rel='noreferrer'
+                className='inline-flex items-center gap-1 text-accent-blue hover:underline'
+              >
+                #{row.prNumber} on GitHub
+                <ExternalLink className='h-3 w-3' aria-hidden='true' />
+              </a>
+            }
+          />
+        ) : null}
+        {row.linearUrl ? (
+          <DrawerPropertyRow
+            label='Linear'
+            value={
+              <a
+                href={row.linearUrl}
+                target='_blank'
+                rel='noreferrer'
+                className='inline-flex items-center gap-1 text-accent-blue hover:underline'
+              >
+                {row.identifier}
+                <ExternalLink className='h-3 w-3' aria-hidden='true' />
+              </a>
+            }
+          />
+        ) : null}
+        {!row.prUrl && !row.linearUrl ? (
+          <p className='px-1 text-xs text-tertiary-token'>
+            No external evidence links for this item.
+          </p>
+        ) : null}
+      </DrawerSection>
+    </>
+  );
+}
 
 function ShippingRowRail({
   row,
@@ -220,121 +328,22 @@ function ShippingRowRail({
       entityHeaderSurface='flat'
       isEmpty={!row}
       emptyMessage='Select a work item to inspect it.'
-      entityHeader={
-        row ? (
-          <div className='px-3 pt-3'>
-            <EntityHeader
-              thumbnail={
-                <EntityHeaderThumbnail
-                  variant='connection'
-                  name={row.identifier}
-                  icon={
-                    <GitPullRequest className='h-5 w-5' aria-hidden='true' />
-                  }
-                />
-              }
-              title={row.title}
-              subtitle={`${row.identifier}${row.prNumber != null ? ` · PR #${row.prNumber}` : ''}`}
-              badge={
-                row.attention !== 'ok' ? (
-                  <HudStatusPill
-                    label={ATTENTION_LABELS[row.attention]}
-                    tone={
-                      row.attention === 'queued' && row.stage === 'merge-queued'
-                        ? 'good'
-                        : row.attention === 'stalled'
-                          ? 'warning'
-                          : 'bad'
-                    }
-                  />
-                ) : undefined
-              }
-            />
-          </div>
-        ) : undefined
-      }
+      entityHeader={row ? <ShippingRowRailHeader row={row} /> : undefined}
     >
-      {row ? (
-        <>
-          <DrawerSection title='Status' sectionKind='status'>
-            <DrawerPropertyRow label='Stage' value={STAGE_LABELS[row.stage]} />
-            <DrawerPropertyRow
-              label='Checks'
-              value={<ChecksCell row={row} />}
-            />
-            <DrawerPropertyRow label='Queue' value={<QueueCell row={row} />} />
-            <DrawerPropertyRow label='Owner' value={row.agent ?? 'UNKNOWN'} />
-            <DrawerPropertyRow label='Branch' value={row.branch ?? 'UNKNOWN'} />
-            <DrawerPropertyRow
-              label='Head SHA'
-              value={row.sha ? row.sha.slice(0, 7) : 'UNKNOWN'}
-            />
-            <DrawerPropertyRow
-              label='Opened'
-              value={row.createdAt ? formatTimeAgo(row.createdAt) : 'UNKNOWN'}
-            />
-            <DrawerPropertyRow
-              label='Last Transition'
-              value={
-                row.transition ??
-                (row.updatedAt ? formatTimeAgo(row.updatedAt) : 'UNKNOWN')
-              }
-            />
-          </DrawerSection>
-          {row.failingChecks.length > 0 ? (
-            <DrawerSection title='Failing checks' sectionKind='details'>
-              <ul className='space-y-1 px-1 text-xs text-error'>
-                {row.failingChecks.map(name => (
-                  <li key={name} className='truncate' title={name}>
-                    {name}
-                  </li>
-                ))}
-              </ul>
-            </DrawerSection>
-          ) : null}
-          <DrawerSection title='Evidence' sectionKind='links'>
-            {row.prUrl ? (
-              <DrawerPropertyRow
-                label='Pull Request'
-                value={
-                  <a
-                    href={row.prUrl}
-                    target='_blank'
-                    rel='noreferrer'
-                    className='inline-flex items-center gap-1 text-accent-blue hover:underline'
-                  >
-                    #{row.prNumber} on GitHub
-                    <ExternalLink className='h-3 w-3' aria-hidden='true' />
-                  </a>
-                }
-              />
-            ) : null}
-            {row.linearUrl ? (
-              <DrawerPropertyRow
-                label='Linear'
-                value={
-                  <a
-                    href={row.linearUrl}
-                    target='_blank'
-                    rel='noreferrer'
-                    className='inline-flex items-center gap-1 text-accent-blue hover:underline'
-                  >
-                    {row.identifier}
-                    <ExternalLink className='h-3 w-3' aria-hidden='true' />
-                  </a>
-                }
-              />
-            ) : null}
-            {!row.prUrl && !row.linearUrl ? (
-              <p className='px-1 text-xs text-tertiary-token'>
-                No external evidence links for this item.
-              </p>
-            ) : null}
-          </DrawerSection>
-        </>
-      ) : null}
+      {row ? <ShippingRowRailContent row={row} /> : null}
     </EntitySidebarShell>
   );
+}
+
+function matrixSummary(
+  query: Readonly<{ isPending: boolean; isError: boolean }>,
+  rowCount: number,
+  attentionCount: number,
+  syncState: TaskFeed['syncState'] | undefined
+): string {
+  if (query.isPending) return 'Loading in-flight work…';
+  if (query.isError) return 'UNKNOWN — observation failed. Refresh to retry.';
+  return `${rowCount} open · ${attentionCount} need attention · ${syncState ?? 'unknown'} cache`;
 }
 
 /**
@@ -391,16 +400,17 @@ export function ShippingMatrix() {
           <div className='min-w-0'>
             <h2
               id='shipping-matrix-title'
-              className='text-app font-semibold text-primary-token'
+              className='line-clamp-2 text-app font-semibold text-primary-token'
             >
               In-flight Work
             </h2>
             <p className='truncate text-2xs text-tertiary-token'>
-              {query.isPending
-                ? 'Loading in-flight work…'
-                : query.isError
-                  ? 'UNKNOWN — observation failed. Refresh to retry.'
-                  : `${rows.length} open · ${attentionCount} need attention · ${feed?.syncState ?? 'unknown'} cache`}
+              {matrixSummary(
+                query,
+                rows.length,
+                attentionCount,
+                feed?.syncState
+              )}
             </p>
           </div>
           <Button
@@ -468,7 +478,12 @@ export function ShippingMatrix() {
                     }
                   >
                     <th scope='row' className='max-w-0 p-2'>
-                      <div className='min-w-0'>
+                      <button
+                        type='button'
+                        aria-expanded={selectedId === row.id}
+                        aria-label={`Inspect ${row.identifier}: ${row.title}`}
+                        className='block w-full min-w-0 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                      >
                         <div className='truncate font-medium text-primary-token'>
                           {row.title}
                         </div>
@@ -479,7 +494,7 @@ export function ShippingMatrix() {
                             ? ` · ${ATTENTION_LABELS[row.attention]}`
                             : ''}
                         </div>
-                      </div>
+                      </button>
                     </th>
                     <td className='p-2 whitespace-nowrap'>
                       <HudStatusPill
