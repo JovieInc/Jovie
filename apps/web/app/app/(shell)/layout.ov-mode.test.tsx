@@ -85,7 +85,7 @@ vi.mock('./chat/ChatLoadingState', () => ({
 vi.mock('./dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => null,
 }));
-vi.mock('./library/LibrarySurface', () => ({
+vi.mock('./library/LibraryLoadingState', () => ({
   LibraryLoadingState: () => null,
 }));
 vi.mock('./DashboardShellContent', () => ({

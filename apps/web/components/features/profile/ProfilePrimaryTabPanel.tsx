@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/molecules/EmptyState';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { SubscriptionFormSkeleton } from '@/features/profile/artist-notifications-cta/shared';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type {
@@ -62,6 +63,12 @@ interface ProfilePrimaryTabPanelProps {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  /**
+   * False while the per-user experiment assignment is still resolving. The
+   * subscribe CTA stays a skeleton until this is true so the assigned
+   * variant is fixed before the capture control can render or take clicks.
+   */
+  readonly visitorAssignmentResolved?: boolean;
   readonly isSubscribed: boolean;
   readonly contentPrefs: Record<NotificationContentType, boolean>;
   readonly onTogglePref: (key: NotificationContentType) => void;
@@ -205,6 +212,7 @@ function SubscribePanel({
   notificationsPortalContainer,
   subscribeTwoStep,
   alertOptInVariant,
+  visitorAssignmentResolved = true,
   previewNotificationsState,
   onFlowClosed,
   onSubscriptionActivated,
@@ -222,6 +230,7 @@ function SubscribePanel({
   notificationsPortalContainer?: HTMLElement | null;
   subscribeTwoStep?: boolean;
   alertOptInVariant?: ProfileAlertOptInVariant;
+  visitorAssignmentResolved?: boolean;
   previewNotificationsState?: ProfilePreviewNotificationsState;
   onFlowClosed?: () => void;
   onSubscriptionActivated?: () => void;
@@ -248,7 +257,9 @@ function SubscribePanel({
     return (
       <ProfileStayCloseCard accent={accent}>
         <div className='-mx-4 -mb-4'>
-          {subscribeTwoStep ? (
+          {!visitorAssignmentResolved ? (
+            <SubscriptionFormSkeleton />
+          ) : subscribeTwoStep ? (
             <TwoStepNotificationsCTA
               artist={artist}
               startExpanded
@@ -371,6 +382,7 @@ export function ProfilePrimaryTabPanel({
   dsps = [],
   subscribeTwoStep = false,
   alertOptInVariant,
+  visitorAssignmentResolved = true,
   isSubscribed,
   contentPrefs,
   onTogglePref,
@@ -544,6 +556,7 @@ export function ProfilePrimaryTabPanel({
         notificationsPortalContainer={notificationsPortalContainer}
         subscribeTwoStep={subscribeTwoStep}
         alertOptInVariant={alertOptInVariant}
+        visitorAssignmentResolved={visitorAssignmentResolved}
         previewNotificationsState={previewNotificationsState}
         onFlowClosed={handleSubscribeFlowClosed}
         onSubscriptionActivated={handleSubscriptionActivated}

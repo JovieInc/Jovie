@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 /**
  * Tests for ReleaseFilterDropdown — filter toggle and clear logic.
  *
@@ -431,5 +433,21 @@ describe('ReleaseFilterDropdown', () => {
         labels: [],
       });
     });
+  });
+});
+
+describe('VirtualizedLabelList virtualized window under React Compiler', () => {
+  it('opts the virtualizer reader out of memoization (JOV-6702)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx'
+      ),
+      'utf8'
+    );
+    const body = source.slice(source.indexOf('function VirtualizedLabelList'));
+    expect(body.slice(0, body.indexOf('useVirtualizer('))).toContain(
+      "'use no memo';"
+    );
   });
 });

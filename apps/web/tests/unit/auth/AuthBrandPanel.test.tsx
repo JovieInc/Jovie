@@ -88,7 +88,7 @@ describe('AuthBrandPanel', () => {
       screen.getByText(DEFAULT_AUTH_BRAND_DESCRIPTION)
     ).toBeInTheDocument();
     expect(DEFAULT_AUTH_BRAND_HEADLINE).toBe(
-      'A living identity for the internet.'
+      'Your living identity on the internet.'
     );
     expect(DEFAULT_AUTH_BRAND_DESCRIPTION).toBe(
       'Your work, your links, your next chapter. Together in your Jovie profile.'

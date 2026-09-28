@@ -38,6 +38,7 @@ const summerHistorySchema = z.object({
       content: z.string(),
       createdAt: z.string().datetime(),
       clientMessageId: z.string().nullable(),
+      summerFailed: z.literal(true).optional(),
     })
   ),
   hasMore: z.literal(false),

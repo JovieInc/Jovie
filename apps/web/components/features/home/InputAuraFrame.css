@@ -8,7 +8,7 @@
 .input-aura-frame--editorial {
   --input-aura-rim: color-mix(
     in oklab,
-    var(--system-b-text-primary) 16%,
+    var(--system-b-text-primary) 20%,
     transparent
   );
   --input-aura-rim-bright: color-mix(
@@ -28,7 +28,8 @@
   border-radius: inherit;
   padding: var(--space-px);
   background: var(--input-aura-rim);
-  opacity: 0.72;
+  /* Pen V9RoEr: the resting pill rim reads at 20% (JOV-6946). */
+  opacity: 1;
   transition: opacity var(--ds-motion-subtle-duration)
     var(--ds-motion-subtle-easing);
   -webkit-mask:

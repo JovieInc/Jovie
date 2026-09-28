@@ -34,6 +34,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import pr_events  # noqa: E402
@@ -69,7 +70,8 @@ HOST = socket.gethostname().split(".")[0]
 LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
-              "scripts/tests/test_reason_lane.py", "scripts/tests/test_gh_app_token.py"]
+              "scripts/tests/test_reason_lane.py", "scripts/tests/test_gh_app_token.py",
+              "scripts/tests/test_disk_guard.py"]
 # Files outside scripts/lanes a release carries: the HUD's PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs"]
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -229,6 +231,8 @@ def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
         "  non-interactive path. Do not run gstack or other skill workflows (ship, review, qa,",
         "  upgrade) and do not upgrade any tooling: commit with git and open the PR with",
         "  `gh pr create --draft`.",
+        "- Remove any git worktrees you create when done (`git worktree remove`); the host",
+        "  reclaims idle ones, but ENOSPC once took every lane down at once.",
         *sensitive_contract,
         "- End with a handoff: what changed, what you verified, concerns and deviations.",
     ])
@@ -965,6 +969,11 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             pushed = bool(after) and after != pr["headRefOid"]
             receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                            verdict="fix-pushed" if pushed else "fix-no-change")
+            if pushed:
+                # A new fix head earns another queue try; a repeat failure re-marks it. The PR
+                # summary carries no labels, so delete unconditionally (404 when absent).
+                sh(["gh", "api", "-X", "DELETE",
+                    f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
             if pushed and not pr.get("isDraft"):
                 # Conflicts and failures can drop auto-merge; re-arm it so the fix actually lands.
                 sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto"], log=log)
@@ -1267,6 +1276,10 @@ def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
     if not spec.get("enabled", True):
         return 0  # a lane turned off in a newer release stops at its next re-exec
+    try:
+        disk_guard.check(host)  # spawn is an event path: reclaim before the run needs disk
+    except Exception:
+        pass
     slot = None
     for index in range(host.slots(name, spec.get("slots", 1))):
         lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
@@ -1386,6 +1399,7 @@ def dispatch(host: Host) -> int:
     try:
         ensure_full_history(host)
         prune_worktrees(host)
+        tick["disk"] = disk_guard.check(host)
         for name, spec in load_providers().items():
             slots = host.slots(name, spec.get("slots", 1))
             # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
@@ -1556,7 +1570,10 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
         return
     shim_dir.mkdir(parents=True, exist_ok=True)
     shim = shim_dir / "gh"
-    shim.write_text(f'#!/bin/sh\nGH_TOKEN="$(python3 {HERE / "gh_app_token.py"})" || exit 1\n'
+    # App installation tokens cannot touch user gists (403), and the status feed is Tim's gist:
+    # `gh gist` keeps the host's own login.
+    shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+                    f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"})" || exit 1\n'
                     f'export GH_TOKEN\nexec {real} "$@"\n')
     shim.chmod(0o755)
     os.environ["PATH"] = f"{shim_dir}{os.pathsep}{os.environ.get('PATH', '')}"
