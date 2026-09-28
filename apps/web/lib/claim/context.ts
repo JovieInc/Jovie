@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { trackServerEvent } from '@/lib/server-analytics';
 import type { ClaimEntryMode, PendingClaimContext } from './types';
 
 export const PENDING_CLAIM_COOKIE = 'jovie_pending_claim';
@@ -105,6 +106,28 @@ export async function writePendingClaimContext(input: {
     path: '/',
     maxAge: Math.floor(PENDING_CLAIM_TTL_MS / 1000),
   });
+
+  // Canonical unique-profile claim_started: durable server event independent
+  // of client telemetry. This intentionally measures the first recorded claim
+  // intent per profile (not every attempt), matching profile-scoped completion
+  // identities without inflating the funnel across refreshes or devices. A
+  // sink failure must not interrupt the claim redirect, so it is reported and
+  // swallowed here.
+  const claimStarted = await trackServerEvent(
+    'claim_started',
+    { profileId: input.creatorProfileId, source: input.mode },
+    undefined,
+    { eventIdentity: `claim_started:${input.creatorProfileId}` }
+  ).catch(error => ({ ok: false as const, error }));
+  if (!claimStarted.ok) {
+    await captureError(
+      'claim_started analytics delivery failed',
+      claimStarted.error instanceof Error
+        ? claimStarted.error
+        : new Error(String(claimStarted.error)),
+      { route: 'pending-claim-context' }
+    );
+  }
 
   return context;
 }

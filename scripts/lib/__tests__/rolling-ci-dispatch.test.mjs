@@ -641,9 +641,11 @@ describe('rolling CI dispatch CLI and workflow', () => {
       "GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jovie.com'",
       "GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jovie.com'",
       'startup_failure',
+      "node-version: '24'",
     ]) {
       expect(WORKFLOW, token).toContain(token);
     }
+    expect(WORKFLOW).not.toContain("node-version: '22'");
     const prepareStart = WORKFLOW.indexOf('\n  prepare:\n');
     const testStart = WORKFLOW.indexOf('\n  test:\n', prepareStart);
     const prepareJob = WORKFLOW.slice(prepareStart, testStart);
