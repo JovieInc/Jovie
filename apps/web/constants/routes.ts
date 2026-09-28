@@ -114,7 +114,6 @@ export const APP_ROUTES = {
   ADMIN_INGEST: '/app/ov/ingest',
   ADMIN_SCREENSHOTS: '/app/ov/screenshots',
   ADMIN_FEATURE_REGISTRY: '/app/ov/feature-registry',
-  ADMIN_DESIGN_SYSTEM_REGISTRY: '/app/ov/design-system-registry',
   ADMIN_SHARE_STUDIO: '/app/ov/share-studio',
   ADMIN_RELEASES: '/app/ov/releases',
   ADMIN_USERS_BAN: '/app/ov/users/ban',

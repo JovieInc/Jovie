@@ -21,7 +21,7 @@ export default async function FeatureRegistryPage() {
   return (
     <AdminPage
       title='Feature Registry'
-      description='Inspect canonical Jovie capabilities, attached product evidence, and the subset ready for local founder taste certification.'
+      description='Canonical Jovie capabilities with attached evidence and local founder taste certification.'
       testId='admin-feature-registry-page'
     >
       <FounderReviewRegistry kind='feature' items={items} />

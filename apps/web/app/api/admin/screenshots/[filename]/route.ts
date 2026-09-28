@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { type NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/admin/middleware';
 import { resolveScreenshotPath } from '@/lib/admin/screenshots';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
@@ -10,11 +10,15 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ filename: string }> }
 ) {
-  // Screenshot assets are a read-only extension of the role-gated admin page.
-  // Requiring a fresh MFA entitlement here made the page render while every
-  // image failed with 403. Mutating admin APIs remain MFA-gated.
-  const authError = await requireAdmin();
-  if (authError) return authError;
+  const entitlements = await getCurrentUserEntitlements();
+
+  if (!entitlements.isAuthenticated) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!entitlements.isAdmin) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { filename } = await params;
   const filePath = resolveScreenshotPath(decodeURIComponent(filename));

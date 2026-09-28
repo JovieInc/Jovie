@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { assert, describe, expect, it } from 'vitest';
 import {
-  buildDesignSystemReviewItems,
   buildFeatureReviewItems,
   parseFeatureRegistryMarkdown,
 } from '@/lib/admin/founder-review-registry';
@@ -34,15 +33,10 @@ describe('founder review registries', () => {
   it('attaches visual media to every feature while admitting only honest ready packets', () => {
     const items = buildFeatureReviewItems(FEATURE_REGISTRY);
 
-    expect(items.every(item => item.media.length > 0)).toBe(true);
     expect(items.every(item => item.media[0]?.src.startsWith('/'))).toBe(true);
     expect(items.some(item => item.scope === 'capability')).toBe(true);
     expect(items.find(item => item.title === 'Delete a contact')).toMatchObject(
-      {
-        scope: 'behavior',
-        readiness: 'collecting',
-        status: 'Implemented',
-      }
+      { scope: 'behavior', readiness: 'collecting', status: 'Implemented' }
     );
     expect(items.some(item => item.readiness === 'ready')).toBe(true);
     expect(
@@ -51,20 +45,11 @@ describe('founder review registries', () => {
       readiness: 'collecting',
       media: [{ dedicated: false }],
     });
+
     const readyItems = items.filter(item => item.readiness === 'ready');
-    expect(new Set(readyItems.map(item => item.title))).toEqual(
-      new Set([
-        'Release pages with listen links per DSP',
-        'Smart link editing and customization',
-        'Spotify pre-save campaigns',
-        'Public profile pages',
-        'Subscribe / follow page',
-        'Contact page',
-        'Tour dates (Bandsintown)',
-        'Latest release card on profile',
-        'Advanced analytics and geo insights',
-      ])
-    );
+    expect(
+      readyItems.map(item => [item.title, item.media[0]?.src])
+    ).toMatchSnapshot();
     expect(
       readyItems.every(
         item =>
@@ -88,9 +73,7 @@ describe('founder review registries', () => {
     const items = buildFeatureReviewItems(FEATURE_REGISTRY);
     const ready = items.find(item => item.readiness === 'ready');
     const collecting = items.find(item => item.readiness === 'collecting');
-    expect(ready).toBeDefined();
-    expect(collecting).toBeDefined();
-    if (!ready || !collecting) return;
+    assert(ready && collecting);
 
     expect(ready.certificationPacket.contract).toBe(
       JOVIE_CERTIFICATION_CONTRACT
@@ -118,8 +101,7 @@ describe('founder review registries', () => {
     const item = buildFeatureReviewItems(FEATURE_REGISTRY).find(
       candidate => candidate.readiness === 'ready'
     );
-    expect(item).toBeDefined();
-    if (!item) return;
+    assert(item);
 
     const recorded = recordFounderCertificationDecision({
       packet: item.certificationPacket,
@@ -131,20 +113,18 @@ describe('founder review registries', () => {
         evidenceDigest: item.decisionEvidenceDigest,
       },
     });
-    expect(recorded.ok).toBe(true);
-    if (!recorded.ok) return;
+    assert(recorded.ok);
 
     // A media swap mints a new source fingerprint and a new digest; the prior
     // approved decision becomes a stale founder lock.
-    const tamperedPacket = {
-      ...item.certificationPacket,
-      itemMedia: item.certificationPacket.itemMedia.map(media => ({
-        ...media,
-        ref: '/changed-evidence.png',
-      })),
-    };
     const tamperedAdmission = evaluateCertificationAdmission({
-      packet: tamperedPacket,
+      packet: {
+        ...item.certificationPacket,
+        itemMedia: item.certificationPacket.itemMedia.map(media => ({
+          ...media,
+          ref: '/changed-evidence.png',
+        })),
+      },
       decisions: recorded.decisions,
     });
     expect(tamperedAdmission.decisionEvidenceDigest).not.toBe(
@@ -156,27 +136,5 @@ describe('founder review registries', () => {
         event => event.type === 'founder_lock_stale'
       )
     ).toBe(true);
-  });
-
-  it('projects every canonical design component with media and keeps incomplete proof blocked', () => {
-    const items = buildDesignSystemReviewItems();
-    const registrySize = items.length;
-
-    expect(registrySize).toBeGreaterThanOrEqual(11);
-    expect(items.every(item => item.scope === 'component')).toBe(true);
-    expect(items.every(item => item.media.length > 0)).toBe(true);
-    expect(items.find(item => item.title === 'Button')?.readiness).toBe(
-      'ready'
-    );
-    expect(items.find(item => item.title === 'IconButton')?.readiness).toBe(
-      'collecting'
-    );
-    // Components without a proven Pen binding fail the required_variants tier.
-    expect(
-      evaluateCertificationAdmission({
-        packet: items.find(item => item.title === 'Input')
-          ?.certificationPacket as never,
-      }).blockers.map(blocker => blocker.code)
-    ).toContain('required_variant_missing');
   });
 });

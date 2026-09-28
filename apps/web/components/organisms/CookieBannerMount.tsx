@@ -10,7 +10,6 @@ import {
 import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import type { Consent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
-import { isElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { setConsentState } from '@/lib/tracking/consent';
 
 type CookieModalComponent = ComponentType<{
@@ -30,10 +29,6 @@ declare global {
 }
 
 function shouldMountCookieBanner(pathname: string): boolean {
-  if (isElectronRuntime()) {
-    return false;
-  }
-
   if (shouldSuppressCookieBannerForPathname(pathname)) {
     return false;
   }
@@ -62,7 +57,6 @@ export function CookieBannerMount() {
   const listenersRef = useRef(new Set<(v: unknown) => void>());
 
   const openPreferences = useCallback(() => {
-    if (isElectronRuntime()) return;
     void import('@/components/organisms/CookieModal').then(mod => {
       setModal(() => mod.CookieModal);
       setPreferencesOpen(true);
@@ -98,13 +92,6 @@ export function CookieBannerMount() {
   }, [openPreferences]);
 
   useEffect(() => {
-    if (isElectronRuntime()) {
-      setBanner(null);
-      setModal(null);
-      setPreferencesOpen(false);
-      return;
-    }
-
     if (shouldMountCookieBanner(globalThis.location.pathname)) {
       void import('@/components/organisms/CookieBannerSection').then(mod => {
         setBanner(() => mod.CookieBannerSection);

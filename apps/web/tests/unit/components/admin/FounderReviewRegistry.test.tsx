@@ -7,45 +7,17 @@ import {
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import type { FounderReviewItem } from '@/lib/admin/founder-review-registry';
-import {
-  buildCertificationDecisionDigest,
-  JOVIE_CERTIFICATION_CONTRACT,
-} from '@/lib/agent-os/certification';
+import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
 
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
 
-function itemFixture(
-  overrides: Partial<FounderReviewItem> &
-    Pick<FounderReviewItem, 'id' | 'title' | 'readiness'>
-): FounderReviewItem {
-  const certificationPacket = {
-    contract: JOVIE_CERTIFICATION_CONTRACT,
-    subject: {
-      id: overrides.id,
-      kind: 'feature' as const,
-      title: overrides.title,
-    },
-    source: null,
-    canonicalReferences: [],
-    invariantEvaluation: [],
-    testsCoverage: [],
-    visualProof: [],
-    requiredVariants: [],
-    itemMedia: [],
-  };
-  return {
-    registry: 'feature',
-    eyebrow: 'Smart Links',
-    scope: 'capability',
-    description: 'A source-backed capability with dedicated evidence.',
-    status: 'Shipped',
-    access: 'Free+',
-    source: 'docs/FEATURE_REGISTRY.md',
-    gate: 'None',
-    readinessReason: 'The review packet is complete.',
-    evidence: ['Canonical feature registry', 'Dedicated product capture'],
+const items: readonly FounderReviewItem[] = [
+  founderReviewItemFixture({
+    id: 'feature.ready',
+    title: 'Ready feature',
+    readiness: 'ready',
     media: [
       {
         kind: 'image',
@@ -55,22 +27,8 @@ function itemFixture(
         dedicated: true,
       },
     ],
-    certificationPacket,
-    decisionEvidenceDigest:
-      buildCertificationDecisionDigest(certificationPacket),
-    certificationState:
-      overrides.readiness === 'ready' ? 'review_ready' : 'working',
-    ...overrides,
-  };
-}
-
-const items: readonly FounderReviewItem[] = [
-  itemFixture({
-    id: 'feature.ready',
-    title: 'Ready feature',
-    readiness: 'ready',
   }),
-  itemFixture({
+  founderReviewItemFixture({
     id: 'feature.contacts.delete-contact',
     title: 'Delete a contact',
     eyebrow: 'Contacts',
@@ -82,7 +40,6 @@ const items: readonly FounderReviewItem[] = [
     gate: 'Destructive confirmation',
     readiness: 'collecting',
     readinessReason: 'A dedicated end-to-end capture is still required.',
-    evidence: ['Server action', 'Confirmation test'],
     media: [
       {
         kind: 'image',
@@ -176,16 +133,17 @@ describe('FounderReviewRegistry', () => {
   });
 
   it('removes a local decision recorded against a stale evidence digest', async () => {
+    const stale = {
+      'feature.ready': {
+        outcome: 'certified',
+        note: 'Old review',
+        reviewedAt: '2026-08-30T12:00:00.000Z',
+        evidenceDigest: 'sha256:stale',
+      },
+    };
     localStorage.setItem(
       'ovie-founder-review-decisions-v1',
-      JSON.stringify({
-        'feature.ready': {
-          outcome: 'certified',
-          note: 'Old review',
-          reviewedAt: '2026-08-30T12:00:00.000Z',
-          evidenceDigest: 'sha256:stale',
-        },
-      })
+      JSON.stringify(stale)
     );
 
     renderRegistry();

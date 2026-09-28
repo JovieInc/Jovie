@@ -1,13 +1,8 @@
 import { createHash } from 'node:crypto';
 import {
-  DESIGN_SYSTEM_COMPONENT_REGISTRY,
-  type DesignSystemComponentRegistryEntry,
-} from '@/data/designSystem/componentRegistry';
-import {
   buildCertificationDecisionDigest,
   type CertificationEvidenceReceipt,
   type CertificationItemMediaReceipt,
-  type CertificationRequiredVariant,
   type CertificationReviewPacket,
   type CertificationState,
   type CertificationTasteEvidenceTier,
@@ -41,13 +36,8 @@ export interface FounderReviewItem {
   readonly gate: string;
   readonly readiness: FounderReviewReadiness;
   readonly readinessReason: string;
-  readonly evidence: readonly string[];
   readonly media: readonly FounderReviewMedia[];
-  /**
-   * The JOV-5753 certification packet this item projects. Founder decisions
-   * bind to `decisionEvidenceDigest`; any evidence change mints a new digest
-   * and invalidates a stale local decision.
-   */
+  /** The JOV-5753 certification packet this item projects. */
   readonly certificationPacket: CertificationReviewPacket;
   readonly decisionEvidenceDigest: string;
   readonly certificationState: CertificationState;
@@ -62,235 +52,116 @@ interface ParsedFeatureRow {
   readonly notes: string;
 }
 
-interface FeatureMediaRule {
-  readonly feature: string;
-  readonly src: string;
-  readonly alt: string;
-}
+type Shot = readonly [src: string, alt: string];
+type MediaContext = Omit<FounderReviewMedia, 'alt' | 'dedicated'>;
 
-const FEATURE_MEDIA_RULES: readonly FeatureMediaRule[] = [
-  {
-    feature: 'Release pages with listen links per DSP',
-    src: '/product-screenshots/release-landing-desktop.png',
-    alt: 'Jovie release landing page with streaming links',
-  },
-  {
-    feature: 'Smart link editing and customization',
-    src: '/product-screenshots/artist-spec-tracked-links-desktop.png',
-    alt: 'Jovie tracked-link controls',
-  },
-  {
-    feature: 'Spotify pre-save campaigns',
-    src: '/product-screenshots/tim-white-profile-presave-phone.png',
-    alt: 'Jovie pre-save experience on a phone',
-  },
-  {
-    feature: 'Public profile pages',
-    src: '/product-screenshots/profile-desktop.png',
-    alt: 'Jovie public artist profile',
-  },
-  {
-    feature: 'Subscribe / follow page',
-    src: '/product-screenshots/tim-white-profile-subscribe-phone.png',
-    alt: 'Jovie subscriber capture experience',
-  },
-  {
-    feature: 'Contact page',
-    src: '/product-screenshots/tim-white-profile-contact-phone.png',
-    alt: 'Jovie artist contact experience',
-  },
-  {
-    feature: 'Tour dates (Bandsintown)',
-    src: '/product-screenshots/tim-white-profile-tour-phone.png',
-    alt: 'Jovie artist tour-date experience',
-  },
-  {
-    feature: 'Latest release card on profile',
-    src: '/product-screenshots/tim-white-profile-live-desktop.png',
-    alt: 'Jovie latest-release profile card',
-  },
-  {
-    feature: 'Advanced analytics and geo insights',
-    src: '/product-screenshots/artist-spec-geo-insights-desktop.png',
-    alt: 'Jovie geographic audience insights',
-  },
-] as const;
-
-interface FeatureContextMediaRule {
-  readonly pattern: RegExp;
-  readonly src: string;
-  readonly alt: string;
-}
-
-const FEATURE_CONTEXT_MEDIA_RULES: readonly FeatureContextMediaRule[] = [
-  {
-    pattern:
-      /release pages with listen links|unlimited smart links|smart deep links/i,
-    src: '/product-screenshots/release-landing-desktop.png',
-    alt: 'Jovie release landing page with streaming links',
-  },
-  {
-    pattern: /smart link editing|tracked links|vanity urls|content slugs/i,
-    src: '/product-screenshots/artist-spec-tracked-links-desktop.png',
-    alt: 'Jovie tracked-link controls',
-  },
-  {
-    pattern: /spotify pre-save|pre-release|countdown/i,
-    src: '/product-screenshots/tim-white-profile-presave-phone.png',
-    alt: 'Jovie pre-save experience on a phone',
-  },
-  {
-    pattern: /public profile pages|artist bio|social links|about page/i,
-    src: '/product-screenshots/profile-desktop.png',
-    alt: 'Jovie public artist profile',
-  },
-  {
-    pattern: /subscribe \/ follow page|contact \/ subscriber capture/i,
-    src: '/product-screenshots/tim-white-profile-subscribe-phone.png',
-    alt: 'Jovie subscriber capture experience',
-  },
-  {
-    pattern: /contact page/i,
-    src: '/product-screenshots/tim-white-profile-contact-phone.png',
-    alt: 'Jovie artist contact experience',
-  },
-  {
-    pattern: /tour dates/i,
-    src: '/product-screenshots/tim-white-profile-tour-phone.png',
-    alt: 'Jovie artist tour-date experience',
-  },
-  {
-    pattern: /latest release card/i,
-    src: '/product-screenshots/tim-white-profile-live-desktop.png',
-    alt: 'Jovie latest-release profile card',
-  },
-  {
-    pattern: /audience intelligence|basic analytics|click & visit tracking/i,
-    src: '/product-screenshots/artist-spec-audience-quality-desktop.png',
-    alt: 'Jovie audience-quality analytics',
-  },
-  {
-    pattern: /advanced analytics|geo insights/i,
-    src: '/product-screenshots/artist-spec-geo-insights-desktop.png',
-    alt: 'Jovie geographic audience insights',
-  },
-  {
-    pattern: /ai-powered insights|fan crm|contact export/i,
-    src: '/product-screenshots/audience-crm.png',
-    alt: 'Jovie audience workspace',
-  },
-  {
-    pattern: /earnings dashboard/i,
-    src: '/product-screenshots/audience-crm.png',
-    alt: 'Jovie analytics workspace context',
-  },
-  {
-    pattern: /auto-sync from spotify|manual release creation/i,
-    src: '/product-screenshots/releases-dashboard-full.png',
-    alt: 'Jovie releases workspace',
-  },
-] as const;
-
-const FEATURE_AREA_FALLBACK_MEDIA: Readonly<
-  Record<string, Omit<FounderReviewMedia, 'alt' | 'dedicated'>>
-> = {
-  Analytics: {
-    kind: 'image',
-    src: '/product-screenshots/artist-spec-audience-quality-desktop.png',
-    label: 'Related product context',
-  },
-  'AI Assistant': {
-    kind: 'video',
-    src: '/demo/jovie-demo.mp4',
-    poster: '/demo/jovie-demo-poster.jpg',
-    label: 'Jovie product walkthrough',
-  },
-  'Creator recording': {
-    kind: 'video',
-    src: '/demo/jovie-demo.mp4',
-    poster: '/demo/jovie-demo-poster.jpg',
-    label: 'Jovie product walkthrough',
-  },
-  Profile: {
-    kind: 'image',
-    src: '/product-screenshots/profile-desktop.png',
-    label: 'Related product context',
-  },
-  'Release Workflows': {
-    kind: 'image',
-    src: '/product-screenshots/releases-dashboard-full.png',
-    label: 'Related product context',
-  },
-  'Smart Links': {
-    kind: 'image',
-    src: '/product-screenshots/release-landing-desktop.png',
-    label: 'Related product context',
-  },
+const PS = '/product-screenshots';
+const SHOTS: Record<string, Shot> = {
+  releaseLanding: [
+    `${PS}/release-landing-desktop.png`,
+    'Jovie release landing page with streaming links',
+  ],
+  trackedLinks: [
+    `${PS}/artist-spec-tracked-links-desktop.png`,
+    'Jovie tracked-link controls',
+  ],
+  presave: [
+    `${PS}/tim-white-profile-presave-phone.png`,
+    'Jovie pre-save experience on a phone',
+  ],
+  profile: [`${PS}/profile-desktop.png`, 'Jovie public artist profile'],
+  subscribe: [
+    `${PS}/tim-white-profile-subscribe-phone.png`,
+    'Jovie subscriber capture experience',
+  ],
+  contact: [
+    `${PS}/tim-white-profile-contact-phone.png`,
+    'Jovie artist contact experience',
+  ],
+  tour: [
+    `${PS}/tim-white-profile-tour-phone.png`,
+    'Jovie artist tour-date experience',
+  ],
+  liveCard: [
+    `${PS}/tim-white-profile-live-desktop.png`,
+    'Jovie latest-release profile card',
+  ],
+  audienceQuality: [
+    `${PS}/artist-spec-audience-quality-desktop.png`,
+    'Jovie audience-quality analytics',
+  ],
+  geo: [
+    `${PS}/artist-spec-geo-insights-desktop.png`,
+    'Jovie geographic audience insights',
+  ],
+  crm: [`${PS}/audience-crm.png`, 'Jovie audience workspace'],
+  releases: [`${PS}/releases-dashboard-full.png`, 'Jovie releases workspace'],
 };
 
-const DEFAULT_FEATURE_MEDIA: Omit<FounderReviewMedia, 'alt' | 'dedicated'> = {
+const FEATURE_MEDIA: ReadonlyMap<string, Shot> = new Map([
+  ['Release pages with listen links per DSP', SHOTS.releaseLanding],
+  ['Smart link editing and customization', SHOTS.trackedLinks],
+  ['Spotify pre-save campaigns', SHOTS.presave],
+  ['Public profile pages', SHOTS.profile],
+  ['Subscribe / follow page', SHOTS.subscribe],
+  ['Contact page', SHOTS.contact],
+  ['Tour dates (Bandsintown)', SHOTS.tour],
+  ['Latest release card on profile', SHOTS.liveCard],
+  ['Advanced analytics and geo insights', SHOTS.geo],
+]);
+
+const FEATURE_CONTEXT_MEDIA: readonly (readonly [RegExp, Shot])[] = [
+  [
+    /release pages with listen links|unlimited smart links|smart deep links/i,
+    SHOTS.releaseLanding,
+  ],
+  [
+    /smart link editing|tracked links|vanity urls|content slugs/i,
+    SHOTS.trackedLinks,
+  ],
+  [/spotify pre-save|pre-release|countdown/i, SHOTS.presave],
+  [/public profile pages|artist bio|social links|about page/i, SHOTS.profile],
+  [/subscribe \/ follow page|contact \/ subscriber capture/i, SHOTS.subscribe],
+  [/contact page/i, SHOTS.contact],
+  [/tour dates/i, SHOTS.tour],
+  [/latest release card/i, SHOTS.liveCard],
+  [
+    /audience intelligence|basic analytics|click & visit tracking/i,
+    SHOTS.audienceQuality,
+  ],
+  [/advanced analytics|geo insights/i, SHOTS.geo],
+  [/ai-powered insights|fan crm|contact export/i, SHOTS.crm],
+  [
+    /earnings dashboard/i,
+    [`${PS}/audience-crm.png`, 'Jovie analytics workspace context'],
+  ],
+  [/auto-sync from spotify|manual release creation/i, SHOTS.releases],
+];
+
+const ctx = (src: string): MediaContext => ({
   kind: 'image',
-  src: '/product-screenshots/design-studio-music-ai-command.png',
-  label: 'Jovie product context',
+  src,
+  label: 'Related product context',
+});
+const DEMO: MediaContext = {
+  kind: 'video',
+  src: '/demo/jovie-demo.mp4',
+  poster: '/demo/jovie-demo-poster.jpg',
+  label: 'Jovie product walkthrough',
 };
 
-const DESIGN_SYSTEM_MEDIA: Readonly<Record<string, FounderReviewMedia>> = {
-  'atom.button': {
-    kind: 'image',
-    src: '/product-screenshots/release-landing-desktop.png',
-    alt: 'Jovie release page showing the canonical button family in context',
-    label: 'Rendered product reference',
-    dedicated: true,
-  },
-  'atom.icon-button': {
-    kind: 'image',
-    src: '/product-screenshots/tim-white-profile-more-menu-phone.png',
-    alt: 'Jovie profile menu showing icon-button controls',
-    label: 'Rendered product reference',
-    dedicated: false,
-  },
-  'atom.link': {
-    kind: 'image',
-    src: '/product-screenshots/artist-spec-tracked-links-desktop.png',
-    alt: 'Jovie tracked-links interface showing link treatments',
-    label: 'Rendered product reference',
-    dedicated: false,
-  },
-  'atom.brand-logo': {
-    kind: 'image',
-    src: '/brand/jovie-icon-contact-sheet.png',
-    alt: 'Jovie brand icon contact sheet',
-    label: 'Brand source sheet',
-    dedicated: true,
-  },
-  'atom.logo': {
-    kind: 'image',
-    src: '/brand/jovie-icon-contact-sheet.png',
-    alt: 'Jovie brand icon contact sheet',
-    label: 'Brand source sheet',
-    dedicated: true,
-  },
-  'atom.logo-link': {
-    kind: 'image',
-    src: '/brand/jovie-icon-contact-sheet.png',
-    alt: 'Jovie brand icon contact sheet',
-    label: 'Brand source sheet',
-    dedicated: true,
-  },
+const FEATURE_AREA_FALLBACK_MEDIA: Record<string, MediaContext> = {
+  Analytics: ctx(SHOTS.audienceQuality[0]),
+  'AI Assistant': DEMO,
+  'Creator recording': DEMO,
+  Profile: ctx(SHOTS.profile[0]),
+  'Release Workflows': ctx(SHOTS.releases[0]),
+  'Smart Links': ctx(SHOTS.releaseLanding[0]),
 };
 
-/**
- * Components without a mapped capture still get a context attachment so the
- * rail renders — context-only media never satisfies the visual_proof tier.
- */
-const DEFAULT_DESIGN_SYSTEM_MEDIA: Omit<
-  FounderReviewMedia,
-  'alt' | 'dedicated'
-> = {
-  kind: 'image',
-  src: '/product-screenshots/design-studio-music-ai-command.png',
-  label: 'Jovie product context',
-};
+const DEFAULT_FEATURE_MEDIA: MediaContext = ctx(
+  `${PS}/design-studio-music-ai-command.png`
+);
 
 function cleanMarkdownCell(value: string): string {
   return value
@@ -306,13 +177,8 @@ function stableId(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/**
- * Deterministic 40-hex content fingerprint standing in for a canonical-source
- * commit SHA. Registry items are projected from repo content at build time, so
- * the fingerprint — not a git sha — is what evidence receipts bind to. Any
- * packet input change mints a new fingerprint and therefore a new decision
- * digest, which invalidates stale founder locks exactly like a source change.
- */
+/** Deterministic content fingerprint; evidence receipts bind to it, so any
+ * packet input change mints a new digest and invalidates stale founder locks. */
 function contentSha(...parts: readonly (string | null | undefined)[]): string {
   return createHash('sha256')
     .update(JSON.stringify(parts))
@@ -339,12 +205,20 @@ function passedReceipt(
   };
 }
 
+type ReceiptSpec = readonly [suffix: string, summary: string, ref: string];
+
+interface PacketTiers {
+  readonly canonical?: ReceiptSpec;
+  readonly invariant?: ReceiptSpec;
+  readonly tests?: ReceiptSpec;
+  readonly visual?: ReceiptSpec;
+}
+
 function itemMediaReceipt(
   itemId: string,
   sourceSha: string,
-  media: FounderReviewMedia | undefined
+  media: FounderReviewMedia
 ): CertificationItemMediaReceipt[] {
-  if (!media) return [];
   return [
     {
       id: `${itemId}.media`,
@@ -361,18 +235,20 @@ function itemMediaReceipt(
   ];
 }
 
-interface PacketSeed {
+type PacketSeed = Pick<
+  CertificationReviewPacket,
+  | 'canonicalReferences'
+  | 'invariantEvaluation'
+  | 'testsCoverage'
+  | 'visualProof'
+  | 'requiredVariants'
+  | 'itemMedia'
+> & {
   readonly itemId: string;
   readonly kind: FounderReviewRegistryKind;
   readonly title: string;
   readonly sourcePath: string;
-  readonly canonicalReferences: readonly CertificationEvidenceReceipt[];
-  readonly invariantEvaluation: readonly CertificationEvidenceReceipt[];
-  readonly testsCoverage: readonly CertificationEvidenceReceipt[];
-  readonly visualProof: readonly CertificationEvidenceReceipt[];
-  readonly requiredVariants: readonly CertificationRequiredVariant[];
-  readonly itemMedia: readonly CertificationItemMediaReceipt[];
-}
+};
 
 function buildFounderReviewPacket(seed: PacketSeed): CertificationReviewPacket {
   const sourceSha = contentSha(
@@ -469,116 +345,57 @@ export function parseFeatureRegistryMarkdown(
       continue;
     }
 
-    rows.push({
-      productArea: cells[0],
-      feature: cells[1],
-      status: cells[2],
-      accessModel: cells[3],
-      flagOrGate: cells[4],
-      notes: cells[5],
-    });
+    const [productArea, feature, status, accessModel, flagOrGate, notes] =
+      cells;
+    rows.push({ productArea, feature, status, accessModel, flagOrGate, notes });
   }
 
   return rows;
 }
 
 function featureMedia(row: ParsedFeatureRow): FounderReviewMedia {
-  const rule = FEATURE_MEDIA_RULES.find(
-    candidate => candidate.feature === row.feature
-  );
-  if (rule) {
+  const dedicated = FEATURE_MEDIA.get(row.feature);
+  const context = FEATURE_CONTEXT_MEDIA.find(([pattern]) =>
+    pattern.test(`${row.productArea} ${row.feature}`)
+  )?.[1];
+  const shot = dedicated ?? context;
+  if (!shot) {
     return {
-      kind: 'image',
-      src: rule.src,
-      alt: rule.alt,
-      label: 'Dedicated product capture',
-      dedicated: true,
-    };
-  }
-
-  const contextRule = FEATURE_CONTEXT_MEDIA_RULES.find(candidate =>
-    candidate.pattern.test(`${row.productArea} ${row.feature}`)
-  );
-  if (contextRule) {
-    return {
-      kind: 'image',
-      src: contextRule.src,
-      alt: `${row.feature} — ${contextRule.alt}`,
-      label: 'Related product context',
+      ...(FEATURE_AREA_FALLBACK_MEDIA[row.productArea] ??
+        DEFAULT_FEATURE_MEDIA),
+      alt: `${row.feature} — related Jovie product context`,
       dedicated: false,
     };
   }
-
-  const fallback =
-    FEATURE_AREA_FALLBACK_MEDIA[row.productArea] ?? DEFAULT_FEATURE_MEDIA;
   return {
-    ...fallback,
-    alt: `${row.feature} — related Jovie product context`,
-    dedicated: false,
+    kind: 'image',
+    src: shot[0],
+    alt: dedicated ? shot[1] : `${row.feature} — ${shot[1]}`,
+    label: dedicated ? 'Dedicated product capture' : 'Related product context',
+    dedicated: Boolean(dedicated),
   };
 }
 
-function featurePacket(
+function founderPacket(
   itemId: string,
-  row: ParsedFeatureRow,
-  media: FounderReviewMedia,
+  kind: FounderReviewRegistryKind,
+  title: string,
   sourcePath: string,
-  shippedEvidence: string,
-  testEvidence: string | null
+  tiers: PacketTiers,
+  media: FounderReviewMedia
 ): CertificationReviewPacket {
-  const sha = contentSha('feature', itemId);
-  const shipped = row.status.startsWith('Shipped');
+  const sha = contentSha(kind, itemId);
+  const mk = (tier: CertificationTasteEvidenceTier, spec?: ReceiptSpec) =>
+    spec ? [passedReceipt(itemId, sha, tier, spec[0], spec[1], spec[2])] : [];
   return buildFounderReviewPacket({
     itemId,
-    kind: 'feature',
-    title: row.feature,
+    kind,
+    title,
     sourcePath,
-    canonicalReferences: [
-      passedReceipt(
-        itemId,
-        sha,
-        'canonical_references',
-        'registry-row',
-        'Canonical feature registry entry',
-        sourcePath
-      ),
-    ],
-    invariantEvaluation: shipped
-      ? [
-          passedReceipt(
-            itemId,
-            sha,
-            'invariant_evaluation',
-            'shipped-status',
-            shippedEvidence,
-            sourcePath
-          ),
-        ]
-      : [],
-    testsCoverage: testEvidence
-      ? [
-          passedReceipt(
-            itemId,
-            sha,
-            'tests_coverage',
-            'gate-or-test-evidence',
-            testEvidence,
-            sourcePath
-          ),
-        ]
-      : [],
-    visualProof: media.dedicated
-      ? [
-          passedReceipt(
-            itemId,
-            sha,
-            'visual_proof',
-            'item-specific-capture',
-            `Item-specific rendered capture: ${media.src}`,
-            media.src
-          ),
-        ]
-      : [],
+    canonicalReferences: mk('canonical_references', tiers.canonical),
+    invariantEvaluation: mk('invariant_evaluation', tiers.invariant),
+    testsCoverage: mk('tests_coverage', tiers.tests),
+    visualProof: mk('visual_proof', tiers.visual),
     requiredVariants: [],
     itemMedia: itemMediaReceipt(itemId, sha, media),
   });
@@ -600,13 +417,32 @@ export function buildFeatureReviewItems(
         : shipped
           ? 'Shipped registry status with entitlement or rollout evidence'
           : null;
-    const packet = featurePacket(
+    const packet = founderPacket(
       itemId,
-      row,
-      media,
+      'feature',
+      row.feature,
       registrySource,
-      `Registry status: ${row.status}`,
-      testEvidence
+      {
+        canonical: [
+          'registry-row',
+          'Canonical feature registry entry',
+          registrySource,
+        ],
+        invariant: shipped
+          ? ['shipped-status', `Registry status: ${row.status}`, registrySource]
+          : undefined,
+        tests: testEvidence
+          ? ['gate-or-test-evidence', testEvidence, registrySource]
+          : undefined,
+        visual: media.dedicated
+          ? [
+              'item-specific-capture',
+              `Item-specific rendered capture: ${media.src}`,
+              media.src,
+            ]
+          : undefined,
+      },
+      media
     );
 
     return finalizeItem(
@@ -621,10 +457,6 @@ export function buildFeatureReviewItems(
         access: row.accessModel,
         source: registrySource,
         gate: row.flagOrGate,
-        evidence: [
-          'Canonical feature registry',
-          media.dedicated ? 'Dedicated product capture' : 'Context attachment',
-        ],
         media: [media],
       },
       packet,
@@ -636,46 +468,31 @@ export function buildFeatureReviewItems(
     'apps/web/app/app/(shell)/dashboard/contacts/actions.ts#deleteContact';
   const behaviorMedia: FounderReviewMedia = {
     kind: 'image',
-    src: '/product-screenshots/audience-crm.png',
+    src: SHOTS.crm[0],
     alt: 'Jovie audience CRM containing the contact workspace',
     label: 'Contact workspace context',
     dedicated: false,
   };
   const behaviorId = 'feature.contacts.delete-contact';
-  const behaviorPacket = buildFounderReviewPacket({
-    itemId: behaviorId,
-    kind: 'feature',
-    title: 'Delete a contact',
-    sourcePath: behaviorSource,
-    canonicalReferences: [
-      passedReceipt(
-        behaviorId,
-        contentSha('feature', behaviorId),
-        'canonical_references',
+  const behaviorPacket = founderPacket(
+    behaviorId,
+    'feature',
+    'Delete a contact',
+    behaviorSource,
+    {
+      canonical: [
         'canonical-source',
         'Canonical contact row action and owned-profile server action',
-        behaviorSource
-      ),
-    ],
-    invariantEvaluation: [],
-    testsCoverage: [
-      passedReceipt(
-        behaviorId,
-        contentSha('feature', behaviorId),
-        'tests_coverage',
+        behaviorSource,
+      ],
+      tests: [
         'behavior-tests',
         'Destructive confirmation behavior tests',
-        behaviorSource
-      ),
-    ],
-    visualProof: [],
-    requiredVariants: [],
-    itemMedia: itemMediaReceipt(
-      behaviorId,
-      contentSha('feature', behaviorId),
-      behaviorMedia
-    ),
-  });
+        behaviorSource,
+      ],
+    },
+    behaviorMedia
+  );
 
   const auditedBehaviorItems: readonly FounderReviewItem[] = [
     finalizeItem(
@@ -691,11 +508,6 @@ export function buildFeatureReviewItems(
         access: 'Authenticated creator',
         source: behaviorSource,
         gate: 'Owned profile · destructive confirmation',
-        evidence: [
-          'Canonical contact row action',
-          'Owned-profile server action',
-          'Destructive confirmation tests',
-        ],
         media: [behaviorMedia],
       },
       behaviorPacket,
@@ -704,172 +516,4 @@ export function buildFeatureReviewItems(
   ];
 
   return [...auditedBehaviorItems, ...capabilityItems];
-}
-
-function designSystemEvidence(
-  entry: DesignSystemComponentRegistryEntry
-): readonly string[] {
-  return [
-    entry.storySource ? 'Storybook story' : 'Story missing',
-    entry.testSources.length > 0 ? 'Behavior tests' : 'Tests missing',
-    entry.penRootId || Object.keys(entry.penRootByVariantKey ?? {}).length > 0
-      ? 'Pen source mapping'
-      : 'Pen mapping missing',
-  ];
-}
-
-function designSystemVariants(
-  entry: DesignSystemComponentRegistryEntry,
-  sourceSha: string,
-  itemId: string
-): readonly CertificationRequiredVariant[] {
-  const variantKeys = Object.keys(entry.penRootByVariantKey ?? {});
-  if (variantKeys.length > 0) {
-    return variantKeys.map(variantKey => {
-      const master = entry.penRootByVariantKey?.[
-        variantKey as keyof typeof entry.penRootByVariantKey
-      ] as { readonly rootId: string } | undefined;
-      return {
-        id: `${itemId}.variant.${stableId(variantKey)}`,
-        label: variantKey,
-        sourceSha,
-        proof: passedReceipt(
-          itemId,
-          sourceSha,
-          'required_variants',
-          `variant-${stableId(variantKey)}`,
-          `Canonical Pen variant binding: ${variantKey}`,
-          `pen:${master?.rootId ?? variantKey}`
-        ),
-        requiredMediaIds: [],
-      };
-    });
-  }
-
-  if (entry.penRootId) {
-    return [
-      {
-        id: `${itemId}.pen-binding`,
-        label: 'Canonical Pen root binding',
-        sourceSha,
-        proof: passedReceipt(
-          itemId,
-          sourceSha,
-          'required_variants',
-          'pen-binding',
-          `Canonical Pen root binding: ${entry.penRootId}`,
-          `pen:${entry.penRootId}`
-        ),
-        requiredMediaIds: [],
-      },
-    ];
-  }
-
-  return [
-    {
-      id: `${itemId}.pen-binding`,
-      label: 'Canonical Pen root binding',
-      sourceSha,
-      proof: null,
-      requiredMediaIds: [],
-    },
-  ];
-}
-
-export function buildDesignSystemReviewItems(): readonly FounderReviewItem[] {
-  return DESIGN_SYSTEM_COMPONENT_REGISTRY.map(
-    (entry: DesignSystemComponentRegistryEntry) => {
-      const itemId = `design.${entry.id}`;
-      const sha = contentSha('design-system', itemId);
-      const mapped = DESIGN_SYSTEM_MEDIA[entry.id];
-      const media: FounderReviewMedia = mapped ?? {
-        ...DEFAULT_DESIGN_SYSTEM_MEDIA,
-        alt: `${entry.exportName} — related Jovie product context`,
-        dedicated: false,
-      };
-      const requiredVariants = designSystemVariants(entry, sha, itemId);
-      const packet = buildFounderReviewPacket({
-        itemId,
-        kind: 'design-system',
-        title: entry.exportName,
-        sourcePath: entry.source,
-        canonicalReferences: entry.storySource
-          ? [
-              passedReceipt(
-                itemId,
-                sha,
-                'canonical_references',
-                'storybook-story',
-                `Storybook story: ${entry.storySource}`,
-                entry.storySource
-              ),
-            ]
-          : [],
-        invariantEvaluation: entry.referenceEligible
-          ? [
-              passedReceipt(
-                itemId,
-                sha,
-                'invariant_evaluation',
-                'reference-eligibility',
-                'Design reference eligibility invariants pass',
-                entry.source
-              ),
-            ]
-          : [],
-        testsCoverage:
-          entry.testSources.length > 0
-            ? [
-                passedReceipt(
-                  itemId,
-                  sha,
-                  'tests_coverage',
-                  'behavior-tests',
-                  `Behavior tests: ${entry.testSources.join(', ')}`,
-                  entry.testSources[0]
-                ),
-              ]
-            : [],
-        visualProof: media?.dedicated
-          ? [
-              passedReceipt(
-                itemId,
-                sha,
-                'visual_proof',
-                'item-specific-render',
-                `Item-specific rendered reference: ${media.src}`,
-                media.src
-              ),
-            ]
-          : [],
-        requiredVariants,
-        itemMedia: itemMediaReceipt(itemId, sha, media),
-      });
-
-      return finalizeItem(
-        {
-          id: itemId,
-          registry: 'design-system',
-          title: entry.exportName,
-          eyebrow: `${entry.layer} · ${entry.id}`,
-          scope: 'component',
-          description:
-            entry.penIdentityReason ??
-            'Canonical source, variant contract, Storybook story, tests, and Pen mapping are registered.',
-          status: entry.referenceEligible
-            ? 'Review packet ready'
-            : 'Evidence collecting',
-          access: entry.storybookTitle ?? 'No Storybook title',
-          source: entry.source,
-          gate: entry.referenceEligible
-            ? 'Design reference eligible'
-            : 'Reference eligibility blocked',
-          evidence: designSystemEvidence(entry),
-          media: [media],
-        },
-        packet,
-        'Canonical source, tests, Storybook coverage, Pen mapping, and an item-specific rendered reference are present.'
-      );
-    }
-  );
 }

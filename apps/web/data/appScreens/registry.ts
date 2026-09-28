@@ -223,7 +223,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/chat/page.tsx',
   'apps/web/app/app/(shell)/admin/costs/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
-  'apps/web/app/app/(shell)/admin/design-system-registry/page.tsx',
   'apps/web/app/app/(shell)/admin/feature-registry/page.tsx',
   'apps/web/app/app/(shell)/admin/features/page.tsx',
   'apps/web/app/app/(shell)/admin/feedback/page.tsx',

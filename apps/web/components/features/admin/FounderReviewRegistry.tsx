@@ -59,9 +59,9 @@ function isReviewDecision(value: unknown): value is ReviewDecision {
 
 function loadReviewDecisions(): ReviewDecisionMap {
   try {
-    const raw = localStorage.getItem(LOCAL_REVIEW_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(
+      localStorage.getItem(LOCAL_REVIEW_STORAGE_KEY) ?? 'null'
+    );
     if (!parsed || typeof parsed !== 'object') return {};
     return Object.fromEntries(
       Object.entries(parsed).filter(
@@ -71,17 +71,6 @@ function loadReviewDecisions(): ReviewDecisionMap {
   } catch {
     return {};
   }
-}
-
-function formatReviewDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return 'Recorded locally';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
 }
 
 function scopeLabel(item: FounderReviewItem): string {
@@ -103,23 +92,12 @@ function validDecisionForItem(
   return decision;
 }
 
-function ReadinessMark({ item }: Readonly<{ item: FounderReviewItem }>) {
-  if (item.readiness === 'ready') {
-    return (
-      <span className='inline-flex items-center gap-1 text-2xs text-success'>
-        <CheckCircle2 className='size-3' aria-hidden='true' />
-        Ready
-      </span>
-    );
-  }
-
-  return (
-    <span className='inline-flex items-center gap-1 text-2xs text-secondary-token'>
-      <CircleDashed className='size-3' aria-hidden='true' />
-      Collecting
-    </span>
-  );
-}
+const MARK_TOKENS = {
+  certified: ['size-3', Check, 'Certified', 'text-success'],
+  'needs-work': ['size-3', XCircle, 'Needs Work', 'text-warning'],
+  ready: ['size-3', CheckCircle2, 'Ready', 'text-success'],
+  collecting: ['size-3', CircleDashed, 'Collecting', 'text-secondary-token'],
+} as const;
 
 function DecisionMark({
   item,
@@ -128,48 +106,26 @@ function DecisionMark({
   item: FounderReviewItem;
   decision?: ReviewDecision;
 }>) {
-  if (decision?.outcome === 'certified') {
-    return (
-      <span className='inline-flex items-center gap-1 text-2xs text-success'>
-        <Check className='size-3' aria-hidden='true' />
-        Certified
-      </span>
-    );
-  }
-  if (decision?.outcome === 'needs-work') {
-    return (
-      <span className='inline-flex items-center gap-1 text-2xs text-warning'>
-        <XCircle className='size-3' aria-hidden='true' />
-        Needs Work
-      </span>
-    );
-  }
-  return <ReadinessMark item={item} />;
+  const [size, Icon, label, tone] =
+    MARK_TOKENS[decision?.outcome ?? item.readiness];
+  return (
+    <span className={`inline-flex items-center gap-1 text-2xs ${tone}`}>
+      <Icon className={size} aria-hidden='true' />
+      {label}
+    </span>
+  );
 }
 
 export function FounderReviewRegistry({
   kind,
   items,
 }: Readonly<FounderReviewRegistryProps>) {
-  const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<RegistryFilter>('all');
   const [selectedId, setSelectedId] = useState(
     items.find(item => item.readiness === 'ready')?.id ?? items[0]?.id ?? ''
   );
   const [decisions, setDecisions] = useState<ReviewDecisionMap>({});
   const [note, setNote] = useState('');
-  const [storageReady, setStorageReady] = useState(false);
-
-  useEffect(() => {
-    const loaded = loadReviewDecisions();
-    setDecisions(loaded);
-    try {
-      localStorage.setItem(LOCAL_REVIEW_STORAGE_KEY, JSON.stringify(loaded));
-    } catch {
-      // Invalid legacy records remain ignored when storage is unavailable.
-    }
-    setStorageReady(true);
-  }, []);
 
   const persistDecisions = useCallback((next: ReviewDecisionMap) => {
     setDecisions(next);
@@ -181,55 +137,45 @@ export function FounderReviewRegistry({
   }, []);
 
   useEffect(() => {
-    if (!storageReady) return;
+    persistDecisions(loadReviewDecisions());
+  }, [persistDecisions]);
+
+  // Prune decisions whose evidence digest no longer matches the item's packet.
+  useEffect(() => {
     const itemById = new Map(items.map(item => [item.id, item]));
-    const next: Record<string, ReviewDecision> = { ...decisions };
-    let removedStaleDecision = false;
-
-    for (const [itemId, decision] of Object.entries(decisions)) {
+    const stale = Object.keys(decisions).filter(itemId => {
       const item = itemById.get(itemId);
-      if (
+      return (
         item &&
-        validDecisionForItem(item, { [itemId]: decision }) === undefined
-      ) {
-        delete next[itemId];
-        removedStaleDecision = true;
-      }
-    }
-
-    if (removedStaleDecision) persistDecisions(next);
-  }, [decisions, items, persistDecisions, storageReady]);
-
-  const counts = useMemo(() => {
-    const ready = items.filter(item => item.readiness === 'ready').length;
-    const certified = items.filter(
-      item => validDecisionForItem(item, decisions)?.outcome === 'certified'
-    ).length;
-    const needsWork = items.filter(
-      item => validDecisionForItem(item, decisions)?.outcome === 'needs-work'
-    ).length;
-    const behaviors = items.filter(item => item.scope === 'behavior').length;
-    return { ready, certified, needsWork, behaviors };
-  }, [decisions, items]);
-
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return items.filter(item => {
-      const matchesQuery =
-        !normalizedQuery ||
-        `${item.title} ${item.eyebrow} ${item.description} ${item.scope}`
-          .toLowerCase()
-          .includes(normalizedQuery);
-      if (!matchesQuery) return false;
-      if (filter === 'all') return true;
-      if (filter === 'ready') return item.readiness === 'ready';
-      return validDecisionForItem(item, decisions)?.outcome === filter;
+        validDecisionForItem(item, { [itemId]: decisions[itemId] }) ===
+          undefined
+      );
     });
-  }, [decisions, filter, items, query]);
+    if (stale.length === 0) return;
+    const next = { ...decisions };
+    for (const itemId of stale) delete next[itemId];
+    persistDecisions(next);
+  }, [decisions, items, persistDecisions]);
+
+  const behaviorCount = useMemo(
+    () => items.filter(item => item.scope === 'behavior').length,
+    [items]
+  );
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter(item => {
+        if (filter === 'all') return true;
+        if (filter === 'ready') return item.readiness === 'ready';
+        return validDecisionForItem(item, decisions)?.outcome === filter;
+      }),
+    [decisions, filter, items]
+  );
 
   useEffect(() => {
-    if (filteredItems.some(item => item.id === selectedId)) return;
-    setSelectedId(filteredItems[0]?.id ?? '');
+    if (!filteredItems.some(item => item.id === selectedId)) {
+      setSelectedId(filteredItems[0]?.id ?? '');
+    }
   }, [filteredItems, selectedId]);
 
   const selected =
@@ -259,13 +205,28 @@ export function FounderReviewRegistry({
 
   const reopenSelected = useCallback(() => {
     if (!selected) return;
-    const next = { ...decisions };
-    delete next[selected.id];
+    const { [selected.id]: _removed, ...next } = decisions;
     persistDecisions(next);
   }, [decisions, persistDecisions, selected]);
 
-  const columns = useMemo<ColumnDef<FounderReviewItem, unknown>[]>(
-    () => [
+  const columns = useMemo<ColumnDef<FounderReviewItem, unknown>[]>(() => {
+    const text = (
+      id: string,
+      header: string,
+      size: number,
+      read: (item: FounderReviewItem) => string
+    ): ColumnDef<FounderReviewItem, unknown> => ({
+      id,
+      accessorFn: read,
+      header,
+      size,
+      cell: ({ row }) => (
+        <span className='line-clamp-1 text-2xs text-secondary-token'>
+          {read(row.original)}
+        </span>
+      ),
+    });
+    return [
       {
         id: 'item',
         accessorFn: item => item.title,
@@ -282,39 +243,9 @@ export function FounderReviewRegistry({
           </div>
         ),
       },
-      {
-        id: 'scope',
-        accessorFn: item => item.scope,
-        header: 'Level',
-        size: 90,
-        cell: ({ row }) => (
-          <span className='text-2xs text-secondary-token'>
-            {scopeLabel(row.original)}
-          </span>
-        ),
-      },
-      {
-        id: 'area',
-        accessorFn: item => item.eyebrow,
-        header: kind === 'feature' ? 'Area' : 'Layer',
-        size: 130,
-        cell: ({ row }) => (
-          <span className='line-clamp-1 text-2xs text-secondary-token'>
-            {row.original.eyebrow}
-          </span>
-        ),
-      },
-      {
-        id: 'status',
-        accessorFn: item => item.status,
-        header: 'Product Status',
-        size: 120,
-        cell: ({ row }) => (
-          <span className='line-clamp-1 text-2xs text-secondary-token'>
-            {row.original.status}
-          </span>
-        ),
-      },
+      text('scope', 'Level', 90, scopeLabel),
+      text('area', kind === 'feature' ? 'Area' : 'Layer', 130, i => i.eyebrow),
+      text('status', 'Product Status', 120, i => i.status),
       {
         id: 'review',
         header: 'Review',
@@ -326,14 +257,13 @@ export function FounderReviewRegistry({
           />
         ),
       },
-    ],
-    [decisions, kind]
-  );
+    ];
+  }, [decisions, kind]);
 
   const detailPanel = useMemo(() => {
     if (!selected) return null;
     const media = selected.media[0];
-    const reviewStatus = selectedDecision && storageReady;
+    const canCertify = selected.readiness === 'ready';
 
     return (
       <EntitySidebarShell
@@ -356,9 +286,9 @@ export function FounderReviewRegistry({
                 value={note}
                 onChange={event => setNote(event.target.value)}
                 rows={2}
-                disabled={selected.readiness !== 'ready'}
+                disabled={!canCertify}
                 placeholder={
-                  selected.readiness === 'ready'
+                  canCertify
                     ? 'What should stay true or change?'
                     : 'Available when the review packet is ready.'
                 }
@@ -375,14 +305,14 @@ export function FounderReviewRegistry({
                   <Button
                     size='sm'
                     variant='secondary'
-                    disabled={selected.readiness !== 'ready'}
+                    disabled={!canCertify}
                     onClick={() => recordDecision('needs-work')}
                   >
                     Needs Work
                   </Button>
                   <Button
                     size='sm'
-                    disabled={selected.readiness !== 'ready'}
+                    disabled={!canCertify}
                     onClick={() => recordDecision('certified')}
                     data-testid='certify-review-item'
                   >
@@ -395,8 +325,8 @@ export function FounderReviewRegistry({
               className='min-h-4 text-2xs text-tertiary-token'
               aria-live='polite'
             >
-              {reviewStatus
-                ? `${selectedDecision.outcome === 'certified' ? 'Certified' : 'Needs Work'} · ${formatReviewDate(selectedDecision.reviewedAt)}${selectedDecision.note ? ` · ${selectedDecision.note}` : ''}`
+              {selectedDecision
+                ? `${selectedDecision.outcome === 'certified' ? 'Certified' : 'Needs Work'} · ${new Date(selectedDecision.reviewedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}${selectedDecision.note ? ` · ${selectedDecision.note}` : ''}`
                 : 'Local founder-review record only; this does not imply CI, deploy, or runtime certification.'}
             </div>
           </div>
@@ -475,15 +405,13 @@ export function FounderReviewRegistry({
           </DrawerSection>
 
           <DrawerSection title='Evidence'>
-            <ul className='space-y-1.5'>
-              {selected.evidence.map(item => (
-                <li
-                  key={item}
-                  className='flex items-center gap-2 text-2xs text-secondary-token'
-                >
-                  <span className='size-1.5 rounded-full bg-tertiary-token' />
-                  {item}
-                </li>
+            <ul className='list-disc space-y-1 pl-4 text-2xs text-secondary-token marker:text-tertiary-token'>
+              {[
+                ...selected.certificationPacket.canonicalReferences,
+                ...selected.certificationPacket.invariantEvaluation,
+                ...selected.certificationPacket.testsCoverage,
+              ].map(receipt => (
+                <li key={receipt.id}>{receipt.summary}</li>
               ))}
             </ul>
           </DrawerSection>
@@ -499,47 +427,13 @@ export function FounderReviewRegistry({
         </div>
       </EntitySidebarShell>
     );
-  }, [
-    note,
-    recordDecision,
-    reopenSelected,
-    selected,
-    selectedDecision,
-    storageReady,
-  ]);
+  }, [note, recordDecision, reopenSelected, selected, selectedDecision]);
 
   useRegisterRightPanel(detailPanel);
 
-  const metricRows: readonly (readonly [string, number])[] = [
-    ['Ready now', counts.ready],
-    ['Certified', counts.certified],
-    ['Needs Work', counts.needsWork],
-  ];
-
   return (
     <div className='space-y-4' data-testid={`${kind}-review-registry`}>
-      <div className='grid grid-cols-3 divide-x divide-(--app-shell-border) overflow-hidden rounded-lg border border-(--app-shell-border) bg-surface-1'>
-        {metricRows.map(([label, value]) => (
-          <div key={label} className='px-3 py-2'>
-            <p className='text-2xs text-tertiary-token'>{label}</p>
-            <p className='mt-0.5 text-base font-semibold tabular-nums text-primary-token'>
-              {value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
-        <label className='relative min-w-0 flex-1'>
-          <span className='sr-only'>Search registry</span>
-          <Search className='pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-tertiary-token' />
-          <input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder='Search registry'
-            className='h-9 w-full rounded-lg border border-(--app-shell-border) bg-surface-1 pl-9 pr-3 text-xs text-primary-token outline-none placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-ring'
-          />
-        </label>
+      <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end'>
         <AppSegmentControl<RegistryFilter>
           aria-label='Registry Filter'
           value={filter}
@@ -557,8 +451,8 @@ export function FounderReviewRegistry({
 
       {kind === 'feature' ? (
         <p className='text-2xs text-tertiary-token'>
-          {counts.behaviors} source-audited atomic behavior · capability and
-          behavior inventory is intentionally incomplete
+          {behaviorCount} source-audited atomic behavior · inventory
+          intentionally incomplete
         </p>
       ) : null}
 
