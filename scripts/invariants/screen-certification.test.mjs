@@ -789,6 +789,32 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('keeps every registered marketing route binding internally consistent', () => {
+    const routes = Object.entries(SCREEN_MARKETING_ROUTES);
+    assert.ok(routes.length > 1, 'expected more than just web.homepage bound');
+    const seenRoutes = new Set();
+    for (const [screenId, route] of routes) {
+      const screen = SCREEN_REGISTRY.find(entry => entry.id === screenId);
+      assert.ok(screen, `${screenId} must be a registered screen`);
+      assert.ok(!screen.excluded, `${screenId} must not be excluded`);
+      assert.equal(
+        screen.platform,
+        'web',
+        `${screenId} is not a web screen; marketing routes only bind web screens`
+      );
+      assert.match(
+        route,
+        /^\//,
+        `${screenId} marketing route must be an absolute path`
+      );
+      assert.ok(
+        !seenRoutes.has(route),
+        `route ${route} is bound to more than one screen id`
+      );
+      seenRoutes.add(route);
+    }
+  });
+
   it('routes changed screens to their matching artifacts in one certification pass', () => {
     const homepage = home();
     const profile = SCREEN_REGISTRY.find(
@@ -1406,6 +1432,153 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       });
       assert.equal(resolved.proof?.certificationStatus, 'not-certified');
       assert.equal(resolved.proof?.environment, 'local-production-build');
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      if (priorArtifact === undefined)
+        delete process.env.SCREEN_CERT_ARTIFACT_ID;
+      else process.env.SCREEN_CERT_ARTIFACT_ID = priorArtifact;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('resolves a marketing artifact past the old 32MB download cap (JOV-INV-018 2026-09-28)', () => {
+    // Regression for the incident where `screenshots.yml` "Certify Screenshots"
+    // failed every screen routed through the marketing artifact fallback with
+    // the generic "controlled GitHub artifact resolver is unavailable" finding.
+    // Root cause: the resolver's `gh api .../zip` download used a 32MB
+    // spawnSync `maxBuffer`, and the real marketing artifact (60 routes x two
+    // viewports of full-page PNGs) had grown to ~163MB. spawnSync silently
+    // kills the child and returns a null exit status once stdout exceeds
+    // maxBuffer, which `run()` turned into a thrown, unspecific error. Pad this
+    // fixture's bundle with an unrelated, unmatched route pair past the old
+    // 32MB ceiling to prove the download transport itself is no longer the
+    // limiting factor; extraction's own MAX_EXTRACTED_ARTIFACT_BYTES ceiling
+    // remains the authoritative zip-bomb guard.
+    const root = mkdtempSync(join(tmpdir(), 'screen-marketing-large-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    const priorArtifact = process.env.SCREEN_CERT_ARTIFACT_ID;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const receiptFor = viewport => ({
+        schemaVersion: MARKETING_EVIDENCE_SCHEMA,
+        buildMode: 'production',
+        capturedAt: iso(-60_000),
+        coverageId: `web-marketing-route-home-${viewport}`,
+        documentStatus: 200,
+        finalPath: '/',
+        route: '/',
+        fixturePath: '/',
+        qualityChecks: [...REQUIRED_MARKETING_QUALITY_CHECKS],
+        routeDisposition: 'active-verified',
+        screenshotSha256: createHash('sha256').update(image).digest('hex'),
+        sourcePath: 'apps/web/app/(home)/page.tsx',
+        sourceGitSha: head,
+        stateMatrix: ['anonymous-default'],
+        viewport,
+      });
+      for (const viewport of ['desktop', 'mobile']) {
+        const dir = join(root, `home-${viewport}`);
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(
+          join(dir, 'receipt.json'),
+          JSON.stringify(receiptFor(viewport))
+        );
+        writeFileSync(join(dir, 'marketing-route.png'), image);
+      }
+      // An unrelated route's evidence pair, padded well past the old 32MB
+      // spawnSync cap. Its sourcePath deliberately does not match
+      // web.homepage's registered sources, so decodeMarketingProof's
+      // sourceMatches check skips it entirely — its bytes never need to be a
+      // valid screenshot. Only its size, which the transport must tolerate,
+      // matters here.
+      const fillerDir = join(root, 'other-route-desktop');
+      mkdirSync(fillerDir, { recursive: true });
+      writeFileSync(
+        join(fillerDir, 'receipt.json'),
+        JSON.stringify({
+          schemaVersion: MARKETING_EVIDENCE_SCHEMA,
+          sourcePath: 'apps/web/app/(marketing)/unrelated-filler/page.tsx',
+        })
+      );
+      const fillerBytes = Buffer.alloc(40 * 1024 * 1024, 0x42);
+      writeFileSync(join(fillerDir, 'marketing-route.png'), fillerBytes);
+      writeProofZip(root, [
+        'home-desktop/receipt.json',
+        'home-desktop/marketing-route.png',
+        'home-mobile/receipt.json',
+        'home-mobile/marketing-route.png',
+        'other-route-desktop/receipt.json',
+        'other-route-desktop/marketing-route.png',
+      ]);
+      const zip = readFileSync(join(root, 'proof.zip'));
+      assert.ok(
+        zip.length > 32 * 1024 * 1024,
+        `fixture archive must exceed the old 32MB cap to reproduce the incident (got ${zip.length} bytes)`
+      );
+      const records = {
+        artifact: {
+          id: 42,
+          name: marketingArtifactName(head),
+          expired: false,
+          digest: sha256(zip),
+          created_at: iso(-30_000),
+          workflow_run: { id: 77 },
+        },
+        run: {
+          id: 77,
+          run_attempt: 3,
+          repository: { full_name: 'JovieInc/Jovie' },
+          head_branch: 'main',
+          head_sha: head,
+          path: '.github/workflows/screenshots.yml',
+          event: 'push',
+          conclusion: 'success',
+        },
+        jobs: {
+          jobs: [
+            {
+              id: 99,
+              name: 'Generate Screenshots',
+              run_id: 77,
+              run_attempt: 3,
+              head_sha: head,
+              conclusion: 'success',
+              started_at: iso(-90_000),
+              completed_at: iso(-10_000),
+            },
+          ],
+        },
+      };
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+      process.env.SCREEN_CERT_ARTIFACT_ID = '42';
+      const result = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        artifactId: 42,
+      });
+      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
+      assert.equal(result.receipt.certified, true);
+      assert.equal(result.receipt.changedScreens[0]?.id, 'web.homepage');
+      assert.equal(result.receipt.changedScreens[0]?.verdict, 'pass');
     } finally {
       process.env.PATH = priorPath;
       if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
