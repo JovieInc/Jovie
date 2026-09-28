@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { BadgeCheck, BarChart3, Bell, Sparkles } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/upgrade-offer';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
@@ -25,6 +26,7 @@ import { formatAmount } from '@/lib/utils/format-number';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
+  readonly profileId: string | null;
   readonly monthlyPriceId: string;
   readonly annualPriceId: string | null;
   readonly monthlyAmount: number;
@@ -188,6 +190,7 @@ function BillingIntervalSelector({
 
 export function OnboardingCheckoutClient({
   plan,
+  profileId,
   monthlyPriceId,
   annualPriceId,
   monthlyAmount,
@@ -243,6 +246,13 @@ export function OnboardingCheckoutClient({
       interval,
       intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
+    if (profileId) {
+      void recordOnboardingUpgradeOfferDecision(
+        profileId,
+        'accepted',
+        plan
+      ).catch(() => {});
+    }
 
     try {
       const response = await fetch('/api/stripe/checkout', {
@@ -274,27 +284,36 @@ export function OnboardingCheckoutClient({
       );
       setIsLoading(false);
     }
-  }, [plan, currentPriceId, interval, isDefaultUpsell, returnTo]);
+  }, [plan, profileId, currentPriceId, interval, isDefaultUpsell, returnTo]);
 
   const handleSkip = useCallback(() => {
     track('onboarding_checkout_skipped', {
       plan,
       intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
+    if (profileId) {
+      void recordOnboardingUpgradeOfferDecision(
+        profileId,
+        'dismissed',
+        plan
+      ).catch(() => {});
+    }
     clearPlanIntent();
     globalThis.location.href = returnTo;
-  }, [isDefaultUpsell, plan, returnTo]);
+  }, [isDefaultUpsell, plan, profileId, returnTo]);
 
   const checkoutContent = (
     <div className='flex flex-col items-center justify-center py-8'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
-            Upgrade To {planMarketing.displayName}
+            {isDefaultUpsell
+              ? 'Upgrade To Artist Presence'
+              : `Upgrade To ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
-              ? `Congrats! Your profile is live at jov.ie/${username}. Want to make it even better?`
+              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what Artist Presence adds on top.`
               : `Your profile is live. See what ${planMarketing.displayName} unlocks.`}
           </p>
         </div>
@@ -365,7 +384,9 @@ export function OnboardingCheckoutClient({
         >
           {isLoading
             ? 'Redirecting to checkout...'
-            : `Upgrade to ${planMarketing.displayName}`}
+            : isDefaultUpsell
+              ? 'Upgrade to Artist Presence'
+              : `Upgrade to ${planMarketing.displayName}`}
         </Button>
 
         {/* Skip */}

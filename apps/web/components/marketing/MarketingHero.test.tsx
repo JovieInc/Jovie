@@ -277,4 +277,61 @@ describe('MarketingHero source-backed default story', () => {
       'marketing-hero-dock'
     );
   });
+
+  it('renders the unique per-route hero photo behind content-mode copy when provided', () => {
+    render(
+      <MarketingHero
+        {...MARKETING_HERO_DEFAULT_PROPS}
+        testId='photo-content-hero'
+        photo={{
+          src: '/images/marketing-hero/product.webp',
+          width: 1600,
+          height: 901,
+        }}
+      />
+    );
+
+    const hero = screen.getByTestId('photo-content-hero');
+    expect(hero).toHaveClass('relative', 'overflow-hidden');
+    const photo = hero.querySelector('.marketing-hero-photo');
+    expect(photo).not.toBeNull();
+    expect(photo?.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('product.webp')
+    );
+    expect(photo?.querySelector('img')).toHaveAttribute('alt', '');
+  });
+
+  it('omits the hero photo layer and the relative/overflow classes without a photo prop', () => {
+    const { container } = render(
+      <MarketingHero {...MARKETING_HERO_DEFAULT_PROPS} />
+    );
+
+    const hero = container.querySelector('section.marketing-hero');
+    expect(hero?.querySelector('.marketing-hero-photo')).toBeNull();
+    expect(hero?.className).not.toContain('overflow-hidden');
+  });
+
+  it('applies the requested opacity to the landing-mode hero photo', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='photo-landing-heading'
+        title='Landing title'
+        body='Landing body'
+        media={<div>Media</div>}
+        testId='photo-landing-hero'
+        photo={{
+          src: '/images/marketing-hero/ai.webp',
+          width: 1600,
+          height: 1067,
+          opacity: 0.2,
+        }}
+      />
+    );
+
+    const hero = screen.getByTestId('photo-landing-hero');
+    const img = hero.querySelector('.marketing-hero-photo img');
+    expect(img).toHaveStyle({ opacity: '0.2' });
+  });
 });

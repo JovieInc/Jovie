@@ -33,7 +33,7 @@ describe('SpotifyConnectDialog System B style guard', () => {
       offenders,
       `SpotifyConnectDialog leaked ${offenders.join(', ')}`
     ).toEqual([]);
-    expect(source).toContain('system-b-spotify-connect-card');
+    expect(source).toContain("data-spotify-connect-surface='card'");
     expect(source).toContain('system-b-spotify-connect-input-shell');
     expect(source).toContain('system-b-spotify-connect-trailing');
     expect(source).toContain('system-b-spotify-connect-dropdown');

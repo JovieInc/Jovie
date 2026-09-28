@@ -14,7 +14,7 @@ readable. The runtime masters cited below were read with `Get` only.
 | Drift class | Count (authed surface: `components/features`, `components/jovie`, `app/app`, 1,059 files) | Guardrail today |
 |---|---|---|
 | Pen identity unbound: app-screen components with `penRootId: null` while a Pen runtime master exists | 7 of 7 app-screen components, 11 of 11 DS atoms (Button is bound per variant) | None. No Pen-vs-code parity check for the authed app. |
-| Retired shims and forks still importable | 4 retired in this PR (25 consumers migrated); `features/dashboard/tokens` barrel still has 7 consumers | **New:** `retired-modules.json` gate + ESLint |
+| Retired shims and forks still importable | 4 retired in this PR (25 consumers migrated); `features/dashboard/tokens` barrel still has 8 consumers | **New:** `retired-modules.json` gate + ESLint |
 | Raw Tailwind palette utilities (`text-amber-700`, `bg-white`, hex) | 765 occurrences in 139 files | Contrast ratchet (shrink-only), `no-hardcoded-theme-colors` |
 | Arbitrary values (`w-[327px]`, `leading-[18px]`) | 999 in 272 files | Arbitrary-values ratchet (shrink-only) |
 | Raw `<button>` | 293 in 175 files | Raw-button ratchet |
@@ -93,7 +93,7 @@ save/readback proof**, not bindings:
 
 ## Guardrails
 
-Landed in this PR:
+Guardrails in PR #18960 (retire deprecated sidebar and token shims) and PR #18970 (canonical Badge and status tokens in billing and work feed):
 
 - `apps/web/data/designSystem/retired-modules.json` is the registry of
   retired forks, shims, and exports. Each row names its canonical
@@ -108,7 +108,7 @@ Landed in this PR:
 Protocol: to retire a fork, migrate its consumers, delete it, and add a row
 to the registry in the same PR. That makes deletion permanent.
 
-Proposed next (tracked in the backlog):
+Proposed next (tracked in Linear under the `ds-drift` label: JOV-6772, JOV-6773, JOV-6774, JOV-6775, JOV-6776, JOV-6777, JOV-6778; D5 and D6 were decided on 2026-09-27 and became JOV-6841 and JOV-6842; staging marketing defects JOV-6848 and JOV-6849 went to the Devin lane):
 
 - **Pen parity gate for authed components:** once the design session
   confirms the identity map above with readback proof, set `penRootId` and
@@ -116,8 +116,8 @@ Proposed next (tracked in the backlog):
   padding, radius) disagree with the source contract.
 - **Component-family ratchet extension:** add `*StatusPill|*StatusBadge|
   *StatusDot|*Glyph` and `*Header` (entity) families.
-- **Finish the `features/dashboard/tokens` barrel retirement:** 10 of 17
-  consumers now import `@/components/tokens/linear-surface`. The remaining 7
+- **Finish the `features/dashboard/tokens` barrel retirement:** 10 of 18
+  consumers now import `@/components/tokens/linear-surface`. The remaining 8
   (three of them shared organisms, which inverts the dependency direction)
   carry pre-existing whole-file lint debt (`shadcn/no-restyle` outside the
   baseline, a react-compiler ref write, and label casing), so touching their
