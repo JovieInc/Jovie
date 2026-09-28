@@ -684,3 +684,43 @@ test('production keeps immutable version tags and never uses rolling mutations',
     false
   );
 });
+
+test('production publishes forward-only when main advances past the verified generation', async t => {
+  const releaseSha = 'c'.repeat(40);
+  const version = '26.8.1';
+  const local = await localRelease(t, 'production', version);
+  const common = {
+    environment: 'production',
+    installedVersion: version,
+    releaseSha,
+    version,
+  };
+
+  const advanced = fakeClient({ mainSha: [releaseSha, SUPER_SHA] });
+  await prepare({ ...common, client: advanced });
+  await uploadAndPublish({
+    ...common,
+    client: advanced,
+    dist: local.dir,
+    output: local.output,
+  });
+  assert.equal(advanced.release.draft, false);
+  assert.equal(advanced.release.tag_name, `v${version}`);
+  assert.match(await readFile(local.output, 'utf8'), /release_sha=c{40}/);
+
+  const diverged = fakeClient({
+    mainSha: [releaseSha, SUPER_SHA],
+    mainlineAncestor: false,
+  });
+  await prepare({ ...common, client: diverged });
+  await assert.rejects(
+    uploadAndPublish({
+      ...common,
+      client: diverged,
+      dist: local.dir,
+      output: local.output,
+    }),
+    /not a trusted ancestor/
+  );
+  assert.equal(diverged.release.draft, true);
+});

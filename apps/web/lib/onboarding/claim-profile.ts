@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, desc, eq } from 'drizzle-orm';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -458,6 +459,8 @@ export async function materializeClaimedOnboardingProfile({
     ipAddress,
     userAgent,
   });
+
+  await recordFunnelStep({ funnel: 'artist_signup', step: 'claim_complete' });
 
   return { profileId, handle, status };
 }

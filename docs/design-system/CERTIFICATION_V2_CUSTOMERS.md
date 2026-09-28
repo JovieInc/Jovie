@@ -72,8 +72,11 @@ Evidence mapping for both subjects (same six taste tiers):
 | `required_variants` | Light and dark, mobile and desktop |
 
 Operational receipts: `runtime_dogfood` is the customer's own successful use after
-signup (kind `human_cohort`, section 4 of the dogfood spec). That receipt moves a
-customer-capability subject to `monitored`.
+signup (kind `human_signal`, section 4 of the dogfood spec), proven by the
+capability mission passing on their account. That receipt moves a
+customer-capability subject to `monitored`. It proves the capability works for
+this customer. It is not a human certification: only Tim certifies (dogfood spec
+section 7), and his per-prospect approval in section 4 is that certification.
 
 ## 4. Pipeline states
 

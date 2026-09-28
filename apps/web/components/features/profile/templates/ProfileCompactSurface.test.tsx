@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
@@ -63,10 +63,16 @@ vi.mock(
 vi.mock('@/features/profile/ProfileHomeRail', () => ({
   ProfileHomeRail: ({
     showAlertsCard,
+    featuredAccent,
   }: {
     readonly showAlertsCard?: boolean;
+    readonly featuredAccent?: { accent: string; strength: string };
   }) => (
-    <div data-testid='mock-profile-home-rail'>
+    <div
+      data-testid='mock-profile-home-rail'
+      data-featured-accent={featuredAccent?.accent}
+      data-featured-strength={featuredAccent?.strength}
+    >
       {showAlertsCard ? <div data-testid='profile-home-alerts-row' /> : null}
     </div>
   ),
@@ -76,13 +82,33 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
   ProfilePrimaryTabPanel: ({
     mode,
     catalogLoadFailed,
+    creditSegments,
+    contacts,
+    modeCardAccents,
+    paymentsVenmoLink,
   }: {
     readonly mode: string;
     readonly catalogLoadFailed?: boolean;
+    readonly creditSegments?: readonly { readonly type: string }[];
+    readonly contacts?: readonly { readonly id: string }[];
+    readonly modeCardAccents?: Record<string, { accent: string }>;
+    readonly paymentsVenmoLink?: string | null;
   }) => (
     <div
       data-testid={`mock-primary-tab-panel-${mode}`}
       data-catalog-load-failed={catalogLoadFailed ? 'true' : 'false'}
+      data-credit-segments={(creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
+      data-contacts={(contacts ?? []).map(contact => contact.id).join('|')}
+      data-accents={
+        modeCardAccents
+          ? ['listen', 'events', 'payments', 'stay-close']
+              .map(kind => modeCardAccents[kind]?.accent)
+              .join(',')
+          : undefined
+      }
+      data-payments-link={paymentsVenmoLink ?? ''}
     />
   ),
 }));
@@ -233,6 +259,24 @@ describe('ProfileCompactSurface', () => {
     );
   });
 
+  it('routes selected credits into the About panel (JOV-6199)', () => {
+    renderSurface({
+      activeMode: 'about',
+      creditSegments: [
+        { type: 'text', text: 'Credited on "' },
+        {
+          type: 'release',
+          text: 'Neon Circuit',
+          href: '/timwhite/neon-circuit',
+        },
+        { type: 'text', text: '".' },
+      ],
+    });
+
+    const panel = screen.getByTestId('mock-primary-tab-panel-about');
+    expect(panel).toHaveAttribute('data-credit-segments', 'text|release|text');
+  });
+
   it('renders registry-cased hero social aria labels for TikTok', () => {
     renderSurface({ socialLinks: [tiktokLink] });
 
@@ -294,14 +338,21 @@ describe('ProfileCompactSurface', () => {
     expect(scrollRegion.className).toContain('overflow-y-auto');
   });
 
-  it('keeps the home hero and content regions in the responsive layout contract', () => {
+  it('keeps the chrome, identity header, and content regions in the responsive layout contract', () => {
     renderSurface();
 
+    // Floating chrome over the identity header; the header scrolls with
+    // the content instead of occupying a fixed hero band.
     expect(screen.getByTestId('profile-cover')).toHaveClass(
-      'profile-home-fluid-hero',
-      'profile-home-fluid-hero--no-media',
-      'shrink-0'
+      'pointer-events-none',
+      'absolute',
+      'inset-x-0',
+      'top-0'
     );
+    const scroll = screen.getByTestId('profile-content-scroll');
+    expect(
+      within(scroll).getByTestId('profile-identity-header')
+    ).toBeInTheDocument();
     expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
       'profile-home-content-scroll',
       'min-h-0',
@@ -310,6 +361,56 @@ describe('ProfileCompactSurface', () => {
       'flex-col',
       'overflow-y-auto',
       'overscroll-contain'
+    );
+  });
+
+  it('anchors the mode-card accents on the featured artwork, matching the Pen', () => {
+    renderSurface({
+      latestRelease: {
+        title: 'Never Say A Word',
+        slug: 'never-say-a-word',
+        artworkUrl: '/art.jpg',
+        releaseDate: '2026-08-01T00:00:00.000Z',
+        releaseType: 'single',
+      },
+    });
+
+    const rail = screen.getByTestId('mock-profile-home-rail');
+    expect(rail).toHaveAttribute('data-featured-accent', 'ultra');
+    expect(rail).toHaveAttribute('data-featured-strength', 'art');
+  });
+
+  it('rotates positionally and passes the payments link only when tips are on', () => {
+    const venmo = {
+      id: 'venmo-1',
+      artist_id: artist.id,
+      platform: 'venmo',
+      url: 'https://venmo.com/u/timwhite',
+      clicks: 0,
+      created_at: '2026-01-01T00:00:00.000Z',
+    };
+    const { unmount } = renderSurface({
+      activeMode: 'about',
+      socialLinks: [venmo],
+    });
+
+    const panel = screen.getByTestId('mock-primary-tab-panel-about');
+    // No release art and no photo: no image anchor, plain visual order.
+    expect(panel).toHaveAttribute('data-accents', 'ion,ultra,pulse,orange');
+    expect(panel).toHaveAttribute(
+      'data-payments-link',
+      'https://venmo.com/u/timwhite'
+    );
+    unmount();
+
+    renderSurface({
+      activeMode: 'about',
+      socialLinks: [venmo],
+      showPayButton: false,
+    });
+    expect(screen.getByTestId('mock-primary-tab-panel-about')).toHaveAttribute(
+      'data-payments-link',
+      ''
     );
   });
 });

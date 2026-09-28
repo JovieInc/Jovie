@@ -20,7 +20,7 @@ const rawVisualUtilityPattern =
   /\b(?:bg|border|text|ring|shadow|outline|rounded|h|w|max-w|min-h|min-w|tracking|leading|px|py|pt|pb)-\[/;
 
 describe('NotFoundPageContent', () => {
-  it('renders profile miss copy with artist discovery', () => {
+  it('renders profile miss copy with a profile discovery link', () => {
     render(<NotFoundPageContent variant='profile-miss' surface='profile' />);
 
     expect(
@@ -32,7 +32,7 @@ describe('NotFoundPageContent', () => {
       APP_ROUTES.HOME
     );
     expect(
-      screen.getByRole('link', { name: 'Search artists' })
+      screen.getByRole('link', { name: 'Explore profiles' })
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
   });
 
@@ -49,7 +49,7 @@ describe('NotFoundPageContent', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go home' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'Search artists' })
+      screen.queryByRole('link', { name: 'Explore profiles' })
     ).not.toBeInTheDocument();
     expect(screen.getAllByRole('link')).toHaveLength(1);
   });

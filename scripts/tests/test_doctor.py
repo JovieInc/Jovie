@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -102,10 +103,96 @@ class ReconcileTest(unittest.TestCase):
         state = doctor.reconcile({"disk-low": "much later"}, state, tracker, now + 700 + doctor.COOL_OFF_S + 1)
         self.assertEqual(len(tracker.opened), 2, "after the cool-off a fresh issue is opened")
 
-    def test_tracker_failure_still_records_the_alert(self):
+    def test_tracker_failure_still_records_the_alert_and_retries_the_open(self):
         state = doctor.reconcile({"hud-stale": "x"}, {}, None, 5.0)
         self.assertEqual(state["alerts"], {"hud-stale": "x"})
         self.assertEqual(state["issues"]["hud-stale"]["id"], None)
+        tracker = FakeTracker()
+        state = doctor.reconcile({"hud-stale": "x"}, state, tracker, 65.0)
+        self.assertEqual(tracker.opened, [("hud-stale", "x")], "an alert whose issue never opened is retried")
+        self.assertEqual(state["issues"]["hud-stale"]["id"], "id-hud-stale")
+
+    def test_tracker_titles_carry_the_host_and_reuse_an_existing_issue(self):
+        class FakeLinear:
+            def __init__(self):
+                self.calls = []
+
+            def gql(self, query, variables):
+                self.calls.append(query)
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": [{"id": "existing-1"}]}}
+                raise AssertionError("must not create when one exists")
+        linear = FakeLinear()
+        tracker = doctor.Tracker(linear, "gem")
+        self.assertEqual(tracker.title("disk-low"), "Symphony doctor: disk-low (gem)")
+        self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
+
+
+class OrphanPrTest(unittest.TestCase):
+    def test_orphan_prs_from_a_fresh_sweep_raise_one_alert(self):
+        sweep = {"atEpoch": 1_000_000.0 - 60, "orphans": [18938, 18924], "counts": {"open": 150}}
+        alerts = doctor.judge(obs(reconcile=sweep))
+        self.assertIn("#18938 #18924", alerts["orphan-prs"])
+        self.assertNotIn("orphan-prs", doctor.judge(obs(reconcile={**sweep, "orphans": []})))
+        self.assertNotIn("orphan-prs", doctor.judge(obs(reconcile={**sweep, "atEpoch": 0})), "a stale sweep proves nothing")
+
+
+class StatusFeedTest(unittest.TestCase):
+    def test_feed_counts_running_and_idle_slots_per_lane(self):
+        import fcntl
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "slots").mkdir()
+            for name in ("devin.0.lock", "devin.1.lock", "codex.0.lock", "gate.0.lock"):
+                (state / "slots" / name).touch()
+            held = open(state / "slots" / "devin.0.lock", "w")
+            fcntl.flock(held, fcntl.LOCK_EX)
+            host = type("Host", (), {"state": state})()
+            lane = type("Lane", (), {"HOST": "gem"})
+            feed = doctor.status_feed(host, lane, obs(pool=12, lastLandingAge=30), {"disk-low": "x"}, {"release": "abc1234"})
+            held.close()
+        self.assertEqual((feed["running"], feed["idle"], feed["pool"], feed["release"]), (1, 2, 12, "abc1234"))
+        self.assertEqual(feed["lanes"]["devin"], {"running": 1, "slots": 2})
+        self.assertEqual(feed["alerts"], {"disk-low": "x"})
+        self.assertNotIn("gate", feed["lanes"])
+        self.assertEqual((feed["held_by_reason"], feed["failed_by_reason"], feed["prs"], feed["orphan_prs"]),
+                         ({}, {}, {}, []))
+
+    def test_feed_publishes_held_and_failed_records_by_reason(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "held.json").write_text(json.dumps({
+                "1": {"sha": "a", "evidence": ["gate-timeout:x3"]},
+                "2": {"sha": "b", "reason": "missing-test", "next_action": "fix-loop"}}))
+            (state / "failures.json").write_text(json.dumps({
+                "JOV-1": {"count": 1, "at": 0, "reason": "agent-timeout"}, "JOV-2": {"count": 2, "at": 0}, "JOV-3": 1}))
+            host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
+            lane = type("Lane", (), {"Linear": staticmethod(lambda env: (_ for _ in ()).throw(OSError("x"))),
+                                     "load_providers": staticmethod(lambda: {}),
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "gem"})
+            codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
+            try:
+                observed = doctor.observe(host, lane, codex)
+            finally:
+                os.environ.pop("LANES_SELFTEST", None)
+            (state / "slots").mkdir()
+            feed = doctor.status_feed(host, lane, observed, {}, {})
+        self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
+        self.assertEqual(feed["failed_by_reason"], {"agent-timeout": 1, "legacy": 2})
+
+
+class PublishTest(unittest.TestCase):
+    def test_only_the_primary_host_publishes(self):
+        saved = doctor.PRIMARY_FLAG
+        with tempfile.TemporaryDirectory() as tmp:
+            doctor.PRIMARY_FLAG = Path(tmp) / "primary"
+            host = type("Host", (), {"state": Path(tmp)})()
+            try:
+                self.assertIsNone(doctor.publish_status(host, None, {"x": 1}))
+                self.assertFalse((Path(tmp) / "lanes-status.json").exists(), "a non-primary host writes nothing")
+            finally:
+                doctor.PRIMARY_FLAG = saved
 
 
 class RunTest(unittest.TestCase):
@@ -121,10 +208,14 @@ class RunTest(unittest.TestCase):
                 def __init__(self, env):
                     raise OSError("no env")
             lane = type("Lane", (), {"Linear": FakeLinear, "load_providers": staticmethod(lambda: {}),
-                                     "load_github_env": staticmethod(lambda: None), "HOST": "test"})
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "test"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {"count": 0, "available": [], "accounts": {}})})
             tracker = FakeTracker()
-            result = doctor.run(host, lane, codex, tracker)
+            os.environ["LANES_SELFTEST"] = "1"  # no gist from a unit test
+            try:
+                result = doctor.run(host, lane, codex, tracker)
+            finally:
+                os.environ.pop("LANES_SELFTEST", None)
             self.assertIn("provider-down:devin", result["alerts"])
             self.assertIn("linear-down", result["alerts"])
             written = json.loads((state / "doctor.json").read_text())

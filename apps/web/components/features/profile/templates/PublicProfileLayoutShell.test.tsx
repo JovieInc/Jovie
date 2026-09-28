@@ -138,6 +138,43 @@ describe('PublicProfileLayoutShell', () => {
     expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
   });
 
+  it('marks the viewport for the desktop hand-off only when a desktop surface ships', () => {
+    render(
+      <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
+    );
+
+    expect(screen.getByTestId('public-profile-layout-shell')).toHaveClass(
+      'profile-viewport--desktop-surface'
+    );
+  });
+
+  it('renders only the compact column when the desktop surface is flagged off', () => {
+    const { desktopSurface: _desktopSurface, ...compactOnlyProps } =
+      commonProps;
+    render(
+      <PublicProfileLayoutShell
+        {...compactOnlyProps}
+        isDesktopLayout={false}
+        desktopBanner={<div data-testid='desktop-banner-content'>Banner</div>}
+        showClaimFooter
+        claimFooterHref='/test/claim'
+      />
+    );
+
+    const viewport = screen.getByTestId('public-profile-layout-shell');
+    expect(viewport).toHaveAttribute('data-layout', 'compact');
+    expect(viewport).not.toHaveClass('profile-viewport--desktop-surface');
+    expect(screen.getByTestId('compact-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
+    expect(screen.queryByTestId('desktop-banner-content')).toBeNull();
+    expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
+    // The claim footer still sits under the centered column.
+    expect(screen.getByTestId('profile-claim-footer-cta')).toHaveAttribute(
+      'href',
+      '/test/claim'
+    );
+  });
+
   it('keeps the desktop placeholder for embedded previews', () => {
     render(
       <PublicProfileLayoutShell

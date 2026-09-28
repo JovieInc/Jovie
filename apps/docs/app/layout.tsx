@@ -1,22 +1,36 @@
-import { Head, Search } from 'nextra/components';
+import { Head } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
 import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import 'nextra-theme-docs/style.css';
+import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { ArticleFeedback } from '@/components/ArticleFeedback';
 import { ContactSupportLink } from '@/components/ContactSupportLink';
+import { HelpCenterAnalytics } from '@/components/HelpCenterAnalytics';
+import { HelpCenterSearch } from '@/components/HelpCenterSearch';
 import {
   filterNavigationPageMap,
   loadArticleRegistry,
 } from '@/lib/article-registry.mjs';
+import { DOCS_ORIGIN } from '@/lib/help-center-seo.mjs';
+import './help-search.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(DOCS_ORIGIN),
   title: {
     default: 'Jovie Help Center',
     template: '%s | Jovie Help Center',
   },
   description:
     'Clear answers for building your profile, sharing your work, and understanding your audience.',
+  openGraph: {
+    siteName: 'Jovie Help Center',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+  },
 };
 
 export default async function RootLayout({
@@ -52,6 +66,7 @@ export default async function RootLayout({
                 </span>
               }
             >
+              <HelpCenterSearch variant='mobile-only' />
               <a href='/contact'>Contact support</a>
             </Navbar>
           }
@@ -64,9 +79,11 @@ export default async function RootLayout({
               <ContactSupportLink />
             </Footer>
           }
-          search={<Search />}
+          search={<HelpCenterSearch variant='desktop-only' />}
         >
           {children}
+          <ArticleFeedback />
+          <HelpCenterAnalytics />
         </Layout>
       </body>
     </html>

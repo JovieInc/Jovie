@@ -35,6 +35,7 @@ import * as backlogReduction from './backlog-reduction.mjs';
 import * as backlogRemediation from './backlog-remediation.mjs';
 import * as classifier from './classifier.mjs';
 import * as contextGate from './context-gate.mjs';
+import { reconcileConversationRequest } from './conversation-intake.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
 import * as gateNextHold from './gate-next-hold.mjs';
 import { cliGbrainClient } from './gbrain-client.mjs';
@@ -151,6 +152,7 @@ Usage:
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
   node backlog-orchestrator.mjs backlog-hygiene       Aged dedup + stale Sentry-only hygiene pass (dry-run)
+  node backlog-orchestrator.mjs reconcile-conversation --evidence-file=/path/request.json
   node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
@@ -182,6 +184,8 @@ Usage:
     await runBacklogReduction(cache);
   } else if (command === 'backlog-hygiene') {
     await runBacklogHygiene(cache);
+  } else if (command === 'reconcile-conversation') {
+    await runConversationReconciliation(evidenceFile, evidenceJson, isDryRun);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else if (command === 'approve-research') {
@@ -190,6 +194,28 @@ Usage:
     console.error(`Unknown command: ${command}`);
     process.exit(1);
   }
+}
+
+async function runConversationReconciliation(
+  evidenceFile,
+  evidenceJson,
+  isDryRun
+) {
+  if (!evidenceFile && !evidenceJson)
+    throw new Error(
+      'reconcile-conversation requires --evidence-file or --evidence'
+    );
+  const request = evidenceFile
+    ? JSON.parse(readFileSync(evidenceFile, 'utf8'))
+    : JSON.parse(evidenceJson);
+  const receipt = await reconcileConversationRequest({
+    request,
+    teamId: TEAM_CONFIGS[0].id,
+    stateId: TEAM_FILE_CONFIG.states.triage,
+    client: linear,
+    dryRun: isDryRun,
+  });
+  console.log(JSON.stringify(receipt, null, 2));
 }
 
 async function runIntakeReadiness(cache, issueArg) {

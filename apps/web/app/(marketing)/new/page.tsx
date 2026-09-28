@@ -54,18 +54,15 @@ export const metadata: Metadata = {
 };
 
 const WEBSITE_SCHEMA = buildWebsiteSchema({
-  alternateName: ['Jovie', 'jov.ie', 'Jovie release platform'],
+  alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description: HOMEPAGE_V2_COPY.seo.description,
 });
 
-const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Artist profiles, smart links, fan capture, and reactivation built as one release system for artists.'
-);
+const SOFTWARE_SCHEMA = buildSoftwareSchema(HOMEPAGE_V2_COPY.seo.description);
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: LEGAL_ENTITY_NAME,
-  description:
-    'Jovie builds artist profiles, release surfaces, smart links, and fan intelligence for independent artists.',
+  description: HOMEPAGE_V2_COPY.seo.description,
 });
 
 export default function NewLandingPage() {

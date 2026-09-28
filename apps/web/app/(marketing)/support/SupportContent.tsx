@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { MarketingContainer } from '@/components/marketing';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
 import { page, track } from '@/lib/analytics';
+import { trackHelpCenterEscalationLanding } from '@/lib/tracking/help-center-client';
 
 const HELP_CENTER_URL = `${DOCS_URL}/docs`;
 const CONTACT_URL = `${DOCS_URL}/contact`;
@@ -43,6 +44,7 @@ export function SupportChannels() {
     page('Support Page', {
       path: '/support',
     });
+    trackHelpCenterEscalationLanding(window.location.search);
   }, []);
 
   return (

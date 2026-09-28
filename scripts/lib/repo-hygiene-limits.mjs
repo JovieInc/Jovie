@@ -8,7 +8,10 @@ export const HYGIENE_LIMITS = Object.freeze({
   maxChangedBinaryFiles: 120,
   maxSnapshotBytes: 12 * MiB,
   maxSnapshotFiles: 100,
-  maxTrackedBytes: 180 * MiB,
+  // Raised 180 -> 198 MiB (+10%, the documented per-raise cap) under JOV-6635:
+  // origin/main measured 178.14 MiB (99.0% of budget), blocking every PR that
+  // adds tracked bytes. Measurements in docs/ci/repository-health.md.
+  maxTrackedBytes: 198 * MiB,
   maxTrackedBinaryBytes: 96 * MiB,
 });
 
