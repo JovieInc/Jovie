@@ -11,6 +11,18 @@ const mocks = vi.hoisted(() => ({
   releaseInvestorViewDedup: vi.fn(),
   shouldRecordInvestorView: vi.fn(),
   apiLimiterLimit: vi.fn(),
+  getSessionCookie: vi.fn(),
+  isTestAuthBypassEnabled: vi.fn(() => false),
+  resolveTestBypassUserId: vi.fn(() => null),
+}));
+
+vi.mock('better-auth/cookies', () => ({
+  getSessionCookie: mocks.getSessionCookie,
+}));
+
+vi.mock('@/lib/auth/test-mode', () => ({
+  isTestAuthBypassEnabled: mocks.isTestAuthBypassEnabled,
+  resolveTestBypassUserId: mocks.resolveTestBypassUserId,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -58,7 +70,10 @@ vi.mock('@/lib/rate-limit', () => ({
   },
 }));
 
-import { handleInvestorRequest } from '@/lib/auth/investor-portal';
+import {
+  handleInvestorRequest,
+  isRetiredInvestorPath,
+} from '@/lib/auth/investor-portal';
 
 function createInvestorRequest(path: string) {
   return new NextRequest(`https://jov.ie${path}`);
@@ -77,6 +92,8 @@ describe('investor portal proxy helper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.select.mockReset();
+    mocks.getSessionCookie.mockReturnValue(null);
+    mocks.isTestAuthBypassEnabled.mockReturnValue(false);
     mocks.shouldRecordInvestorView.mockResolvedValue(true);
     mocks.apiLimiterLimit.mockResolvedValue({
       success: true,
@@ -214,5 +231,118 @@ describe('investor portal proxy helper', () => {
     await handleInvestorRequest(req);
 
     expect(mocks.apiLimiterLimit).not.toHaveBeenCalled();
+  });
+
+  function expectPrivateNotFound(res: Response | null | undefined) {
+    expect(res?.status).toBe(404);
+    expect(res?.headers.get('X-Robots-Tag')).toBe(
+      'noindex, nofollow, noarchive, nosnippet'
+    );
+    expect(res?.headers.get('Cache-Control')).toBe('private, no-store');
+  }
+
+  it.each([
+    '/investors',
+    '/investors/',
+    '/investors/deck',
+    '/pitch',
+    '/pitch/index.html',
+    '/pitch/assets/tim-universal.png',
+    '/Jovie-Pitch-Deck.pdf',
+  ])('answers a neutral noindex 404 for retired public path %s', async path => {
+    mocks.getSessionCookie.mockReturnValue('session-token');
+
+    const res = await handleInvestorRequest(createInvestorRequest(path));
+
+    expectPrivateNotFound(res);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('leaves profile handles that merely share a prefix alone', async () => {
+    expect(isRetiredInvestorPath('/pitchfork')).toBe(false);
+    expect(isRetiredInvestorPath('/investorsclub')).toBe(false);
+    expect(
+      await handleInvestorRequest(createInvestorRequest('/pitchfork'))
+    ).toBeNull();
+    expect(
+      await handleInvestorRequest(createInvestorRequest('/investor-portalx'))
+    ).toBeNull();
+  });
+
+  it.each([
+    '/investor-portal',
+    '/investor-portal/memo',
+    '/investor-portal/deck/Jovie-Pitch-Deck.pdf',
+  ])(
+    'answers a neutral noindex 404 for %s without a cookie or session',
+    async path => {
+      const res = await handleInvestorRequest(createInvestorRequest(path));
+
+      expectPrivateNotFound(res);
+      expect(mocks.select).not.toHaveBeenCalled();
+    }
+  );
+
+  it('answers a neutral noindex 404 for an unknown link token', async () => {
+    mockSelectRows([]);
+
+    const res = await handleInvestorRequest(
+      createInvestorRequest('/investor-portal?t=unknown')
+    );
+
+    expectPrivateNotFound(res);
+    expect(res?.cookies.get('__investor_token')).toBeUndefined();
+  });
+
+  it('answers a neutral 404 and clears an invalid cookie for a signed-out visitor', async () => {
+    mockSelectRows([]);
+    const req = new NextRequest('https://jov.ie/investor-portal', {
+      headers: { Cookie: '__investor_token=revoked' },
+    });
+
+    const res = await handleInvestorRequest(req);
+
+    expectPrivateNotFound(res);
+    expect(res?.cookies.get('__investor_token')?.value).toBe('');
+  });
+
+  it('passes signed-in sessions to the server gate with private headers', async () => {
+    mocks.getSessionCookie.mockReturnValue('session-token');
+
+    const res = await handleInvestorRequest(
+      createInvestorRequest('/investor-portal/memo')
+    );
+
+    expect(res?.status).toBe(200);
+    expect(res?.headers.get('x-middleware-next')).toBe('1');
+    expect(res?.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res?.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('passes the dev test-auth bypass identity to the server gate', async () => {
+    mocks.isTestAuthBypassEnabled.mockReturnValue(true);
+    mocks.resolveTestBypassUserId.mockReturnValue('admin-user' as never);
+
+    const res = await handleInvestorRequest(
+      createInvestorRequest('/investor-portal')
+    );
+
+    expect(res?.status).toBe(200);
+    expect(res?.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('marks valid cookie visits noindex and private', async () => {
+    mockSelectRows([{ id: 'link-1', isActive: true, expiresAt: null }]);
+    mocks.shouldRecordInvestorView.mockResolvedValue(false);
+    const req = new NextRequest('https://jov.ie/investor-portal', {
+      headers: { Cookie: '__investor_token=token-123' },
+    });
+
+    const res = await handleInvestorRequest(req);
+
+    expect(res?.status).toBe(200);
+    expect(res?.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res?.headers.get('Cache-Control')).toBe('private, no-store');
   });
 });

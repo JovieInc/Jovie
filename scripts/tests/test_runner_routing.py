@@ -735,7 +735,7 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert 'degrade pending "current exact heartbeat' in query
     assert "for ((attempt = 1; attempt <= POLL_ATTEMPTS; attempt++))" in awaiter
     assert 'if [[ "$probe_state" != "pending" ]]' in awaiter
-    assert "needs: [ci-path-changes, ci-merge-group-admission]" in units
+    assert "needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]" in units
     assert "ci-unit-runner-route" not in units
     assert "runs-on: ubuntu-latest" in units
     assert "runs-on: jovie-runner" not in units

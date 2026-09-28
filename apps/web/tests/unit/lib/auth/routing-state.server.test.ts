@@ -260,4 +260,133 @@ describe('auth routing state store', () => {
     ).resolves.toEqual({ ok: false, reason: 'missing' });
     expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
   });
+  describe('desktop handback', () => {
+    const flow = 'desktop_flow_nonce_12345';
+    const verifier = 'v'.repeat(86);
+    const challenge = (value: string) => `challenge:${value}`;
+
+    async function sealHandback(expiresAt = 301_000): Promise<{
+      identifier: string;
+      value: string;
+    }> {
+      const { createStoredDesktopHandback } = await modulePromise;
+      await expect(
+        createStoredDesktopHandback({
+          code: 'code_123',
+          state: 'state_123',
+          desktopFlow: flow,
+          codeChallenge: challenge(verifier),
+          expiresAt,
+          returnCode: 'BCDFGHJK',
+        })
+      ).resolves.toBe('BCDFGHJK');
+      return hoisted.createVerificationValue.mock.calls.at(-1)?.[0];
+    }
+
+    async function redeem(
+      overrides: {
+        returnCode?: string;
+        codeVerifier?: string;
+        now?: number;
+      } = {}
+    ) {
+      const { redeemStoredDesktopHandback } = await modulePromise;
+      return redeemStoredDesktopHandback({
+        desktopFlow: flow,
+        codeVerifier: overrides.codeVerifier ?? verifier,
+        returnCode: overrides.returnCode ?? 'bcdf-ghjk',
+        createCodeChallenge: challenge,
+        now: overrides.now ?? 2_000,
+      });
+    }
+
+    it('generates unbiased RFC 8628 style return codes', async () => {
+      const {
+        createDesktopReturnCode,
+        DESKTOP_RETURN_CODE_ALPHABET,
+        DESKTOP_RETURN_CODE_LENGTH,
+      } = await modulePromise;
+      const seen = new Set<string>();
+      for (let i = 0; i < 200; i += 1) {
+        const code = createDesktopReturnCode();
+        expect(code).toHaveLength(DESKTOP_RETURN_CODE_LENGTH);
+        for (const char of code) {
+          expect(DESKTOP_RETURN_CODE_ALPHABET).toContain(char);
+        }
+        seen.add(code);
+      }
+      expect(seen.size).toBe(200);
+    });
+
+    it('normalizes typed codes and rejects look-alikes', async () => {
+      const { normalizeDesktopReturnCode } = await modulePromise;
+      expect(normalizeDesktopReturnCode(' bcdf-ghjk ')).toBe('BCDFGHJK');
+      expect(normalizeDesktopReturnCode('BCDF GHJK')).toBe('BCDFGHJK');
+      expect(normalizeDesktopReturnCode('BCDF-GHJ0')).toBeNull();
+      expect(normalizeDesktopReturnCode('ABCDEFGH')).toBeNull();
+      expect(normalizeDesktopReturnCode('BCDF')).toBeNull();
+    });
+
+    it('stores only a hash of the return code, sealed, keyed by flow hash', async () => {
+      const stored = await sealHandback();
+      expect(stored.identifier).toMatch(
+        /^jovie-auth-desktop-handback:[A-Za-z0-9_-]{43}$/
+      );
+      expect(stored.identifier).not.toContain(flow);
+      expect(stored.value).toMatch(/^v1\./);
+      expect(stored.value).not.toContain('code_123');
+      expect(stored.value).not.toContain('BCDFGHJK');
+    });
+
+    it('redeems with the right code and verifier exactly once', async () => {
+      const stored = await sealHandback();
+      hoisted.findVerificationValue.mockResolvedValue(
+        verification(stored.value)
+      );
+      hoisted.consumeVerificationValue.mockResolvedValueOnce(
+        verification(stored.value)
+      );
+
+      await expect(redeem()).resolves.toEqual({
+        status: 'complete',
+        code: 'code_123',
+        state: 'state_123',
+      });
+      expect(hoisted.consumeVerificationValue).toHaveBeenCalledWith(
+        stored.identifier
+      );
+      // Replay: the row is already consumed.
+      await expect(redeem()).resolves.toEqual({ status: 'invalid' });
+    });
+
+    it('never consumes the handback on a typo or a foreign verifier', async () => {
+      const stored = await sealHandback();
+      hoisted.findVerificationValue.mockResolvedValue(
+        verification(stored.value)
+      );
+
+      await expect(redeem({ returnCode: 'BCDFGHJL' })).resolves.toEqual({
+        status: 'invalid',
+      });
+      // An attacker who crafted the sign-in link holds a different verifier.
+      await expect(redeem({ codeVerifier: 'x'.repeat(86) })).resolves.toEqual({
+        status: 'invalid',
+      });
+      expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
+    });
+
+    it('treats unknown, malformed and expired handbacks as invalid', async () => {
+      await expect(redeem()).resolves.toEqual({ status: 'invalid' });
+      await expect(redeem({ returnCode: '0000' })).resolves.toEqual({
+        status: 'invalid',
+      });
+
+      const stored = await sealHandback(1_500);
+      hoisted.findVerificationValue.mockResolvedValue(
+        verification(stored.value)
+      );
+      await expect(redeem()).resolves.toEqual({ status: 'invalid' });
+      expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
+    });
+  });
 });

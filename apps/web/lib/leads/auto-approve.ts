@@ -11,8 +11,8 @@ import {
   or,
 } from 'drizzle-orm';
 import {
-  machineCertifyPremadeProfile,
   projectLeadEvidence,
+  runPremadeProfilePreflight,
 } from '@/lib/acquisition';
 import { db } from '@/lib/db';
 import {
@@ -131,13 +131,14 @@ export async function runAutoApprove(
   let errors = 0;
 
   for (const lead of eligibleLeads) {
-    const certification = machineCertifyPremadeProfile(
-      projectLeadEvidence(lead)
-    );
-    if (!certification.passed) {
-      pipelineLog('auto-approve', 'Skipping machine-cert failure', {
+    // Field-presence preflight only; building the profile and certifying the
+    // built experience are separate steps after this gate.
+    const preflight = runPremadeProfilePreflight(projectLeadEvidence(lead));
+    if (!preflight.passed) {
+      pipelineLog('auto-approve', 'Skipping preflight failure', {
         leadId: lead.id,
-        failures: certification.failures.map(item => item.id),
+        failures: preflight.failures.map(item => item.id),
+        checklistCoverage: preflight.checklistCoverage,
       });
       continue;
     }

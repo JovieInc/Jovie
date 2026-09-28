@@ -6,15 +6,15 @@
   },
   "conservative": {
     "armed": true,
-    "count": 738,
+    "count": 733,
     "perFamily": {
       "marketing": 113,
-      "web-shell": 296,
+      "web-shell": 291,
       "web-other": 318,
       "packages/ui": 11
     },
     "perUtility": {
-      "gap-2.5": 92,
+      "gap-2.5": 91,
       "gap-3.5": 15,
       "gap-x-2.5": 1,
       "mb-2.5": 9,
@@ -23,7 +23,7 @@
       "mx-2.5": 1,
       "my-2.5": 1,
       "p-2.5": 34,
-      "p-3.5": 32,
+      "p-3.5": 31,
       "pb-2.5": 12,
       "pb-3.5": 1,
       "pl-2.5": 2,
@@ -31,7 +31,7 @@
       "pr-2.5": 3,
       "pr-3.5": 2,
       "pt-2.5": 9,
-      "px-2.5": 246,
+      "px-2.5": 243,
       "px-3.5": 47,
       "py-2.5": 131,
       "py-3.5": 34,
@@ -41,11 +41,11 @@
   },
   "strict": {
     "armed": false,
-    "count": 2380,
+    "count": 2383,
     "perFamily": {
       "marketing": 313,
-      "web-shell": 920,
-      "web-other": 1088,
+      "web-shell": 917,
+      "web-other": 1094,
       "packages/ui": 59
     }
   }

@@ -12,11 +12,11 @@ import { BaseSequencer } from 'vitest/node';
 // balance toward equal counts; it never drops a file.
 
 // Cost of non-Vitest CI work pinned to a shard (.github/workflows/ci.yml:
-// packages/ui ~43s on 4/14, quarantine retries ~12s on 7/14, Ovie ~3s on
-// 1/14) in map cost units (~1.6x wall on the slower hosted runners: a
-// ~260k-unit 10-way shard ran ~165s), preloaded so LPT offsets it. Keys must
-// match the ci-unit-tests matrix; other shard counts get no reservation.
-export const CI_RESERVED_MS = { '1/14': 5000, '4/14': 68_000, '7/14': 19_000 };
+// quarantine retries ~12s on 7/14, Ovie ~3s on 1/14) in map cost units (~1.6x
+// wall on the slower hosted runners: a ~260k-unit 10-way shard ran ~165s),
+// preloaded so LPT offsets it. Keys must match the ci-unit-tests matrix; other
+// shard counts get no reservation. packages/ui runs in its own matrix entry.
+export const CI_RESERVED_MS = { '1/14': 5000, '7/14': 19_000 };
 
 export const DEFAULT_DURATIONS_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

@@ -6,6 +6,24 @@
       "rule": "arbitrary-value",
       "value": "JOV-[1-9]",
       "reason": "JOV-6224: server-side issue identifier regular expression, not a Tailwind class or visual token. Preserve strict positive issue-number validation."
+    },
+    {
+      "file": "apps/web/lib/agent-os/design-reference-corpus/corpus.ts",
+      "rule": "arbitrary-property",
+      "value": "[key: string]",
+      "reason": "JOV-6040: TypeScript index signature on a recursive serializer type (StableObject/StableValue for deterministic corpus digests), not a Tailwind arbitrary-property class. An interface is required because the equivalent Record type alias is circular (TS2456); no canonical design token applies."
+    },
+    {
+      "file": "apps/web/lib/tracking/help-center-contract.ts",
+      "rule": "arbitrary-property",
+      "value": "[a-zA-Z0-9:_-]",
+      "reason": "JOV-5905: zod character-class regex for opaque analytics ids, not a Tailwind arbitrary property. No canonical design token applies."
+    },
+    {
+      "file": "apps/web/lib/tracking/help-center-contract.ts",
+      "rule": "arbitrary-value",
+      "value": "fnv1a-[0-9a-f]",
+      "reason": "JOV-5905: zod regex for the documented FNV-1a query-hash fallback, not a Tailwind arbitrary value. No canonical design token applies."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."

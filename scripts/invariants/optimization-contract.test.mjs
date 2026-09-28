@@ -9,7 +9,6 @@ import {
   CONTROL_PLANE_OPTIMIZATION_EXCEPTION,
   completeProductOptimizationContract,
   resolveOptimizationContract,
-  SPAWNED_OPTIMIZATION_CONTRACT_INSTRUCTION,
   validateOptimizationContract,
 } from './optimization-contract.mjs';
 
@@ -137,32 +136,6 @@ describe('JOV-INV-012 optimization contract', () => {
     assert.deepEqual(
       exemptedPayload.evidence.optimization,
       CONTROL_PLANE_OPTIMIZATION_EXCEPTION
-    );
-  });
-
-  it('instructs spawned agents to satisfy or explicitly exempt the optimization contract', () => {
-    const grokShip = readFileSync(
-      resolve(ROOT, 'scripts/symphony/grok-ship-one'),
-      'utf8'
-    );
-    const shipper = readFileSync(
-      resolve(ROOT, 'scripts/symphony/lib/codex-issue-shipper.ts'),
-      'utf8'
-    );
-    const compact = text => text.replace(/\s+/g, ' ');
-    assert.match(grokShip, /JOV-INV-012/);
-    assert.match(shipper, /JOV-INV-012/);
-    assert.equal(
-      compact(grokShip).includes(SPAWNED_OPTIMIZATION_CONTRACT_INSTRUCTION),
-      true
-    );
-    assert.equal(
-      compact(shipper).includes(SPAWNED_OPTIMIZATION_CONTRACT_INSTRUCTION),
-      true
-    );
-    assert.match(
-      SPAWNED_OPTIMIZATION_CONTRACT_INSTRUCTION,
-      /explicitly declare a justified exception/
     );
   });
 

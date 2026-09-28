@@ -146,6 +146,15 @@ jobs:
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
         continue-on-error: false
+      - name: DB migrate (staging - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (post-migration schema check)
         id: verify
         env:
@@ -723,7 +732,7 @@ jobs:
       ]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
@@ -768,6 +777,15 @@ jobs:
           doppler run --project jovie-web --config prd
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
+      - name: DB migrate (production - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (production schema check)
         id: verify-production-schema
         env:
@@ -807,7 +825,13 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
+      # The production SBOM (`pnpm licenses list`) reads package index files
+      # from the pnpm store. An exact node_modules cache hit restores the tree
+      # without any store, which froze production (JOV-6726). Install from the
+      # lockfile into a warm store here instead of restoring a cached tree.
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          package_cache: 'false'
       # Production runtime config comes from the isolated Doppler `prd`
       # service token. Vercel remains the deployment control plane only.
       - uses: ./.github/actions/setup-doppler
@@ -869,6 +893,7 @@ jobs:
           PRODUCTION_NEXT_CACHE_RESTORE_HIT: ${{ steps.production-next-cache-restore.outputs.cache-hit }}
           PRODUCTION_NEXT_CACHE_SAVE_ENABLED: ${{ vars.JOVIE_PRODUCTION_NEXT_CACHE_SAVE || 'false' }}
           PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           production_stage() {
             set -euo pipefail
@@ -949,8 +974,12 @@ jobs:
 
           provenance_dir="$RUNNER_TEMP/production-input-provenance"
           mkdir "$provenance_dir"
+          if ! node .github/scripts/production-input-provenance.mjs sbom \
+            "$provenance_dir/sbom.cdx.json"; then
+            fail_stage "Unable to generate the production SBOM from the installed dependency tree." production_artifact_failed
+          fi
           node .github/scripts/production-input-provenance.mjs inputs \
-            "$provenance_dir/inputs.json"
+            "$provenance_dir/inputs.json" "$provenance_dir/sbom.cdx.json"
 
           if ! env -u TURBO_REMOTE_ONLY \
             VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
@@ -1007,7 +1036,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           provenance_digests="$(node .github/scripts/production-input-provenance.mjs artifact \
-            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json")"
+            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json" \
+            "$provenance_dir/sbom.cdx.json")"
           read -r input_receipt_digest artifact_digest <<< "$provenance_digests"
           [[ "$input_receipt_digest" =~ ^[0-9a-f]{64}$ && "$artifact_digest" =~ ^[0-9a-f]{64}$ ]] || \
             fail_stage "Production input receipt digest is invalid." production_artifact_failed
