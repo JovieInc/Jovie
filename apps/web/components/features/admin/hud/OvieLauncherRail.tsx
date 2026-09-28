@@ -124,17 +124,21 @@ export function OvieLauncherRail() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [fetchFailed, setFetchFailed] = useState(false);
+  // 403 = admin step-up lock, not a broken inventory (JOV-5830).
+  const [locked, setLocked] = useState(false);
   const [query, setQuery] = useState('');
 
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     setFetchFailed(false);
+    setLocked(false);
     try {
       const response = await fetch(FETCH_URL, {
         cache: 'no-store',
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!response.ok) {
+        setLocked(response.status === 403);
         setFetchFailed(true);
         return;
       }
@@ -169,58 +173,60 @@ export function OvieLauncherRail() {
   );
 
   return (
-    <ContentSurfaceCard
-      surface='details'
-      className='min-h-40 space-y-3 p-3'
-      data-testid='ovie-launcher-rail'
-    >
-      <div className='flex items-center justify-between gap-2'>
-        <p className='text-xs font-caption text-tertiary-token'>Launchers</p>
-        <p className='text-2xs text-tertiary-token'>Human controls first</p>
-      </div>
-      {isLoading && !inventory ? (
-        <div
-          className='grid min-h-16 grid-cols-2 gap-2 sm:grid-cols-4'
-          aria-hidden
-        >
-          {[1, 2, 3, 4].map(slot => (
-            <div
-              key={slot}
-              className='h-8 animate-pulse rounded-lg border border-subtle bg-surface-0 motion-reduce:animate-none'
-            />
-          ))}
+    <ContentSurfaceCard surface='details' data-testid='ovie-launcher-rail'>
+      <div className='min-h-40 space-y-3 p-3'>
+        <div className='flex items-center justify-between gap-2'>
+          <p className='text-xs font-caption text-tertiary-token'>Launchers</p>
+          <p className='text-2xs text-tertiary-token'>Human controls first</p>
         </div>
-      ) : null}
-      {inventory ? (
-        <div className='flex flex-col gap-3 lg:flex-row'>
-          <LauncherGroup group='internal' controls={primaryInternal} />
-          <LauncherGroup group='external' controls={primaryExternal} />
-        </div>
-      ) : null}
-      {observation === 'unavailable' ? (
-        <HudObservationStatus
-          state='unavailable'
-          message='Launcher destinations could not be loaded.'
-          onRetry={() => void fetchInventory()}
-          testId='ovie-launcher-observation'
-        />
-      ) : null}
-      <details className='group' data-testid='ovie-launcher-all-tools'>
-        <summary className='cursor-pointer list-none rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-xs font-medium text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'>
-          All tools
-        </summary>
-        <div className='mt-3 space-y-3'>
-          <Input
-            type='search'
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder='Search tools'
-            aria-label='Search All Tools'
-            data-testid='ovie-launcher-search'
+        {isLoading && !inventory ? (
+          <div
+            className='grid min-h-16 grid-cols-2 gap-2 sm:grid-cols-4'
+            aria-hidden
+          >
+            {[1, 2, 3, 4].map(slot => (
+              <div
+                key={slot}
+                className='h-8 animate-pulse rounded-lg border border-subtle bg-surface-0 motion-reduce:animate-none'
+              />
+            ))}
+          </div>
+        ) : null}
+        {inventory ? (
+          <div className='flex flex-col gap-3 lg:flex-row'>
+            <LauncherGroup group='internal' controls={primaryInternal} />
+            <LauncherGroup group='external' controls={primaryExternal} />
+          </div>
+        ) : null}
+        {observation === 'unavailable' ? (
+          <HudObservationStatus
+            state='unavailable'
+            message={
+              locked
+                ? 'Admin data is locked. Unlock with Touch ID, then retry.'
+                : 'Launcher destinations could not be loaded.'
+            }
+            onRetry={() => void fetchInventory()}
+            testId='ovie-launcher-observation'
           />
-          <AllToolsList controls={filteredAll} />
-        </div>
-      </details>
+        ) : null}
+        <details className='group' data-testid='ovie-launcher-all-tools'>
+          <summary className='cursor-pointer list-none rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-xs font-medium text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'>
+            All tools
+          </summary>
+          <div className='mt-3 space-y-3'>
+            <Input
+              type='search'
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder='Search tools'
+              aria-label='Search All Tools'
+              data-testid='ovie-launcher-search'
+            />
+            <AllToolsList controls={filteredAll} />
+          </div>
+        </details>
+      </div>
     </ContentSurfaceCard>
   );
 }

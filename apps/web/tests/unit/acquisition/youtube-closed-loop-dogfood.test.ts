@@ -116,7 +116,7 @@ describe('YouTube closed-loop dogfood (JOV-5883)', () => {
       sendRemainsHuman: true,
     });
     expect(receipt.qualification?.qualified).toBe(true);
-    expect(receipt.machineCertification?.passed).toBe(true);
+    expect(receipt.preflightReadiness?.passed).toBe(true);
   });
 
   it('blocks (not fakes) the apply stage without a Connect grant', async () => {
@@ -155,7 +155,7 @@ describe('YouTube closed-loop dogfood (JOV-5883)', () => {
 
     expect(receipt.outcome).toBe('blocked');
     expect(receipt.blocker).toBe('free_thumbnails');
-    expect(receipt.machineCertification?.passed).toBe(false);
+    expect(receipt.preflightReadiness?.passed).toBe(false);
   });
 
   it('fails closed when the paste surface errors', async () => {

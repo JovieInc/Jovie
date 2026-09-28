@@ -1,5 +1,6 @@
 import {
   type CountMeasurement,
+  type DeliveryPatch,
   EMPTY_CORRELATION,
   emptyCounts,
   emptyDurations,
@@ -9,7 +10,6 @@ import {
   NOT_MEASURED_COUNT,
   type ObservationState,
   type OperationalTask,
-  type OperationalTaskPriority,
   type OperationalTaskWorkflowState,
   SHIPPING_SOURCE_IDS,
   SHIPPING_SOURCE_SCHEMAS,
@@ -59,6 +59,8 @@ export type AuthorityRead = {
     readonly productionVerified?: boolean | null;
     readonly exactLiveBuild?: boolean | null;
   };
+  /** The delivery block this source owns, when the read measured it. */
+  readonly delivery?: DeliveryPatch;
 };
 
 export type AuthorityReader = () => Promise<AuthorityRead>;
@@ -89,9 +91,7 @@ function schemaMatches(
   if (schema == null) return false;
   if (schema === SHIPPING_SOURCE_SCHEMAS[sourceId]) return true;
   return (
-    (sourceId === 'symphony-runtime' &&
-      schema === 'symphony-runtime-state/v1') ||
-    (sourceId === 'production-controller' && schema === 'github-actions-run/v1')
+    sourceId === 'production-controller' && schema === 'github-actions-run/v1'
   );
 }
 
@@ -143,24 +143,48 @@ export function interpretCounts(
   truncated = false
 ): SourceObservation['counts'] {
   if (status !== 'ok' || payload == null) return emptyCounts();
-  if (sourceId === 'symphony-runtime' || sourceId === 'symphony-task') {
-    return {
-      running: countFromList(payload.running, 'running' in payload),
-      retrying: countFromList(payload.retrying, 'retrying' in payload),
-      blocked: countFromList(payload.blocked, 'blocked' in payload),
-      terminalFailures: Array.isArray(payload.deadLetters)
-        ? countFromList(payload.deadLetters, true)
-        : countFromNumber(payload.deadLetterCount),
-      queued: NOT_MEASURED_COUNT,
-      openPullRequests: NOT_MEASURED_COUNT,
-      capacityAvailable: NOT_MEASURED_COUNT,
-    };
-  }
-  if (sourceId === 'lease-guard-capacity') {
-    const capacity = isRecord(payload.capacity) ? payload.capacity : payload;
+  if (sourceId === 'lanes-status') {
+    let terminalFailures: CountMeasurement = NOT_MEASURED_COUNT;
+    if (isRecord(payload.failed_by_reason)) {
+      let total = 0;
+      let valid = true;
+      for (const value of Object.values(payload.failed_by_reason)) {
+        if (!Number.isSafeInteger(value) || Number(value) < 0) {
+          valid = false;
+          break;
+        }
+        total += Number(value);
+      }
+      if (valid) terminalFailures = measuredCount(total);
+    }
     return {
       ...emptyCounts(),
-      capacityAvailable: countFromNumber(capacity.available),
+      running: countFromNumber(payload.running),
+      capacityAvailable: countFromNumber(payload.idle),
+      // Terminal (dead-lettered) lane failures are reported per reason by the
+      // feed; they never alias blocked work, and absent evidence stays
+      // not-measured.
+      terminalFailures,
+    };
+  }
+  if (sourceId === 'lane-pull-requests') {
+    const pullRequests = asList(payload.pullRequests).filter(isRecord);
+    const measured = Array.isArray(payload.pullRequests) && !truncated;
+    return {
+      ...emptyCounts(),
+      running: measured
+        ? measuredCount(pullRequests.length)
+        : NOT_MEASURED_COUNT,
+      blocked: measured
+        ? measuredCount(
+            pullRequests.filter(
+              pr => lanePullRequestWorkflowState(pr) === 'blocked'
+            ).length
+          )
+        : NOT_MEASURED_COUNT,
+      openPullRequests: measured
+        ? measuredCount(pullRequests.length)
+        : NOT_MEASURED_COUNT,
     };
   }
   if (sourceId === 'github-native-merge-queue') {
@@ -168,9 +192,11 @@ export function interpretCounts(
     return {
       ...emptyCounts(),
       queued:
-        truncated || payload.truncated === true
-          ? NOT_MEASURED_COUNT
-          : countFromList(entries, Array.isArray(entries)),
+        typeof payload.totalCount === 'number'
+          ? countFromNumber(payload.totalCount)
+          : truncated || payload.truncated === true
+            ? NOT_MEASURED_COUNT
+            : countFromList(entries, Array.isArray(entries)),
       openPullRequests: countFromNumber(payload.openPullRequests),
     };
   }
@@ -212,94 +238,53 @@ function interpretDurations(
   };
 }
 
-function taskEntities(
-  sourceId: 'symphony-runtime' | 'symphony-task',
-  payload: Readonly<Record<string, unknown>>,
-  observationTimestamp: string,
-  emissionTimestamp: string,
-  sequence: number
-): ShippingEntity[] {
-  const groups: ReadonlyArray<{
-    readonly key: 'running' | 'retrying' | 'blocked';
-    readonly state: ObservationState;
-    readonly workflowState: OperationalTaskWorkflowState;
-  }> = [
-    { key: 'running', state: 'fresh', workflowState: 'running' },
-    { key: 'retrying', state: 'degraded', workflowState: 'retrying' },
-    { key: 'blocked', state: 'error', workflowState: 'blocked' },
-  ];
-  const entities: ShippingEntity[] = [];
-  for (const group of groups) {
-    for (const item of asList(payload[group.key])) {
-      if (!isRecord(item)) continue;
-      const issue = sanitizeOpaqueIdentifier(
-        typeof item.issue_identifier === 'string'
-          ? item.issue_identifier.toUpperCase()
-          : typeof item.issue === 'string'
-            ? item.issue.toUpperCase()
-            : null
-      );
-      if (issue == null || !/^[A-Z]+-\d+$/.test(issue)) continue;
-      const sourceRevision =
-        typeof item.head === 'string'
-          ? item.head
-          : typeof item.workspaceRevision === 'string'
-            ? item.workspaceRevision
-            : null;
-      const retryAt = parseTimestamp(item.due_at);
-      entities.push({
-        ...identityFields({
-          sourceId,
-          entityId: `linear:${issue}`,
-          sequence,
-          observationTimestamp,
-          emissionTimestamp,
-          sourceRevision,
-          sourceTimestamp:
-            parseTimestamp(item.updated_at) ?? parseTimestamp(item.ts),
-          correlation: {
-            workId: issue,
-            leaseId: issue,
-            sha: isExactSha(item.head) ? item.head : null,
-          },
-          lastError:
-            typeof item.error === 'string'
-              ? sanitizedError(observationTimestamp, 'task-error', item.error)
-              : null,
-        }),
-        state: group.state,
-        truncated: false,
-        operationalTask: {
-          id: `linear:${issue}`,
-          linearIdentifier: issue,
-          linearUrl: linearIssueUrl(item.issue_url, issue),
-          title: operationalTaskTitle(item, issue),
-          workflowState: group.workflowState,
-          priority: operationalTaskPriority(item.priority),
-          attempt:
-            Number.isSafeInteger(item.attempt) && Number(item.attempt) >= 0
-              ? Number(item.attempt)
-              : null,
-          retryAt,
-          sourceRevision: sanitizeOpaqueIdentifier(sourceRevision),
-          updatedAt:
-            parseTimestamp(item.updated_at) ??
-            parseTimestamp(item.ts) ??
-            retryAt,
-        } satisfies OperationalTask,
-      });
-    }
-  }
-  return entities;
+const LANE_ISSUE_RE = /^(?:devin|codex)\/(jov-\d+)(?:-|$)/i;
+
+/** Linear issue a lane branch (`devin/jov-123-<stamp>`) is working. */
+export function laneIssueIdentifier(headRefName: unknown): string | null {
+  if (typeof headRefName !== 'string') return null;
+  const match = LANE_ISSUE_RE.exec(headRefName);
+  return match?.[1] ? match[1].toUpperCase() : null;
 }
 
-function operationalTaskPriority(value: unknown): OperationalTaskPriority {
-  if (value === 1 || value === 'urgent') return 'urgent';
-  if (value === 2 || value === 'high') return 'high';
-  if (value === 3 || value === 'medium') return 'medium';
-  if (value === 4 || value === 'low') return 'low';
-  return 'none';
+export function lanePullRequestWorkflowState(
+  pr: Readonly<Record<string, unknown>>
+): OperationalTaskWorkflowState {
+  if (Number.isInteger(pr.mergeQueuePosition)) return 'merge-queued';
+  if (
+    pr.mergeable === 'CONFLICTING' ||
+    pr.reviewDecision === 'CHANGES_REQUESTED'
+  ) {
+    return 'blocked';
+  }
+  if (pr.isDraft === true) return 'running';
+  return 'in-review';
 }
+
+const WORKFLOW_OBSERVATION: Record<
+  OperationalTaskWorkflowState,
+  ObservationState
+> = {
+  queued: 'fresh',
+  running: 'fresh',
+  retrying: 'degraded',
+  blocked: 'error',
+  'in-review': 'fresh',
+  'merge-queued': 'fresh',
+  merged: 'fresh',
+  'production-verified': 'fresh',
+};
+
+const LANE_TASK_ORDER: Record<OperationalTaskWorkflowState, number> = {
+  'merge-queued': 0,
+  blocked: 1,
+  'in-review': 2,
+  running: 3,
+  retrying: 4,
+  queued: 5,
+  merged: 6,
+  'production-verified': 7,
+};
 
 function safeDisplayText(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -307,44 +292,67 @@ function safeDisplayText(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function linearIssueUrl(value: unknown, issue: string): string | null {
-  if (typeof value !== 'string') return null;
-  try {
-    const url = new URL(value);
-    const expectedPrefix = `/jovie/issue/${issue.toLowerCase()}`;
+function lanePullRequestEntities(
+  payload: Readonly<Record<string, unknown>>,
+  observationTimestamp: string,
+  emissionTimestamp: string,
+  sequence: number
+): ShippingEntity[] {
+  const byIssue = new Map<string, ShippingEntity>();
+  for (const pr of asList(payload.pullRequests)) {
+    if (!isRecord(pr)) continue;
+    const issue = laneIssueIdentifier(pr.headRefName);
+    const prNumber = Number.isSafeInteger(pr.number) ? Number(pr.number) : 0;
+    if (issue == null || prNumber < 1) continue;
+    const updatedAt = parseTimestamp(pr.updatedAt);
+    const prior = byIssue.get(issue);
     if (
-      url.protocol !== 'https:' ||
-      url.hostname !== 'linear.app' ||
-      (url.pathname.toLowerCase() !== expectedPrefix &&
-        !url.pathname.toLowerCase().startsWith(`${expectedPrefix}/`))
+      prior?.operationalTask?.updatedAt &&
+      updatedAt &&
+      Date.parse(prior.operationalTask.updatedAt) >= Date.parse(updatedAt)
     ) {
-      return null;
+      continue;
     }
-    return url.toString();
-  } catch {
-    return null;
+    const sha = isExactSha(pr.headRefOid) ? pr.headRefOid : null;
+    const workflowState = lanePullRequestWorkflowState(pr);
+    byIssue.set(issue, {
+      ...identityFields({
+        sourceId: 'lane-pull-requests',
+        entityId: `linear:${issue}`,
+        sequence,
+        observationTimestamp,
+        emissionTimestamp,
+        sourceRevision: sha,
+        sourceTimestamp: updatedAt,
+        correlation: { workId: issue, prNumber, sha },
+      }),
+      state: WORKFLOW_OBSERVATION[workflowState],
+      truncated: false,
+      operationalTask: {
+        id: `linear:${issue}`,
+        linearIdentifier: issue,
+        linearUrl: `https://linear.app/jovie/issue/${issue.toLowerCase()}`,
+        title: safeDisplayText(pr.title) ?? issue,
+        workflowState,
+        priority: 'none',
+        attempt: null,
+        retryAt: null,
+        sourceRevision: sha,
+        updatedAt,
+      } satisfies OperationalTask,
+    });
   }
-}
-
-function operationalTaskTitle(
-  item: Readonly<Record<string, unknown>>,
-  issue: string
-): string {
-  const explicit =
-    safeDisplayText(item.title) ?? safeDisplayText(item.issue_title);
-  if (explicit) return explicit;
-  const issueUrl = linearIssueUrl(item.issue_url, issue);
-  if (!issueUrl) return issue;
-  const slug = new URL(issueUrl).pathname
-    .split('/')
-    .findLast(part => part.length > 0);
-  if (!slug || slug.toLowerCase() === issue.toLowerCase()) return issue;
-  return slug
-    .split('-')
-    .filter(Boolean)
-    .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
-    .join(' ')
-    .slice(0, 180);
+  // Closest to landing first, then most recently touched.
+  return [...byIssue.values()].sort((a, b) => {
+    const rank =
+      LANE_TASK_ORDER[a.operationalTask?.workflowState ?? 'running'] -
+      LANE_TASK_ORDER[b.operationalTask?.workflowState ?? 'running'];
+    if (rank !== 0) return rank;
+    return (
+      Date.parse(b.operationalTask?.updatedAt ?? '') -
+        Date.parse(a.operationalTask?.updatedAt ?? '') || 0
+    );
+  });
 }
 
 function queueEntities(
@@ -476,10 +484,8 @@ export function interpretAuthorityRead(
           emissionTimestamp,
           sequence
         )
-      : read.sourceId === 'symphony-runtime' ||
-          read.sourceId === 'symphony-task'
-        ? taskEntities(
-            read.sourceId,
+      : read.sourceId === 'lane-pull-requests'
+        ? lanePullRequestEntities(
             payload,
             observationTimestamp,
             emissionTimestamp,
@@ -532,6 +538,7 @@ export function interpretAuthorityRead(
         payload,
         live ? 'ok' : read.status
       ),
+      delivery: live ? (read.delivery ?? null) : null,
     },
     cursor: ingest.cursor,
   };

@@ -1,8 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { resolveProfileModeCardAccents } from '@/lib/profile/mode-card-accent';
 import type { NotificationContentType } from '@/types/notifications';
 import { ProfilePrimaryTabPanel } from './ProfilePrimaryTabPanel';
+
+// What the compact surface passes when the featured card shows artwork.
+const PEN_ACCENTS = resolveProfileModeCardAccents({
+  listenArtworkAccent: 'ultra',
+});
+
 import {
   PROFILE_STORY_ARTIST,
   PROFILE_STORY_CONTENT_PREFS,
@@ -10,6 +17,9 @@ import {
 
 vi.mock('@/features/profile/TourModePanel', () => ({
   TourDrawerContent: () => <div data-testid='mock-tour-drawer-content' />,
+  TourEventAlertsAction: () => (
+    <div data-testid='mock-tour-event-alerts-action' />
+  ),
 }));
 
 vi.mock(
@@ -75,12 +85,80 @@ function renderPanel(
 }
 
 describe('ProfilePrimaryTabPanel', () => {
-  it('labels the tour panel Events per the shared nav contract', () => {
-    renderPanel({ mode: 'tour' });
+  it('renders the Events mode card with a truthful empty state and the alerts opt-in', () => {
+    renderPanel({ mode: 'tour', modeCardAccents: PEN_ACCENTS });
 
     expect(screen.getByTestId('profile-primary-tab-tour')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Events' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Shows' })).toBeNull();
+    const card = screen.getByTestId('profile-primary-tab-events-empty');
+    // Shared nav contract (#18803): Events, never Shows.
+    expect(card).toHaveAccessibleName('Events');
+    expect(screen.queryByText('Shows')).toBeNull();
+    expect(card).toHaveAttribute('data-accent', 'pulse');
+    expect(
+      within(card).getByRole('heading', { name: 'No upcoming events' })
+    ).toBeInTheDocument();
+    expect(within(card).getByText('New dates will appear here.')).toBeVisible();
+    // Only the event-alerts opt-in; no event list, no invented CTA.
+    expect(
+      within(card).getByTestId('mock-tour-event-alerts-action')
+    ).toBeInTheDocument();
+    expect(within(card).queryByTestId('mock-tour-drawer-content')).toBeNull();
+  });
+
+  it('lists upcoming events inside the Events mode card', () => {
+    renderPanel({
+      mode: 'tour',
+      modeCardAccents: PEN_ACCENTS,
+      tourDates: [
+        {
+          id: 'show-1',
+          title: 'Live',
+          venueName: 'The Echo',
+          city: 'Los Angeles',
+          region: 'CA',
+          country: 'US',
+          startDate: '2099-05-01T20:00:00.000Z',
+          timezone: 'America/Los_Angeles',
+          ticketUrl: null,
+          ticketStatus: 'available',
+        } as never,
+      ],
+    });
+
+    const card = screen.getByTestId('profile-events-card');
+    expect(card).toHaveAttribute('data-accent', 'pulse');
+    expect(
+      within(card).getByTestId('mock-tour-drawer-content')
+    ).toBeInTheDocument();
+  });
+
+  it('wraps the alerts flow in the Stay close mode card', () => {
+    renderPanel({ mode: 'subscribe', modeCardAccents: PEN_ACCENTS });
+
+    const card = screen.getByTestId('profile-primary-tab-subscribe');
+    expect(card).toHaveAccessibleName('Stay close');
+    expect(card).toHaveAttribute('data-accent', 'orange');
+    expect(
+      within(card).getByTestId('mock-artist-notifications-cta')
+    ).toBeInTheDocument();
+  });
+
+  it('shows the Payments card on About when the profile can take payments', () => {
+    renderPanel({
+      mode: 'about',
+      modeCardAccents: PEN_ACCENTS,
+      paymentsVenmoLink: 'https://venmo.com/u/timwhite',
+    });
+
+    const card = screen.getByTestId('profile-payments-card');
+    expect(card).toHaveAttribute('data-accent', 'ion');
+    expect(screen.getByTestId('profile-primary-tab-about')).toBeInTheDocument();
+  });
+
+  it('hides the Payments card when there is no safe payment link', () => {
+    renderPanel({ mode: 'about', paymentsVenmoLink: 'https://evil.test/pay' });
+
+    expect(screen.queryByTestId('profile-payments-card')).toBeNull();
   });
 
   it('labels the About panel About per the shared nav contract', () => {
@@ -144,7 +222,7 @@ describe('ProfilePrimaryTabPanel', () => {
   });
 
   it('keeps the subscribe panel mounted as the subscribe destination', () => {
-    renderPanel({ mode: 'subscribe' });
+    renderPanel({ mode: 'subscribe', modeCardAccents: PEN_ACCENTS });
 
     expect(
       screen.getByTestId('profile-primary-tab-subscribe')
