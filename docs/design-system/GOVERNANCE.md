@@ -107,6 +107,9 @@ not expand `design-conformance:gate`, unit tests, or e2e.
 
 Exception (JOV-5447): `design-exception-registry` compares inventoried
 design-debt registries to the trusted ci-fast base and fails closed on growth.
+A `count-map` ceiling may rise only via a declared `raises` entry in the same
+registry file carrying full exception metadata (owner, reason, JOV issue,
+removalCondition or expiry, evidence); undeclared or expired raises still fail.
 
 Exception (JOV-6280): the remaining-group `shadcn-lint-contracts` lane runs the
 shipped ESLint config against `@jovie/ui` Button/Card/Input fixtures plus an

@@ -204,6 +204,45 @@ describe('design exception-registry contract (JOV-5447)', () => {
       true
     );
   });
+
+  it('allows a count-map raise only with a complete declared raises entry', () => {
+    const family = readJson(FAMILY);
+    const raise = (overrides = {}) => ({
+      owner: '@jovie-design',
+      reason: 'Seed a new drift-prone family at the real count',
+      issue: 'JOV-6841',
+      removalCondition: 'Forks migrate onto the canonical owner',
+      evidence: 'docs/design-system/GOVERNANCE.md',
+      ...overrides,
+    });
+    const grown = {
+      ...family,
+      counts: { ...family.counts, palette: family.counts.palette + 1 },
+    };
+    expect(
+      evaluatePair({ [FAMILY]: grown }).issues.map(item => item.code)
+    ).toContain(ISSUE_CODES.COUNT_GROWTH);
+    expect(
+      evaluatePair({
+        [FAMILY]: { ...grown, raises: { palette: raise({ owner: '' }) } },
+      }).issues.map(item => item.code)
+    ).toContain(ISSUE_CODES.COUNT_GROWTH);
+    expect(
+      evaluatePair({
+        [FAMILY]: {
+          ...grown,
+          raises: { palette: raise({ expiresOn: '2026-01-01' }) },
+        },
+      }).issues.map(item => item.code)
+    ).toContain(ISSUE_CODES.COUNT_GROWTH);
+    const approved = evaluatePair({
+      [FAMILY]: { ...grown, raises: { palette: raise() } },
+    });
+    expect(
+      approved.ok,
+      approved.issues.map(item => item.detail).join('\n')
+    ).toBe(true);
+  });
 });
 
 describe('design exception-registry native ci-fast gate (JOV-5447)', () => {

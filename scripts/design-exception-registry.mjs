@@ -130,7 +130,7 @@ function fail(spec, code, detail) {
   return issue(code, spec.id, `${spec.path}: ${detail}`);
 }
 
-function compareCounts(spec, candidateRecord, baseRecord, keys) {
+function compareCounts(spec, candidateRecord, baseRecord, keys, raises, now) {
   /** @type {ReturnType<typeof issue>[]} */
   const issues = [];
   for (const key of keys) {
@@ -147,11 +147,23 @@ function compareCounts(spec, candidateRecord, baseRecord, keys) {
       continue;
     }
     if (candidate > base) {
+      const approval = isObject(raises) ? raises[key] : undefined;
+      const prefix = `${spec.path} raises entry ${key}`;
+      const approvalIssues = exceptionMetadataIssues(approval, prefix);
+      const expired =
+        ISO_DATE.test(approval?.expiresOn ?? '') &&
+        expiryMs(approval.expiresOn) < now.getTime();
+      if (approvalIssues.length === 0 && !expired) continue;
       issues.push(
         fail(
           spec,
           ISSUE_CODES.COUNT_GROWTH,
-          `${key} grew ${base} → ${candidate} versus trusted base`
+          `${key} grew ${base} → ${candidate} versus trusted base` +
+            (expired
+              ? `; declared raise expired on ${approval.expiresOn}`
+              : approvalIssues.length > 0
+                ? `; declared raise invalid: ${approvalIssues.join('; ')}`
+                : '')
         )
       );
     }
@@ -315,7 +327,9 @@ function compareRegistry(spec, candidateRecord, baseRecord, now) {
         spec,
         atPointer(candidateRecord, spec.pointer),
         atPointer(baseRecord, spec.pointer),
-        spec.counts ?? []
+        spec.counts ?? [],
+        undefined,
+        now
       );
     case 'count-map': {
       const left = atPointer(candidateRecord, spec.pointer);
@@ -324,7 +338,14 @@ function compareRegistry(spec, candidateRecord, baseRecord, now) {
         ...Object.keys(isObject(right) ? right : {}),
         ...Object.keys(isObject(left) ? left : {}),
       ];
-      return compareCounts(spec, left, right, [...new Set(keys)]);
+      return compareCounts(
+        spec,
+        left,
+        right,
+        [...new Set(keys)],
+        isObject(candidateRecord) ? candidateRecord.raises : undefined,
+        now
+      );
     }
     case 'set':
       return compareSet(spec, candidateRecord, baseRecord);

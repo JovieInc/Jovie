@@ -7,6 +7,22 @@
     "status": 9,
     "entityHeader": 5
   },
+  "raises": {
+    "status": {
+      "owner": "@jovie-design",
+      "reason": "Seed the status family (StatusPill/StatusBadge/StatusDot/Glyph) at the real count so new forks fail CI while legacy forks migrate onto @jovie/ui StatusGlyph.",
+      "issue": "JOV-6841",
+      "removalCondition": "Legacy status forks are migrated onto the canonical StatusGlyph and the count ratchets down to 1.",
+      "evidence": "docs/design-system/drift-audit-2026-09-27.md decision D5; packages/ui/atoms/status-glyph.tsx (Pen jAcP1)"
+    },
+    "entityHeader": {
+      "owner": "@jovie-design",
+      "reason": "Seed the entityHeader family at the real count so new entity-rail header forks fail CI pending the design-owner decision.",
+      "issue": "JOV-6777",
+      "removalCondition": "Design decision D6 names the canonical entity header owner (Pen odpZ8) and the count ratchets down.",
+      "evidence": "docs/design-system/drift-audit-2026-09-27.md decision D6; Pen entity header odpZ8"
+    }
+  },
   "allowedEmptyStatePaths": [
     "components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx",
     "components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx",
