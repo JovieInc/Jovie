@@ -348,7 +348,7 @@ class ExecuteTest(unittest.TestCase):
             gone = reason.execute(job, CONFIG, "ctx", Path(tmp), run=Runner(hyperagent=OSError("x")))
         self.assertEqual(out["record"]["confidence"], "research")
         self.assertIn("Answer: yes", out["comment"])
-        self.assertIn("fable-5.1", run.made("hyperagent")[0][3])
+        self.assertIn("z-ai/glm-5.3", run.made("hyperagent")[0][3])
         self.assertTrue(failed["retry"])
         self.assertEqual(raw["record"]["confidence"], "research")
         self.assertTrue(gone["retry"])

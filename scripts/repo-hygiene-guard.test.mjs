@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  readdirSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -945,4 +946,28 @@ test('cleanup preserves aged Git temp packs when lsof is unavailable', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// JOV-6671: drizzle-kit only reads the newest `*_snapshot.json` in
+// apps/web/drizzle/migrations/meta (the diff base for `generate`), while the
+// migrator only reads `_journal.json` + `*.sql`. Each full snapshot costs
+// ~1 MiB, so committing one per migration pushed tracked bytes to ~99% of the
+// combined-tree budget. Keep a bounded trailing window; prune older snapshots
+// in the same PR that would exceed the cap.
+test('drizzle meta retains only a bounded window of schema snapshots', () => {
+  const metaDir = resolve('apps/web/drizzle/migrations/meta');
+  const snapshots = readdirSync(metaDir)
+    .filter(name => /^\d+_snapshot\.json$/.test(name))
+    .sort();
+  assert.ok(
+    snapshots.length > 0,
+    'drizzle-kit generate needs the newest snapshot as its diff base'
+  );
+  const MAX_RETAINED_SNAPSHOTS = 8;
+  assert.ok(
+    snapshots.length <= MAX_RETAINED_SNAPSHOTS,
+    `${snapshots.length} drizzle meta snapshots retained (cap ${MAX_RETAINED_SNAPSHOTS}); ` +
+      'each is a ~1 MiB copy of the full schema and only the newest is read by ' +
+      'drizzle-kit generate — git rm the oldest *_snapshot.json files in this PR'
+  );
 });

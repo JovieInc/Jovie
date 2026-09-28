@@ -5,6 +5,7 @@ import {
   NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE as FIXTURE,
   isEncodedUnclaimedArtistHandle,
   isOpaqueInternalProfileHandle,
+  isPublicArtistMentionHref,
   opaqueInternalProfileRedirectPath,
   publicProfilePathForHandle,
 } from './opaque-internal-profile-handle';
@@ -68,6 +69,30 @@ describe('opaque internal profile handles (JOV-6201)', () => {
         ownerName: FIXTURE.ownerName,
       })
     ).toBe(FIXTURE.ownerHandle);
+  });
+
+  it('does not link a credit-only collaborator with an encoded a_* handle', () => {
+    expect(
+      canonicalizeReleaseArtistHandle({
+        handle: 'a_eiqd46x3irj64dlgo8a3glau4',
+        name: 'LYNX',
+        ownerHandle: FIXTURE.ownerHandle,
+        ownerName: FIXTURE.ownerName,
+      })
+    ).toBeNull();
+  });
+
+  it('accepts only readable single-segment profile paths as mention hrefs', () => {
+    expect(isPublicArtistMentionHref('/tim')).toBe(true);
+    expect(isPublicArtistMentionHref('/a_eiqd46x3irj64dlgo8a3glau4')).toBe(
+      false
+    );
+    expect(isPublicArtistMentionHref('/tmoc9mm7xfvx02c')).toBe(false);
+    expect(
+      isPublicArtistMentionHref('/artists/f5441adb-6789-449a-9553-ab7460c9c61c')
+    ).toBe(false);
+    expect(isPublicArtistMentionHref('/tim/about')).toBe(false);
+    expect(isPublicArtistMentionHref(null)).toBe(false);
   });
 
   it('redirects the opaque profile URL to the canonical handle when one exists', () => {
