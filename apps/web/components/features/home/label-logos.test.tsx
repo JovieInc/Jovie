@@ -12,25 +12,17 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  BlackHoleRecordingsLogo,
-  BlancoYNegroLogo,
-  DiscoWaxLogo,
-  RecPlayLogo,
-  TheOrchardLogo,
-  UniversalMusicGroupLogo,
-} from './label-logos';
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
+import { BlancoYNegroLogo, DiscoWaxLogo, RecPlayLogo } from './label-logos';
 
 describe('label-logos', () => {
   it('renders every vector logo with an accessible label', () => {
     render(
       <>
-        <UniversalMusicGroupLogo />
-        <ArmadaMusicLogo />
-        <AwalLogo />
-        <TheOrchardLogo />
+        <NormalizedTrustLogo id='umg' />
+        <NormalizedTrustLogo id='armada' />
+        <NormalizedTrustLogo id='awal' />
+        <NormalizedTrustLogo id='orchard' />
         <DiscoWaxLogo />
         <BlancoYNegroLogo />
         <RecPlayLogo />
@@ -47,7 +39,7 @@ describe('label-logos', () => {
   });
 
   it('serves the Black Hole logo as a direct public asset (JOV-6849)', () => {
-    render(<BlackHoleRecordingsLogo />);
+    render(<NormalizedTrustLogo id='black-hole-recordings' />);
 
     const img = screen.getByAltText('Black Hole Recordings');
     expect(img).toHaveAttribute(

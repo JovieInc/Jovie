@@ -1,18 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  BlackHoleRecordingsLogo,
-  BlancoYNegroLogo,
-  DiscoWaxLogo,
-  RecPlayLogo,
-  TheOrchardLogo,
-  UniversalMusicGroupLogo,
-} from './label-logos';
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
+import { TRUST_LOGO_ASSETS } from '@/components/media/trustLogoAssets';
+import { BlancoYNegroLogo, DiscoWaxLogo, RecPlayLogo } from './label-logos';
 
 const meta = {
   title: 'Marketing/Sections/LabelLogos',
-  component: BlackHoleRecordingsLogo,
+  component: NormalizedTrustLogo,
   parameters: {
     layout: 'fullscreen',
     backgrounds: { default: 'dark' },
@@ -23,7 +16,7 @@ const meta = {
       },
     },
   },
-} satisfies Meta<typeof BlackHoleRecordingsLogo>;
+} satisfies Meta<typeof NormalizedTrustLogo>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -31,11 +24,11 @@ type Story = StoryObj<typeof meta>;
 export const LogoBar: Story = {
   render: () => (
     <div className='flex flex-wrap items-center justify-center gap-x-10 gap-y-6 p-10 text-white/55'>
-      <UniversalMusicGroupLogo className='h-5 w-auto' />
-      <ArmadaMusicLogo className='h-6 w-auto' />
-      <AwalLogo className='h-6 w-auto' />
-      <TheOrchardLogo className='h-6 w-auto' />
-      <BlackHoleRecordingsLogo className='h-6 w-auto' />
+      {TRUST_LOGO_ASSETS.map(asset => (
+        <div key={asset.id} className='w-32'>
+          <NormalizedTrustLogo id={asset.id} />
+        </div>
+      ))}
       <DiscoWaxLogo />
       <BlancoYNegroLogo />
       <RecPlayLogo />
