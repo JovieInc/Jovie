@@ -85,7 +85,7 @@ function DockScene({ chromeState, theme, rightRail }: DockSceneProps) {
   const isPlaying = chromeState === 'playing';
 
   return (
-    <div className='flex h-[420px] w-[720px] gap-2 bg-(--linear-bg-page) p-2'>
+    <div className='flex h-[420px] w-[720px] gap-2 bg-base p-2'>
       {/* Main column: rounded panel + dock below, matching AppShellFrame. */}
       <div className='flex min-w-0 flex-1 flex-col'>
         <div className='flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--app-shell-radius) bg-(--app-shell-content-surface) shadow-(--app-shell-shadow)'>
