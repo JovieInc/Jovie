@@ -500,7 +500,13 @@ describe('merge_group workflow contract', () => {
     expect(remaining).toContain('chromatic\\.config\\.json$');
     expect(remaining).toContain('package\\.json$');
     expect(remaining).toContain('shared-ui-visual-arbitrary');
-    expect(remaining).toContain('scripts/doc-freshness-lint');
+    // Control-lane paths moved to data (JOV-6837).
+    expect(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
+        'utf8'
+      )
+    ).toContain('scripts/doc-freshness-lint');
     expect(remaining).toContain('apps/web/tests/');
 
     for (const jobId of [

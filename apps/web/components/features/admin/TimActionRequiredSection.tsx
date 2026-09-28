@@ -124,6 +124,8 @@ export function TimActionRequiredSection() {
   const isInitialLoadRef = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchFailed, setFetchFailed] = useState(false);
+  // 403 = admin step-up lock, not a Linear outage.
+  const [locked, setLocked] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [optimisticallyClosedIds, setOptimisticallyClosedIds] = useState<
     Set<string>
@@ -136,6 +138,7 @@ export function TimActionRequiredSection() {
     }
     try {
       const response = await fetch(FETCH_URL, { signal });
+      setLocked(response.status === 403);
       if (!response.ok) {
         throw new Error(`Fetch failed (${response.status})`);
       }
@@ -258,7 +261,7 @@ export function TimActionRequiredSection() {
         ) : (
           <HudObservationStatus
             state={observation}
-            message={timActionsMessage(observation, data)}
+            message={timActionsMessage(observation, data, locked)}
             freshnessLabel={
               data?.fetchedAt
                 ? `Updated ${formatFetchedAt(data.fetchedAt)}`
@@ -309,8 +312,12 @@ function resolveTimActionsObservation({
 
 function timActionsMessage(
   observation: HudObservationState,
-  data: TimActionsResponse | null
+  data: TimActionsResponse | null,
+  locked = false
 ): string {
+  if (locked && observation === 'unavailable') {
+    return 'Admin data is locked. Unlock with Touch ID, then retry.';
+  }
   if (observation === 'not_configured') {
     return (
       data?.errorMessage ??

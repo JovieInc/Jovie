@@ -107,6 +107,8 @@ export interface ChatError {
   readonly errorCode?: string;
   readonly requestId?: string;
   readonly failedMessage?: string;
+  /** Summer turn id to resend unchanged; set only when nothing was recorded. */
+  readonly retryClientTurnId?: string;
   /** Tool-only failures stay inline in the thread and should not pause the composer. */
   readonly suppressComposerPause?: boolean;
 }

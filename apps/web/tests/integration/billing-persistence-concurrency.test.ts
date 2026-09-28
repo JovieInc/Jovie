@@ -205,4 +205,58 @@ describe('billing persistence concurrency (integration)', () => {
       );
     }
   });
+
+  it('applies the same Stripe event exactly once across a retry', async () => {
+    const suffix = randomUUID();
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: `billing-retry-${suffix}@example.test`,
+        userStatus: 'active',
+      })
+      .returning({ id: users.id, billingVersion: users.billingVersion });
+    userIds.add(user.id);
+
+    const stripeEventId = `evt_retry_${suffix}`;
+    const base = {
+      userId: user.id,
+      userIdentity: user.id,
+      isPro: true,
+      plan: 'pro',
+      billingUpdatedAt: new Date(),
+      previousState: { isPro: false, plan: 'free' },
+      newState: { isPro: true, plan: 'pro' },
+      stripeEventId,
+      source: 'webhook',
+      metadata: {},
+      eventType: 'payment_succeeded',
+    } as const;
+
+    const first = await applyBillingUpdateWithAudit({
+      ...base,
+      expectedBillingVersion: user.billingVersion,
+    });
+    const retry = await applyBillingUpdateWithAudit({
+      ...base,
+      expectedBillingVersion: user.billingVersion + 1,
+    });
+
+    expect(first?.deduplicated).toBe(false);
+    expect(retry).toMatchObject({
+      appUserId: user.id,
+      billingVersion: user.billingVersion + 1,
+      deduplicated: true,
+    });
+
+    const [persisted] = await db
+      .select({ billingVersion: users.billingVersion })
+      .from(users)
+      .where(eq(users.id, user.id));
+    const auditRows = await db
+      .select({ id: billingAuditLog.id })
+      .from(billingAuditLog)
+      .where(eq(billingAuditLog.stripeEventId, stripeEventId));
+    expect(persisted?.billingVersion).toBe(user.billingVersion + 1);
+    expect(auditRows).toHaveLength(1);
+  });
 });

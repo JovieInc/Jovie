@@ -21,6 +21,15 @@
   --text-2xs: 0.75rem;
   --text-app: 0.75rem;
   --text-mid: 0.875rem;
+  /* Display ladder (same decision): Tailwind's off-scale defaults snap to
+     the nearest step. text-lg 18 -> 16 (large), text-3xl 30 -> 32,
+     text-4xl 36 -> 40. Line heights keep Tailwind's ratios. */
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 1.2;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 1.1;
   /* Profile composition shapes (#11899, lib/profile/composition.ts):
      aspect-hero = fixed hero banner crop; aspect-card-standard = the default
      4:5 portrait card. 1:1 / 16:9 use built-in aspect-square / aspect-video. */
