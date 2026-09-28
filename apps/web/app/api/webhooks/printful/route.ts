@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { webhookEvents } from '@/lib/db/schema/suppression';
@@ -10,6 +10,39 @@ import { verifyPrintfulWebhookSignature } from '@/lib/printful/client';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
+
+// Uses processedAt as a short-lived lease while processed=false (same
+// pattern as lib/notifications/sms-webhook and the stripe-merch route).
+const WEBHOOK_CLAIM_STALE_MS = 10 * 60 * 1000;
+
+async function claimWebhookEventForProcessing(id: string): Promise<boolean> {
+  const staleBefore = new Date(Date.now() - WEBHOOK_CLAIM_STALE_MS);
+  const [claimed] = await db
+    .update(webhookEvents)
+    .set({ processedAt: new Date() })
+    .where(
+      and(
+        eq(webhookEvents.id, id),
+        eq(webhookEvents.processed, false),
+        or(
+          isNull(webhookEvents.processedAt),
+          lt(webhookEvents.processedAt, staleBefore)
+        )
+      )
+    )
+    .returning({ id: webhookEvents.id });
+  return Boolean(claimed);
+}
+
+async function releaseWebhookEventClaim(
+  id: string,
+  errorMessage: string
+): Promise<void> {
+  await db
+    .update(webhookEvents)
+    .set({ processedAt: null, error: errorMessage })
+    .where(and(eq(webhookEvents.id, id), eq(webhookEvents.processed, false)));
+}
 
 function buildEventId(payload: {
   readonly type?: string;
@@ -73,9 +106,15 @@ export async function POST(request: Request) {
     })
     .returning({ id: webhookEvents.id });
 
-  if (!inserted) {
+  let webhookEventId: string;
+  if (inserted) {
+    webhookEventId = inserted.id;
+  } else {
     const [existing] = await db
-      .select({ processed: webhookEvents.processed })
+      .select({
+        id: webhookEvents.id,
+        processed: webhookEvents.processed,
+      })
       .from(webhookEvents)
       .where(
         and(
@@ -84,28 +123,32 @@ export async function POST(request: Request) {
         )
       )
       .limit(1);
-    if (existing?.processed !== true) {
-      const error = new Error(
-        'Printful webhook replay found unprocessed event'
-      );
-      logger.error('[merch] Printful webhook replay is still unprocessed', {
-        eventId,
-      });
-      await captureCriticalError(
-        'Printful merch webhook replay blocked',
-        error,
-        {
-          route: '/api/webhooks/printful',
-          eventId,
-          eventType: payload.type,
-        }
-      );
+    if (existing?.processed === true) {
+      // Already processed — duplicate delivery is a safe no-op.
       return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500, headers: NO_STORE_HEADERS }
+        { received: true },
+        { headers: NO_STORE_HEADERS }
       );
     }
-    return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
+    // Recorded but never processed (a prior attempt failed or crashed).
+    // Fall through so the retry replays instead of dead-lettering the event.
+    webhookEventId = existing?.id ?? '';
+  }
+
+  // Claim the row before processing so concurrent duplicate deliveries
+  // cannot both run the order handler (the unique index prevents double
+  // inserts, not double processing of the same unprocessed row).
+  const claimed = await claimWebhookEventForProcessing(webhookEventId);
+  if (!claimed) {
+    // Another delivery holds a fresh lease but has not durably completed.
+    // Stay retryable so the event is not lost if that worker crashes.
+    return NextResponse.json(
+      { error: 'Webhook processing in progress' },
+      {
+        status: 503,
+        headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' },
+      }
+    );
   }
 
   try {
@@ -113,22 +156,15 @@ export async function POST(request: Request) {
     await db
       .update(webhookEvents)
       .set({ processed: true, processedAt: new Date() })
-      .where(eq(webhookEvents.id, inserted.id));
+      .where(eq(webhookEvents.id, webhookEventId));
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('[merch] Printful webhook failed', { error, eventId });
-    await db
-      .update(webhookEvents)
-      .set({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        processed: false,
-      })
-      .where(
-        and(
-          eq(webhookEvents.provider, 'printful'),
-          eq(webhookEvents.eventId, eventId)
-        )
-      );
+    // Release the lease so the provider retry can reclaim and replay.
+    await releaseWebhookEventClaim(
+      webhookEventId,
+      error instanceof Error ? error.message : 'Unknown error'
+    );
     await captureCriticalError('Printful merch webhook failed', error, {
       route: '/api/webhooks/printful',
       eventId,

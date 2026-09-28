@@ -46,18 +46,11 @@ function isClerkRedirect(url: string): boolean {
   );
 }
 
-async function openHomepageForScreenshot(
-  page: import('@playwright/test').Page
+// Visual readiness belongs to the viewport, not unrelated network traffic.
+async function waitForVisualReadiness(
+  page: import('@playwright/test').Page,
+  pageName: string
 ) {
-  const response = await page.goto('/', {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-  expect(response?.status(), 'homepage document must succeed').toBe(200);
-  expect(new URL(page.url()).pathname).toBe('/');
-  await expect(page.getByTestId('marketing-section-hero')).toBeVisible();
-  await expect(page.locator('h1').first()).toBeVisible();
-  // Visual readiness belongs to the viewport, not unrelated network traffic.
   await expect
     .poll(
       () =>
@@ -80,10 +73,24 @@ async function openHomepageForScreenshot(
         }),
       {
         timeout: 15_000,
-        message: 'homepage fonts and viewport images must load',
+        message: `${pageName} fonts and viewport images must load`,
       }
     )
     .toEqual([]);
+}
+
+async function openHomepageForScreenshot(
+  page: import('@playwright/test').Page
+) {
+  const response = await page.goto('/', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+  expect(response?.status(), 'homepage document must succeed').toBe(200);
+  expect(new URL(page.url()).pathname).toBe('/');
+  await expect(page.getByTestId('marketing-section-hero')).toBeVisible();
+  await expect(page.locator('h1').first()).toBeVisible();
+  await waitForVisualReadiness(page, 'homepage');
 }
 
 // ==========================================================================
@@ -162,19 +169,21 @@ test.describe('pricing visual regression', () => {
   test('dark mode', async ({ page }) => {
     await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/pricing', {
-      waitUntil: 'networkidle',
+    const response = await page.goto('/pricing', {
+      waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
-
     if (isClerkRedirect(page.url())) {
       test.skip(true, 'Clerk handshake redirect');
       return;
     }
 
+    expect(response?.status(), 'pricing document must succeed').toBe(200);
+
     await expect(page.locator('h1, h2').first()).toBeVisible({
       timeout: 15_000,
     });
+    await waitForVisualReadiness(page, 'pricing');
 
     await expect(page).toHaveScreenshot('pricing-dark.png', {
       fullPage: false,
@@ -184,19 +193,21 @@ test.describe('pricing visual regression', () => {
   test('light mode', async ({ page }) => {
     await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'light' });
-    await page.goto('/pricing', {
-      waitUntil: 'networkidle',
+    const response = await page.goto('/pricing', {
+      waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
-
     if (isClerkRedirect(page.url())) {
       test.skip(true, 'Clerk handshake redirect');
       return;
     }
 
+    expect(response?.status(), 'pricing document must succeed').toBe(200);
+
     await expect(page.locator('h1, h2').first()).toBeVisible({
       timeout: 15_000,
     });
+    await waitForVisualReadiness(page, 'pricing');
 
     await expect(page).toHaveScreenshot('pricing-light.png', {
       fullPage: false,

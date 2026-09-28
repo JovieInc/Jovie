@@ -1,11 +1,11 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
+
 import { Switch } from '@jovie/ui';
 import { BellOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
-import { toast } from '@/components/feedback';
-import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -21,6 +21,7 @@ import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { track } from '@/lib/analytics';
 import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ShareContext } from '@/lib/share/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
@@ -39,6 +40,7 @@ import {
 import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
 import { MenuView } from './views/MenuView';
+import { PayView } from './views/PayView';
 import { ReleasesView } from './views/ReleasesView';
 import { PROFILE_VIEW_REGISTRY } from './views/registry';
 
@@ -77,11 +79,14 @@ interface ProfileUnifiedDrawerProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly tourDates?: TourDateViewModel[];
   readonly hasTourDates: boolean;
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
   readonly presentation?: ProfileSurfacePresentation;
+  readonly onOpenReleaseCredits?: () => void;
 }
 
 const PAY_AMOUNTS = [5, 10, 20];
@@ -230,10 +235,12 @@ export function ProfileUnifiedDrawer({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   tourDates = [],
   hasTourDates,
   hasReleases,
   releases = [],
+  onOpenReleaseCredits,
   presentation = 'standalone',
 }: ProfileUnifiedDrawerProps) {
   const visibleReleases = useMemo(
@@ -330,28 +337,6 @@ export function ProfileUnifiedDrawer({
   const hasValidVenmoLink = venmoLink !== null && isAllowedVenmoUrl(venmoLink);
   const venmoUsername = extractVenmoUsername(venmoLink);
 
-  const handleTipAmountSelected = useMemo(() => {
-    return (amount: number) => {
-      if (!venmoLink || !hasValidVenmoLink) {
-        toast.error('Unable to open Venmo. The payment link is not valid.');
-        return;
-      }
-      const sep = venmoLink.includes('?') ? '&' : '?';
-      const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(venmoUsername ?? '')}`;
-      // @ts-expect-error joviePixel is injected by JoviePixel
-      globalThis.joviePixel?.track?.('tip_intent', {
-        tipAmount: amount,
-        tipMethod: 'venmo',
-      });
-      const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        toast.error(
-          'Venmo could not be opened. Please allow pop-ups and try again.'
-        );
-      }
-    };
-  }, [hasValidVenmoLink, venmoLink, venmoUsername]);
-
   const isSubView = renderedView !== 'menu';
 
   return (
@@ -381,6 +366,14 @@ export function ProfileUnifiedDrawer({
               hasTourDates={canOpenTourDrawer}
               hasTip={hasTip}
               hasContacts={hasContacts}
+              onOpenReleaseCredits={
+                onOpenReleaseCredits
+                  ? () => {
+                      handleOpenChange(false);
+                      onOpenReleaseCredits();
+                    }
+                  : undefined
+              }
             />
           )}
 
@@ -407,7 +400,6 @@ export function ProfileUnifiedDrawer({
                     checked={contentPrefs[pref.key]}
                     onCheckedChange={() => onTogglePref(pref.key)}
                     aria-label={pref.label}
-                    className='data-[state=checked]:bg-success data-[state=checked]:hover:bg-success/90'
                   />
                 </div>
               ))}
@@ -479,6 +471,8 @@ export function ProfileUnifiedDrawer({
                 genres={genres}
                 pressPhotos={pressPhotos}
                 allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                contacts={contacts}
               />
             </div>
           )}
@@ -510,17 +504,15 @@ export function ProfileUnifiedDrawer({
                       Pay {artist.name}
                     </p>
                     <p className='mt-1 text-xs text-tertiary-token'>
-                      @{artist.handle} via Venmo
+                      @{artist.handle}
                     </p>
                   </div>
-                  <PaySelector
+                  <PayView
+                    profileId={artist.id}
+                    artistHandle={artist.handle}
+                    venmoLink={venmoLink ?? ''}
+                    venmoUsername={venmoUsername}
                     amounts={PAY_AMOUNTS}
-                    onContinue={handleTipAmountSelected}
-                    presentation='drawer'
-                    primaryLabel='Continue with Venmo'
-                    paymentLabel='Venmo'
-                    screenReaderDescription={`Choose an amount to pay ${artist.name}, @${artist.handle}, with Venmo.`}
-                    showOtherPaymentOptions={false}
                   />
                 </>
               ) : (

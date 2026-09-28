@@ -185,32 +185,15 @@ function SpotifyTabContent({
     router.refresh();
   }
 
-  async function connectSpotify() {
+  function connectSpotify() {
     if (!user) return;
     setResult(null);
     setIsConnecting(true);
-    try {
-      // Clerk → Better Auth migration follow-up: `user.createExternalAccount`
-      // was a Clerk-specific API for linking external OAuth accounts (Spotify).
-      // Better Auth does not have an equivalent for non-auth provider
-      // connections. This admin feature needs to be rewired onto a direct
-      // Spotify OAuth flow (separate from the BA auth session). Linear
-      // follow-up filed. For now, surface a clear "not yet migrated" error
-      // so the failure is visible rather than silent.
-      const redirectUrl = `${globalThis.location.origin}${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}`;
-      void redirectUrl;
-      throw new Error(
-        'Spotify connection is being migrated to Better Auth and is temporarily unavailable. See Linear follow-up.'
-      );
-    } catch (error) {
-      setResult({
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to connect Spotify.',
-      });
-    } finally {
-      setIsConnecting(false);
-    }
+    // Canonical connector OAuth flow — same primitive as artist integrations.
+    const returnTo = `${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}?tab=spotify`;
+    router.push(
+      `/api/connectors/spotify/authorize?returnTo=${encodeURIComponent(returnTo)}`
+    );
   }
 
   function handleUseAccount() {

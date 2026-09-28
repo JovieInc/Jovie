@@ -23,7 +23,7 @@ vi.mock('next/link', () => {
 });
 
 describe('EmptyState (canonical molecule API)', () => {
-  it('renders heading, description, and greyscale icon chip', () => {
+  it('renders heading, description, and greyscale icon without a nested panel', () => {
     render(
       <EmptyState
         heading='No Data Yet'
@@ -39,8 +39,9 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(screen.getByText(/add content/i)).toBeInTheDocument();
     expect(screen.getByTestId('test-icon')).toBeInTheDocument();
     const iconWrapper = screen.getByTestId('test-icon').parentElement;
-    expect(iconWrapper?.className).toContain('h-9');
     expect(iconWrapper?.className).toContain('text-tertiary-token');
+    expect(iconWrapper?.className).not.toContain('bg-surface-1');
+    expect(iconWrapper?.className).not.toContain('border-subtle');
     expect(screen.getByRole('status')).toHaveAttribute(
       'data-content-state',
       'empty'

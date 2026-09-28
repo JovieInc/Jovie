@@ -167,7 +167,9 @@ describe('Ovie speaks through durable Eve Summer', () => {
         { headers: { 'x-jovie-eve-deployment-id': 'dpl_test' } }
       )
     );
-    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(await collect()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_admission_rejected' },
+    ]);
     expect(fetchShadow).toHaveBeenCalledOnce();
   });
   it('rejects a response from a different Eve deployment', async () => {
@@ -176,7 +178,9 @@ describe('Ovie speaks through durable Eve Summer', () => {
         headers: { 'x-jovie-eve-deployment-id': 'dpl_other' },
       })
     );
-    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(await collect()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_deployment_unverified' },
+    ]);
     expect(fetchShadow).toHaveBeenCalledOnce();
   });
   it('fails closed on wrong event, principal, deployment, session, model, or malformed terminal response', async () => {
@@ -186,7 +190,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
       { ...result, deploymentId: 'dpl_other' },
       { ...result, deploymentId: undefined },
       { ...result, sessionId: 'ses_wrong' },
-      { ...result, model: 'openai/gpt-5.6' },
+      { ...result, model: 'not a gateway model' },
       {},
     ]) {
       fetchShadow
@@ -197,7 +201,9 @@ describe('Ovie speaks through durable Eve Summer', () => {
         ...input,
         previousEveSessionId: 'ses_summer',
       });
-      expect(events).toEqual([{ type: 'error', state: 'unknown' }]);
+      expect(events).toEqual([
+        { type: 'error', state: 'unknown', hop: 'summer_result_unverified' },
+      ]);
     }
   });
   it('surfaces budget exhaustion with reset time and never invokes another provider', async () => {
@@ -237,7 +243,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
         text: "Summer's daily conversation allowance is used up. It resets at 2026-09-06T00:00:00Z.",
         code: 'daily_turn_budget_exhausted',
       },
-      { type: 'error', state: 'unavailable' },
+      { type: 'error', state: 'unavailable', hop: 'summer_budget_exhausted' },
     ]);
     expect(fetchShadow).toHaveBeenCalledOnce();
   });
@@ -263,10 +269,37 @@ describe('Ovie speaks through durable Eve Summer', () => {
           { status: 429 }
         )
       );
-      expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+      expect(await collect()).toEqual([
+        { type: 'error', state: 'unknown', hop: 'summer_admission_rejected' },
+      ]);
       expect(fetchShadow).toHaveBeenCalledOnce();
     }
   });
+  it('accepts the answer from whichever gateway model Summer ran', async () => {
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(eveResponse({ ok: true }))
+      .mockResolvedValueOnce(
+        eveResponse({
+          result: { ...result, model: 'anthropic/claude-sonnet-5' },
+        })
+      );
+    expect((await collect()).at(-1)).toEqual({
+      type: 'text-delta',
+      text: result.responseText,
+    });
+  });
+  it.each(['dispatch_abandoned', 'event_conflict'])(
+    'records a permanently rejected %s event so Retry sends a new turn',
+    async code => {
+      fetchShadow
+        .mockReset()
+        .mockResolvedValueOnce(eveResponse({ code }, { status: 410 }));
+      expect(await collect()).toEqual([
+        { type: 'error', state: 'failure', hop: 'summer_admission_rejected' },
+      ]);
+    }
+  );
   it('keeps failed and uncertain results explicit', async () => {
     fetchShadow
       .mockReset()
@@ -279,9 +312,12 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect((await collect()).at(-1)).toEqual({
       type: 'error',
       state: 'failure',
+      hop: 'summer_turn_failed',
     });
     fetchShadow.mockReset().mockRejectedValue(new Error('timeout'));
-    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(await collect()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_unreachable' },
+    ]);
   });
   it('reconciles an uncertain POST through the durable result endpoint without redispatch', async () => {
     fetchShadow
@@ -378,7 +414,9 @@ describe('Ovie speaks through durable Eve Summer', () => {
         })
       );
 
-    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(await collect()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_admission_rejected' },
+    ]);
     expect(fetchShadow).toHaveBeenCalledTimes(2);
   });
   it('surfaces a terminal notice without redispatch while the canonical blocker is pending', async () => {
@@ -407,10 +445,10 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(await collect()).toEqual([
       {
         type: 'notice',
-        text: 'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.',
+        text: 'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.',
         code: 'summer_turn_pending',
       },
-      { type: 'error', state: 'unknown' },
+      { type: 'error', state: 'unknown', hop: 'summer_busy' },
     ]);
     expect(fetchShadow).toHaveBeenCalledTimes(2);
   });
@@ -423,10 +461,10 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(await collect()).toEqual([
       {
         type: 'notice',
-        text: 'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.',
+        text: 'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.',
         code: 'summer_turn_pending',
       },
-      { type: 'error', state: 'unknown' },
+      { type: 'error', state: 'unknown', hop: 'summer_busy' },
     ]);
     expect(fetchShadow).toHaveBeenCalledOnce();
   });
@@ -442,10 +480,10 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(await collect()).toEqual([
       {
         type: 'notice',
-        text: 'Summer is still reconciling this turn. Your message will not be sent again; reopen this conversation to check for the exact Eve result.',
+        text: 'Summer is still reconciling this turn. Retry this message in a moment; the same turn is recovered rather than duplicated.',
         code: 'summer_turn_pending',
       },
-      { type: 'error', state: 'unknown' },
+      { type: 'error', state: 'unknown', hop: 'summer_result_pending' },
     ]);
     expect(fetchShadow).toHaveBeenCalledTimes(2);
   });

@@ -5,14 +5,20 @@
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Badge, Button, CommonDropdown } from '@jovie/ui';
 import {
+  ArrowDownToLine,
+  CircleAlert,
   Cookie,
   CreditCard,
+  Eye,
+  EyeOff,
   FileCheck2,
   HelpCircle,
   Keyboard,
+  Lock,
   LogOut,
   MessageSquare,
   Monitor,
+  RotateCcw,
   Settings,
   Shield,
   Smartphone,
@@ -20,16 +26,25 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
+import { DesktopReleaseIdentity } from '@/components/atoms/DesktopTitlebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
+import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
 import { track } from '@/lib/analytics';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import {
+  isMoneyHidden,
+  lockWorkspace,
+  setMoneyHidden,
+} from '@/lib/workspace-lock/workspace-lock';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
+import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
 import { useUserButton } from './useUserButton';
@@ -73,10 +88,58 @@ interface BuildDropdownItemsParams {
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
   isElectronRuntime: boolean;
+  moneyHidden: boolean;
+  desktopUpdate?: {
+    state: DesktopUpdateViewState;
+    openModal: () => void;
+  } | null;
 }
 
 const USER_MENU_CONTENT_CLASS = 'w-80 max-w-[calc(100vw-1rem)]';
 const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
+
+const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
+
+/**
+ * First-row Update entry for the compact user menu (JOV-6683). Renders only
+ * while the updater has something to act on; opens the provider's modal.
+ */
+export function buildDesktopUpdateMenuItem(
+  state: DesktopUpdateViewState,
+  openModal: () => void
+): CommonDropdownItem[] {
+  const entry =
+    state.state === 'available'
+      ? {
+          label: UPDATE_MENU_COPY.updateToLabel(state.version),
+          icon: ArrowDownToLine,
+        }
+      : state.state === 'downloading'
+        ? {
+            label: UPDATE_MENU_COPY.downloadingLabel(state.percent),
+            icon: ArrowDownToLine,
+          }
+        : state.state === 'ready'
+          ? { label: UPDATE_MENU_COPY.readyLabel, icon: RotateCcw }
+          : state.state === 'error'
+            ? { label: UPDATE_MENU_COPY.errorLabel, icon: CircleAlert }
+            : null;
+  if (!entry) return [];
+  return [
+    {
+      type: 'action',
+      id: 'desktop-update',
+      label: entry.label,
+      icon: entry.icon,
+      onClick: openModal,
+    },
+    {
+      type: 'separator',
+      id: 'sep-update',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
+  ];
+}
 
 function sanitizeInstallUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -108,8 +171,15 @@ function buildDropdownItems({
   setIsFeedbackOpen,
   handleOpenShortcuts,
   isElectronRuntime,
+  moneyHidden,
+  desktopUpdate,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
+  const updateItems = desktopUpdate
+    ? buildDesktopUpdateMenuItem(desktopUpdate.state, desktopUpdate.openModal)
+    : [];
+
   const items: CommonDropdownItem[] = [
+    ...updateItems,
     {
       type: 'action-row',
       id: 'profile-help',
@@ -327,6 +397,30 @@ function buildDropdownItems({
     });
   }
 
+  // Privacy controls (JOV-6829): quick workspace lock + money visibility.
+  items.push(
+    {
+      type: 'separator',
+      id: 'sep-privacy',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
+    {
+      type: 'action',
+      id: 'lock-workspace',
+      label: 'Lock Workspace',
+      icon: Lock,
+      onClick: () => lockWorkspace(),
+      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} L`,
+    },
+    {
+      type: 'action',
+      id: 'toggle-money',
+      label: moneyHidden ? 'Show money' : 'Hide money',
+      icon: moneyHidden ? Eye : EyeOff,
+      onClick: () => setMoneyHidden(!moneyHidden),
+    }
+  );
+
   // Add feedback, version info, and sign out.
   // Version is now shown to all users (moved from admin-only sidebar footer).
   items.push(
@@ -351,11 +445,20 @@ function buildDropdownItems({
       type: 'custom',
       id: 'version',
       render: () => (
-        <div className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'>
-          Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {process.env.NEXT_PUBLIC_BUILD_SHA
-            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-            : ''}
+        <div
+          className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'
+          data-testid='app-build-diagnostics'
+        >
+          {isElectronRuntime ? (
+            <DesktopReleaseIdentity />
+          ) : (
+            <span>
+              Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+              {process.env.NEXT_PUBLIC_BUILD_SHA
+                ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+                : ''}
+            </span>
+          )}
         </div>
       ),
     },
@@ -389,7 +492,9 @@ export function UserButton({
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const isElectronRuntime = useIsElectronRuntime();
+  const desktopUpdate = useDesktopUpdateContext();
   const { mutateAsync: submitFeedback } = useFeedbackMutation();
+  const [moneyHidden, setMoneyHiddenState] = useState(false);
   const [iosAlphaAccess, setIOSAlphaAccess] = useState<{
     hasAccess: boolean;
     installUrl: string | null;
@@ -445,6 +550,10 @@ export function UserButton({
     window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
     setIsMenuOpen(false);
   }, [setIsMenuOpen]);
+
+  useEffect(() => {
+    setMoneyHiddenState(isMoneyHidden());
+  }, []);
 
   useEffect(() => {
     if (!isElectronRuntime || !isLoaded || !user) {
@@ -553,6 +662,8 @@ export function UserButton({
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,
     isElectronRuntime,
+    moneyHidden,
+    desktopUpdate,
   });
 
   // Custom trigger — use provided trigger prop or build default

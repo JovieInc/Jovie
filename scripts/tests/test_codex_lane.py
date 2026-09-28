@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -82,14 +83,24 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((kind, until), ("limit", now + 9000))
 
     def test_limit_without_a_reset_uses_the_default_cooldown(self):
-        kind, until = codex.classify("error: rate limit exceeded", 1, 5.0)
+        kind, until = codex.classify("error: usage limit reached", 1, 5.0)
         self.assertEqual((kind, until), ("limit", 5.0 + codex.DEFAULT_COOLDOWN_S))
+        # A burst rate limit backs off briefly instead of banking the account for hours.
+        self.assertEqual(codex.classify("error: rate limit exceeded", 1, 5.0), ("rate", 5.0 + codex.RATE_BACKOFF_S))
 
     def test_auth_failures_bank_for_a_day_and_success_clears(self):
         kind, until = codex.classify("codex: not logged in", 1, 0.0)
         self.assertEqual((kind, until), ("auth", 86400.0))
         self.assertEqual(codex.classify("codex\nOK\ntokens used\n12", 0, 0.0), ("ok", None))
         self.assertEqual(codex.classify("boom", 3, 0.0), ("error", None))
+
+    def test_successful_run_that_mentions_rate_limits_is_not_exhausted(self):
+        transcript = "reading rate-limiter.test.ts\nexpect 429 Too Many Requests\nquota fallback\n" + "work\n" * 40 + "Done."
+        self.assertEqual(codex.classify(transcript, 0, 0.0), ("ok", None))
+
+    def test_limit_text_early_in_a_failed_run_is_not_the_failure(self):
+        transcript = "handles 429 retries\n" + "step\n" * 40 + "error: stream disconnected"
+        self.assertEqual(codex.classify(transcript, 1, 0.0), ("error", None))
 
     def test_reset_clock_times_roll_to_the_next_occurrence(self):
         now = 1_000_000.0
@@ -124,10 +135,11 @@ class StatusTest(Isolated):
 
 
 class RunTest(Isolated):
-    def test_run_leases_streams_and_banks_on_limit(self):
+    def run_with(self, script: str) -> int:
+        codex.ROTATE_PAUSE_S = 0
         fake = codex.ACCOUNTS_ROOT.parent / "bin"
-        fake.mkdir()
-        (fake / "codex").write_text("#!/bin/sh\ncat >/dev/null\necho 'You have hit your usage limit. Try again in 1 hour.'\nexit 1\n")
+        fake.mkdir(exist_ok=True)
+        (fake / "codex").write_text(script)
         (fake / "codex").chmod(0o755)
         saved = os.environ.get("PATH")
         os.environ["PATH"] = f"{fake}:{saved}"
@@ -135,15 +147,27 @@ class RunTest(Isolated):
             with tempfile.NamedTemporaryFile("w", suffix=".md") as prompt, tempfile.TemporaryDirectory() as cwd:
                 prompt.write("ship it")
                 prompt.flush()
-                code = codex.main(["run", "--prompt-file", prompt.name, "--cwd", cwd])
+                return codex.main(["run", "--prompt-file", prompt.name, "--cwd", cwd])
         finally:
             os.environ["PATH"] = saved
-        self.assertEqual(code, 1)
+
+    def test_every_account_spent_banks_all_and_hands_off(self):
+        code = self.run_with("#!/bin/sh\ncat >/dev/null\necho 'You have hit your usage limit. Try again in 1 hour.'\nexit 1\n")
+        self.assertEqual(code, codex.NO_ACCOUNT_EXIT)
         state = codex.read_state()
-        banked = [name for name, entry in state.items() if entry.get("exhaustedUntil")]
-        self.assertEqual(len(banked), 1)
-        self.assertEqual(state[banked[0]]["lastKind"], "limit")
-        self.assertEqual(state[banked[0]]["runs"], 1)
+        self.assertEqual(sorted(n for n, e in state.items() if e.get("exhaustedUntil")), ["alpha", "beta"])
+        self.assertTrue(all(state[n]["lastKind"] == "limit" and state[n]["runs"] == 1 for n in ("alpha", "beta")))
+
+    def test_a_limit_mid_run_rotates_to_the_next_account_and_finishes(self):
+        script = ("#!/bin/sh\ncat >/dev/null\n"
+                  "if [ \"$(basename \"$CODEX_HOME\")\" = alpha ]; then echo 'error: 429 Too Many Requests'; exit 1; fi\n"
+                  "echo OK\nexit 0\n")
+        self.assertEqual(self.run_with(script), 0)
+        state = codex.read_state()
+        self.assertEqual(state["alpha"]["lastKind"], "rate")
+        self.assertLess(state["alpha"]["exhaustedUntil"] - time.time(), codex.DEFAULT_COOLDOWN_S)
+        self.assertEqual(state["beta"]["lastKind"], "ok")
+        self.assertNotIn("exhaustedUntil", state["beta"])
 
 
 if __name__ == "__main__":

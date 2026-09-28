@@ -322,6 +322,7 @@ export const updateContentPreferencesSchema = z
     phone: z.string().min(1).max(64).optional(),
     preferences: z.record(contentPreferenceKeySchema, z.boolean()).optional(),
     artist_email_opt_in: z.boolean().optional(),
+    management_token: z.string().max(1024).optional(),
   })
   .refine(
     data => Boolean(data.email) || Boolean(data.phone),

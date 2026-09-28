@@ -388,7 +388,8 @@ export function validateFundraisingRegistry(
         claim.provenance.some(
           source =>
             source.classification !== 'founder-authored' ||
-            source.href.startsWith('/pitch')
+            source.href.startsWith('/pitch') ||
+            source.href.startsWith('/investor-portal')
         ))
     ) {
       issues.push({

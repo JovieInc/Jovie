@@ -83,14 +83,19 @@ vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
   ProfileUnifiedDrawer: ({
     open,
     presentation,
+    creditSegments,
   }: {
     readonly open: boolean;
     readonly presentation?: string;
+    readonly creditSegments?: readonly { readonly type: string }[];
   }) => (
     <div
       data-testid='mock-desktop-drawer'
       data-open={String(open)}
       data-presentation={presentation ?? 'standalone'}
+      data-credit-segments={(creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
     />
   ),
 }));
@@ -111,15 +116,19 @@ vi.mock('@/features/profile/StaticListenInterface', () => ({
   ),
 }));
 
-vi.mock('@/lib/profile-dsps', () => ({
-  getCanonicalProfileDSPs: () => [
+const mockGetCanonicalProfileDSPs = vi.hoisted(() =>
+  vi.fn(() => [
     {
       key: 'spotify',
       name: 'Spotify',
       url: 'https://open.spotify.com/artist/4u',
       config: {},
     },
-  ],
+  ])
+);
+
+vi.mock('@/lib/profile-dsps', () => ({
+  getCanonicalProfileDSPs: () => mockGetCanonicalProfileDSPs(),
 }));
 
 vi.mock('@/lib/dsp', () => ({
@@ -166,6 +175,14 @@ const contentPrefs: Record<NotificationContentType, boolean> = {
 describe('ProfileDesktopSurface', () => {
   beforeEach(() => {
     mockUseIsAuthenticated.mockReturnValue(false);
+    mockGetCanonicalProfileDSPs.mockReturnValue([
+      {
+        key: 'spotify',
+        name: 'Spotify',
+        url: 'https://open.spotify.com/artist/4u',
+        config: {},
+      },
+    ]);
   });
 
   it('hides the desktop back control on the public profile root for logged-out visitors', () => {
@@ -265,6 +282,7 @@ describe('ProfileDesktopSurface', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
   it('renders the desktop shell and primary navigation', () => {
+    const onModeSelect = vi.fn();
     render(
       <ProfileDesktopSurface
         artist={artist}
@@ -274,7 +292,7 @@ describe('ProfileDesktopSurface', () => {
         drawerOpen={false}
         drawerView='menu'
         activeMode='profile'
-        onModeSelect={vi.fn()}
+        onModeSelect={onModeSelect}
         onDrawerOpenChange={vi.fn()}
         onDrawerViewChange={vi.fn()}
         onOpenMenu={vi.fn()}
@@ -302,13 +320,13 @@ describe('ProfileDesktopSurface', () => {
       within(navigation).getByRole('button', { name: 'Music' })
     ).toBeInTheDocument();
     expect(
-      within(navigation).getByRole('button', { name: 'Shows' })
+      within(navigation).getByRole('button', { name: 'Events' })
     ).toBeInTheDocument();
     expect(
       within(navigation).getByRole('button', { name: 'About' })
     ).toBeInTheDocument();
     expect(
-      within(navigation).queryByRole('button', { name: 'Events' })
+      within(navigation).queryByRole('button', { name: 'Shows' })
     ).not.toBeInTheDocument();
     expect(
       within(navigation).queryByRole('button', { name: 'Alerts' })
@@ -316,6 +334,10 @@ describe('ProfileDesktopSurface', () => {
     expect(
       within(navigation).queryByRole('button', { name: 'Get updates' })
     ).not.toBeInTheDocument();
+
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Events' }));
+    expect(onModeSelect).toHaveBeenCalledWith('tour');
+
     const listenCta = screen.getByRole('button', { name: 'Listen' });
     expect(listenCta).toHaveClass('h-auto', 'min-h-7');
     expect(listenCta).toHaveClass(
@@ -430,6 +452,75 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
   });
 
+  // JOV-6453: while the AnonCookieBootstrap fetch is still in flight the
+  // variant-dependent hero CTA stays inert so it cannot morph post-paint.
+  it('holds the hero subscribe CTA inert while the visitor assignment resolves', () => {
+    // No playable destinations -> hero primary action resolves to subscribe.
+    mockGetCanonicalProfileDSPs.mockReturnValue([]);
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        visitorAssignmentResolved={false}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    const resolving = screen.getByTestId('profile-desktop-subscribe-resolving');
+    expect(resolving).toBeDisabled();
+    expect(resolving).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.queryByTestId('mock-desktop-alerts-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('mounts the hero subscribe CTA once the visitor assignment is resolved', () => {
+    mockGetCanonicalProfileDSPs.mockReturnValue([]);
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture
+        visitorAssignmentResolved
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-alerts-cta')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-desktop-subscribe-resolving')
+    ).not.toBeInTheDocument();
+  });
+
   // Regression: JOV-4103 — desktop hero must render social media icons.
   it('renders hero social icons when Instagram and Twitter links are present', () => {
     render(
@@ -514,13 +605,13 @@ describe('ProfileDesktopSurface', () => {
         screen.queryByRole('switch', { name: 'New Music' })
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('switch', { name: 'Shows' })
+        screen.queryByRole('switch', { name: 'Events' })
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole('switch', { name: 'Merch' })
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'View Shows' })
+        screen.queryByRole('button', { name: 'View Events' })
       ).not.toBeInTheDocument();
       expect(screen.getByText('No live shows listed.')).toBeVisible();
       expect(screen.queryByText('No upcoming shows.')).not.toBeInTheDocument();
@@ -661,7 +752,7 @@ describe('ProfileDesktopSurface', () => {
     }
   );
 
-  it('offers View Shows only when upcoming dates exist', () => {
+  it('offers View Events only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
     const upcomingShow = {
       id: 'show-1',
@@ -707,7 +798,7 @@ describe('ProfileDesktopSurface', () => {
       />
     );
 
-    screen.getByRole('button', { name: 'View Shows' }).click();
+    screen.getByRole('button', { name: 'View Events' }).click();
     expect(onModeSelect).toHaveBeenCalledWith('tour');
   });
 
@@ -850,5 +941,37 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('mock-static-listen-interface')
     ).not.toBeInTheDocument();
+  });
+
+  it('routes selected credits into the drawer About destination (JOV-6199)', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={true}
+        drawerView='about'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        creditSegments={[
+          { type: 'text', text: 'Credited on "' },
+          {
+            type: 'release',
+            text: 'Neon Circuit',
+            href: '/timwhite/neon-circuit',
+          },
+          { type: 'text', text: '".' },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-credit-segments',
+      'text|release|text'
+    );
   });
 });

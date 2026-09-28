@@ -274,7 +274,6 @@ describe('Vercel function config', () => {
     const runtimePaths = [
       'CHANGELOG.md',
       'docs/FEATURE_REGISTRY.md',
-      'scripts/symphony/symphony-codex-account-control.py',
       'apps/eve-pilot/identities/jovie/instructions.md',
       'apps/eve-pilot/identities/summer/instructions.md',
       'apps/web/content/legal/cookies.md',
@@ -285,7 +284,7 @@ describe('Vercel function config', () => {
     const excludedPaths = [
       'apps/web/lib/services/retouching/styles/white-space.md',
       'docs/ordinary-reference.md',
-      'scripts/symphony/unrelated-helper.py',
+      'scripts/fleet-gate/unrelated-helper.py',
       'apps/web/lib/services/retouching/styles/other-style.md',
       'apps/web/tests/fixtures/private-fixture.json',
     ];
@@ -307,7 +306,6 @@ describe('Vercel function config', () => {
       expect.arrayContaining([
         'runtime-data/CHANGELOG.md',
         'runtime-data/docs/FEATURE_REGISTRY.md',
-        'runtime-data/scripts/symphony/symphony-codex-account-control.py',
         'runtime-data/apps/eve-pilot/identities/jovie/instructions.md',
         'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
         'tests/quarantine.json',
@@ -333,6 +331,17 @@ describe('Vercel function config', () => {
       expect.arrayContaining(screenshotIncludes)
     );
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
+
+    // Certification packet files are staged into runtime-data and traced only
+    // into the certification API routes that read them.
+    const certificationIncludes = ['runtime-data/docs/certification/**/*'];
+    expect(includesByRoute['/api/ovie/certifications']).toEqual(
+      certificationIncludes
+    );
+    expect(includesByRoute['/api/ovie/certifications/**']).toEqual(
+      certificationIncludes
+    );
+    expect(includes).not.toEqual(expect.arrayContaining(certificationIncludes));
   });
 
   it('excludes non-runtime repo files from traces without dropping runtime reads', async () => {

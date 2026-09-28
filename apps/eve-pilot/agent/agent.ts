@@ -1,4 +1,5 @@
 import { defineAgent } from 'eve';
+import { EVE_PILOT_COMPACTION_THRESHOLD_PERCENT } from './lib/context-budget';
 import {
   assertEvePilotFactoryLock,
   bindEvePilotIdentity,
@@ -21,4 +22,6 @@ export default defineAgent({
   // already wired (`zai/glm-5.3-flash`); do not buy keys. Photon/iMessage
   // binds Ovie; Summer is not this root model.
   model: 'zai/glm-5.3-flash',
+  // Bound replayed history (~60K tokens) instead of compacting near the 1M-token window.
+  compaction: { thresholdPercent: EVE_PILOT_COMPACTION_THRESHOLD_PERCENT },
 });

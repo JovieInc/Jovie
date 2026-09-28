@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
@@ -114,6 +116,16 @@ describe('MarketingHero source-backed default story', () => {
       outstanding:
         'Active variant-to-route mapping remains owner-stacked and is not proven by this story.',
     });
+  });
+
+  it('excludes the MARKETING_HERO_* fixture exports from the story index', () => {
+    const exclude = marketingHeroMeta.excludeStories;
+    expect(exclude).toEqual(/^MARKETING_HERO_/);
+    const pattern = exclude as RegExp;
+    expect(pattern.test('MARKETING_HERO_DEFAULT_PROPS')).toBe(true);
+    expect(pattern.test('MARKETING_HERO_SOURCE_SHA')).toBe(true);
+    expect(pattern.test('SourceBackedDefault')).toBe(false);
+    expect(pattern.test('LandingActions')).toBe(false);
   });
 
   it('honors the shared root test id in landing mode', () => {
@@ -236,5 +248,117 @@ describe('MarketingHero source-backed default story', () => {
       'inset-0'
     );
     expect(shell.innerHTML).not.toContain('--linear-hero-backdrop');
+  });
+
+  it('docks the content and landing heroes under the header', () => {
+    const { container } = render(
+      <MarketingHero {...MARKETING_HERO_DEFAULT_PROPS} />
+    );
+    // Content mode already pads by the header height, so it only bleeds.
+    const content = container.querySelector('section.marketing-hero');
+    expect(content).toHaveClass('marketing-hero-dock');
+    expect(content).not.toHaveClass('marketing-hero-dock--inset');
+
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='dock-heading'
+        title='Dock title'
+        body='Dock body'
+        media={<div>Media</div>}
+        testId='dock-hero'
+      />
+    );
+    // Landing mode keeps its copy offset as inner inset (no arbitrary pt).
+    const landing = screen.getByTestId('dock-hero');
+    expect(landing).toHaveClass(
+      'marketing-hero-landing',
+      'marketing-hero-dock',
+      'marketing-hero-dock--inset'
+    );
+    expect(landing.className).not.toMatch(/\bpt-\[/);
+  });
+
+  it('leaves shell heroes out of the dock contract', () => {
+    render(
+      <MarketingHero variant='left' testId='shell-hero'>
+        <h1>Shell</h1>
+      </MarketingHero>
+    );
+    expect(screen.getByTestId('shell-hero')).not.toHaveClass(
+      'marketing-hero-dock'
+    );
+  });
+
+  it('renders the unique per-route hero photo behind content-mode copy when provided', () => {
+    render(
+      <MarketingHero
+        {...MARKETING_HERO_DEFAULT_PROPS}
+        testId='photo-content-hero'
+        photo={{
+          src: '/images/marketing-hero/product.webp',
+          width: 1600,
+          height: 901,
+        }}
+      />
+    );
+
+    const hero = screen.getByTestId('photo-content-hero');
+    expect(hero).toHaveClass('relative', 'overflow-hidden');
+    const photo = hero.querySelector('.marketing-hero-photo');
+    expect(photo).not.toBeNull();
+    expect(photo?.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('product.webp')
+    );
+    expect(photo?.querySelector('img')).toHaveAttribute('alt', '');
+  });
+
+  it('omits the hero photo layer and the relative/overflow classes without a photo prop', () => {
+    const { container } = render(
+      <MarketingHero {...MARKETING_HERO_DEFAULT_PROPS} />
+    );
+
+    const hero = container.querySelector('section.marketing-hero');
+    expect(hero?.querySelector('.marketing-hero-photo')).toBeNull();
+    expect(hero?.className).not.toContain('overflow-hidden');
+  });
+
+  it('applies the requested opacity to the landing-mode hero photo', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='photo-landing-heading'
+        title='Landing title'
+        body='Landing body'
+        media={<div>Media</div>}
+        testId='photo-landing-hero'
+        photo={{
+          src: '/images/marketing-hero/ai.webp',
+          width: 1600,
+          height: 1067,
+          opacity: 0.2,
+        }}
+      />
+    );
+
+    const hero = screen.getByTestId('photo-landing-hero');
+    const img = hero.querySelector('.marketing-hero-photo img');
+    expect(img).toHaveStyle({ opacity: '0.2' });
+  });
+});
+
+describe('MarketingHero photo stacking', () => {
+  it('keeps hero copy above the positioned hero photo', () => {
+    // The photo layer is positioned (z-index 0); static copy after it would
+    // paint underneath, which hid the /pricing headline in production.
+    const css = readFileSync(
+      resolve(__dirname, '../../app/globals.css'),
+      'utf8'
+    );
+
+    expect(css).toMatch(
+      /\.marketing-hero-photo ~ \*\s*\{\s*position: relative;\s*z-index: 1;/
+    );
   });
 });

@@ -67,19 +67,6 @@ env:
   # steps. Job-level concurrency is evaluated before assignment, where github.job is null.
 
 jobs:
-  proof-v2-substrate:
-    name: Validate exact PR head proof v2
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - run: python3 scripts/symphony/tests/run-proof-gate.py
-      - name: Verify Codex account recovery and lease boundaries
-        run: bash scripts/symphony/tests/codex-recovery-ci.sh
-
   runner-image-offline-proof:
     name: Build and verify runner image offline
     if: >-
@@ -176,7 +163,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v22.23.2
+              test "$(node --version)" = v24.21.0
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -305,12 +292,42 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v22.23.2 "$(node --version)"
+          assert_equal 'Node version' v24.21.0 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
           assert_executable 'Chromium headless shell' /opt/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
           assert_executable 'FFmpeg' /opt/ms-playwright/ffmpeg-1011/ffmpeg-linux
+
+  # Start before path selection and queue admission. On a warm exact cache this
+  # finishes inside their existing latency; on a miss, only this job fetches,
+  # installs, validates, and saves the dependency workspace for every isolated
+  # Linux build/test consumer in the synthetic-head run.
+  ci-merge-group-workspace:
+    name: Merge-group Dependency Workspace
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact merge-group head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.merge_group.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify exact merge-group head
+        env:
+          EXPECTED_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Prepare validated dependency workspace
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          save_merge_group_workspace: 'true'
+      - name: Revalidate published workspace receipt
+        run: node scripts/lib/ci-dependency-workspace.mjs validate
 
   # Successful root for every CI event, with one-shot proof only for push:main.
   # Queue-proven SHAs reuse their exact merge_group gate and skip every duplicate
@@ -504,7 +521,6 @@ jobs:
       shared_contract_impact: ${{ steps.detect.outputs.shared_contract_impact || 'none' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       has_web_coverage_changes: ${{ steps.coverage-detect.outputs.has_web_coverage_changes || 'false' }}
-      has_route_prep_coverage_changes: ${{ steps.coverage-detect.outputs.has_route_prep_coverage_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
       # The resolver may replace the event base with the live-main merge-base
       # for coalesced heads. Downstream exact-diff gates must use this same SHA.
@@ -925,14 +941,6 @@ jobs:
           set -euo pipefail
           CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
           test -f "$CHANGED_PATHS"
-          # Route-prep capacity logic is bash plus an embedded interpreter.
-          # Exact-head coverage runs the behavior suites when these paths change.
-          ROUTE_PREP_COVERAGE_PATTERN='^(scripts/symphony/codex-account-probe\.sh|scripts/symphony/symphony-agent-router|scripts/symphony/tests/codex-account-probe\.test\.py|scripts/symphony/tests/symphony-agent-router\.test\.py|scripts/symphony/tests/run-route-prep-coverage-gate\.py)$'
-          if grep -q -E "$ROUTE_PREP_COVERAGE_PATTERN" "$CHANGED_PATHS"; then
-            echo "has_route_prep_coverage_changes=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_route_prep_coverage_changes=false" >> "$GITHUB_OUTPUT"
-          fi
           # Promptfoo eval-infrastructure-only source PRs keep V8 on the combined head.
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
@@ -1081,7 +1089,7 @@ jobs:
       # the three-minute latency ratchet before classification even starts.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Collect changed files
         id: changed-files
         shell: bash
@@ -1305,9 +1313,12 @@ jobs:
   ci-golden-path-lock:
     name: Golden Path Lock
     # JOV-5085: cheap focused Vitest; no Neon/Playwright/signup secrets.
+    needs: [ci-merge-group-workspace]
     if: >-
-      github.event_name == 'pull_request' ||
-      github.event_name == 'merge_group'
+      always() &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'merge_group' &&
+      needs.ci-merge-group-workspace.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1316,6 +1327,8 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Fail-closed golden path lock
         run: node scripts/golden-path-lock.mjs merge-gate
       - name: Upload golden-path lock helper coverage
@@ -1334,18 +1347,29 @@ jobs:
     # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. Snapshot refresh
     # stays on visual-regression.yml. JOV-5960: changed homepage source also
     # renders and compares the committed homepage baselines on the source lane.
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-workspace]
     if: >-
-      github.event_name == 'merge_group' ||
+      always() &&
       (
-        github.event_name == 'pull_request' &&
-        needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        (github.event_name == 'merge_group' &&
+        needs.ci-merge-group-workspace.result == 'success') ||
+        (github.event_name == 'pull_request' &&
+        needs.ci-path-changes.outputs.run_homepage_visual == 'true')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      # The homepage render uses mock keys only, so its screenshots are public.
+      # Without this the producer guard omits every image and a failed compare
+      # uploads no -actual.png, leaving an intentional homepage change no
+      # CI-rendered baseline to adopt (scripts/visual-baseline-adopt.mjs).
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      # A failed compare also writes Playwright's error-context.md. Without
+      # this the guard blocks it as an unknown binary and uploads nothing
+      # (run 36347764603). Markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1353,11 +1377,13 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Validate snapshot inventory and workflow contract
         run: node scripts/visual-snapshot-compare.mjs compare
       - uses: ./.github/actions/setup-node-pnpm
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
       - uses: ./.github/actions/setup-playwright
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
       # The build below spent 3.2 of its ~4.2 min in a cold Turbopack compile
@@ -1472,12 +1498,13 @@ jobs:
           retention-days: 14
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
 
   ci-fast-typecheck:
     name: ci-fast (typecheck)
     # JOV-4477: dedicated jobs keep structural Docker/Python action setup out of
     # the typecheck path while preserving parallel hosted fan-out.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     if: >-
@@ -1487,6 +1514,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -1500,6 +1528,8 @@ jobs:
         if: >-
           github.event_name != 'pull_request' ||
           needs.ci-path-changes.outputs.run_jovie_typecheck == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
@@ -1587,7 +1617,7 @@ jobs:
     # remaining group, where their path-gated lane can actually run.
     # JOV-5454: live Storybook certification needs Chromium plus bounded
     # build/serve budget inside the structural lane.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     if: &ci-fast-gate >-
@@ -1597,6 +1627,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -1637,12 +1668,14 @@ jobs:
           rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
           (
             set +e
-            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+            git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
             echo "$?" > "$BASE_FETCH_DIR/status.tmp"
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       # Checksum-pinned actionlint/shellcheck/pyflakes binaries identical to
       # the former rhysd/actionlint Docker action, whose image was rebuilt at
       # every job start (~30s) even when this step was skipped. It reads only
@@ -1678,6 +1711,13 @@ jobs:
             echo "::error title=Base-branch fetch::git fetch exited $fetch_status"
             exit 1
           fi
+          # No command in this job may kick detached `git maintenance run
+          # --auto` (or gc --auto): it keeps rewriting
+          # .git/objects/info/commit-graph while the structural lane's
+          # provenance guards read it, which intermittently flips
+          # `merge-base --is-ancestor` to a false "not an ancestor".
+          git config maintenance.auto false
+          git config gc.auto 0
           if [[ "$(git rev-parse --is-shallow-repository)" != 'false' ]]; then
             echo "::error title=Base-branch fetch::checkout is still shallow"
             exit 1
@@ -1701,6 +1741,45 @@ jobs:
         # The required prevention receipt must exist for every source PR and
         # exact merge-group head, even when no contract file changed.
         run: pnpm ci:incident-contract:validate
+      - name: Resolve incident-labeled Linear issues for this PR
+        # JOV-6689: a PR closing an `incident` issue must ship or link a
+        # post-mortem. The label lookup is the only non-deterministic piece,
+        # so it stays in this step; the check below is pure file/text.
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          ids="$(printf '%s\n%s\n' "${PR_TITLE:-}" "${PR_BODY:-}" \
+            | grep -oE 'JOV-[0-9]+' | sort -u || true)"
+          incident=""
+          if [ -n "${LINEAR_API_KEY:-}" ]; then
+            while IFS= read -r id; do
+              [ -z "$id" ] && continue
+              labels="$(curl -sS --max-time 10 https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_API_KEY" \
+                -H 'Content-Type: application/json' \
+                -d "{\"query\":\"query { issues(filter: { team: { key: { eq: \\\"JOV\\\" } }, number: { eq: ${id#JOV-} } }, first: 1) { nodes { labels { nodes { name } } } } }\"}" \
+                | jq -r '.data.issues.nodes[0].labels.nodes[]?.name' 2>/dev/null || true)"
+              if printf '%s\n' "$labels" | grep -qx 'incident'; then
+                incident="${incident:+$incident,}$id"
+              fi
+            done <<< "$ids"
+          else
+            echo "::notice::LINEAR_API_KEY unavailable; incident label resolution skipped (frontmatter lint still runs)."
+          fi
+          echo "POSTMORTEM_INCIDENT_ISSUES=$incident" >> "$GITHUB_ENV"
+          echo "Incident-labeled references: ${incident:-none}"
+      - name: Post-mortem linkage and frontmatter check
+        # Same always-on placement as the incident contract above: every
+        # source PR and merge-group head, dependency-free (JOV-6689).
+        env:
+          POSTMORTEM_PR_TITLE: ${{ github.event.pull_request.title }}
+          POSTMORTEM_PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/postmortem-linkage-check.mjs
       - name: Verify Node and tsx seed-loader compatibility
         shell: bash
         run: |
@@ -1727,36 +1806,10 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
           unset AUTH_HEADER GH_TOKEN
-          STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/symphony/(align-runner-source-revision\.sh$|symphony-elixir-safe-restart$|install-gem-service-attestation\.sh$|systemd/gem-service-attestation\.service$|emit_gem_service_attestation\.py$|verify_upstream_burrito_payload\.py$|profiles/upstream-preservation/|symphony_official_runtime\.py$|closure_health\.py$|control-bundle-manifest\.mjs$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\.sh$|jovie-symphony-workspace(-create)?$|model-router\.py$|summer_bottleneck_producer\.py$|summer-symphony-outbox-(consumer(\.test)?|contract\.test)\.mjs$|summer-shipping-lead-contract(\.test)?\.mjs$|(run-native-queue-execution|native-queue-starvation-execute(\.test)?)\.mjs$|symphony-nvme-package-cache\.sh$|symphony-reconciler\.py$|systemd/gem-(disk-reclaim|pr-drain)\.(service|timer)$)|scripts/symphony/tests/(align-runner-source-revision\.test\.sh$|run-safe-restart-gate\.py$|symphony-safe-restart\.test\.py$|run-runtime-proof-gate\.py$|symphony-burrito-workflow\.test\.py$|control-bundle-manifest\.test\.mjs$|(upstream-(burrito-payload|preservation)|workflow-preservation|activation-ownership)\.test\.py$|closure-health\.test\.py$|gem-(service-attestation|disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|hyperagent-lifecycle\.test\.py$|jovie-symphony-workspace\.test\.py$|summer-bottleneck-producer\.test\.py$|symphony-(nvme-package-cache|reconciler)\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim|_gem_workspace_migrate)\.py$)|scripts/brand-scrub\.py|scripts/lanes/|scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
-
-          # Typed company composition must run its real coverage gate on future edits too.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/security/deepsec-policy(\.test)?\.mjs$|^scripts/security/deepsec/|^scripts/summer-commissioning/'
-
-          # Evidence collection changes must execute the existing native-queue
-          # behavioral tests and per-file coverage, including test-only edits.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/native-queue-eval\.mjs$|^scripts/lib/native-queue-(eval|group-evidence|policy-evidence)\.mjs$|^scripts/lib/__tests__/native-queue-(collector|eval|group-evidence|policy-evidence)\.test\.mjs$'
-
-          # FX remediation policy, dispatcher, and finisher must run their real
-          # per-file coverage suite when the implementation or tests change.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.test\.mjs$'
-
-          # Codex intake selection must execute the pinned Symphony scheduler.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/tests/run-governor-bounded-codex-selector\.sh$|^scripts/symphony/tests/governor_bounded_codex_intake_test\.exs$'
-
-          # Protected-item intake must run the fail-closed pre-workspace check.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/profiles/governor-bounded-codex/|^scripts/symphony/tests/protected-intake-check\.test\.py$'
-
-          # Conflict event policy, entrypoint, and proof changes always run the
-          # existing structural control selector with exact-path coverage.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/pr-conflict-handler\.mjs$|^scripts/lib/(pr-conflict-(handler|event)|github-open-prs-rest)\.mjs$|^scripts/lib/__tests__/(pr-conflict-(handler|event)|github-open-prs-rest)\.test\.mjs$'
-
-          # Route-prep capacity refresh must run both behavior suites on source
-          # PRs, including test-only edits. Merge groups already force this lane.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/symphony/codex-account-probe\.sh$|^scripts/symphony/symphony-agent-router$|^scripts/symphony/tests/codex-account-probe\.test\.py$|^scripts/symphony/tests/symphony-agent-router\.test\.py$|^scripts/symphony/tests/run-route-prep-coverage-gate\.py$'
-
-          # Inputs apps/web/tests/unit/ci reads beyond .github/: web Unit Tests
-          # skip PRs, so these contracts run here (#18718).
-          STRUCTURAL_CONTROL_PATTERN+='|^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/REPO-POLICY\.md|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$|symphony/jobs/ci-failure-diagnosis)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$)'
+          # Control-lane paths are data, one ERE alternative per line, so
+          # concurrent additions do not conflict on this file (JOV-6837).
+          STRUCTURAL_CONTROL_PATTERN="$(grep -vE '^[[:space:]]*(#|$)' .github/ci-harness/structural-control-paths.ere | paste -sd'|' -)"
+          [[ -n "$STRUCTURAL_CONTROL_PATTERN" ]]
 
           # Invariant-scanned sources must run invariants:check (#18182 added a
           # readFileSync to apps/desktop/src/main.ts unchecked). Derived from the
@@ -1787,6 +1840,7 @@ jobs:
             echo "spotify=false"
             echo "kbd=false"
             echo "crawler=false"
+            echo "overlay=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -1795,6 +1849,9 @@ jobs:
           SPOTIFY_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog(\.stories)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect\.ts|app/api/spotify/search/.*|tests/e2e/storybook-spotify-connect\.spec\.ts)$'
           KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
+          # Overlay primitives, their layer tokens, and the
+          # collision harness re-prove stacking, focus, and viewport fit.
+          OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
           changed_files="$RUNNER_TEMP/storybook-changed-files.txt"
           git diff --name-only "origin/${{ github.base_ref }}" HEAD > "$changed_files"
           if grep -qE "$SPOTIFY_STORYBOOK_PATTERN" "$changed_files"; then
@@ -1812,6 +1869,12 @@ jobs:
           if grep -qE "$CRAWLER_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "crawler=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$OVERLAY_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "overlay=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -1851,27 +1914,6 @@ jobs:
       - name: Setup Playwright (Chromium)
         if: ${{ success() && (steps.structural.outputs.skip != 'true' || steps.storybook-browser.outputs.run == 'true') }}
         uses: ./.github/actions/setup-playwright
-      # The pinned Symphony selector otherwise downloads OTP/Elixir, reinstalls
-      # Hex/rebar and recompiles deps on every structural run. The exact-key
-      # cache holds only outputs derived from the selector pin, OTP/Elixir
-      # versions and platform; the selector re-verifies them before reuse.
-      # This job only restores. Queue-proven main pushes skip this job, so
-      # symphony-selector-cache-warm.yml writes the entry from trusted main.
-      - name: Resolve Symphony selector cache key
-        id: selector-cache-key
-        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        run: bash scripts/symphony/tests/run-governor-bounded-codex-selector.sh --print-cache-key >> "$GITHUB_OUTPUT"
-      - name: Restore Symphony selector cache
-        id: selector-cache
-        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ runner.temp }}/symphony-selector-beam
-            ${{ runner.temp }}/symphony-selector-mix-home
-            ${{ runner.temp }}/symphony-selector-src/elixir/deps
-            ${{ runner.temp }}/symphony-selector-src/elixir/_build/test
-          key: symphony-selector-v1-${{ runner.os }}-${{ steps.selector-cache-key.outputs.platform }}-otp-${{ steps.selector-cache-key.outputs.otp }}-elixir-${{ steps.selector-cache-key.outputs.elixir }}-${{ steps.selector-cache-key.outputs.pin }}-${{ hashFiles('scripts/symphony/tests/run-governor-bounded-codex-selector.sh') }}
       # Runs while the background cheap lanes finish instead of after them
       # (~55-105s of idle await in merge groups). Fail-fast is kept: a non-zero
       # cheap-lane status stops new structural commands (web reads its own web
@@ -1880,15 +1922,15 @@ jobs:
       - name: Run structural ci-fast lane
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: &structural-run-env
+          # Lets the story-quality guard repair a checkout a concurrent
+          # depth-limited fetch re-shallowed mid-lane (JOV-6623).
+          GH_TOKEN: ${{ github.token }}
           CI_FAST_LANE_GROUP: remaining
           CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
           CI_FAST_ONLY_STRUCTURAL: 'true'
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes-structural.json
           CI_FAST_STRUCTURAL_ABORT_STATUS_FILE: ${{ runner.temp }}/ci-fast-lanes-bg/status
-          SYMPHONY_ELIXIR_PREFIX: ${{ runner.temp }}/symphony-selector-beam
-          MIX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/mix
-          HEX_HOME: ${{ runner.temp }}/symphony-selector-mix-home/hex
         run: node scripts/ci-fast-lanes.mjs
       - name: Await ci-fast lanes
         id: lanes
@@ -1911,6 +1953,7 @@ jobs:
           RUN_SPOTIFY: ${{ steps.storybook-browser.outputs.spotify }}
           RUN_KBD: ${{ steps.storybook-browser.outputs.kbd }}
           RUN_CRAWLER: ${{ steps.storybook-browser.outputs.crawler }}
+          RUN_OVERLAY: ${{ steps.storybook-browser.outputs.overlay }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -1927,6 +1970,9 @@ jobs:
           fi
           if [[ "$RUN_CRAWLER" == 'true' ]]; then
             specs+=(tests/e2e/storybook-ai-crawler.spec.ts)
+          fi
+          if [[ "$RUN_OVERLAY" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-overlay-collisions.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -1979,7 +2025,7 @@ jobs:
     # Secret-free browser proof for public-profile visual, accessibility, and
     # runtime behavior. The aggregate makes this required on PR and merge-group
     # heads whenever the bounded profile surface selector matches.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: >-
@@ -1989,6 +2035,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2014,7 +2061,7 @@ jobs:
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - name: Select public-profile browser admission
         id: profile-browser
         shell: bash
@@ -2063,6 +2110,8 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.profile-browser.outputs.run == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Setup Playwright (Chromium)
         if: steps.profile-browser.outputs.run == 'true'
         uses: ./.github/actions/setup-playwright
@@ -2147,7 +2196,7 @@ jobs:
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     # Model-free semantic gate: path-selected only on the exact combined head
     # and direct-main fallback. Manual dispatch may run it exhaustively.
     runs-on: ubuntu-latest
@@ -2158,6 +2207,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2184,6 +2234,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Validate Promptfoo config
         run: pnpm --filter @jovie/web run evals:validate
       - name: Run deterministic Promptfoo evals
@@ -2191,7 +2243,7 @@ jobs:
 
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     # Model-free semantic gate with the same combined-head/fallback contract.
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2201,6 +2253,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2224,13 +2277,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Run golden eval-set CI gate
         run: pnpm run evals:golden
 
   ci-fast-structural-python:
     name: ci-fast (structural python)
     # Pytest shards + invariants/control suites off remaining's CPU-bound pool.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: *ci-fast-gate
@@ -2243,6 +2298,8 @@ jobs:
         env: *base-fetch-start-env
         run: *base-fetch-start
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Fetch base-branch history
         shell: bash
         timeout-minutes: 10
@@ -2266,7 +2323,7 @@ jobs:
     # Web product lane + every @jovie/web Vitest run (~200s of the ~445s
     # CPU-bound structural sum) off remaining's pool. Chromium serves the
     # tests/unit/ci Playwright contracts; no Python/Elixir command runs here.
-    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: *ci-fast-gate
@@ -2279,6 +2336,8 @@ jobs:
         env: *base-fetch-start-env
         run: *base-fetch-start
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Fetch base-branch history
         shell: bash
         timeout-minutes: 10
@@ -2499,11 +2558,17 @@ jobs:
 
   drizzle-migration-guard:
     name: Migration Guard
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-workspace]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
+    if: >-
+      always() && needs.ci-path-changes.result == 'success' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'merge_group' &&
+      needs.ci-merge-group-workspace.result == 'success') ||
+      (github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')))
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 6
     permissions:
       contents: read
       issues: read
@@ -2522,6 +2587,10 @@ jobs:
         id: check_changes
         shell: bash
         run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
 
       # Skip notification (updated condition)
       - name: Skip notification
@@ -2541,6 +2610,7 @@ jobs:
 
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
+          pnpm exec tsx scripts/online-index-migrate.ts --validate-only
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
@@ -2643,13 +2713,14 @@ jobs:
   # split stays fail-closed.
   ci-build-layout:
     name: Build + Layout (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2674,6 +2745,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Turbopack's persistent build cache (Next 16 default) lives under
@@ -2733,6 +2806,10 @@ jobs:
           done
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+      - name: Enforce authed route initial JS budgets
+        # Deterministic gzip sizes from the build manifests; a few seconds.
+        # Ratchet lives in apps/web/scripts/route-js-budgets.json.
+        run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
       - name: Run deterministic layout behavior guard
         run: |
           set -euo pipefail
@@ -2816,13 +2893,14 @@ jobs:
 
   ci-build-ovie:
     name: Ovie Build (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2847,6 +2925,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
         if: hashFiles('apps/ovie/package.json') != ''
+        with:
+          reuse_merge_group_workspace: 'true'
       # This guard permits the trusted-classifier prerequisite to land before
       # the app. Once present, Ovie must independently build and typecheck.
       # ci-typecheck-ovie checks the same tsconfig program that `next build`
@@ -2870,13 +2950,14 @@ jobs:
 
   ci-typecheck-ovie:
     name: Ovie Typecheck (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2901,6 +2982,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
         if: hashFiles('apps/ovie/package.json') != ''
+        with:
+          reuse_merge_group_workspace: 'true'
       # Split from ci-build-ovie so tsc runs beside `next build` instead of
       # before it. Same command as before: routes.mjs, next typegen, then
       # tsc --noEmit over the full Ovie tsconfig.
@@ -2910,13 +2993,14 @@ jobs:
 
   ci-storybook-surfaces:
     name: Storybook Surface Matrix (combined)
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -2945,6 +3029,8 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       # Boot Storybook before the independent checks and Playwright setup so
       # its ~12s startup and Vite dependency scan/bundle overlap them instead
       # of running serially inside the matrix step. Output goes to a file: a
@@ -3001,6 +3087,8 @@ jobs:
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
+                  tests/e2e/storybook-overlay-collisions.spec.ts \
+                  tests/e2e/storybook-spotify-connect.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2
               exit 0
@@ -3016,6 +3104,9 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          # Name the blocked file when the artifact guard stops the step;
+          # "exit 1" alone left the JOV-6541 failures undiagnosable.
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'
       - name: Upload combined Storybook failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -3172,7 +3263,7 @@ jobs:
   ci-cross-product-integration:
     name: Cross-Product Integration (combined)
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos]
+      [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3180,6 +3271,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -3213,6 +3305,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
       - name: Run model-free shared contracts
         run: |
           pnpm --filter @jovie/auth-routing test
@@ -3977,9 +4071,26 @@ jobs:
           retention-days: 3
 
   ci-lighthouse-dashboard-pr:
-    name: Lighthouse (dashboard manual)
+    name: Lighthouse (dashboard gate)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    # Launch gate (JOV-6002): blocking on the merge-group combined head when
+    # launch-gate paths change; manual dispatch keeps deep-evidence runs.
+    # neon-db and ci-build-public are dispatch-only needs, so they may be
+    # skipped on merge_group — a failure still blocks the job.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.neon-db.result != 'failure' &&
+      needs.neon-db.result != 'cancelled' &&
+      needs.ci-build-public.result != 'failure' &&
+      needs.ci-build-public.result != 'cancelled' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_golden_path == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -4143,9 +4254,26 @@ jobs:
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-lighthouse-onboarding-pr:
-    name: Lighthouse (onboarding manual)
+    name: Lighthouse (onboarding gate)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    # Launch gate (JOV-6002): blocking on the merge-group combined head when
+    # launch-gate paths change; manual dispatch keeps deep-evidence runs.
+    # neon-db and ci-build-public are dispatch-only needs, so they may be
+    # skipped on merge_group — a failure still blocks the job.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.neon-db.result != 'failure' &&
+      needs.neon-db.result != 'cancelled' &&
+      needs.ci-build-public.result != 'failure' &&
+      needs.ci-build-public.result != 'cancelled' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_golden_path == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -4160,14 +4288,15 @@ jobs:
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        # neon-db is dispatch-only; merge-group runs fall back to DATABASE_URL_MAIN.
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -4176,16 +4305,16 @@ jobs:
           fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Export DATABASE_URL (main — non-DB PR)
         # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        if: needs.ci-path-changes.outputs.run_neon != 'true' || needs.neon-db.result != 'success'
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -4620,7 +4749,7 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       always() &&
       !cancelled() &&
@@ -4628,6 +4757,7 @@ jobs:
       (
         github.event_name != 'merge_group' ||
         (
+          needs.ci-merge-group-workspace.result == 'success' &&
           needs.ci-merge-group-admission.result == 'success' &&
           needs.ci-merge-group-admission.outputs.admitted == 'true'
         )
@@ -4659,9 +4789,12 @@ jobs:
       # 14 shards: at 10, balanced ~325-file shards took 155-176s of Vitest on
       # the slower hosted runners (max job ~250s); 14 cuts that to ~125s for
       # ~4 extra runner-minutes of fixed setup per run.
+      # 'packages/ui' is its own entry (same setup, same gate result) that runs
+      # only the @jovie/ui suite: chained after 4/14's Vitest it made that shard
+      # the critical path (192s vs <=180s elsewhere); alone it ends in ~80s.
       max-parallel: 120
       matrix:
-        shard: ['1/14', '2/14', '3/14', '4/14', '5/14', '6/14', '7/14', '8/14', '9/14', '10/14', '11/14', '12/14', '13/14', '14/14']
+        shard: ['1/14', '2/14', '3/14', '4/14', '5/14', '6/14', '7/14', '8/14', '9/14', '10/14', '11/14', '12/14', '13/14', '14/14', 'packages/ui']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -4687,7 +4820,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # Full history for vitest --changed (names via commit graph)
+          # Full history for vitest --changed (names via commit graph); the
+          # packages/ui entry runs no --changed/--affected selection.
+          fetch-depth: ${{ matrix.shard == 'packages/ui' && 1 || 0 }}
           filter: blob:none # historical blobs lazy-fetch; saves ~30s × 5 shards/run
           clean: true
 
@@ -4726,26 +4861,28 @@ jobs:
       - name: Setup Node.js and pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
 
       - name: Setup Playwright warm path
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         uses: ./.github/actions/setup-playwright
 
       - name: Load quarantined unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         id: quarantine
         run: node .github/scripts/quarantine-ledger.mjs emit-github-output
 
       - name: Run unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui'
         env:
           # Isolated forks start a fresh process per test file, so each jsdom
           # file re-parses jsdom's ~1,000 modules (the jsdom environment is
           # ~35% of shard worker time). Vitest flushes each fork's V8 compile
           # cache on stop, so later forks load bytecode instead of re-parsing.
           # Entries failing Node's source-hash check recompile, and Vitest
-          # drops the cache itself under v8 coverage. The quarantine and
-          # packages/ui steps below reuse this per-job directory.
+          # drops the cache itself under v8 coverage. The quarantine step
+          # below reuses this per-job directory.
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -4816,11 +4953,11 @@ jobs:
           retention-days: 7
 
       - name: Run packages/ui unit tests
-        # Not sharded: one shard runs it, not every shard. Its cost is preloaded
-        # on 4/14 by CI_RESERVED_MS in apps/web/scripts/vitest-duration-sequencer.mjs.
+        # Not sharded: only the dedicated 'packages/ui' matrix entry runs it, in
+        # parallel with the web shards (so no CI_RESERVED_MS entry is needed).
         env:
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
-        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '4/14'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == 'packages/ui'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Preserve failed unit-shard diagnosis
@@ -4846,7 +4983,7 @@ jobs:
 
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
-        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' }}
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -4857,7 +4994,7 @@ jobs:
 
   ci-exact-head-coverage-shard:
     name: Exact-head Coverage shard ${{ matrix.shard }}/4
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-workspace]
     # V8 coverage for the planned related tests is CPU-bound on one 4-vCPU
     # runner (merge_group run 36260335136: 331 files, 313s step). Four
     # `vitest --shard` runners each take a disjoint quarter of the same
@@ -4869,7 +5006,13 @@ jobs:
       always() &&
       needs.ci-path-changes.result == 'success' &&
       needs.ci-path-changes.outputs.has_web_coverage_changes == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+      (
+        github.event_name == 'pull_request' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-merge-group-workspace.result == 'success'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 18
     permissions:
@@ -4904,7 +5047,7 @@ jobs:
           [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           if [[ "$EVENT_NAME" == pull_request ]]; then
             base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
             COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"
@@ -4930,6 +5073,8 @@ jobs:
           git cat-file -e "${COVERAGE_BASE}^{commit}"
 
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
 
       - name: Run exact-head coverage shard
         id: coverage-shard
@@ -5026,7 +5171,7 @@ jobs:
       contents: read
     steps:
       - name: Record non-applicable coverage receipt
-        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true' && needs.ci-path-changes.outputs.has_route_prep_coverage_changes != 'true'
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
         run: echo "No web runtime or coverage-substrate change; selected exact-head CI tests own the changed behavior."
 
       - name: Require every exact-head coverage shard
@@ -5081,7 +5226,7 @@ jobs:
           [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           if [[ "$EVENT_NAME" == pull_request ]]; then
             base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
             COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"
@@ -5168,33 +5313,6 @@ jobs:
             --base "$COVERAGE_BASE" \
             --head "$EXPECTED_HEAD" \
             "${coverage_args[@]}"
-
-      - name: Checkout exact route-prep coverage head
-        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Verify exact route-prep coverage head
-        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
-        env:
-          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-        run: |
-          set -euo pipefail
-          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-
-      - name: Setup Node for route-prep behavior suites
-        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true' && needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Run route-prep behavior coverage
-        if: needs.ci-path-changes.outputs.has_route_prep_coverage_changes == 'true'
-        run: python3 scripts/symphony/tests/run-route-prep-coverage-gate.py
 
   ci-a11y:
     name: A11y (axe)
@@ -6587,6 +6705,8 @@ jobs:
         ci-golden-path-lock,
         ci-visual-snapshot-compare,
         drizzle-migration-guard,
+        ci-lighthouse-dashboard-pr,
+        ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
@@ -6622,6 +6742,8 @@ jobs:
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
+          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
+          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
@@ -6632,6 +6754,7 @@ jobs:
           SHARED_IMPACT="${{ needs.ci-path-changes.outputs.shared_contract_impact }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
+          RUN_LAUNCH_GATE="${{ needs.ci-path-changes.outputs.run_golden_path }}"
           {
             echo "### Merge group ready"
             echo
@@ -6668,6 +6791,8 @@ jobs:
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
             echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
+            echo "| Dashboard Lighthouse (launch-gate paths) | $DASHBOARD_LIGHTHOUSE_RESULT |"
+            echo "| Onboarding Lighthouse (launch-gate paths) | $ONBOARDING_LIGHTHOUSE_RESULT |"
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -6731,7 +6856,9 @@ jobs:
 
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
-            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT"; do
+            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT" \
+            "Dashboard Lighthouse:$RUN_LAUNCH_GATE:$DASHBOARD_LIGHTHOUSE_RESULT" \
+            "Onboarding Lighthouse:$RUN_LAUNCH_GATE:$ONBOARDING_LIGHTHOUSE_RESULT"; do
             name="${selected_gate%%:*}"
             selection_and_result="${selected_gate#*:}"
             selected="${selection_and_result%%:*}"

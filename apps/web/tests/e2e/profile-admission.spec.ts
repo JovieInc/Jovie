@@ -1,12 +1,28 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import { HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES } from '../../components/features/home/homepage-profile-preview-fixture';
+import {
+  startOfProfileSurfaceLocalDay,
+  toProfileSurfaceDateValue,
+} from '../../components/features/profile/profile-surface-state';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
+import {
+  expectCenteredPhoneColumn,
+  expectDesktopSurfaceBuildMatches,
+  expectedPublicProfileLayout,
+  PROFILE_DESKTOP_SURFACE_SHIPPED,
+} from './utils/profile-desktop-surface';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
   runDspInteraction,
 } from './utils/public-surface-helpers';
+
+const DESKTOP_SURFACE_ONLY =
+  'Exercises the flagged wide desktop surface; set NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=1 for the build and runner';
+const PHONE_COLUMN_ONLY =
+  'Exercises the default mobile-first desktop column; the build ships the desktop surface';
 
 const diagnostics = new WeakMap<object, () => Promise<void>>();
 
@@ -23,6 +39,26 @@ test.use({
   storageState: { cookies: [], origins: [] },
   viewport: { width: 390, height: 844 },
 });
+
+function getUpcomingFixtureVenue(now = new Date()) {
+  // Match the profile surface's local-day boundary so the assertion follows
+  // the browser's current-date filtering at midnight in the test environment.
+  const today = startOfProfileSurfaceLocalDay(now).getTime();
+  const upcoming = HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES.find(tourDate => {
+    const start = toProfileSurfaceDateValue(tourDate.startDate);
+    return (
+      start !== null && startOfProfileSurfaceLocalDay(start).getTime() >= today
+    );
+  });
+
+  if (!upcoming) {
+    throw new Error(
+      'The populated profile fixture must contain at least one upcoming event'
+    );
+  }
+
+  return upcoming.venueName;
+}
 
 function intersectionArea(
   left: { x: number; y: number; width: number; height: number },
@@ -107,10 +143,10 @@ async function waitForSettledProfileLayout(
 }
 
 test.describe('public profile browser admission', () => {
-  for (const viewport of [
-    { width: 1179, layout: 'compact' as const },
-    { width: 1180, layout: 'desktop' as const },
-  ]) {
+  for (const viewport of [1179, 1180].map(width => ({
+    width,
+    layout: expectedPublicProfileLayout(width),
+  }))) {
     test(`${viewport.width}px owns the expected public profile presentation`, async ({
       page,
     }) => {
@@ -123,6 +159,7 @@ test.describe('public profile browser admission', () => {
 
       const shell = page.getByTestId('public-profile-layout-shell');
       await expect(shell).toHaveAttribute('data-layout', viewport.layout);
+      await expectDesktopSurfaceBuildMatches(page);
       await expect(
         page.getByTestId(
           viewport.layout === 'desktop'
@@ -153,11 +190,10 @@ test.describe('public profile browser admission', () => {
     });
   }
 
-  for (const viewport of [
-    { width: 1179, layout: 'compact' as const },
-    { width: 1180, layout: 'desktop' as const },
-    { width: 1512, layout: 'desktop' as const },
-  ]) {
+  for (const viewport of [1179, 1180, 1512].map(width => ({
+    width,
+    layout: expectedPublicProfileLayout(width),
+  }))) {
     test(`${viewport.width}px canonical /unfazed owns its presentation`, async ({
       page,
     }) => {
@@ -199,6 +235,7 @@ test.describe('public profile browser admission', () => {
   test('1512px public route blocks the founder-reported compact desktop hybrid', async ({
     page,
   }, testInfo) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await page.setViewportSize({ width: 1512, height: 932 });
     const response = await page.goto(
       '/renders/profile-admission?layout=public&state=unclaimed',
@@ -243,6 +280,55 @@ test.describe('public profile browser admission', () => {
     });
   });
 
+  test('1512px public route centers the mobile profile in a phone column', async ({
+    page,
+  }, testInfo) => {
+    test.skip(PROFILE_DESKTOP_SURFACE_SHIPPED, PHONE_COLUMN_ONLY);
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1512, height: 932 });
+    const response = await page.goto(
+      '/renders/profile-admission?layout=public&state=unclaimed',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+    await waitForSettledProfileLayout(page, 'compact');
+    await waitForSettledProfile(page);
+    await expectDesktopSurfaceBuildMatches(page);
+
+    // The wide surface never mounts; the compact profile owns every width.
+    await expect(page.getByTestId('profile-desktop-shell')).toHaveCount(0);
+    await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(0);
+    await expectCenteredPhoneColumn(page);
+
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.claimCtaLineCount).toBe(1);
+    expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+
+    // Banner, dock, and drawers stay inside the column instead of stretching
+    // to the viewport.
+    const column = await page
+      .getByTestId('profile-compact-shell')
+      .boundingBox();
+    expect(column).not.toBeNull();
+    const within = async (testId: string) => {
+      const box = await page.getByTestId(testId).first().boundingBox();
+      expect(box, `${testId} must render`).not.toBeNull();
+      expect(box!.x, testId).toBeGreaterThanOrEqual(column!.x - 1);
+      expect(box!.x + box!.width, testId).toBeLessThanOrEqual(
+        column!.x + column!.width + 1
+      );
+    };
+    await within('profile-shell-banner');
+    await within('profile-tab-bar');
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+    await within('profile-menu-drawer');
+    await testInfo.attach('public-profile-phone-column-1512.png', {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+  });
+
   test('1512px long-name claim CTA remains one line', async ({ page }) => {
     await page.setViewportSize({ width: 1512, height: 932 });
     const response = await page.goto(
@@ -250,11 +336,7 @@ test.describe('public profile browser admission', () => {
       { waitUntil: 'domcontentloaded' }
     );
     expect(response?.status()).toBe(200);
-    await expect(page.getByTestId('profile-desktop-surface')).toBeVisible();
-    await expect(page.getByTestId('profile-desktop-surface')).toHaveAttribute(
-      'data-interactive-ready',
-      'true'
-    );
+    await waitForSettledProfileLayout(page, expectedPublicProfileLayout(1512));
     await waitForSettledProfile(page);
 
     const audit = await auditPublicProfileLayout(page);
@@ -290,10 +372,13 @@ test.describe('public profile browser admission', () => {
   });
 
   const responsiveCases = [
-    { id: '1179-compact', width: 1179, height: 932, layout: 'compact' },
-    { id: '1180-desktop', width: 1180, height: 932, layout: 'desktop' },
-    { id: '1512-desktop', width: 1512, height: 982, layout: 'desktop' },
-  ] as const;
+    { width: 1179, height: 932 },
+    { width: 1180, height: 932 },
+    { width: 1512, height: 982 },
+  ].map(({ width, height }) => {
+    const layout = expectedPublicProfileLayout(width);
+    return { id: `${width}-${layout}`, width, height, layout };
+  });
 
   for (const fixture of responsiveCases) {
     test(`${fixture.id} enforces one responsive presentation`, async ({
@@ -336,7 +421,7 @@ test.describe('public profile browser admission', () => {
         ).toHaveCount(0);
       }
       await captureStill(page, testInfo, `${fixture.id}.png`);
-      if (fixture.id === '1512-desktop') {
+      if (fixture.width === 1512) {
         const music = page.getByRole('button', { name: 'Music', exact: true });
         await music.click();
         await expect(music).toHaveAttribute('aria-current', 'page');
@@ -347,6 +432,188 @@ test.describe('public profile browser admission', () => {
         await expect(page.getByTestId('profile-menu-drawer')).toBeHidden();
         await expect(menu).toBeFocused();
       }
+    });
+  }
+
+  const eventsNavigationCases = [
+    {
+      id: 'populated-mobile-pointer',
+      width: 390,
+      height: 932,
+      events: 'populated' as const,
+      activation: 'pointer' as const,
+    },
+    {
+      id: 'populated-desktop-keyboard',
+      width: 1512,
+      height: 982,
+      events: 'populated' as const,
+      activation: 'keyboard' as const,
+    },
+    {
+      id: 'empty-mobile-keyboard',
+      width: 390,
+      height: 932,
+      events: 'empty' as const,
+      activation: 'keyboard' as const,
+    },
+    {
+      id: 'empty-desktop-pointer',
+      width: 1512,
+      height: 982,
+      events: 'empty' as const,
+      activation: 'pointer' as const,
+    },
+  ] as const;
+
+  for (const fixture of eventsNavigationCases) {
+    test(`${fixture.id} exposes and activates the Events destination`, async ({
+      page,
+    }, testInfo) => {
+      await installPublicRouteMocks(page);
+      await page.setViewportSize({
+        width: fixture.width,
+        height: fixture.height,
+      });
+      const response = await page.goto(
+        `/renders/profile-admission?layout=public&state=claimed&events=${fixture.events}`,
+        { waitUntil: 'domcontentloaded' }
+      );
+      expect(response?.status()).toBe(200);
+      const layout = expectedPublicProfileLayout(fixture.width);
+      await waitForSettledProfileLayout(page, layout);
+
+      const surface = page.getByTestId(
+        layout === 'desktop'
+          ? 'profile-desktop-surface'
+          : 'profile-compact-shell'
+      );
+      const navigation = surface.getByRole('navigation', {
+        name: 'Profile Navigation',
+      });
+      const eventsButton = navigation.getByRole('button', {
+        name: 'Events',
+        exact: true,
+      });
+      await expect(eventsButton).toBeVisible();
+      await expect(
+        navigation.getByRole('button', { name: 'Shows', exact: true })
+      ).toHaveCount(0);
+      if (layout === 'compact') {
+        await expect(eventsButton).toHaveAttribute('aria-label', 'Events');
+      }
+
+      const geometry = await eventsButton.evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        const visibleViewportHeight =
+          window.visualViewport?.height ?? window.innerHeight;
+        const profileShell = element.closest<HTMLElement>(
+          '[data-testid="profile-compact-shell"]'
+        );
+        const compactFrame = element.closest<HTMLElement>(
+          '.public-profile-layout-frame--compact'
+        );
+        const tabBar = element.closest<HTMLElement>(
+          '[data-testid="profile-tab-bar"]'
+        );
+        const profileViewport = element.closest<HTMLElement>(
+          '[data-testid="public-profile-layout-shell"]'
+        );
+        return {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+          viewportWidth: window.innerWidth,
+          viewportHeight: visibleViewportHeight,
+          layoutViewportHeight: window.innerHeight,
+          pageScrollY: window.scrollY,
+          profileShellBottom:
+            profileShell?.getBoundingClientRect().bottom ?? null,
+          compactFrameBottom:
+            compactFrame?.getBoundingClientRect().bottom ?? null,
+          tabBarBottom: tabBar?.getBoundingClientRect().bottom ?? null,
+          profileViewportBottom:
+            profileViewport?.getBoundingClientRect().bottom ?? null,
+        };
+      });
+      await testInfo.attach(`events-navigation-${fixture.id}-geometry.json`, {
+        body: JSON.stringify(geometry, null, 2),
+        contentType: 'application/json',
+      });
+      console.log(
+        `[Events geometry ${fixture.id}] ${JSON.stringify(geometry)}`
+      );
+      expect(geometry.width).toBeGreaterThanOrEqual(44);
+      expect(geometry.height).toBeGreaterThanOrEqual(44);
+      expect(geometry.left).toBeGreaterThanOrEqual(0);
+      expect(geometry.top).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+      expect(
+        geometry.bottom,
+        `Events hit target geometry: ${JSON.stringify(geometry)}`
+      ).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+      if (layout === 'compact') {
+        const compactBoundaries = [
+          ['profile viewport', geometry.profileViewportBottom],
+          ['compact frame', geometry.compactFrameBottom],
+          ['compact shell', geometry.profileShellBottom],
+          ['bottom tab bar', geometry.tabBarBottom],
+        ] as const;
+        for (const [label, bottom] of compactBoundaries) {
+          expect(bottom, `${label} bottom is measured`).not.toBeNull();
+          expect(
+            bottom ?? Number.POSITIVE_INFINITY,
+            `${label} must stay inside the visible viewport: ${JSON.stringify(geometry)}`
+          ).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+        }
+      }
+      await captureStill(
+        page,
+        testInfo,
+        `events-navigation-${fixture.id}-home.png`
+      );
+
+      if (fixture.activation === 'keyboard') {
+        await eventsButton.focus();
+        await expect(eventsButton).toBeFocused();
+        await page.keyboard.press('Enter');
+      } else {
+        await eventsButton.click();
+      }
+
+      await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
+      await expect(eventsButton).toHaveAttribute('aria-current', 'page');
+      const selected = page.getByTestId('profile-primary-tab-tour');
+      await expect(selected).toBeVisible();
+      if (layout === 'desktop') {
+        await expect(
+          selected.getByRole('heading', { name: 'Events', exact: true })
+        ).toBeVisible();
+      }
+
+      if (fixture.events === 'populated') {
+        if (layout === 'compact') {
+          await expect(selected.getByTestId('tour-drawer-list')).toBeVisible();
+        }
+        await expect(
+          selected.getByText(getUpcomingFixtureVenue(), { exact: true })
+        ).toBeVisible();
+      } else if (layout === 'compact') {
+        const empty = selected.getByTestId('profile-primary-tab-events-empty');
+        await expect(empty).toBeVisible();
+        await expect(empty).toContainText('No upcoming events');
+      } else {
+        await expect(selected).toContainText('No upcoming shows.');
+      }
+
+      await captureStill(
+        page,
+        testInfo,
+        `events-navigation-${fixture.id}-selected.png`
+      );
     });
   }
 
@@ -374,7 +641,7 @@ test.describe('public profile browser admission', () => {
         );
         await waitForSettledProfileLayout(
           page,
-          width < 1180 ? 'compact' : 'desktop'
+          expectedPublicProfileLayout(width)
         );
         const wrappers = page.locator(
           '[data-testid="profile-desktop-banner"]:visible, [data-testid="profile-shell-banner"]:visible'
@@ -403,6 +670,7 @@ test.describe('public profile browser admission', () => {
   test('deliberate red detects reserved space without a rendered banner', async ({
     page,
   }) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1512, height: 932 });
     await page.goto('/renders/profile-admission?layout=public&state=claimed');
@@ -418,6 +686,7 @@ test.describe('public profile browser admission', () => {
   });
 
   test('live resize transfers ownership exactly at 1180', async ({ page }) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1179, height: 932 });
     await page.goto('/renders/profile-admission?layout=public', {
@@ -432,6 +701,35 @@ test.describe('public profile browser admission', () => {
     await page.setViewportSize({ width: 1179, height: 932 });
     await waitForSettledProfileLayout(page, 'compact');
     expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+  });
+
+  test('live resize across 1180 keeps one compact column without remounting', async ({
+    page,
+  }) => {
+    test.skip(PROFILE_DESKTOP_SURFACE_SHIPPED, PHONE_COLUMN_ONLY);
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1179, height: 932 });
+    await page.goto('/renders/profile-admission?layout=public', {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForSettledProfileLayout(page, 'compact');
+    await page
+      .getByTestId('profile-compact-shell')
+      .evaluate(element => element.setAttribute('data-resize-probe', '1'));
+
+    await page.setViewportSize({ width: 1180, height: 932 });
+    await waitForSettledProfileLayout(page, 'compact');
+    await expectCenteredPhoneColumn(page);
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+
+    await page.setViewportSize({ width: 1179, height: 932 });
+    await waitForSettledProfileLayout(page, 'compact');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+    // Same DOM node throughout: resizing never swaps surfaces.
+    await expect(page.getByTestId('profile-compact-shell')).toHaveAttribute(
+      'data-resize-probe',
+      '1'
+    );
   });
 
   for (const width of [1179, 1180, 1512]) {
@@ -463,7 +761,15 @@ test.describe('public profile browser admission', () => {
           0
         );
         await expect(page.getByText('Loading profile…')).toHaveCount(0);
-        if (width >= 1180) {
+        if (expectedPublicProfileLayout(width) === 'compact' && width >= 1180) {
+          // Default build: the server paints the centered phone column and
+          // never ships the desktop surface markup.
+          await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+          await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(
+            0
+          );
+          await expectCenteredPhoneColumn(page);
+        } else if (width >= 1180) {
           await expect(
             page.getByTestId('profile-desktop-surface')
           ).toBeVisible();
@@ -498,7 +804,7 @@ test.describe('public profile browser admission', () => {
     await page.goto('/renders/profile-admission?layout=public&name=long', {
       waitUntil: 'domcontentloaded',
     });
-    await waitForSettledProfileLayout(page, 'desktop');
+    await waitForSettledProfileLayout(page, expectedPublicProfileLayout(1280));
 
     const audit = await auditPublicProfileLayout(page);
     expect(audit.claimCtaLineCount).toBe(1);
@@ -511,6 +817,7 @@ test.describe('public profile browser admission', () => {
   test('deliberate red detects a desktop artist name escaping its cover', async ({
     page,
   }) => {
+    test.skip(!PROFILE_DESKTOP_SURFACE_SHIPPED, DESKTOP_SURFACE_ONLY);
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/renders/profile-admission?layout=public&name=long', {
@@ -530,7 +837,7 @@ test.describe('public profile browser admission', () => {
     ).toContain('artist_name_clipped');
   });
 
-  test('captures the founder 3024x1964 retina state without a compact desktop shell', async ({
+  test('captures the founder 3024x1964 retina state in its shipped presentation', async ({
     browser,
   }, testInfo) => {
     const context = await browser.newContext({
@@ -547,7 +854,10 @@ test.describe('public profile browser admission', () => {
         { waitUntil: 'domcontentloaded' }
       );
       expect(response?.status()).toBe(200);
-      await waitForSettledProfileLayout(page, 'desktop');
+      await waitForSettledProfileLayout(
+        page,
+        expectedPublicProfileLayout(1512)
+      );
 
       const audit = await auditPublicProfileLayout(page);
       expect(audit.claimCtaLineCount).toBe(1);

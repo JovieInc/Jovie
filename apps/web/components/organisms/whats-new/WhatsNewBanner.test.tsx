@@ -1,0 +1,213 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { WhatsNewFeed } from '@/lib/whats-new';
+import {
+  loadUnseenWhatsNew,
+  WHATS_NEW_LAST_SEEN_KEY,
+  WhatsNewBanner,
+  WhatsNewBannerView,
+} from './WhatsNewBanner';
+
+const FEED: WhatsNewFeed = {
+  version: 1,
+  changelogUrl: 'https://jov.ie/changelog',
+  entries: [
+    {
+      id: '26.9.2',
+      title: 'Chat is home',
+      date: '2026-09-26',
+      summary: 'Ask first, then open the library.',
+      url: 'https://jov.ie/changelog/26.9.2',
+      highlights: [],
+      dogfood: [],
+    },
+    {
+      id: '26.9.1',
+      title: 'Library filters',
+      date: '2026-09-20',
+      summary: 'One catalog.',
+      url: 'https://jov.ie/changelog/26.9.1',
+      highlights: [],
+      dogfood: [],
+    },
+  ],
+};
+
+function jsonResponse(body: unknown, ok = true): Response {
+  return { ok, json: async () => body } as Response;
+}
+
+describe('loadUnseenWhatsNew', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('returns the newest entry when nothing was seen', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(FEED));
+    const result = await loadUnseenWhatsNew(fetchImpl);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/changelog/whats-new.json',
+      expect.anything()
+    );
+    expect(result?.entry.id).toBe('26.9.2');
+    expect(result?.href).toBe('https://jov.ie/changelog/26.9.2');
+  });
+
+  it('returns null when the newest entry was seen', async () => {
+    localStorage.setItem(WHATS_NEW_LAST_SEEN_KEY, '26.9.2');
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(FEED));
+    expect(await loadUnseenWhatsNew(fetchImpl)).toBeNull();
+  });
+
+  it('stays silent on network, status, and contract failures', async () => {
+    expect(
+      await loadUnseenWhatsNew(vi.fn().mockRejectedValue(new Error('offline')))
+    ).toBeNull();
+    expect(
+      await loadUnseenWhatsNew(
+        vi.fn().mockResolvedValue(jsonResponse(FEED, false))
+      )
+    ).toBeNull();
+    expect(
+      await loadUnseenWhatsNew(
+        vi.fn().mockResolvedValue(jsonResponse({ version: 99 }))
+      )
+    ).toBeNull();
+  });
+});
+
+describe('WhatsNewBannerView', () => {
+  it('names the region and links the single unseen post', () => {
+    render(
+      <WhatsNewBannerView
+        unseen={{
+          entry: FEED.entries[0],
+          unseenCount: 1,
+          href: FEED.entries[0].url,
+        }}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('complementary', { name: "What's New" })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Chat is home')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: "See What's New" })
+    ).toHaveAttribute('href', 'https://jov.ie/changelog/26.9.2');
+  });
+
+  it('sits on the banner overlay layer, below sheets and dialogs', () => {
+    render(
+      <WhatsNewBannerView
+        unseen={{
+          entry: FEED.entries[0],
+          unseenCount: 1,
+          href: FEED.entries[0].url,
+        }}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    const banner = screen.getByTestId('whats-new-banner');
+    expect(banner.className).toContain('z-banner');
+    expect(banner.className).not.toMatch(/(?:^|\s)z-\d/);
+  });
+
+  it('counts multiple unseen updates and links the changelog index', () => {
+    render(
+      <WhatsNewBannerView
+        unseen={{
+          entry: FEED.entries[0],
+          unseenCount: 2,
+          href: FEED.changelogUrl,
+        }}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(screen.getByText("What's New · 2 updates")).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: "See What's New" })
+    ).toHaveAttribute('href', 'https://jov.ie/changelog');
+  });
+
+  it('dismisses from the button and from Escape', () => {
+    const onDismiss = vi.fn();
+    render(
+      <WhatsNewBannerView
+        unseen={{
+          entry: FEED.entries[0],
+          unseenCount: 1,
+          href: FEED.entries[0].url,
+        }}
+        onOpen={vi.fn()}
+        onDismiss={onDismiss}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: "Dismiss What's New" }));
+    fireEvent.keyDown(screen.getByRole('link'), { key: 'Escape' });
+    expect(onDismiss).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('WhatsNewBanner', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(FEED)));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  async function settle() {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1600);
+    });
+  }
+
+  it('renders nothing while disabled', async () => {
+    render(<WhatsNewBanner enabled={false} />);
+    await settle();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+
+  it('stays silent while loading, then shows the unseen entry', async () => {
+    render(<WhatsNewBanner enabled />);
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+    await settle();
+    expect(screen.getByTestId('whats-new-banner')).toBeInTheDocument();
+  });
+
+  it('records the entry as seen on dismiss and stays hidden', async () => {
+    const { unmount } = render(<WhatsNewBanner enabled />);
+    await settle();
+    fireEvent.click(screen.getByTestId('whats-new-banner-dismiss'));
+    expect(localStorage.getItem(WHATS_NEW_LAST_SEEN_KEY)).toBe('26.9.2');
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+    unmount();
+
+    render(<WhatsNewBanner enabled />);
+    await settle();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+
+  it('records the entry as seen when the link opens', async () => {
+    render(<WhatsNewBanner enabled />);
+    await settle();
+    fireEvent.click(screen.getByTestId('whats-new-banner-link'));
+    expect(localStorage.getItem(WHATS_NEW_LAST_SEEN_KEY)).toBe('26.9.2');
+    await settle();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+
+  it('shows nothing when the request fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    render(<WhatsNewBanner enabled />);
+    await settle();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+});

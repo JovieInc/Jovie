@@ -43,7 +43,7 @@ test.describe('Pricing Page', () => {
     await expect(page.locator('h1')).toHaveText('Pricing');
     await expect(
       page.getByRole('heading', {
-        name: 'Public artist profile and audience capture',
+        name: 'Public Jovie profile and audience capture',
       })
     ).toBeVisible();
 
@@ -132,7 +132,7 @@ test.describe('Pricing Page', () => {
       );
     expect(pricingCardCtasAreCentered).toEqual([true, true, true]);
     await expect(
-      page.getByRole('link', { name: 'Explore Artist Profiles' }).first()
+      page.getByRole('link', { name: 'Explore Jovie Profiles' }).first()
     ).toBeVisible();
 
     await expect(page.getByText('Compare all features').first()).toBeVisible();
@@ -142,5 +142,22 @@ test.describe('Pricing Page', () => {
     // Verify page has substantial content (pricing details)
     const bodyText = await page.locator('body').textContent();
     expect(bodyText && bodyText.length > 500).toBe(true);
+  });
+
+  test('renders every logo-bar image without broken assets (JOV-6849)', async ({
+    page,
+  }) => {
+    const logoBar = page.locator(
+      '.marketing-hero-logos [data-testid="homepage-trust"]'
+    );
+    await expect(logoBar).toBeVisible();
+    const brokenImages = await logoBar
+      .locator('img')
+      .evaluateAll(imgs =>
+        imgs
+          .filter(img => !(img.complete && img.naturalWidth > 0))
+          .map(img => img.getAttribute('src') ?? img.alt)
+      );
+    expect(brokenImages).toEqual([]);
   });
 });

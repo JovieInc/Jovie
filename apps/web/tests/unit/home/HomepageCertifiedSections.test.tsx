@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
 vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
@@ -36,81 +36,70 @@ vi.mock('next/image', () => ({
 }));
 
 describe('HomepageCertifiedSections', () => {
-  it('renders the locked connected and relationships sections without unsupported proof', () => {
-    render(<HomepageCertifiedSections />);
+  it('renders one relationships section with real jov.ie/tim next steps (JOV-6946)', () => {
+    render(
+      <HomepageCertifiedSections
+        previews={{
+          subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+          pay: HOMEPAGE_MEDIA_MAP.pay.asset,
+        }}
+      />
+    );
 
+    const sections = document.querySelectorAll('[data-homepage-testid]');
+    expect(sections).toHaveLength(1);
+    const section = sections[0] as HTMLElement;
+    expect(section).toHaveAttribute(
+      'data-homepage-testid',
+      'homepage-section-relationships'
+    );
+    expect(section).toHaveAttribute('data-marketing-variant', 'editorial');
     expect(
-      screen.queryByTestId('marketing-section-logo-cloud')
-    ).not.toBeInTheDocument();
+      within(section).getByRole('heading', {
+        level: 2,
+        name: 'Turn attention into relationships.',
+      })
+    ).toBeInTheDocument();
+    expect(section.textContent).not.toMatch(/\u2014/);
 
-    const sections = screen.getAllByTestId('marketing-section-feature-split');
-    expect(sections).toHaveLength(2);
-    expect(
-      sections.map(section => section.getAttribute('data-marketing-occurrence'))
-    ).toEqual(['connected', 'relationships']);
-
-    const connected = document.querySelector<HTMLElement>(
-      '[data-homepage-testid="homepage-section-connected"]'
-    )!;
-    expect(connected).toHaveAttribute('data-marketing-variant', 'editorial');
-    expect(connected).toHaveAttribute('data-rhythm', 'product');
-    expect(connected).toHaveTextContent('IDENTITY, ACROSS THE INTERNET');
-    expect(connected).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[0].headline
-    );
-    expect(connected).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[0].body
-    );
-    expect(connected.querySelector('.ap-phone-frame')).toBeNull();
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'src',
-      '/assets/generated/homepage-identity-optical-v1.webp'
-    );
-    expect(connected.querySelector('img')).toHaveAttribute(
-      'alt',
-      'A conceptual photographic assembly of a profile identity'
-    );
-
-    const relationships = document.querySelector<HTMLElement>(
-      '[data-homepage-testid="homepage-section-relationships"]'
-    )!;
-    expect(relationships).toHaveAttribute('data-rhythm', 'text');
-    expect(relationships).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[1].headline
-    );
-    expect(relationships).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
-    );
-    expect(relationships.querySelectorAll('img')).toHaveLength(0);
-    expect(within(relationships).getByRole('list')).toHaveAttribute(
-      'aria-label',
-      'Relationships'
-    );
-
-    const outcomes = within(relationships).getAllByRole('listitem');
-    expect(outcomes).toHaveLength(3);
-    expect(outcomes.map(outcome => outcome.textContent)).toEqual([
-      expect.stringContaining('Be found. Be understood.'),
-      expect.stringContaining('Know who cares.'),
-      expect.stringContaining('Built around who you are.'),
+    // Real captures only, in visual accent order: pay, then updates.
+    const images = within(section).getAllByRole('img');
+    expect(images.map(image => image.getAttribute('src'))).toEqual([
+      HOMEPAGE_MEDIA_MAP.pay.asset.publicUrl,
+      HOMEPAGE_MEDIA_MAP.relationships.asset.publicUrl,
     ]);
-    expect(
-      outcomes.map(outcome => outcome.querySelector('span')?.textContent)
-    ).toEqual(['01', '02', '03']);
+    expect(section).toHaveTextContent('A direct way to pay Tim, in one tap.');
+    expect(section).toHaveTextContent(
+      'Tim’s updates, sent only to people who asked for them.'
+    );
+    expect(section.querySelector('.homepage-chapter-visual')).toBeNull();
+    expect(section).not.toHaveTextContent(/Listener|Collaborator|Investor/);
+  });
 
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  it('records publication and fallback receipts for every homepage asset', () => {
+    for (const media of Object.values(HOMEPAGE_MEDIA_MAP)) {
+      expect(media.publicationState).toBe('current-public-export');
+      expect(media.rightsPrivacyApproval).toContain('approved');
+      expect(media.placeholder).toBe(false);
+      expect(media.expiration).toBeNull();
+      expect(media.intendedCrop.desktop).toContain('uncropped');
+      expect(media.intendedCrop.mobile).toContain('uncropped');
+      expect(media.loading).toBe('lazy');
+      expect(media.reducedMotionFallback).toContain('static');
+    }
   });
 });
 
 describe('HomepageClose', () => {
-  it('requests access instead of focusing absent search when gated', () => {
+  it('returns to the name search instead of requesting access when gated', () => {
     gate.WAITLIST_ENABLED = true;
     render(<HomepageClose />);
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Find your profile' })
+    ).toHaveAttribute('type', 'button');
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
   });
   it('renders the saved closing headline and a single focus-only action', () => {
     render(<HomepageClose />);

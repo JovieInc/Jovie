@@ -1,5 +1,7 @@
 # Hermes-Air Operator Runbook
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 Day-to-day operations for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. For the operating contract and invariants, read `.claude/rules/hermes-air.md`.
 
 ## What This Machine Is
@@ -10,7 +12,7 @@ A single-purpose orchestration node. It accepts Telegram brain dumps, persists s
 
 ## First-Time Setup
 
-The current `scripts/symphony/bootstrap-air.sh` bootstraps every rendered Hermes launchd unit, including the legacy voice-memo watcher. Therefore the all-in-one bootstrap is blocked while private voice activation is disabled. Do not run it unless the legacy unit has first been excluded from the rendered launchd set. If the unit exists from an earlier installation, keep it unloaded:
+The current `symphony-control/bootstrap-air.sh` bootstraps every rendered Hermes launchd unit, including the legacy voice-memo watcher. Therefore the all-in-one bootstrap is blocked while private voice activation is disabled. Do not run it unless the legacy unit has first been excluded from the rendered launchd set. If the unit exists from an earlier installation, keep it unloaded:
 
 ```bash
 launchctl bootout gui/$(id -u)/co.jovie.hermes.voice-memo-watcher 2>/dev/null || true
@@ -18,10 +20,10 @@ launchctl bootout gui/$(id -u)/co.jovie.hermes.voice-memo-watcher 2>/dev/null ||
 
 Once that exclusion is verified, the bootstrap script is idempotent. It will:
 
-1. Verify Node 22 / pnpm 9.15.4.
+1. Verify Node 24 / pnpm 9.15.9.
 2. Install (if missing): Hermes (`hermes-agent-rs`), gbrain CLI, Doppler, Tailscale, Ollama.
 3. Pull the Ollama fallback model (`qwen3:4b-q4_K_M`).
-4. Render `~/.hermes/config.yaml` from `scripts/symphony/config.air.template.yaml` + Doppler secrets.
+4. Render `~/.hermes/config.yaml` from `symphony-control/config.air.template.yaml` + Doppler secrets.
 5. Render `~/.hermes/.env` from Doppler (and `chmod 600`).
 6. Install and bootstrap the remaining Hermes launchd plists into `~/Library/LaunchAgents/`. The legacy `co.jovie.hermes.voice-memo-watcher` must be absent from this set.
 7. Pause for the non-voice manual GUI steps (see below).
@@ -135,7 +137,7 @@ tail -50 ~/.hermes/logs/launchd/cron-codex-issue-shipper.log
 tail -50 ~/.hermes/logs/codex-issue-shipper/*.log 2>/dev/null  # retained historical files, if any
 
 # Hermes/OpenClaw agent config health
-tsx scripts/symphony/jobs/agent-config-health.ts
+tsx symphony-control/jobs/agent-config-health.ts
 tail -50 ~/.hermes/logs/launchd/cron-agent-config-health.err.log
 
 # Latest gbrain health summary written by Hermes
@@ -206,7 +208,7 @@ The current `--reconfigure` path can load every rendered plist, including the le
 ### Retired codex GitHub-Issue shipper
 
 Do not load or invoke `co.jovie.hermes.cron-codex-issue-shipper`. The unit is
-disabled and `scripts/symphony/jobs/codex-issue-shipper.ts` exits through an
+disabled and `symphony-control/jobs/codex-issue-shipper.ts` exits through an
 unconditional `retired_linear_only` guard before environment loading or any
 GitHub scan. A config or workflow-state flip cannot restore this intake path.
 
@@ -259,7 +261,7 @@ GitHub-Issue shipper.
 
 1. Check launchd state: `launchctl print gui/$(id -u)/ai.hermes.gateway | grep -A 3 "last exit"`
 2. Tail gateway log: `tail -100 ~/.hermes/logs/gateway.error.log`
-3. Run the config sentinel: `tsx scripts/symphony/jobs/agent-config-health.ts`
+3. Run the config sentinel: `tsx symphony-control/jobs/agent-config-health.ts`
 4. Confirm the supported Hermes gateway command works: `hermes gateway status`
 5. Restart the gateway with `hermes gateway restart --all`.
 6. Do not use bootstrap or `--reconfigure` as recovery while voice activation is disabled; both can load the legacy watcher. Restore a known-good `~/.hermes/config.yaml`, then start only the explicit non-voice units using the guarded loop under "Re-enable after stop."
@@ -269,7 +271,7 @@ GitHub-Issue shipper.
 Run the config sentinel before changing models or restarting services:
 
 ```bash
-tsx scripts/symphony/jobs/agent-config-health.ts
+tsx symphony-control/jobs/agent-config-health.ts
 tail -20 ~/.hermes/logs/jobs.jsonl | jq 'select(.job == "agent-config-health")'
 ```
 
@@ -278,7 +280,7 @@ schema-clobbered `memorySearch` blocks in `~/.openclaw/openclaw.json`, Vercel AI
 
 ### Voice memo ingest stopped working
 
-Voice ingest is intentionally disabled. Do not restart the legacy watcher or run `scripts/symphony/jobs/voice-memo-ingest.ts` manually.
+Voice ingest is intentionally disabled. Do not restart the legacy watcher or run `symphony-control/jobs/voice-memo-ingest.ts` manually.
 
 Before activation can be considered:
 
@@ -346,7 +348,7 @@ If steady-state exceeds 6 GB, investigate before adding new jobs.
 ## Tearing Down (Hand This Machine Back)
 
 ```bash
-./scripts/symphony/bootstrap-air.sh --uninstall
+./symphony-control/bootstrap-air.sh --uninstall
 ```
 
 Removes all launchd plists, drops `~/.hermes/`, leaves Doppler and Tailscale alone.

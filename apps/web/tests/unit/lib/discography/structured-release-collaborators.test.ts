@@ -46,7 +46,7 @@ describe('structured release collaborator projection', () => {
     expect(result[0]).toMatchObject({
       artistId: duplicate.artistId,
       releaseId: duplicate.releaseId,
-      href: `/artists/${duplicate.artistId}`,
+      href: '/austinleeds',
       profileState: 'unclaimed',
     });
   });
@@ -96,7 +96,7 @@ describe('structured release collaborator projection', () => {
     expect(result[0]?.artistId).toBe(sameDisplayNameDifferentIdentity.artistId);
   });
 
-  it('links unavailable exact identities through the stable route and excludes non-artist roles', () => {
+  it('leaves unbound exact identities unlinked and excludes non-artist roles', () => {
     const result = project([
       row({
         artistProfileId: null,
@@ -111,7 +111,7 @@ describe('structured release collaborator projection', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
-      href: `/artists/${result[0]?.artistId}`,
+      href: null,
       profileState: 'unavailable',
       reconciliationEligible: true,
     });
@@ -153,6 +153,20 @@ describe('structured release collaborator projection', () => {
       expect(result[0]).toMatchObject({
         href: null,
         profileState: 'unavailable',
+      });
+    }
+  );
+
+  it.each(['a_15ivccsfpjhtappd1vh15i8jj', 'a_0000000000000000000000000'])(
+    'never links a public binding whose handle is an encoded raw ID: %s',
+    profileUsername => {
+      const result = project([row({ profileUsername })]);
+
+      // The unclaimed profile still exists — it just is not a readable
+      // public link destination (JOV-6612).
+      expect(result[0]).toMatchObject({
+        href: null,
+        profileState: 'unclaimed',
       });
     }
   );

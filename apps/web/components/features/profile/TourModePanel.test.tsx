@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
-import { TourModePanel } from './TourModePanel';
+import { TourEventAlertsAction, TourModePanel } from './TourModePanel';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -27,7 +27,18 @@ vi.mock('@/hooks/useTourDateTicketClick', () => ({
 vi.mock(
   '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA',
   () => ({
-    ArtistNotificationsCTA: () => null,
+    ArtistNotificationsCTA: ({
+      triggerLabel,
+      source,
+    }: {
+      readonly triggerLabel?: string;
+      readonly source?: string;
+    }) =>
+      triggerLabel === 'Turn On Event Alerts' ? (
+        <span data-testid='mock-event-alerts-cta' data-source={source}>
+          {triggerLabel}
+        </span>
+      ) : null,
   })
 );
 
@@ -86,5 +97,46 @@ describe('TourModePanel', () => {
     expect(screen.queryByTestId('tour-drawer-list')).not.toBeInTheDocument();
     expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
     expect(screen.queryByText('Releases')).not.toBeInTheDocument();
+  });
+});
+
+describe('TourEventAlertsAction', () => {
+  const sourceContext = {
+    artistId: 'artist-1',
+    profileId: 'artist-1',
+    profileSlug: 'tim',
+    currentTab: 'events',
+    ctaLocation: 'events_empty_state',
+    intent: 'event_alerts',
+  } as const;
+
+  it('renders the live event alerts opt-in with the empty-state source', () => {
+    render(
+      <TourEventAlertsAction
+        artist={PROFILE_STORY_ARTIST}
+        sourceContext={sourceContext}
+        renderMode='interactive'
+      />
+    );
+
+    expect(screen.getByTestId('mock-event-alerts-cta')).toHaveAttribute(
+      'data-source',
+      'events_empty_state'
+    );
+  });
+
+  it('renders a disabled placeholder in previews', () => {
+    render(
+      <TourEventAlertsAction
+        artist={PROFILE_STORY_ARTIST}
+        sourceContext={sourceContext}
+        renderMode='preview'
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Turn On Event Alerts' })
+    ).toBeDisabled();
+    expect(screen.queryByTestId('mock-event-alerts-cta')).toBeNull();
   });
 });

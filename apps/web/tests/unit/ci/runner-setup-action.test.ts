@@ -121,7 +121,7 @@ describe('self-hosted runner setup action', () => {
       // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
       // workspace, patches and .npmrc, and no prefix match may restore.
       expect(restoreStep).toContain(
-        "key: pnpm-node-modules-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
+        "key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}"
       );
       expect(restoreStep).not.toContain('restore-keys');
     });
@@ -134,9 +134,11 @@ describe('self-hosted runner setup action', () => {
       expect(stepBlock('Warm pnpm store')).toContain(
         "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'"
       );
-      // The frozen install still runs on a hit and re-verifies the tree.
+      // Only validated merge-group consumers skip the redundant frozen install.
       const installStep = stepBlock('Install dependencies');
-      expect(installStep).not.toContain('if:');
+      expect(installStep).toContain(
+        "inputs.reuse_merge_group_workspace != 'true'"
+      );
       expect(installStep).toContain('pnpm install --frozen-lockfile');
     });
 
@@ -158,11 +160,10 @@ describe('self-hosted runner setup action', () => {
       expect(saveStep).toContain(
         "(github.event_name == 'pull_request' &&\n        github.event.pull_request.head.repo.full_name == github.repository))"
       );
-      for (const untrusted of [
-        'pull_request_target',
-        'workflow_run',
-        'merge_group',
-      ]) {
+      expect(saveStep).toContain(
+        "github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true'"
+      );
+      for (const untrusted of ['pull_request_target', 'workflow_run']) {
         expect(saveStep).not.toContain(`== '${untrusted}'`);
       }
       expect(saveStep).toContain(cachedPaths);
@@ -479,8 +480,8 @@ describe('baked runner prerequisite contract', () => {
       readonly engines: { readonly pnpm: string };
       readonly devDependencies: Readonly<Record<string, string>>;
     };
-    expect(requirements.nodeMajor).toBe(22);
-    expect(requirements.nodeMinimum).toBe('22.23.2');
+    expect(requirements.nodeMajor).toBe(24);
+    expect(requirements.nodeMinimum).toBe('24.21.0');
     expect(requirements.nodeMinimum).toBe(
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
@@ -502,7 +503,7 @@ describe('baked runner prerequisite contract', () => {
       'sha256:f546db5932b903c81cf269a712dad679fdf139dc08b7676c08f391a11258de5e'
     );
     expect(runnerDockerfile).toContain(
-      'd60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307'
+      'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6'
     );
     expect(runnerDockerfile).toContain('sha256sum --check --strict');
     expect(runnerDockerfile).not.toMatch(/curl[\s\S]*?\|\s*tar/);
@@ -512,7 +513,7 @@ describe('baked runner prerequisite contract', () => {
     expect(runnerDockerfile).toContain('COREPACK_HOME=/opt/corepack');
     expect(runnerDockerfile).toContain('su -s /bin/bash runner -c');
     expect(runnerDockerfile).toContain(
-      '/opt/hostedtoolcache/node/22.23.2/x64/bin/pnpm --version'
+      '/opt/hostedtoolcache/node/24.21.0/x64/bin/pnpm --version'
     );
     expect(
       runnerDockerfile.indexOf('FROM runner-base\n\n# Corepack')

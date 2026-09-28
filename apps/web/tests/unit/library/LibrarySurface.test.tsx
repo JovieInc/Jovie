@@ -263,7 +263,7 @@ function renderLibraryWithSidebarProbe(assets: readonly LibraryReleaseAsset[]) {
 }
 
 function clickGridView() {
-  fireEvent.click(screen.getByRole('button', { name: 'Grid View' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Grid View' }));
 }
 
 function expectDesktop32Control(
@@ -285,6 +285,64 @@ function expectDesktop32Control(
 }
 
 describe('LibrarySurface', () => {
+  it('disables YouTube import when the creator profile is unavailable', async () => {
+    const user = userEvent.setup();
+    const onImportYouTube = vi.fn();
+
+    renderLibrary([buildAsset()], {
+      onImportYouTube,
+      youtubeImportDisabled: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const item = screen.getByRole('menuitem', { name: 'Connect YouTube' });
+    expect(item).toHaveAttribute('data-disabled');
+    await user.click(item);
+    expect(onImportYouTube).not.toHaveBeenCalled();
+  });
+
+  it('keeps YouTube import available for a real creator profile', async () => {
+    const user = userEvent.setup();
+    const onImportYouTube = vi.fn();
+
+    renderLibrary([buildAsset()], {
+      onImportYouTube,
+      youtubeConnected: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const item = screen.getByRole('menuitem', { name: 'Import YouTube' });
+    expect(item).not.toHaveAttribute('data-disabled');
+    await user.click(item);
+    expect(onImportYouTube).toHaveBeenCalledOnce();
+  });
+
+  it('keeps provider actions under the single Add menu', async () => {
+    const user = userEvent.setup();
+
+    renderLibrary([buildAsset()], {
+      canSyncSpotify: true,
+      onImportYouTube: vi.fn(),
+      youtubeConnected: true,
+    });
+
+    expect(
+      screen.queryByRole('button', { name: 'Import YouTube' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Sync from Spotify' })
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(
+      screen.getByRole('menuitem', { name: 'Import YouTube' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Sync from Spotify' })
+    ).toBeInTheDocument();
+  });
+
   const baseMatchMedia = window.matchMedia;
   const baseScrollYDescriptor = Object.getOwnPropertyDescriptor(
     globalThis,
@@ -438,10 +496,13 @@ describe('LibrarySurface', () => {
         'Releases, merch, images, videos, and audio will appear here as they land.'
       )
     ).toBeDefined();
-    expect(screen.getByRole('link', { name: 'Open Releases' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.RELEASES
-    );
+    const firstActions = screen.getAllByRole('link', {
+      name: 'Open Releases',
+    });
+    expect(firstActions).toHaveLength(2);
+    for (const action of firstActions) {
+      expect(action).toHaveAttribute('href', APP_ROUTES.RELEASES);
+    }
     expect(emptyState).toHaveClass('py-16', 'min-h-90');
     expect(
       screen.getByRole('heading', { name: 'No Library Items' })
@@ -560,10 +621,10 @@ describe('LibrarySurface', () => {
 
     renderLibrary([buildAsset()]);
 
-    expectDesktop32Control(screen.getByRole('button', { name: /^All/u }));
-    expectDesktop32Control(screen.getByRole('button', { name: /Audio/u }));
+    expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
+    expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
     expectDesktop32Control(
-      screen.getByRole('button', { name: 'Show filters' }),
+      screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }
     );
     expectDesktop32Control(
@@ -582,15 +643,17 @@ describe('LibrarySurface', () => {
       screen.getByRole('button', { name: /Large cards/u }),
       { square: true }
     );
-    expectDesktop32Control(screen.getByRole('button', { name: 'Grid View' }), {
-      square: true,
-    });
-    expectDesktop32Control(screen.getByRole('button', { name: 'List View' }), {
-      square: true,
-    });
-    expectDesktop32Control(screen.getByRole('button', { name: 'Table View' }), {
-      square: true,
-    });
+    // The view slider (2026-09-25 header/toolbar IA) is a single fixed-size
+    // sliding control rather than three independently-densified buttons, so
+    // it intentionally stays at the founder-specified 28px visible size
+    // instead of picking up the desktop 32px density override.
+    for (const name of ['Grid View', 'List View', 'Table View']) {
+      const visibleOption = screen
+        .getByRole('radio', { name })
+        .closest('label');
+      expect(visibleOption).toHaveClass('h-7', 'w-7');
+      expect(visibleOption).not.toHaveClass('h-8');
+    }
   });
 
   it('renders aspect-ratio-aware artwork frames in grid cards', () => {
@@ -724,7 +787,7 @@ describe('LibrarySurface', () => {
     ).toHaveTextContent('Needs Review');
 
     // Filter rail exposes Approval Status as a first-class chip group (#10384).
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const rail = screen.getByTestId('library-filter-panel');
     expect(screen.getByRole('group', { name: 'Library Filters' })).toBe(rail);
     expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
@@ -797,7 +860,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const rail = screen.getByTestId('library-filter-panel');
 
     const approvalSection = within(rail)
@@ -1089,7 +1152,14 @@ describe('LibrarySurface', () => {
       ).not.toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+    await user.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /Archived/u }
+      )
+    );
+    await user.keyboard('{Escape}');
     actions = within(screen.getByTestId('library-row-actions-release-1'));
     await user.click(actions.getByRole('button', { name: 'More actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
@@ -1135,7 +1205,14 @@ describe('LibrarySurface', () => {
       });
     });
 
-    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+    await user.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /Archived/u }
+      )
+    );
+    await user.keyboard('{Escape}');
     actions = within(screen.getByTestId('library-row-actions-merch-card-1'));
     await user.click(actions.getByRole('button', { name: 'More actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
@@ -1292,7 +1369,7 @@ describe('LibrarySurface', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
     clickGridView();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
 
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(
@@ -1317,7 +1394,7 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
 
     // Catalog rows render with the minimal column header.
     expect(
@@ -1345,7 +1422,7 @@ describe('LibrarySurface', () => {
     );
 
     // No regression: switching back to list restores release rows.
-    fireEvent.click(screen.getByRole('button', { name: 'List View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
     expect(
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
@@ -1358,7 +1435,7 @@ describe('LibrarySurface', () => {
   it('renders the full dense Tracks-catalog column set in table mode (JOV-4846)', () => {
     renderLibrary([buildAsset()]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
 
     // Full experiment column set: status · artwork · title · artist · type ·
     // BPM · key · energy · rating · length · waveform · DSP providers.
@@ -1415,7 +1492,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
     expect(
       screen.getByTestId('library-catalog-row-release-1')
     ).toBeInTheDocument();
@@ -1423,8 +1500,13 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-catalog-row-release-2')
     ).toBeInTheDocument();
 
-    // Audio tab keeps only the asset with a playable preview.
-    fireEvent.click(screen.getByRole('button', { name: /^Audio/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+    fireEvent.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /^Audio/ }
+      )
+    );
     expect(
       screen.getByTestId('library-catalog-row-release-1')
     ).toBeInTheDocument();
@@ -1602,7 +1684,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     expect(
       screen.getByTestId('library-saved-filter-views')
     ).toBeInTheDocument();
@@ -1619,7 +1701,7 @@ describe('LibrarySurface', () => {
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
   });
 
-  it('filters library assets from top-level view chips', async () => {
+  it('filters library assets from the Filters kind axis', async () => {
     renderLibrary([
       buildAsset(),
       buildAsset({
@@ -1636,18 +1718,100 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    expect(screen.getByTestId('library-view-filter-chips')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Audio/u }));
+    expect(
+      screen.getByRole('tablist', { name: 'Library Stages' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+    const kindFilters = screen.getByTestId('library-view-filter-chips');
+    expect(kindFilters).toBeInTheDocument();
+    fireEvent.click(
+      within(kindFilters).getByRole('button', { name: /Audio/u })
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Take Me Over')).toBeInTheDocument();
       expect(screen.queryByText('Never Say A Word')).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /^All/u }));
+    fireEvent.click(within(kindFilters).getByRole('button', { name: /^All/u }));
 
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+  });
+
+  it('moves focus and selection through the lifecycle tabs with the keyboard', () => {
+    renderLibrary([buildAsset()]);
+
+    const allTab = screen.getByRole('tab', { name: 'All' });
+    const ideasTab = screen.getByRole('tab', { name: 'Ideas' });
+    const panel = screen.getByRole('tabpanel');
+
+    allTab.focus();
+    fireEvent.keyDown(allTab, { key: 'ArrowRight' });
+
+    expect(ideasTab).toHaveFocus();
+    expect(ideasTab).toHaveAttribute('aria-selected', 'true');
+    expect(ideasTab).not.toHaveAttribute('aria-pressed');
+    expect(panel).toHaveAttribute('aria-labelledby', ideasTab.id);
+  });
+
+  it('surfaces quick-apply filter suggestions next to the filter button, hidden while the filter dropdown is open', () => {
+    renderLibrary([
+      buildAsset({ id: 'release-1', status: 'draft' }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        status: 'draft',
+      }),
+      buildAsset({
+        id: 'release-3',
+        title: 'Reel',
+        artist: 'Third Artist',
+        status: 'released',
+      }),
+    ]);
+
+    const suggestions = screen.getByTestId('library-filter-suggestions');
+    expect(suggestions).not.toHaveAttribute('aria-hidden');
+    expect(
+      within(suggestions).getByRole('button', { name: 'Status · Draft' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+
+    expect(suggestions).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('applies a "Status" suggestion pill as a real filter, not a decorative pill', async () => {
+    renderLibrary([
+      buildAsset({ id: 'release-1', status: 'draft' }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        status: 'draft',
+      }),
+      buildAsset({
+        id: 'release-3',
+        title: 'Reel',
+        artist: 'Third Artist',
+        status: 'released',
+      }),
+    ]);
+
+    expect(screen.getByText('Reel')).toBeInTheDocument();
+
+    const suggestions = screen.getByTestId('library-filter-suggestions');
+    fireEvent.click(
+      within(suggestions).getByRole('button', { name: 'Status · Draft' })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+      expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+      expect(screen.queryByText('Reel')).not.toBeInTheDocument();
+    });
   });
 
   it('keeps global header search as the only Library search surface', () => {
@@ -1718,10 +1882,18 @@ describe('LibrarySurface', () => {
     expect(contract).not.toHaveAttribute('data-key');
     expect(contract).not.toHaveAttribute('data-back-href');
     expect(contract).not.toHaveAttribute('data-back-label');
-    expect(screen.getByTestId('library-view-filter-chips')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Merch/u })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(
+      screen.getByRole('tablist', { name: 'Library Stages' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+    const kindFilters = screen.getByTestId('library-view-filter-chips');
+    expect(kindFilters).toBeInTheDocument();
+    expect(
+      within(kindFilters).getByRole('button', { name: /Merch/u })
+    ).toBeInTheDocument();
+    expect(
+      within(kindFilters).getByRole('button', { name: /Audio/u })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('library-filter-panel')).toBeInTheDocument();
     expect(
       screen.getByTestId('library-saved-filter-views')
@@ -1753,7 +1925,7 @@ describe('LibrarySurface', () => {
     ]);
 
     const user = userEvent.setup();
-    const trigger = screen.getByRole('button', { name: 'Show filters' });
+    const trigger = screen.getByRole('button', { name: /^Show filters/i });
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
@@ -1795,7 +1967,7 @@ describe('LibrarySurface', () => {
     ]);
 
     const filterTrigger = screen.getByRole('button', {
-      name: 'Show filters',
+      name: /^Show filters/i,
     });
     expectDesktop32Control(filterTrigger, { square: true });
     expect(
@@ -1841,8 +2013,8 @@ describe('LibrarySurface', () => {
       within(panel).getByRole('button', { name: /Album/u })
     ).toBeInTheDocument();
     expect(
-      within(panel).getByRole('button', { name: /Video/u })
-    ).toBeInTheDocument();
+      within(panel).getAllByRole('button', { name: /Video/u }).length
+    ).toBeGreaterThan(0);
     expect(
       within(panel).getByRole('button', { name: /Apple Music/u })
     ).toBeInTheDocument();
@@ -1874,23 +2046,28 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    expect(screen.getByRole('button', { name: /Audio/u })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+    const kindFilters = screen.getByTestId('library-view-filter-chips');
+    expect(
+      within(kindFilters).getByRole('button', { name: /Audio/u })
+    ).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^All\s*\d/u }));
+    await user.click(
+      within(kindFilters).getByRole('button', { name: /^All/u })
+    );
     expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
       scroll: false,
     });
     expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
     expect(screen.getByText('Missing Audio')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Show filters' }));
     expect(
-      screen.getByRole('button', { name: /Needs Attention/u })
+      within(screen.getByTestId('library-saved-filter-views')).getByRole(
+        'button',
+        { name: /Needs Attention/u }
+      )
     ).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -1906,7 +2083,7 @@ describe('LibrarySurface', () => {
 
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
-    const trigger = screen.getByRole('button', { name: 'Show filters' });
+    const trigger = screen.getByRole('button', { name: /^Show filters/i });
     expectDesktop32Control(trigger, { square: true });
     expect(trigger).toHaveClass(
       'before:h-full',

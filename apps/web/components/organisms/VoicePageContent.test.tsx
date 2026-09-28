@@ -71,6 +71,18 @@ describe('VoicePageContent source contract', () => {
     ).toHaveAttribute('href', APP_ROUTES.SUPPORT);
   });
 
+  it('renders no internal PR references in customer-facing copy', () => {
+    const { container } = render(<VoicePageContent />);
+    expect(container.textContent).not.toMatch(/PR #?\d{3,}/);
+  });
+
+  it('docks the hero over its own abstract photo', () => {
+    const { container } = render(<VoicePageContent />);
+    const photo = container.querySelector('.marketing-hero-photo img');
+    expect(photo?.getAttribute('src')).toContain('marketing-hero%2Fvoice.webp');
+    expect(photo).toHaveAttribute('alt', '');
+  });
+
   it('binds the route and Storybook to the one shared body', () => {
     const routeSource = readFileSync(
       resolve(process.cwd(), 'app/(marketing)/voice/page.tsx'),

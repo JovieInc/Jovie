@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { crc32 } from 'node:zlib';
 import { readInvariantRegistry } from './registry.mjs';
 import {
   classifyScreenPath,
@@ -57,6 +58,57 @@ const digestFile = path =>
   `sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`;
 const sha256 = bytes =>
   `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+// Archive fixtures use a store-only ZIP written in-process so the suite does
+// not depend on a `zip` executable being provisioned on the runner.
+function writeProofZip(root, names) {
+  const nameBytes = name => new TextEncoder().encode(name);
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+  for (const name of names) {
+    const data = readFileSync(join(root, name));
+    const encoded = nameBytes(name);
+    const crc = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0x0800, 6);
+    local.writeUInt16LE(0, 8);
+    local.writeUInt16LE(0, 10);
+    local.writeUInt16LE(0, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(encoded.length, 26);
+    chunks.push(local, encoded, data);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(20, 4);
+    entry.writeUInt16LE(20, 6);
+    entry.writeUInt16LE(0x0800, 8);
+    entry.writeUInt16LE(0, 10);
+    entry.writeUInt16LE(0, 12);
+    entry.writeUInt16LE(0, 14);
+    entry.writeUInt32LE(crc, 16);
+    entry.writeUInt32LE(data.length, 20);
+    entry.writeUInt32LE(data.length, 24);
+    entry.writeUInt16LE(encoded.length, 28);
+    entry.writeUInt32LE(offset, 42);
+    central.push(entry, encoded);
+    offset += local.length + encoded.length + data.length;
+  }
+  const directory = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(names.length, 8);
+  end.writeUInt16LE(names.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  writeFileSync(
+    join(root, 'proof.zip'),
+    Buffer.concat([...chunks, directory, end])
+  );
+}
 function validExternalProof(screen = gated()[0], headSha = HEAD) {
   return {
     schema: SCREEN_BROWSER_PROOF_SCHEMA,
@@ -125,6 +177,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'registered'
     );
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
+    assert.equal(
+      kindOf('apps/web/app/(auth)/auth/native-return/page.tsx'),
+      'excluded'
+    );
+    assert.equal(kindOf('apps/web/app/auth-return/page.tsx'), 'excluded');
+    assert.equal(
+      kindOf('apps/web/app/mobile-auth-return/page.tsx'),
+      'excluded'
+    );
     assert.equal(kindOf('apps/web/app/error.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
     assert.equal(
@@ -152,6 +213,45 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.public-profile',
       'web.start',
     ]);
+  });
+
+  it('registers the artist pay page when that screen changes', () => {
+    const source = 'apps/web/app/[username]/pay/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.artist-pay');
+
+    assert.equal(kindOf(source), 'registered');
+    assert.deepEqual(screen?.sources, [source]);
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(
+      result.changedScreens.map(changed => changed.id),
+      ['web.artist-pay']
+    );
+  });
+
+  it('registers every founder cockpit route for changed-surface certification', () => {
+    const sources = [
+      'apps/web/app/app/(shell)/admin/activity/page.tsx',
+      'apps/web/app/app/(shell)/admin/growth/page.tsx',
+      'apps/web/app/app/(shell)/admin/needs-you/page.tsx',
+      'apps/web/app/app/(shell)/admin/operations/page.tsx',
+      'apps/web/app/app/(shell)/admin/product/page.tsx',
+    ];
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.ov-founder-cockpit'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.ov-founder-cockpit',
+      platform: 'web',
+      owner: 'ovie-founder-cockpit',
+      sources,
+      viewports: ['desktop', 'mobile'],
+    });
+    for (const source of sources) assert.equal(kindOf(source), 'registered');
   });
 
   it('registers the public artists directory for changed-surface certification', () => {
@@ -471,19 +571,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         mkdirSync(dirname(join(root, name)), { recursive: true });
         writeFileSync(join(root, name), bytes);
       }
-      assert.equal(
-        spawnSync(
-          'zip',
-          [
-            '-q',
-            'proof.zip',
-            'screen-proof.json',
-            ...images.map(([name]) => name),
-          ],
-          { cwd: root }
-        ).status,
-        0
-      );
+      writeProofZip(root, [
+        'screen-proof.json',
+        ...images.map(([name]) => name),
+      ]);
       const zip = readFileSync(join(root, 'proof.zip'));
       let records = {
         artifact: {
@@ -597,19 +688,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         for (const [name] of images)
           writeFileSync(join(root, name), screenshot);
         rmSync(join(root, 'proof.zip'));
-        assert.equal(
-          spawnSync(
-            'zip',
-            [
-              '-q',
-              'proof.zip',
-              'screen-proof.json',
-              ...images.map(([name]) => name),
-            ],
-            { cwd: root }
-          ).status,
-          0
-        );
+        writeProofZip(root, [
+          'screen-proof.json',
+          ...images.map(([name]) => name),
+        ]);
         records.artifact.digest = sha256(readFileSync(join(root, 'proof.zip')));
       };
       /** @param {{ mutate: () => void; archive?: boolean }} test */
@@ -875,19 +957,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       }
       proof.artifactDigest = `sha256:${digest.digest('hex')}`;
       writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
-      assert.equal(
-        spawnSync(
-          'zip',
-          [
-            '-q',
-            'proof.zip',
-            'screen-proof.json',
-            ...images.map(([name]) => name),
-          ],
-          { cwd: root }
-        ).status,
-        0
-      );
+      writeProofZip(root, [
+        'screen-proof.json',
+        ...images.map(([name]) => name),
+      ]);
       const zip = readFileSync(join(root, 'proof.zip'));
       const records = {
         artifact: {
@@ -1058,19 +1131,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       const buildArchive = proof => {
         writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
         rmSync(join(root, 'proof.zip'), { force: true });
-        assert.equal(
-          spawnSync(
-            'zip',
-            [
-              '-q',
-              'proof.zip',
-              'screen-proof.json',
-              ...images.map(([name]) => name),
-            ],
-            { cwd: root }
-          ).status,
-          0
-        );
+        writeProofZip(root, [
+          'screen-proof.json',
+          ...images.map(([name]) => name),
+        ]);
         return readFileSync(join(root, 'proof.zip'));
       };
       const ghScript = [
@@ -1258,21 +1322,12 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         );
         writeFileSync(join(dir, 'marketing-route.png'), image);
       }
-      assert.equal(
-        spawnSync(
-          'zip',
-          [
-            '-q',
-            'proof.zip',
-            'home-desktop/receipt.json',
-            'home-desktop/marketing-route.png',
-            'home-mobile/receipt.json',
-            'home-mobile/marketing-route.png',
-          ],
-          { cwd: root }
-        ).status,
-        0
-      );
+      writeProofZip(root, [
+        'home-desktop/receipt.json',
+        'home-desktop/marketing-route.png',
+        'home-mobile/receipt.json',
+        'home-mobile/marketing-route.png',
+      ]);
       const zip = readFileSync(join(root, 'proof.zip'));
       const records = {
         artifact: {
@@ -1405,21 +1460,12 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           writeFileSync(join(dir, 'marketing-route.png'), image);
         }
         rmSync(join(root, 'proof.zip'), { force: true });
-        assert.equal(
-          spawnSync(
-            'zip',
-            [
-              '-q',
-              'proof.zip',
-              'home-desktop/receipt.json',
-              'home-desktop/marketing-route.png',
-              'home-mobile/receipt.json',
-              'home-mobile/marketing-route.png',
-            ],
-            { cwd: root }
-          ).status,
-          0
-        );
+        writeProofZip(root, [
+          'home-desktop/receipt.json',
+          'home-desktop/marketing-route.png',
+          'home-mobile/receipt.json',
+          'home-mobile/marketing-route.png',
+        ]);
         return readFileSync(join(root, 'proof.zip'));
       };
       const baselineReceipts = {
@@ -1983,34 +2029,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers the marketing investors page for changed-surface certification', () => {
-    const source = 'apps/web/app/(marketing)/investors/page.tsx';
-    const screen = SCREEN_REGISTRY.find(
-      entry => entry.id === 'web.marketing-investors'
-    );
-
-    assert.deepEqual(screen, {
-      id: 'web.marketing-investors',
-      platform: 'web',
-      owner: 'marketing-investors',
-      sources: [source],
-      viewports: ['desktop', 'mobile'],
-    });
-
-    const result = evaluateChangedScreens({
-      changedFiles: [{ path: source, status: 'M' }],
-      headSha: HEAD,
-    });
-    assert.deepEqual(result.issues, []);
-    assert.deepEqual(result.changedScreens, [
-      {
-        id: 'web.marketing-investors',
-        verdict: 'evidence-required',
-        findings: [],
-      },
-    ]);
-  });
-
   it('registers the marketing launch page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/launch/page.tsx';
     const screen = SCREEN_REGISTRY.find(
@@ -2069,6 +2087,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('registers the marketing pricing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/pricing/page.tsx';
+    const layoutSource = 'apps/web/app/(marketing)/pricing/layout.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.marketing-pricing'
     );
@@ -2077,7 +2096,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       id: 'web.marketing-pricing',
       platform: 'web',
       owner: 'marketing-pricing',
-      sources: [source],
+      sources: [source, layoutSource],
       viewports: ['desktop', 'mobile'],
     });
 
@@ -2089,6 +2108,47 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.changedScreens, [
       {
         id: 'web.marketing-pricing',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+
+    const layoutResult = evaluateChangedScreens({
+      changedFiles: [{ path: layoutSource, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(layoutResult.issues, []);
+    assert.deepEqual(layoutResult.changedScreens, [
+      {
+        id: 'web.marketing-pricing',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the staged homepage v2 landing page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/new/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-new'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-new',
+      platform: 'web',
+      owner: 'marketing-new',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-new',
         verdict: 'evidence-required',
         findings: [],
       },
@@ -2184,6 +2244,35 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.changedScreens, [
       {
         id: 'web.profile-mode-render',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the guarded profile-admission fixture screen for changed-surface certification', () => {
+    const source =
+      'apps/web/app/(profile-admission)/renders/profile-admission/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.profile-admission'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.profile-admission',
+      platform: 'web',
+      owner: 'profile-admission',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.profile-admission',
         verdict: 'evidence-required',
         findings: [],
       },
@@ -2360,7 +2449,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.match(result.issues.join('\n'), /missing registration/);
   });
 
-  it('rejects unregistered visible boundary, desktop renderer, iOS screen, and deleted paths', () => {
+  it('rejects unregistered visible boundary, desktop renderer, and iOS screen paths', () => {
     const paths = [
       'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
@@ -2368,18 +2457,38 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'apps/desktop/src/renderer/App.tsx',
       'apps/ios/Jovie/Features/New/NewScreen.swift',
       'apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift',
-      'apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift',
+      'apps/ios/Jovie/Features/Camera/CameraOverlayView.swift',
     ];
     for (const path of paths) {
       assert.equal(kindOf(path), 'unregistered', path);
     }
-    const deleted = evaluateChangedScreens({
-      changedFiles: [{ path: 'apps/web/app/new/page.tsx', status: 'D' }],
+    const added = evaluateChangedScreens({
+      changedFiles: [{ path: 'apps/web/app/new/page.tsx', status: 'A' }],
       headSha: HEAD,
       proofs: [],
       requireExternalEvidence: true,
     });
-    assert.match(deleted.issues.join('\n'), /missing registration/);
+    assert.match(added.issues.join('\n'), /missing registration/);
+  });
+
+  it('records deleted unregistered screens as removed instead of demanding registration', () => {
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/new/page.tsx', status: 'D' },
+        { path: 'apps/web/app/new/layout.tsx', status: 'D' },
+        { path: 'apps/web/app/other/page.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(result.removedScreens, [
+      'apps/web/app/new/page.tsx',
+      'apps/web/app/new/layout.tsx',
+    ]);
+    assert.deepEqual(result.issues, [
+      'missing registration for changed in-scope screen apps/web/app/other/page.tsx',
+    ]);
   });
 
   it('requires exact-head proof for a registered protected source', () => {

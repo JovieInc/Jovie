@@ -109,7 +109,8 @@ describe('homepage certified optical grid (homepage-optical-polish-v1 item 1)', 
     const source = readFileSync(path.join(webRoot, sectionsPath), 'utf8');
     expect(source).toContain("data-align='start'");
     expect(source).toContain('HOMEPAGE_LAUNCH_COPY.certified');
-    expect(source).toContain('ConnectedSection');
-    expect(source).toContain('RelationshipsSection');
+    // Pen My0zu (JOV-6946): one relationships section, real captures only.
+    expect(source).toContain('homepage-next-steps');
+    expect(source).not.toContain('ConnectedSection');
   });
 });

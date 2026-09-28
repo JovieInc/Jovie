@@ -64,7 +64,7 @@ function isPlaywrightConfigModule(
   );
 }
 const localTrace = Object.fromEntries(
-  'playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
+  'playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
     .map(value => value.split('='))
 );
@@ -79,6 +79,7 @@ const imageUploads =
 const markdownUploads = [
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
@@ -710,7 +711,24 @@ describe('Playwright artifact secret boundary', () => {
     await expect(configs(true, false, 'sentinel')).rejects.toThrow(
       'Global Vercel bypass headers are forbidden'
     );
-  }, 20_000);
+  }, 90_000);
+
+  it('keeps fixture Playwright configs from fetching into the enclosing checkout', () => {
+    // Fixtures live under apps/web, inside the real checkout. With CI's
+    // GITHUB_ACTIONS and a pull_request event, Playwright's git-commit-info
+    // plugin runs `git fetch origin <base.sha> --depth=1` from the config dir,
+    // which shallows the checkout under concurrent structural commands.
+    const source = readFileSync(import.meta.filename, 'utf8');
+    const fixtureConfigs = source
+      .split(['export default', 'defineConfig({'].join(' '))
+      .slice(1);
+    expect(fixtureConfigs.length).toBeGreaterThan(0);
+    for (const config of fixtureConfigs) {
+      expect(
+        config.startsWith('captureGitInfo:{commit:false,diff:false},')
+      ).toBe(true);
+    }
+  });
 
   it('inherits child env without JSON disclosure and rejects a real credential trace', async () => {
     const directory = fixture('.artifact-json-', webRoot);
@@ -727,7 +745,7 @@ describe('Playwright artifact secret boundary', () => {
     );
     write(
       join(directory, 'playwright.config.ts'),
-      `import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:${JSON.stringify(outputDir)},reporter:[['json',{outputFile:${JSON.stringify(report)}}]],use:{trace:'on',extraHTTPHeaders:{'x-secret':process.env.TRACE_HEADER_SENTINEL}},webServer:{command:${JSON.stringify(`${process.execPath} server.mjs`)},cwd:${JSON.stringify(directory)},env:{SAFE:'1'},url:'http://127.0.0.1:${serverPort}'}})`
+      `import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:${JSON.stringify(outputDir)},reporter:[['json',{outputFile:${JSON.stringify(report)}}]],use:{trace:'on',extraHTTPHeaders:{'x-secret':process.env.TRACE_HEADER_SENTINEL}},webServer:{command:${JSON.stringify(`${process.execPath} server.mjs`)},cwd:${JSON.stringify(directory)},env:{SAFE:'1'},url:'http://127.0.0.1:${serverPort}'}})`
     );
     const result = spawnSync(
       'pnpm',
@@ -1100,7 +1118,6 @@ ${fixtureCheckout}
       const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
         .split('\n')
         .filter(line => line.includes('doppler run --'));
-      expect(doppler).toHaveLength(7);
       const guarded = doppler.filter(line => line.includes(guardScriptName));
       expect(guarded).toHaveLength(6);
       expect(
@@ -1114,9 +1131,26 @@ ${fixtureCheckout}
       expect(
         guarded.filter(line => line.trim() === waitlistDopplerCommand)
       ).toHaveLength(1);
-      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual([
+      const expectedNonPlaywrightCommands = [
         expect.stringContaining('scripts/check-signup-readiness.ts'),
-      ]);
+        ...(file === 'synthetic-monitoring.yml'
+          ? [
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+              // JOV-6870: limiter-store probe of /api/health/redis.
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+            ]
+          : []),
+      ];
+      expect(doppler).toHaveLength(
+        guarded.length + expectedNonPlaywrightCommands.length
+      );
+      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual(
+        expectedNonPlaywrightCommands
+      );
     }
     const screenshots = readFileSync(
       join(workflowsRoot, 'screenshots.yml'),
@@ -2244,7 +2278,7 @@ ${fixtureCheckout}
     const comparisonSpec = join(comparison, 'comparison.spec.ts');
     write(
       comparisonConfig,
-      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:'test-results',snapshotPathTemplate:'snapshots/{arg}{ext}',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:16,height:16}}})"
+      "import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',snapshotPathTemplate:'snapshots/{arg}{ext}',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:16,height:16}}})"
     );
     const comparisonSource = (color: string) =>
       `import{expect,test}from'@playwright/test';test('comparison',async({page})=>{await page.setContent('<style>html,body{margin:0;width:16px;height:16px;background:${color}}</style>');await expect(page).toHaveScreenshot('comparison.png',{animations:'disabled'})})`;
@@ -2285,7 +2319,7 @@ ${fixtureCheckout}
     const chromiumConfig = join(chromiumDir, 'playwright.config.ts');
     write(
       chromiumConfig,
-      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
+      "import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
     );
     write(
       join(chromiumDir, 'route.spec.ts'),

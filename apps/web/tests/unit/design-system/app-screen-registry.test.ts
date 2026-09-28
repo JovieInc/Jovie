@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_PEN_EXPORT_SCHEMA,
+  APP_SCREEN_PEN_GEOMETRY,
+  APP_SCREEN_PEN_PENDING_DECISIONS,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
   type AppScreenRegistryEntry,
@@ -31,7 +33,7 @@ describe('authenticated app screen registry', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(96);
+    expect(APP_SCREEN_REGISTRY).toHaveLength(103);
   });
 
   it('has a valid registered recipe and component composition', () => {
@@ -45,7 +47,7 @@ describe('authenticated app screen registry', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
-    expect(references).toHaveLength(46);
+    expect(references).toHaveLength(49);
     for (const screen of references) {
       expect(screen.archetypeId, screen.route).not.toBeNull();
     }
@@ -67,14 +69,116 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('keeps authenticated shared components source-backed but non-referenceable until a native Pen root is proven', () => {
+  it('binds Pen roots only to masters proven by the committed readback', () => {
     for (const component of APP_SCREEN_COMPONENT_REGISTRY) {
-      expect(component.penRootId, component.id).toBeNull();
-      expect(component.penReferenceEligible, component.id).toBe(false);
-      expect(component.penIdentityReason, component.id).toMatch(
-        /native canonical-Pen .*root is source-mapped/i
-      );
+      const root: string | null = component.penRootId;
+      if (root === null) {
+        expect(component.penReferenceEligible, component.id).toBe(false);
+      } else {
+        const master = APP_SCREEN_PEN_GEOMETRY.masters[root];
+        expect(master, `${component.id} -> ${root}`).toBeDefined();
+        expect(master?.registryComponentId, component.id).toBe(component.id);
+      }
+      if (!component.penReferenceEligible) {
+        expect(component.penIdentityReason, component.id).toMatch(
+          /readback 2026-09-27/
+        );
+      }
     }
+    expect(
+      Object.fromEntries(
+        APP_SCREEN_COMPONENT_REGISTRY.map(component => [
+          component.id,
+          component.penRootId,
+        ])
+      )
+    ).toEqual({
+      'component.app-shell-frame': 'JwsdW',
+      'component.app-shell-content-panel': null,
+      'component.settings-panel': null,
+      'component.unified-table': 'A3fqK',
+      'component.entity-sidebar': 'RosMb',
+      'component.empty-state': null,
+      'component.error-fallback': null,
+    });
+  });
+
+  it('fails closed on Pen roots missing from, or contradicting, the readback', () => {
+    const bound = APP_SCREEN_COMPONENT_REGISTRY.find(
+      component => component.id === 'component.unified-table'
+    );
+    expect(bound).toBeDefined();
+    const withRoot = (root: string) =>
+      APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+        component.id === bound?.id
+          ? { ...component, penRootId: root }
+          : component
+      );
+    expect(
+      validateAppScreenSystem({ components: withRoot('minted-id') }).map(
+        issue => issue.code
+      )
+    ).toContain('component-pen-root-without-readback');
+    expect(
+      validateAppScreenSystem({ components: withRoot('ftsrB') }).map(
+        issue => issue.code
+      )
+    ).toContain('component-pen-root-readback-mismatch');
+
+    const promoteTable = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === bound?.id
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    expect(
+      validateAppScreenSystem({ components: promoteTable }).map(
+        issue => issue.code
+      )
+    ).toContain('reference-component-with-pending-pen-decision');
+    expect(
+      validateAppScreenSystem({
+        components: promoteTable,
+        penPendingDecisions: [],
+      }).map(issue => issue.code)
+    ).not.toContain('reference-component-with-pending-pen-decision');
+
+    const promoteShell = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === 'component.app-shell-frame'
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    const headerOnly = APP_SCREEN_PEN_PENDING_DECISIONS.filter(
+      decision => decision.checkId === 'app-header.height'
+    );
+    expect(headerOnly).toHaveLength(1);
+    expect(
+      validateAppScreenSystem({
+        components: promoteShell,
+        penPendingDecisions: headerOnly,
+      }).find(
+        issue => issue.code === 'reference-component-with-pending-pen-decision'
+      )?.message
+    ).toMatch(/D1 is pending on JwsdW/);
+
+    const promoteEntitySidebar = APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+      component.id === 'component.entity-sidebar'
+        ? { ...component, penReferenceEligible: true }
+        : component
+    );
+    const entityIssues = validateAppScreenSystem({
+      components: promoteEntitySidebar,
+    });
+    expect(
+      entityIssues.find(
+        issue => issue.code === 'reference-component-with-pending-pen-decision'
+      )?.message
+    ).toMatch(/D6 is pending on RosMb/);
+    expect(
+      validateAppScreenSystem({
+        components: promoteEntitySidebar,
+        penReferenceHolds: [],
+      }).map(issue => issue.code)
+    ).not.toContain('reference-component-with-pending-pen-decision');
   });
 
   it('keeps every recipe behind a real error boundary', () => {
@@ -98,14 +202,14 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('assigns exactly 46 unique deterministic browser-safe story IDs', () => {
+  it('assigns exactly 49 unique deterministic browser-safe story IDs', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
     // Source-of-truth pin: the Pen lane must derive this count from the
     // export receipt, never hardcode it. /app/ov/ops and /app/admin redirect
     // to /hud.
-    expect(references).toHaveLength(46);
+    expect(references).toHaveLength(49);
     const storyIds = references.map(entry => {
       expect(entry.story, entry.route).not.toBeNull();
       return entry.story?.id as string;
@@ -175,7 +279,7 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 46,
+      designReferences: 49,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
       archetypes: 8,
@@ -185,11 +289,9 @@ describe('authenticated app screen registry', () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: 'component.app-shell-frame',
-          penRootId: null,
+          penRootId: 'JwsdW',
           penReferenceEligible: false,
-          penIdentityReason: expect.stringMatching(
-            /native canonical-Pen app-shell root/i
-          ),
+          penIdentityReason: expect.stringMatching(/D1 is pending/),
         }),
       ])
     );
@@ -260,7 +362,7 @@ describe('authenticated app screen registry', () => {
     expect(
       validateAppScreenSystem({
         components: APP_SCREEN_COMPONENT_REGISTRY.map(component =>
-          component.id === first.id
+          component.id === second.id
             ? { ...component, penReferenceEligible: true }
             : component
         ),

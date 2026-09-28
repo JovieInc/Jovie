@@ -312,7 +312,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Find capacity and dispatch candidates
         env:
@@ -614,7 +614,7 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "URL", "value": "https://jov.ie", "short": true },
-                    { "title": "Failed Tests", "value": "```\n${{ steps.test-results.outputs.failed_tests }}\n```", "short": false },
+                    { "title": "Failed Tests", "value": ${{ toJSON(format('```{0}```', steps.test-results.outputs.failed_tests)) }}, "short": false },
                     { "title": "Action", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": false }
                   ]
                 }

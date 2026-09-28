@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 /**
  * Storybook story quality guard.
  *
@@ -63,16 +64,124 @@ const STRING_CONSTANT_PATTERN =
 const SOURCE_SHA_PROPERTY_PATTERN =
   /\bsourceSha\s*:\s*(?:(['"])([^'"]*)\1|([A-Za-z_$][\w$]*))/g;
 
-function gitSucceeds(args) {
-  try {
-    execFileSync('git', args, {
+// Exit 0 and 1 are git's definitive answers for `rev-parse --verify --quiet`
+// and `merge-base --is-ancestor`. Anything else (spawn failure, signal, exit 128
+// from an unreadable object) is an execution error, not a verdict: retry it,
+// then fail closed with the stderr instead of reporting a false "not an
+// ancestor".
+const GIT_ATTEMPTS = 3;
+
+// Every provenance read walks the real object graph, not the commit-graph
+// file. CI checkouts run `git fetch` with auto maintenance enabled, whose
+// detached `git maintenance run --auto` rewrites .git/objects/info/commit-graph
+// while structural lanes run concurrently; a half-written or stale graph can
+// answer --is-ancestor falsely and report a valid receipt as a non-ancestor.
+const GIT_FLAGS = ['-c', 'core.commitGraph=false'];
+
+/** @returns {{ value: boolean, error: string }} Non-empty error = no verdict. */
+function gitVerdict(args) {
+  let error = '';
+  for (let attempt = 1; attempt <= GIT_ATTEMPTS; attempt += 1) {
+    const result = spawnSync('git', [...GIT_FLAGS, ...args], {
       cwd: root,
-      stdio: ['ignore', 'ignore', 'ignore'],
+      encoding: 'utf8',
+      stdio: ['ignore', 'ignore', 'pipe'],
     });
-    return true;
-  } catch {
-    return false;
+    if (result.status === 0) return { value: true, error: '' };
+    if (result.status === 1) return { value: false, error: '' };
+    error =
+      result.error?.message ||
+      result.stderr?.trim() ||
+      `exit ${result.status ?? 'null'} signal ${result.signal ?? 'none'}`;
   }
+  return { value: false, error: `git ${args.join(' ')}: ${error}` };
+}
+
+function gitOutput(args) {
+  const result = spawnSync('git', [...GIT_FLAGS, ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return result.status === 0 ? result.stdout.trim() : '';
+}
+
+// A shallow boundary hides every commit below it, so in a shallow checkout a
+// missing commit or a failed ancestry walk proves nothing about the receipt.
+// A hosted structural lane reported a receipt ~1,345 commits deep as "not an
+// ancestor" after the job had verified the checkout was unshallowed; the
+// context below tells the next occurrence whether HEAD was cut off.
+function checkoutContext() {
+  const gitPath = name => {
+    const file = gitOutput(['rev-parse', '--git-path', name]);
+    return file ? path.resolve(root, file) : '';
+  };
+  const shallowPath = gitPath('shallow');
+  const boundaryShas =
+    shallowPath && existsSync(shallowPath)
+      ? readFileSync(shallowPath, 'utf8').split('\n').filter(Boolean)
+      : [];
+  const shallow =
+    gitOutput(['rev-parse', '--is-shallow-repository']) === 'true' ||
+    boundaryShas.length > 0;
+  const head = gitOutput(['rev-parse', '--short', 'HEAD']) || 'unknown';
+  const reachable = gitOutput(['rev-list', '--count', 'HEAD']) || 'unknown';
+  let summary = `HEAD ${head}, ${reachable} commits reachable, ${boundaryShas.length} shallow boundaries`;
+  if (boundaryShas.length > 0) {
+    // Name who cut the history: when the shallow file was written, where the
+    // cut is, and what the most recent fetch retrieved.
+    const fetchHeadPath = gitPath('FETCH_HEAD');
+    const lastFetch =
+      fetchHeadPath && existsSync(fetchHeadPath)
+        ? readFileSync(fetchHeadPath, 'utf8').split('\n')[0].trim()
+        : 'none';
+    summary += `; boundary ${boundaryShas.slice(0, 3).join(',')}; shallow file written ${statSync(shallowPath).mtime.toISOString()}; last fetch: ${lastFetch || 'none'}`;
+  }
+  return { shallow, summary };
+}
+
+// A shallow boundary can appear mid-run: a concurrent depth-limited fetch
+// re-cuts history under this gate even after the job verified the checkout
+// was unshallowed (JOV-6623, JOV-5820). Before reporting a receipt as bad
+// data, repair once — a bounded `fetch --unshallow` restores full ancestry —
+// then re-run the verdict on healed history. GH_TOKEN/GITHUB_TOKEN, when the
+// caller provides one, authenticates the fetch like the job's base-fetch step.
+let shallowRepair;
+function healShallowCheckout() {
+  if (shallowRepair !== undefined) return shallowRepair;
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
+  const authArgs = token
+    ? [
+        '-c',
+        `http.https://github.com/.extraheader=AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+      ]
+    : [];
+  spawnSync(
+    'git',
+    [...authArgs, 'fetch', '--no-tags', '--unshallow', 'origin'],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] }
+  );
+  // Trust the post-fetch state, not the fetch exit: a concurrent unshallow can
+  // finish first, in which case this fetch errors but the checkout is healed.
+  shallowRepair =
+    gitOutput(['rev-parse', '--is-shallow-repository']) === 'false';
+  return shallowRepair;
+}
+
+// A negative verdict in a shallow checkout proves nothing about the receipt,
+// so try the repair before returning it; callers still fail closed (as
+// story-provenance-shallow) when the history stays cut.
+function verdictOrHeal(args) {
+  const verdict = gitVerdict(args);
+  if (
+    !verdict.error &&
+    !verdict.value &&
+    checkoutContext().shallow &&
+    healShallowCheckout()
+  ) {
+    return gitVerdict(args);
+  }
+  return verdict;
 }
 
 function stringConstants(text) {
@@ -115,30 +224,72 @@ async function checkStoryProvenance(files, texts) {
   }
 
   for (const [sha, stories] of storiesBySha) {
-    if (!gitSucceeds(['cat-file', '-e', `${sha}^{commit}`])) {
-      for (const story of stories) {
-        add(
-          story.file,
-          'story-provenance-commit',
-          `sourceSha ${sha} does not resolve to a commit in this checkout.`
+    const reportAll = (rule, detail) => {
+      for (const story of stories) add(story.file, rule, detail);
+    };
+
+    const exists = verdictOrHeal([
+      'rev-parse',
+      '--verify',
+      '--quiet',
+      `${sha}^{commit}`,
+    ]);
+    if (exists.error) {
+      reportAll('story-provenance-git-error', exists.error);
+      continue;
+    }
+    if (!exists.value) {
+      const context = checkoutContext();
+      if (context.shallow) {
+        reportAll(
+          'story-provenance-shallow',
+          `sourceSha ${sha} is not in this shallow checkout (${context.summary}); fetch full history before checking provenance.`
         );
+        continue;
       }
+      reportAll(
+        'story-provenance-commit',
+        `sourceSha ${sha} does not resolve to a commit in this checkout.`
+      );
       continue;
     }
 
-    if (!gitSucceeds(['merge-base', '--is-ancestor', sha, 'HEAD'])) {
-      for (const story of stories) {
-        add(
-          story.file,
-          'story-provenance-ancestor',
-          `sourceSha ${sha} is not an ancestor of HEAD; update the receipt to a commit containing this story.`
+    const ancestor = verdictOrHeal([
+      'merge-base',
+      '--is-ancestor',
+      sha,
+      'HEAD',
+    ]);
+    if (ancestor.error) {
+      reportAll('story-provenance-git-error', ancestor.error);
+      continue;
+    }
+    if (!ancestor.value) {
+      const context = checkoutContext();
+      if (context.shallow) {
+        reportAll(
+          'story-provenance-shallow',
+          `sourceSha ${sha} is below the shallow boundary of this checkout (${context.summary}); fetch full history before checking provenance.`
         );
+        continue;
       }
+      reportAll(
+        'story-provenance-ancestor',
+        `sourceSha ${sha} is not an ancestor of HEAD (${context.summary}); update the receipt to a commit containing this story.`
+      );
       continue;
     }
 
     for (const story of stories) {
-      if (!gitSucceeds(['cat-file', '-e', `${sha}:${story.storyPath}`])) {
+      const atReceipt = gitVerdict([
+        'rev-parse',
+        '--verify',
+        '--quiet',
+        `${sha}:${story.storyPath}`,
+      ]);
+      if (atReceipt.error) {
+        add(story.file, 'story-provenance-git-error', atReceipt.error);
+      } else if (!atReceipt.value) {
         add(
           story.file,
           'story-provenance-story-at-receipt',

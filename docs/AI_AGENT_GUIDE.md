@@ -39,6 +39,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/admin/campaigns/invites` | GET | Admin | List campaign invites |
 | `/api/admin/campaigns/settings` | GET | Admin | Campaign settings |
 | `/api/admin/campaigns/stats` | GET | Admin | Campaign statistics |
+| `/api/admin/contacts` | GET/POST | Admin | Read canonical customer lifecycle data and update stages |
 | `/api/admin/creator-avatar` | POST | Admin | Upload creator avatar |
 | `/api/admin/creator-ingest` | POST | Admin | Ingest single creator |
 | `/api/admin/creator-ingest/rerun` | POST | Admin | Re-run creator ingestion |
@@ -55,11 +56,19 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/admin/leads/[id]` | PATCH | Admin | Update lead |
 | `/api/admin/leads/keywords` | GET | Admin | Lead keywords |
 | `/api/admin/leads/qualify` | POST | Admin | Qualify leads |
+| `/api/admin/moderation` | GET/POST | Admin | Abuse reports + takedowns |
 | `/api/admin/overview` | GET | Admin | Admin dashboard overview |
 | `/api/admin/roles` | POST | Admin | Manage user roles |
 | `/api/admin/screenshots/[filename]` | GET | Admin | Serve screenshot |
 | `/api/admin/users` | GET | Admin | List users |
 | `/api/admin/waitlist` | GET | Admin | Waitlist management |
+
+### Agents (public, anonymous)
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/agents/profiles` | POST | None (IP rate limit, `AGENT_PROFILE_CREATE` kill switch) | Create or find a claimable profile from a Spotify artist URL (`@jovie/cli profile create`) |
+| `/api/agents/feedback` | POST | None (IP rate limit) | Agent bug/feedback reports into `feedback_items` (source `agent_cli`) for Summer triage (`@jovie/cli report`, MCP `report_issue`) |
 
 ### Audience (public/token-based)
 
@@ -118,6 +127,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/cron/process-pre-saves` | GET | CRON_SECRET | Process pre-save queue |
 | `/api/cron/schedule-release-notifications` | GET | CRON_SECRET | Schedule release alerts |
 | `/api/cron/send-release-notifications` | GET | CRON_SECRET | Send release alerts |
+| `/api/cron/web-ai-health` | GET | CRON_SECRET | Probe five production AI surfaces and return a redacted health receipt |
 
 ### Inbox Founder Reviews (authenticated founder surface)
 
@@ -258,6 +268,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/referrals/apply` | POST | Better Auth | Apply referral code |
 | `/api/referrals/code` | GET/POST | Better Auth | Get/create referral code |
 | `/api/referrals/stats` | GET | Better Auth | Referral stats |
+| `/api/report` | POST | Public | Submit abuse/security report (rate-limited) |
 | `/api/revalidate/featured-creators` | POST | Internal | Revalidate featured cache |
 | `/api/suggestions` | GET | Better Auth | Profile suggestions |
 | `/api/suggestions/avatars/[id]/dismiss` | POST | Better Auth | Dismiss avatar suggestion |
@@ -451,6 +462,7 @@ All Drizzle schema files: `apps/web/lib/db/schema/`
 | `auth.ts` | Users, roles, sessions |
 | `analytics.ts` | Page views, click events |
 | `chat.ts` | Chat conversations, messages |
+| `contacts.ts` | Canonical contacts and lifecycle stage history |
 | `insights.ts` | AI-generated insights |
 | `dsp-enrichment.ts` | DSP match candidates |
 | `dsp-bio-sync.ts` | Bio sync jobs |
@@ -580,7 +592,7 @@ Zod-validated environment variables. Never use `process.env` directly.
 
 For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 
-- **Node 22 + pnpm 9.15.4** -- verify before any command
+- **Node 24 + pnpm 9.15.9** -- verify before any command
 - **Monorepo commands from root** -- `pnpm --filter web ...`, never `cd apps/web`
 - **Server/client boundaries** -- no DB imports in `'use client'` files
 - **No `db.transaction()`** -- requires explicit approval; use approved RLS wrappers

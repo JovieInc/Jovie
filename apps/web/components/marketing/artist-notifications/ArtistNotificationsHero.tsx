@@ -1,4 +1,5 @@
 import { Button } from '@jovie/ui';
+import Image from 'next/image';
 import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
 import { ArtistNotificationFloatingCardView } from '@/components/marketing/MarketingStoryPrimitives';
@@ -23,15 +24,31 @@ export function ArtistNotificationsHero({
   hero,
 }: Readonly<ArtistNotificationsHeroProps>) {
   return (
-    <section className='relative overflow-hidden pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24'>
+    <section className='marketing-hero-dock relative overflow-hidden pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24'>
+      <Image
+        fill
+        priority
+        aria-hidden='true'
+        alt=''
+        sizes='100vw'
+        src='/images/hero/artist-notifications.webp'
+        className='object-cover opacity-30'
+      />
       <div
         aria-hidden='true'
         className='system-b-artist-notifications-hero-backdrop'
       />
+      <div
+        aria-hidden='true'
+        className='system-b-artist-notifications-hero-underlay'
+      />
       <MarketingContainer width='landing' className='relative'>
         <div className='system-b-artist-notifications-hero-grid'>
           <div className='system-b-artist-notifications-hero-copy'>
-            <h1 className='system-b-artist-notifications-hero-title line-clamp-2'>
+            <h1
+              data-wrap='editorial-title'
+              className='system-b-artist-notifications-hero-title'
+            >
               {hero.headlineLines?.length
                 ? hero.headlineLines.map(line =>
                     line ? (

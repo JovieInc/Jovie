@@ -1,4 +1,9 @@
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import type { ReactNode } from 'react';
+import {
+  MarketingContainer,
+  MarketingEditorialHeroPhoto,
+  MarketingHero,
+} from '@/components/marketing';
 import type {
   BlogPostSummary,
   ResolvedAuthor,
@@ -14,13 +19,30 @@ interface BlogFeedProps {
   readonly entries: readonly BlogFeedEntry[];
 }
 
+/** Docked hero shell for /blog: bleeds the editorial photo to y=0 under
+ * the transparent-at-top MarketingHeader (marketing routes spec, 2026-09-26). */
+function BlogHeroFrame({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <div className='marketing-hero-dock relative overflow-hidden'>
+      <MarketingEditorialHeroPhoto
+        src='/images/hero/blog-index.webp'
+        opacity={0.4}
+        testId='blog-hero-photo'
+      />
+      <MarketingHero variant='left' className='relative z-10'>
+        {children}
+      </MarketingHero>
+    </div>
+  );
+}
+
 export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
   const [featured, ...remaining] = entries;
 
   if (!featured) {
     return (
       <div className='min-h-screen'>
-        <MarketingHero variant='left'>
+        <BlogHeroFrame>
           <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
           <h1 className='system-b-marketing-route-title mb-6 mt-6 max-w-2xl text-primary-token line-clamp-2'>
             Blog
@@ -28,23 +50,23 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
           <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
             Posts coming soon.
           </p>
-        </MarketingHero>
+        </BlogHeroFrame>
       </div>
     );
   }
 
   return (
     <div className='min-h-screen'>
-      <MarketingHero variant='left'>
+      <BlogHeroFrame>
         <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
         <h1 className='system-b-marketing-route-title mb-6 mt-6 max-w-2xl text-primary-token line-clamp-2'>
           Blog
         </h1>
         <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
-          Thoughts on product, strategy, and the craft of building tools for
-          artists.
+          Thoughts on product, strategy, and the craft of building your Jovie
+          profile.
         </p>
-      </MarketingHero>
+      </BlogHeroFrame>
 
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>
         <div className='marketing-divider mb-10' />
