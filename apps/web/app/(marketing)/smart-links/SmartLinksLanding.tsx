@@ -1,8 +1,18 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroPhoto,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { SmartLinksDemo } from './SmartLinksDemo';
+
+const SMART_LINKS_HERO_PHOTO = {
+  src: '/images/marketing-hero/smart-links.webp',
+  width: 1600,
+  height: 686,
+} as const;
 
 const steps = [
   [
@@ -25,11 +35,15 @@ const steps = [
 export function SmartLinksLanding() {
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
-      <section aria-labelledby='smart-links-title' className='py-14 sm:py-24'>
-        <MarketingContainer width='page'>
+      <section
+        aria-labelledby='smart-links-title'
+        className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden py-14 sm:py-24'
+      >
+        <MarketingHeroPhoto {...SMART_LINKS_HERO_PHOTO} />
+        <MarketingContainer width='page' className='relative z-3'>
           <div className='grid items-center gap-12 lg:grid-cols-2'>
             <div>
-              <p className='homepage-section-eyebrow'>MUSIC SMART LINKS</p>
+              <p className='homepage-section-eyebrow'>SMART LINKS</p>
               <h1
                 id='smart-links-title'
                 className='marketing-h1-linear mt-5 max-w-3xl text-balance line-clamp-2'
@@ -37,8 +51,8 @@ export function SmartLinksLanding() {
                 One Link. Their Music App.
               </h1>
               <p className='mt-6 max-w-xl text-base leading-7 text-secondary-token sm:text-lg'>
-                Let fans choose where to listen. The action stays put while the
-                service moves, and their choice follows the next song.
+                Let visitors choose where to listen. The action stays put while
+                the service moves, and their choice follows the next song.
               </p>
               <div className='mt-8 flex flex-wrap gap-3'>
                 <Button asChild variant='primary' size='md'>
@@ -127,7 +141,8 @@ export function SmartLinksLanding() {
             Make Every Link Sing.
           </h2>
           <p className='mx-auto mt-4 max-w-xl text-base leading-7 text-secondary-token'>
-            Give every release a home that takes fans to their chosen music app.
+            Give every release a home that takes visitors to their chosen music
+            app.
           </p>
           <div className='mt-8'>
             <Button asChild variant='secondary' size='md'>

@@ -1,12 +1,22 @@
 /**
  * Linktree Tracking Pixel Detection
  *
- * Detects creator-owned tracking pixels (Facebook, TikTok, Google) from
- * Linktree profile HTML. Only init/load calls count — script src presence
- * alone does NOT count, since Linktree loads these for its own analytics.
+ * Detects creator-owned tracking pixels (Facebook, TikTok, Google, X/Twitter,
+ * Snapchat, Pinterest) from Linktree profile HTML. Only init/load calls count —
+ * script src presence alone does NOT count, since Linktree loads these for its
+ * own analytics.
  */
 
 import type { DiscoveredPixels } from '@/lib/db/schema/profiles';
+
+const PIXEL_PLATFORMS = [
+  'facebook',
+  'tiktok',
+  'google',
+  'twitter',
+  'snapchat',
+  'pinterest',
+] as const satisfies readonly (keyof DiscoveredPixels)[];
 
 const PIXEL_DETECTORS = [
   {
@@ -21,6 +31,22 @@ const PIXEL_DETECTORS = [
     platform: 'google' as const,
     initPattern: /gtag\s*\(\s*['"]config['"]\s*,\s*['"]([A-Z0-9-]+)['"]/g,
   },
+  {
+    // X (Twitter) pixel: twq('init', 'o1234') and twq('config', 'o1234')
+    platform: 'twitter' as const,
+    initPattern:
+      /twq\s*\(\s*['"](?:init|config)['"]\s*,\s*['"]([a-z0-9]+)['"]/gi,
+  },
+  {
+    // Snapchat pixel: snaptr('init', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
+    platform: 'snapchat' as const,
+    initPattern: /snaptr\s*\(\s*['"]init['"]\s*,\s*['"]([0-9a-f-]+)['"]/gi,
+  },
+  {
+    // Pinterest tag: pintrk('load', '2612345678901')
+    platform: 'pinterest' as const,
+    initPattern: /pintrk\s*\(\s*['"]load['"]\s*,\s*['"](\d+)['"]/g,
+  },
 ];
 
 /**
@@ -28,6 +54,8 @@ const PIXEL_DETECTORS = [
  *
  * Scans for platform-specific init/load calls and extracts pixel IDs.
  * Script tag presence alone is ignored — only explicit init calls count.
+ * Pixel IDs are deduplicated per platform: the same init call commonly appears
+ * twice (inline script plus its serialized copy inside __NEXT_DATA__).
  *
  * @param html - The HTML content of the Linktree page
  * @returns Discovered pixels by platform, or null if none found
@@ -46,7 +74,7 @@ export function detectTrackingPixels(html: string): DiscoveredPixels | null {
 
     let match: RegExpExecArray | null;
     while ((match = regex.exec(html)) !== null) {
-      if (match[1]) {
+      if (match[1] && !ids.includes(match[1])) {
         ids.push(match[1]);
       }
     }
@@ -80,7 +108,7 @@ export function mergeDiscoveredPixels(
 
   const merged: DiscoveredPixels = { ...existing };
 
-  for (const platform of ['facebook', 'tiktok', 'google'] as const) {
+  for (const platform of PIXEL_PLATFORMS) {
     if (incoming[platform]) {
       merged[platform] = incoming[platform];
     }
@@ -106,7 +134,7 @@ export function getCreatorOwnedPixels(
   const result: DiscoveredPixels = {};
   let found = false;
 
-  for (const platform of ['facebook', 'tiktok', 'google'] as const) {
+  for (const platform of PIXEL_PLATFORMS) {
     const entry = discoveredPixels[platform];
     if (!entry) continue;
 

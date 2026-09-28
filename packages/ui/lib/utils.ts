@@ -11,11 +11,6 @@ export const OVERLAY_Z_LAYERS = [
 ] as const;
 
 const mergeTailwindClasses = extendTailwindMerge({
-  extend: {
-    classGroups: {
-      z: [{ z: [...OVERLAY_Z_LAYERS] }],
-    },
-  },
   override: {
     classGroups: {
       'font-size': [
@@ -32,6 +27,14 @@ const mergeTailwindClasses = extendTailwindMerge({
           ],
         },
       ],
+    },
+  },
+  extend: {
+    classGroups: {
+      z: [{ z: [...OVERLAY_Z_LAYERS] }],
+      // `border-strong` is a theme border color. Without this group, tailwind-merge
+      // keeps it beside the keycap's arbitrary border utility and the border flips.
+      'border-color': [{ border: ['strong'] }],
     },
   },
 });

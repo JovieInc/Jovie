@@ -86,11 +86,13 @@ describe('public profile Liquid Glass navigation', () => {
   });
 
   it('renders the PAC listen slot as flat glass from the tab bar lens material', () => {
+    // The rail listen slot keeps the glass tone; the featured mode card
+    // swaps the face to the neutral card CTA through `shape`.
     expect(PAC).toMatch(
-      /<PrimaryPill tone='glass' href=\{listenHref\}>\s*Listen/
+      /<PrimaryPill shape=\{pillShape\} tone='glass' href=\{listenHref\}>\s*\{isFeatured \? 'Listen now' : 'Listen'\}/
     );
     expect(PAC).toMatch(
-      /<PrimaryPill\s+tone='glass'\s+href=\{listenHref\}\s+onClick=\{handlePlayClick\}/
+      /<PrimaryPill\s+shape=\{pillShape\}\s+tone='glass'\s+href=\{listenHref\}\s+onClick=\{handlePlayClick\}/
     );
     expect(PAC).toContain("? 'profile-glass-pill'");
     const pill =

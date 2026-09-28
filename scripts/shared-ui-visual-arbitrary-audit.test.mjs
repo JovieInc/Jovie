@@ -62,6 +62,7 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/theme/motion-policy.ts',
   'packages/ui/theme/tokens.ts',
   'packages/ui/lib/badge-geometry-contract.ts',
+  'packages/ui/atoms/founder-pen-atoms.ts',
 ];
 const EXCLUDED_NON_PRODUCTION_SOURCES = [
   'packages/ui/index.test.ts',

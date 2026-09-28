@@ -1017,6 +1017,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(warm).toContain("github.ref == 'refs/heads/main' &&");
     expect(warm).not.toMatch(/secrets\.|TURBO_TOKEN|continue-on-error/);
     expect(warm).toContain('persist-credentials: false');
+    // JOV-6835: the only main-scoped node_modules writer must not be gated
+    // on the tsc key, or main's dependency cache goes stale after manifests move.
+    expect(warm).toMatch(
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n {6}- name:/
+    );
     const keys = body =>
       body.split('\n').filter(line => line.includes('jovie-web-tsbuildinfo'));
     const [ciKey, ...ciFallbacks] = keys(restore).map(line => line.trim());
@@ -1094,7 +1099,7 @@ describe('ci-fast bounded parallel workflow', () => {
         const [selector] = selectors;
         expect(block).toContain(`name: ${jobName}`);
         expect(block).toMatch(
-          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+          /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
         );
         expect(block).not.toContain('always()');
         // Aliased gate jobs share remaining's anchored condition verbatim.
@@ -1399,7 +1404,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(preflight).not.toMatch(/\bpnpm (?:exec|install|run)\b/);
     for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
       expect(jobBlock(jobId, nextJobId)).toMatch(
-        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace\]/
       );
     }
   });
@@ -1795,7 +1800,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
