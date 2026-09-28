@@ -2,6 +2,10 @@ import 'server-only';
 
 import { JOVIE_AGENT_DISPLAY_NAME } from '@/lib/brand/agent-display-name';
 import { env } from '@/lib/env-server';
+import {
+  hasHudGithubAuth,
+  resolveHudGithubToken,
+} from '@/lib/github/hud-token.server';
 import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
 import { serverFetch } from '@/lib/http/server-fetch';
 import type {
@@ -119,7 +123,7 @@ async function fetchGitHubJson(
   | { ok: true; payload: unknown }
   | { ok: false; errorMessage: string; status?: number }
 > {
-  const token = env.HUD_GITHUB_TOKEN;
+  const token = await resolveHudGithubToken();
   const owner = env.HUD_GITHUB_OWNER;
   const repo = env.HUD_GITHUB_REPO;
 
@@ -328,7 +332,7 @@ export async function getHudAiOpsSummary(
   const generatedAtIso = now.toISOString();
   const dispatch = getHermesDispatchAvailability();
   const githubConfigured = Boolean(
-    env.HUD_GITHUB_TOKEN && env.HUD_GITHUB_OWNER && env.HUD_GITHUB_REPO
+    hasHudGithubAuth() && env.HUD_GITHUB_OWNER && env.HUD_GITHUB_REPO
   );
 
   if (!githubConfigured) {

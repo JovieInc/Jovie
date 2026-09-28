@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { LeadPipelineSettings } from '@/lib/db/schema/leads';
+
 const {
   captureErrorMock,
   executeMock,
@@ -58,8 +60,15 @@ const {
 });
 
 vi.mock('@/lib/leads/google-cse', () => ({
-  searchGoogleCSE: searchGoogleCSEMock,
+  searchGoogleCSEWithStatus: searchGoogleCSEMock,
 }));
+
+const okOutcome = (results: unknown[]) => ({
+  status: 'ok' as const,
+  provider: 'google_cse' as const,
+  results,
+  error: null,
+});
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: captureErrorMock,
@@ -83,7 +92,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-const defaultSettings = {
+const defaultSettings: LeadPipelineSettings = {
   id: 1,
   enabled: true,
   discoveryEnabled: true,
@@ -96,6 +105,19 @@ const defaultSettings = {
   queriesUsedToday: 0,
   queryBudgetResetsAt: null,
   lastDiscoveryQueryIndex: 0,
+  dailySendCap: 10,
+  maxPerHour: 5,
+  rampMode: 'manual',
+  guardrailsEnabled: true,
+  guardrailThresholds: {
+    minimumSampleSize: 30,
+    increaseClaimClickRate: 0.06,
+    holdClaimClickRateFloor: 0.03,
+    pauseClaimClickRateFloor: 0.03,
+    maxBounceComplaintRate: 0.03,
+    maxUnsubscribeRate: 0.05,
+    maxProviderFailureRate: 0.1,
+  },
   dmTemplate: null,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -142,12 +164,14 @@ describe('runDiscovery', () => {
       (url: string) => url.split('/').at(-1) ?? null
     );
 
-    searchGoogleCSEMock.mockResolvedValue([
-      { link: 'https://linktr.ee/artist-one' },
-      { link: 'https://linktr.ee/artist-one' },
-      { link: 'https://linktr.ee/artist-two' },
-      { link: 'https://example.com/not-linktree' },
-    ]);
+    searchGoogleCSEMock.mockResolvedValue(
+      okOutcome([
+        { link: 'https://linktr.ee/artist-one' },
+        { link: 'https://linktr.ee/artist-one' },
+        { link: 'https://linktr.ee/artist-two' },
+        { link: 'https://example.com/not-linktree' },
+      ])
+    );
 
     returningMock.mockResolvedValue([{ id: 'lead-1' }]);
 
@@ -198,10 +222,12 @@ describe('runDiscovery', () => {
     isLinktreeUrlMock.mockReturnValue(false);
     extractLinktreeHandleMock.mockReturnValue(null);
 
-    searchGoogleCSEMock.mockResolvedValue([
-      { link: 'https://example.com/a' },
-      { link: 'https://example.com/b' },
-    ]);
+    searchGoogleCSEMock.mockResolvedValue(
+      okOutcome([
+        { link: 'https://example.com/a' },
+        { link: 'https://example.com/b' },
+      ])
+    );
 
     const result = await runDiscovery(defaultSettings, [defaultKeyword]);
 
@@ -224,10 +250,12 @@ describe('runDiscovery', () => {
       (url: string) => url.split('/').at(-1) ?? null
     );
 
-    searchGoogleCSEMock.mockResolvedValue([
-      { link: 'https://linktr.ee/artist-three' },
-      { link: 'https://linktr.ee/artist-four' },
-    ]);
+    searchGoogleCSEMock.mockResolvedValue(
+      okOutcome([
+        { link: 'https://linktr.ee/artist-three' },
+        { link: 'https://linktr.ee/artist-four' },
+      ])
+    );
 
     returningMock.mockRejectedValueOnce(
       new Error('column "has_instagram" of relation "leads" does not exist')
@@ -255,7 +283,7 @@ describe('runDiscovery', () => {
 
   it('passes searchOffset to Google CSE for pagination', async () => {
     isLinktreeUrlMock.mockReturnValue(false);
-    searchGoogleCSEMock.mockResolvedValue([]);
+    searchGoogleCSEMock.mockResolvedValue(okOutcome([]));
 
     const { runDiscovery } = await import('@/lib/leads/discovery');
 
@@ -270,9 +298,11 @@ describe('runDiscovery', () => {
   it('resets searchOffset to 1 when results are less than 10', async () => {
     isLinktreeUrlMock.mockReturnValue(false);
     searchGoogleCSEMock.mockResolvedValue(
-      Array.from({ length: 5 }, (_, i) => ({
-        link: `https://example.com/${i}`,
-      }))
+      okOutcome(
+        Array.from({ length: 5 }, (_, i) => ({
+          link: `https://example.com/${i}`,
+        }))
+      )
     );
 
     const { runDiscovery } = await import('@/lib/leads/discovery');
@@ -336,5 +366,62 @@ describe('runDiscovery', () => {
         route: 'leads/discovery',
       })
     );
+  });
+
+  it('does not treat provider failure as exhaustion or reset pagination', async () => {
+    searchGoogleCSEMock.mockResolvedValue({
+      status: 'quota_exceeded',
+      provider: 'google_cse',
+      results: [],
+      error: 'Daily Limit Exceeded',
+    });
+
+    const { runDiscovery } = await import('@/lib/leads/discovery');
+
+    const result = await runDiscovery(defaultSettings, [
+      { ...defaultKeyword, searchOffset: 31 },
+    ]);
+
+    expect(result.queriesUsed).toBe(1);
+    expect(result.newLeadsFound).toBe(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      providerStatus: 'quota_exceeded',
+      error: 'Daily Limit Exceeded',
+      searchOffset: 31,
+    });
+    // No keyword stats/pagination update is written on provider failure.
+    expect(setMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ searchOffset: expect.any(Number) })
+    );
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      'Discovery query provider failure',
+      expect.any(Error),
+      expect.objectContaining({ route: 'leads/discovery' })
+    );
+  });
+
+  it('does not bill unconfigured providers as queries and stops the run', async () => {
+    searchGoogleCSEMock.mockResolvedValue({
+      status: 'not_configured',
+      provider: 'none',
+      results: [],
+      error: 'missing env: SERPAPI_API_KEY',
+    });
+
+    const { runDiscovery } = await import('@/lib/leads/discovery');
+
+    const result = await runDiscovery(
+      { ...defaultSettings, dailyQueryBudget: 10 },
+      [defaultKeyword, { ...defaultKeyword, id: 'keyword-2' }]
+    );
+
+    expect(result.queriesUsed).toBe(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      providerStatus: 'not_configured',
+      error: 'missing env: SERPAPI_API_KEY',
+    });
+    expect(searchGoogleCSEMock).toHaveBeenCalledTimes(1);
   });
 });

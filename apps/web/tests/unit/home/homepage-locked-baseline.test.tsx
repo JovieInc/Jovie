@@ -11,9 +11,9 @@ import {
   HOMEPAGE_EDITORIAL_CARDS,
   HomepageEditorialChangelog,
 } from '@/components/homepage/HomepageEditorialChangelog';
-import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HERO_COPY } from '@/components/homepage/intent';
+import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
@@ -84,12 +84,7 @@ vi.mock('next/image', () => ({
 function LockedHomepageBody() {
   return (
     <>
-      <HomepageEditorialHero
-        headingId='home-hero-heading'
-        headline={HERO_COPY.headline}
-        support={HERO_COPY.subhead}
-        search={HERO_COPY.search}
-      />
+      <HomepageIdentityHero headingId='home-hero-heading' />
       <div data-testid='homepage-story-stack'>
         <HomepageCertifiedSections
           previews={{
@@ -106,9 +101,10 @@ function LockedHomepageBody() {
 
 describe('JOV-5864 locked homepage baseline', () => {
   it('pins the certified body, close, changelog, and SEO copy verbatim', () => {
-    expect(HOMEPAGE_LAUNCH_COPY.seo).toEqual({
-      title: 'Jovie | Control how the world sees you',
-      description: 'Find what the internet knows. Turn it into relationships.',
+    expect(HOMEPAGE_IDENTITY_COPY.seo).toEqual({
+      title: 'Jovie | A living identity for the internet',
+      description:
+        'Your work, your links, your next chapter. Together in your Jovie profile.',
     });
 
     expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toEqual([
@@ -172,7 +168,7 @@ describe('JOV-5864 locked homepage baseline', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Control how the world sees you.',
+        name: 'A living identity for the internet.',
       })
     ).toBeInTheDocument();
     expect(
@@ -186,13 +182,15 @@ describe('JOV-5864 locked homepage baseline', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses access links in both conversion positions when gated', () => {
+  it('keeps the name search and /start handoff when the waitlist gate is on', () => {
     gate.WAITLIST_ENABLED = true;
     render(<LockedHomepageBody />);
+    expect(screen.getByPlaceholderText('Search your name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Find me' })).toBeEnabled();
     expect(
-      screen.getAllByRole('link', { name: 'Request access' })
-    ).toHaveLength(2);
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Get started')).toBeNull();
   });
 
   it('keeps one canonical name search with one terminal return action', () => {
@@ -215,7 +213,8 @@ describe('JOV-5864 locked homepage baseline', () => {
   });
 
   it('keeps the mounted baseline person-first and category-neutral', () => {
-    const { certified, hero, seo } = HOMEPAGE_LAUNCH_COPY;
+    const { certified } = HOMEPAGE_LAUNCH_COPY;
+    const { hero, seo } = HOMEPAGE_IDENTITY_COPY;
     const mountedCopy = [
       seo.title,
       seo.description,

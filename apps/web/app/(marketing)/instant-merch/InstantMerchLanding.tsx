@@ -20,7 +20,7 @@ function MerchFlowPreview() {
       className='w-full'
     >
       <div className='grid gap-3 sm:grid-cols-3'>
-        {['Heavyweight tee', 'Tour hoodie', 'Limited cap'].map(
+        {['Heavyweight tee', 'Zip hoodie', 'Limited cap'].map(
           (product, index) => (
             <div
               key={product}
@@ -53,6 +53,11 @@ export function InstantMerchLanding() {
           title={copy.hero.title}
           body={copy.hero.body}
           media={<MerchFlowPreview />}
+          photo={{
+            src: '/images/marketing-hero/instant-merch.webp',
+            width: 1600,
+            height: 901,
+          }}
           headingId='instant-merch-hero-heading'
           sectionTestId='marketing-section-hero'
           primaryCtaLabel={copy.hero.primaryCta}
