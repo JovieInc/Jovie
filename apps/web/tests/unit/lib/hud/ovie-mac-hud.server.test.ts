@@ -51,6 +51,8 @@ function stripeAvailable() {
     mrrGrowth30dUsd: 200,
     isConfigured: true,
     isAvailable: true,
+    excludedInternalSubscribers: 0,
+    excludedInternalMrrUsd: 0,
   };
 }
 
