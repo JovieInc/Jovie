@@ -35,6 +35,15 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
+    // JOV-6860: every marketing-header route shares the waitlist-mode
+    // front-door CTA via the single resolver; no per-route CTA overrides
+    // other than the locked homepage entry.
+    expect(headerSource).toContain('resolveMarketingHeaderPrimaryCta');
+    expect(headerSource).toContain(
+      'getHomepageFrontDoorCtaContract(waitlistEnabled).primary'
+    );
+    expect(headerSource).not.toContain('MARKETING_CTA_INTENTS');
+    expect(headerSource).not.toContain('APP_ROUTES.ARTIST_PROFILES]:');
     // Homepage conversion lock (JOV-5085): / shows Find yourself -> /start
     // even while waitlisting; other routes keep the front-door CTA.
     expect(headerSource).toContain(
