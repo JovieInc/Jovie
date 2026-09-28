@@ -103,7 +103,7 @@ describe('design-system component-family ratchet', () => {
   it('keeps the retained EntityHeaderCard API as a canonical adapter', () => {
     const source = readFileSync(LEGACY_ENTITY_HEADER_PATH, 'utf8');
 
-    expect(source).toContain("from './EntityHeader'");
+    expect(source).toMatch(/from '\.\/EntityHeader'/);
     expect(source).toContain('<EntityHeader');
     expect(source).not.toContain('StableHeaderTextSlot');
     expect(source).not.toContain('data-entity-header-identity');
