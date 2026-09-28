@@ -58,3 +58,29 @@ export function useAudioChromeSnapshot(): AudioChromeSnapshot {
     getAudioChromeSnapshot
   );
 }
+
+/**
+ * Expand-request channel (JOV-6680). The full player owns its own open state
+ * inside PersistentAudioBar, so chrome that wants to reopen it — e.g. the
+ * sidebar mini card — cannot set the snapshot directly (the player would
+ * overwrite it on its next publish). Instead, mini chrome bumps this counter;
+ * the player subscribes and opens itself, then publishes the new snapshot.
+ */
+let fullPlayerExpandRequests = 0;
+
+export function requestFullAudioPlayer(): void {
+  fullPlayerExpandRequests += 1;
+  emitAudioChromeChange();
+}
+
+function getFullPlayerExpandRequests(): number {
+  return fullPlayerExpandRequests;
+}
+
+export function useFullAudioPlayerExpandRequests(): number {
+  return useSyncExternalStore(
+    subscribeAudioChrome,
+    getFullPlayerExpandRequests,
+    getFullPlayerExpandRequests
+  );
+}

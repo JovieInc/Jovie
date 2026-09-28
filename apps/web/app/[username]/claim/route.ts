@@ -56,11 +56,13 @@ function getCanonicalSpotifyUrl(profile: {
   return `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`;
 }
 
-async function hasActiveCreatorProfile(clerkUserId: string): Promise<boolean> {
+// `getOptionalAuth().userId` is the app `users.id` since the Better Auth
+// cutover; `users.clerk_id` is null or `ba:`-prefixed on current rows.
+async function hasActiveCreatorProfile(appUserId: string): Promise<boolean> {
   const [user] = await db
     .select({ activeProfileId: users.activeProfileId })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, appUserId))
     .limit(1);
 
   return Boolean(user?.activeProfileId);

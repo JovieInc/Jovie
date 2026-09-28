@@ -41,6 +41,18 @@ import {
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
+// JOV-6837: the structural control paths are data, one ERE alternative per line.
+const STRUCTURAL_CONTROL_PATHS = readFileSync(
+  resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
+  'utf8'
+);
+function structuralControlPattern() {
+  return STRUCTURAL_CONTROL_PATHS.split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+    .join('|');
+}
 const WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
@@ -311,12 +323,8 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('path-selects and runs the DeepSec policy and closed-loop tests', () => {
-    const initial = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
-    const additions = [
-      ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
-    ].map(match => match[1]);
-    expect(initial).toBeTruthy();
-    const pattern = initial + additions.join('');
+    const pattern = structuralControlPattern();
+    expect(pattern).toBeTruthy();
     for (const path of [
       'scripts/security/deepsec-policy.mjs',
       'scripts/security/deepsec-policy.test.mjs',
@@ -1193,13 +1201,13 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(structuralDecision).not.toContain('apps/ios/');
     expect(structuralDecision).toContain('echo "skip=true"');
-    expect(structuralDecision).toContain(
+    expect(STRUCTURAL_CONTROL_PATHS).toContain(
       'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))'
     );
-    expect(structuralDecision).toContain(
+    expect(STRUCTURAL_CONTROL_PATHS).toContain(
       'scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))\\.test\\.mjs$'
     );
-    expect(structuralDecision).toContain('canon/invariants\\.jsonl');
+    expect(STRUCTURAL_CONTROL_PATHS).toContain('canon/invariants\\.jsonl');
     expect(structuralDecision).toContain('scripts/invariants/');
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignConformance\([^)]*\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
@@ -1378,12 +1386,12 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('enforces external shared health contract coverage for package and test changes', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
+    expect(STRUCTURAL_CONTROL_PATHS).toContain(
+      'packages/agent-transport-contracts/'
     );
-    expect(remaining).toContain('packages/agent-transport-contracts/');
-    expect(remaining).toContain('symphony-health-contract\\.test\\.mjs');
+    expect(STRUCTURAL_CONTROL_PATHS).toContain(
+      'symphony-health-contract\\.test\\.mjs'
+    );
     expect(CI_FAST_SOURCE).toContain(
       "selected.has('operations') || selected.has('web')"
     );
@@ -1397,15 +1405,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('selects structural coverage for native queue evidence and collector edits', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    const pattern = [
-      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
-    ]
-      .map(match => match[1])
-      .join('');
+    const pattern = structuralControlPattern();
     for (const path of [
       'scripts/native-queue-eval.mjs',
       'scripts/lib/native-queue-eval.mjs',
@@ -1430,15 +1430,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('selects the existing control lane for conflict event entrypoint and proof edits', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-    const pattern = [
-      ...remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
-    ]
-      .map(match => match[1])
-      .join('');
+    const pattern = structuralControlPattern();
     for (const path of [
       'scripts/pr-conflict-handler.mjs',
       'scripts/lib/pr-conflict-handler.mjs',
@@ -1456,12 +1448,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('enforces fleet gate and backlog-orchestrator coverage in structural CI', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining',
-      'ci-profile-admission-browser'
-    );
-
-    expect(remaining).toContain('scripts/fleet-gate/');
+    expect(STRUCTURAL_CONTROL_PATHS).toContain('scripts/fleet-gate/');
     expect(CI_FAST_SOURCE).toContain('elif [ "\\${CI:-}" = "true" ]');
     expect(CI_FAST_SOURCE).not.toContain('elif [[');
     for (const command of [
@@ -1988,13 +1975,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const controlPattern = remaining.match(
-      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
-    )?.[1];
-    const controlPatternAdditions = Array.from(
-      remaining.matchAll(/STRUCTURAL_CONTROL_PATTERN\+='([^']+)'/g),
-      match => match[1]
-    );
+    const controlPattern = structuralControlPattern();
+    const controlPatternAdditions = [];
     const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
@@ -2159,9 +2141,7 @@ describe('ci-fast bounded parallel workflow', () => {
       remaining.indexOf('- name: Decide structural lane'),
       remaining.indexOf('- name: Select Storybook browser proof')
     );
-    const controlPattern = remaining.match(
-      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
-    )?.[1];
+    const controlPattern = structuralControlPattern();
     const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
@@ -2308,7 +2288,7 @@ describe('ci-fast bounded parallel workflow', () => {
 });
 
 it('runs authenticated Summer bridge coverage for admission-only edits', () => {
-  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
+  const pattern = structuralControlPattern();
   const selected = new RegExp(pattern);
   expect(selected.test('apps/web/lib/ovie/summer-admissions.ts')).toBe(true);
   expect(
@@ -2323,11 +2303,7 @@ it('runs authenticated Summer bridge coverage for admission-only edits', () => {
 });
 
 it('runs web CI contracts on PRs changing the files they read (#18718)', () => {
-  const pattern = [
-    ...WORKFLOW.matchAll(/STRUCTURAL_CONTROL_PATTERN\+?='([^']+)'/g),
-  ]
-    .map(match => match[1])
-    .join('');
+  const pattern = structuralControlPattern();
   const selects = path =>
     spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status === 0;
   for (const path of [
@@ -2469,7 +2445,7 @@ describe('CI diff selection on a divergent PR', () => {
 });
 
 it('selects and enforces offline failure behavior coverage for module-only and test-only edits', () => {
-  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+  const pattern = structuralControlPattern();
   expect(pattern).toBeDefined();
   for (const path of [
     'scripts/lib/rolling-ci-failure-disposition.mjs',
@@ -2509,4 +2485,31 @@ it('selects and enforces offline failure behavior coverage for module-only and t
       `--coverage.thresholds.${metric}`
     );
   }
+});
+
+it('reads structural control paths from data, one alternative per line (JOV-6837)', () => {
+  const decision = WORKFLOW.slice(
+    WORKFLOW.indexOf('- name: Decide structural lane'),
+    WORKFLOW.indexOf('- name: Select Storybook browser proof')
+  );
+  expect(decision).toContain(
+    `STRUCTURAL_CONTROL_PATTERN="$(grep -vE '^[[:space:]]*(#|$)' .github/ci-harness/structural-control-paths.ere | paste -sd'|' -)"`
+  );
+  expect(decision).toContain('[[ -n "$STRUCTURAL_CONTROL_PATTERN" ]]');
+  expect(decision).not.toMatch(/STRUCTURAL_CONTROL_PATTERN\+?='/);
+  const lines = STRUCTURAL_CONTROL_PATHS.split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'));
+  for (const line of lines) {
+    expect(line.startsWith('^'), line).toBe(true);
+    expect(() => new RegExp(line), line).not.toThrow();
+  }
+  const selected = execFileSync('git', ['ls-files'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(path => new RegExp(structuralControlPattern()).test(path));
+  expect(selected).toContain('.github/workflows/ci.yml');
+  expect(selected).not.toContain('README.md');
 });

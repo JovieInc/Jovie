@@ -52,3 +52,11 @@ const meta = {
 
 export default meta;
 export const Verified: StoryObj<typeof meta> = {};
+
+export const GetUpdates: StoryObj<typeof meta> = {
+  args: { onGetUpdatesClick: fn() },
+};
+
+export const UpdatesOn: StoryObj<typeof meta> = {
+  args: { onGetUpdatesClick: fn(), isSubscribed: true },
+};
