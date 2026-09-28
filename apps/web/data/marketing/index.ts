@@ -111,6 +111,30 @@ export type {
 } from './designGaps';
 export { getProposedSection, PROPOSED_SECTIONS } from './designGaps';
 export type {
+  MarketingEditorialBackgroundAccent,
+  MarketingEditorialBackgroundComposition,
+  MarketingEditorialBackgroundCurve,
+  MarketingEditorialBackgroundDecision,
+  MarketingEditorialBackgroundFinding,
+  MarketingEditorialBackgroundFindingCode,
+  MarketingEditorialBackgroundPoint,
+  MarketingEditorialBackgroundRect,
+  MarketingEditorialBackgroundVariant,
+  MarketingEditorialBackgroundVariantId,
+} from './editorialBackgrounds';
+export {
+  auditMarketingEditorialBackgroundDecision,
+  EDITORIAL_BACKGROUND_FLOW,
+  EDITORIAL_BACKGROUND_SOFT,
+  formatMarketingEditorialBackgroundsForPrompt,
+  getMarketingEditorialBackground,
+  isMarketingEditorialBackgroundVariantId,
+  JOVIE_EDITORIAL_BACKGROUND_SCHEMA,
+  JOVIE_EDITORIAL_BACKGROUND_VERSION,
+  MARKETING_EDITORIAL_BACKGROUND_VARIANT_IDS,
+  MARKETING_EDITORIAL_BACKGROUNDS,
+} from './editorialBackgrounds';
+export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,
