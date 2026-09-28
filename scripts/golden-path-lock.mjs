@@ -367,7 +367,6 @@ async function runProdProbe(args) {
   }
 }
 
-
 function gh(args) {
   const result = spawnSync('gh', args, { encoding: 'utf8' });
   if (result.status !== 0) {
@@ -436,10 +435,7 @@ async function runAutofix(args) {
   if (apiKey) {
     // JOV-6832: an unreadable owner list is not permission to launch another
     // agent; 28 duplicate PRs in 5 h came from launching blind.
-    const openPrNumber = findOpenAutofixPr(
-      listOpenPrs(),
-      receipt.fingerprint
-    );
+    const openPrNumber = findOpenAutofixPr(listOpenPrs(), receipt.fingerprint);
     if (openPrNumber) {
       // The open PR already carries the Linear intake; this run's log is the new evidence.
       fail(
