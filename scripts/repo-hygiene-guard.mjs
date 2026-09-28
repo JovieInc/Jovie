@@ -876,6 +876,16 @@ function pathDelta(base, current) {
   };
 }
 
+export function filterMergeParentIdenticalPaths(
+  changedPaths,
+  stagedOids,
+  mergeHeadOids
+) {
+  return changedPaths.filter(
+    path => stagedOids.get(path) !== mergeHeadOids.get(path)
+  );
+}
+
 export function collectGitPaths(args) {
   const diffBaseIndex = args.indexOf('--diff-base');
   const staged = args.includes('--staged');
@@ -906,12 +916,7 @@ export function collectGitPaths(args) {
       ).trim();
       if (mergeHead) {
         mergeHeadOids = new Map();
-        for (const record of gitPaths([
-          'ls-tree',
-          '-r',
-          '-z',
-          mergeHead,
-        ])) {
+        for (const record of gitPaths(['ls-tree', '-r', '-z', mergeHead])) {
           const separator = record.indexOf('\t');
           if (separator < 0) continue;
           const metadata = record.slice(0, separator).split(' ');
@@ -933,8 +938,10 @@ export function collectGitPaths(args) {
         if (metadata[2] !== '0') continue;
         stagedOids.set(normalizePath(record.slice(separator + 1)), metadata[1]);
       }
-      changedPaths = changedPaths.filter(
-        path => stagedOids.get(path) !== mergeHeadOids.get(path)
+      changedPaths = filterMergeParentIdenticalPaths(
+        changedPaths,
+        stagedOids,
+        mergeHeadOids
       );
     }
   }
