@@ -26,7 +26,7 @@ function redirectError(origin: string, returnTo: string, error: string) {
 /**
  * Spotify OAuth for the canonical connector primitive — one route serves artist
  * accounts on Jovie and company accounts on Ovie.
- * GET /api/connectors/spotify/authorize?returnTo=/app/admin/platform-connections
+ * GET /api/connectors/spotify/authorize?returnTo=/app/settings/connectors
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);

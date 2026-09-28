@@ -7,9 +7,9 @@
  * Scope rule: this type carries ONLY the fields real `useUserSafe()`
  * consumers read today (grep evidence per field below). Clerk-specific
  * resource methods (`createExternalAccount`, `createEmailAddress`,
- * `getSessions`, …) are intentionally absent — their two call sites
- * (PlatformConnectionsClient, AccountSettingsSection's ClerkUserResource
- * cast) are reworked onto `authClient` APIs in the client-flip commit.
+ * `getSessions`, …) are intentionally absent — their remaining call site
+ * (AccountSettingsSection's ClerkUserResource
+ * cast) is reworked onto `authClient` APIs in the client-flip commit.
  */
 
 /**

@@ -42,7 +42,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
   '/app/ov/interviews': 'Internal admin review workspace (manual entry)',
-  '/app/ov/playlists': 'Internal admin workflow (manual entry)',
+  '/app/ov/screenshots':
+    'Internal docs/QA screenshot utility retained for manual entry after Ovie nav consolidation (JOV-6895)',
   '/app/ov/presence': 'Internal admin workspace pending Ovie IA placement',
   '/app/ov/agent-runs/[id]':
     'Dynamic operator debug route reached from an agent run action',

@@ -133,8 +133,8 @@ export async function generatePlaylist(
     for (const j of jovieArtistTracks)
       jovieTrackLookup.set(j.spotifyTrackId, j);
 
-    // Cover art is generated and uploaded at admin approval time
-    // (see playlist-actions.ts approvePlaylist).
+    // Cover art is generated and uploaded at approval time by the playlist
+    // agent workflow (the manual admin approval page was removed in JOV-6895).
     const coverImageUrlForDb: string | null = null;
 
     const playlistId = randomUUID();

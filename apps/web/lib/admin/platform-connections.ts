@@ -361,7 +361,7 @@ export async function getPlaylistSpotifyStatus(): Promise<PlaylistSpotifyStatus>
       updatedAt: settings?.playlistSpotifyUpdatedAt ?? null,
       updatedByUserId: settings?.playlistSpotifyUpdatedBy ?? null,
       error:
-        'Playlist Spotify publisher is not configured. Connect Spotify in Admin → Platform Connections.',
+        'Playlist Spotify publisher is not configured. Connect Spotify in Settings → Connectors.',
     };
   }
 

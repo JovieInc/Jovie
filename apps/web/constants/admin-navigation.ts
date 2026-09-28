@@ -41,16 +41,10 @@ export type AdminWorkspaceId =
   | 'shipping'
   | 'people'
   | 'growth'
-  | 'platform_connections'
   | 'activity'
   | 'investors'
   | 'feature_registry'
-  | 'screenshots'
-  | 'costs'
-  | 'revenue_lift'
-  | 'share_studio'
-  | 'system_map'
-  | 'features';
+  | 'costs';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
 
@@ -75,16 +69,10 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'certifications',
   'shipping',
   'people',
-  'platform_connections',
   'activity',
   'investors',
   'feature_registry',
-  'screenshots',
-  'share_studio',
   'costs',
-  'revenue_lift',
-  'system_map',
-  'features',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -155,13 +143,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'platform_connections',
-    label: 'Platform Connections',
-    href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
-    description: 'Spotify publisher and playlist generation controls',
-    section: 'utilities',
-  },
-  {
     id: 'activity',
     label: 'Timeline',
     href: APP_ROUTES.ADMIN_ACTIVITY,
@@ -183,47 +164,11 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'screenshots',
-    label: 'Screenshots',
-    href: APP_ROUTES.ADMIN_SCREENSHOTS,
-    description: 'Generated docs and QA screenshots',
-    section: 'utilities',
-  },
-  {
     id: 'costs',
     label: 'Costs',
     href: APP_ROUTES.ADMIN_COSTS,
     description:
       'Company infra, AI gateway, Neon, and vendor spend (30-day view)',
-    section: 'utilities',
-  },
-  {
-    id: 'revenue_lift',
-    label: 'Revenue Lift',
-    href: APP_ROUTES.ADMIN_REVENUE_LIFT,
-    description:
-      'IRPAA North Star, KPI tree, cohort lift, multi-agent contribution',
-    section: 'utilities',
-  },
-  {
-    id: 'share_studio',
-    label: 'Share Studio',
-    href: APP_ROUTES.ADMIN_SHARE_STUDIO,
-    description: 'Preview story assets, payloads, and tracked share outputs',
-    section: 'utilities',
-  },
-  {
-    id: 'system_map',
-    label: 'System Map',
-    href: APP_ROUTES.ADMIN_SYSTEM,
-    description: 'Read-only map of skills, connectors, tools, and memory',
-    section: 'utilities',
-  },
-  {
-    id: 'features',
-    label: 'Features',
-    href: APP_ROUTES.ADMIN_FEATURES,
-    description: 'Runtime feature flags with per-environment toggles',
     section: 'utilities',
   },
 ] as const;

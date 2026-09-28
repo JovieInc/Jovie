@@ -118,26 +118,32 @@ export const APP_ROUTES = {
   ADMIN_OUTREACH_DM: '/app/ov/outreach/dm',
   ADMIN_OUTREACH_REVIEW: '/app/ov/outreach/review',
   ADMIN_INGEST: '/app/ov/ingest',
+  /** Internal docs/QA screenshot utility; intentionally absent from OV nav. */
   ADMIN_SCREENSHOTS: '/app/ov/screenshots',
   ADMIN_FEATURE_REGISTRY: '/app/ov/feature-registry',
+  /** Redirect-only; Share Studio was removed in JOV-6895 (no recurring founder job). */
   ADMIN_SHARE_STUDIO: '/app/ov/share-studio',
   ADMIN_RELEASES: '/app/ov/releases',
   ADMIN_USERS_BAN: '/app/ov/users/ban',
   ADMIN_USERS_UNBAN: '/app/ov/users/unban',
   ADMIN_ALGORITHM_HEALTH: '/app/ov/algorithm-health',
+  /** Redirect-only; playlist approval moved to agent workflows (JOV-6895). */
   ADMIN_PLAYLISTS: '/app/ov/playlists',
+  /** Redirect-only; Jovie company connections live on Settings → Connectors (JOV-6895). */
   ADMIN_PLATFORM_CONNECTIONS: '/app/ov/platform-connections',
   ADMIN_AGENT_RUN: '/app/ov/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/ov/agent-runs/[id]',
   ADMIN_COSTS: '/app/ov/costs',
-  /** VC/ops revenue-lift dashboard (IRPAA North Star + KPI tree). */
+  /** Redirect-only; revenue-lift folded into Now (/hud) in JOV-6895. */
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
+  /** Redirect-only; System Map was internal machinery (JOV-6895). */
   ADMIN_SYSTEM: '/app/ov/system',
+  /** Redirect-only; certification-driven rollout replaced manual toggles (JOV-6895). */
   ADMIN_FEATURES: '/app/ov/features',
   /** Jovie's own pages: index, SEO/agentic cert, copy gate, Lighthouse (JOV-6770). */
   ADMIN_PRESENCE: '/app/ov/presence',
   ADMIN_CERTIFICATIONS: '/app/ov/certifications',
-  /** Legacy feature-flags route. Redirect-only; use ADMIN_FEATURES. */
+  /** Legacy feature-flags route. Redirect-only; use ADMIN_CERTIFICATIONS. */
   LEGACY_FEATURE_FLAGS: '/app/feature-flags',
 
   // System

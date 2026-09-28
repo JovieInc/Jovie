@@ -12,20 +12,20 @@ test.describe('OV shell access boundary @smoke', () => {
     page,
   }) => {
     await page.goto(
-      `/api/dev/test-auth/enter?persona=admin&redirect=${APP_ROUTES.ADMIN_FEATURES}`
+      `/api/dev/test-auth/enter?persona=admin&redirect=${APP_ROUTES.ADMIN_CERTIFICATIONS}`
     );
-    await page.waitForURL(APP_ROUTES.ADMIN_FEATURES);
+    await page.waitForURL(APP_ROUTES.ADMIN_CERTIFICATIONS);
 
-    const response = await page.request.get(APP_ROUTES.ADMIN_FEATURES, {
+    const response = await page.request.get(APP_ROUTES.ADMIN_CERTIFICATIONS, {
       maxRedirects: 0,
     });
     const html = await response.text();
 
     expect(response.status()).toBe(200);
-    expect(new URL(page.url()).pathname).toBe(APP_ROUTES.ADMIN_FEATURES);
+    expect(new URL(page.url()).pathname).toBe(APP_ROUTES.ADMIN_CERTIFICATIONS);
     expect(html).toContain('ov-mode');
     expect(html).not.toContain('>Jovie<');
-    expect(html).toContain('Runtime feature flags');
+    expect(html).toContain('ovie-certifications-page');
   });
 
   test('non-admin OV HTML contains only the trusted OV fallback and server redirect', async ({
@@ -36,7 +36,7 @@ test.describe('OV shell access boundary @smoke', () => {
     );
     await page.waitForURL(APP_ROUTES.CHAT);
 
-    const response = await page.request.get(APP_ROUTES.ADMIN_FEATURES, {
+    const response = await page.request.get(APP_ROUTES.ADMIN_CERTIFICATIONS, {
       maxRedirects: 0,
     });
     const html = await response.text();
@@ -47,7 +47,7 @@ test.describe('OV shell access boundary @smoke', () => {
     expect(response.status()).toBe(200);
     expect(html).toContain('ov-mode');
     expect(html).not.toContain('>Jovie<');
-    expect(html).not.toContain('Runtime feature flags');
+    expect(html).not.toContain('ovie-certifications-page');
     expect(html).toContain('NEXT_REDIRECT');
     expect(html).toContain('replace;/app;307');
   });

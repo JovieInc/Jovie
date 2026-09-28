@@ -4,10 +4,11 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export const metadata: Metadata = {
   title: 'Feature Flags',
-  description: 'Redirects to the canonical admin feature-flags workspace.',
+  description:
+    'Redirects to certifications, which replaced manual flag toggling.',
 };
 
-/** Redirect-only compatibility route; OV owns the feature-flags surface. */
+/** Redirect-only compatibility route; certification-driven rollout owns rollout state. */
 export default function LegacyFeatureFlagsPage() {
-  redirect(APP_ROUTES.ADMIN_FEATURES);
+  redirect(APP_ROUTES.ADMIN_CERTIFICATIONS);
 }

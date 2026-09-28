@@ -72,7 +72,7 @@ describe('AdminHealthDashboard', () => {
     expect(screen.getByTestId('admin-health-dashboard')).toBeInTheDocument();
 
     const business = screen.getByTestId('admin-health-business');
-    expect(business).toHaveAttribute('href', '/app/ov/revenue-lift');
+    expect(business).toHaveAttribute('href', '/hud');
     expect(business).toHaveTextContent('Business');
     expect(business).toHaveTextContent('Monthly Recurring Revenue');
 
@@ -100,8 +100,9 @@ describe('AdminHealthDashboard', () => {
     ).toHaveLength(4);
     for (const tile of screen.getByTestId('admin-health-dashboard-skeleton')
       .children) {
-      expect(tile).toHaveClass('rounded-xl', 'skeleton');
+      expect(tile).toHaveClass('rounded-xl');
       expect(tile.className).toContain('border-(--app-shell-border)');
+      expect(tile.firstElementChild).toHaveClass('skeleton');
     }
   });
 });

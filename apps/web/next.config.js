@@ -481,6 +481,32 @@ const nextConfig = {
         source: '/app/admin/ingest',
         destination: '/app/ov/growth?view=ingest',
       },
+      // JOV-6895 Ovie IA consolidation: internal-system pages merge into
+      // canonical founder surfaces instead of living as top-level products.
+      {
+        source: '/app/ov/share-studio',
+        destination: '/app/ov/growth',
+      },
+      {
+        source: '/app/ov/revenue-lift',
+        destination: '/hud',
+      },
+      {
+        source: '/app/ov/platform-connections',
+        destination: '/app/settings/connectors',
+      },
+      {
+        source: '/app/ov/playlists',
+        destination: '/app/settings/connectors',
+      },
+      {
+        source: '/app/ov/system',
+        destination: '/hud',
+      },
+      {
+        source: '/app/ov/features',
+        destination: '/app/ov/certifications',
+      },
       {
         source: '/app/admin/:path*',
         destination: '/app/ov/:path*',

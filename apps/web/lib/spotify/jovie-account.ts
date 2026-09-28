@@ -114,7 +114,7 @@ export async function getJovieSpotifyToken(): Promise<string> {
 
   if (!userId) {
     throw new SpotifyAuthError(
-      'Playlist Spotify publisher is not configured. Connect Spotify in Admin → Platform Connections.'
+      'Playlist Spotify publisher is not configured. Connect Spotify in Settings → Connectors.'
     );
   }
 

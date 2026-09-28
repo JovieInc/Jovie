@@ -10,7 +10,6 @@ const TEST_DIR = dirname(
 );
 
 const CURATED_ROUTE_FILES = [
-  join(TEST_DIR, '../../../app/app/(shell)/admin/playlists/page.tsx'),
   join(TEST_DIR, '../../../app/app/(shell)/settings/analytics/page.tsx'),
   join(
     TEST_DIR,

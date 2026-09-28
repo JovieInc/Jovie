@@ -40,8 +40,8 @@ describe('founder product page', () => {
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Inspect feature state →' })
-    ).toHaveAttribute('href', '/app/ov/features');
+      screen.getByRole('link', { name: 'Review certifications →' })
+    ).toHaveAttribute('href', '/app/ov/certifications');
     expect(
       screen.getByRole('link', { name: 'Inspect release entities →' })
     ).toHaveAttribute('href', '/app/ov/releases');

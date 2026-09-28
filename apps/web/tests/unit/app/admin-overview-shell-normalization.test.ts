@@ -70,7 +70,7 @@ describe('admin health dashboard ownership (JOV-2098)', () => {
     expect(source).toContain('admin-health-growth');
     expect(source).toContain('admin-health-ops');
     expect(source).toContain('admin-health-people');
-    expect(source).toContain('APP_ROUTES.ADMIN_REVENUE_LIFT');
+    expect(source).toContain('APP_ROUTES.HUD');
     expect(source).toContain('APP_ROUTES.ADMIN_GROWTH');
     expect(source).toContain('APP_ROUTES.ADMIN_OPS');
     expect(source).toMatch(/buildAdminPeopleHref\(["']waitlist["']\)/);

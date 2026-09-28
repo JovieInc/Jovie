@@ -48,28 +48,30 @@ function HealthAreaTile({
       data-testid={testId}
       aria-label={`${area}: ${label} ${value}. Open ${hrefLabel}`}
     >
-      <ContentSurfaceCard className='flex min-h-28 flex-col justify-between p-4 transition-colors group-hover:border-default'>
-        <div className='flex items-start justify-between gap-2'>
-          <div className='flex items-center gap-1.5'>
-            <Icon
-              className='size-3.5 shrink-0 text-tertiary-token'
+      <ContentSurfaceCard>
+        <div className='flex min-h-28 flex-col justify-between p-4'>
+          <div className='flex items-start justify-between gap-2'>
+            <div className='flex items-center gap-1.5'>
+              <Icon
+                className='size-3.5 shrink-0 text-tertiary-token'
+                aria-hidden
+              />
+              <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
+                {area}
+              </p>
+            </div>
+            <ArrowUpRight
+              className='size-3.5 shrink-0 text-tertiary-token transition-colors group-hover:text-secondary-token'
               aria-hidden
             />
-            <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
-              {area}
-            </p>
           </div>
-          <ArrowUpRight
-            className='size-3.5 shrink-0 text-tertiary-token transition-colors group-hover:text-secondary-token'
-            aria-hidden
-          />
-        </div>
-        <div className='mt-3 space-y-1'>
-          <p className='text-2xl font-semibold leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
-            {value}
-          </p>
-          <p className='text-xs leading-4 text-secondary-token'>{label}</p>
-          <p className='text-2xs text-tertiary-token'>{hrefLabel}</p>
+          <div className='mt-3 space-y-1'>
+            <p className='text-2xl font-semibold leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
+              {value}
+            </p>
+            <p className='text-xs leading-4 text-secondary-token'>{label}</p>
+            <p className='text-2xs text-tertiary-token'>{hrefLabel}</p>
+          </div>
         </div>
       </ContentSurfaceCard>
     </Link>
@@ -121,8 +123,8 @@ export async function AdminHealthDashboard() {
         area='Business'
         label='Monthly Recurring Revenue'
         value={mrrDisplay}
-        href={APP_ROUTES.ADMIN_REVENUE_LIFT}
-        hrefLabel='Open Revenue Lift'
+        href={APP_ROUTES.HUD}
+        hrefLabel='Open Now'
         icon={CircleDollarSign}
         testId='admin-health-business'
       />
@@ -165,7 +167,9 @@ export function AdminHealthDashboardSkeleton() {
       aria-hidden='true'
     >
       {['business', 'growth', 'ops', 'people'].map(key => (
-        <ContentSurfaceCard key={key} className='min-h-28 skeleton' />
+        <ContentSurfaceCard key={key}>
+          <div className='min-h-28 skeleton' />
+        </ContentSurfaceCard>
       ))}
     </section>
   );

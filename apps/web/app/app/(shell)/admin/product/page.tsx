@@ -75,9 +75,9 @@ export default async function ProductPage() {
           <div className='flex flex-wrap gap-3 text-2xs font-medium'>
             <a
               className='text-secondary-token hover:text-primary-token'
-              href={APP_ROUTES.ADMIN_FEATURES}
+              href={APP_ROUTES.ADMIN_CERTIFICATIONS}
             >
-              Inspect feature state →
+              Review certifications →
             </a>
             <a
               className='text-secondary-token hover:text-primary-token'
