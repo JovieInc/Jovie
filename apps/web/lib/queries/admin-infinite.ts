@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { PAGINATED_CACHE } from './cache-strategies';
+import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import type { AdminLead } from './useAdminLeadsPrimitives';
 
@@ -131,9 +132,7 @@ const parseDate = (value: Date | string | null | undefined) => {
 };
 
 async function fetchPage<T>(url: string, signal: AbortSignal) {
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Failed to fetch page: ${res.status}`);
-  return (await res.json()) as InfinitePage<T>;
+  return fetchWithTimeout<InfinitePage<T>>(url, { signal });
 }
 
 export function useAdminUsersInfiniteQuery({

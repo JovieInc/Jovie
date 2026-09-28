@@ -51,7 +51,7 @@ export function SessionManagementCard({
         const { data, error } = await authClient.listSessions();
         if (error) throw error;
         if (!cancelled) {
-          setSessions(data ?? []);
+          setSessions(Array.isArray(data) ? data : []);
         }
       } catch (error) {
         if (!cancelled) {

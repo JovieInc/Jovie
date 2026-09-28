@@ -1012,6 +1012,22 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
             self.assertAlmostEqual(record["at"], time.time(), delta=60)
 
+    def test_shared_cache_serves_every_worker_one_read_per_ttl(self):
+        calls = []
+        fetch = lambda: calls.append(1) or (None if len(calls) == 1 else ["pr"])
+        saved = lane.SHARED_CACHE_DIR, os.environ.pop("LANES_EXECUTION_BACKEND")
+        with tempfile.TemporaryDirectory() as tmp:
+            lane.SHARED_CACHE_DIR = Path(tmp)
+            try:
+                self.assertIsNone(lane.shared("k", 60, fetch), "a failed read is returned")
+                self.assertEqual(lane.shared("k", 60, fetch), ["pr"], "and never cached")
+                self.assertEqual(lane.shared("k", 60, fetch), ["pr"])
+                self.assertEqual(len(calls), 2, "fresh value served from the file")
+                self.assertEqual(lane.shared("k", 0, fetch), ["pr"])
+                self.assertEqual(len(calls), 3, "expired value is re-read")
+            finally:
+                lane.SHARED_CACHE_DIR, os.environ["LANES_EXECUTION_BACKEND"] = saved
+
     def test_a_head_claimed_elsewhere_is_skipped_not_a_stop(self):
         first, second = {**self.pr(number=4), "headRefName": "devin/jov-4-20260925204809"}, \
             {**self.pr(), "headRefName": "devin/jov-1-20260925204809"}
