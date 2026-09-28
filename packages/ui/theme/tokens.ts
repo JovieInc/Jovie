@@ -250,9 +250,9 @@ export const typography = {
     },
   },
   size: {
-    '2xs': 'var(--text-2xs)', // 11px — tiny labels
+    '2xs': 'var(--text-2xs)', // 12px — small step (consolidated 2026-09-27)
     xs: 'var(--text-xs)', // 12px
-    app: 'var(--text-app)', // 13px — LINEAR'S DEFAULT APP UI SIZE
+    app: 'var(--text-app)', // 12px — app default (consolidated 2026-09-27)
     sm: 'var(--text-sm)', // 14px
     base: 'var(--text-base)', // 16px
     lg: 'var(--text-lg)', // 18px

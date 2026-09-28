@@ -105,7 +105,7 @@ jobs:
           node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
             --closure-health-file="${{ steps.refresh.outputs.receipt_path }}"
 
-      - name: Remediate JOV backlog through official Symphony
+      - name: Remediate JOV backlog after fleet gate refresh
         if: >-
           steps.refresh.outcome == 'success' &&
           steps.stack-actions.outcome == 'success' &&
@@ -117,7 +117,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          linear_env="${HOME}/.config/symphony/linear.env"
+          linear_env="${HOME}/.config/jovie-lanes/linear.env"
+          [[ -r "$linear_env" ]] || linear_env="${HOME}/.config/symphony/linear.env"
           if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
             LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
             export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
@@ -126,7 +127,7 @@ jobs:
 
   # Retired linear-triage-assessment.yml; signed Linear Issue events are bridged
   # by /api/webhooks/linear. This job rereads the exact current issue on Gem,
-  # records its disposition, and wakes official Symphony only after the existing
+  # records its disposition, and wakes the lanes picker only after the existing
   # reconciler moves it to Todo. It does not select workers or bypass
   # Summer/fleet gates. Per-issue ordering is provided by the shared
   # fleet-gate-event-refresh concurrency group.
@@ -151,7 +152,8 @@ jobs:
           RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
         run: |
           set -euo pipefail
-          linear_env="${HOME}/.config/symphony/linear.env"
+          linear_env="${HOME}/.config/jovie-lanes/linear.env"
+          [[ -r "$linear_env" ]] || linear_env="${HOME}/.config/symphony/linear.env"
           if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
             LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
             export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
@@ -170,7 +172,7 @@ jobs:
           timeout 60s node scripts/backlog-orchestrator/triage-event-assess.mjs \
             --event-file="$GITHUB_EVENT_PATH" > "$RECEIPT_FILE"
           jq -e '.schema == "linear-triage-assessment/v1"' "$RECEIPT_FILE"
-      - name: Wake the existing Symphony picker after Todo transition
+      - name: Wake the lanes picker after Todo transition
         shell: bash
         env:
           RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json

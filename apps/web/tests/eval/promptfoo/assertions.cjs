@@ -4524,8 +4524,13 @@ function assertChatTitleContractCovered(output) {
   ) {
     return fail('chat title contract did not inspect the production route');
   }
-  if (payload.titleModel !== 'google/gemini-2.0-flash') {
-    return fail(`unexpected title model: ${String(payload.titleModel)}`);
+  if (
+    typeof payload.titleModel !== 'string' ||
+    payload.titleModel !== payload.lightModel
+  ) {
+    return fail(
+      `title model ${String(payload.titleModel)} is not the light tier ${String(payload.lightModel)}`
+    );
   }
   if (
     typeof payload.routeSourceLength !== 'number' ||

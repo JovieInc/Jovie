@@ -80,6 +80,8 @@ function VirtualizedLabelList({
   searchInputRef,
   emptyMessage,
 }: VirtualizedLabelListProps) {
+  // Reads live virtualizer state each render; see virtualizer-compiler-optout.test.ts.
+  'use no memo';
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Use virtualization only if we have more than 20 items

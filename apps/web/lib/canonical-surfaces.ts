@@ -36,7 +36,7 @@ export const CANONICAL_SURFACES = [
     liveRoutes: ['/'],
     reviewRoute: '/',
     sourceRoute: '/',
-    sourceComponent: 'app/(home)/page.tsx -> HomepageEditorialHero',
+    sourceComponent: 'app/(home)/page.tsx -> HomepageIdentityHero',
     demoRoute: '/',
     fixtureSetId: 'marketing-static',
     screenshotIds: ['marketing-home-desktop'],

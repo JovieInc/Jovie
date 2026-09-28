@@ -442,7 +442,12 @@ export function HeroSpotifySearch({
         className={isEditorial ? 'rounded-full' : undefined}
       >
         <div className={fieldClassName}>
-          {isEditorial ? null : (
+          {isEditorial ? (
+            <Search
+              aria-hidden='true'
+              className='homepage-name-search__icon size-4 shrink-0 text-tertiary-token'
+            />
+          ) : (
             <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
               <SocialIcon
                 platform='spotify'
@@ -477,7 +482,11 @@ export function HeroSpotifySearch({
             autoCorrect='off'
             autoComplete='off'
             className={cn(
-              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
+              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none',
+              // The editorial pill owns focus (JOV-6946): no square ring
+              // inside pill geometry. The default field keeps its own ring.
+              !isEditorial &&
+                'focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
               isEditorial ? 'homepage-name-search__input' : 'text-sm'
             )}
             role='combobox'

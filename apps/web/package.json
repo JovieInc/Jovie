@@ -194,6 +194,7 @@
     "test:a11y": "vitest run --config=vitest.config.storybook.mts",
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
     "perf:auth": "tsx scripts/performance-auth.ts",
+    "perf:route-js": "node scripts/route-js-budget.mjs",
     "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
     "perf:queue": "doppler run --project jovie-web --config dev -- tsx scripts/performance-batch-queue.ts",
     "qa:routes": "tsx scripts/route-qa.ts",
@@ -285,7 +286,7 @@
     "jose": "^6.2.12",
     "jszip": "^3.10.2",
     "langfuse": "^3.39.2",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.48.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^13.4.4",
     "next": "16.3.6",
@@ -369,6 +370,6 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vite": "8.3.1",
-    "vitest": "5.0.1"
+    "vitest": "5.0.2"
   }
 }
