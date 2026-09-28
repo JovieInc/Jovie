@@ -120,14 +120,14 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeader: ({
     thumbnail,
     title,
-    details,
+    subtitle,
     statusGlyph,
     actions,
     'data-testid': testId,
   }: {
     thumbnail?: React.ReactNode;
     title: string;
-    details?: React.ReactNode;
+    subtitle?: React.ReactNode;
     statusGlyph?: React.ReactNode;
     actions?: React.ReactNode;
     'data-testid'?: string;
@@ -136,7 +136,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       {thumbnail}
       <h2 className='truncate text-sm font-semibold'>{title}</h2>
       <div data-testid='entity-header-details-row'>
-        {details}
+        {subtitle}
         {statusGlyph}
       </div>
       {actions}

@@ -44,7 +44,7 @@ import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atom
 import {
   DrawerAnalyticsSummaryCard,
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -645,8 +645,8 @@ function ConnectionRail({
       emptyMessage='Select a profile or page to view details.'
       entityHeader={
         row ? (
-          <EntityHeaderCard
-            image={
+          <EntityHeader
+            thumbnail={
               row.rowType === 'connector' ? (
                 <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
                   <ConnectionBrandIcon

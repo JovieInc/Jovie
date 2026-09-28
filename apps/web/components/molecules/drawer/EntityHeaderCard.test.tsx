@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { EntityHeaderCard } from './EntityHeaderCard';
 
 describe('EntityHeaderCard', () => {
-  it('does not clamp the subtitle by default outside stable layout', () => {
+  it('delegates to the canonical heading without clamping the subtitle', () => {
     render(<EntityHeaderCard title='Audience member' subtitle='Artist team' />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Audience member' })
+    ).toBeInTheDocument();
     expect(screen.getByText('Artist team')).not.toHaveClass('line-clamp-1');
   });
 

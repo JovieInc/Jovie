@@ -4,6 +4,7 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
@@ -36,11 +37,13 @@ const meta = {
         <DashboardDataProvider value={dashboardData}>
           <TooltipProvider delayDuration={0} skipDelayDuration={0}>
             <SidebarProvider>
-              <ShellSidebarOverrideProvider>
-                <PreviewPanelProvider enabled={false}>
-                  <Story />
-                </PreviewPanelProvider>
-              </ShellSidebarOverrideProvider>
+              <HeaderActionsProvider>
+                <ShellSidebarOverrideProvider>
+                  <PreviewPanelProvider enabled={false}>
+                    <Story />
+                  </PreviewPanelProvider>
+                </ShellSidebarOverrideProvider>
+              </HeaderActionsProvider>
             </SidebarProvider>
           </TooltipProvider>
         </DashboardDataProvider>
