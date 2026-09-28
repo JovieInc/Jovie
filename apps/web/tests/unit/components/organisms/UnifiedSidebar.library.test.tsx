@@ -462,6 +462,19 @@ describe('UnifiedSidebar library route', () => {
     ).toBeInTheDocument();
   });
 
+  it('lets the operator navigation scroll without a visible scrollbar', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+    });
+
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    expect(operatorNavigation).toHaveClass('overflow-y-auto');
+    expect(operatorNavigation).not.toHaveClass('overflow-hidden');
+  });
+
   it('marks only the exact Ops destination current', () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.ADMIN_OPS,

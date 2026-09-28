@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/admin/FounderReviewRegistry.test.tsx
 import { Button } from '@jovie/ui';
 import {
   Check,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   DrawerSection,
   EntitySidebarShell,
@@ -23,7 +25,6 @@ import type {
   FounderReviewRegistryKind,
 } from '@/lib/admin/types';
 import type { ColumnDef } from '@/lib/tanstack-table';
-import { cn } from '@/lib/utils';
 
 type ReviewOutcome = 'certified' | 'needs-work';
 type RegistryFilter = 'all' | 'ready' | ReviewOutcome;
@@ -456,16 +457,16 @@ export function FounderReviewRegistry({
           </div>
 
           <DrawerSection title='Certification details'>
-            <dl className='grid grid-cols-[5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-2xs'>
+            <dl className='flex flex-col gap-y-2 text-2xs'>
               {[
                 ['Status', selected.status],
                 ['Access', selected.access],
                 ['Gate', selected.gate],
                 ['Source', selected.source],
               ].map(([label, value]) => (
-                <div key={label} className='contents'>
-                  <dt className='text-tertiary-token'>{label}</dt>
-                  <dd className='min-w-0 break-words text-secondary-token'>
+                <div key={label} className='flex gap-3'>
+                  <dt className='w-20 shrink-0 text-tertiary-token'>{label}</dt>
+                  <dd className='min-w-0 flex-1 break-words text-secondary-token'>
                     {value}
                   </dd>
                 </div>
@@ -539,25 +540,19 @@ export function FounderReviewRegistry({
             className='h-9 w-full rounded-lg border border-(--app-shell-border) bg-surface-1 pl-9 pr-3 text-xs text-primary-token outline-none placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-ring'
           />
         </label>
-        <fieldset className='flex h-9 items-center gap-1 rounded-lg border border-(--app-shell-border) bg-surface-1 p-1'>
-          <legend className='sr-only'>Registry filter</legend>
-          {(['all', 'ready', 'certified', 'needs-work'] as const).map(value => (
-            <button
-              key={value}
-              type='button'
-              onClick={() => setFilter(value)}
-              className={cn(
-                'h-7 rounded-md px-2.5 text-2xs font-medium text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                filter === value && 'bg-surface-2 text-primary-token'
-              )}
-              aria-pressed={filter === value}
-            >
-              {value === 'needs-work'
-                ? 'Needs Work'
-                : value[0].toUpperCase() + value.slice(1)}
-            </button>
-          ))}
-        </fieldset>
+        <AppSegmentControl<RegistryFilter>
+          aria-label='Registry Filter'
+          value={filter}
+          onValueChange={setFilter}
+          layout='hug'
+          size='sm'
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'ready', label: 'Ready' },
+            { value: 'certified', label: 'Certified' },
+            { value: 'needs-work', label: 'Needs Work' },
+          ]}
+        />
       </div>
 
       {kind === 'feature' ? (
