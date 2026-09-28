@@ -421,6 +421,13 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(self.ledger()[0]["runId"], receipt["runId"])
         prompt = next((self.host.state / "runs").glob("*.prompt.md")).read_text()
         self.assertIn("ctx", prompt)
+        self.assertEqual(receipt["origin"], "autonomous-lane")
+        self.assertEqual(receipt["linearIssueId"], "id-JOV-8")
+        self.assertEqual(receipt["offer"], {"eligible": True, "accepted": True})
+        self.assertEqual(receipt["attribution"]["category"], "autonomous-created")
+        self.assertTrue(receipt["branch"].startswith("devin/jov-8-"))
+        self.assertIn(receipt["runId"], receipt["worktree"])
+        self.assertEqual(receipt["result"], {"verdict": "landing", "commit": None, "pr": 9, "prUrl": None})
 
     def test_agent_that_never_worked_is_a_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
@@ -484,6 +491,52 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(receipt["verdict"], "failed")
         self.assertIn("harness-error:ValueError", receipt["reasons"][0])
         self.assertEqual(len(self.ledger()), 1)
+
+
+class AttributionAndThroughputTest(unittest.TestCase):
+    def test_receipts_outrank_branch_prefixes_and_preserve_distinct_roles(self):
+        merged = {"number": 9, "headRefName": "codex/manual-looking", "createdAt": "2026-09-28T10:00:00Z",
+                  "mergedAt": "2026-09-28T11:00:00Z"}
+        receipts = [
+            {"runId": "create", "issue": "JOV-9", "pr": 9, "provider": "devin",
+             "startedAt": "2026-09-28T10:00:00Z"},
+            {"runId": "review", "kind": "adopt", "pr": 9, "provider": "codex", "endedAt": "2026-09-28T10:30:00Z"},
+            {"runId": "fix", "kind": "fix-red", "pr": 9, "provider": "codex", "verdict": "fix-pushed",
+             "endedAt": "2026-09-28T10:45:00Z"},
+        ]
+        attributed = lane.pr_attribution(merged, receipts)
+        self.assertEqual(attributed["category"], "cross-provider-finalizer")
+        self.assertEqual((attributed["origin"], attributed["originProvider"], attributed["finalProvider"]),
+                         ("autonomous-lane", "devin", "codex"))
+        self.assertIn({"provider": "codex", "category": "review-only", "runId": "review"},
+                      attributed["roles"])
+
+    def test_unreceipted_codex_branches_are_not_counted_as_autonomous(self):
+        recent = {"number": 1, "headRefName": "codex/manual", "createdAt": "2026-09-28T10:00:00Z",
+                  "mergedAt": "2026-09-28T11:00:00Z"}
+        old = {**recent, "number": 2, "createdAt": "2026-09-20T10:00:00Z"}
+        self.assertEqual(lane.pr_attribution(recent, [])["category"], "manual-codex-app-created")
+        self.assertEqual(lane.pr_attribution(old, [])["category"], "old-codex-branch-landed-later")
+        self.assertNotEqual(lane.pr_attribution(recent, [])["origin"], "autonomous-lane")
+
+    def test_provider_metrics_count_only_receipted_origin_as_landed_output(self):
+        rows = [{"runId": "r", "issue": "JOV-9", "pr": 9, "provider": "codex", "agentExit": 0,
+                 "startedAt": "2026-09-28T10:00:00Z", "endedAt": "2026-09-28T10:10:00Z",
+                 "verdict": "landing", "execution": {"event": "attempt_finished"},
+                 "providerEvidence": [{"provider": "codex", "event": "account-leased"}]}]
+        merged = [{"number": 9, "headRefName": "codex/jov-9-x", "createdAt": "2026-09-28T10:00:00Z",
+                   "mergedAt": "2026-09-28T10:30:00Z"},
+                  {"number": 10, "headRefName": "codex/manual", "createdAt": "2026-09-28T10:00:00Z",
+                   "mergedAt": "2026-09-28T10:20:00Z"}]
+        report = lane.provider_throughput(rows, ["codex", "devin"], merged)
+        codex = report["providers"]["codex"]
+        self.assertEqual((codex["eligibleWorkOffered"], codex["workerStarts"], codex["productiveRuns"],
+                          codex["prsCreated"], codex["firstPassGreen"], codex["accountLeases"],
+                          codex["landedOutput"]), (1, 1, 1, 1, 1, 1, 1))
+        self.assertEqual(codex["issueToPrSecondsP50"], 600)
+        self.assertEqual(codex["issueToMergeSecondsP50"], 1800)
+        self.assertEqual(report["landedByAttribution"],
+                         {"autonomous-created": 1, "manual-codex-app-created": 1})
 
 
 class WorkerTest(unittest.TestCase):

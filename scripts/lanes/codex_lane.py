@@ -38,6 +38,8 @@ AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token
 RESET_AT = re.compile(r"(?:try again|resets?|available)\s+(?:at|on)\s+([0-9T:\-\. ]+(?:AM|PM|Z)?)", re.I)
 RESET_IN = re.compile(r"try again in\s+((?:\d+\s*(?:days?|hours?|hrs?|minutes?|mins?|seconds?|secs?|[dhms])\s*)+)", re.I)
 NO_ACCOUNT_EXIT = 75  # EX_TEMPFAIL: the lane treats it as provider-error and cools down
+PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
+ACCOUNT_CLASS = "chatgpt-oauth"
 
 
 def accounts() -> list[str]:
@@ -65,6 +67,21 @@ def write_state(state: dict) -> None:
     tmp = STATE.with_suffix(f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(state, indent=1, sort_keys=True))
     os.replace(tmp, STATE)
+
+
+def record_lease(path: str | None, name: str, cwd, now: float) -> None:
+    """Append proof after flock succeeds, before the Codex process starts."""
+    if not path:
+        return
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    row = {"schema": PROVIDER_EVIDENCE_SCHEMA, "provider": "codex", "event": "account-leased",
+           "accountClass": ACCOUNT_CLASS, "account": name, "leasedAt": iso(now),
+           "worktree": str(Path(cwd or ".").resolve())}
+    with open(target, "a") as handle:
+        handle.write(json.dumps(row, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def update_state(change) -> dict:
@@ -186,21 +203,25 @@ def run(args) -> int:
         text = prompt if len(tried) == 1 else (
             "A previous attempt on this worktree stopped when its account hit a limit. Continue from the "
             "current state of the worktree (check `git status` and `git diff`); do not start over.\n\n" + prompt)
-        code, kind, until = run_account(name, handle, base, text, args.cwd, now)
+        code, kind, until = run_account(name, handle, base, text, args.cwd, now,
+                                        getattr(args, "receipt_file", None))
         if kind not in ("rate", "limit", "auth"):
             return code
         print(f"codex-lane: account {name} {kind}; banked until {iso(until)}; rotating", file=sys.stderr)
         time.sleep(ROTATE_PAUSE_S)
 
 
-def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float):
+def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
+                receipt_file: str | None = None):
     home = ACCOUNTS_ROOT / name
     env = {**os.environ, "CODEX_HOME": str(home)}
-    update_state(lambda st: st.setdefault(name, {}).update(lastUsed=now, runs=int(st.get(name, {}).get("runs") or 0) + 1))
-    print(f"codex-lane: account={name} home={home}", flush=True)
     from collections import deque
     tail = deque(maxlen=400)  # classification only needs the end of the output
     try:
+        update_state(lambda st: st.setdefault(name, {}).update(
+            lastUsed=now, runs=int(st.get(name, {}).get("runs") or 0) + 1))
+        record_lease(receipt_file, name, cwd, now)
+        print(f"codex-lane: account={name} accountClass={ACCOUNT_CLASS} home={home}", flush=True)
         proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True)
         proc.stdin.write(prompt)
@@ -209,6 +230,7 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float)
             tail.append(line)
             sys.stdout.write(line)
             sys.stdout.flush()
+        proc.stdout.close()
         code = proc.wait()
     finally:
         handle.close()
@@ -261,6 +283,7 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     go = sub.add_parser("run")
     go.add_argument("--prompt-file", required=True)
+    go.add_argument("--receipt-file")
     go.add_argument("--cwd")
     go.add_argument("--model", default=os.environ.get("CODEX_LANE_MODEL"))
     go.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh"))

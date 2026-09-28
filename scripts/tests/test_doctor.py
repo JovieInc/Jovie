@@ -37,6 +37,11 @@ def obs(**overrides):
     return base
 
 
+def throughput_stub(_receipts, provider_names=(), _merged=None, attribution_receipts=None):
+    return {"schema": "jovie-provider-throughput/v1", "windowHours": 24,
+            "providers": {name: {} for name in provider_names}, "landedByAttribution": {}}
+
+
 class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
@@ -75,6 +80,15 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(doctor.judge(obs(**{**idle, "worktrees": 2}, lastWorkAge=None)), {})
         self.assertIn("workers exit on claim", doctor.judge(obs(**idle, lastWorkAge=3601))["spawn-exit"])
         self.assertIn("spawn-exit", doctor.judge(obs(**idle, lastWorkAge=None)))
+
+    def test_available_codex_capacity_with_compatible_work_and_no_starts_is_p0(self):
+        idle = {"poolByProvider": {"codex": 12}, "capacityByProvider": {"codex": {"running": 0, "slots": 3}}}
+        alerts = doctor.judge(obs(**idle), {"codexIdleSince": 1_000_000.0 - doctor.PROVIDER_IDLE_S - 1})
+        self.assertIn("0/3 workers", alerts["provider-idle:codex"])
+        self.assertNotIn("provider-idle:codex", doctor.judge(obs(**{**idle, "capacityByProvider": {
+            "codex": {"running": 1, "slots": 3}}})))
+        self.assertNotIn("provider-idle:codex", doctor.judge(
+            obs(**idle), {"codexIdleSince": 1_000_000.0 - doctor.PROVIDER_IDLE_S + 1}))
 
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
@@ -140,6 +154,23 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(tracker.title("disk-low"), "Symphony doctor: disk-low (gem)")
         self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
 
+    def test_idle_codex_alert_opens_as_urgent(self):
+        captured = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}]}}]}}
+                captured.append(variables["i"])
+                return {"issueCreate": {"issue": {"id": "urgent", "identifier": "JOV-1"}}}
+
+        self.assertEqual(doctor.Tracker(FakeLinear(), "gem").open("provider-idle:codex", "idle"), "urgent")
+        self.assertEqual(captured[0]["priority"], 1)
+
 
 class OrphanPrTest(unittest.TestCase):
     def test_orphan_prs_from_a_fresh_sweep_raise_one_alert(self):
@@ -161,7 +192,7 @@ class StatusFeedTest(unittest.TestCase):
             held = open(state / "slots" / "devin.0.lock", "w")
             fcntl.flock(held, fcntl.LOCK_EX)
             host = type("Host", (), {"state": state})()
-            lane = type("Lane", (), {"HOST": "gem"})
+            lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
             feed = doctor.status_feed(host, lane, obs(pool=12, lastLandingAge=30), {"disk-low": "x"}, {"release": "abc1234"})
             held.close()
         self.assertEqual((feed["running"], feed["idle"], feed["pool"], feed["release"]), (1, 2, 12, "abc1234"))
@@ -182,7 +213,8 @@ class StatusFeedTest(unittest.TestCase):
             host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
             lane = type("Lane", (), {"Linear": staticmethod(lambda env: (_ for _ in ()).throw(OSError("x"))),
                                      "load_providers": staticmethod(lambda: {}),
-                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "gem"})
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
+                                     "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
@@ -193,6 +225,20 @@ class StatusFeedTest(unittest.TestCase):
             feed = doctor.status_feed(host, lane, observed, {}, {})
         self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
         self.assertEqual(feed["failed_by_reason"], {"agent-timeout": 1, "legacy": 2})
+
+    def test_feed_tracks_available_codex_capacity_idle_while_compatible_work_waits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "slots").mkdir()
+            (state / "slots/codex.0.lock").touch()
+            host = type("Host", (), {"state": state})()
+            lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+            observed = obs(now=1000.0, poolByProvider={"codex": 5})
+            feed = doctor.status_feed(host, lane, observed, {}, {}, {"idleQualifiedSince": {"codex": 900.0}})
+        metric = feed["throughput"]["providers"]["codex"]
+        self.assertEqual(metric["idleReason"], "capacity-idle-with-qualified-work")
+        self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
+        self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
 
 
 class PublishTest(unittest.TestCase):

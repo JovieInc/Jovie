@@ -147,7 +147,11 @@ class RunTest(Isolated):
             with tempfile.NamedTemporaryFile("w", suffix=".md") as prompt, tempfile.TemporaryDirectory() as cwd:
                 prompt.write("ship it")
                 prompt.flush()
-                return codex.main(["run", "--prompt-file", prompt.name, "--cwd", cwd])
+                receipt = Path(cwd) / "provider.jsonl"
+                code = codex.main(["run", "--prompt-file", prompt.name, "--receipt-file", str(receipt),
+                                   "--cwd", cwd])
+                self.lease_events = [json.loads(line) for line in receipt.read_text().splitlines()]
+                return code
         finally:
             os.environ["PATH"] = saved
 
@@ -168,6 +172,10 @@ class RunTest(Isolated):
         self.assertLess(state["alpha"]["exhaustedUntil"] - time.time(), codex.DEFAULT_COOLDOWN_S)
         self.assertEqual(state["beta"]["lastKind"], "ok")
         self.assertNotIn("exhaustedUntil", state["beta"])
+        self.assertEqual([row["account"] for row in self.lease_events], ["alpha", "beta"])
+        self.assertTrue(all(row["schema"] == "jovie-provider-lease/v1" and
+                            row["accountClass"] == "chatgpt-oauth" and
+                            row["event"] == "account-leased" for row in self.lease_events))
 
 
 if __name__ == "__main__":
