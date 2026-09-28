@@ -25,10 +25,7 @@ describe('homepage hero contract (JOV-5864)', () => {
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    const componentSource = [
-      'components/homepage/HomepageIdentityHero.tsx',
-      'components/homepage/HomepageProfileSpecimen.tsx',
-    ]
+    const componentSource = ['components/homepage/HomepageIdentityHero.tsx']
       .map(file => readFileSync(path.join(webRoot, file), 'utf8'))
       .join('\n');
     const heroSource = pageSource.slice(
@@ -46,7 +43,8 @@ describe('homepage hero contract (JOV-5864)', () => {
 
     expect(rejectedPhotoFixture).toMatch(rasterSourcePattern);
     expect(rejectedPhotoFixture).toMatch(cssImagePattern);
-    // The page itself mounts no media; the hero owns exactly two rasters.
+    // The page itself mounts no media; the hero's only raster is the real
+    // jov.ie/tim capture from the media map (JOV-6946), not a generated asset.
     expect(heroSource).not.toMatch(rasterSourcePattern);
     expect(heroCss).not.toMatch(cssImagePattern);
     expect(componentSource).not.toMatch(/<(?:picture|img|video|canvas)\b/);
@@ -54,22 +52,17 @@ describe('homepage hero contract (JOV-5864)', () => {
       [...componentSource.matchAll(/'\/assets\/generated\/[^']+'/g)].map(
         match => match[0]
       )
-    ).toEqual([
-      "'/assets/generated/homepage-hero-technical-texture-v1.webp'",
-      "'/assets/generated/homepage-avery-chen-portrait-v1.webp'",
-    ]);
-    // The hero texture is the LCP layer: priority, full-bleed, sized by fill.
-    expect(componentSource).toMatch(
-      /<Image\s+alt=''\s+className='homepage-identity-hero__texture-image'\s+fill\s+priority\s+sizes='100vw'/
+    ).toEqual([]);
+    expect(componentSource).toContain('HOMEPAGE_MEDIA_MAP.connected.asset');
+    // Pen My0zu (JOV-6914): the hero light is a CSS layer, not an image.
+    expect(componentSource).toContain(
+      "className='homepage-identity-hero__light'"
     );
   });
 
   it('uses the exact canonical headline and one support line', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.eyebrow).toBe(
-      'Jovie / Identity, connected'
-    );
     expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'A living identity for the internet.'
+      'Your living identity on the internet.'
     );
     expect(HOMEPAGE_IDENTITY_COPY.hero.subhead).toBe(
       'Your work, your links, your next chapter. Together in your Jovie profile.'
@@ -104,7 +97,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
-      /\.homepage-identity-hero__headline\s*\{[\s\S]*?max-width: 11ch;[\s\S]*?text-wrap: balance;[\s\S]*?\}/
+      /\.homepage-identity-hero__headline\s*\{[\s\S]*?max-width: 20ch;[\s\S]*?text-wrap: balance;[\s\S]*?\}/
     );
     expect(css).toMatch(
       /\.homepage-identity-hero__support\s*\{[\s\S]*?text-wrap: balance;[\s\S]*?\}/
@@ -132,14 +125,10 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
-  it('drifts only the texture for 20s with reduced-motion parity', () => {
+  it('keeps the hero still: a static CSS light, no drift or reveal', () => {
     const css = readHeroCss();
 
-    expect(css).toContain(
-      'animation: homepage-identity-texture-drift 20s ease-in-out infinite'
-    );
-    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(css).toContain('animation: none;');
+    expect(css).not.toContain('homepage-identity-texture-drift');
     expect(css).not.toContain('homepage-hero-content-reveal');
   });
 

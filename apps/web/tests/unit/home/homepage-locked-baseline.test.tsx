@@ -88,8 +88,8 @@ function LockedHomepageBody() {
       <div data-testid='homepage-story-stack'>
         <HomepageCertifiedSections
           previews={{
-            connected: HOMEPAGE_MEDIA_MAP.connected.asset,
-            relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+            subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+            pay: HOMEPAGE_MEDIA_MAP.pay.asset,
           }}
         />
         <HomepageEditorialChangelog />
@@ -102,37 +102,22 @@ function LockedHomepageBody() {
 describe('JOV-5864 locked homepage baseline', () => {
   it('pins the certified body, close, changelog, and SEO copy verbatim', () => {
     expect(HOMEPAGE_IDENTITY_COPY.seo).toEqual({
-      title: 'Jovie | A living identity for the internet',
+      title: 'Jovie | Your living identity on the internet',
       description:
         'Your work, your links, your next chapter. Together in your Jovie profile.',
     });
 
+    // Pen My0zu (JOV-6946): one relationships beat with real next steps.
     expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toEqual([
-      {
-        id: 'connected',
-        eyebrow: 'IDENTITY, ACROSS THE INTERNET',
-        headline: 'Everything about you, connected.',
-        body: 'Your work and story are scattered across the internet. Your identity should be easier to see.',
-      },
       {
         id: 'relationships',
         headline: 'Turn attention into relationships.',
-        body: 'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-        outcomes: [
+        body: 'Give every person a tailored next step, without forcing everyone through the same funnel.',
+        steps: [
+          { id: 'pay', caption: 'A direct way to pay Tim, in one tap.' },
           {
-            id: 'found',
-            headline: 'Be found. Be understood.',
-            body: 'Share the right version of you, legible wherever people want to know how you can help.',
-          },
-          {
-            id: 'know',
-            headline: 'Know who cares.',
-            body: 'See who is paying attention, what brought them to you, and what they may want next.',
-          },
-          {
-            id: 'built',
-            headline: 'Built around who you are.',
-            body: 'Jovie adapts to your work without reducing you to a category.',
+            id: 'subscribe',
+            caption: 'Tim’s updates, sent only to people who asked for them.',
           },
         ],
       },
@@ -159,7 +144,6 @@ describe('JOV-5864 locked homepage baseline', () => {
     );
     expect(sectionIds).toEqual([
       'homepage-hero-shell',
-      'homepage-section-connected',
       'homepage-section-relationships',
       'homepage-editorial-changelog',
       'homepage-close',
@@ -168,7 +152,7 @@ describe('JOV-5864 locked homepage baseline', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'A living identity for the internet.',
+        name: 'Your living identity on the internet.',
       })
     ).toBeInTheDocument();
     expect(
@@ -227,15 +211,9 @@ describe('JOV-5864 locked homepage baseline', () => {
       certified.changelog.headline,
       certified.changelog.allPostsLabel,
       ...certified.sections.flatMap(section => [
-        ...('eyebrow' in section ? [section.eyebrow] : []),
         section.headline,
         section.body,
-        ...('outcomes' in section
-          ? section.outcomes.flatMap(outcome => [
-              outcome.headline,
-              outcome.body,
-            ])
-          : []),
+        ...section.steps.map(step => step.caption),
       ]),
       ...HOMEPAGE_EDITORIAL_CARDS.flatMap(card => [
         card.title,
@@ -253,8 +231,8 @@ describe('JOV-5864 locked homepage baseline', () => {
       <div data-testid='homepage-story-stack'>
         <HomepageCertifiedSections
           previews={{
-            connected: HOMEPAGE_MEDIA_MAP.connected.asset,
-            relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
+            subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+            pay: HOMEPAGE_MEDIA_MAP.pay.asset,
           }}
         />
         <HomepageEditorialChangelog />
