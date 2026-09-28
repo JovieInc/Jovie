@@ -98,7 +98,7 @@ export function ProductClaimHandleForm({
             aria-describedby={statusId}
             className={cn(
               'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token focus-visible:border-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
-              unavailable && 'text-destructive'
+              unavailable && 'text-error'
             )}
           />
           <HandleStatusIcon
@@ -127,7 +127,7 @@ export function ProductClaimHandleForm({
         data-testid={`${testIdPrefix}-handle-status`}
         className={cn(
           'min-h-5 px-1 pt-2 text-xs text-secondary-token',
-          unavailable && 'text-destructive',
+          unavailable && 'text-error',
           available === true && !unavailable && 'text-success'
         )}
         aria-live='polite'

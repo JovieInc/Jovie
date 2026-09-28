@@ -268,7 +268,7 @@ export function YouTubeOptimizationPanel({
         </>
       ) : (
         <p
-          className={`${COPY} ${loadState === 'error' ? 'text-destructive' : 'text-secondary-token'}`}
+          className={`${COPY} ${loadState === 'error' ? 'text-error' : 'text-secondary-token'}`}
         >
           {loadState === 'error'
             ? 'Optimization history could not be loaded.'
