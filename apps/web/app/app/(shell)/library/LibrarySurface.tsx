@@ -1429,7 +1429,7 @@ function LibraryToolbar({
   isSyncingSpotify,
   onSyncSpotify,
   youtubeConnected,
-  isImportingYouTube,
+  isImportingYouTube = false,
   youtubeImportDisabled = false,
   onImportYouTube,
 }: {
@@ -1455,8 +1455,8 @@ function LibraryToolbar({
   readonly canSyncSpotify: boolean;
   readonly isSyncingSpotify: boolean;
   readonly onSyncSpotify: () => void;
-  readonly youtubeConnected: boolean;
-  readonly isImportingYouTube: boolean;
+  readonly youtubeConnected?: boolean;
+  readonly isImportingYouTube?: boolean;
   readonly youtubeImportDisabled?: boolean;
   readonly onImportYouTube?: () => void;
 }) {
@@ -1509,6 +1509,23 @@ function LibraryToolbar({
             />
           ) : null}
           <ViewToggle view={view} onView={onView} />
+          {onImportYouTube ? (
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              disabled={isImportingYouTube || youtubeImportDisabled}
+              onClick={onImportYouTube}
+              data-youtube-connected={youtubeConnected ? 'true' : 'false'}
+              className='shrink-0'
+            >
+              {isImportingYouTube
+                ? 'Importing...'
+                : youtubeConnected
+                  ? 'Import YouTube'
+                  : 'Connect YouTube'}
+            </Button>
+          ) : null}
           <LibraryFirstAction
             canSyncSpotify={canSyncSpotify}
             isSyncing={isSyncingSpotify}
@@ -2572,6 +2589,10 @@ export function LibrarySurface({
   profileId = null,
   artistHandle = null,
   canSyncSpotify = false,
+  youtubeConnected = false,
+  isImportingYouTube = false,
+  youtubeImportDisabled = false,
+  onImportYouTube,
   merchProducts = EMPTY_MERCH_PRODUCTS,
   relationships = EMPTY_RELATIONSHIPS,
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
@@ -2584,6 +2605,10 @@ export function LibrarySurface({
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
   readonly canSyncSpotify?: boolean;
+  readonly youtubeConnected?: boolean;
+  readonly isImportingYouTube?: boolean;
+  readonly youtubeImportDisabled?: boolean;
+  readonly onImportYouTube?: () => void;
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
