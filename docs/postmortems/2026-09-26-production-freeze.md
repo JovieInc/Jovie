@@ -155,7 +155,7 @@ Two independent mechanisms, in sequence:
 | [JOV-6687](https://linear.app/jovie/issue/JOV-6687) | Controller convergence invariant and simulation | `non-convergent-control-loop` | Backlog | pending |
 | [JOV-5934](https://linear.app/jovie/issue/JOV-5934) | Exact-SHA lineage ledger, no skipped-as-green | `green-by-implication` | In Review (existing) | pending |
 | [JOV-6688](https://linear.app/jovie/issue/JOV-6688) | Sanctioned break-glass promote | `privileged-recovery-only` | Backlog | pending |
-| [JOV-6689](https://linear.app/jovie/issue/JOV-6689) | CI: incident closure requires a post-mortem | `unowned-incident` | Backlog | pending |
+| [JOV-6689](https://linear.app/jovie/issue/JOV-6689) | CI: incident closure requires a post-mortem | `unowned-incident` | In Review | pending |
 | [JOV-6690](https://linear.app/jovie/issue/JOV-6690) | Summer review, GBrain mirror, weekly class review | `unowned-incident` | Backlog | pending |
 
 ## Runbook until the controls ship

@@ -27,22 +27,32 @@ describe('SupportPage', () => {
     expect(heading).toHaveTextContent("We're Here To Help.");
   });
 
-  it('renders the contact support button as a link', () => {
+  it('renders the contact support button as a Help Center escalation link', () => {
     render(<SupportPage />);
 
     const contactButton = screen.getByRole('link', {
-      name: /send email to support team/i,
+      name: /contact support with page context attached/i,
     });
     expect(contactButton).toBeInTheDocument();
-    expect(contactButton).toHaveAttribute('href', 'mailto:support@jov.ie');
+    expect(contactButton).toHaveAttribute(
+      'href',
+      'https://docs.jov.ie/contact?from=/support'
+    );
     expect(contactButton).toHaveTextContent('Contact Support');
+  });
+
+  it('keeps a direct email fallback', () => {
+    render(<SupportPage />);
+
+    const emailLink = screen.getByRole('link', { name: 'support@jov.ie' });
+    expect(emailLink).toHaveAttribute('href', 'mailto:support@jov.ie');
   });
 
   it('renders the CTA on the canonical 28px marketing Button atom', () => {
     render(<SupportPage />);
 
     const contactButton = screen.getByRole('link', {
-      name: /send email to support team/i,
+      name: /contact support with page context attached/i,
     });
     expect(contactButton).toHaveAttribute('data-variant', 'secondary');
     expect(contactButton).toHaveAttribute('data-size', 'marketing');
@@ -61,27 +71,13 @@ describe('SupportPage', () => {
     expect(contactButton).not.toHaveClass('public-action-primary');
   });
 
-  it('has proper accessibility attributes', () => {
-    render(<SupportPage />);
-
-    const contactButton = screen.getByRole('link', {
-      name: /send email to support team/i,
-    });
-    expect(contactButton).toHaveAttribute(
-      'aria-label',
-      'Send email to support team at support@jov.ie'
-    );
-  });
-
   it('tracks analytics events when email is clicked', async () => {
     const { track } = await import('@/lib/analytics');
     render(<SupportPage />);
 
-    const contactButton = screen.getByRole('link', {
-      name: /send email to support team/i,
-    });
-    contactButton.addEventListener('click', event => event.preventDefault());
-    fireEvent.click(contactButton);
+    const emailLink = screen.getByRole('link', { name: 'support@jov.ie' });
+    emailLink.addEventListener('click', event => event.preventDefault());
+    fireEvent.click(emailLink);
 
     expect(track).toHaveBeenCalledWith('Support Email Clicked', {
       email: 'support@jov.ie',
@@ -120,7 +116,7 @@ describe('SupportPage', () => {
     }
 
     const sectionHeadings = screen.getAllByRole('heading', { level: 2 });
-    expect(sectionHeadings).toHaveLength(3);
+    expect(sectionHeadings).toHaveLength(2);
     for (const sectionHeading of sectionHeadings) {
       expect(sectionHeading).toHaveClass('text-primary-token');
       expect(sectionHeading).toHaveClass('text-2xl');
@@ -135,21 +131,21 @@ describe('SupportPage', () => {
     expect(section).toBeInTheDocument();
   });
 
-  it('renders support channels as surfaced cards with icons', () => {
+  it('renders Help Center and contact destinations as surfaced cards', () => {
     render(<SupportPage />);
 
     expect(
       screen.getByRole('heading', { level: 2, name: 'How Can We Help?' })
     ).toBeInTheDocument();
 
-    for (const title of ['Documentation', 'Email Support', 'Getting Started']) {
+    for (const title of ['Help Center', 'Contact Support']) {
       expect(
         screen.getByRole('heading', { level: 3, name: title })
       ).toBeInTheDocument();
     }
 
     const cards = screen.getAllByRole('article');
-    expect(cards).toHaveLength(3);
+    expect(cards).toHaveLength(2);
     for (const card of cards) {
       // Canonical Card atom: concentric System B card radius, no raw rounded-2xl.
       expect(card).toHaveClass(
@@ -165,7 +161,9 @@ describe('SupportPage', () => {
     for (const action of screen
       .getAllByRole('link')
       .filter(link =>
-        /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
+        /^(Browse the Help Center|Contact support)$/.test(
+          link.textContent?.trim() ?? ''
+        )
       )) {
       expect(action).toHaveAttribute('data-size', 'marketing');
       expect(action).toHaveClass(

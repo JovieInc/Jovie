@@ -75,7 +75,6 @@ export function PresenceIdentityPhoto({
         size={size}
         shape={photo.kind === 'generic' ? 'artwork' : 'person'}
         verified={false}
-        className='bg-surface-0'
       />
       <ProviderBadge platform={subject.platform} label={platformLabel} />
       {showSource ? (

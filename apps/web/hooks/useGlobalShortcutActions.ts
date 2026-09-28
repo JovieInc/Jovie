@@ -21,11 +21,7 @@ import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataC
 import { useThemeToggle } from '@/components/site/theme-toggle/useThemeToggle';
 import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import {
-  APP_SHELL_WORKSPACES,
-  getCurrentAppShellWorkspace,
-  getNextAppShellWorkspace,
-} from '@/lib/app-shell/workspaces';
+import { getNextPermittedAppShellWorkspace } from '@/lib/app-shell/workspaces';
 import { WORKSPACE_SWITCH_KEY } from '@/lib/keyboard-shortcuts';
 import { isFounderDoorToggleEvent } from '@/lib/ovie/founder-door';
 import { isFormElement } from '@/lib/utils/keyboard';
@@ -79,10 +75,9 @@ export function useGlobalShortcutActions() {
         return;
       }
       if (isFormElement(e.target)) return;
-      const currentWorkspace = getCurrentAppShellWorkspace(pathname);
-      const nextWorkspace = getNextAppShellWorkspace(
-        APP_SHELL_WORKSPACES,
-        currentWorkspace.id
+      const nextWorkspace = getNextPermittedAppShellWorkspace(
+        { isAdmin },
+        pathname
       );
       if (!nextWorkspace) return;
       e.preventDefault();

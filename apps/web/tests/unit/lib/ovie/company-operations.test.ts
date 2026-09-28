@@ -88,6 +88,59 @@ describe('deriveOvieCompanyOverview', () => {
     );
   });
 
+  it('measures week-over-week MRR net of churn from the Stripe baseline', () => {
+    const growth = deriveOvieCompanyOverview(
+      buildMetrics({ weekAgo: { mrrUsd: 5000, activeSubscribers: 40 } }),
+      NOW
+    ).metrics[1];
+    expect(growth).toMatchObject({
+      value: '+$200 MRR (+4.0%)',
+      state: 'fresh',
+      drillDownLabel: 'Inspect Stripe',
+    });
+    expect(growth.detail).toContain('+2 WoW');
+
+    const decline = deriveOvieCompanyOverview(
+      buildMetrics({ weekAgo: { mrrUsd: 5400, activeSubscribers: 44 } }),
+      NOW
+    ).metrics[1];
+    expect(decline.value).toBe('-$200 MRR (-3.7%)');
+    expect(decline.detail).toContain('(-2 WoW)');
+
+    const single = deriveOvieCompanyOverview(
+      buildMetrics({
+        activeSubscribers: 1,
+        weekAgo: { mrrUsd: 5200, activeSubscribers: 1 },
+      }),
+      NOW
+    ).metrics[1];
+    expect(single.detail).toContain('1 paying subscriber (+0 WoW)');
+
+    const fromZero = deriveOvieCompanyOverview(
+      buildMetrics({
+        mrrUsd: 0,
+        activeSubscribers: 0,
+        weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
+      }),
+      NOW
+    ).metrics[1];
+    expect(fromZero.value).toBe('+$0 MRR');
+  });
+
+  it('never shows a week-over-week number when Stripe is not readable', () => {
+    const metrics = buildMetrics({
+      weekAgo: { mrrUsd: 5000, activeSubscribers: 40 },
+    });
+    metrics.sources.stripe = {
+      ...metrics.sources.stripe,
+      state: 'unauthorized',
+    };
+    expect(deriveOvieCompanyOverview(metrics, NOW).metrics[1]).toMatchObject({
+      value: 'Not Measured',
+      state: 'unauthorized',
+    });
+  });
+
   it('fails closed when Mercury burn is degraded instead of displaying zero', () => {
     const metrics = buildMetrics({
       burnRateUsd: 0,
