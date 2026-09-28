@@ -1,9 +1,12 @@
+import { Activity } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   type WorkspaceTabOption,
   WorkspaceTabsSurface,
 } from '@/components/organisms/WorkspaceTabsSurface';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 export interface AdminPageTabsConfig<
@@ -73,7 +76,7 @@ export function AdminPage<
 }: Readonly<AdminPageProps<TPrimary, TSecondary>>) {
   const tabsHeaderless = Boolean(tabs);
   // Breadcrumb owns the page title; only surface description + actions here.
-  const showMetaHeader = Boolean(description || actions);
+  const showMetaHeader = true;
 
   return (
     <PageShell frame='none' contentPadding='none'>
@@ -102,6 +105,14 @@ export function AdminPage<
                   {actions}
                 </div>
               ) : null}
+              <Link
+                href={APP_ROUTES.ADMIN_ACTIVITY}
+                className='inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-2xs font-medium text-secondary-token transition-colors hover:text-primary-token'
+                aria-label='Open Company Timeline'
+              >
+                <Activity className='h-3.5 w-3.5' aria-hidden='true' />
+                Timeline
+              </Link>
             </div>
           ) : null}
 
