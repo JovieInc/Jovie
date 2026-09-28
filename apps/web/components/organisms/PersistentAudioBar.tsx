@@ -16,7 +16,6 @@ import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { ShellAudioDock } from '@/components/shell/ShellAudioDock';
-import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
   APP_ROUTES,
   buildLyricsRoute,
@@ -30,10 +29,6 @@ import {
   setAudioChromeSnapshot,
   useFullAudioPlayerExpandRequests,
 } from './audio-chrome-state';
-
-/** Docked now-playing chip — flat, no elevation into the content canvas (JOV-3511). */
-const SHELL_NOW_PLAYING_CARD_CLASSNAME =
-  'max-w-56 border-0 bg-transparent px-1 py-1 shadow-none transition-[opacity] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
@@ -171,6 +166,11 @@ export function PersistentAudioBar() {
       )
     );
   }, [router, searchParams]);
+
+  const prefetchLyricsRoute = useCallback(() => {
+    if (!playbackState.activeTrackId || !playbackState.hasLyrics) return;
+    router.prefetch(buildLyricsRoute(playbackState.activeTrackId));
+  }, [playbackState.activeTrackId, playbackState.hasLyrics, router]);
 
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
@@ -420,11 +420,6 @@ export function PersistentAudioBar() {
     musicalKey: playbackState.musicalKey,
   };
   const lyricsPath = buildLyricsRoute(activeTrackId);
-  const nowPlayingTrack = {
-    trackTitle: playbackState.trackTitle,
-    artistName: playbackState.artistName,
-    artworkUrl: playbackState.artworkUrl,
-  };
 
   return (
     <>
@@ -440,15 +435,8 @@ export function PersistentAudioBar() {
             data-testid='audio-surface-expanded-shell'
             data-shell-audio-surface='persistent-expanded'
             aria-hidden={!playerOpen}
-            className='grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] items-center gap-3 px-4 py-1.5 lg:px-6'
+            className='grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-1.5 lg:px-6'
           >
-            <SidebarNowPlaying
-              track={nowPlayingTrack}
-              isPlaying={playbackState.isPlaying}
-              onPlay={handleToggle}
-              playOverlayVisible={false}
-              className={SHELL_NOW_PLAYING_CARD_CLASSNAME}
-            />
             <AudioBar
               isPlaying={playbackState.isPlaying}
               onPlay={handleToggle}
@@ -471,6 +459,7 @@ export function PersistentAudioBar() {
               onOpenLyrics={
                 playbackState.hasLyrics ? handleOpenLyrics : undefined
               }
+              onLyricsIntent={prefetchLyricsRoute}
               track={shellTrack}
               className='min-w-0 px-0 py-0'
             />
