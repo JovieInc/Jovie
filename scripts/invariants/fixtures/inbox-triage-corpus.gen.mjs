@@ -10,7 +10,10 @@
  * patterns so the bounded-request secret/PII screen stays green.
  */
 
+import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { JEV_ROUTE } from '../jev-gateway.mjs';
+import { UNCATEGORIZED_LABEL } from '../jev-inbox-triage.mjs';
 
 // Canonical inbound-email fixtures per existing category enum. Each entry:
 // [subject, body, priority, extraTags].
@@ -1150,6 +1153,145 @@ export function buildCorpus() {
     examples: examples.map(e => ({ ...e, tags: [...e.tags] })),
   };
 }
+
+/**
+ * Predeclared materiality, protected metrics and evidence sufficiency for the
+ * pilot. `corpusSha256` is derived from the generated corpus, so the pin is
+ * regenerated with the corpus of record. Concentration thresholds are
+ * predeclared priors, not calibrated values, and deliberately do NOT reuse
+ * the Haiku classifier's self-reported 0.6/0.7 confidence cutoffs.
+ * Production activation additionally requires the JOV-6420 pilot's positive
+ * disposition, workload-specific canary admission and rollback proof.
+ */
+export function buildPilotConfig() {
+  return {
+    schema: 'inbox-triage-pilot-config/v1',
+    version: '2026-09-28.1',
+    issue: 'JOV-6421',
+    corpusSha256: createHash('sha256')
+      .update(JSON.stringify(buildCorpus()))
+      .digest('hex'),
+    materiality: {
+      minMacroF1: 0.75,
+      minMacroF1DeltaVsBaseline: 0.03,
+      maxFalseSuggestionRate: 0.03,
+      maxCorrectionRate: 0.15,
+      abstentionBand: [0.02, 0.5],
+      maxP95LatencyMs: 12000,
+      maxEstimatedCostPerDecisionUsd: 0.0005,
+    },
+    protectedLimits: {
+      uncategorizedRecallMin: 0.85,
+      highValueMissRateMax: 0.1,
+      spamOvercaptureRateMax: 0.05,
+    },
+    sufficiency: {
+      minCorpusSize: 200,
+      minTuningExamples: 100,
+      minHoldoutExamples: 60,
+      minExamplesPerExpectedCategory: 3,
+      minExamplesPerExpectedPriority: 5,
+      requiredTags: [
+        'time-sensitive-booking',
+        'mixed-inquiry',
+        'fan-mail',
+        'forwarded-thread',
+        'quoted-instructions',
+        'ambiguous-priority',
+        'legit-resembling-spam',
+        'injection',
+        'typo',
+        'off-topic',
+      ],
+      minExecutedComparisons: 200,
+      rareEventNote:
+        'A 200-500 example corpus is not proof of rare-event safety or production readiness; it bounds ordinary-quality evidence only.',
+    },
+    pricingEstimate: {
+      jevInputPerMillionUsd: 0.04,
+      jevOutputPerMillionUsd: null,
+      // The incumbent Haiku call still runs for free-form summary and
+      // extraction whenever Jev only supplies category/priority; whole-
+      // workflow cost counts BOTH calls and stays null until filled from
+      // recorded baseline usage.
+      incumbentCostPerEmailUsd: null,
+    },
+  };
+}
+
+// ---- Canned fixtures for the shadow-eval test suite (synthetic only) ----
+
+/** One canonical synthetic eval input; no real sender data. */
+export const EVAL_INPUT = Object.freeze({
+  sourceSha: 'a'.repeat(40),
+  artifactSha256: 'b'.repeat(64),
+  scope: 'inbox-triage test',
+  fromName: 'Talent Buyer',
+  fromDomain: 'promoter.example',
+  subject: 'Festival booking for April',
+  bodyText: 'We would love to book you for our festival on April 18.',
+  artistName: 'Eval Artist',
+  artistGenres: ['indie'],
+});
+
+/** Canned transport payload: choice answers at 0.8 concentration. */
+export function transportResult({
+  category = 'booking',
+  priority = 'high',
+} = {}) {
+  const answer = choice => ({
+    type: 'choice',
+    choice,
+    probabilities: { [choice]: 0.8, [UNCATEGORIZED_LABEL]: 0.2 },
+  });
+  return {
+    answers: { category: answer(category), priority: answer(priority) },
+    response: { modelId: JEV_ROUTE.model, headers: { 'x-vercel-id': 'fx-1' } },
+    usage: { inputTokens: 60, outputTokens: 8 },
+    warnings: [],
+  };
+}
+
+/** Canned evaluated receipt for one category/priority at a concentration. */
+export function receiptFor(category, priority, concentration) {
+  const un = UNCATEGORIZED_LABEL;
+  return {
+    status: 'evaluated',
+    responseId: 'fx-test',
+    inputTokens: 60,
+    outputTokens: 8,
+    decision: {
+      category,
+      categoryLabel: category ?? un,
+      categoryConcentration: concentration,
+      priority,
+      priorityLabel: priority ?? un,
+      priorityConcentration: null,
+      abstained: category === null,
+    },
+  };
+}
+
+/** Receipt that perfectly matches an example's expected labels. */
+export const labeledOutcome = example =>
+  receiptFor(
+    example.expectedCategory === UNCATEGORIZED_LABEL
+      ? null
+      : example.expectedCategory,
+    example.expectedPriority === UNCATEGORIZED_LABEL
+      ? null
+      : example.expectedPriority,
+    0.9
+  );
+
+/** Map a corpus to recorded decision rows via a decide function. */
+export const outcomesFor = (corpusLike, decide, { executed = true } = {}) =>
+  corpusLike.examples.map(example => ({
+    id: example.id,
+    receipt: decide(example),
+    latencyMs: 800,
+    executed,
+  }));
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const corpus = buildCorpus();
