@@ -59,6 +59,9 @@ HELD_REASONS = (
 )
 # Held codes that green CI supersedes (the lane's local gate, not a diff policy, said no).
 CI_SUPERSEDES = frozenset({"gate-check-failed", "gate-timeout"})
+# Hold next_actions a pushed head can still clear. The rest (bug-intake, close-pr, ...)
+# name conditions no agent push satisfies, so the fix loop must not burn attempts on them.
+FIXABLE_ACTIONS = frozenset({"fix-loop", "regate"})
 RUN_FAILURES = (
     ("timeout:", "agent-timeout"),
     ("harness-error:", "harness-error"),
@@ -86,6 +89,14 @@ def held_record(sha: str, evidence: list[str], at: float | None = None) -> dict:
     reason, action = held_reason(evidence)
     return {"sha": sha, "evidence": evidence[-60:], "reason": reason, "next_action": action,
             "at": time.time() if at is None else at}
+
+
+def fixable_hold(entry: dict | None, sha: str) -> bool:
+    """False when the gate's recorded hold on this exact head names a reason no push can
+    clear (e.g. `diff-too-large`): the fix loop cannot help and bug intake owns the PR."""
+    if not entry or entry.get("sha") != sha:
+        return True
+    return held_reason(entry.get("evidence") or [])[1] in FIXABLE_ACTIONS
 
 
 def failure_reason(receipt: dict, exhausted: bool) -> dict:
@@ -393,6 +404,9 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
                 and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):
             continue  # the tick's no-model sync with main goes first
+        if not fixable_hold(held.get(str(pr["number"])), pr["headRefOid"]):
+            consume(lane, pr)  # intake owns this head; the label must not keep queueing fixes
+            continue
         if not may_take(name, pr, record, order, now) or lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
         entry = held.get(str(pr["number"]), {})

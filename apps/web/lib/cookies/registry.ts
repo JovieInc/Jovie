@@ -207,6 +207,16 @@ export const COOKIE_REGISTRY = [
     preConsent: false,
   },
   {
+    name: 'jv_sub_mgmt',
+    match: 'exact',
+    category: 'essential',
+    purpose:
+      'Proves mailbox control after notification email verification so only the subscriber can enable notification categories.',
+    duration: '1 hour',
+    ttlSeconds: 60 * 60,
+    preConsent: true,
+  },
+  {
     name: 'jovie_lead_attribution',
     match: 'exact',
     category: 'marketing',

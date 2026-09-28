@@ -1054,6 +1054,13 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+export {
+  insertProfileInquirySchema,
+  type NewProfileInquiry,
+  type ProfileInquiry,
+  profileInquiries,
+  selectProfileInquirySchema,
+} from './profile-inquiries';
 // Provider-neutral artist search monitoring and issue evidence
 export {
   type ProfileSearchQuery,
