@@ -67,7 +67,6 @@ import {
   type EveIdentityId,
 } from '@/lib/ovie/identity';
 import { OvieProgramError } from '@/lib/ovie/program';
-import { logger } from '@/lib/utils/logger';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
 
@@ -671,8 +670,15 @@ export async function executeChatTurn(
       // Always leave the real provider error in runtime logs: callers map it to
       // recovery copy and telemetry is optional, so it was otherwise invisible
       // (JOV-6533: 200 + "Message paused" with no trace anywhere).
-      logger.error('[chat] model stream error', {
-        error,
+      // console.error, not logger: the app logger is a no-op in production builds,
+      // and this line exists to be visible in Vercel runtime logs.
+      console.error('[chat] model stream error', {
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : undefined,
+        cause:
+          error instanceof Error && error.cause instanceof Error
+            ? error.cause.message
+            : undefined,
         requestId,
         mode,
         selectedModel,
