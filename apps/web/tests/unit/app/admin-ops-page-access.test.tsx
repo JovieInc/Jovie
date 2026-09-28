@@ -40,8 +40,8 @@ vi.mock('@/components/features/admin/hud/HudFullscreenControl', () => ({
 vi.mock('@/components/features/admin/OperationalControlPanel', () => ({
   OperationalControlPanel: () => null,
 }));
-vi.mock('@/app/app/(shell)/admin/ops/HudDashboardClient', () => ({
-  HudDashboardClient: () => null,
+vi.mock('@/app/app/(shell)/admin/ops/OpsCockpitClient', () => ({
+  OpsCockpitClient: () => null,
 }));
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({ children }: { children: unknown }) => children,

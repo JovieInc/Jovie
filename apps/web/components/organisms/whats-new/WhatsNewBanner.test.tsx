@@ -96,6 +96,23 @@ describe('WhatsNewBannerView', () => {
     ).toHaveAttribute('href', 'https://jov.ie/changelog/26.9.2');
   });
 
+  it('sits on the banner overlay layer, below sheets and dialogs', () => {
+    render(
+      <WhatsNewBannerView
+        unseen={{
+          entry: FEED.entries[0],
+          unseenCount: 1,
+          href: FEED.entries[0].url,
+        }}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    const banner = screen.getByTestId('whats-new-banner');
+    expect(banner.className).toContain('z-banner');
+    expect(banner.className).not.toMatch(/(?:^|\s)z-\d/);
+  });
+
   it('counts multiple unseen updates and links the changelog index', () => {
     render(
       <WhatsNewBannerView

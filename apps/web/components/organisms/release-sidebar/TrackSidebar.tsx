@@ -12,7 +12,7 @@ import {
   DrawerSurfaceCard,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
-import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
+import { EntityHeader } from '@/components/molecules/drawer/EntityHeader';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   InspectorEmpty,
@@ -327,7 +327,7 @@ export function TrackSidebar({
                 onClick={handleBackToRelease}
               />
             ) : null}
-            <EntityHeaderCard
+            <EntityHeader
               data-testid='track-entity-header'
               className='px-3 pt-3'
               title={track.title}
@@ -349,7 +349,7 @@ export function TrackSidebar({
                   ) : null}
                 </span>
               }
-              image={
+              thumbnail={
                 <DrawerMediaThumb
                   src={track.releaseArtworkUrl}
                   alt={`${track.releaseTitle} artwork`}

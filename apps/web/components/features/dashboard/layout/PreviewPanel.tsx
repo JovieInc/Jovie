@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/PreviewPanel.test.tsx
+
 import { Button, type CommonDropdownItem } from '@jovie/ui';
 import {
   Check,
@@ -19,8 +21,8 @@ import {
 import { toast } from '@/components/feedback';
 import {
   DrawerButton,
-  DrawerHeader,
   DrawerInlineNote,
+  EntityHeader,
 } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -55,7 +57,8 @@ function PreviewPanelEmpty({
       ariaLabel='Live Preview'
     >
       <div className='flex h-full flex-col'>
-        <DrawerHeader
+        <EntityHeader
+          layout='chrome'
           title='Live preview'
           actions={
             <DrawerHeaderActions
@@ -343,7 +346,8 @@ export function PreviewPanel() {
       contextMenuItems={contextMenuItems}
     >
       <div className='flex h-full flex-col'>
-        <DrawerHeader
+        <EntityHeader
+          layout='chrome'
           title={headerTitle}
           actions={
             <DrawerHeaderActions

@@ -9,7 +9,7 @@ import {
   DrawerButton,
   DrawerFormField,
   DrawerSurfaceCard,
-  EntityHeaderCard,
+  EntityHeader,
 } from '@/components/molecules/drawer';
 import {
   Dialog,
@@ -84,8 +84,8 @@ export function ReleaseEditDialog({
               variant='card'
               className='rounded-lg border border-subtle bg-(--app-shell-content-surface) p-3.5'
             >
-              <EntityHeaderCard
-                image={
+              <EntityHeader
+                thumbnail={
                   <ReleaseArtworkThumb
                     src={release.artworkUrl}
                     alt={`${release.title} artwork`}

@@ -558,6 +558,15 @@ describe('surface elevation guardrails', () => {
     expect(creatorProfiles).not.toContain("'@tanstack/react-table'");
   });
 
+  it('renders the admin feedback detail header through the canonical EntityHeader', () => {
+    const adminFeedbackTable = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx'
+    );
+
+    expect(adminFeedbackTable).toContain('EntityHeader');
+    expect(adminFeedbackTable).not.toContain('EntityHeaderCard');
+  });
+
   it('names the hidden-header release table for screen readers', () => {
     const releaseTable = readComponent(
       'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'

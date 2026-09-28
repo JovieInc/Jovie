@@ -95,6 +95,7 @@ function funnel(
       label: key,
       description: '',
       count: counts[i] ?? 0,
+      drillDownHref: '',
       conversionRate:
         i === 0 || (counts[i - 1] ?? 0) <= 0
           ? null

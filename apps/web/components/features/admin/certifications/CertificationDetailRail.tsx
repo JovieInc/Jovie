@@ -372,7 +372,7 @@ export function CertificationDetailRail({
                 />
               }
               title={row.subject.title}
-              details={`${OVIE_CERTIFICATION_DOMAIN_LABELS[row.domain]} · ${row.surface}`}
+              subtitle={`${OVIE_CERTIFICATION_DOMAIN_LABELS[row.domain]} · ${row.surface}`}
               statusGlyph={
                 <Tooltip label={OVIE_CERTIFICATION_STATE_LABELS[row.state]}>
                   <span className='inline-flex'>
