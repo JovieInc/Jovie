@@ -37,7 +37,7 @@ export default function AiPage() {
               Public Brief
             </p>
             {/* ui-casing-allow: marketing display headline */}
-            <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl line-clamp-2'>
+            <h1 className='text-4xl font-semibold leading-tight tracking-tight sm:text-5xl line-clamp-2'>
               The AI operating system behind every Jovie profile
             </h1>
             <p className='max-w-2xl text-lg leading-8 text-secondary-token'>

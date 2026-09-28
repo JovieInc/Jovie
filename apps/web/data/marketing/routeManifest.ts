@@ -175,12 +175,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         'feature-split',
         'editorial',
-        'connected'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
         'relationships'
       ),
       approvedBinding(
@@ -193,7 +187,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'source history #17063, #17185, #17353; pinned 12b203f9',
       notes:
-        'Locked connected and relationships beats plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
+        'Locked relationships beat (real jov.ie/tim pay and updates captures, JOV-6946) plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',

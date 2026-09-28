@@ -63,9 +63,7 @@ describe('HomepageNoScriptContent', () => {
       ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
         item.headline,
         item.body,
-        ...('outcomes' in item
-          ? item.outcomes.flatMap(outcome => [outcome.headline, outcome.body])
-          : []),
+        ...item.steps.map(step => step.caption),
       ]),
       HOMEPAGE_LAUNCH_COPY.certified.close.headline,
     ];

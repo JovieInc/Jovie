@@ -52,8 +52,13 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+vi.mock('@/components/organisms/desktop-update/DesktopUpdateProvider', () => ({
+  useDesktopUpdateContext: vi.fn(),
+}));
+
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from '@/components/feedback';
+import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
 import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
@@ -87,6 +92,7 @@ const mockUseUserSafe = vi.mocked(useUserSafe);
 const mockUseAuthSafe = vi.mocked(useAuthSafe);
 const mockUseRouter = vi.mocked(useRouter);
 const mockUsePathname = vi.mocked(usePathname);
+const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
 const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
@@ -219,6 +225,7 @@ describe('UserButton billing actions', () => {
       push: pushMock,
     } as any);
     mockUsePathname.mockReturnValue('/app');
+    mockUseDesktopUpdateContext.mockReturnValue(null);
 
     mockUseBillingStatusQuery.mockReset();
 
@@ -721,6 +728,39 @@ describe('UserButton billing actions', () => {
     expect(screen.getByText('Usage remaining')).toBeInTheDocument();
     expect(screen.getByText('73%')).toBeInTheDocument();
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
+  });
+
+  it('shows the desktop update entry only when actionable and opens the modal from the menu', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    const openModal = vi.fn();
+    mockUseDesktopUpdateContext.mockReturnValue({
+      state: { state: 'idle' },
+      openModal,
+    });
+
+    const user = userEvent.setup();
+    const { unmount } = render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    expect(screen.queryByText(/^Update to /)).not.toBeInTheDocument();
+    unmount();
+
+    mockUseDesktopUpdateContext.mockReturnValue({
+      state: {
+        state: 'available',
+        version: '26.9.16',
+        releaseDate: '2026-09-27T00:00:00.000Z',
+        notesUrl: 'https://jov.ie/changelog',
+      },
+      openModal,
+    });
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    await user.click(await screen.findByText('Update to 26.9.16'));
+    expect(openModal).toHaveBeenCalledTimes(1);
   });
 
   it('gives identity and help enough width while preserving menu focus order', async () => {
