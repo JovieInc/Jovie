@@ -1,5 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -146,5 +152,22 @@ describe('lockfile importer specifier preflight', () => {
     });
     const lockfile = `lockfileVersion: '9.0'\n\nimporters:\n  .:\n  apps/web:\n    dependencies:\n      next:\n        specifier: 15.0.0\n  packages/audio-contracts:\n    devDependencies:\n      typescript:\n        specifier: ^6.0.3\n`;
     expect(compareWorkspaceSpecifiers({ root, lockfile })).toEqual([]);
+  });
+
+  it('keeps the isolated eve-pilot lockfile aligned with its manifest', () => {
+    const root = process.cwd();
+    const packagePath = join(root, 'apps', 'eve-pilot');
+    const manifest = JSON.parse(
+      readFileSync(join(packagePath, 'package.json'), 'utf8')
+    );
+    const lockfile = readFileSync(join(packagePath, 'pnpm-lock.yaml'), 'utf8');
+
+    expect(
+      compareWorkspaceSpecifiers({
+        root,
+        manifestByPath: new Map([['.', manifest]]),
+        lockfile,
+      })
+    ).toEqual([]);
   });
 });
