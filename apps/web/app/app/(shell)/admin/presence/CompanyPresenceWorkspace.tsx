@@ -60,7 +60,6 @@ const FILTERS: ReadonlyArray<{
 function absoluteUrl(path: string): string {
   return `${BASE_URL.replace(/\/$/, '')}${path}`;
 }
-
 function formatCheckedAt(value: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -72,7 +71,6 @@ function formatCheckedAt(value: string | null): string | null {
     minute: '2-digit',
   });
 }
-
 /** A check never renders as a number unless a source measured it. */
 function CheckCell({ check }: Readonly<{ check: CompanyPresenceCheck }>) {
   if (check.state === 'unconfigured') {

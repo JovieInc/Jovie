@@ -1494,13 +1494,8 @@ function runMergeGroupGuards() {
         !file.startsWith('apps/web/tests/e2e/') &&
         existsSync(resolve(REPO_ROOT, file))
     )
-    .map(file => file.replace(/^apps\/web\//, ''));
-  // Paths may contain shell metacharacters (e.g. Next.js route groups like
-  // `(shell)`), so quote each one — /bin/sh otherwise dies with a syntax error.
-  const quotedTests = ownTests.map(file => JSON.stringify(file));
-  return shell(
-    [LANE_COMMANDS['merge-group-guards'], ...quotedTests].join(' ')
-  );
+    .map(file => JSON.stringify(file.replace(/^apps\/web\//, '')));
+  return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
 }
 
 /** Async twin of shell() so structural commands can overlap. */
