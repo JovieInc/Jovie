@@ -12,6 +12,20 @@ export const SCREENSHOT_VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 } as const;
 
+/**
+ * Top safe-area inset for mobile captures (Dynamic Island iPhones: 59px).
+ * Marketing phone frames draw an island over the screen; without the inset
+ * the profile's `env(safe-area-inset-top)` padding resolves to 0 and content
+ * sits under the island. The bottom stays 0: frames draw no home indicator,
+ * and a bottom inset shrinks the scroll area enough to clip the last card.
+ */
+export const SCREENSHOT_MOBILE_SAFE_AREA = {
+  top: 59,
+  bottom: 0,
+  left: 0,
+  right: 0,
+} as const;
+
 export const GROUP_LABELS: Record<ScreenshotGroup, string> = {
   marketing: 'Marketing',
   onboarding: 'Onboarding',
