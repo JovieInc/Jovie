@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { assertSeedDatabaseTarget } from './seed-database-guard';
+import { DEMO_VIDEO_RELEASE } from './seed-helpers';
 
 const { creatorProfiles, discogReleases, providerLinks } = schema;
 
@@ -72,20 +73,7 @@ async function main() {
     .insert(discogReleases)
     .values({
       creatorProfileId: profile.id,
-      title: 'Miracle (Official Music Video)',
-      slug: 'demo-miracle-official-music-video',
-      releaseType: 'music_video',
-      releaseDate: new Date('2023-04-14'),
-      artworkUrl: '/images/demo/artwork-video.jpg',
-      totalTracks: 0,
-      metadata: {
-        youtubeVideoId: 'v7GHn2WJCM4',
-        youtubeThumbnailUrl: '/images/demo/artwork-video.jpg',
-        youtubeChannelId: 'UCIjYyZxkFucP_W-tmXg_ILw',
-        youtubeChannelName: 'Calvin Harris',
-        duration: 219,
-      },
-      sourceType: 'manual',
+      ...DEMO_VIDEO_RELEASE,
     })
     .onConflictDoNothing()
     .returning({ id: discogReleases.id });
