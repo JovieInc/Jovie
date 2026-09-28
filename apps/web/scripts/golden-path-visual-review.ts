@@ -203,8 +203,13 @@ export function confirmedBlockers(
     .map(v => v.id);
 }
 
-async function main() {
+export async function main(
+  argv: readonly string[] = process.argv.slice(2),
+  env: NodeJS.ProcessEnv = process.env,
+  fetchImpl?: typeof fetch
+) {
   const { values } = parseArgs({
+    args: argv as string[],
     options: {
       dir: { type: 'string' },
       out: { type: 'string' },
@@ -217,7 +222,7 @@ async function main() {
   if (records.length === 0)
     throw new Error('no keyframes recorded; the capture did not run');
   const baseUrl =
-    process.env.VISUAL_REVIEW_BASE_URL ?? 'https://ai-gateway.vercel.sh/v1';
+    env.VISUAL_REVIEW_BASE_URL ?? 'https://ai-gateway.vercel.sh/v1';
   const verdicts: KeyframeVerdict[] = [];
   for (const record of records) {
     const layout = reviewLayout(record);
@@ -225,8 +230,9 @@ async function main() {
       png: readFileSync(join(values.dir, record.file)),
       stepId: record.id,
       path: pathOf(record.url),
-      apiKey: process.env.AI_GATEWAY_API_KEY,
+      apiKey: env.AI_GATEWAY_API_KEY,
       baseUrl,
+      ...(fetchImpl ? { fetchImpl } : {}),
     });
     const suspected = layout.blockers.length > 0 || model.verdict === 'blocker';
     verdicts.push({

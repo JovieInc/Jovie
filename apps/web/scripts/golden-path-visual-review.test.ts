@@ -1,11 +1,12 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   confirmedBlockers,
   type KeyframeRecord,
   type KeyframeVerdict,
+  main,
   parseModelVerdict,
   pathOf,
   readManifest,
@@ -102,6 +103,11 @@ describe('golden path visual review', () => {
       verdict: 'unknown',
       reason: 'invalid JSON',
     });
+    expect(
+      parseModelVerdict(
+        '{"verdict":"pass","findings":["ok",{"n":1},"' + 'x'.repeat(400) + '"]}'
+      ).findings
+    ).toEqual(['ok', 'x'.repeat(300)]);
   });
 
   it('reviewer A reports unknown on outage, missing key or HTTP error', async () => {
@@ -131,6 +137,15 @@ describe('golden path visual review', () => {
         },
       })
     ).resolves.toMatchObject({ verdict: 'unknown', reason: 'network down' });
+    await expect(
+      reviewWithModel({
+        ...base,
+        apiKey: 'k',
+        fetchImpl: async () => {
+          throw 'string failure';
+        },
+      })
+    ).resolves.toMatchObject({ verdict: 'unknown', reason: 'request failed' });
   });
 
   it('reviewer A sends the image with the rubric and parses the verdict', async () => {
@@ -196,10 +211,121 @@ describe('golden path visual review', () => {
 
   it('reads the manifest.jsonl written by the keyframe capture', () => {
     const dir = mkdtempSync(join(tmpdir(), 'golden-path-review-'));
-    writeFileSync(
-      join(dir, 'manifest.jsonl'),
-      `${JSON.stringify(record())}\n${JSON.stringify(record({ overflowPx: 9 }))}\n`
-    );
-    expect(readManifest(dir)).toEqual([record(), record({ overflowPx: 9 })]);
+    try {
+      writeFileSync(
+        join(dir, 'manifest.jsonl'),
+        `${JSON.stringify(record())}\n${JSON.stringify(record({ overflowPx: 9 }))}\n`
+      );
+      expect(readManifest(dir)).toEqual([record(), record({ overflowPx: 9 })]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reads keyframe records from the manifest', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gpr-manifest-'));
+    try {
+      writeFileSync(
+        join(dir, 'manifest.jsonl'),
+        `${JSON.stringify(record())}\n\n${JSON.stringify(record({ overflowPx: 3 }))}\n`
+      );
+      const records = readManifest(dir);
+      expect(records).toHaveLength(2);
+      expect(records[1]?.audit.overflowPx).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  describe('main', () => {
+    const dirs: string[] = [];
+    afterEach(() => {
+      while (dirs.length) rmSync(dirs.pop()!, { recursive: true, force: true });
+      vi.restoreAllMocks();
+    });
+
+    function setupDir(...records: KeyframeRecord[]) {
+      const dir = mkdtempSync(join(tmpdir(), 'gpr-main-'));
+      dirs.push(dir);
+      writeFileSync(
+        join(dir, 'manifest.jsonl'),
+        records.map(r => JSON.stringify(r)).join('\n')
+      );
+      for (const r of records) writeFileSync(join(dir, r.file), 'png');
+      return dir;
+    }
+
+    const passFetch = async () =>
+      Response.json({
+        choices: [{ message: { content: '{"verdict":"pass","findings":[]}' } }],
+      });
+
+    it('requires --dir and --out', async () => {
+      await expect(main([], {})).rejects.toThrow('--dir and --out');
+      const dir = setupDir(record());
+      await expect(
+        main(['--dir', dir, '--out', join(dir, 'v.json')], {})
+        // no key -> model unknown, layout ok -> nothing suspected
+      ).resolves.toBeUndefined();
+    });
+
+    it('fails when the capture recorded no keyframes', async () => {
+      const dir = setupDir();
+      await expect(
+        main(['--dir', dir, '--out', join(dir, 'v.json')], {})
+      ).rejects.toThrow('no keyframes recorded');
+    });
+
+    it('writes a first-phase verdict file from layout + model reviews', async () => {
+      const dir = setupDir(record());
+      const out = join(dir, 'verdict.json');
+      await main(
+        ['--dir', dir, '--out', out],
+        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        passFetch
+      );
+      const written = JSON.parse(readFileSync(out, 'utf8'));
+      expect(written.phase).toBe('first');
+      expect(written.confirmed).toEqual([]);
+      expect(written.suspected).toEqual([]);
+      expect(written.keyframes[0].id).toBe('public-profile');
+      expect(written.keyframes[0].model).toEqual({
+        verdict: 'pass',
+        findings: [],
+      });
+    });
+
+    it('exits 1 only when the replay confirms a suspected keyframe', async () => {
+      const dir = setupDir(record(), record());
+      const out = join(dir, 'replay.json');
+      const firstVerdicts = {
+        keyframes: [verdict('public-profile', true), verdict('other', true)],
+      };
+      const confirm = join(dir, 'first.json');
+      writeFileSync(confirm, JSON.stringify(firstVerdicts));
+      const exitSpy = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => undefined) as never);
+      const blockerFetch = async () =>
+        Response.json({
+          choices: [
+            {
+              message: {
+                content: '{"verdict":"blocker","findings":["layout: clipped"]}',
+              },
+            },
+          ],
+        });
+      await main(
+        ['--dir', dir, '--out', out, '--confirm-against', confirm],
+        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        blockerFetch
+      );
+      const written = JSON.parse(readFileSync(out, 'utf8'));
+      expect(written.phase).toBe('replay');
+      // 'other' was not flagged again in the replay, so it drops out
+      expect(written.confirmed).toEqual(['public-profile']);
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
   });
 });
