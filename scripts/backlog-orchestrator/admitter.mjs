@@ -17,7 +17,7 @@ import {
 } from './ownership-inventory.mjs';
 import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
-import { scoreIssue } from './scorer.mjs';
+import { rankQueueCandidates, scoreIssue } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
 export const SYMPHONY_LABEL = 'symphony';
@@ -893,7 +893,11 @@ export function hasAdmissionEvidence(issue, classification = issue) {
 
 export function buildAdmissionReceipt(
   issue,
-  { now = new Date().toISOString(), fingerprint = '' } = {}
+  {
+    now = new Date().toISOString(),
+    fingerprint = '',
+    queueRankingReceipt = null,
+  } = {}
 ) {
   const targeting = resolveAdmissionTarget(issue);
   const target =
@@ -909,6 +913,7 @@ export function buildAdmissionReceipt(
       researchGateReceipt(issue, { now })?.payload?.fingerprint || '',
     action: 'lease',
     at: now,
+    ...(queueRankingReceipt ? { queueRanking: queueRankingReceipt } : {}),
     ...(target || {}),
   })} -->`;
 }
@@ -1016,10 +1021,7 @@ export async function selectNextToAdmit(
       type: 'issue',
       issue: issueForClassification(classification),
       score: scoreIssue(classification).score,
-    }))
-    .sort(
-      (a, b) => b.score - a.score || a.identifier.localeCompare(b.identifier)
-    );
+    }));
 
   if (candidates.length === 0) {
     return {
@@ -1030,12 +1032,21 @@ export async function selectNextToAdmit(
       admissionDecisions,
     };
   }
-  const selected = candidates[0];
+  const queueRanking = rankQueueCandidates(candidates, {
+    selectedAt: state.now,
+  });
+  const selected = {
+    ...queueRanking.ranked[0],
+    queueRankingReceipt: queueRanking.receipt,
+  };
   return {
     admit: [selected],
-    reason: `selected: ${selected.identifier} (score ${selected.score})`,
+    reason:
+      `selected: ${selected.identifier} (score ${selected.score}; ` +
+      `${queueRanking.receipt.mode})`,
     fleetGate,
     admissionDecisions,
+    queueRankingReceipt: queueRanking.receipt,
   };
 }
 
@@ -1097,6 +1108,7 @@ export async function admitIssue({
   const receipt = buildAdmissionReceipt(issue, {
     now,
     fingerprint: classification.fingerprint || '',
+    queueRankingReceipt: classification.queueRankingReceipt || null,
   });
   if (
     hasReceipt(issue, receipt) ||
