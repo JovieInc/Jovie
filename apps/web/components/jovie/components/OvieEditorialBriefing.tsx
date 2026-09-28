@@ -34,8 +34,8 @@ export function OvieEditorialBriefing({
           </p>
         </header>
 
-        <div className='grid border-t border-subtle md:grid-cols-[minmax(0,1.65fr)_minmax(15rem,0.75fr)]'>
-          <div className='min-w-0 py-5 pr-0 md:py-7 md:pr-8'>
+        <div className='grid border-t border-subtle md:grid-cols-3'>
+          <div className='min-w-0 py-5 pr-0 md:col-span-2 md:py-7 md:pr-8'>
             <p className='text-2xs font-medium text-tertiary-token'>
               What Matters Right Now
             </p>

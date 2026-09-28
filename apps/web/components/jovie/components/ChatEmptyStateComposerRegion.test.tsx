@@ -7,6 +7,7 @@ import {
   CHAT_EMPTY_SAMPLE_STORAGE_KEY,
   DESKTOP_CONTENT_GRID_ANCHOR,
 } from '../chat-empty-starters';
+import { CHAT_CONTENT_SHELL_CLASSNAME } from '../chat-layout';
 import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
 
 describe('ChatEmptyStateComposerRegion', () => {
@@ -269,6 +270,49 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(screen.queryByTestId('chat-empty-state-welcome')).toBeNull();
     expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(screen.queryByTestId('chat-empty-state-greeting')).toBeNull();
+  });
+
+  it('lets fullBleed editorial content use the canvas while keeping the composer docked', () => {
+    render(
+      <ChatEmptyStateComposerRegion
+        stableDocked
+        fullBleed
+        above={<div data-testid='briefing-slot'>Briefing</div>}
+      >
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    const region = screen.getByTestId('chat-empty-state-composer-region');
+    expect(region).toHaveAttribute('data-layout', 'docked');
+    expect(region.className).toContain('w-full');
+    expect(region.className).not.toContain(CHAT_CONTENT_SHELL_CLASSNAME);
+
+    const suggestions = screen
+      .getByTestId('briefing-slot')
+      .closest('[data-empty-chat-suggestions="true"]');
+    expect(suggestions).toHaveClass('min-h-full');
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toHaveAttribute('data-dock', 'bottom');
+  });
+
+  it('keeps the content shell constraint when fullBleed is not set', () => {
+    render(
+      <ChatEmptyStateComposerRegion
+        stableDocked
+        above={<div data-testid='briefing-slot'>Briefing</div>}
+      >
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    const region = screen.getByTestId('chat-empty-state-composer-region');
+    expect(region.className).toContain(CHAT_CONTENT_SHELL_CLASSNAME);
+    const suggestions = screen
+      .getByTestId('briefing-slot')
+      .closest('[data-empty-chat-suggestions="true"]');
+    expect(suggestions).not.toHaveClass('min-h-full');
   });
 
   it('preserves focus order from the sample into the composer', () => {
