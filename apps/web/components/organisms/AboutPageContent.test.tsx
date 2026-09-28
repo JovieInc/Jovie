@@ -18,7 +18,7 @@ describe('AboutPageContent', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Presence, Relationships, And Growth.',
+        name: 'Presence, relationships, and growth.',
       })
     ).toBeVisible();
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
