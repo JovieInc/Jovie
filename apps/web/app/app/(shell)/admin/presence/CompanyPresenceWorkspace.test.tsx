@@ -87,7 +87,6 @@ describe('CompanyPresenceWorkspace', () => {
       row.getAllByTestId('company-presence-check-unconfigured')
     ).toHaveLength(4);
     expect(row.queryByTestId('company-presence-check-measured')).toBeNull();
-    // Status badge (desktop column + mobile slot) states the page is unconfigured.
     expect(
       row.getAllByText('Unconfigured', { selector: 'span.min-w-0' }).length
     ).toBeGreaterThan(0);
@@ -112,8 +111,8 @@ describe('CompanyPresenceWorkspace', () => {
     const bodyRows = screen.getAllByRole('row').slice(1);
     const firstBodyRow = within(bodyRows[0] as HTMLElement);
     expect(firstBodyRow.getByText('/pricing')).toBeInTheDocument();
-    expect(firstBodyRow.getByText('41')).toBeInTheDocument();
-    expect(firstBodyRow.getByText('Indexed')).toBeInTheDocument();
+    expect(firstBodyRow.getByText('41 · fail')).toBeInTheDocument();
+    expect(firstBodyRow.getByText('Indexed · pass')).toBeInTheDocument();
     expect(firstBodyRow.getAllByText('Needs Review').length).toBeGreaterThan(0);
   });
 

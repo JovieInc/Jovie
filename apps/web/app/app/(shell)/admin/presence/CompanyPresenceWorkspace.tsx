@@ -90,14 +90,14 @@ function CheckCell({ check }: Readonly<{ check: CompanyPresenceCheck }>) {
   return (
     <span
       className={cn(
-        'text-xs tabular-nums',
+        'text-xs tabular-nums capitalize',
         check.outcome === 'pass' && 'text-success',
         check.outcome === 'warn' && 'text-warning',
         check.outcome === 'fail' && 'text-error'
       )}
       data-testid='company-presence-check-measured'
     >
-      {check.summary}
+      {check.summary} · {check.outcome}
     </span>
   );
 }
@@ -220,11 +220,7 @@ function checkColumn(
   });
 }
 
-/**
- * Ovie Presence for Jovie itself (JOV-6770). Same table, status badge,
- * signals, and right rail as the creator Presence workspace, scoped to
- * Jovie's own pages.
- */
+/** Jovie's own pages using the creator Presence workspace primitives. */
 export function CompanyPresenceWorkspace({
   data,
 }: Readonly<{ data: CompanyPresenceData }>) {

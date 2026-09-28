@@ -14,11 +14,7 @@ import {
   type CompanyPresenceSourceStatus,
 } from './model';
 
-/**
- * Where each check will come from. Every source is unconfigured today: the
- * reason names the missing read so the page states the gap instead of
- * rendering zeros. Wire a source by returning its per-path reading here.
- */
+/** Declared reads stay unconfigured until a per-path source is wired. */
 export const COMPANY_PRESENCE_SOURCES: readonly CompanyPresenceSourceStatus[] =
   [
     {
@@ -91,11 +87,7 @@ function kindForMarketingPath(path: string): CompanyPageKind {
   return isEditorialSitemapPath(path) ? 'editorial' : 'marketing';
 }
 
-/**
- * Closed-world inventory of Jovie's own pages: every active exact public
- * marketing route, the published legal and machine paths, and public
- * profiles owned by Jovie staff accounts.
- */
+/** Closed-world inventory of public Jovie routes and staff-owned profiles. */
 export function buildCompanyPresencePages({
   ownedProfiles,
   sources = COMPANY_PRESENCE_SOURCES,

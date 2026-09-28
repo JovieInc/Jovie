@@ -1,9 +1,9 @@
 import 'server-only';
 
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildCompanyPresencePages,
@@ -12,9 +12,6 @@ import {
 } from './inventory';
 import type { CompanyPresenceData } from './model';
 
-const OWNED_PROFILE_LIMIT = 50;
-
-/** Public profiles owned by Jovie staff (admin) accounts. */
 async function loadOwnedProfiles(): Promise<OwnedProfileRef[]> {
   return db
     .select({
@@ -22,7 +19,20 @@ async function loadOwnedProfiles(): Promise<OwnedProfileRef[]> {
       displayName: creatorProfiles.displayName,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .leftJoin(
+      userProfileClaims,
+      and(
+        eq(userProfileClaims.creatorProfileId, creatorProfiles.id),
+        eq(userProfileClaims.role, 'owner')
+      )
+    )
+    .innerJoin(
+      users,
+      or(
+        eq(users.id, userProfileClaims.userId),
+        and(isNull(userProfileClaims.id), eq(users.id, creatorProfiles.userId))
+      )
+    )
     .where(
       and(
         eq(users.isAdmin, true),
@@ -30,8 +40,7 @@ async function loadOwnedProfiles(): Promise<OwnedProfileRef[]> {
         eq(creatorProfiles.isPublic, true)
       )
     )
-    .orderBy(asc(creatorProfiles.usernameNormalized))
-    .limit(OWNED_PROFILE_LIMIT);
+    .orderBy(asc(creatorProfiles.usernameNormalized));
 }
 
 export async function loadCompanyPresenceData(): Promise<CompanyPresenceData> {

@@ -4,11 +4,7 @@ import type {
   PresenceSignal,
 } from '@/lib/profile-surfaces/workspace';
 
-/**
- * Ovie company presence (JOV-6770): Jovie's own pages scored with the same
- * status and signal primitives as the creator Presence workspace. A check
- * with no connected source is `unconfigured` and never renders as a zero.
- */
+/** Jovie's pages use creator Presence primitives; unwired checks never render as zero. */
 
 export type CompanyPageKind =
   | 'marketing'
