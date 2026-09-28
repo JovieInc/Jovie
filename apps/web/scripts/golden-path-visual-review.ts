@@ -6,7 +6,7 @@
  *  - A: an economical vision model through the allowlisted AI Gateway, with a
  *       strict user-blocking rubric (never taste or polish).
  *  - B: the deterministic in-page layout audit recorded with the keyframe.
- * A suspected blocker only fails the gate once a replay of the journey flags
+ * A suspected blocker only fails the gate once an independent second review flags
  * the same keyframe again. Model outages or unparseable answers are recorded
  * as `unknown`: never a pass, never a block.
  *
