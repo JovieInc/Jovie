@@ -15,6 +15,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -159,6 +160,29 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(labeled.made("gh", "api"), [], "an already queued PR is not relabeled")
         missing = Shell({("gh", "pr", "view"): (1, "")})
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, missing, set()), [])
+
+    def test_a_second_failed_ejection_in_a_day_marks_the_pr_queue_poison(self):
+        now = time.time()
+        stamp = lambda ago: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - ago))
+        view = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h7",
+                "isCrossRepository": False, "labels": []}
+        payload = {"action": "dequeued", "pull_request": {"number": 7, "head": {"sha": "h7"}}}
+
+        def relay_with(removals, labels=()):
+            shell = Shell({("gh", "pr", "view"): {**view, "labels": [{"name": n} for n in labels]},
+                           ("gh", "api", "graphql"): removals})
+            return events.relay("pull_request_target", payload, shell, set()), shell
+
+        added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"},
+                                   {"createdAt": stamp(3600), "reason": "MANUAL"},
+                                   {"createdAt": stamp(30 * 3600), "reason": "failed_checks"}])
+        self.assertEqual(added, [(7, "dequeued")], "one failure today plus a manual or old removal is not poison")
+        added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"},
+                                   {"createdAt": stamp(7200), "reason": "failed_checks"}])
+        self.assertEqual(added, [(7, "queue-poison"), (7, "dequeued")])
+        self.assertEqual(len(shell.made("gh", "pr", "comment")), 1)
+        added, shell = relay_with([{"createdAt": stamp(60), "reason": "failed_checks"}] * 3, labels=["queue-poison"])
+        self.assertEqual(shell.made("gh", "pr", "comment"), [], "an already-poisoned PR is not re-announced")
 
     def test_a_push_to_main_labels_newly_conflicting_prs_after_mergeability_settles(self):
         reads = iter([
@@ -408,6 +432,9 @@ class GapTest(unittest.TestCase):
         claimed = events.claim_event_pr(self.host, fake_lane(shell), "devin", [pr(kinds=["dequeued"], merge="CLEAN")], NOW)
         self.assertIn("e2e smoke failed", claimed["queueFailure"])
         self.assertEqual(shell.made("gh", "run", "view")[0][3], "9")
+        poisoned = pr(number=6, kinds=["dequeued"], merge="CLEAN", labels=[events.POISON_LABEL])
+        claimed = events.claim_event_pr(self.host, fake_lane(shell), "devin", [poisoned], NOW)
+        self.assertEqual(claimed["number"], 6, "a repeatedly ejected head bypasses another mechanical sync")
         self.assertEqual(events.queue_failure(fake_lane(Shell({("gh", "run", "list"): []})), 5), "")
         self.assertEqual(events.queue_failure(fake_lane(Shell({("gh", "run", "list"): (0, "not json")})), 5), "")
 
@@ -426,6 +453,12 @@ class GapTest(unittest.TestCase):
                          ("gh", "api", "-X", "PUT"): (1, "")})
         self.assertEqual(events.tick(self.host, fake_lane(failing), lambda: None, NOW), {7: "sync-failed"})
         self.assertEqual(failing.made("gh", "api", "-X", "DELETE"), [], "a failed sync leaves the label for the model")
+        poisoned = Shell({("gh", "pr", "list"): [
+            pr(number=8, merge="CLEAN", labels=["lane-fix-dequeued", events.POISON_LABEL])
+        ]})
+        self.assertEqual(events.tick(self.host, fake_lane(poisoned), lambda: None, NOW), {})
+        self.assertEqual(poisoned.made("gh", "api", "-X", "PUT"), [], "poisoned PRs go straight to a model fix")
+        self.assertEqual(poisoned.made("gh", "api", "-X", "DELETE"), [], "the model-fix label stays actionable")
 
     def node(self, number, **extra):
         base = {"number": number, "isDraft": False, "headRefName": f"tim/x{number}", "headRefOid": "h", "labels": [],
@@ -452,9 +485,11 @@ class GapTest(unittest.TestCase):
             self.node(12, isDraft=True, headRefName="codex/jov-10-20260926t0500", updatedAt=old),
             self.node(13, isDraft=True, headRefName="tim/wip", updatedAt=old),
             self.node(14, updatedAt="2033-05-18T02:50:00Z"),
+            self.node(15, labels=[{"name": events.POISON_LABEL}]),
         ]
         plan = events.reconcile_plan(prs, {"8": {"count": 2}, "11": {"count": 2}}, set(), 2, now)
-        self.assertEqual(plan["label"], [(1, "conflict"), (2, "red"), (9, "green"), (12, "stale")])
+        self.assertEqual(plan["label"], [(1, "conflict"), (2, "red"), (9, "green"), (12, "stale"),
+                                         (15, "dequeued")])
         self.assertEqual(plan["close"], [(10, "superseded by #12 for the same issue"),
                                          (11, "stale for 48h after its fix attempts ran out")])
         self.assertEqual(plan["reset"], [3, 4, 9])
@@ -462,7 +497,7 @@ class GapTest(unittest.TestCase):
         self.assertEqual(plan["orphans"], [4, 8], "CLEAN but unqueued, and a spent fix label, have no owner")
         counts = plan["counts"]
         self.assertEqual((counts["open"], counts["dirty"], counts["red"], counts["cleanNotQueued"], counts["inQueue"],
-                          counts["staleLaneDrafts"], counts["staleOtherDrafts"]), (14, 2, 2, 1, 1, 3, 1))
+                          counts["staleLaneDrafts"], counts["staleOtherDrafts"]), (15, 2, 2, 1, 1, 3, 1))
 
     def test_reconcile_applies_the_plan_on_its_own_cadence(self):
         page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [

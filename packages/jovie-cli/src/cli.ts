@@ -68,6 +68,7 @@ export interface CliDependencies {
 
 type CliValues = {
   readonly baseUrl?: string;
+  readonly flags: Readonly<Record<string, string | undefined>>;
   readonly dir?: string;
   readonly full?: boolean;
   readonly help?: boolean;
@@ -85,6 +86,9 @@ function usage(): string {
     const name = [
       ...command.path,
       ...(command.arg ? [`<${command.arg.name}>`] : []),
+      ...(command.flags ?? [])
+        .filter(flag => flag.required)
+        .map(flag => `--${flag.name} <text>`),
     ].join(' ');
     return `  ${name.padEnd(width)} ${command.summary}`;
   });
@@ -150,6 +154,11 @@ function errorPayload(error: unknown): Record<string, unknown> {
   };
 }
 
+/** Command flags declared in the table (e.g. --title), parsed as strings. */
+const COMMAND_FLAG_NAMES = [
+  ...new Set(COMMANDS.flatMap(command => command.flags ?? []).map(f => f.name)),
+];
+
 function parseCliArgs(argv: readonly string[]): {
   readonly values: CliValues;
   readonly positionals: readonly string[];
@@ -163,12 +172,15 @@ function parseCliArgs(argv: readonly string[]): {
       help: { type: 'boolean', short: 'h' },
       json: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
+      ...Object.fromEntries(
+        COMMAND_FLAG_NAMES.map(name => [name, { type: 'string' as const }])
+      ),
     },
     allowPositionals: true,
     strict: true,
   });
 
-  const values = parsed.values as {
+  const values = parsed.values as Record<string, unknown> & {
     readonly 'base-url'?: string;
     readonly dir?: string;
     readonly full?: boolean;
@@ -180,6 +192,11 @@ function parseCliArgs(argv: readonly string[]): {
   return {
     values: {
       baseUrl: values['base-url'],
+      flags: Object.fromEntries(
+        COMMAND_FLAG_NAMES.filter(name => values[name] !== undefined).map(
+          name => [name, String(values[name])]
+        )
+      ),
       dir: values.dir,
       full: values.full,
       help: values.help,
@@ -204,15 +221,35 @@ async function execute(
   }
 
   const command = findCommand(positionals);
-  const expectedLength = command?.arg ? 3 : 2;
-  if (!command || positionals.length !== expectedLength) {
+  if (!command) {
+    throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
+  }
+  const expectedLength = command.arg ? 3 : 2;
+  if (command.arg && positionals.length < expectedLength) {
+    throw new UsageError(
+      `Missing required argument <${command.arg.name}> for ${command.path.join(' ')}`
+    );
+  }
+  if (positionals.length !== expectedLength) {
     throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
   }
   if (values.full && !command.acceptsFull) {
     throw new UsageError('--full is only supported by docs llms');
   }
+  const declared = new Set((command.flags ?? []).map(flag => flag.name));
+  const stray = Object.keys(values.flags).find(name => !declared.has(name));
+  if (stray) {
+    throw new UsageError(
+      `--${stray} is not supported by ${command.path.join(' ')}`
+    );
+  }
   return command.run(
-    { arg: positionals[2], full: values.full === true },
+    {
+      arg: positionals[2],
+      full: values.full === true,
+      flags: values.flags,
+      meta: { channel: 'cli', version: CLI_VERSION },
+    },
     {
       baseUrl,
       fetchImpl: dependencies.fetchImpl,

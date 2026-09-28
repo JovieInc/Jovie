@@ -261,3 +261,42 @@ export function createProfile(
   }
   return requestJson('/api/agents/profiles', options, { url: url.toString() });
 }
+
+export type ReportKind = 'bug' | 'feedback';
+
+/** Safe execution context only; never env, credentials, or file contents. */
+export interface ReportContext {
+  readonly cliVersion?: string;
+  readonly command?: string;
+  readonly apiCode?: string;
+  readonly scenario?: string;
+  readonly platform?: string;
+  readonly runtime?: string;
+  readonly channel?: 'cli' | 'mcp';
+}
+
+/** File a bug or feedback report. Returns `{ reportId }`. */
+export function reportIssue(
+  report: {
+    readonly kind: ReportKind;
+    readonly title: string;
+    readonly details: string;
+  },
+  context: ReportContext = {},
+  options: ResourceOptions = {}
+): Promise<unknown> {
+  const title = report.title.trim();
+  const details = report.details.trim();
+  if (!title || !details) {
+    throw new JovieInputError('A report needs both a title and details.');
+  }
+  const safeContext = Object.fromEntries(
+    Object.entries(context).filter(([, value]) => value)
+  );
+  return requestJson('/api/agents/feedback', options, {
+    kind: report.kind,
+    title,
+    details,
+    context: safeContext,
+  });
+}

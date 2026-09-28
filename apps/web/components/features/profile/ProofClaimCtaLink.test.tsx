@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ProofClaimCtaLink } from './ProofClaimCtaLink';
+import {
+  ProofClaimCtaLink,
+  proofClaimFooterClassName,
+} from './ProofClaimCtaLink';
 
 const emitProofClaimEvent = vi.fn();
 const rememberProofClaimAttribution = vi.fn();
@@ -37,5 +40,11 @@ describe('ProofClaimCtaLink', () => {
         label: 'Request access',
       })
     );
+  });
+
+  it('gives the footer claim link at least a 24px hit area', () => {
+    // Production audit 2026-09-28: the claim footer CTA measured 163x20,
+    // below the WCAG 2.2 target-size floor. The visual stays text-sized.
+    expect(proofClaimFooterClassName().split(' ')).toContain('min-h-6');
   });
 });

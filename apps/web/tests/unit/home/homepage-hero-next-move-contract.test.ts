@@ -1,11 +1,19 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
 function readHeroCss(): string {
+  return readFileSync(
+    path.join(webRoot, 'components/homepage/HomepageIdentity.css'),
+    'utf8'
+  );
+}
+
+function readNameSearchCss(): string {
   const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
   const start = css.indexOf('HOMEPAGE EDITORIAL HERO START');
   const end = css.indexOf('HOMEPAGE EDITORIAL HERO END', start);
@@ -13,15 +21,21 @@ function readHeroCss(): string {
 }
 
 describe('homepage hero contract (JOV-5864)', () => {
-  it('rejects raster media regardless of how it is mounted', () => {
+  it('proves the hero with the profile home tab, not a back-arrow subpage', () => {
+    expect(HOMEPAGE_MEDIA_MAP.connected.sourceScenarioId).toBe(
+      'tim-white-profile-live-mobile'
+    );
+    expect(HOMEPAGE_MEDIA_MAP.connected.sourceRoute).toContain('release=live');
+  });
+
+  it('mounts only the approved hero rasters, never CSS background images', () => {
     const pageSource = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    const componentSource = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageEditorialHero.tsx'),
-      'utf8'
-    );
+    const componentSource = ['components/homepage/HomepageIdentityHero.tsx']
+      .map(file => readFileSync(path.join(webRoot, file), 'utf8'))
+      .join('\n');
     const heroSource = pageSource.slice(
       pageSource.indexOf('function HomepageHero()'),
       pageSource.indexOf('function HomepageUnlockedSections()')
@@ -29,7 +43,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     const heroCss = readHeroCss();
     const rejectedPhotoFixture = `
       <picture><img src='/stock-nightlife.webp' /></picture>
-      .homepage-editorial-hero { background: image-set(url('/stock.jpg') 1x); }
+      .homepage-identity-hero { background: image-set(url('/stock.jpg') 1x); }
     `;
     const rasterSourcePattern =
       /<(?:picture|img|video|canvas)\b|\.(?:avif|gif|jpe?g|png|webp)\b/i;
@@ -37,22 +51,34 @@ describe('homepage hero contract (JOV-5864)', () => {
 
     expect(rejectedPhotoFixture).toMatch(rasterSourcePattern);
     expect(rejectedPhotoFixture).toMatch(cssImagePattern);
-    const heroImplementation = `${heroSource}\n${componentSource}\n${heroCss}`;
-    expect(heroImplementation).not.toMatch(rasterSourcePattern);
-    expect(heroImplementation).not.toMatch(cssImagePattern);
+    // The page itself mounts no media; the hero's only raster is the real
+    // jov.ie/tim capture from the media map (JOV-6946), not a generated asset.
+    expect(heroSource).not.toMatch(rasterSourcePattern);
+    expect(heroCss).not.toMatch(cssImagePattern);
+    expect(componentSource).not.toMatch(/<(?:picture|img|video|canvas)\b/);
+    expect(
+      [...componentSource.matchAll(/'\/assets\/generated\/[^']+'/g)].map(
+        match => match[0]
+      )
+    ).toEqual([]);
+    expect(componentSource).toContain('HOMEPAGE_MEDIA_MAP.connected.asset');
+    // Pen My0zu (JOV-6914): the hero light is a CSS layer, not an image.
+    expect(componentSource).toContain(
+      "className='homepage-identity-hero__light'"
+    );
   });
 
-  it('uses the exact locked headline and one-line support', () => {
-    expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Control how the world sees you.'
+  it('uses the exact canonical headline and one support line', () => {
+    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
+      'Your living identity on the internet.'
     );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
-      'Find what the internet knows. Turn it into relationships.'
+    expect(HOMEPAGE_IDENTITY_COPY.hero.subhead).toBe(
+      'Your work, your links, your next chapter. Together in your Jovie profile.'
     );
   });
 
-  it('keeps the existing name search as the sole primary conversion', () => {
-    expect(HOMEPAGE_LAUNCH_COPY.hero.search).toEqual({
+  it('keeps one primary action with the name search as the waitlist-off fallback', () => {
+    expect(HOMEPAGE_IDENTITY_COPY.hero.search).toEqual({
       placeholder: 'Search your name',
       action: 'Find me',
     });
@@ -66,37 +92,30 @@ describe('homepage hero contract (JOV-5864)', () => {
       pageSource.indexOf('function HomepageUnlockedSections()')
     );
 
-    expect(heroSource).toContain('search={HERO_COPY.search}');
+    expect(heroSource).toContain(
+      "<HomepageIdentityHero headingId='home-hero-heading' />"
+    );
     expect(heroSource).not.toContain('primaryCta');
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
     expect(pageSource).not.toContain('/images/hero/');
   });
 
-  it('keeps the one-line H1 contract and the two-line phone fallback', () => {
+  it('keeps the two-line H1 measure balanced at every width', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
-      /\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
+      /\.homepage-identity-hero__headline\s*\{[\s\S]*?max-width: 20ch;[\s\S]*?text-wrap: balance;[\s\S]*?\}/
     );
     expect(css).toMatch(
-      /@media \(max-width: 767px\)[\s\S]*?\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: normal;[\s\S]*?\}/
+      /\.homepage-identity-hero__support\s*\{[\s\S]*?text-wrap: balance;[\s\S]*?\}/
     );
-    expect(css).toMatch(
-      /\.homepage-editorial-hero__support\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
-    );
+    expect(css).not.toMatch(/white-space: nowrap/);
   });
 
-  it('keeps the editorial search wide and clips its aura to the pill', () => {
-    const css = readHeroCss();
+  it('clips the name-search aura to the pill', () => {
+    const css = readNameSearchCss();
 
-    expect(css).toMatch(
-      /\.homepage-editorial-hero__copy\s*\{[\s\S]*?width: min\([\s\S]*?100%[\s\S]*?\);[\s\S]*?\}/
-    );
-    expect(css).toContain('width: min(40rem, 100%);');
-    expect(css).toMatch(
-      /@media \(max-width: 1023px\)[\s\S]*?\.homepage-editorial-hero__search\s*\{[\s\S]*?width: 100%;[\s\S]*?\}/
-    );
     expect(css).not.toMatch(/\.group\\\//);
     const auraCss = readFileSync(
       path.join(webRoot, 'components/features/home/InputAuraFrame.css'),
@@ -107,20 +126,18 @@ describe('homepage hero contract (JOV-5864)', () => {
   });
 
   it('keeps the Find me pill on the 32/510 marketing button contract', () => {
-    const css = readHeroCss();
+    const css = readNameSearchCss();
 
     expect(css).toMatch(
       /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
     );
   });
 
-  it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
+  it('keeps the hero still: a static CSS light, no drift or reveal', () => {
     const css = readHeroCss();
 
-    expect(css).toContain('--homepage-hero-reveal-delay: 100ms;');
-    expect(css).toContain('animation: homepage-hero-content-reveal');
-    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(css).toContain('animation: none;');
+    expect(css).not.toContain('homepage-identity-texture-drift');
+    expect(css).not.toContain('homepage-hero-content-reveal');
   });
 
   it('mounts registry Artist Profile previews directly in phone frames', () => {
@@ -134,7 +151,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
   });
 
-  it('uses the canonical icon header with full marketing navigation', () => {
+  it('uses the one canonical docked marketing header and the full footer', () => {
     const headerSource = readFileSync(
       path.join(webRoot, 'components/site/MarketingHeader.tsx'),
       'utf8'
@@ -145,13 +162,16 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
 
     expect(headerSource).toContain('MARKETING_GLASS_DESKTOP_LINKS');
+    expect(headerSource).toContain('MARKETING_CUSTOMERS_FLYOUT');
     expect(headerSource).toContain("presentation === 'marketing-glass'");
-    expect(layoutSource).toContain("headerVariant='homepage'");
+    // Default landing header (marketing glass), docked over the hero.
+    expect(layoutSource).not.toContain('headerVariant=');
+    expect(layoutSource).not.toContain('mainOffset={false}');
     expect(layoutSource).toContain("footerVariant='expanded'");
     expect(layoutSource).toContain("logoSize='sm'");
-    expect(layoutSource).toContain("logoVariant='icon'");
     expect(layoutSource).not.toContain("logoVariant='word'");
     expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
+    expect(layoutSource).not.toContain('HomeScrollWatcher');
 
     const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
     expect(css).not.toMatch(

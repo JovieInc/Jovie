@@ -837,6 +837,19 @@ function gitPaths(args) {
     .filter(Boolean);
 }
 
+function gitPathsRevParse(ref) {
+  try {
+    return (
+      execFileSync('git', ['rev-parse', '--verify', '--quiet', ref], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim() || null
+    );
+  } catch {
+    return null;
+  }
+}
+
 const REGULAR_GIT_MODES = new Set(['100644', '100755']);
 function gitPathModes(args, indexFormat) {
   const modes = new Map();
@@ -876,6 +889,16 @@ function pathDelta(base, current) {
   };
 }
 
+export function filterMergeParentIdenticalPaths(
+  changedPaths,
+  stagedOids,
+  mergeHeadOids
+) {
+  return changedPaths.filter(
+    path => stagedOids.get(path) !== mergeHeadOids.get(path)
+  );
+}
+
 export function collectGitPaths(args) {
   const diffBaseIndex = args.indexOf('--diff-base');
   const staged = args.includes('--staged');
@@ -883,19 +906,69 @@ export function collectGitPaths(args) {
     throw new Error(
       'usage: repo-hygiene-guard.mjs --staged | --diff-base <rev>'
     );
-  const baseRef = diffBaseIndex >= 0 ? args[diffBaseIndex + 1] : 'HEAD';
+  // During a merge commit the index delta against HEAD is the entire
+  // incoming branch, which mismeasures the change the committer introduces.
+  // Diff against MERGE_HEAD instead so the guard measures this branch's
+  // contribution plus the conflict resolution, matching --diff-base semantics.
+  const mergeHead =
+    staged && diffBaseIndex < 0 ? gitPathsRevParse('MERGE_HEAD') : null;
+  const baseRef =
+    diffBaseIndex >= 0 ? args[diffBaseIndex + 1] : (mergeHead ?? 'HEAD');
   if (!baseRef) throw new Error('--diff-base requires a Git revision');
   const base = gitPathModes(['ls-tree', '-r', '-z', baseRef], false);
   const current = staged
     ? gitPathModes(['ls-files', '-s', '-z'], true)
     : gitPathModes(['ls-tree', '-r', '-z', 'HEAD'], false);
   const diffArgs = staged
-    ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']
+    ? ['diff', '--cached', baseRef, '--name-only', '--diff-filter=ACMR', '-z']
     : ['diff', '--name-only', '--diff-filter=ACMR', '-z', `${baseRef}..HEAD`];
+  let changedPaths = gitPaths(diffArgs);
+  if (staged) {
+    // During a merge the index contains every incoming change from the other
+    // parent; only paths that differ from BOTH parents are real edits (the
+    // conflict resolutions). Drop paths identical to MERGE_HEAD.
+    let mergeHeadOids = null;
+    try {
+      const mergeHead = execFileSync(
+        'git',
+        ['rev-parse', '--verify', '-q', 'MERGE_HEAD'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+      ).trim();
+      if (mergeHead) {
+        mergeHeadOids = new Map();
+        for (const record of gitPaths(['ls-tree', '-r', '-z', mergeHead])) {
+          const separator = record.indexOf('\t');
+          if (separator < 0) continue;
+          const metadata = record.slice(0, separator).split(' ');
+          mergeHeadOids.set(
+            normalizePath(record.slice(separator + 1)),
+            metadata[2]
+          );
+        }
+      }
+    } catch {
+      mergeHeadOids = null;
+    }
+    if (mergeHeadOids) {
+      const stagedOids = new Map();
+      for (const record of gitPaths(['ls-files', '-s', '-z'])) {
+        const separator = record.indexOf('\t');
+        if (separator < 0) continue;
+        const metadata = record.slice(0, separator).split(' ');
+        if (metadata[2] !== '0') continue;
+        stagedOids.set(normalizePath(record.slice(separator + 1)), metadata[1]);
+      }
+      changedPaths = filterMergeParentIdenticalPaths(
+        changedPaths,
+        stagedOids,
+        mergeHeadOids
+      );
+    }
+  }
   return {
     baseRef,
     ...pathDelta(base, current),
-    changedPaths: gitPaths(diffArgs),
+    changedPaths,
     trackedPaths: [...current.keys()],
   };
 }

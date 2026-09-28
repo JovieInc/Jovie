@@ -47,18 +47,22 @@ export const CLI_DOCUMENTED_COMMANDS = [
     request:
       'Installs the Jovie skill into Claude, Codex, OpenClaw, and Hermes',
   },
+  {
+    command: 'jovie skill',
+    request: 'Prints the Jovie SKILL.md for agents',
+  },
 ] as const;
 
 export const CLI_FAQ_ITEMS = [
   {
     question: 'Does the CLI require an account or API key?',
     answer:
-      'No. Every command is anonymous. The only write is profile create, which makes an unclaimed profile the artist claims by verifying their Spotify artist. The CLI does not log in, cache responses, or send telemetry.',
+      'No. Every command is anonymous. The only writes are profile create, which makes an unclaimed profile the artist claims by verifying their Spotify artist, and the report commands, which file bugs and feedback. The CLI does not log in, cache responses, or send telemetry.',
   },
   {
     question: 'Which Node.js version does it need?',
     answer:
-      'Node.js 22.23.2 or later, and below Node 23. That matches the published package engines field.',
+      'Node.js 24.21.0 or later, and below Node 25. That matches the published package engines field.',
   },
   {
     question: 'Can I point it at another Jovie deployment?',
@@ -126,6 +130,11 @@ export function CliLandingPage() {
           href: APP_ROUTES.DEVELOPERS,
           testId: 'cli-hero-developers',
         }}
+        photo={{
+          src: '/images/marketing-hero/cli.webp',
+          width: 1600,
+          height: 901,
+        }}
         logos={false}
         align='center'
         testId='cli-hero'
@@ -172,9 +181,16 @@ export function CliLandingPage() {
                   <h3 className='text-base font-semibold text-primary-token'>
                     {item.title}
                   </h3>
-                  <pre className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-4 text-sm leading-relaxed text-primary-token'>
-                    <code>{item.command}</code>
-                  </pre>
+                  <section
+                    aria-label={`${item.title} command`}
+                    className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                    // biome-ignore lint/a11y/noNoninteractiveTabindex: long commands scroll sideways on narrow screens and need a keyboard entry point (axe scrollable-region-focusable)
+                    tabIndex={0}
+                  >
+                    <pre className='p-4 text-sm leading-relaxed text-primary-token'>
+                      <code>{item.command}</code>
+                    </pre>
+                  </section>
                   <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                     {item.body}
                   </p>

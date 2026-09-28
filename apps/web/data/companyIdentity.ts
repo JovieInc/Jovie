@@ -6,18 +6,19 @@
  * as a nav/taxonomy registry (JOV-4491) or a homepage taste rewrite (JOV-5861).
  *
  * seoTitle / seoDescription / homepageHeadline must stay identical to the
- * approved homepage copy in `homepageLaunchCopy.ts`.
+ * approved homepage copy in `homepageIdentityCopy.ts`.
  */
 export const COMPANY_IDENTITY = {
   productName: 'Jovie',
-  headline: 'Presence, Relationships, And Growth.',
+  headline: 'Presence, relationships, and growth.',
   support:
     'One product for artists, founders, authors, creators, and independent experts.',
   definition:
     'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships.',
-  seoTitle: 'Jovie | Control how the world sees you',
-  seoDescription: 'Find what the internet knows. Turn it into relationships.',
-  homepageHeadline: 'Control how the world sees you.',
+  seoTitle: 'Jovie | Your living identity on the internet',
+  seoDescription:
+    'Your work, your links, your next chapter. Together in your Jovie profile.',
+  homepageHeadline: 'Your living identity on the internet.',
   audiences: [
     'artists',
     'founders',

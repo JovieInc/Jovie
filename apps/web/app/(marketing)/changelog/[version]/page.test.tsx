@@ -15,6 +15,7 @@ vi.mock('next/navigation', () => ({
 const RELEASES: readonly ChangelogRelease[] = [
   {
     version: '26.9.0',
+    kind: 'release',
     date: '2026-09-09',
     summary: 'Presence workspace ships **public visibility** reporting.',
     sections: {
@@ -27,6 +28,7 @@ const RELEASES: readonly ChangelogRelease[] = [
   },
   {
     version: '26.8.0',
+    kind: 'release',
     date: '2026-08-09',
     summary: 'Chat shell refinements.',
     sections: {
@@ -39,6 +41,7 @@ const RELEASES: readonly ChangelogRelease[] = [
   },
   {
     version: '26.7.0',
+    kind: 'release',
     date: '2026-07-21',
     summary: 'First public release in this set.',
     sections: {
@@ -156,6 +159,14 @@ describe('ChangelogReleasePage', () => {
     expect(screen.getByText('1 update')).toBeVisible();
   });
 
+  it('emits Article and BreadcrumbList JSON-LD for agents and rich results', async () => {
+    const { container } = await renderVersion('26.8.0');
+    const types = [
+      ...container.querySelectorAll('script[type="application/ld+json"]'),
+    ].map(node => JSON.parse(node.textContent ?? '{}')['@type']);
+    expect(types).toEqual(['Article', 'BreadcrumbList']);
+  });
+
   it('calls notFound for unknown versions', async () => {
     await expect(renderVersion('0.0.0')).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mocks.notFound).toHaveBeenCalled();
@@ -180,7 +191,11 @@ describe('ChangelogReleasePage', () => {
     expect(metadata.openGraph).toMatchObject({
       type: 'article',
       publishedTime: '2026-08-09T00:00:00Z',
+      images: [
+        expect.objectContaining({ url: 'https://jov.ie/og/default.png' }),
+      ],
     });
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' });
 
     await expect(
       generateMetadata({ params: Promise.resolve({ version: '0.0.0' }) })

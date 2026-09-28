@@ -163,7 +163,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v22.23.2
+              test "$(node --version)" = v24.21.0
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -292,7 +292,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v22.23.2 "$(node --version)"
+          assert_equal 'Node version' v24.21.0 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -1089,7 +1089,7 @@ jobs:
       # the three-minute latency ratchet before classification even starts.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Collect changed files
         id: changed-files
         shell: bash
@@ -1361,6 +1361,15 @@ jobs:
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      # The homepage render uses mock keys only, so its screenshots are public.
+      # Without this the producer guard omits every image and a failed compare
+      # uploads no -actual.png, leaving an intentional homepage change no
+      # CI-rendered baseline to adopt (scripts/visual-baseline-adopt.mjs).
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      # A failed compare also writes Playwright's error-context.md. Without
+      # this the guard blocks it as an unknown binary and uploads nothing
+      # (run 36347764603). Markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1368,7 +1377,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Validate snapshot inventory and workflow contract
         run: node scripts/visual-snapshot-compare.mjs compare
       - uses: ./.github/actions/setup-node-pnpm
@@ -1477,6 +1486,7 @@ jobs:
           retention-days: 14
           allow-images: 'true'
           public-images: 'true'
+          allow-markdown: 'true'
 
   ci-fast-typecheck:
     name: ci-fast (typecheck)
@@ -1646,7 +1656,7 @@ jobs:
           rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
           (
             set +e
-            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+            git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
             echo "$?" > "$BASE_FETCH_DIR/status.tmp"
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
@@ -1689,6 +1699,13 @@ jobs:
             echo "::error title=Base-branch fetch::git fetch exited $fetch_status"
             exit 1
           fi
+          # No command in this job may kick detached `git maintenance run
+          # --auto` (or gc --auto): it keeps rewriting
+          # .git/objects/info/commit-graph while the structural lane's
+          # provenance guards read it, which intermittently flips
+          # `merge-base --is-ancestor` to a false "not an ancestor".
+          git config maintenance.auto false
+          git config gc.auto 0
           if [[ "$(git rev-parse --is-shallow-repository)" != 'false' ]]; then
             echo "::error title=Base-branch fetch::checkout is still shallow"
             exit 1
@@ -1777,26 +1794,10 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
           unset AUTH_HEADER GH_TOKEN
-          STRUCTURAL_CONTROL_PATTERN='^(scripts/lib/(rolling-ci-failure-disposition\.mjs$|__tests__/rolling-ci-failure-disposition\.test\.mjs$)|scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)|apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)|packages/agent-transport-contracts/|scripts/lib/__tests__/symphony-health-contract\.test\.mjs$|\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|apps/web/scripts/optical-grid-scanners\.ts$|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|shipping-lead-gate|summer-shipping-lead-contract|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|production-release-supersession|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/brand-scrub\.py|scripts/lanes/|scripts/fleet-gate/|scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy)\.py)'
-
-          # Typed company composition must run its real coverage gate on future edits too.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/security/deepsec-(policy|loop)(\.test)?\.mjs$|^scripts/security/deepsec/|^scripts/summer-commissioning/'
-
-          # Evidence collection changes must execute the existing native-queue
-          # behavioral tests and per-file coverage, including test-only edits.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/native-queue-eval\.mjs$|^scripts/lib/native-queue-(eval|group-evidence|policy-evidence)\.mjs$|^scripts/lib/__tests__/native-queue-(collector|eval|group-evidence|policy-evidence)\.test\.mjs$'
-
-          # FX remediation policy, dispatcher, and finisher must run their real
-          # per-file coverage suite when the implementation or tests change.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/lib/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.mjs$|^scripts/lib/__tests__/(fx-remediation-lane|rolling-ci-dispatch|rolling-ci-fx(-finish)?)\.test\.mjs$'
-
-          # Conflict event policy, entrypoint, and proof changes always run the
-          # existing structural control selector with exact-path coverage.
-          STRUCTURAL_CONTROL_PATTERN+='|^scripts/pr-conflict-handler\.mjs$|^scripts/lib/(pr-conflict-(handler|event)|github-open-prs-rest)\.mjs$|^scripts/lib/__tests__/(pr-conflict-(handler|event)|github-open-prs-rest)\.test\.mjs$'
-
-          # Inputs apps/web/tests/unit/ci reads beyond .github/: web Unit Tests
-          # skip PRs, so these contracts run here (#18718).
-          STRUCTURAL_CONTROL_PATTERN+='|^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/REPO-POLICY\.md|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$)'
+          # Control-lane paths are data, one ERE alternative per line, so
+          # concurrent additions do not conflict on this file (JOV-6837).
+          STRUCTURAL_CONTROL_PATTERN="$(grep -vE '^[[:space:]]*(#|$)' .github/ci-harness/structural-control-paths.ere | paste -sd'|' -)"
+          [[ -n "$STRUCTURAL_CONTROL_PATTERN" ]]
 
           # Invariant-scanned sources must run invariants:check (#18182 added a
           # readFileSync to apps/desktop/src/main.ts unchecked). Derived from the
@@ -1827,6 +1828,7 @@ jobs:
             echo "spotify=false"
             echo "kbd=false"
             echo "crawler=false"
+            echo "overlay=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -1835,6 +1837,9 @@ jobs:
           SPOTIFY_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog(\.stories)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect\.ts|app/api/spotify/search/.*|tests/e2e/storybook-spotify-connect\.spec\.ts)$'
           KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
+          # Overlay primitives, their layer tokens, and the
+          # collision harness re-prove stacking, focus, and viewport fit.
+          OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
           changed_files="$RUNNER_TEMP/storybook-changed-files.txt"
           git diff --name-only "origin/${{ github.base_ref }}" HEAD > "$changed_files"
           if grep -qE "$SPOTIFY_STORYBOOK_PATTERN" "$changed_files"; then
@@ -1852,6 +1857,12 @@ jobs:
           if grep -qE "$CRAWLER_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "crawler=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$OVERLAY_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "overlay=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -1927,6 +1938,7 @@ jobs:
           RUN_SPOTIFY: ${{ steps.storybook-browser.outputs.spotify }}
           RUN_KBD: ${{ steps.storybook-browser.outputs.kbd }}
           RUN_CRAWLER: ${{ steps.storybook-browser.outputs.crawler }}
+          RUN_OVERLAY: ${{ steps.storybook-browser.outputs.overlay }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -1943,6 +1955,9 @@ jobs:
           fi
           if [[ "$RUN_CRAWLER" == 'true' ]]; then
             specs+=(tests/e2e/storybook-ai-crawler.spec.ts)
+          fi
+          if [[ "$RUN_OVERLAY" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-overlay-collisions.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -2031,7 +2046,7 @@ jobs:
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - name: Select public-profile browser admission
         id: profile-browser
         shell: bash
@@ -2776,6 +2791,10 @@ jobs:
           done
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+      - name: Enforce authed route initial JS budgets
+        # Deterministic gzip sizes from the build manifests; a few seconds.
+        # Ratchet lives in apps/web/scripts/route-js-budgets.json.
+        run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
       - name: Run deterministic layout behavior guard
         run: |
           set -euo pipefail
@@ -3053,6 +3072,7 @@ jobs:
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
+                  tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2
@@ -4036,9 +4056,26 @@ jobs:
           retention-days: 3
 
   ci-lighthouse-dashboard-pr:
-    name: Lighthouse (dashboard manual)
+    name: Lighthouse (dashboard gate)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    # Launch gate (JOV-6002): blocking on the merge-group combined head when
+    # launch-gate paths change; manual dispatch keeps deep-evidence runs.
+    # neon-db and ci-build-public are dispatch-only needs, so they may be
+    # skipped on merge_group — a failure still blocks the job.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.neon-db.result != 'failure' &&
+      needs.neon-db.result != 'cancelled' &&
+      needs.ci-build-public.result != 'failure' &&
+      needs.ci-build-public.result != 'cancelled' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_golden_path == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -4202,9 +4239,26 @@ jobs:
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-lighthouse-onboarding-pr:
-    name: Lighthouse (onboarding manual)
+    name: Lighthouse (onboarding gate)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    # Launch gate (JOV-6002): blocking on the merge-group combined head when
+    # launch-gate paths change; manual dispatch keeps deep-evidence runs.
+    # neon-db and ci-build-public are dispatch-only needs, so they may be
+    # skipped on merge_group — a failure still blocks the job.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.neon-db.result != 'failure' &&
+      needs.neon-db.result != 'cancelled' &&
+      needs.ci-build-public.result != 'failure' &&
+      needs.ci-build-public.result != 'cancelled' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_golden_path == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -4219,14 +4273,15 @@ jobs:
 
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        # neon-db is dispatch-only; merge-group runs fall back to DATABASE_URL_MAIN.
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -4235,16 +4290,16 @@ jobs:
           fallback_json_key: db_url
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Export DATABASE_URL (main — non-DB PR)
         # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        if: needs.ci-path-changes.outputs.run_neon != 'true' || needs.neon-db.result != 'success'
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
-        if: needs.ci-path-changes.outputs.run_neon == 'true'
+        if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -4977,7 +5032,7 @@ jobs:
           [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           if [[ "$EVENT_NAME" == pull_request ]]; then
             base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
             COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"
@@ -5156,7 +5211,7 @@ jobs:
           [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           if [[ "$EVENT_NAME" == pull_request ]]; then
             base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
             COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"
@@ -6635,6 +6690,8 @@ jobs:
         ci-golden-path-lock,
         ci-visual-snapshot-compare,
         drizzle-migration-guard,
+        ci-lighthouse-dashboard-pr,
+        ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
@@ -6670,6 +6727,8 @@ jobs:
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
+          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
+          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
@@ -6680,6 +6739,7 @@ jobs:
           SHARED_IMPACT="${{ needs.ci-path-changes.outputs.shared_contract_impact }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
+          RUN_LAUNCH_GATE="${{ needs.ci-path-changes.outputs.run_golden_path }}"
           {
             echo "### Merge group ready"
             echo
@@ -6716,6 +6776,8 @@ jobs:
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
             echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
+            echo "| Dashboard Lighthouse (launch-gate paths) | $DASHBOARD_LIGHTHOUSE_RESULT |"
+            echo "| Onboarding Lighthouse (launch-gate paths) | $ONBOARDING_LIGHTHOUSE_RESULT |"
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -6779,7 +6841,9 @@ jobs:
 
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
-            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT"; do
+            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT" \
+            "Dashboard Lighthouse:$RUN_LAUNCH_GATE:$DASHBOARD_LIGHTHOUSE_RESULT" \
+            "Onboarding Lighthouse:$RUN_LAUNCH_GATE:$ONBOARDING_LIGHTHOUSE_RESULT"; do
             name="${selected_gate%%:*}"
             selection_and_result="${selected_gate#*:}"
             selected="${selection_and_result%%:*}"

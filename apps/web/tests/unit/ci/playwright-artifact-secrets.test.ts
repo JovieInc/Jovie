@@ -64,7 +64,7 @@ function isPlaywrightConfigModule(
   );
 }
 const localTrace = Object.fromEntries(
-  'playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
+  'playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
     .map(value => value.split('='))
 );
@@ -79,6 +79,7 @@ const imageUploads =
 const markdownUploads = [
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
@@ -1117,7 +1118,6 @@ ${fixtureCheckout}
       const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
         .split('\n')
         .filter(line => line.includes('doppler run --'));
-      expect(doppler).toHaveLength(7);
       const guarded = doppler.filter(line => line.includes(guardScriptName));
       expect(guarded).toHaveLength(6);
       expect(
@@ -1131,9 +1131,26 @@ ${fixtureCheckout}
       expect(
         guarded.filter(line => line.trim() === waitlistDopplerCommand)
       ).toHaveLength(1);
-      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual([
+      const expectedNonPlaywrightCommands = [
         expect.stringContaining('scripts/check-signup-readiness.ts'),
-      ]);
+        ...(file === 'synthetic-monitoring.yml'
+          ? [
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+              // JOV-6870: limiter-store probe of /api/health/redis.
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+            ]
+          : []),
+      ];
+      expect(doppler).toHaveLength(
+        guarded.length + expectedNonPlaywrightCommands.length
+      );
+      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual(
+        expectedNonPlaywrightCommands
+      );
     }
     const screenshots = readFileSync(
       join(workflowsRoot, 'screenshots.yml'),

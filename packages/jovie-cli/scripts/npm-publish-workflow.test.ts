@@ -28,7 +28,7 @@ function assertPublishWorkflowContract(source: string): void {
   );
   expect(source).toMatch(/node-version-file: .nvmrc/);
   expect(source).toContain('registry-url: https://registry.npmjs.org');
-  expect(source).toMatch(/node --version.*v22\.23\.2/s);
+  expect(source).toMatch(/node --version.*v24\.21\.0/s);
   expect(source).toContain('pnpm install --frozen-lockfile');
   expect(source).toContain('pnpm --filter @jovie/cli run test:coverage');
   expect(source).toContain('pnpm --filter @jovie/cli run typecheck');
@@ -58,10 +58,12 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('case "$registry_status" in');
   expect(source).toContain('404)');
   expect(source).toContain('200)');
-  expect(source).toMatch(
-    /NODE_AUTH_TOKEN:\s*\$\{\{\s*secrets\.NPM_TOKEN\s*\}\}/
-  );
+  // Trusted publishing only: no long-lived npm credential may be wired in.
+  expect(source).not.toContain('NPM_TOKEN');
+  expect(source).not.toContain('NODE_AUTH_TOKEN:');
   expect(source).not.toContain('NPM_CONFIG_USERCONFIG:');
+  expect(source).toContain('npm install --global npm@11.6.2');
+  expect(source).toContain('npm >= 11.5.1 is required for trusted publishing');
   expect(source).toContain(
     'npm publish --provenance --access public "$PACKAGE_DIR"'
   );
@@ -70,9 +72,8 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('metadata.dist?.attestations?.url');
   expect(source).toContain('metadata.dist?.attestations?.provenance');
   expect(source).toContain('Array.isArray(metadata.maintainers)');
-  expect(source).toContain('npm access list collaborators "$PACKAGE_NAME"');
   expect(source).toContain(
-    "Object.values(collaborators).includes('read-write')"
+    "['maintainers', Array.isArray(metadata.maintainers) && metadata.maintainers.length > 0]"
   );
   expect(source).toContain('"$PACKAGE_NAME@$RELEASE_VERSION"');
   expect(source).toContain('"$installed_cli" --version');
@@ -113,11 +114,15 @@ describe('manual npm provenance workflow', () => {
       ),
     ],
     [
-      'publish auth config override',
+      'token-free trusted publishing',
       workflow.replace(
-        '          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}',
-        '          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc\n          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}'
+        '          PACKAGE_DIR: ${{ steps.package.outputs.path }}',
+        '          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}\n          PACKAGE_DIR: ${{ steps.package.outputs.path }}'
       ),
+    ],
+    [
+      'trusted publishing npm version',
+      workflow.replace('npm install --global npm@11.6.2', 'true'),
     ],
     [
       'public provenance receipt',

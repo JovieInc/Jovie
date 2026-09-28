@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import {
@@ -211,6 +214,33 @@ describe('jovie CLI', () => {
     expect(invalid.read()).toContain('--full is only supported by docs llms');
   });
 
+  it('reports a missing command argument instead of an unknown command', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+
+    await expect(
+      runCli(['artist', 'get', '--json'], {
+        stdout: stdout.output,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(JSON.parse(stdout.read())).toEqual({
+      error: {
+        code: 'USAGE_ERROR',
+        message: 'Missing required argument <username> for artist get',
+      },
+    });
+
+    const text = createOutput();
+    await expect(
+      runCli(['profile', 'create'], { stderr: text.output })
+    ).resolves.toBe(2);
+    expect(text.read()).toContain(
+      'Missing required argument <url> for profile create'
+    );
+    expect(text.read()).not.toContain('Unknown command');
+  });
+
   it('rejects malformed parser options and unsafe base URLs', async () => {
     const parserError = createOutput();
     await expect(
@@ -339,5 +369,71 @@ describe('jovie CLI', () => {
       (tool: { name: string }) => tool.name
     );
     expect(tools).toContain('create_profile');
+  });
+
+  it('installs the skill with init and rejects a bad MCP base URL', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jovie-cli-init-'));
+    const stdout = createOutput();
+    await expect(
+      runCli(['init', '--dir', dir, '--json'], { stdout: stdout.output })
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read()).installed).toEqual([
+      join(dir, 'jovie/SKILL.md'),
+    ]);
+
+    const stderr = createOutput();
+    await expect(
+      runCli(['mcp', '--base-url', 'ftp://x'], {
+        stdin: Readable.from([]),
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toContain('Base URL must be');
+  });
+
+  it('files a report with flags and attaches safe context', async () => {
+    const stdout = createOutput();
+    const bodies: unknown[] = [];
+    const fetchImpl: FetchImplementation = async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response('{"reportId":"r-9"}', { status: 201 });
+    };
+    await expect(
+      runCli(
+        [
+          'report',
+          'bug',
+          '--title',
+          'claim link 404',
+          '--details',
+          'Opened it, got 404.',
+          '--code',
+          'CREATE_FAILED',
+          '--json',
+        ],
+        { fetchImpl, stdout: stdout.output }
+      )
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read())).toEqual({ reportId: 'r-9' });
+    expect(bodies[0]).toMatchObject({
+      kind: 'bug',
+      title: 'claim link 404',
+      context: { apiCode: 'CREATE_FAILED', channel: 'cli' },
+    });
+    const context = (bodies[0] as { context: Record<string, unknown> }).context;
+    expect(Object.keys(context).sort()).toEqual(
+      ['apiCode', 'channel', 'cliVersion', 'platform', 'runtime'].sort()
+    );
+  });
+
+  it('rejects report flags on commands that do not take them', async () => {
+    const stderr = createOutput();
+    await expect(
+      runCli(['api', 'openapi', '--title', 'x'], { stderr: stderr.output })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toContain('--title is not supported by api openapi');
+    const help = createOutput();
+    await runCli(['--help'], { stdout: help.output });
+    expect(help.read()).toContain('report bug --title <text> --details <text>');
   });
 });

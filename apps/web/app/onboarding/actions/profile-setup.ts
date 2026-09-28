@@ -167,17 +167,18 @@ export async function updateExistingProfile(
 }
 
 /**
- * Fetches an existing user record by Clerk ID.
+ * Fetches an existing user record by app user ID (`users.id`), the identity
+ * `getCachedAuth()` and `withDbSessionTx` return since the Better Auth cutover.
  */
 export async function fetchExistingUser(
   tx: DbTransaction,
-  clerkUserId: string
+  appUserId: string
 ): Promise<{ id: string } | null> {
   try {
     const [existingUser] = await tx
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.clerkId, clerkUserId))
+      .where(eq(users.id, appUserId))
       .limit(1);
 
     return existingUser ?? null;

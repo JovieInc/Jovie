@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type PropsWithChildren, useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
@@ -303,9 +304,9 @@ function SidebarHeaderNav({
           if (hasMultipleProfiles && !isOperatorSection) {
             return <ProfileSwitcher />;
           }
-          // Clean header: brand logo + wordmark for identity (matches Linear's
-          // workspace pill pattern). User menu lives in the bottom Settings button.
-          // Wordmark and logo variant are driven by the active brand skin.
+          // Clean header: the Jovie mark is the global "Ask Jovie" entry point
+          // (JOV-6569). OV skin keeps its static identity wordmark; user menu
+          // lives in the bottom Settings button.
           return (
             <div
               className={cn(
@@ -313,16 +314,20 @@ function SidebarHeaderNav({
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
-              <BrandLogo
-                size={24}
-                tone='auto'
-                variant={variant}
-                rounded={false}
-                className='rounded-sm shrink-0'
-              />
               {variant === 'ov' ? (
-                <span>{BRAND_WORDMARKS[variant]}</span>
-              ) : null}
+                <>
+                  <BrandLogo
+                    size={24}
+                    tone='auto'
+                    variant={variant}
+                    rounded={false}
+                    className='rounded-sm shrink-0'
+                  />
+                  <span>{BRAND_WORDMARKS[variant]}</span>
+                </>
+              ) : (
+                <AskJovieMark variant={variant} />
+              )}
             </div>
           );
         })()}

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { HomepageNoScriptContent } from './HomepageNoScriptContent';
 
@@ -52,19 +53,17 @@ describe('HomepageNoScriptContent', () => {
     expect(section?.hasAttribute('data-testid')).toBe(false);
     expect(rawMarkup).not.toContain('<noscript');
     expect(section?.querySelector('h2')?.textContent).toBe(
-      HOMEPAGE_LAUNCH_COPY.hero.headline
+      HOMEPAGE_IDENTITY_COPY.hero.headline
     );
     expect(section?.hasAttribute('hidden')).toBe(false);
     expect(section?.getAttribute('aria-hidden')).toBeNull();
 
     const ordered = [
-      HOMEPAGE_LAUNCH_COPY.hero.subhead,
+      HOMEPAGE_IDENTITY_COPY.hero.subhead,
       ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
         item.headline,
         item.body,
-        ...('outcomes' in item
-          ? item.outcomes.flatMap(outcome => [outcome.headline, outcome.body])
-          : []),
+        ...item.steps.map(step => step.caption),
       ]),
       HOMEPAGE_LAUNCH_COPY.certified.close.headline,
     ];

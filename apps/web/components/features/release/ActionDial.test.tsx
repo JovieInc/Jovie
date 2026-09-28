@@ -114,4 +114,27 @@ describe('ActionDial', () => {
     act(() => vi.advanceTimersByTime(180));
     expect(onSelect).toHaveBeenCalledWith('apple');
   });
+
+  it('uses the compact frame for one method and disables Pay while it is unavailable', () => {
+    render(
+      <ActionDial
+        options={[{ id: 'stripe', label: 'Apple Pay / Card' }]}
+        selectedId='stripe'
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+        actionLabel='Pay $5'
+        groupLabel='Choose a payment method'
+        disabled
+      />
+    );
+
+    const action = screen.getByRole('button', {
+      name: 'Pay $5 with Apple Pay / Card',
+    });
+    expect(action).toBeDisabled();
+    expect(action.className).toContain('top-3');
+    expect(action.className).not.toContain('top-20');
+    expect(action.parentElement?.className).toContain('h-19');
+    expect(action.parentElement?.className).not.toContain('h-53');
+  });
 });

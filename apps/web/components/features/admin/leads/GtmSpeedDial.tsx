@@ -7,7 +7,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { AdminVerificationRequired } from '@/features/admin/AdminVerificationRequired';
 import {
+  isForbiddenError,
   type LeadPipelineSettings,
   queryKeys,
   useLeadPipelineSettingsQuery,
@@ -123,9 +125,13 @@ export function GtmSpeedDial() {
   if (settingsQuery.isError || !settings) {
     return (
       <ContentSurfaceCard className='px-(--app-shell-content-padding-x) py-4'>
-        <p className='text-xs font-book text-destructive'>
-          Failed to load pipeline settings.
-        </p>
+        {isForbiddenError(settingsQuery.error) ? (
+          <AdminVerificationRequired message='Admin verification required to load pipeline settings.' />
+        ) : (
+          <p className='text-xs font-book text-destructive'>
+            Failed to load pipeline settings.
+          </p>
+        )}
       </ContentSurfaceCard>
     );
   }

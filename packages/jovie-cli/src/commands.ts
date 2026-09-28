@@ -4,12 +4,23 @@ import {
   fetchArtistLlms,
   fetchOpenApi,
   fetchSiteLlms,
+  type ReportKind,
   type ResourceOptions,
+  reportIssue,
 } from './client.js';
 
 export interface CommandInput {
   readonly arg?: string;
   readonly full?: boolean;
+  readonly flags?: Readonly<Record<string, string | undefined>>;
+  /** Set by the caller (CLI or MCP); attached to reports as safe context. */
+  readonly meta?: { readonly channel: 'cli' | 'mcp'; readonly version: string };
+}
+
+export interface FlagSpec {
+  readonly name: string;
+  readonly description: string;
+  readonly required?: boolean;
 }
 
 /** One definition drives CLI dispatch, `--help`, and MCP tools. */
@@ -19,6 +30,7 @@ export interface CommandSpec {
   readonly summary: string;
   readonly arg?: { readonly name: string; readonly description: string };
   readonly acceptsFull?: boolean;
+  readonly flags?: readonly FlagSpec[];
   readonly readOnly: boolean;
   readonly run: (
     input: CommandInput,
@@ -28,6 +40,39 @@ export interface CommandSpec {
 
 function required(input: CommandInput): string {
   return input.arg ?? '';
+}
+
+const REPORT_FLAGS: readonly FlagSpec[] = [
+  { name: 'title', description: 'One-line summary', required: true },
+  {
+    name: 'details',
+    description: 'What you tried, what happened, what you expected',
+    required: true,
+  },
+  { name: 'command', description: 'Jovie command or tool that failed' },
+  { name: 'code', description: 'apiCode/error code you received' },
+  { name: 'scenario', description: 'Task or scenario you were attempting' },
+];
+
+function report(kind: ReportKind) {
+  return (input: CommandInput, options: ResourceOptions) =>
+    reportIssue(
+      {
+        kind,
+        title: input.flags?.title ?? '',
+        details: input.flags?.details ?? '',
+      },
+      {
+        command: input.flags?.command,
+        apiCode: input.flags?.code,
+        scenario: input.flags?.scenario,
+        channel: input.meta?.channel,
+        cliVersion: input.meta?.version,
+        platform: `${process.platform}-${process.arch}`,
+        runtime: `node ${process.versions.node}`,
+      },
+      options
+    );
 }
 
 export const COMMANDS: readonly CommandSpec[] = [
@@ -76,6 +121,24 @@ export const COMMANDS: readonly CommandSpec[] = [
     acceptsFull: true,
     readOnly: true,
     run: (input, options) => fetchSiteLlms(input.full === true, options),
+  },
+  {
+    path: ['report', 'bug'],
+    tool: 'report_issue',
+    summary:
+      'Report a Jovie bug you hit (something failed or returned wrong data). Returns a reportId.',
+    flags: REPORT_FLAGS,
+    readOnly: false,
+    run: report('bug'),
+  },
+  {
+    path: ['report', 'feedback'],
+    tool: 'report_feedback',
+    summary:
+      'Send feedback on Jovie (confusing, missing, or slow). Returns a reportId.',
+    flags: REPORT_FLAGS,
+    readOnly: false,
+    run: report('feedback'),
   },
 ];
 

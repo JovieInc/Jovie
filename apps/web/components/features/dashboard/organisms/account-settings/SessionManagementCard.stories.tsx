@@ -23,14 +23,19 @@ const OTHER_SESSION = {
 
 type MockMode = 'pending' | 'sessions' | 'empty' | 'error';
 
-function createSessionsFetchMock(
+type ApiMockWindow = Window & {
+  __jovieApiMock?: (request: {
+    url: URL;
+    init?: RequestInit;
+  }) => Response | Promise<Response> | undefined;
+};
+
+function createSessionsApiMock(
   mode: MockMode,
-  sessions: ReadonlyArray<Record<string, unknown>>,
-  originalFetch: typeof fetch
-): typeof fetch {
-  return ((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.toString();
-    if (url.includes('/list-sessions')) {
+  sessions: ReadonlyArray<Record<string, unknown>>
+): NonNullable<ApiMockWindow['__jovieApiMock']> {
+  return ({ url }) => {
+    if (url.pathname.endsWith('/list-sessions')) {
       if (mode === 'pending') return new Promise<Response>(() => undefined);
       if (mode === 'error') {
         return Promise.resolve(new Response('Internal error', { status: 500 }));
@@ -43,17 +48,21 @@ function createSessionsFetchMock(
       );
     }
     if (
-      url.includes('/revoke-session') ||
-      url.includes('/revoke-other-sessions')
+      url.pathname.endsWith('/revoke-session') ||
+      url.pathname.endsWith('/revoke-other-sessions')
     ) {
       return Promise.resolve(
         new Response(JSON.stringify({ status: true }), { status: 200 })
       );
     }
-    return originalFetch(input as RequestInfo, init);
-  }) as typeof fetch;
+    return undefined;
+  };
 }
 
+// authClient pins `fetch` at module init (better-auth `customFetchImpl`), so
+// replacing `globalThis.fetch` here never intercepts `listSessions`. The
+// storybook preview's /api/* interceptor instead consults the live
+// `window.__jovieApiMock` handler on every request.
 function WithSessionsFetch({
   children,
   mode,
@@ -63,19 +72,12 @@ function WithSessionsFetch({
   mode: MockMode;
   sessions?: ReadonlyArray<Record<string, unknown>>;
 }>) {
-  const originalFetchRef = React.useRef<typeof fetch | null>(null);
-
   React.useLayoutEffect(() => {
-    originalFetchRef.current = globalThis.fetch;
-    globalThis.fetch = createSessionsFetchMock(
-      mode,
-      sessions,
-      globalThis.fetch
-    );
+    const apiMockWindow = window as ApiMockWindow;
+    const previous = apiMockWindow.__jovieApiMock;
+    apiMockWindow.__jovieApiMock = createSessionsApiMock(mode, sessions);
     return () => {
-      if (originalFetchRef.current) {
-        globalThis.fetch = originalFetchRef.current;
-      }
+      apiMockWindow.__jovieApiMock = previous;
     };
   }, [mode, sessions]);
 

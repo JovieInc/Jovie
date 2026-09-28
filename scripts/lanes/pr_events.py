@@ -177,6 +177,45 @@ def add_label(number: int, kind: str, sh=run) -> bool:
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
 
 
+POISON_LABEL = "queue-poison"
+POISON_WINDOW_S = 24 * 3600
+# Only a failed merge group says something about the PR's code (not manual, merged, conflict).
+FAILED_DEQUEUE = "failed_checks"
+
+
+def queue_ejections(number: int, now: float, sh=run) -> int | None:
+    """Failure removals from the merge queue in the last 24 h (the current one included)."""
+    owner, name = REPO.split("/")
+    listed = sh(["gh", "api", "graphql", "-f", f"query={{repository(owner:\"{owner}\",name:\"{name}\"){{"
+                 f"pullRequest(number:{number}){{timelineItems(last:20,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){{"
+                 "nodes{... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}",
+                 "--jq", ".data.repository.pullRequest.timelineItems.nodes"])
+    if listed.returncode != 0:
+        return None
+    count = 0
+    for item in json.loads(listed.stdout or "[]"):
+        at = iso_ts(item.get("createdAt"))
+        if at and now - at <= POISON_WINDOW_S and str(item.get("reason") or "").lower() == FAILED_DEQUEUE:
+            count += 1
+    return count
+
+
+def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
+    """JOV-6904: a PR the queue ejected twice in 24 h is poison. Every re-entry (usually a sync
+    with main, same defect) fails the group it joins and every group behind it. Label it so
+    the enroll workflow skips it; the lanes still fix it and drop the label with their fix."""
+    if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh) or 0) < 2:
+        return False
+    if sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={POISON_LABEL}"]).returncode:
+        return False
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body",
+        f"🤖 `{POISON_LABEL}`: the merge queue ejected this PR twice in 24 h, so it stays out of the queue "
+        "until a fix lands (each re-entry fails every merge group behind it). The lanes are fixing it from "
+        "the merge-group failure and remove this label when their fix pushes; remove it by hand once the "
+        "failing merge-group check passes locally."])
+    return True
+
+
 def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -> list[tuple[int, str]]:
     disabled = disabled_lanes() if disabled is None else disabled
     added = []
@@ -188,6 +227,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         pr = json.loads(viewed.stdout or "{}")
         if sha and pr.get("headRefOid") != sha:
             continue  # a newer head is already running CI; its own events speak for it
+        if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
+            added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):
             continue
         if in_scope(pr, kind, disabled) and add_label(number, kind, sh):
@@ -237,11 +278,17 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
 def queued_prs(lane, kinds) -> list[dict]:
     """Open PRs carrying any of these queue labels: one search, never a scan."""
     search = "label:" + ",".join(PREFIX + kind for kind in kinds)
-    listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
-                      "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
-    if listed.returncode != 0:
+
+    def fetch():
+        listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
+                          "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
+        return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
+    # Per-check rollups over 100 PRs are the costliest GraphQL read the lanes make, and every
+    # worker pass asked for them; one read per minute per host serves them all.
+    shared = getattr(lane, "shared", None)
+    prs = shared("queued-" + "-".join(sorted(kinds)), 60, fetch) if shared else fetch()
+    if prs is None:
         return []
-    prs = json.loads(listed.stdout or "[]")
     for pr in prs:
         pr["eventKinds"] = [name[len(PREFIX):] for name in label_names(pr)
                             if name.startswith(PREFIX) and name[len(PREFIX):] in kinds]
@@ -343,6 +390,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         if record.get("count", 0) >= lane.MAX_FIX_ATTEMPTS or in_flight(record, pr, now):
             continue
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
+                and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):
             continue  # the tick's no-model sync with main goes first
         if not may_take(name, pr, record, order, now) or lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
@@ -461,7 +509,7 @@ def ledger(host, receipt: dict) -> None:
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
 pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title url isDraft
-headRefName headRefOid mergeStateStatus isInMergeQueue isCrossRepository updatedAt labels(first:30){nodes{name}}
+headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository updatedAt labels(first:30){nodes{name}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
@@ -522,6 +570,8 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
             if PREFIX + EXHAUSTED in labels:
                 plan["unlabel"].append((number, EXHAUSTED))
         wanted = []
+        if POISON_LABEL in labels:
+            wanted.append("dequeued")  # repeated ejections need the merge-group log and a model fix
         if dirty:
             wanted.append("conflict")
         elif red:
@@ -616,6 +666,7 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     open_prs, linear = None, None
     for pr in prs:
         if "dequeued" in pr["eventKinds"] and str(pr["number"]) not in synced and pr.get("mergeStateStatus") != "DIRTY" \
+                and POISON_LABEL not in label_names(pr) \
                 and in_scope(pr, "red", set()):
             outcomes[pr["number"]] = sync_main(host, lane, pr, now)
             if outcomes[pr["number"]] == "synced":
