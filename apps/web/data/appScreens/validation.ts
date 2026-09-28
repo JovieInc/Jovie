@@ -13,7 +13,12 @@ import {
 } from './canvas';
 import {
   APP_SCREEN_PEN_GEOMETRY,
+  APP_SCREEN_PEN_PARITY_CHECKS,
+  APP_SCREEN_PEN_PENDING_DECISIONS,
+  APP_SCREEN_PEN_REFERENCE_HOLDS,
   type AppScreenPenGeometryExport,
+  type PenPendingDecision,
+  type PenReferenceHold,
 } from './penParity';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
@@ -39,6 +44,7 @@ export type AppScreenValidationCode =
   | 'reference-component-without-pen-root'
   | 'component-pen-root-without-readback'
   | 'component-pen-root-readback-mismatch'
+  | 'reference-component-with-pending-pen-decision'
   | 'unresolved-component-pen-identity-without-reason'
   | 'duplicate-recipe-component'
   | 'missing-recipe'
@@ -87,6 +93,10 @@ export interface AppScreenValidationInput {
   readonly canvasExceptions?: Readonly<Record<string, AppScreenCanvasContract>>;
   /** Committed Pen readback that every bound `penRootId` must appear in. */
   readonly penGeometry?: AppScreenPenGeometryExport;
+  /** Pending Pen-vs-code decisions; a root with any stays non-referenceable. */
+  readonly penPendingDecisions?: readonly PenPendingDecision[];
+  /** Non-geometry decisions that also keep a root non-referenceable. */
+  readonly penReferenceHolds?: readonly PenReferenceHold[];
 }
 
 const duplicates = (values: readonly string[]): readonly string[] => {
@@ -125,6 +135,8 @@ export function validateAppScreenSystem({
   archetypes = APP_SCREEN_ARCHETYPE_REGISTRY,
   canvasExceptions = APP_SCREEN_CANVAS_EXCEPTIONS,
   penGeometry = APP_SCREEN_PEN_GEOMETRY,
+  penPendingDecisions = APP_SCREEN_PEN_PENDING_DECISIONS,
+  penReferenceHolds = APP_SCREEN_PEN_REFERENCE_HOLDS,
 }: AppScreenValidationInput = {}): readonly AppScreenValidationIssue[] {
   const issues: AppScreenValidationIssue[] = [];
   const add = (code: AppScreenValidationCode, message: string) =>
@@ -183,6 +195,24 @@ export function validateAppScreenSystem({
         add(
           'component-pen-root-readback-mismatch',
           `component ${component.id} binds Pen root ${component.penRootId}, but the readback maps it to ${master.registryComponentId ?? 'no component'}`
+        );
+      }
+      const penRootId = component.penRootId;
+      const pendingForRoot = [
+        ...penPendingDecisions.filter(decision =>
+          APP_SCREEN_PEN_PARITY_CHECKS.some(
+            check =>
+              check.id === decision.checkId && check.masterId === penRootId
+          )
+        ),
+        ...penReferenceHolds.filter(hold => hold.masterId === penRootId),
+      ];
+      if (component.penReferenceEligible && pendingForRoot.length > 0) {
+        add(
+          'reference-component-with-pending-pen-decision',
+          `component ${component.id} is Pen-referenceable while ${[
+            ...new Set(pendingForRoot.map(decision => decision.decisionId)),
+          ].join(', ')} is pending on ${penRootId}`
         );
       }
     }
