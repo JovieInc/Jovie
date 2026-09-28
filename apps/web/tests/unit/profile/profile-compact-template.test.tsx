@@ -225,7 +225,7 @@ const mockArtist: Artist = {
 const mockContacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,
