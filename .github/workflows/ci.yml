@@ -691,6 +691,7 @@ jobs:
             echo "path_diff_base_sha=$PATH_DIFF_BASE_SHA" >> "$GITHUB_OUTPUT"
             CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"
             CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"
+            CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Fail closed on base resolution: a failed fetch used to leave an
             # empty CHANGED_FILES list that looked like docs-only and skip-
@@ -702,6 +703,7 @@ jobs:
             fi
             CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"
             CLASSIFICATION_HEAD_REF="HEAD"
+            CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
             TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
             git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
               > "$TRUSTED_CI_REPO_LANES"
@@ -720,8 +722,16 @@ jobs:
               if ! git cat-file -e "${PULL_REQUEST_HEAD_SHA}^{commit}" 2>/dev/null; then
                 git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"
               fi
+              # The fallback diff is merge-base(origin/base, head)..head, so the
+              # semantic classifier must read package.json et al. at those same
+              # refs; HEAD here is tree-identical to origin/<base> and would
+              # show no delta. Trusted policy scripts stay pinned to the live
+              # base via CLASSIFICATION_POLICY_REF.
+              CLASSIFICATION_BASE_REF=$(git merge-base \
+                "origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")
+              CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"
               CHANGED_FILES=$(git diff --no-renames --name-only \
-                "origin/${{ github.base_ref }}...$PULL_REQUEST_HEAD_SHA")
+                "$CLASSIFICATION_BASE_REF" "$CLASSIFICATION_HEAD_REF")
             fi
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
@@ -751,6 +761,7 @@ jobs:
             git cat-file -e "${PUSH_BASE_SHA}^{commit}"
             CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"
             CLASSIFICATION_HEAD_REF="HEAD"
+            CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
             TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
             git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
               > "$TRUSTED_CI_REPO_LANES"
@@ -764,7 +775,7 @@ jobs:
           mkdir -p "$PRODUCT_LANE_DIR"
           printf '%s\n' "$CHANGED_FILES" > "$PRODUCT_LANE_DIR/changed-paths.txt"
           TRUSTED_PRODUCT_LANE_CLASSIFIER="$PRODUCT_LANE_DIR/product-lane-classifier.mjs"
-          git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs" \
+          git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs" \
             > "$TRUSTED_PRODUCT_LANE_CLASSIFIER"
           node "$TRUSTED_PRODUCT_LANE_CLASSIFIER" \
             --files-from "$PRODUCT_LANE_DIR/changed-paths.txt" \
