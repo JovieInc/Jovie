@@ -331,7 +331,7 @@ async function fileDefects(
       priority: 3,
     });
     console.log(
-      `[marketing-cert] ${packet.subject.id} defect ${defect.fingerprint} -> ${result.ok ? result.action : result.reason}`
+      `[marketing-cert] ${packet.subject.id} defect ${defect.fingerprint} -> ${result.ok ? ('action' in result ? result.action : 'ok') : result.reason}`
     );
   }
 }
