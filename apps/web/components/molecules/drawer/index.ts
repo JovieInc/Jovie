@@ -127,6 +127,8 @@ export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   ENTITY_HEADER_THUMBNAIL_SIZE_PX,
   EntityHeader,
+  type EntityHeaderLayout,
+  type EntityHeaderMetaOverflow,
   type EntityHeaderProps,
   EntityHeaderStatusGlyph,
   type EntityHeaderStatusGlyphProps,
