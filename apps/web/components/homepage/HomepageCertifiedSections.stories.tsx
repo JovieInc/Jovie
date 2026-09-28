@@ -1,15 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 import { HomepageCertifiedSections } from './HomepageCertifiedSections';
 
 // Same real public-profile exports the live homepage mounts (jov.ie/timwhite).
 const previews = {
-  connected: getMarketingExportImage('tim-white-profile-listen-mobile'),
-  relationships: [
-    getMarketingExportImage('tim-white-profile-subscribe-mobile'),
-    getMarketingExportImage('tim-white-profile-pay-mobile'),
-    getMarketingExportImage('tim-white-profile-tour-mobile'),
-  ],
+  connected: HOMEPAGE_MEDIA_MAP.connected.asset,
+  relationships: HOMEPAGE_MEDIA_MAP.relationships.asset,
 } as const;
 
 const meta = {

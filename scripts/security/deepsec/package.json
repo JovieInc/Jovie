@@ -1,0 +1,8 @@
+{
+  "name": "jovie-deepsec-scanner",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "deepsec": "2.3.10"
+  }
+}

@@ -39,6 +39,9 @@ access remain authoritative in the product feature list below.
 | audience-intelligence-device-location-intent | Audience intelligence (device, location, intent) |
 | ai-powered-insights | AI-powered insights |
 | direct-upgrade-checkout-flow | Direct upgrade checkout flow |
+| subscription-and-billing-management | Subscription and billing management |
+| account-data-export-and-deletion | Account data export and deletion |
+| support-and-incorrect-data-reporting | Support and incorrect data reporting |
 
 ## Product Feature List
 
@@ -94,6 +97,9 @@ access remain authoritative in the product feature list below.
 | Growth (Coming Soon) | Catalog monitoring | Planned | Growth | None | Monitor catalog across DSPs |
 | Integrations | Spotify OAuth sign-in method | Shipped (internal v1 default-on) | Free+ | Former key: `feature_spotify_oauth` | Available in auth method selector |
 | Billing | Direct upgrade checkout flow | Shipped (internal v1 default-on) | Free+ | Former key: `billing.upgradeDirect` | Billing UX experiment |
+| Billing | Subscription and billing management | Shipped | Free+ | None | Plan status, Stripe portal, and cancellation controls |
+| Account | Account data export and deletion | Shipped | Authenticated users | None | Settings controls backed by account export and deletion routes |
+| Support | Support and incorrect data reporting | Shipped | Public | None | Contextual Help Center handoff plus direct email fallback |
 | Conversion | Subscribe CTA variant experiment | In rollout | Flag-gated | `experiment_subscribe_cta_variant` | Variant defaults to `inline` |
 | Conversion | Public profile PAC variant slots | In rollout | Flag-gated | `profile_pac_variant_slots` | Five-slot Statsig experiment: S1 copy arm, S1 trigger threshold, S2 monetization slot, cold-visitor tab bar, capture dismiss affordance |
 | Creator recording | Teleprompter recording proposals + showcase interstitial | In rollout | Flag-gated | `teleprompter_recording` + `experiment_teleprompter_showcase` | A/B measures interstitial lift into recorder use |

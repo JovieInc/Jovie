@@ -83,14 +83,19 @@ vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
   ProfileUnifiedDrawer: ({
     open,
     presentation,
+    creditSegments,
   }: {
     readonly open: boolean;
     readonly presentation?: string;
+    readonly creditSegments?: readonly { readonly type: string }[];
   }) => (
     <div
       data-testid='mock-desktop-drawer'
       data-open={String(open)}
       data-presentation={presentation ?? 'standalone'}
+      data-credit-segments={(creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
     />
   ),
 }));
@@ -302,13 +307,13 @@ describe('ProfileDesktopSurface', () => {
       within(navigation).getByRole('button', { name: 'Music' })
     ).toBeInTheDocument();
     expect(
-      within(navigation).getByRole('button', { name: 'Shows' })
+      within(navigation).getByRole('button', { name: 'Events' })
     ).toBeInTheDocument();
     expect(
       within(navigation).getByRole('button', { name: 'About' })
     ).toBeInTheDocument();
     expect(
-      within(navigation).queryByRole('button', { name: 'Events' })
+      within(navigation).queryByRole('button', { name: 'Shows' })
     ).not.toBeInTheDocument();
     expect(
       within(navigation).queryByRole('button', { name: 'Alerts' })
@@ -514,13 +519,13 @@ describe('ProfileDesktopSurface', () => {
         screen.queryByRole('switch', { name: 'New Music' })
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('switch', { name: 'Shows' })
+        screen.queryByRole('switch', { name: 'Events' })
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole('switch', { name: 'Merch' })
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'View Shows' })
+        screen.queryByRole('button', { name: 'View Events' })
       ).not.toBeInTheDocument();
       expect(screen.getByText('No live shows listed.')).toBeVisible();
       expect(screen.queryByText('No upcoming shows.')).not.toBeInTheDocument();
@@ -661,7 +666,7 @@ describe('ProfileDesktopSurface', () => {
     }
   );
 
-  it('offers View Shows only when upcoming dates exist', () => {
+  it('offers View Events only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
     const upcomingShow = {
       id: 'show-1',
@@ -707,7 +712,7 @@ describe('ProfileDesktopSurface', () => {
       />
     );
 
-    screen.getByRole('button', { name: 'View Shows' }).click();
+    screen.getByRole('button', { name: 'View Events' }).click();
     expect(onModeSelect).toHaveBeenCalledWith('tour');
   });
 
@@ -850,5 +855,37 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('mock-static-listen-interface')
     ).not.toBeInTheDocument();
+  });
+
+  it('routes selected credits into the drawer About destination (JOV-6199)', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={true}
+        drawerView='about'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        creditSegments={[
+          { type: 'text', text: 'Credited on "' },
+          {
+            type: 'release',
+            text: 'Neon Circuit',
+            href: '/timwhite/neon-circuit',
+          },
+          { type: 'text', text: '".' },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-credit-segments',
+      'text|release|text'
+    );
   });
 });

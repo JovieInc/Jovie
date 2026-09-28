@@ -88,7 +88,7 @@ function AlertsSettingsRow({
 
 const PREFERENCE_ROWS = [
   ['New Music', 'Singles, albums, and videos.', 'newMusic'],
-  ['Events', 'Tour dates and ticket updates.', 'tourDates'],
+  ['Events', 'Upcoming events and tickets.', 'tourDates'],
   ['Merch', 'Drops, restocks, and low-stock updates.', 'merch'],
   ['General', 'Occasional artist updates.', 'general'],
 ] as const;

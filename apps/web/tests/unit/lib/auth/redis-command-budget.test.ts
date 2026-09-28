@@ -413,7 +413,8 @@ describe('redis command budget', () => {
     mockGetSession.mockClear();
     await fullAuth.getCachedAuth();
     await loadEntitlements();
-    expect(mockGetSession).toHaveBeenCalledTimes(2);
+    // Entitlements' identity read reuses the request's session read.
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
     for (const call of mockGetSession.mock.calls) {
       expect(call[0]?.query).toBeUndefined();
     }
