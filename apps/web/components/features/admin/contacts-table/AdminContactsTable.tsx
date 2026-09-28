@@ -388,7 +388,7 @@ export function AdminContactsTable({
                 defaultValue={search}
                 placeholder='Search name, email, handle'
                 aria-label='Search Contacts'
-                className='h-7 w-48 rounded-md border border-(--linear-border-strong) bg-surface-0 px-2 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                className='h-7 w-48 rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               />
             </form>
           </div>
