@@ -1220,9 +1220,12 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     path = host.state / "verified.json"
     verified = json.loads(path.read_text()) if path.exists() else {}
     pr = unverified_pr(prs, verified)
+    # Another host gating a head skips it, not the whole pass: returning None here idled every
+    # worker behind one claimed PR (2026-09-28, 0 running with 45 eligible PRs).
+    while pr and claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+        prs = [other for other in prs if other["number"] != pr["number"]]
+        pr = unverified_pr(prs, verified)
     if pr:
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
-            return None  # another host is gating this head; we look again next pass
         verified[str(pr["number"])] = pr["headRefOid"]
         path.write_text(json.dumps(verified))
         post_claim(pr["number"], pr["headRefOid"], "gate")
@@ -1238,12 +1241,14 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     order, now = pr_events.cost_order(load_providers()), time.time()
     prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
+    # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
+    while pr and claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+        prs = [other for other in prs if other["number"] != pr["number"]]
+        pr = red_pr(prs, attempts, held)
     if pr:
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
-        if claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
-            return None  # another host is already fixing this head; no attempt is charged
         record = attempts.get(str(pr["number"]), {})
         attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1,
                                        "lane": name, "at": now}
