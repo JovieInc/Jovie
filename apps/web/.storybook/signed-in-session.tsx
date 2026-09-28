@@ -5,12 +5,22 @@ import React from 'react';
  * Shared signed-in Better Auth fixture for Storybook stories.
  *
  * `authClient.useSession()` resolves `GET /api/auth/get-session`, which the
- * preview fetch catch-all answers with `{}` — a truthy body with no
- * `session`/`user`, so consumers that mount `JovieAuthValuesProvider` crash.
- * Stories that exercise signed-in surfaces install this interceptor through
- * the `withSignedInSession` decorator; it patches `window.fetch` before the
- * provider mounts and restores the previous handler on unmount.
+ * preview fetch catch-all answers with `null` (signed out). Stories that
+ * exercise signed-in surfaces install this interceptor through the
+ * `withSignedInSession` decorator.
+ *
+ * The handler registers on `window.__jovieApiMock`, which the preview's
+ * /api/* interceptor consults on every request. This reaches clients like
+ * better-auth's `authClient` that pin `fetch` at module init — swapping
+ * `globalThis.fetch` inside a decorator can never intercept them.
  */
+
+type ApiMockWindow = Window & {
+  __jovieApiMock?: (request: {
+    url: URL;
+    init?: RequestInit;
+  }) => Response | Promise<Response> | undefined;
+};
 
 const SIGNED_IN_USER = {
   id: 'story-user',
@@ -37,32 +47,35 @@ const SIGNED_IN_SESSIONS_LIST = [
   },
 ];
 
-function createSignedInFetchMock(nextFetch: typeof fetch): typeof fetch {
-  return ((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.toString();
-    if (url.includes('/api/auth/get-session')) {
-      return Promise.resolve(
-        Response.json({ user: SIGNED_IN_USER, session: SIGNED_IN_SESSION })
-      );
+export function createSignedInApiMock(): NonNullable<
+  ApiMockWindow['__jovieApiMock']
+> {
+  return ({ url }) => {
+    if (url.pathname.endsWith('/get-session')) {
+      return Response.json({
+        user: SIGNED_IN_USER,
+        session: SIGNED_IN_SESSION,
+      });
     }
-    if (url.includes('/list-sessions')) {
-      return Promise.resolve(Response.json(SIGNED_IN_SESSIONS_LIST));
+    if (url.pathname.endsWith('/list-sessions')) {
+      return Response.json(SIGNED_IN_SESSIONS_LIST);
     }
-    return nextFetch(input as RequestInfo, init);
-  }) as typeof fetch;
+    return undefined;
+  };
 }
 
 function SignedInSessionBoundary({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Install during first render so the patch precedes any descendant's
-  // mount-time session fetch; restore on unmount.
+  // Register during first render so the mock precedes any descendant's
+  // mount-time session fetch; restore the previous handler on unmount.
   const restoreRef = React.useRef<(() => void) | null>(null);
-  if (restoreRef.current === null) {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = createSignedInFetchMock(originalFetch);
+  if (restoreRef.current === null && typeof window !== 'undefined') {
+    const apiMockWindow = window as ApiMockWindow;
+    const previous = apiMockWindow.__jovieApiMock;
+    apiMockWindow.__jovieApiMock = createSignedInApiMock();
     restoreRef.current = () => {
-      globalThis.fetch = originalFetch;
+      apiMockWindow.__jovieApiMock = previous;
     };
   }
   React.useEffect(

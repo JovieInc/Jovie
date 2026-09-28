@@ -331,6 +331,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ops/firecrawl-crawl.test.mjs',
   'scripts/performance-artifact-retention.test.mjs',
   'scripts/postmortem-linkage-check.test.mjs',
+  'scripts/quality-gap-finder.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
@@ -1571,9 +1572,13 @@ function runMergeGroupGuards() {
         !file.startsWith('apps/web/tests/e2e/') &&
         existsSync(resolve(REPO_ROOT, file))
     )
-    .map(file => file.replace(/^apps\/web\//, ''))
-    .map(file => JSON.stringify(file));
+    .map(file => shellQuote(file.replace(/^apps\/web\//, '')));
   return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
+}
+
+/** Quote a path for /bin/sh (route groups like `app/(profile-admission)/`). */
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
 /** Async twin of shell() so structural commands can overlap. */

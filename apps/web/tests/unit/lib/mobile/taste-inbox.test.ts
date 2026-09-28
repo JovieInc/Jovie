@@ -117,4 +117,35 @@ describe('buildMobileTasteInbox', () => {
     });
     expect(inbox.items[1]).toMatchObject({ typeLabel: 'Card' });
   });
+
+  it('embeds the full card detail so clients can render and decide inline', async () => {
+    hoisted.listPendingDesignProposals.mockResolvedValue([]);
+    const summerCard = {
+      id: 'sc_0123456789abcdef0123456789abcdef',
+      kind: 'spend' as const,
+      body: 'Full deposit terms and date holds.',
+      defaultIfSilent: 'Hold expires Friday.',
+      recipient: 'Magic Stick',
+      amountUsd: 400,
+      evidence: ['https://example.com/quote'],
+    };
+    hoisted.listSummerCards.mockResolvedValue([
+      {
+        ...summerCard,
+        idempotencyKey: 'spend-0001',
+        product: 'jov',
+        title: 'Book Detroit venue',
+        recommendation: 'Approve the $400 deposit.',
+        status: 'pending',
+        comment: null,
+        createdAt: '2026-09-06T10:00:00.000Z',
+        decidedAt: null,
+      },
+    ]);
+
+    const { buildMobileTasteInbox } = await import('@/lib/mobile/taste-inbox');
+    const inbox = await buildMobileTasteInbox();
+
+    expect(inbox.items[0].summerCard).toEqual(summerCard);
+  });
 });

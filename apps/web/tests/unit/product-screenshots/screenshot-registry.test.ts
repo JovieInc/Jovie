@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -196,5 +198,27 @@ describe('screenshot registry', () => {
     );
 
     expect(scenario?.reducedMotion).toBe(true);
+  });
+
+  it('waits for the empty Events card on the events-empty capture', () => {
+    // The tour list only mounts when dates exist, so the capture must wait
+    // for the empty branch that ProfileEventsCard actually renders.
+    const waitTargets = new Map(
+      SCREENSHOT_SCENARIOS.map(({ id, waitFor }) => [id, waitFor])
+    );
+    const cardSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/profile/ProfileEventsCard.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(cardSource).toContain(
+      "dataTestId='profile-primary-tab-events-empty'"
+    );
+    expect(waitTargets.get('tim-white-profile-events-empty-mobile')).toBe(
+      '[data-testid="profile-primary-tab-events-empty"]'
+    );
   });
 });

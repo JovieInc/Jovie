@@ -1,7 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { withSignedInSession } from '@/.storybook/signed-in-session';
+import {
+  createSignedInApiMock,
+  withSignedInSession,
+} from '@/.storybook/signed-in-session';
+
+type ApiMockWindow = Window & {
+  __jovieApiMock?: (request: {
+    url: URL;
+    init?: RequestInit;
+  }) => Response | Promise<Response> | undefined;
+};
+
+const apiMockWindow = window as ApiMockWindow;
 
 function renderDecorator(story: () => React.ReactElement) {
   return render(<>{withSignedInSession(story, {} as never)}</>);
@@ -9,33 +21,42 @@ function renderDecorator(story: () => React.ReactElement) {
 
 describe('withSignedInSession', () => {
   afterEach(() => {
+    apiMockWindow.__jovieApiMock = undefined;
     vi.restoreAllMocks();
   });
 
-  it('patches fetch before the story mounts and restores it on unmount', () => {
-    const originalFetch = globalThis.fetch;
-    let fetchDuringMount: typeof fetch | undefined;
+  it('registers __jovieApiMock before the story mounts and restores on unmount', () => {
+    let mockDuringMount: ApiMockWindow['__jovieApiMock'];
 
     const { unmount } = renderDecorator(() => {
-      fetchDuringMount = globalThis.fetch;
+      mockDuringMount = apiMockWindow.__jovieApiMock;
       return <div data-testid='story' />;
     });
 
     expect(screen.getByTestId('story')).toBeTruthy();
-    expect(fetchDuringMount).not.toBe(originalFetch);
+    expect(mockDuringMount).toBeTypeOf('function');
 
     unmount();
-    expect(globalThis.fetch).toBe(originalFetch);
+    expect(apiMockWindow.__jovieApiMock).toBeUndefined();
+  });
+
+  it('restores a previously registered __jovieApiMock on unmount', () => {
+    const previous = vi.fn();
+    apiMockWindow.__jovieApiMock = previous;
+
+    const { unmount } = renderDecorator(() => <div />);
+    unmount();
+
+    expect(apiMockWindow.__jovieApiMock).toBe(previous);
   });
 
   it('answers get-session with the signed-in user and session', async () => {
-    renderDecorator(() => <div />);
+    const mock = createSignedInApiMock();
+    const response = await mock({
+      url: new URL('http://localhost/api/auth/get-session'),
+    });
 
-    const response = await globalThis.fetch(
-      'http://localhost/api/auth/get-session'
-    );
-    const body = await response.json();
-
+    const body = await response?.json();
     expect(body.user).toMatchObject({
       id: 'story-user',
       email: 'tim@example.com',
@@ -48,28 +69,23 @@ describe('withSignedInSession', () => {
   });
 
   it('answers list-sessions with the current session entry', async () => {
-    renderDecorator(() => <div />);
+    const mock = createSignedInApiMock();
+    const response = await mock({
+      url: new URL('http://localhost/api/auth/list-sessions'),
+    });
 
-    const response = await globalThis.fetch(
-      'http://localhost/api/auth/list-sessions'
-    );
-    const body = await response.json();
-
+    const body = await response?.json();
     expect(Array.isArray(body)).toBe(true);
     expect(body[0]).toMatchObject({ id: 'story-session' });
   });
 
-  it('passes unrelated requests through to the original fetch', async () => {
-    const passthrough = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response('ok'));
+  it('returns undefined for unrelated requests so other mocks can respond', () => {
+    const mock = createSignedInApiMock();
+    const result = mock({
+      url: new URL('http://localhost/api/other'),
+      init: { method: 'POST' },
+    });
 
-    renderDecorator(() => <div />);
-
-    await globalThis.fetch('http://localhost/api/other', { method: 'POST' });
-    expect(passthrough).toHaveBeenCalledWith(
-      'http://localhost/api/other',
-      expect.objectContaining({ method: 'POST' })
-    );
+    expect(result).toBeUndefined();
   });
 });
