@@ -46,8 +46,7 @@ export async function loadAskJovieContext(
       latestRelease: result.latestRelease
         ? {
             ...result.latestRelease,
-            releaseDate:
-              toISOStringOrNull(result.latestRelease.releaseDate),
+            releaseDate: toISOStringOrNull(result.latestRelease.releaseDate),
           }
         : null,
       tourDates: tourDates.map(show => ({
