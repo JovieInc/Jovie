@@ -42,6 +42,7 @@ export interface AppliedMigration {
 export interface MissingMigration {
   idx: number;
   tag: string;
+  when: number;
   hash: string;
 }
 
