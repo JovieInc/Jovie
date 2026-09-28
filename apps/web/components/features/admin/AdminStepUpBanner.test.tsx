@@ -29,6 +29,15 @@ afterEach(() => {
 });
 
 describe('AdminStepUpBanner', () => {
+  it('renders the locked-session message and shared unlock button', () => {
+    render(<AdminStepUpBanner />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Admin data is locked on this session. Unlock with Touch ID for 12 hours.'
+    );
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled();
+  });
+
   it('enrolls a first passkey, then steps up and reloads', async () => {
     client.listUserPasskeys.mockResolvedValue({ data: [], error: null });
     client.addPasskey.mockResolvedValue({ data: {}, error: null });
