@@ -80,7 +80,7 @@ export default async function AlternativesPage({
           <div className='absolute inset-0 bg-gradient-to-b from-base via-base/70 to-base' />
         </div>
         <p className='text-sm font-medium text-tertiary-token'>Alternative</p>
-        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl line-clamp-2'>
+        <h1 className='mt-6 max-w-2xl text-4xl font-semibold leading-tight tracking-tight text-balance text-primary-token sm:text-5xl line-clamp-2'>
           {data.heroHeadline}
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
