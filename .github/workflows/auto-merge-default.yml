@@ -2,7 +2,7 @@
 #
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Ovie
-# necessary-trust-boundary: This controller is the single writer that enables GitHub native auto-merge on every PR and the only scheduled triage that comments on stuck PRs; GITHUB_TOKEN mutations stay inside this workflow so per-PR events and the hourly sweep never race a second writer.
+# necessary-trust-boundary: This controller is the single writer that enables GitHub native auto-merge on every PR and the only scheduled triage that comments on stuck PRs; Jovie Bot app-token mutations stay inside this workflow so per-PR events and the hourly sweep never race a second writer.
 # revisit-trigger: Remove this workflow if GitHub exposes a repo-level "auto-merge on by default" setting or a first-party stuck auto-merge triage surface.
 #
 # PURPOSE: Auto-merge (squash) is ON for every PR by default, forever, with no
@@ -75,9 +75,18 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Generate Jovie Bot token
+        # GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
+        # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
+        # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
       - name: Enable auto-merge
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
@@ -112,9 +121,18 @@ jobs:
       - name: Run unit tests for triage script
         run: node --test .github/scripts/auto-merge-stuck-triage.test.js
 
+      - name: Generate Jovie Bot token
+        # See the enable job: GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
+        # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
+        # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
       - name: Triage stuck PRs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
           THRESHOLD_HOURS: ${{ inputs.threshold_hours || '6' }}

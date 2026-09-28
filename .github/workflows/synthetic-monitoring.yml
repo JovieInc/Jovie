@@ -413,3 +413,52 @@ jobs:
         run: |
           echo "Web AI health status is '${{ steps.health.outputs.health_status }}'."
           exit 1
+
+  # JOV-6870: /api/health stays 200 while every requireRedis limiter fails
+  # closed (hid the 09-24 quota outage for 3 days). Probe the limiter store.
+  limiter-store-health:
+    name: Limiter Store Health
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+
+      - name: Probe production limiter store
+        id: probe
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016 # expanded by the inner sh, after doppler injects CRON_SECRET
+          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+            env -u DOPPLER_TOKEN sh -c 'curl --silent --show-error --connect-timeout 10 --max-time 20 \
+              -o "$RUNNER_TEMP/redis-health.json" -w "%{http_code}" \
+              -H "Authorization: Bearer $CRON_SECRET" https://jov.ie/api/health/redis' > "$RUNNER_TEMP/redis-code"
+          code=$(cat "$RUNNER_TEMP/redis-code")
+          body=$(jq -c '{status, failureKind}' "$RUNNER_TEMP/redis-health.json" 2>/dev/null || echo '{}')
+          echo "Limiter store: HTTP $code $body" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "summary=HTTP $code $body" >> "$GITHUB_OUTPUT"
+          test "$code" = 200
+
+      - name: Send Slack alert on limiter store failure
+        if: ${{ failure() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SUMMARY: ${{ steps.probe.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          test -n "$SLACK_WEBHOOK_URL" || exit 0
+          curl --fail --silent --show-error --max-time 20 -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg s "$SUMMARY" --arg r "$RUN_URL" \
+              '{text: ("High: production rate-limit store unhealthy; requireRedis limiters fail closed (onboarding chat, /api/v1). " + $s + " <" + $r + "|run>")}')"
