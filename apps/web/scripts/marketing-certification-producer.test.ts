@@ -5,6 +5,8 @@ import {
   affectedEntries,
   buildPacket,
   certificationPlans,
+  defectReceipts,
+  fileDefects,
   storyFileFor,
   testFilesFor,
 } from './marketing-certification-producer';
@@ -215,5 +217,58 @@ describe('marketing certification producer', () => {
     for (const packet of [noTest, brokenStory, wrongStory, penFlagged]) {
       expect(evaluateCertificationAdmission({ packet }).state).toBe('working');
     }
+  });
+
+  it('files real defects once per entry and tier, never missing evidence', () => {
+    expect(defectReceipts(packetFor())).toEqual([]);
+    expect(
+      defectReceipts(packetFor({ ownTestFiles: [], ownTests: null }))
+    ).toEqual([]);
+    const broken = packetFor({
+      stories: report(
+        'components/marketing/storybook/MarketingShells.stories.tsx',
+        'MarketingFooter',
+        'failed'
+      ),
+    });
+    expect(defectReceipts(broken)).toEqual([
+      expect.objectContaining({
+        fingerprint: 'marketing-cert:shell.footer:visual_proof',
+        tier: 'visual_proof',
+      }),
+    ]);
+  });
+
+  it('upserts one fingerprinted issue per defect only when Linear is configured', async () => {
+    const broken = packetFor({
+      stories: report(
+        'components/marketing/storybook/MarketingShells.stories.tsx',
+        'MarketingFooter',
+        'failed'
+      ),
+    });
+    const calls: { fingerprint: string; title: string; description: string }[] =
+      [];
+    const upsert = async (input: (typeof calls)[number]) => {
+      calls.push(input);
+      return { ok: true, action: 'created' };
+    };
+    const previous = process.env.LINEAR_API_KEY;
+    try {
+      delete process.env.LINEAR_API_KEY;
+      expect(await fileDefects(broken, SHA, async () => upsert)).toBe(0);
+      process.env.LINEAR_API_KEY = 'lin_test';
+      expect(await fileDefects(packetFor(), SHA, async () => upsert)).toBe(0);
+      expect(await fileDefects(broken, SHA, async () => upsert)).toBe(1);
+    } finally {
+      if (previous === undefined) delete process.env.LINEAR_API_KEY;
+      else process.env.LINEAR_API_KEY = previous;
+    }
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      fingerprint: 'marketing-cert:shell.footer:visual_proof',
+      title: expect.stringContaining('shell.footer visual_proof'),
+    });
+    expect(calls[0]?.description).toContain(SHA);
   });
 });
