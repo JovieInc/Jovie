@@ -7,6 +7,24 @@
     "status": 9,
     "entityHeader": 5
   },
+  "exceptions": [
+    {
+      "key": "status",
+      "owner": "@jovie-design",
+      "reason": "Seeds the status family ceiling so new StatusPill/StatusBadge/StatusDot/Glyph forks fail CI while design decision D5 names the canonical atom (Pen jAcP1 status pill).",
+      "issue": "JOV-6777",
+      "removalCondition": "D5 names the status-pill owner and the family converges; the ceiling then only shrinks.",
+      "evidence": "docs/design-system/drift-audit-2026-09-27.md — parallel status components inventoried 2026-09-27."
+    },
+    {
+      "key": "entityHeader",
+      "owner": "@jovie-design",
+      "reason": "Seeds the entityHeader family ceiling so new Entity/Drawer/Member/Detail Header(Card) forks fail CI while design decision D6 names the canonical owner (Pen odpZ8 entity header).",
+      "issue": "JOV-6777",
+      "removalCondition": "D6 names the entity-header owner and the family converges; the ceiling then only shrinks.",
+      "evidence": "docs/design-system/drift-audit-2026-09-27.md — five entity-header variants inventoried 2026-09-27."
+    }
+  ],
   "allowedEmptyStatePaths": [
     "components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx",
     "components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx",
