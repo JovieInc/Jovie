@@ -4,7 +4,7 @@ import {
   resetAudioChromeSnapshot,
   setAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
-import { ShellAudioDock } from '../ShellAudioDock';
+import { ShellAudioDock } from './ShellAudioDock';
 
 let mockPrefersReducedMotion = false;
 vi.mock('@/lib/hooks/useReducedMotion', () => ({

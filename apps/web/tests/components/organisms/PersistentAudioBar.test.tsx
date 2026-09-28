@@ -714,7 +714,7 @@ describe('PersistentAudioBar', () => {
     });
 
     // Keyboard reopen still works while the dock is collapsed.
-    fireEvent.keyDown(globalThis, { key: '`' });
+    fireEvent.keyDown(window, { key: '`' });
 
     await waitFor(() => {
       expect(getDock()).toHaveAttribute('data-state', 'open');
@@ -774,25 +774,25 @@ describe('PersistentAudioBar', () => {
       </AppFlagProvider>
     );
 
-    fireEvent.keyDown(globalThis, { key: ' ' });
+    fireEvent.keyDown(window, { key: ' ' });
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Midnight Drive',
     });
 
-    fireEvent.keyDown(globalThis, { key: 'w' });
+    fireEvent.keyDown(window, { key: 'w' });
     expect(
       screen.getByRole('button', { name: 'Hide waveform' })
     ).toBeInTheDocument();
 
     toggleTrack.mockClear();
-    fireEvent.keyDown(globalThis, { key: 'l' });
+    fireEvent.keyDown(window, { key: 'l' });
     expect(push).toHaveBeenCalledWith(
       buildLyricsRoute('track-1', { from: APP_ROUTES.CHAT })
     );
     expect(toggleTrack).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(globalThis, { key: '`' });
+    fireEvent.keyDown(window, { key: '`' });
     // Backtick toggles the player closed; mini chrome lives in the sidebar.
     expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
       'aria-hidden',
@@ -820,7 +820,7 @@ describe('PersistentAudioBar', () => {
       </AppFlagProvider>
     );
 
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(push).toHaveBeenCalledWith(
       resolveLyricsReturnRoute(searchParams.get('from'), APP_ROUTES.CHAT)
