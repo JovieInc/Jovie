@@ -45,7 +45,7 @@ export const PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS =
   'min-w-0 truncate max-sm:sr-only';
 
 export const TABLE_TOOLBAR_SHELL_CLASS =
-  'flex h-11 min-h-11 min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-3 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'flex h-10 min-h-10 min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-3 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 export const TABLE_TOOLBAR_OVERLAY_CLASS = cn(
   'absolute inset-x-0 top-0 z-10',
