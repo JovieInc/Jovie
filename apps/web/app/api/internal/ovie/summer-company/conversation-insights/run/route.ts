@@ -14,11 +14,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-/**
- * Batch conversation-signal run (JOV-6784): deterministic sampling + the
- * rule-based classifier. Invoked by the scheduler/CLI batch, never per
- * message.
- */
+/** Batch conversation-signal run (JOV-6784); invoked by the scheduler. */
 export async function POST(request: Request): Promise<NextResponse> {
   if (!(await verifySummerOidcRequest(request))) {
     return json({ error: 'unauthorized' }, 401);

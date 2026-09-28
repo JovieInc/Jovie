@@ -14,11 +14,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-/**
- * Inbox-card decision for an objection (JOV-6784): approve the drafted answer,
- * reject the objection, or publish the approved answer into the content
- * pipeline with a resolution reference for the closed conversion loop.
- */
+/** Inbox-card decision for an objection (JOV-6784). */
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }

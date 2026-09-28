@@ -14,32 +14,25 @@ import { chatConversations } from './chat';
 import { conversationFunnelStageEnum, objectionStatusEnum } from './enums';
 
 /**
- * Conversation signal rows (JOV-6784).
- *
- * One row per deterministically sampled Jovie product chat conversation,
- * tagged by the cheapest viable classifier (rule-based, batch). Stores
- * aggregates and redacted quotes only — never PII and never LYB health data.
+ * Conversation signal rows (JOV-6784): one row per sampled product-chat
+ * conversation. Stores aggregates and redacted quotes only — never PII and
+ * never LYB health data.
  */
 export const conversationSignals = pgTable(
   'conversation_signals',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    /** Sampled conversation. Unique so pipeline re-runs stay idempotent. */
+    /** Unique so pipeline re-runs stay idempotent. */
     conversationId: uuid('conversation_id')
       .notNull()
       .references(() => chatConversations.id, { onDelete: 'cascade' }),
-    /** UTC start of the ISO week the conversation was classified in. */
+    /** UTC Monday of the ISO week the conversation was classified in. */
     weekStart: timestamp('week_start', { withTimezone: true }).notNull(),
     stage: conversationFunnelStageEnum('stage').notNull(),
-    /** Primary user intent label (e.g. 'claim_profile', 'pricing'). */
     intent: text('intent').notNull(),
-    /** Stable objection key when an objection was detected. */
     objectionKey: text('objection_key'),
-    /** Confusion or bug signal detected in user turns. */
     confusionOrBug: boolean('confusion_or_bug').notNull().default(false),
-    /** Feature ask label when detected. */
     featureAsk: text('feature_ask'),
-    /** Tag of the last user turn where the conversation dropped off. */
     dropOffPoint: text('drop_off_point'),
     /** Redacted supporting quote. Never raw PII. */
     redactedQuote: text('redacted_quote'),
@@ -62,12 +55,9 @@ export const conversationSignals = pgTable(
 );
 
 /**
- * Objections table in Ovie (JOV-6784).
- *
- * Aggregates detected objections across sources. Answers are drafted by the
- * system, approved via Inbox cards, and published into the content pipeline.
- * `resolutionRef`/`resolvedAt` tag the shipped fix or published answer so the
- * closed loop can measure the stage conversion change.
+ * Objections table in Ovie (JOV-6784): detected objections aggregated across
+ * sources. System-drafted answers are approved via Inbox cards and published
+ * into the content pipeline; `resolutionRef`/`resolvedAt` close the loop.
  */
 export const conversationObjections = pgTable(
   'conversation_objections',
@@ -75,18 +65,13 @@ export const conversationObjections = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     /** Stable dedupe key derived from the classified objection type. */
     objectionKey: text('objection_key').notNull(),
-    /** Human-readable objection label. */
     objection: text('objection').notNull(),
     frequency: integer('frequency').notNull().default(1),
     stage: conversationFunnelStageEnum('stage').notNull(),
-    /** Where the objection was observed: chat | call | email. */
     source: text('source').notNull().default('chat'),
     draftedAnswer: text('drafted_answer'),
     status: objectionStatusEnum('status').notNull().default('draft'),
-    /**
-     * Redacted evidence: `{ conversationId, quote }` links. Bounded; quotes
-     * are pre-redacted before they are written here.
-     */
+    /** Pre-redacted `{ conversationId, quote }` evidence links; bounded. */
     evidence: jsonb('evidence')
       .$type<{ conversationId: string; quote?: string }[]>()
       .notNull()

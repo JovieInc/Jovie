@@ -14,8 +14,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-/** Ovie objections table (JOV-6784): objection, frequency, stage, source,
- * drafted answer, status, and redacted evidence links. */
+/** Ovie objections table read (JOV-6784). */
 export async function GET(request: Request): Promise<NextResponse> {
   if (!(await verifySummerOidcRequest(request))) {
     return json({ error: 'unauthorized' }, 401);

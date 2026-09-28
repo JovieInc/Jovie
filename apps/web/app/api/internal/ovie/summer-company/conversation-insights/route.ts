@@ -14,11 +14,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-/**
- * Summer conversation-insights read (JOV-6784): top objections and asks per
- * funnel stage, week over week, joined with the per-stage conversation counts
- * so Summer can rank work by conversion impact.
- */
+/** Summer conversation-insights read (JOV-6784). */
 export async function GET(request: Request): Promise<NextResponse> {
   if (!(await verifySummerOidcRequest(request))) {
     return json({ error: 'unauthorized' }, 401);

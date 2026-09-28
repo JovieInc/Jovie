@@ -1,12 +1,9 @@
 import { createHash } from 'node:crypto';
 
 /**
- * Conversation insights pipeline (JOV-6784).
- *
- * Pure functions: deterministic sampling, the cheapest viable rule-based
- * classifier, PII redaction, and week-over-week aggregation. No database or
- * network access — the server pipeline in `conversation-insights.server.ts`
- * feeds rows in and persists results.
+ * Conversation insights pipeline (JOV-6784): pure functions for deterministic
+ * sampling, rule-based classification, PII redaction, and weekly aggregation.
+ * Persistence lives in `conversation-insights.server.ts`.
  */
 
 export const FUNNEL_STAGES = ['anonymous', 'claimed', 'paid'] as const;
@@ -25,11 +22,7 @@ export type ObjectionStatus = (typeof OBJECTION_STATUSES)[number];
 
 const MAX_QUOTE_LENGTH = 240;
 
-/**
- * Objection catalog: stable key, display label, classifier patterns, and the
- * system's drafted answer. Drafted answers are deterministic templates — the
- * first of each type is approved via an Inbox card before publication.
- */
+/** Objection catalog: key, label, classifier patterns, and drafted answer. */
 export const OBJECTION_CATALOG: ReadonlyArray<{
   readonly key: string;
   readonly label: string;
@@ -151,11 +144,7 @@ export type ConversationClassification = {
   readonly quote?: string;
 };
 
-/**
- * Classify one conversation from its user-turn texts. Deterministic; the last
- * matching objection/intent wins recency, and the drop-off point is the tag of
- * the final user turn.
- */
+/** Classify one conversation from its user turns; the last match wins. */
 export function classifyUserTurns(
   userTurns: readonly string[]
 ): ConversationClassification {
@@ -209,7 +198,6 @@ export function classifyUserTurns(
   };
 }
 
-/** Map a conversation's owner state onto the funnel stage enum. */
 export function funnelStageForConversation(input: {
   readonly hasUser: boolean;
   readonly isPro: boolean;
@@ -225,10 +213,7 @@ const PHONE_PATTERN = /\+?\d[\d\s().-]{6,}\d/g;
 const LONG_DIGIT_RUN = /\b\d{4,}\b/g;
 const WHITESPACE = /\s+/g;
 
-/**
- * Strip PII-shaped content from a quote: emails, URLs, @handles, phone
- * numbers, and long digit runs. Output is capped and safe to store.
- */
+/** Strip PII (emails, URLs, handles, phones, digit runs) and cap length. */
 export function redactForSignal(text: string): string {
   const cleaned = text
     .replace(EMAIL_PATTERN, '[email]')
@@ -243,10 +228,7 @@ export function redactForSignal(text: string): string {
     : cleaned;
 }
 
-/**
- * Deterministic sampling: stable across re-runs because it hashes the
- * conversation id, not the row order. `rate` is 0..1.
- */
+/** Deterministic sampling by hashing the conversation id. `rate` is 0..1. */
 export function isConversationSampled(
   conversationId: string,
   rate: number
@@ -302,10 +284,7 @@ function topCounts(
     .slice(0, limit);
 }
 
-/**
- * Aggregate signal rows into per-stage insights with week-over-week counts,
- * ranked by frequency so Summer can rank work by conversion impact.
- */
+/** Aggregate signal rows into per-stage week-over-week insights. */
 export function aggregateStageInsights(
   signals: readonly SignalRow[],
   now: Date

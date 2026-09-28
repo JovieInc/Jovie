@@ -30,25 +30,13 @@ import {
 } from './conversation-insights';
 
 const DEFAULT_SAMPLE_RATE = 0.25;
-const DEFAULT_WINDOW_DAYS = 7;
-const DEFAULT_BATCH_LIMIT = 200;
 const SIGNAL_LOOKBACK_WEEKS = 8;
 const MAX_EVIDENCE_PER_OBJECTION = 5;
 
 export const conversationInsightRunSchema = z.object({
   sampleRate: z.coerce.number().min(0).max(1).default(DEFAULT_SAMPLE_RATE),
-  windowDays: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(30)
-    .default(DEFAULT_WINDOW_DAYS),
-  batchLimit: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(500)
-    .default(DEFAULT_BATCH_LIMIT),
+  windowDays: z.coerce.number().int().min(1).max(30).default(7),
+  batchLimit: z.coerce.number().int().min(1).max(500).default(200),
 });
 
 export type ConversationInsightRunInput = z.infer<
@@ -65,10 +53,8 @@ export type ConversationInsightRunResult = {
 };
 
 /**
- * Conversation signal pipeline: deterministically sample recent Jovie chat
- * conversations (never LYB data — this table only holds product chat), tag
- * them with the rule-based classifier, and store aggregates plus redacted
- * quotes only.
+ * Sample recent product-chat conversations (never LYB data), classify them,
+ * and store aggregates plus redacted quotes only.
  */
 export async function runConversationInsightPipeline(
   input: ConversationInsightRunInput,
@@ -241,11 +227,7 @@ export const conversationInsightsQuerySchema = z.object({
   weeks: z.coerce.number().int().min(1).max(SIGNAL_LOOKBACK_WEEKS).default(4),
 });
 
-/**
- * Summer read: top objections and asks per funnel stage, week over week.
- * The per-stage counts are the funnel join — stage is derived from the same
- * claim/subscription state the funnel reports on.
- */
+/** Summer read: top objections and asks per funnel stage, week over week. */
 export async function getConversationInsights(now = new Date()) {
   const since = new Date(
     weekStartUtc(now).getTime() - (SIGNAL_LOOKBACK_WEEKS - 1) * 7 * 86_400_000
@@ -319,9 +301,8 @@ export type ObjectionDecision =
 type ConversationObjectionRow = typeof conversationObjections.$inferSelect;
 
 /**
- * Apply an Inbox-card decision to an objection. Approving a draft moves it to
- * `approved`; publishing requires an approved row with an answer and records
- * the shipped-answer reference for the closed conversion loop.
+ * Apply an Inbox-card decision: approve a draft, or publish an approved
+ * answer with a resolution reference for the closed conversion loop.
  */
 export async function decideConversationObjection(
   id: string,
