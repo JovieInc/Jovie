@@ -9,7 +9,7 @@ import {
   MARKETING_STORY_DESCRIPTION,
   marketingFullscreenParameters,
   recipeViewports,
-} from './marketingStoryMeta';
+} from './storybook/marketingStoryMeta';
 
 /**
  * Editorial background masters (JOV-6249, spec JOV-6246) rendered behind the
