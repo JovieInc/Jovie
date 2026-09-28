@@ -64,7 +64,7 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'A living identity for the internet.',
+        name: 'Your living identity on the internet.',
       })
     ).toBeInTheDocument();
 
@@ -87,7 +87,6 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
       ...container.querySelectorAll('[data-background-image]'),
     ].map(node => node.getAttribute('data-background-image'));
     expect(backgrounds).toEqual([
-      '/assets/generated/homepage-hero-technical-texture-v1.webp',
       '/assets/generated/homepage-presence-satin-v1.webp',
     ]);
     expect(screen.queryByText("What's new in Jovie")).toBeNull();
@@ -98,7 +97,7 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     await renderHomePage();
 
     // The identity hero stays live; only the v3 body is gated.
-    expect(screen.getByTestId('homepage-identity-hero-texture')).not.toBeNull();
+    expect(screen.getByTestId('homepage-identity-hero-light')).not.toBeNull();
     expect(screen.getByTestId('homepage-story-stack')).not.toBeNull();
     expect(screen.queryByTestId('homepage-identity-story-stack')).toBeNull();
     expect(screen.queryByTestId('homepage-presence-material')).toBeNull();
