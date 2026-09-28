@@ -204,7 +204,7 @@ function primaryOutcomeMetric(
       id: 'primary-outcome',
       label: 'Week Over Week',
       value: `${signedUsd(deltaUsd)} MRR${percent}`,
-      detail: `${formatUsd(metrics.overview.mrrUsd)} MRR now vs ${formatUsd(weekAgo.mrrUsd)} 7 days ago, net of churn · ${metrics.overview.activeSubscribers} paying subscribers (${subscriberDelta < 0 ? '' : '+'}${subscriberDelta} WoW).`,
+      detail: `${formatUsd(metrics.overview.mrrUsd)} MRR now vs ${formatUsd(weekAgo.mrrUsd)} 7 days ago, net of churn · ${metrics.overview.activeSubscribers} paying ${metrics.overview.activeSubscribers === 1 ? 'subscriber' : 'subscribers'} (${subscriberDelta < 0 ? '' : '+'}${subscriberDelta} WoW).`,
       state,
       authoritativeSource: 'Stripe subscriptions (net MRR, 7-day baseline)',
       observedAt: metricObservedAt([stripe]),

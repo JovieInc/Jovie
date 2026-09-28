@@ -72,10 +72,134 @@ const GITHUB_RATE_LIMIT_MAX_BACKOFF_MS = 60 * 60_000;
 export type LiveIo = {
   readonly fetch: (url: string, init?: RequestInit) => Promise<Response>;
   readonly githubToken?: string;
+  /** Preferred over githubToken: resolves a fresh (bot) token per call. */
+  readonly getGithubToken?: () => Promise<string | undefined>;
   readonly githubOwner?: string;
   readonly githubRepo?: string;
   readonly nowMs?: () => number;
+  /**
+   * Optional authenticated bridge to the Gem execution host. When present,
+   * Gem-resident authorities are read over this transport instead of the
+   * public feed that only exists once Gem publishes it.
+   */
+  readonly gemBridge?: GemBridge;
 };
+
+export type GemBridge = {
+  readonly url: string;
+  readonly token: string;
+};
+
+/**
+ * Fixed receipt keys the Gem bridge may serve. Each maps to exactly one
+ * `GET {bridge}/receipts/{key}` — the transport can never address an
+ * arbitrary path, log, or command surface.
+ */
+export const GEM_BRIDGE_RECEIPT_KEYS = {
+  'lanes-status': 'lanes-status',
+} as const satisfies Partial<Record<ShippingSourceId, string>>;
+
+const GEM_BRIDGE_TIMEOUT_MS = 2_500;
+
+export function gemBridgeReceiptUrl(
+  bridge: GemBridge,
+  sourceId: ShippingSourceId
+): string | null {
+  const key = (
+    GEM_BRIDGE_RECEIPT_KEYS as Partial<Record<ShippingSourceId, string>>
+  )[sourceId];
+  if (key == null || bridge.token.length === 0) return null;
+  let base: URL;
+  try {
+    base = new URL(bridge.url);
+  } catch {
+    return null;
+  }
+  if (
+    (base.protocol !== 'https:' && base.protocol !== 'http:') ||
+    base.username !== '' ||
+    base.password !== '' ||
+    base.search !== '' ||
+    base.hash !== ''
+  ) {
+    return null;
+  }
+  let prefix = base.pathname;
+  while (prefix.length > 1 && prefix.endsWith('/')) {
+    prefix = prefix.slice(0, -1);
+  }
+  if (prefix === '/') prefix = '';
+  return `${base.origin}${prefix}/receipts/${key}`;
+}
+
+async function readJsonAuthority(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  url: string,
+  timeoutMs: number,
+  authority: string,
+  malformedMessage: string,
+  headers: Record<string, string> = {}
+): Promise<AuthorityRead> {
+  try {
+    const response = await io.fetch(url, {
+      method: 'GET',
+      headers: { accept: 'application/json', ...headers },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status === 401 || response.status === 403) {
+      return failedRead(
+        sourceId,
+        'unauthorized',
+        `${authority} returned ${response.status}`
+      );
+    }
+    if (!response.ok) {
+      return failedRead(
+        sourceId,
+        'unavailable',
+        `${authority} returned ${response.status}`,
+        { errorCode: `http-${response.status}` }
+      );
+    }
+    const payload: unknown = await response.json();
+    if (!isRecord(payload)) {
+      return failedRead(sourceId, 'error', malformedMessage, {
+        errorCode: 'malformed',
+      });
+    }
+    return okJsonRead(sourceId, payload);
+  } catch (error) {
+    return disconnectedRead(
+      sourceId,
+      error instanceof Error ? error.message : `${authority} unreachable`
+    );
+  }
+}
+
+async function readBridgeReceipt(
+  io: LiveIo,
+  sourceId: ShippingSourceId
+): Promise<AuthorityRead> {
+  const url = io.gemBridge ? gemBridgeReceiptUrl(io.gemBridge, sourceId) : null;
+  if (url == null) {
+    return failedRead(
+      sourceId,
+      'unavailable',
+      'Gem bridge receipt is not configured',
+      { errorCode: 'not-configured' }
+    );
+  }
+  return readJsonAuthority(
+    io,
+    sourceId,
+    url,
+    GEM_BRIDGE_TIMEOUT_MS,
+    'Gem bridge',
+    'Gem bridge receipt was not an object',
+    { authorization: `Bearer ${io.gemBridge?.token ?? ''}` }
+  );
+}
 
 const githubBackoffUntilByIo = new WeakMap<LiveIo, number>();
 
@@ -208,43 +332,14 @@ async function readNamedUrl(
   url: string,
   timeoutMs: number
 ): Promise<AuthorityRead> {
-  try {
-    const response = await io.fetch(url, {
-      method: 'GET',
-      headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (response.status === 401 || response.status === 403) {
-      return failedRead(
-        sourceId,
-        'unauthorized',
-        `named authority returned ${response.status}`
-      );
-    }
-    if (!response.ok) {
-      return failedRead(
-        sourceId,
-        'unavailable',
-        `named authority returned ${response.status}`,
-        { errorCode: `http-${response.status}` }
-      );
-    }
-    const payload: unknown = await response.json();
-    if (!isRecord(payload)) {
-      return failedRead(
-        sourceId,
-        'error',
-        'named authority payload was not an object',
-        { errorCode: 'malformed' }
-      );
-    }
-    return okJsonRead(sourceId, payload);
-  } catch (error) {
-    return disconnectedRead(
-      sourceId,
-      error instanceof Error ? error.message : 'named authority unreachable'
-    );
-  }
+  return readJsonAuthority(
+    io,
+    sourceId,
+    url,
+    timeoutMs,
+    'named authority',
+    'named authority payload was not an object'
+  );
 }
 
 async function githubFetch(
@@ -254,7 +349,10 @@ async function githubFetch(
   init: RequestInit,
   timeoutMs = GITHUB_TIMEOUT_MS
 ): Promise<Response | AuthorityRead> {
-  if (!io.githubToken || !io.githubOwner || !io.githubRepo) {
+  const githubToken = io.getGithubToken
+    ? await io.getGithubToken()
+    : io.githubToken;
+  if (!githubToken || !io.githubOwner || !io.githubRepo) {
     return failedRead(
       sourceId,
       'unavailable',
@@ -272,7 +370,7 @@ async function githubFetch(
     signal: AbortSignal.timeout(timeoutMs),
     headers: {
       accept: 'application/vnd.github+json',
-      authorization: `Bearer ${io.githubToken}`,
+      authorization: `Bearer ${githubToken}`,
       ...init.headers,
     },
   });
@@ -749,12 +847,14 @@ export function parseLanesStatus(
 }
 
 export async function readLanesStatus(io: LiveIo): Promise<AuthorityRead> {
-  const read = await readNamedUrl(
-    io,
-    'lanes-status',
-    NAMED_AUTHORITY_URLS['lanes-status'],
-    PUBLIC_SOURCE_TIMEOUT_MS
-  );
+  const read = io.gemBridge
+    ? await readBridgeReceipt(io, 'lanes-status')
+    : await readNamedUrl(
+        io,
+        'lanes-status',
+        NAMED_AUTHORITY_URLS['lanes-status'],
+        PUBLIC_SOURCE_TIMEOUT_MS
+      );
   if (read.status !== 'ok' || !read.payload) return read;
   const lanes = parseLanesStatus(read.payload);
   if (!lanes) {
@@ -1128,8 +1228,12 @@ export function defaultLiveIo(overrides: Partial<LiveIo> = {}): LiveIo {
   return {
     fetch: overrides.fetch ?? fetch,
     githubToken: overrides.githubToken,
+    ...(overrides.getGithubToken
+      ? { getGithubToken: overrides.getGithubToken }
+      : {}),
     githubOwner: overrides.githubOwner,
     githubRepo: overrides.githubRepo,
     ...(overrides.nowMs ? { nowMs: overrides.nowMs } : {}),
+    gemBridge: overrides.gemBridge,
   };
 }

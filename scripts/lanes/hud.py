@@ -199,13 +199,13 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
     try:
         client = lane.Linear(env_file)
         data = client.gql(
-            'query($labels:[String!]!,$numbers:[Float!]!){'
+            'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
             'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier priority labels{nodes{name}}}}'
-            'active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
-            '{nodes{identifier title state{name}}}'
-            'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), "numbers": numbers or [0]})
+            + ('active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
+               '{nodes{identifier title state{name}}}' if numbers else '')
+            + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
+            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
     pool = Counter()
@@ -213,7 +213,7 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
         for label in node["labels"]["nodes"]:
             if label["name"] in LANE_LABELS:
                 pool[label["name"]] += 1
-    active = {n["identifier"]: n["title"] for n in data["active"]["nodes"]}
+    active = {n["identifier"]: n["title"] for n in (data.get("active") or {"nodes": []})["nodes"]}
     return {"ok": True, "pool": dict(pool), "poolTotal": len(data["pool"]["nodes"]), "active": active,
             "triage": len(data["triage"]["nodes"]), "fetchedAt": utcnow().isoformat()}
 
@@ -269,8 +269,10 @@ def github_model() -> dict:
         model["errors"]["queue"] = f"{type(error).__name__}: {error}"[:100]
     try:
         limits = gh_json(["api", "rate_limit"])
-        model["rate"] = {"core": limits["resources"]["core"]["remaining"], "graphql": limits["resources"]["graphql"]["remaining"],
-                         "resetAt": datetime.fromtimestamp(limits["resources"]["graphql"]["reset"], timezone.utc).isoformat()}
+        budget = lane.graphql_budget()
+        if budget is None:
+            raise RuntimeError("GraphQL rateLimit unreadable")
+        model["rate"] = {"core": limits["resources"]["core"]["remaining"], "graphql": budget[0], "resetAt": budget[1]}
     except Exception as error:
         model["errors"]["rate"] = f"{type(error).__name__}: {error}"[:100]
     model["promotion"] = promotion_model()
