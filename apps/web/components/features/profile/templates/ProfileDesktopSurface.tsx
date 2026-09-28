@@ -427,7 +427,6 @@ export function ProfileDesktopSurface({
           type='button'
           variant='primary'
           size='marketing'
-          className='gap-2 px-4'
           disabled
           aria-busy='true'
           data-testid='profile-desktop-subscribe-resolving'
