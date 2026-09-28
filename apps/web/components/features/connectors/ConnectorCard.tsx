@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/features/connectors/ConnectorCard.test.tsx
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
