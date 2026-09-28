@@ -477,7 +477,7 @@ export function ShippingMatrix() {
                       setSelectedId(prev => (prev === row.id ? null : row.id))
                     }
                   >
-                    <th scope='row' className='relative max-w-0 p-2'>
+                    <th scope='row' className='relative max-w-0 truncate p-2'>
                       <Button
                         type='button'
                         variant='link'
