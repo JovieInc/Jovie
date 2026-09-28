@@ -3,9 +3,10 @@
 import { useChat } from '@ai-sdk/react';
 import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
-import { DefaultChatTransport, type UIMessage } from 'ai';
+import { DefaultChatTransport, isToolUIPart, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CHAT_STREAM_FAILED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
@@ -212,6 +213,15 @@ function toError(value: unknown): Error {
 
 function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {
   return Array.isArray(message?.parts) ? message.parts : [];
+}
+
+function hasAssistantOutput(parts: UIMessage['parts']): boolean {
+  return parts.some(
+    part =>
+      (part.type === 'text' && part.text.trim().length > 0) ||
+      part.type === 'file' ||
+      isToolUIPart(part)
+  );
 }
 
 function getLastAssistantMessage(messages: readonly UIMessage[]) {
@@ -708,13 +718,37 @@ export function useJovieChat({
         pendingSummerFailureRef.current = parseSummerFailure(dataPart.data);
       }
     },
-    onFinish: ({ message }) => {
+    onFinish: ({ message, isError }) => {
       const metadata = extractChatTurnMetadata(message.metadata);
       const finishedConversationId =
         metadata?.conversationId ?? activeConversationId;
       const clientTurnId = activeClientTurnIdRef.current;
       const latency = activeChatLatencyRef.current;
       const messageParts = getMessageParts(message as UIMessage);
+
+      if (isError) {
+        if (clientTurnId) {
+          handleChatFailure(
+            new Error(CHAT_STREAM_FAILED_USER_MESSAGE),
+            'stream',
+            clientTurnId
+          );
+        }
+        return;
+      }
+
+      if (chatMode !== 'ov' && metadata?.conversationId) {
+        adoptServerConversationId(metadata.conversationId, 'completed');
+      }
+
+      if (clientTurnId && !hasAssistantOutput(messageParts)) {
+        handleChatFailure(
+          new Error(CHAT_STREAM_FAILED_USER_MESSAGE),
+          'stream',
+          clientTurnId
+        );
+        return;
+      }
 
       if (
         clientTurnId &&
@@ -740,9 +774,6 @@ export function useJovieChat({
           toolStepCapExhausted: metadata?.toolStepCapExhausted,
           now: Date.now(),
         });
-      }
-      if (chatMode !== 'ov' && metadata?.conversationId) {
-        adoptServerConversationId(metadata.conversationId, 'completed');
       }
       const summerFailure =
         chatMode === 'ov' && isRecord(message.metadata)
