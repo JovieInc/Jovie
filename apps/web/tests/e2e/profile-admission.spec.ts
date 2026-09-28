@@ -440,7 +440,6 @@ test.describe('public profile browser admission', () => {
       id: 'populated-mobile-pointer',
       width: 390,
       height: 932,
-      layout: 'compact' as const,
       events: 'populated' as const,
       activation: 'pointer' as const,
     },
@@ -448,7 +447,6 @@ test.describe('public profile browser admission', () => {
       id: 'populated-desktop-keyboard',
       width: 1512,
       height: 982,
-      layout: 'desktop' as const,
       events: 'populated' as const,
       activation: 'keyboard' as const,
     },
@@ -456,7 +454,6 @@ test.describe('public profile browser admission', () => {
       id: 'empty-mobile-keyboard',
       width: 390,
       height: 932,
-      layout: 'compact' as const,
       events: 'empty' as const,
       activation: 'keyboard' as const,
     },
@@ -464,7 +461,6 @@ test.describe('public profile browser admission', () => {
       id: 'empty-desktop-pointer',
       width: 1512,
       height: 982,
-      layout: 'desktop' as const,
       events: 'empty' as const,
       activation: 'pointer' as const,
     },
@@ -484,12 +480,13 @@ test.describe('public profile browser admission', () => {
         { waitUntil: 'domcontentloaded' }
       );
       expect(response?.status()).toBe(200);
-      await waitForSettledProfileLayout(page, fixture.layout);
+      const layout = expectedPublicProfileLayout(fixture.width);
+      await waitForSettledProfileLayout(page, layout);
 
       const surface = page.getByTestId(
-        fixture.layout === 'desktop'
+        layout === 'desktop'
           ? 'profile-desktop-surface'
-          : 'profile-compact-surface'
+          : 'profile-compact-shell'
       );
       const navigation = surface.getByRole('navigation', {
         name: 'Profile Navigation',
@@ -502,7 +499,7 @@ test.describe('public profile browser admission', () => {
       await expect(
         navigation.getByRole('button', { name: 'Shows', exact: true })
       ).toHaveCount(0);
-      if (fixture.layout === 'compact') {
+      if (layout === 'compact') {
         await expect(eventsButton).toHaveAttribute('aria-label', 'Events');
       }
 
@@ -558,7 +555,7 @@ test.describe('public profile browser admission', () => {
         geometry.bottom,
         `Events hit target geometry: ${JSON.stringify(geometry)}`
       ).toBeLessThanOrEqual(geometry.viewportHeight + 1);
-      if (fixture.layout === 'compact') {
+      if (layout === 'compact') {
         const compactBoundaries = [
           ['profile viewport', geometry.profileViewportBottom],
           ['compact frame', geometry.compactFrameBottom],
@@ -589,25 +586,25 @@ test.describe('public profile browser admission', () => {
 
       await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
       await expect(eventsButton).toHaveAttribute('aria-current', 'page');
-      const selected = page.getByTestId('profile-primary-tab-tour').filter({
-        has: page.getByRole('heading', { name: 'Shows', exact: true }),
-      });
+      const selected = page.getByTestId('profile-primary-tab-tour');
       await expect(selected).toBeVisible();
-      await expect(
-        selected.getByRole('heading', { name: 'Shows', exact: true })
-      ).toBeVisible();
+      if (layout === 'desktop') {
+        await expect(
+          selected.getByRole('heading', { name: 'Events', exact: true })
+        ).toBeVisible();
+      }
 
       if (fixture.events === 'populated') {
-        if (fixture.layout === 'compact') {
+        if (layout === 'compact') {
           await expect(selected.getByTestId('tour-drawer-list')).toBeVisible();
         }
         await expect(
           selected.getByText(getUpcomingFixtureVenue(), { exact: true })
         ).toBeVisible();
-      } else if (fixture.layout === 'compact') {
+      } else if (layout === 'compact') {
         const empty = selected.getByTestId('profile-primary-tab-events-empty');
         await expect(empty).toBeVisible();
-        await expect(empty).toContainText('No upcoming shows');
+        await expect(empty).toContainText('No upcoming events');
       } else {
         await expect(selected).toContainText('No upcoming shows.');
       }
