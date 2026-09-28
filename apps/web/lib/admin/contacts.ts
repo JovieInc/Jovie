@@ -14,7 +14,7 @@ import {
 } from '@/lib/contacts/lifecycle';
 import { db, doesTableExist } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { contacts } from '@/lib/db/schema/contacts';
+import { contactStageTransitions, contacts } from '@/lib/db/schema/contacts';
 import { leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -519,4 +519,147 @@ export async function getCanonicalContacts(
 export async function getCanonicalContactMetrics(): Promise<CanonicalContactMetrics> {
   const { metrics } = await getCanonicalContacts({ page: 1, pageSize: 1 });
   return metrics;
+}
+
+export interface SetCanonicalContactStageParams {
+  dedupeKey: string;
+  toStage: ContactLifecycleStage;
+  actorUserId?: string | null;
+  actorType?: 'founder' | 'agent' | 'system';
+  reason?: string | null;
+  identity?: {
+    displayName?: string | null;
+    emailNormalized?: string | null;
+    primaryHandle?: string | null;
+    avatarUrl?: string | null;
+    userId?: string | null;
+    creatorProfileId?: string | null;
+    leadId?: string | null;
+    waitlistEntryId?: string | null;
+  };
+}
+
+/**
+ * Founder/agent stage change: upserts the canonical contact row and appends a
+ * transition to `contact_stage_transitions`, preserving full provenance.
+ */
+export async function setCanonicalContactStage(
+  params: SetCanonicalContactStageParams
+): Promise<{ ok: true; stage: ContactLifecycleStage } | { ok: false }> {
+  if (!(await doesTableExist('contacts'))) return { ok: false };
+
+  const now = new Date();
+  const [existing] = await db
+    .select()
+    .from(contacts)
+    .where(eq(contacts.dedupeKey, params.dedupeKey))
+    .limit(1);
+
+  const identity = params.identity ?? {};
+  const certifiedAt =
+    params.toStage === 'certified'
+      ? (existing?.certifiedAt ?? now)
+      : (existing?.certifiedAt ?? null);
+  const certifiedByUserId =
+    params.toStage === 'certified'
+      ? (params.actorUserId ?? existing?.certifiedByUserId ?? null)
+      : (existing?.certifiedByUserId ?? null);
+
+  let contactId: string;
+  if (existing) {
+    contactId = existing.id;
+    await db
+      .update(contacts)
+      .set({
+        displayName: identity.displayName ?? existing.displayName,
+        emailNormalized: identity.emailNormalized ?? existing.emailNormalized,
+        primaryHandle: identity.primaryHandle ?? existing.primaryHandle,
+        avatarUrl: identity.avatarUrl ?? existing.avatarUrl,
+        userId: identity.userId ?? existing.userId,
+        creatorProfileId:
+          identity.creatorProfileId ?? existing.creatorProfileId,
+        leadId: identity.leadId ?? existing.leadId,
+        waitlistEntryId: identity.waitlistEntryId ?? existing.waitlistEntryId,
+        stage: params.toStage,
+        stageEnteredAt: now,
+        stageSource: params.actorType ?? 'founder',
+        certifiedAt,
+        certifiedByUserId,
+        lastActivityAt: now,
+        updatedAt: now,
+      })
+      .where(eq(contacts.id, existing.id));
+  } else {
+    const [inserted] = await db
+      .insert(contacts)
+      .values({
+        dedupeKey: params.dedupeKey,
+        displayName: identity.displayName ?? null,
+        emailNormalized: identity.emailNormalized ?? null,
+        primaryHandle: identity.primaryHandle ?? null,
+        avatarUrl: identity.avatarUrl ?? null,
+        userId: identity.userId ?? null,
+        creatorProfileId: identity.creatorProfileId ?? null,
+        leadId: identity.leadId ?? null,
+        waitlistEntryId: identity.waitlistEntryId ?? null,
+        stage: params.toStage,
+        stageEnteredAt: now,
+        stageSource: params.actorType ?? 'founder',
+        certifiedAt,
+        certifiedByUserId,
+        firstSeenAt: now,
+        lastActivityAt: now,
+      })
+      .returning({ id: contacts.id });
+    contactId = inserted.id;
+  }
+
+  await db.insert(contactStageTransitions).values({
+    contactId,
+    dedupeKey: params.dedupeKey,
+    fromStage: existing?.stage ?? null,
+    toStage: params.toStage,
+    actorType: params.actorType ?? 'founder',
+    actorId: params.actorUserId ?? null,
+    source: 'admin_contacts',
+    reason: params.reason ?? null,
+  });
+
+  return { ok: true, stage: params.toStage };
+}
+
+export interface ContactStageTimelineItem {
+  id: string;
+  fromStage: ContactLifecycleStage | null;
+  toStage: ContactLifecycleStage;
+  actorType: string;
+  actorId: string | null;
+  source: string | null;
+  reason: string | null;
+  createdAt: Date;
+}
+
+/** Append-only transition history for one canonical person. */
+export async function getContactStageTimeline(
+  dedupeKey: string
+): Promise<ContactStageTimelineItem[]> {
+  if (!(await doesTableExist('contact_stage_transitions'))) return [];
+
+  const rows = await db
+    .select()
+    .from(contactStageTransitions)
+    .where(eq(contactStageTransitions.dedupeKey, dedupeKey))
+    .orderBy(desc(contactStageTransitions.createdAt))
+    .limit(200);
+
+  return rows.map(row => ({
+    id: row.id,
+    fromStage: row.fromStage,
+    toStage: row.toStage,
+    actorType: row.actorType,
+    actorId: row.actorId,
+    source: row.source,
+    reason: row.reason,
+    createdAt: row.createdAt,
+  }));
 }
