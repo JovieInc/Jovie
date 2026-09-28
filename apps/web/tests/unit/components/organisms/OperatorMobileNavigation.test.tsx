@@ -110,6 +110,9 @@ describe('OperatorMobileNavigation', () => {
     ).toHaveFocus();
 
     await user.tab();
+    expect(within(menu).getByRole('link', { name: 'Shipping' })).toHaveFocus();
+
+    await user.tab();
     expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
 
     await user.keyboard('{Escape}');

@@ -15,9 +15,11 @@ import { BASE_URL } from '@/constants/app';
 import { buildBreadcrumbObject } from '@/lib/constants/schemas';
 import { getProviderConfidence } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
+import { applyPlaylistContext } from '@/lib/discography/playlist-context';
 import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import { getListenPlaylistContext } from '@/lib/profile/featured-playlist-fallback-data';
 import {
   canonicalizeReleaseArtistCredits,
   canonicalizeReleaseCreditGroups,
@@ -105,6 +107,7 @@ export default async function TrackDeepLinkPage({
   await guardUnreleasedContent(track, creator.id);
 
   const effectiveProviderLinks = track.providerLinks;
+  const listenPlaylistContext = getListenPlaylistContext(creator.settings);
 
   // Build provider data for the landing page
   const allProviders = (Object.keys(PROVIDER_CONFIG) as ProviderKey[])
@@ -114,7 +117,7 @@ export default async function TrackDeepLinkPage({
         key,
         label: PROVIDER_CONFIG[key].label,
         accent: PROVIDER_CONFIG[key].accent,
-        url: link?.url ?? null,
+        url: applyPlaylistContext(key, link?.url, listenPlaylistContext),
         confidence: link ? getProviderConfidence(link) : 'unknown',
       };
     })
@@ -191,7 +194,15 @@ export default async function TrackDeepLinkPage({
 
       {!isUnreleased && (
         <PreferredDspRedirect
-          providerLinks={track.providerLinks}
+          providerLinks={track.providerLinks.map(link => ({
+            ...link,
+            url:
+              applyPlaylistContext(
+                link.providerId,
+                link.url,
+                listenPlaylistContext
+              ) ?? link.url,
+          }))}
           artistHandle={creator.usernameNormalized}
           tracking={{
             contentType: 'track',

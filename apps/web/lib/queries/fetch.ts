@@ -614,6 +614,14 @@ export class FetchPayloadLimitError extends FetchError {
 }
 
 /**
+ * True when a failed request was rejected with HTTP 403 (e.g. an admin
+ * endpoint hit without the passkey step-up on this session).
+ */
+export function isForbiddenError(error: unknown): boolean {
+  return error instanceof FetchError && error.status === 403;
+}
+
+/**
  * Create a query function with consistent error handling.
  * Use this to wrap fetch calls for TanStack Query.
  *
