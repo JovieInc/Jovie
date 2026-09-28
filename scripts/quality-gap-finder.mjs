@@ -720,7 +720,10 @@ export function collectRouteBudgetGaps(pages, budgetedPaths) {
   const missing = pages
     .map(routeFromPage)
     .filter(route => !NON_PUBLIC_ROUTE.test(route))
-    .filter(route => !route.includes('/_') && !/(?:-render|\/preview)(?:\/|$)/.test(route))
+    .filter(
+      route =>
+        !route.includes('/_') && !/(?:-render|\/preview)(?:\/|$)/.test(route)
+    )
     .filter(route => !budgetedPaths.has(route));
   const groups = new Map();
   for (const route of [...new Set(missing)].sort()) {
@@ -849,7 +852,7 @@ async function linearQuery(query, variables, apiKey, fetchImpl = fetch) {
     body: JSON.stringify({ query, variables }),
     signal: AbortSignal.timeout(15_000),
   });
-  const body = await response.json();
+  const body = /** @type {any} */ (await response.json());
   if (!response.ok || body.errors?.length) {
     throw new Error(
       `Linear query failed (${response.status}): ${JSON.stringify(body.errors ?? body).slice(0, 300)}`
