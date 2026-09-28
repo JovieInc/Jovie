@@ -11,6 +11,7 @@ import {
   CHAT_EMPTY_VIEWPORT_CLASSNAME,
   ChatComposerSurface,
   ChatEmptyStateComposerRegion,
+  ChatInlineError,
   ChatLoadingConversationSkeleton,
   ChatThreadMessages,
 } from './JovieChatSections';
@@ -121,6 +122,45 @@ describe('JovieChatSections', () => {
     expect(
       screen.getByRole('button', { name: 'Composer' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('ChatInlineError', () => {
+  const chatError = {
+    type: 'server' as const,
+    message: 'We encountered a temporary issue. Please try again.',
+    failedMessage: 'What matters now?',
+  };
+
+  function renderInlineError(chatMode?: 'ov') {
+    return render(
+      <ChatInlineError
+        chatError={chatError}
+        onRetry={vi.fn()}
+        isLoading={false}
+        isSubmitting={false}
+        chatMode={chatMode}
+      />
+    );
+  }
+
+  it('uses the default paused-message presentation outside ov mode', () => {
+    renderInlineError();
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Message paused');
+    expect(alert).not.toHaveTextContent('Summer Didn’t Finish That Reply');
+  });
+
+  it('uses the operator presentation in ov chat mode', () => {
+    renderInlineError('ov');
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Summer Didn’t Finish That Reply');
+    expect(alert).toHaveTextContent(
+      'Your briefing is still current. Retry this message or ask something else.'
+    );
+    expect(alert).not.toHaveTextContent('Message paused');
   });
 });
 

@@ -214,6 +214,33 @@ describe('jovie CLI', () => {
     expect(invalid.read()).toContain('--full is only supported by docs llms');
   });
 
+  it('reports a missing command argument instead of an unknown command', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+
+    await expect(
+      runCli(['artist', 'get', '--json'], {
+        stdout: stdout.output,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(JSON.parse(stdout.read())).toEqual({
+      error: {
+        code: 'USAGE_ERROR',
+        message: 'Missing required argument <username> for artist get',
+      },
+    });
+
+    const text = createOutput();
+    await expect(
+      runCli(['profile', 'create'], { stderr: text.output })
+    ).resolves.toBe(2);
+    expect(text.read()).toContain(
+      'Missing required argument <url> for profile create'
+    );
+    expect(text.read()).not.toContain('Unknown command');
+  });
+
   it('rejects malformed parser options and unsafe base URLs', async () => {
     const parserError = createOutput();
     await expect(

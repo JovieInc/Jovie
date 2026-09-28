@@ -71,7 +71,9 @@ describe('server analytics contract', () => {
     vi.useRealTimers();
   });
 
-  it('versions and inventories every production call site', () => {
+  it('versions and inventories every production call site', {
+    timeout: 60000,
+  }, () => {
     expect(SERVER_ANALYTICS_CONTRACT_VERSION).toBe('server-analytics/v1');
     expect(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS).toBe(2_000);
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(

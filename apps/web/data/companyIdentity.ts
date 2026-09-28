@@ -10,7 +10,7 @@
  */
 export const COMPANY_IDENTITY = {
   productName: 'Jovie',
-  headline: 'Presence, Relationships, And Growth.',
+  headline: 'Presence, relationships, and growth.',
   support:
     'One product for artists, founders, authors, creators, and independent experts.',
   definition:
