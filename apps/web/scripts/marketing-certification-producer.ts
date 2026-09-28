@@ -83,14 +83,36 @@ export function runVitest(args: readonly string[]): VitestJson | null {
     : null;
 }
 
-/** Entries whose canonical source is among the changed repo paths. */
-export function affectedEntries(
-  entries: readonly MarketingRegistryEntry[],
-  changedRepoPaths: readonly string[]
-): MarketingRegistryEntry[] {
+/**
+ * An entry's evidence depends on its canonical source, its declared tests and
+ * its story. A change to any of them invalidates the certificate, so all of
+ * them select the entry for re-evaluation (repo-relative paths).
+ */
+export function affectedEntries<
+  T extends { readonly dependencies: readonly string[] },
+>(plans: readonly T[], changedRepoPaths: readonly string[]): T[] {
   const changed = new Set(changedRepoPaths);
-  return entries.filter(
-    entry => entry.resolvedSource && changed.has(entry.resolvedSource)
+  return plans.filter(plan =>
+    plan.dependencies.some(path => changed.has(path))
+  );
+}
+
+/**
+ * Tests that certify an entry: its sibling `.test.tsx` and every existing
+ * `@coverage-via <path>` target the source declares (the convention the
+ * component ship gate already honors). Repo-relative.
+ */
+export function testFilesFor(
+  resolvedSource: string,
+  source: string,
+  exists: (repoPath: string) => boolean
+): string[] {
+  const sibling = resolvedSource.replace(/\.tsx?$/u, '.test.tsx');
+  const declared = [...source.matchAll(/@coverage-via\s+(\S+)/gu)].map(
+    match => match[1] ?? ''
+  );
+  return [...new Set([sibling, ...declared])].filter(
+    path => path.length > 0 && exists(path)
   );
 }
 
@@ -174,7 +196,7 @@ export function buildPacket(input: {
   readonly penIssueIds: ReadonlySet<string>;
   readonly invariants: VitestJson | null;
   readonly ownTests: VitestJson | null;
-  readonly ownTestFile: string | null;
+  readonly ownTestFiles: readonly string[];
   readonly stories: VitestJson | null;
   readonly story: { readonly path: string; readonly storyName: string } | null;
   readonly sourceDigest: string | null;
@@ -195,9 +217,23 @@ export function buildPacket(input: {
     : invariantStatuses.includes('failed')
       ? 'failed'
       : 'missing';
-  const tests = input.ownTestFile
-    ? vitestEvidence(input.ownTests, input.ownTestFile)
-    : { status: 'missing' as const, evidence: null };
+  const testResults = input.ownTestFiles.map(file =>
+    vitestEvidence(input.ownTests, file)
+  );
+  const tests: { status: CertificationEvidenceStatus; evidence: unknown } =
+    testResults.length === 0 || testResults.some(r => r.status === 'missing')
+      ? {
+          status: testResults.some(r => r.status === 'failed')
+            ? 'failed'
+            : 'missing',
+          evidence: null,
+        }
+      : {
+          status: testResults.every(r => r.status === 'passed')
+            ? 'passed'
+            : 'failed',
+          evidence: testResults.map(r => r.evidence),
+        };
   const visual = input.story
     ? vitestEvidence(
         input.stories,
@@ -255,9 +291,9 @@ export function buildPacket(input: {
         testsStatus,
         sha,
         runRef,
-        input.ownTestFile
-          ? `${input.ownTestFile}: ${testsStatus}.`
-          : 'No sibling unit test for the canonical source.',
+        input.ownTestFiles.length > 0
+          ? `${input.ownTestFiles.join(', ')}: ${testsStatus}.`
+          : 'No sibling or @coverage-via unit test for the canonical source.',
         tests.evidence
       ),
     ],
@@ -296,40 +332,43 @@ async function main() {
   const changed = values.changed
     ? readFileSync(values.changed, 'utf8').split('\n').filter(Boolean)
     : [];
-  const entries = values.all
-    ? MARKETING_COMPONENT_REGISTRY.filter(entry => entry.resolvedSource)
-    : affectedEntries(MARKETING_COMPONENT_REGISTRY, changed);
-  if (entries.length === 0) {
-    console.log('[marketing-cert] no registry entry affected');
-    return;
-  }
-
   const storyFiles = listStoryFiles(join(WEB_ROOT, 'components')).map(path => ({
     path: relative(WEB_ROOT, path),
     title: /title:\s*'([^']+)'/u.exec(readFileSync(path, 'utf8'))?.[1] ?? '',
   }));
-  const plan = entries.map(entry => {
-    const ownTest =
-      entry.resolvedSource?.replace(/\.tsx?$/u, '.test.tsx') ?? null;
-    return {
-      entry,
-      story: storyFileFor(entry.storybookTitle, storyFiles),
-      ownTestFile:
-        ownTest && existsSync(join(REPO_ROOT, ownTest))
-          ? webRelative(ownTest)
-          : null,
-    };
+  const plans = MARKETING_COMPONENT_REGISTRY.flatMap(entry => {
+    if (!entry.resolvedSource) return [];
+    const sourcePath = join(REPO_ROOT, entry.resolvedSource);
+    const tests = testFilesFor(
+      entry.resolvedSource,
+      existsSync(sourcePath) ? readFileSync(sourcePath, 'utf8') : '',
+      path => existsSync(join(REPO_ROOT, path))
+    );
+    const story = storyFileFor(entry.storybookTitle, storyFiles);
+    return [
+      {
+        entry,
+        story,
+        ownTestFiles: tests.map(webRelative),
+        dependencies: [
+          entry.resolvedSource,
+          ...tests,
+          ...(story ? [`apps/web/${story.path}`] : []),
+        ],
+      },
+    ];
   });
+  const plan = values.all ? plans : affectedEntries(plans, changed);
+  if (plan.length === 0) {
+    console.log('[marketing-cert] no registry entry affected');
+    return;
+  }
 
   const penIssueIds = new Set(
     validateMarketingPenRegistry().map(issue => issue.id)
   );
   const invariants = runVitest(INVARIANT_SUITES);
-  const ownTestFiles = [
-    ...new Set(
-      plan.flatMap(item => (item.ownTestFile ? [item.ownTestFile] : []))
-    ),
-  ];
+  const ownTestFiles = [...new Set(plan.flatMap(item => item.ownTestFiles))];
   const ownTests = ownTestFiles.length > 0 ? runVitest(ownTestFiles) : null;
   const storyPaths = [
     ...new Set(plan.flatMap(item => (item.story ? [item.story.path] : []))),

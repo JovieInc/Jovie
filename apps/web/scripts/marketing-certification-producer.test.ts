@@ -5,6 +5,7 @@ import {
   affectedEntries,
   buildPacket,
   storyFileFor,
+  testFilesFor,
 } from './marketing-certification-producer';
 
 const SHA = 'b'.repeat(40);
@@ -50,7 +51,7 @@ function packetFor(overrides: Partial<Parameters<typeof buildPacket>[0]> = {}) {
       'renders',
       'passed'
     ),
-    ownTestFile: 'components/site/MarketingFooter.test.tsx',
+    ownTestFiles: ['components/site/MarketingFooter.test.tsx'],
     stories: report(
       'components/marketing/storybook/MarketingShells.stories.tsx',
       'MarketingFooter',
@@ -66,17 +67,35 @@ function packetFor(overrides: Partial<Parameters<typeof buildPacket>[0]> = {}) {
 }
 
 describe('marketing certification producer', () => {
-  it('selects only entries whose repo-relative canonical source changed', () => {
-    const picked = affectedEntries(MARKETING_COMPONENT_REGISTRY, [
-      footer.resolvedSource!,
-      'README.md',
-    ]);
-    expect(picked.map(entry => entry.id)).toEqual(['shell.footer']);
+  it('selects entries whose source, declared tests or story changed', () => {
+    const plans = [
+      { id: 'a', dependencies: ['apps/web/a.tsx', 'apps/web/a.test.tsx'] },
+      { id: 'b', dependencies: ['apps/web/b.tsx', 'apps/web/b.stories.tsx'] },
+    ];
     expect(
-      affectedEntries(MARKETING_COMPONENT_REGISTRY, [
-        'components/site/MarketingFooter.tsx',
-      ])
-    ).toEqual([]);
+      affectedEntries(plans, ['apps/web/a.test.tsx']).map(p => p.id)
+    ).toEqual(['a']);
+    expect(
+      affectedEntries(plans, ['apps/web/b.stories.tsx', 'README.md']).map(
+        p => p.id
+      )
+    ).toEqual(['b']);
+    expect(affectedEntries(plans, ['a.tsx'])).toEqual([]);
+  });
+
+  it('certifies with the sibling test plus declared @coverage-via targets', () => {
+    const source =
+      '// @coverage-via apps/web/tests/unit/x.test.ts\n// @coverage-via apps/web/tests/unit/gone.test.ts\nexport {};';
+    const existing = new Set([
+      'apps/web/c/X.test.tsx',
+      'apps/web/tests/unit/x.test.ts',
+    ]);
+    expect(
+      testFilesFor('apps/web/c/X.tsx', source, p => existing.has(p))
+    ).toEqual(['apps/web/c/X.test.tsx', 'apps/web/tests/unit/x.test.ts']);
+    expect(testFilesFor('apps/web/c/Y.tsx', 'export {};', () => false)).toEqual(
+      []
+    );
   });
 
   it('resolves a story from its meta title plus story name', () => {
@@ -105,7 +124,7 @@ describe('marketing certification producer', () => {
   });
 
   it('never reports missing or failed evidence as passed', () => {
-    const noTest = packetFor({ ownTestFile: null, ownTests: null });
+    const noTest = packetFor({ ownTestFiles: [], ownTests: null });
     expect(noTest.testsCoverage[0].status).toBe('missing');
     const brokenStory = packetFor({
       stories: report(
