@@ -125,7 +125,7 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
     claims: [
       {
         id: 'free-forever',
-        statement: 'Artist profiles are free forever at $0.',
+        statement: 'Jovie profiles are free forever at $0.',
         evidence: [PRICING_EVIDENCE.freeTruth, PRICING_EVIDENCE.freePrice],
       },
       {
@@ -292,12 +292,12 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-hero-v1',
         controlHeadline: 'Plans and pricing',
         headline: 'Pricing',
-        body: 'Artist profiles are free forever. Artist Visibility Pro is $199/month with limited access.',
+        body: 'Jovie profiles are free forever. Artist Visibility Pro is $199/month with limited access.',
         supportingText: [
           'Claim my free profile',
           'Explore Artist Profiles',
           'Profile',
-          'Public artist profile and audience capture',
+          'Public Jovie profile and audience capture',
           'Claim profile same day.',
         ],
         claimIds: ['free-forever', 'pro-price'],
@@ -321,7 +321,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
           'Free forever',
           '$0',
           'Claim my free profile',
-          'Public artist profile and audience capture',
+          'Public Jovie profile and audience capture',
         ],
         claimIds: ['free-forever'],
         lineBindings: [
@@ -343,7 +343,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
           'Limited access',
           '$199/mo',
           'Request access',
-          'Public artist profile and audience capture',
+          'Public Jovie profile and audience capture',
         ],
         claimIds: ['pro-price'],
         lineBindings: [
@@ -376,7 +376,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-compare-v1',
         controlHeadline: 'Feature comparison',
         headline: 'Compare All Features',
-        body: 'Public artist profile and audience capture.',
+        body: 'Public Jovie profile and audience capture.',
         claimIds: ['free-forever'],
         lineBindings: [
           ['headline', { outcome: 'choose-plan' }],
