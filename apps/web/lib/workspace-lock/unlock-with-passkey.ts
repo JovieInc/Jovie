@@ -18,6 +18,8 @@ const STEP_UP_STATUS_PATH = '/api/admin/step-up-status';
 export type PasskeyStepUpErrorCode =
   | 'unsupported'
   | 'timeout'
+  | 'cancelled'
+  | 'setup-required'
   | 'admin-factor-missing'
   | 'unconfirmed';
 
@@ -41,6 +43,52 @@ const ADMIN_FACTOR_MISSING_MESSAGE =
   'That passkey can sign you in but cannot unlock admin access. Use the passkey you set up first.';
 const UNCONFIRMED_MESSAGE =
   'Could not confirm the unlock. Check your connection and try again.';
+const ENROLLMENT_CANCELLED_MESSAGE =
+  'Passkey setup was canceled before it finished, so no passkey was saved. Try again, or choose a different authenticator.';
+const SIGN_IN_CANCELLED_MESSAGE =
+  'The passkey prompt was canceled. Try again to unlock.';
+const SETUP_REQUIRED_MESSAGE =
+  'The passkey offered by your password manager is not registered to this account. Try again to set up a new passkey, or choose a different authenticator.';
+
+/**
+ * Provider codes for an authenticator abort before verified registration.
+ * SimpleWebAuthn 13 passes user dismissals (NotAllowedError — the 1Password
+ * cancel path) through as ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY rather than a
+ * dedicated cancel code, so it maps to the same recoverable state.
+ */
+const CANCELLED_CODES = new Set([
+  'AUTH_CANCELLED',
+  'ERROR_CEREMONY_ABORTED',
+  'REGISTRATION_CANCELLED',
+  'ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY',
+]);
+/**
+ * The authenticator answered, but the server has no such credential — the
+ * phantom state from a canceled enrollment (JOV-6892). Reconcile against
+ * `listUserPasskeys` before claiming a passkey exists.
+ */
+const UNREGISTERED_CREDENTIAL_CODES = new Set([
+  'PASSKEY_NOT_FOUND',
+  'AUTHENTICATION_FAILED',
+]);
+
+type PasskeyError = { code?: string; message?: string } | null | undefined;
+
+function passkeyErrorCode(error: unknown): string | null {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  return typeof code === 'string' && code.length > 0 ? code : null;
+}
+
+function toStepUpError(
+  error: PasskeyError,
+  cancelledMessage: string
+): PasskeyStepUpError | Error {
+  const code = passkeyErrorCode(error);
+  if (code && CANCELLED_CODES.has(code)) {
+    return new PasskeyStepUpError('cancelled', cancelledMessage);
+  }
+  return new Error(error?.message || 'Passkey check did not complete.');
+}
 
 /** E2E hook (`__JOVIE_*` convention) so specs do not wait 90s. */
 function stepUpTimeoutMs(): number {
@@ -154,11 +202,33 @@ export async function unlockWithPasskey(): Promise<void> {
     const added = await withTimeout(
       authClient.passkey.addPasskey({ name: 'Ovie' })
     );
-    if (added?.error) throw new Error(added.error.message);
+    // Better Auth writes the passkey row only after verified registration,
+    // so a canceled/aborted ceremony (e.g. dismissing the 1Password prompt)
+    // must never be projected as a saved credential (JOV-6892). Treat a
+    // data-less result — error or not — as an aborted enrollment.
+    if (added?.error || !added?.data) {
+      throw added?.error
+        ? toStepUpError(added.error, ENROLLMENT_CANCELLED_MESSAGE)
+        : new PasskeyStepUpError('cancelled', ENROLLMENT_CANCELLED_MESSAGE);
+    }
   }
 
   const signedIn = await withTimeout(authClient.signIn.passkey());
-  if (signedIn?.error) throw new Error(signedIn.error.message);
+  if (signedIn?.error) {
+    const code = passkeyErrorCode(signedIn.error);
+    if (code && UNREGISTERED_CREDENTIAL_CODES.has(code)) {
+      // The authenticator offered a credential the server never registered
+      // (kept locally after a canceled enrollment). Reconcile against the
+      // authoritative server list before claiming a usable passkey.
+      const reconciled = await withTimeout(
+        authClient.passkey.listUserPasskeys()
+      );
+      if ((reconciled.data ?? []).length === 0) {
+        throw new PasskeyStepUpError('setup-required', SETUP_REQUIRED_MESSAGE);
+      }
+    }
+    throw toStepUpError(signedIn.error, SIGN_IN_CANCELLED_MESSAGE);
+  }
 
   await assertStepUpActive();
 }
