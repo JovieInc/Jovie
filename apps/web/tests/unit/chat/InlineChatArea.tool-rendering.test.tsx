@@ -534,3 +534,19 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(screen.getByText('Audience summary complete.')).toBeDefined();
   });
 });
+
+describe('InlineChatArea virtualized transcript under React Compiler', () => {
+  it('opts the virtualizer owner out of memoization (JOV-6702)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/dashboard/organisms/InlineChatArea.tsx'
+      ),
+      'utf8'
+    );
+    const body = source.slice(source.indexOf('export const InlineChatArea'));
+    expect(body.slice(0, body.indexOf('useVirtualizer('))).toContain(
+      "'use no memo';"
+    );
+  });
+});

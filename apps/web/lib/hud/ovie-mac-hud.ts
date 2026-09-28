@@ -1,3 +1,7 @@
+import {
+  composeDecisionHudView,
+  type DecisionHudView,
+} from '@/lib/hud/decision-signals';
 import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
 
 export const YC_EXCEPTIONAL_GROWTH = 0.1;
@@ -84,6 +88,8 @@ export type OvieMacHudSnapshot = {
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  /** JOV-5924 decision-value ranking view; absent in older fixtures/tests. */
+  decisionHud?: DecisionHudView;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
@@ -529,10 +535,11 @@ export function composeOvieMacHudSnapshot(input: {
   growth: OvieMacHudGrowthInput;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
+  decisionExtras?: import('@/lib/hud/decision-signals').DecisionHudExtras;
   lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 }): OvieMacHudSnapshot {
-  return {
+  const snapshot: OvieMacHudSnapshot = {
     alive: computeDefaultAlive(input.alive),
     growth: computeWowGrowth(input.growth),
     shipping: input.shipping,
@@ -542,4 +549,11 @@ export function composeOvieMacHudSnapshot(input: {
     ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };
+  if (input.decisionExtras !== undefined) {
+    snapshot.decisionHud = composeDecisionHudView(
+      snapshot,
+      input.decisionExtras
+    );
+  }
+  return snapshot;
 }

@@ -225,6 +225,8 @@ export function ChatThreadMessages({
   onScrollToBottom,
   conversationId,
 }: ChatThreadMessagesProps) {
+  // Reads live `virtualizer` state each render; see JovieChat (JOV-6702).
+  'use no memo';
   const renderMessage = (message: ChatThreadMessage, index: number) => {
     const isThinking =
       message.role === 'assistant' && message.status === 'pending';
