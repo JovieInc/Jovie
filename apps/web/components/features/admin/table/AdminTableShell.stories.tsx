@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { AdminTableShell } from './AdminTableShell';
 
+const DEMO_ROWS = Array.from({ length: 40 }, (_, i) => `Row ${i + 1}`);
+
 const meta = {
   title: 'Features/Admin/AdminTableShell',
   component: AdminTableShell,
@@ -17,12 +19,12 @@ const meta = {
         <p className='text-xs text-tertiary-token'>
           headerElevated: {String(headerElevated)} · stickyTopPx: {stickyTopPx}
         </p>
-        {Array.from({ length: 40 }, (_, i) => (
+        {DEMO_ROWS.map(row => (
           <div
-            key={i}
+            key={row}
             className='rounded-md border border-subtle px-3 py-2 text-sm'
           >
-            Row {i + 1}
+            {row}
           </div>
         ))}
       </div>
