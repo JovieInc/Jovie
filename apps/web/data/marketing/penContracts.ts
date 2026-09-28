@@ -31,6 +31,11 @@ export const MARKETING_PEN_CONTRACT_IDS = {
     capture: 'Nqx7t',
     monetization: 'F3grtS',
     contentProse: 'hRysI',
+    /**
+     * Pen registry entry `y8oKXI` ("Registry Entry / CTA") points at design
+     * owner `K4ar1`. The footer/final CTA shells stay adapters under it.
+     */
+    cta: 'y8oKXI',
   },
   recipe: {
     homepage: 'oPZHQ',

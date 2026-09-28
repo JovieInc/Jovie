@@ -326,7 +326,7 @@ export function ChangelogTimeline({
                 );
               }}
             >
-              Read More — {nextBatchCount} Update
+              Show {nextBatchCount} More Update
               {nextBatchCount === 1 ? '' : 's'}
             </Button>
           )}

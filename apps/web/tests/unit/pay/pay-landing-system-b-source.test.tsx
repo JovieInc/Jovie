@@ -46,11 +46,13 @@ describe('pay landing System B source contract', () => {
       'pay-hero-heading'
     );
     expect(
-      screen.getByRole('heading', { name: /turn every payment into a fan/i })
+      screen.getByRole('heading', {
+        name: /turn every payment into a follower/i,
+      })
     ).toHaveAttribute('id', 'pay-hero-heading');
 
     const finalHeading = screen.getByRole('heading', {
-      name: /start turning payments into fans/i,
+      name: /start turning payments into followers/i,
     });
     const finalSection = finalHeading.closest('section');
 
@@ -69,5 +71,17 @@ describe('pay landing System B source contract', () => {
       'a[href], button, input:not([type="hidden"]), select, textarea, [role="button"], [role="link"], [role="textbox"]'
     );
     expect(finalControls).toHaveLength(2);
+  });
+
+  it('bleeds the hero glow under the docked header without moving the copy', () => {
+    render(<PayLanding />);
+
+    const dock = screen.getByTestId('pay-hero').parentElement;
+    expect(dock?.tagName).toBe('SECTION');
+    expect(dock).toHaveClass(
+      'marketing-hero-dock',
+      'marketing-hero-dock--inset'
+    );
+    expect(dock?.querySelector(':scope > .hero-glow')).not.toBeNull();
   });
 });

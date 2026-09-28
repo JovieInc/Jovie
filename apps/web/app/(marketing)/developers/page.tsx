@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
+import '@/components/marketing/MarketingRouteHero.css';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
@@ -9,16 +11,16 @@ import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Developers — ${APP_NAME}`,
+  title: `Developers - ${APP_NAME}`,
   description:
-    'Use Jovie’s public, anonymous, read-only artist API and machine-readable site resources.',
+    'Jovie’s public, anonymous, read-only artist API pairs with machine-readable site resources.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
   },
   openGraph: {
-    title: `Developers — ${APP_NAME}`,
+    title: `Developers - ${APP_NAME}`,
     description:
-      'Use Jovie’s public, anonymous, read-only artist API and machine-readable site resources.',
+      'Jovie’s public, anonymous, read-only artist API pairs with machine-readable site resources.',
     url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
     type: 'website',
   },
@@ -32,40 +34,45 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
 const RESOURCE_LINKS = [
   {
     href: '/api/v1',
-    label: 'Public API capability index',
+    label: 'Public API Capability Index',
     description:
       'A stable, non-enumerating 200 response describing the anonymous read-only API.',
   },
   {
     href: '/openapi.json',
+    // "OpenAPI" is a fixed technical spec name the casing linter can't
+    // validate; kept identical to the matching, test-pinned link text on
+    // /api-versioning (ui-casing-allow: fixed technical spec name)
     label: 'OpenAPI 3.1 contract',
     description: 'The machine-readable contract for the public artist API.',
   },
   {
     href: '/cli',
-    label: 'Read-only Jovie CLI',
+    label: 'Jovie CLI and MCP server',
     description:
-      'Anonymous, read-only `jovie` commands for the public artist GET routes.',
+      'Anonymous `jovie` commands for agents: read public artist data and create claimable artist profiles.',
   },
   {
     href: '/api-versioning',
-    label: 'API versioning and deprecation policy',
+    label: 'API Versioning And Deprecation Policy',
     description:
+      // "Deprecation" and "Sunset" are the literal RFC 9745/8594 HTTP header
+      // names (ui-casing-allow: literal HTTP header names)
       'Active v1 lifecycle boundary, additive versus breaking changes, and future Deprecation and Sunset signals.',
   },
   {
     href: '/llms.txt',
-    label: 'llms.txt',
+    label: 'llms.txt', // ui-casing-allow: literal, case-sensitive filename; also asserted verbatim by page.test.tsx
     description: 'A concise guide to Jovie’s public site and agent surfaces.',
   },
   {
     href: '/llms-full.txt',
-    label: 'llms-full.txt',
+    label: 'llms-full.txt', // ui-casing-allow: literal, case-sensitive filename; also asserted verbatim by page.test.tsx
     description: 'The expanded version of the site guide.',
   },
   {
-    href: DOCS_URL,
-    label: 'Jovie docs',
+    href: `${DOCS_URL}/docs/developers`,
+    label: 'Jovie Docs',
     description: 'Product help and getting-started guidance.',
   },
 ] as const;
@@ -75,30 +82,58 @@ export default function DevelopersPage() {
     <>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
-      <MarketingHero variant='left'>
-        <p className='text-sm font-medium text-tertiary-token'>Developers</p>
-        <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'>
-          Public artist data, in the open.
-        </h1>
-        <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
-          Read public artist profiles, releases, events, and merch with
-          Jovie&apos;s anonymous, read-only API. Start with the contract, then
-          follow the links returned for each artist.
-        </p>
-        <div className='mt-8 flex flex-wrap gap-3'>
-          <Link
-            href='/openapi.json'
-            className='rounded-full bg-btn-primary px-5 py-3 text-sm font-medium text-btn-primary-foreground transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-          >
-            Read the OpenAPI contract
-          </Link>
-          <Link
-            href='/llms.txt'
-            className='rounded-full border border-subtle px-5 py-3 text-sm font-medium text-primary-token transition-colors hover:border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-          >
-            Read llms.txt
-          </Link>
+      <MarketingHero
+        variant='unstyled'
+        headingId='developers-hero-heading'
+        testId='developers-hero'
+        className='marketing-hero-dock marketing-hero-dock--inset relative w-full overflow-hidden pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32'
+      >
+        <div className='marketing-route-hero__media' aria-hidden='true'>
+          <Image
+            src='/images/hero/developers-hero.webp'
+            alt=''
+            fill
+            sizes='100vw'
+            priority
+          />
         </div>
+        <div className='marketing-route-hero__scrim' aria-hidden='true' />
+        <div
+          className='marketing-route-hero__accent marketing-route-hero__accent--purple'
+          aria-hidden='true'
+        />
+        <MarketingContainer
+          width='page'
+          className='marketing-route-hero__content'
+        >
+          <p className='text-sm font-medium text-tertiary-token'>Developers</p>
+          <h1
+            id='developers-hero-heading'
+            className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'
+          >
+            {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
+            Public artist data, in the open.
+          </h1>
+          <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
+            Read public artist profiles, releases, events, and merch with
+            Jovie&apos;s anonymous, read-only API. Start with the contract, then
+            follow the links returned for each artist.
+          </p>
+          <div className='mt-8 flex flex-wrap gap-3'>
+            <Link
+              href='/openapi.json'
+              className='rounded-full bg-btn-primary px-5 py-3 text-sm font-medium text-btn-primary-foreground transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            >
+              Read the OpenAPI contract
+            </Link>
+            <Link
+              href='/llms.txt'
+              className='rounded-full border border-subtle px-5 py-3 text-sm font-medium text-primary-token transition-colors hover:border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            >
+              Read llms.txt
+            </Link>
+          </div>
+        </MarketingContainer>
       </MarketingHero>
 
       <MarketingContainer width='prose' className='pb-20 sm:pb-28'>
@@ -130,6 +165,7 @@ export default function DevelopersPage() {
               id='agent-quickstart-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
+              {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
               Agent quickstart
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
@@ -163,6 +199,7 @@ export default function DevelopersPage() {
               id='resources-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
+              {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
               Machine-readable resources
             </h2>
             <ul className='mt-6 grid gap-6 sm:grid-cols-2'>
@@ -187,6 +224,7 @@ export default function DevelopersPage() {
               id='scope-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
+              {/* ui-casing-allow: marketing headline, sentence case per DESIGN.md */}
               Public by design
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
@@ -200,7 +238,7 @@ export default function DevelopersPage() {
               Profile requests are limited to 100 per client IP in a fixed
               60-second window. Read the{' '}
               <Link
-                href={`${DOCS_URL}/docs/api-reference`}
+                href={`${DOCS_URL}/docs/developers/api-reference`}
                 className='text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               >
                 API reference

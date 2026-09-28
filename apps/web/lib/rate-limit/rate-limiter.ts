@@ -140,22 +140,6 @@ export class RateLimiter {
         ? createRedisRateLimiter(config)
         : null;
     this.memoryLimiter = new MemoryRateLimiter(config);
-
-    // Warn loudly if falling back to in-memory in production — rate limits
-    // stored in memory reset on every Vercel deploy and don't share state
-    // across instances, making them effectively useless in production.
-    // Mandatory limiters never take that path; do not claim they do.
-    if (
-      this.storeKind === 'upstash' &&
-      this.options.preferRedis &&
-      !this.redisLimiter &&
-      this.options.warnOnFallback &&
-      !this.options.requireRedis
-    ) {
-      const message = `[RateLimit:${config.name}] Redis unavailable, using in-memory fallback — rate limits will reset on deploy`;
-      console.error(message);
-      this.options.logger(message);
-    }
   }
 
   /**

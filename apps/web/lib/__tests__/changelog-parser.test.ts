@@ -569,3 +569,61 @@ describe('parseChangelogInline', () => {
     ]);
   });
 });
+
+describe('### Dogfood section', () => {
+  const DOGFOOD_CHANGELOG = `# Changelog
+
+## [3.0.0] - 2026-09-01
+
+### Fixed
+
+- Sign-in recovers after a canceled prompt
+
+### Dogfood
+
+- Open the Mac app and wait for the What's New banner
+- [internal] Check the staging flag
+
+## [2.9.0] - 2026-08-01
+
+### Dogfood
+
+- Only a hint, no customer entries
+`;
+
+  it('collects public dogfood bullets without adding customer entries', () => {
+    const [release] = parseChangelog(DOGFOOD_CHANGELOG);
+    expect(release?.version).toBe('3.0.0');
+    expect(release?.sections.fixed).toEqual([
+      'Sign-in recovers after a canceled prompt',
+    ]);
+    expect(release?.dogfood).toEqual([
+      "Open the Mac app and wait for the What's New banner",
+    ]);
+  });
+
+  it('never publishes a release that only has dogfood bullets', () => {
+    expect(parseChangelog(DOGFOOD_CHANGELOG).map(r => r.version)).toEqual([
+      '3.0.0',
+    ]);
+  });
+
+  it('keeps dogfood bullets out of the email parser sections', async () => {
+    const script = (await import(
+      pathToFileURL(
+        resolve(
+          dirname(fileURLToPath(import.meta.url)),
+          '../../../../scripts/lib/changelog-parser.mjs'
+        )
+      ).href
+    )) as {
+      parseChangelog: (markdown: string) => {
+        releases: { sections: Record<string, string[]> }[];
+      };
+    };
+    const [release] = script.parseChangelog(DOGFOOD_CHANGELOG).releases;
+    expect(release?.sections).toEqual({
+      fixed: ['Sign-in recovers after a canceled prompt'],
+    });
+  });
+});

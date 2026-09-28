@@ -54,6 +54,7 @@ export type PixelEventData = z.infer<typeof pixelEventDataSchema>;
 export const pixelEventPayloadSchema = z.object({
   profileId: z.string().uuid(),
   sessionId: z.string().min(1).max(100),
+  acquisitionId: z.string().uuid().optional(),
   eventType: pixelEventTypeSchema,
   eventData: pixelEventDataSchema.optional(),
   consent: z.boolean(),

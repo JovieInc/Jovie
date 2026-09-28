@@ -29,11 +29,9 @@ import {
 } from '@/lib/ovie/shipping-state';
 import {
   createLiveShippingStateReaders,
-  isAllowlistedAuthorityPath,
-  NAMED_AUTHORITY_PATHS,
+  NAMED_AUTHORITY_URLS,
   readMergeQueue,
   readWorkflow,
-  resolveNamedAuthorityPath,
 } from '@/lib/ovie/shipping-state/live';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -85,22 +83,28 @@ function failed(
   };
 }
 
+function lanes(idle: number, running = 7): Record<string, unknown> {
+  return { schema: 'symphony-lanes-status/v1', running, idle };
+}
+
 function baseline(
   overrides: Partial<Record<ShippingSourceId, AuthorityRead>> = {}
 ): Partial<Record<ShippingSourceId, AuthorityRead>> {
   return {
-    'symphony-runtime': ok('symphony-runtime', {
-      running: [],
-      retrying: [],
-      blocked: [],
+    'lanes-status': ok('lanes-status', {
+      schema: 'symphony-lanes-status/v1',
+      running: 7,
+      idle: 2,
     }),
-    'symphony-task': ok('symphony-task', {
-      running: [],
-      retrying: [],
-      blocked: [],
-    }),
-    'lease-guard-capacity': ok('lease-guard-capacity', {
-      capacity: { available: 2, accounts: 4, locked: 1, cooldown: 1 },
+    'lane-pull-requests': ok('lane-pull-requests', { pullRequests: [] }),
+    'github-merges': ok(
+      'github-merges',
+      { today: 0 },
+      { measuredMeanings: { merged: false } }
+    ),
+    'summer-runtime': ok('summer-runtime', {
+      identity: 'summer',
+      availability: 'up',
     }),
     'github-native-merge-queue': ok('github-native-merge-queue', {
       entries: [],
@@ -129,11 +133,6 @@ function baseline(
         measuredMeanings: { exactLiveBuild: true },
       }
     ),
-    'fleet-receipt': ok(
-      'fleet-receipt',
-      { state: 'GREEN', signals: { main: { sha: SHA } } },
-      { measuredMeanings: { merged: false } }
-    ),
     ...overrides,
   };
 }
@@ -157,14 +156,14 @@ describe('ovie.shipping-state.v1 contract', () => {
   it('names every producer schema and program operational-truth states', async () => {
     expect(SHIPPING_STATE_SCHEMA).toBe('ovie.shipping-state.v1');
     expect(SHIPPING_SOURCE_IDS).toEqual([
-      'symphony-runtime',
-      'symphony-task',
-      'lease-guard-capacity',
+      'lanes-status',
+      'lane-pull-requests',
       'github-native-merge-queue',
+      'github-merges',
       'exact-sha-ci',
       'production-controller',
       'live-build-info',
-      'fleet-receipt',
+      'summer-runtime',
     ]);
     expect(BUDGET).toBe(10_000);
     expect(measuredCount(-1)).toEqual({ state: 'not-measured', value: null });
@@ -192,8 +191,10 @@ describe('ovie.shipping-state.v1 contract', () => {
     expect(FORBIDDEN_ACTUATION).toEqual(expect.arrayContaining(['dispatch']));
     const readers = snapshotReaders(
       baseline({
-        'lease-guard-capacity': ok('lease-guard-capacity', {
-          capacity: { available: 0 },
+        'lanes-status': ok('lanes-status', {
+          schema: 'symphony-lanes-status/v1',
+          running: 0,
+          idle: 0,
         }),
       })
     );
@@ -204,21 +205,34 @@ describe('ovie.shipping-state.v1 contract', () => {
     }
   });
 
-  it('projects Linear-canonical Symphony work with stable shared task identity', async () => {
+  it('projects Linear-canonical lane PR work with stable shared task identity', async () => {
     const projection = await publish(
       baseline({
-        'symphony-runtime': ok('symphony-runtime', {
-          running: [],
-          retrying: [
+        'lane-pull-requests': ok('lane-pull-requests', {
+          pullRequests: [
             {
-              issue_identifier: 'jov-5544',
-              issue_url:
-                'https://linear.app/jovie/issue/JOV-5544/ui-consolidation-library-cards',
-              attempt: 19,
-              due_at: '2026-08-22T00:05:00.000Z',
+              number: 18934,
+              title: 'fix(share): keep native share-sheet cancellation a no-op',
+              headRefName: 'devin/jov-5544-20260927t045528',
+              headRefOid: SHA,
+              isDraft: true,
+              mergeable: 'MERGEABLE',
+              reviewDecision: null,
+              updatedAt: '2026-08-22T00:01:00.000Z',
+              mergeQueuePosition: null,
+            },
+            {
+              number: 18935,
+              title: 'test(ios): certify shipped routes',
+              headRefName: 'codex/jov-6095-20260927t045114',
+              headRefOid: SHA_B,
+              isDraft: false,
+              mergeable: 'MERGEABLE',
+              reviewDecision: null,
+              updatedAt: '2026-08-22T00:00:30.000Z',
+              mergeQueuePosition: 2,
             },
           ],
-          blocked: [],
         }),
       })
     );
@@ -227,40 +241,54 @@ describe('ovie.shipping-state.v1 contract', () => {
       canonicalSource: 'linear',
       cacheMode: 'local-reconciled',
       syncState: 'fresh',
-      sourceId: 'symphony-runtime',
+      sourceId: 'lane-pull-requests',
       tasks: [
         {
+          id: 'linear:JOV-6095',
+          linearIdentifier: 'JOV-6095',
+          linearUrl: 'https://linear.app/jovie/issue/jov-6095',
+          title: 'test(ios): certify shipped routes',
+          workflowState: 'merge-queued',
+        },
+        {
           id: 'linear:JOV-5544',
-          linearIdentifier: 'JOV-5544',
-          title: 'Ui Consolidation Library Cards',
-          workflowState: 'retrying',
-          attempt: 19,
-          retryAt: '2026-08-22T00:05:00.000Z',
+          title: 'fix(share): keep native share-sheet cancellation a no-op',
+          workflowState: 'running',
+          attempt: null,
+          retryAt: null,
         },
       ],
     });
-    expect(projection.sources['symphony-runtime'].entities[0]).toMatchObject({
+    expect(projection.sources['lane-pull-requests'].entities[1]).toMatchObject({
       entityId: 'linear:JOV-5544',
-      sourceId: 'symphony-runtime',
+      sourceId: 'lane-pull-requests',
+      correlation: { prNumber: 18934, workId: 'JOV-5544', sha: SHA },
+    });
+    expect(projection.sources['lane-pull-requests'].counts.running).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
     });
   });
 
   it('emits task state deltas and retains last-known work when sync fails', async () => {
+    const lanePr = (overrides: Record<string, unknown>) => ({
+      number: 18934,
+      title: 'Consolidate library cards',
+      headRefName: 'devin/jov-5544-20260927t045528',
+      headRefOid: SHA,
+      isDraft: true,
+      mergeable: 'MERGEABLE',
+      reviewDecision: null,
+      updatedAt: T0,
+      mergeQueuePosition: null,
+      ...overrides,
+    });
     const first = await publish(
       baseline({
-        'symphony-runtime': ok(
-          'symphony-runtime',
-          {
-            running: [
-              {
-                issue_identifier: 'JOV-5544',
-                title: 'Consolidate library cards',
-              },
-            ],
-            retrying: [],
-            blocked: [],
-          },
-          { sequence: 1, eventId: 'symphony-runtime:task:1' }
+        'lane-pull-requests': ok(
+          'lane-pull-requests',
+          { pullRequests: [lanePr({})] },
+          { sequence: 1, eventId: 'lane-pull-requests:task:1' }
         ),
       })
     );
@@ -268,21 +296,12 @@ describe('ovie.shipping-state.v1 contract', () => {
 
     const second = await publish(
       baseline({
-        'symphony-runtime': ok(
-          'symphony-runtime',
-          {
-            running: [],
-            retrying: [
-              {
-                issue_identifier: 'JOV-5544',
-                title: 'Consolidate library cards',
-              },
-            ],
-            blocked: [],
-          },
+        'lane-pull-requests': ok(
+          'lane-pull-requests',
+          { pullRequests: [lanePr({ mergeable: 'CONFLICTING' })] },
           {
             sequence: 2,
-            eventId: 'symphony-runtime:task:2',
+            eventId: 'lane-pull-requests:task:2',
             sourceRevision: SHA_B,
           }
         ),
@@ -293,14 +312,14 @@ describe('ovie.shipping-state.v1 contract', () => {
         taskId: 'linear:JOV-5544',
         kind: 'updated',
         fromState: 'running',
-        toState: 'retrying',
+        toState: 'blocked',
         sequence: 2,
       },
     ]);
 
     const stale = await publish(
       baseline({
-        'symphony-runtime': failed('symphony-runtime', 'unavailable', {
+        'lane-pull-requests': failed('lane-pull-requests', 'unavailable', {
           sequence: null,
           eventId: null,
         }),
@@ -335,12 +354,10 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(measuredCount(3)).toEqual({ state: 'measured-nonzero', value: 3 });
     const zero = await publish(
       baseline({
-        'lease-guard-capacity': ok('lease-guard-capacity', {
-          capacity: { available: 0 },
-        }),
+        'lanes-status': ok('lanes-status', lanes(0, 0)),
       })
     );
-    expect(zero.sources['symphony-runtime'].counts.running).toEqual({
+    expect(zero.sources['lanes-status'].counts.running).toEqual({
       state: 'measured-zero',
       value: 0,
     });
@@ -457,7 +474,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
   it('covers each observation state without synthesizing current truth', async () => {
     expect((await publish(baseline())).state).toBe('fresh');
     resetShippingStatePublisher();
-    expect((await publish({})).sources['fleet-receipt'].state).toBe(
+    expect((await publish({})).sources['lanes-status'].state).toBe(
       'disconnected'
     );
     const cases: Array<[ShippingSourceId, AuthorityRead, string]> = [
@@ -472,10 +489,10 @@ describe('zero, states, ordering, meanings, cadence', () => {
         'unavailable',
       ],
       [
-        'lease-guard-capacity',
-        failed('lease-guard-capacity', 'unknown', {
-          schema: SHIPPING_SOURCE_SCHEMAS['lease-guard-capacity'],
-          payload: { capacity: { state: 'unknown' } },
+        'lanes-status',
+        failed('lanes-status', 'unknown', {
+          schema: SHIPPING_SOURCE_SCHEMAS['lanes-status'],
+          payload: { state: 'unknown' },
         }),
         'unknown',
       ],
@@ -488,14 +505,12 @@ describe('zero, states, ordering, meanings, cadence', () => {
     }
     resetShippingStatePublisher();
     const mismatch = await publish({
-      'fleet-receipt': ok(
-        'fleet-receipt',
-        { state: 'GREEN' },
-        { schema: 'not-a-real-schema' }
-      ),
+      'lanes-status': ok('lanes-status', lanes(1), {
+        schema: 'not-a-real-schema',
+      }),
     });
-    expect(mismatch.sources['fleet-receipt'].state).toBe('error');
-    expect(mismatch.sources['fleet-receipt'].ingest).toBe('schema-mismatch');
+    expect(mismatch.sources['lanes-status'].state).toBe('error');
+    expect(mismatch.sources['lanes-status'].ingest).toBe('schema-mismatch');
     resetShippingStatePublisher();
     const degraded = await publish(
       baseline({
@@ -549,11 +564,12 @@ describe('zero, states, ordering, meanings, cadence', () => {
     });
   });
 
-  it('expires the canonical fleet receipt at its semantic ten-minute TTL', async () => {
+  it('marks the lanes feed stale once its own `at` is ten minutes old', async () => {
     const fetchedAt = '2026-08-22T00:10:00.001Z';
     const projection = await publish(baseline(), clockAt(fetchedAt));
 
-    expect(projection.sources['fleet-receipt']).toMatchObject({
+    expect(projection.delivery.lanes.stale).toBe(true);
+    expect(projection.sources['lanes-status']).toMatchObject({
       sourceTimestamp: T0,
       observationTimestamp: fetchedAt,
       freshnessDeadline: '2026-08-22T00:10:10.001Z',
@@ -570,7 +586,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
     const firstCapacityReader = vi.fn(() => heldCapacityRead);
     const readers = {
       ...firstReaders,
-      'lease-guard-capacity': firstCapacityReader,
+      'lanes-status': firstCapacityReader,
     };
 
     const first = publishShippingState({
@@ -582,11 +598,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
       clock: clockAt('2026-08-22T00:00:01.000Z'),
     });
 
-    releaseFirst(
-      ok('lease-guard-capacity', {
-        capacity: { available: 7, accounts: 4, locked: 1, cooldown: 1 },
-      })
-    );
+    releaseFirst(ok('lanes-status', lanes(7)));
     const [firstProjection, secondProjection] = await Promise.all([
       first,
       second,
@@ -607,7 +619,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
     const readers = snapshotReaders(baseline());
     const hung = new Promise<AuthorityRead>(() => {});
     const publication = publishShippingState({
-      readers: { ...readers, 'symphony-runtime': () => hung },
+      readers: { ...readers, 'lanes-status': () => hung },
       clock: {
         nowIso: () => new Date(Date.now()).toISOString(),
         nowMs: () => Date.now(),
@@ -619,7 +631,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
 
     expect(projection.latencyMs).toBe(SHIPPING_SOURCE_READ_TIMEOUT_MS);
     expect(projection.withinM1Budget).toBe(true);
-    expect(projection.sources['symphony-runtime']).toMatchObject({
+    expect(projection.sources['lanes-status']).toMatchObject({
       state: 'unavailable',
       lastError: { code: 'reader-timeout' },
     });
@@ -633,28 +645,27 @@ describe('zero, states, ordering, meanings, cadence', () => {
     const firstBase = snapshotReaders(baseline());
     const secondBase = snapshotReaders(baseline());
     const secondCapacityReader = vi.fn(async () =>
-      ok(
-        'lease-guard-capacity',
-        { capacity: { available: 1 } },
-        { sequence: 2, eventId: 'lease-guard-capacity:2:later-request' }
-      )
+      ok('lanes-status', lanes(1), {
+        sequence: 2,
+        eventId: 'lanes-status:2:later-request',
+      })
     );
     const first = publishShippingState({
       readers: {
         ...firstBase,
-        'lease-guard-capacity': () => heldCapacityRead,
+        'lanes-status': () => heldCapacityRead,
       },
       clock: clockAt(T0),
     });
     const second = publishShippingState({
       readers: {
         ...secondBase,
-        'lease-guard-capacity': secondCapacityReader,
+        'lanes-status': secondCapacityReader,
       },
       clock: clockAt('2026-08-22T00:00:01.000Z'),
     });
 
-    releaseFirst(ok('lease-guard-capacity', { capacity: { available: 7 } }));
+    releaseFirst(ok('lanes-status', lanes(7)));
     const [firstProjection, secondProjection] = await Promise.all([
       first,
       second,
@@ -668,10 +679,10 @@ describe('zero, states, ordering, meanings, cadence', () => {
 
   it('bounds shared projection caching and rejects backward-clock cache age', async () => {
     const readers = snapshotReaders(baseline());
-    const capacityReader = vi.fn(readers['lease-guard-capacity']);
+    const capacityReader = vi.fn(readers['lanes-status']);
     const configuredReaders = {
       ...readers,
-      'lease-guard-capacity': capacityReader,
+      'lanes-status': capacityReader,
     };
     const first = await publishShippingState({
       readers: configuredReaders,
@@ -705,10 +716,10 @@ describe('zero, states, ordering, meanings, cadence', () => {
 
   it('re-ages cached source truth without rereading its authorities', async () => {
     const readers = snapshotReaders(baseline());
-    const capacityReader = vi.fn(readers['lease-guard-capacity']);
+    const capacityReader = vi.fn(readers['lanes-status']);
     const configuredReaders = {
       ...readers,
-      'lease-guard-capacity': capacityReader,
+      'lanes-status': capacityReader,
     };
     const first = await publishShippingState({
       readers: configuredReaders,
@@ -723,7 +734,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
 
     expect(first.state).toBe('fresh');
     expect(aged.state).toBe('stale');
-    expect(aged.sources['lease-guard-capacity'].state).toBe('stale');
+    expect(aged.sources['lanes-status'].state).toBe('stale');
     expect(aged.projectionId).toBe(first.projectionId);
     expect(capacityReader).toHaveBeenCalledTimes(1);
     expect(getLastKnownShippingState()).toBe(aged);
@@ -738,13 +749,13 @@ describe('zero, states, ordering, meanings, cadence', () => {
     const publication = publishShippingState({
       readers: {
         ...readers,
-        'lease-guard-capacity': () => heldCapacityRead,
+        'lanes-status': () => heldCapacityRead,
       },
       clock: clockAt(T0),
     });
 
     expect(stopPublishingShippingState()).toBeNull();
-    releaseCapacity(ok('lease-guard-capacity', { capacity: { available: 3 } }));
+    releaseCapacity(ok('lanes-status', lanes(3)));
     const stopped = await publication;
 
     expect(stopped).toMatchObject({ publishing: false, state: 'unknown' });
@@ -764,7 +775,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
     const oldPublication = publishShippingState({
       readers: {
         ...oldReaders,
-        'lease-guard-capacity': () => heldCapacityRead,
+        'lanes-status': () => heldCapacityRead,
       },
       clock: clockAt(T0),
     });
@@ -772,18 +783,14 @@ describe('zero, states, ordering, meanings, cadence', () => {
     resetShippingStatePublisher();
     const replacementReaders = snapshotReaders(
       baseline({
-        'lease-guard-capacity': ok('lease-guard-capacity', {
-          capacity: { available: 9, accounts: 4, locked: 1, cooldown: 1 },
-        }),
+        'lanes-status': ok('lanes-status', lanes(9)),
       })
     );
-    const replacementCapacityReader = vi.fn(
-      replacementReaders['lease-guard-capacity']
-    );
+    const replacementCapacityReader = vi.fn(replacementReaders['lanes-status']);
     const replacementPublication = publishShippingState({
       readers: {
         ...replacementReaders,
-        'lease-guard-capacity': replacementCapacityReader,
+        'lanes-status': replacementCapacityReader,
       },
       clock: clockAt('2026-08-22T00:00:01.000Z'),
     });
@@ -792,11 +799,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(replacementCapacityReader).toHaveBeenCalledTimes(1);
     const replacement = await replacementPublication;
 
-    releaseOld(
-      ok('lease-guard-capacity', {
-        capacity: { available: 1, accounts: 4, locked: 1, cooldown: 1 },
-      })
-    );
+    releaseOld(ok('lanes-status', lanes(1)));
     await oldPublication;
 
     expect(getLastKnownShippingState()).toBe(replacement);
@@ -880,23 +883,18 @@ describe('zero, states, ordering, meanings, cadence', () => {
     await publish({}, clock);
     const recovered = await publish(
       baseline({
-        'symphony-runtime': ok(
-          'symphony-runtime',
-          {
-            running: [{ issue_identifier: 'JOV-1' }],
-            retrying: [],
-            blocked: [],
-          },
-          { sequence: 3, eventId: 'symphony-runtime:3:reconnect' }
-        ),
+        'lanes-status': ok('lanes-status', lanes(3), {
+          sequence: 3,
+          eventId: 'lanes-status:3:reconnect',
+        }),
       }),
       clock
     );
-    expect(recovered.sources['symphony-runtime']).toMatchObject({
+    expect(recovered.sources['lanes-status']).toMatchObject({
       recovered: true,
       ingest: 'reconnect',
     });
-    expect(recovered.retrying.state).not.toBe('not-measured');
+    expect(recovered.capacityAvailable.state).not.toBe('not-measured');
     resetShippingStatePublisher();
     const projection = await publish(
       baseline({
@@ -939,11 +937,11 @@ describe('zero, states, ordering, meanings, cadence', () => {
       nowMs: () => now,
     };
     const readers = snapshotReaders(baseline());
-    const original = readers['fleet-receipt'];
+    const original = readers['lanes-status'];
     const projection = await publishShippingState({
       readers: {
         ...readers,
-        'fleet-receipt': async () => {
+        'lanes-status': async () => {
           now += 25;
           return original();
         },
@@ -966,9 +964,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(stopped?.lastSuccess?.eventId).toBe(live.lastSuccess?.eventId);
     const after = await publish(
       baseline({
-        'lease-guard-capacity': ok('lease-guard-capacity', {
-          capacity: { available: 9 },
-        }),
+        'lanes-status': ok('lanes-status', lanes(9)),
       }),
       clockAt('2026-08-22T00:00:05.000Z')
     );
@@ -978,36 +974,23 @@ describe('zero, states, ordering, meanings, cadence', () => {
   });
 });
 
-describe('live symphony-task reader', () => {
-  it('does not relabel the runtime endpoint as an official task receipt', async () => {
-    const fetchMock = vi.fn();
-    const readers = createLiveShippingStateReaders({
-      readFile: vi.fn(async () => {
-        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
-      }),
-      fetch: fetchMock,
-    });
-    const read = await readers['symphony-task']();
-    expect(read).toMatchObject({
-      sourceId: 'symphony-task',
-      status: 'unavailable',
-      schema: null,
-      errorCode: 'not-configured',
-    });
-    const projection = await publish({ 'symphony-task': read });
-    expect(projection.sources['symphony-task'].state).toBe('unavailable');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-});
-
 describe('live GitHub shipping reader', () => {
   function mergeQueueResponse(
     options: {
       readonly hasNextPage?: boolean;
       readonly nodes?: unknown;
       readonly totalCount?: unknown;
+      readonly queueTotalCount?: unknown;
     } = {}
   ) {
+    const nodes = options.nodes ?? [
+      {
+        id: 'mq-1',
+        position: 1,
+        state: 'QUEUED',
+        pullRequest: { number: 16797, headRefOid: SHA },
+      },
+    ];
     return new Response(
       JSON.stringify({
         data: {
@@ -1015,15 +998,11 @@ describe('live GitHub shipping reader', () => {
             pullRequests: { totalCount: options.totalCount ?? 126 },
             mergeQueue: {
               entries: {
+                totalCount:
+                  options.queueTotalCount ??
+                  (Array.isArray(nodes) ? nodes.length : 0),
                 pageInfo: { hasNextPage: options.hasNextPage ?? false },
-                nodes: options.nodes ?? [
-                  {
-                    id: 'mq-1',
-                    position: 1,
-                    state: 'QUEUED',
-                    pullRequest: { number: 16797, headRefOid: SHA },
-                  },
-                ],
+                nodes,
               },
             },
           },
@@ -1039,7 +1018,6 @@ describe('live GitHub shipping reader', () => {
         mergeQueueResponse()
     );
     const read = await readMergeQueue({
-      readFile: vi.fn(),
       fetch: fetchMock,
       githubToken: 'test-token',
       githubOwner: 'JovieInc',
@@ -1050,8 +1028,10 @@ describe('live GitHub shipping reader', () => {
       status: 'ok',
       payload: {
         openPullRequests: 126,
+        totalCount: 1,
         entries: [{ id: 'mq-1', position: 1, state: 'QUEUED' }],
       },
+      delivery: { mergeQueueDepth: { state: 'measured-nonzero', value: 1 } },
     });
     const request = fetchMock.mock.calls[0]?.[1];
     expect(String(request?.body)).toContain(
@@ -1085,6 +1065,10 @@ describe('live GitHub shipping reader', () => {
     ],
     ['invalid open PR count', () => mergeQueueResponse({ totalCount: '126' })],
     [
+      'queue depth below the listed entries',
+      () => mergeQueueResponse({ queueTotalCount: 0 }),
+    ],
+    [
       'empty truncated page',
       () => mergeQueueResponse({ hasNextPage: true, nodes: [] }),
     ],
@@ -1097,7 +1081,6 @@ describe('live GitHub shipping reader', () => {
     ],
   ])('fails unavailable on %s', async (_label, responseFactory) => {
     const read = await readMergeQueue({
-      readFile: vi.fn(),
       fetch: vi.fn(async () => responseFactory()),
       githubToken: 'test-token',
       githubOwner: 'JovieInc',
@@ -1112,7 +1095,6 @@ describe('live GitHub shipping reader', () => {
 
   it('distinguishes GitHub rate limiting from authorization failure', async () => {
     const read = await readMergeQueue({
-      readFile: vi.fn(),
       fetch: vi.fn(
         async () =>
           new Response('{}', {
@@ -1146,7 +1128,6 @@ describe('live GitHub shipping reader', () => {
         })
     );
     const io = {
-      readFile: vi.fn(),
       fetch: fetchMock,
       githubToken: 'test-token',
       githubOwner: 'JovieInc',
@@ -1161,10 +1142,11 @@ describe('live GitHub shipping reader', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('does not turn a truncated queue page into an exact count', async () => {
+  it('counts queue depth from totalCount even when the entry page is truncated', async () => {
     const read = await readMergeQueue({
-      readFile: vi.fn(),
-      fetch: vi.fn(async () => mergeQueueResponse({ hasNextPage: true })),
+      fetch: vi.fn(async () =>
+        mergeQueueResponse({ hasNextPage: true, queueTotalCount: 25 })
+      ),
       githubToken: 'test-token',
       githubOwner: 'JovieInc',
       githubRepo: 'Jovie',
@@ -1174,87 +1156,14 @@ describe('live GitHub shipping reader', () => {
     const projection = await publish({ 'github-native-merge-queue': read });
     expect(
       projection.sources['github-native-merge-queue'].counts.queued
-    ).toEqual({ state: 'not-measured', value: null });
+    ).toEqual({ state: 'measured-nonzero', value: 25 });
+    expect(projection.delivery.mergeQueueDepth).toEqual({
+      state: 'measured-nonzero',
+      value: 25,
+    });
     expect(
       projection.sources['github-native-merge-queue'].counts.openPullRequests
     ).toEqual({ state: 'measured-nonzero', value: 126 });
-  });
-
-  it('reads live state only from the official OpenAI Symphony port', async () => {
-    const readFile = vi.fn();
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            generated_at: T0,
-            running: [{ issue_identifier: 'JOV-1' }],
-            retrying: [],
-            blocked: [],
-          }),
-          { status: 200 }
-        )
-      )
-    );
-    const readers = createLiveShippingStateReaders({
-      readFile,
-      fetch: fetchMock,
-    });
-
-    const read = await readers['symphony-runtime']();
-
-    expect(read).toMatchObject({
-      status: 'ok',
-      sourceTimestamp: T0,
-      payload: { running: [{ issue_identifier: 'JOV-1' }] },
-    });
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'http://127.0.0.1:4041/api/v1/state'
-    );
-    expect(readFile).not.toHaveBeenCalled();
-  });
-
-  it('projects lease capacity from the canonical Gem fleet receipt', async () => {
-    const observedAt = '2026-08-22T00:00:03.000Z';
-    const readFile = vi.fn(async () =>
-      JSON.stringify({
-        schema: 'jovie-fleet-gate/v1',
-        observedAt,
-        signals: {
-          main: { sha: SHA },
-          lease: {
-            observedAt,
-            status: 'ok',
-            capacity: {
-              accounts: 4,
-              available: 2,
-              locked: 1,
-              cooldown: 1,
-            },
-          },
-        },
-      })
-    );
-    const readers = createLiveShippingStateReaders({
-      readFile,
-      fetch: vi.fn(),
-    });
-
-    const read = await readers['lease-guard-capacity']();
-    const projection = await publish({ 'lease-guard-capacity': read });
-
-    expect(read).toMatchObject({
-      status: 'ok',
-      sourceTimestamp: observedAt,
-      sourceRevision: SHA,
-      payload: { capacity: { available: 2 } },
-    });
-    expect(projection.capacityAvailable).toEqual({
-      state: 'measured-nonzero',
-      value: 2,
-    });
-    expect(readFile).toHaveBeenCalledWith(
-      resolveNamedAuthorityPath('fleet-receipt')
-    );
   });
 
   function productionRunResponse(overrides: Record<string, unknown> = {}) {
@@ -1342,7 +1251,6 @@ describe('live GitHub shipping reader', () => {
 
     const read = await readWorkflow(
       {
-        readFile: vi.fn(),
         fetch: fetchMock,
         githubToken: 'test-token',
         githubOwner: 'JovieInc',
@@ -1383,7 +1291,6 @@ describe('live GitHub shipping reader', () => {
 
     const read = await readWorkflow(
       {
-        readFile: vi.fn(),
         fetch: fetchMock,
         githubToken: 'test-token',
         githubOwner: 'JovieInc',
@@ -1422,7 +1329,6 @@ describe('live GitHub shipping reader', () => {
 
     const read = await readWorkflow(
       {
-        readFile: vi.fn(),
         fetch: fetchMock,
         githubToken: 'test-token',
         githubOwner: 'JovieInc',
@@ -1458,7 +1364,6 @@ describe('live GitHub shipping reader', () => {
         .mockResolvedValue(productionRunResponse(overrides));
       const read = await readWorkflow(
         {
-          readFile: vi.fn(),
           fetch: fetchMock,
           githubToken: 'test-token',
           githubOwner: 'JovieInc',
@@ -1516,7 +1421,6 @@ describe('live GitHub shipping reader', () => {
       .mockResolvedValueOnce(productionJobsResponse(jobs));
     const read = await readWorkflow(
       {
-        readFile: vi.fn(),
         fetch: fetchMock,
         githubToken: 'test-token',
         githubOwner: 'JovieInc',
@@ -1556,7 +1460,6 @@ describe('live GitHub shipping reader', () => {
       .mockResolvedValueOnce(productionJobsResponse(jobs));
     const read = await readWorkflow(
       {
-        readFile: vi.fn(),
         fetch: fetchMock,
         githubToken: 'test-token',
         githubOwner: 'JovieInc',
@@ -1608,7 +1511,6 @@ describe('live GitHub shipping reader', () => {
 
       const read = await readWorkflow(
         {
-          readFile: vi.fn(),
           fetch: fetchMock,
           githubToken: 'test-token',
           githubOwner: 'JovieInc',
@@ -1627,14 +1529,10 @@ describe('live GitHub shipping reader', () => {
 });
 
 describe('shipping-state security', () => {
-  it('refuses arbitrary paths, secrets, and actuation keys', async () => {
-    expect(isAllowlistedAuthorityPath('/etc/passwd')).toBe(false);
-    expect(isAllowlistedAuthorityPath('/var/log/syslog')).toBe(false);
-    expect(NAMED_AUTHORITY_PATHS['fleet-receipt'].startsWith('~/')).toBe(true);
-    expect(
-      isAllowlistedAuthorityPath(NAMED_AUTHORITY_PATHS['fleet-receipt'])
-    ).toBe(true);
-    expect(resolveNamedAuthorityPath('exact-sha-ci')).toBeNull();
+  it('reads only fixed https authorities, and refuses secrets and actuation keys', async () => {
+    for (const url of Object.values(NAMED_AUTHORITY_URLS)) {
+      expect(new URL(url).protocol).toBe('https:');
+    }
     const { sanitizeErrorMessage } = await import('@/lib/ovie/shipping-state');
     const githubTokens = ['ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_'].map(
       prefix => `${prefix}abcdefghijklmnopqrstuvwxyz012345`
@@ -1659,35 +1557,31 @@ describe('shipping-state security', () => {
 
     const taintedProjection = await publish(
       baseline({
-        'symphony-runtime': ok(
-          'symphony-runtime',
-          { running: [], retrying: [], blocked: [] },
-          {
-            schema: githubTokens[0],
-            sourceRevision: githubTokens[1],
-            eventId: '/Users/timwhite/private.json',
-            sequence: -1,
-            correlation: {
-              workId: githubTokens[2],
-              leaseId: '/private/tmp/lease',
-              prNumber: -1,
-              ciRunId: githubTokens[3],
-              deploymentId: githubTokens[4],
-              buildId: 'contains whitespace',
-              sha: 'not-an-exact-sha',
-            },
-            errorCode: githubTokens[0],
-            errorMessage: sensitiveMessage,
-          }
-        ),
+        'lanes-status': ok('lanes-status', lanes(1), {
+          schema: githubTokens[0],
+          sourceRevision: githubTokens[1],
+          eventId: '/Users/timwhite/private.json',
+          sequence: -1,
+          correlation: {
+            workId: githubTokens[2],
+            leaseId: '/private/tmp/lease',
+            prNumber: -1,
+            ciRunId: githubTokens[3],
+            deploymentId: githubTokens[4],
+            buildId: 'contains whitespace',
+            sha: 'not-an-exact-sha',
+          },
+          errorCode: githubTokens[0],
+          errorMessage: sensitiveMessage,
+        }),
       })
     );
     const serialized = JSON.stringify(taintedProjection);
     expect(serialized).not.toMatch(
       /gh[pousr]_|github_pat_|Bearer abcdef|timwhite|private\.json/
     );
-    expect(taintedProjection.sources['symphony-runtime']).toMatchObject({
-      schema: SHIPPING_SOURCE_SCHEMAS['symphony-runtime'],
+    expect(taintedProjection.sources['lanes-status']).toMatchObject({
+      schema: SHIPPING_SOURCE_SCHEMAS['lanes-status'],
       sequence: 1,
       sourceRevision: null,
       correlation: {
@@ -1701,23 +1595,17 @@ describe('shipping-state security', () => {
       },
       lastError: { code: 'source-error' },
     });
-    expect(taintedProjection.sources['symphony-runtime'].eventId).not.toContain(
+    expect(taintedProjection.sources['lanes-status'].eventId).not.toContain(
       'timwhite'
     );
-    const readFile = vi.fn(async (path: string) => {
-      throw Object.assign(new Error(`refused ${path}`), { code: 'ENOENT' });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => {
+      throw new Error('offline');
     });
-    const readers = createLiveShippingStateReaders({
-      readFile,
-      fetch: vi.fn(async () => {
-        throw new Error('offline');
-      }),
-    });
-    await readers['fleet-receipt']();
-    await readers['symphony-runtime']();
-    expect(readFile).not.toHaveBeenCalledWith('/etc/passwd');
-    for (const [path] of readFile.mock.calls) {
-      expect(isAllowlistedAuthorityPath(path)).toBe(true);
+    const readers = createLiveShippingStateReaders({ fetch: fetchMock });
+    await readers['lanes-status']();
+    await readers['summer-runtime']();
+    for (const [url] of fetchMock.mock.calls) {
+      expect(Object.values(NAMED_AUTHORITY_URLS)).toContain(String(url));
     }
     expect(FORBIDDEN_QUERY_KEYS).toEqual(
       expect.arrayContaining([
@@ -1741,5 +1629,92 @@ describe('shipping-state security', () => {
         'dispatch',
       ])
     );
+  });
+});
+
+describe('truthful blocked-work and ship-time semantics', () => {
+  it('never aliases blocked lane work as a terminal failure', async () => {
+    const projection = await publish(
+      baseline({
+        'lane-pull-requests': ok('lane-pull-requests', {
+          pullRequests: [
+            {
+              number: 1,
+              title: 'One',
+              headRefName: 'devin/jov-1-a',
+              mergeable: 'CONFLICTING',
+            },
+            {
+              number: 2,
+              title: 'Two',
+              headRefName: 'codex/jov-2-b',
+              reviewDecision: 'CHANGES_REQUESTED',
+            },
+          ],
+        }),
+      })
+    );
+
+    expect(projection.sources['lane-pull-requests'].counts.blocked).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
+    });
+    expect(projection.terminalFailures).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+  });
+
+  it('requires matched work/build identity before computing ship time', async () => {
+    const matching = await publish(
+      baseline({
+        'github-native-merge-queue': ok(
+          'github-native-merge-queue',
+          { entries: [] },
+          {
+            sourceTimestamp: T0,
+            correlation: { sha: SHA },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA },
+          {
+            sourceTimestamp: '2026-08-22T00:04:00.000Z',
+            correlation: { sha: SHA, buildId: 'b1' },
+          }
+        ),
+      })
+    );
+    expect(matching.timeToShipSeconds).toEqual({
+      state: 'measured-nonzero',
+      value: 240,
+    });
+
+    resetShippingStatePublisher();
+    const unmatched = await publish(
+      baseline({
+        'github-native-merge-queue': ok(
+          'github-native-merge-queue',
+          { entries: [] },
+          {
+            sourceTimestamp: T0,
+            correlation: { sha: SHA_B },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA },
+          {
+            sourceTimestamp: '2026-08-22T00:04:00.000Z',
+            correlation: { sha: SHA, buildId: 'b1' },
+          }
+        ),
+      })
+    );
+    expect(unmatched.timeToShipSeconds).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
   });
 });

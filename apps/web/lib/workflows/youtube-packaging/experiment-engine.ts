@@ -130,8 +130,8 @@ export interface ExperimentGuardrailViolation {
 
 export interface ExperimentDecision {
   readonly kind: ExperimentDecisionKind;
-  /** P(treatment watch_minutes_per_impression > control). */
-  readonly probTreatmentWins: number;
+  /** P(treatment watch_minutes_per_impression > control), or null when no valid estimate exists (JOV-6469). */
+  readonly probTreatmentWins: number | null;
   readonly watchMinutesPerImpressionControl: number;
   readonly watchMinutesPerImpressionTreatment: number;
   readonly guardrailViolations: readonly ExperimentGuardrailViolation[];
@@ -188,35 +188,42 @@ export function watchMinutesPerImpression(m: VariantMetrics): number {
 }
 
 /**
- * P(treatment watch_minutes_per_impression > control) via Gaussian approximation.
+ * Attempts P(treatment watch_minutes_per_impression > control).
  *
- * Models each variant as a Poisson rate:
- *   rate = watchMinutes / impressions
- *   SE²  = rate / impressions   (Poisson rate standard error)
+ * JOV-6469 finding: this used to model each variant's watch-minutes total
+ * as a Poisson rate (SE² = rate / impressions), i.e. treated a continuous,
+ * aggregated duration as if it were an event count. That's invalid for a
+ * continuous outcome and is not unit invariant — expressing the same watch
+ * time in seconds instead of minutes rescales the implied variance and
+ * changes the resulting confidence (see experiment-engine.test.ts, "units
+ * invariance"). A valid test of two continuous-duration means requires the
+ * per-observation variance of watch time, which `VariantMetrics` does not
+ * carry (only the aggregate total and the mean) — the sample mean alone is
+ * consistent with any true variance from zero to unbounded.
  *
- * P(B > A) = Φ((rate_B - rate_A) / sqrt(SE_A² + SE_B²))
- *
- * Returns 0.5 when either variant has zero impressions (no information).
+ * Always returns `null` today ("insufficient evidence"). Callers must hold
+ * at 'continue'/'inconclusive' rather than substitute a guess. Retained
+ * input validation (NaN/negative/non-finite) so corrupt data can never
+ * silently produce a confidence once a real estimator lands here.
  */
 export function computeBayesianProbBOverA(
   control: VariantMetrics,
   treatment: VariantMetrics
-): number {
-  if (control.impressions === 0 || treatment.impressions === 0) return 0.5;
+): number | null {
+  if (
+    !Number.isFinite(control.impressions) ||
+    !Number.isFinite(control.watchMinutes) ||
+    !Number.isFinite(treatment.impressions) ||
+    !Number.isFinite(treatment.watchMinutes) ||
+    control.impressions < 0 ||
+    treatment.impressions < 0
+  ) {
+    return null;
+  }
 
-  const rateA = watchMinutesPerImpression(control);
-  const rateB = watchMinutesPerImpression(treatment);
-
-  // Poisson SE²: guard against zero rates to avoid NaN
-  const seA2 =
-    rateA > 0 ? rateA / control.impressions : 1 / control.impressions;
-  const seB2 =
-    rateB > 0 ? rateB / treatment.impressions : 1 / treatment.impressions;
-
-  const pooledSE = Math.sqrt(seA2 + seB2);
-  if (pooledSE === 0) return rateB > rateA ? 1 : rateB < rateA ? 0 : 0.5;
-
-  return normalCdf((rateB - rateA) / pooledSE);
+  // ponytail: unconditional until VariantMetrics carries an observed
+  // watch-time variance/second-moment field (JOV-6469) — see doc above.
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +370,7 @@ export function evaluatePackagingExperiment(
       watchMinutesPerImpressionControl: rateControl,
       watchMinutesPerImpressionTreatment: rateTreatment,
       guardrailViolations: [],
-      rationale: `Test exceeded max duration (${Math.round(elapsedMs / (24 * MS_PER_HOUR))}d) without a clear winner. P(treatment wins) = ${(prob * 100).toFixed(1)}%.`,
+      rationale: `Test exceeded max duration (${Math.round(elapsedMs / (24 * MS_PER_HOUR))}d) without a clear winner. ${prob === null ? 'No statistically valid confidence was available.' : `P(treatment wins) = ${(prob * 100).toFixed(1)}%.`}`,
       decidedAt,
       requiresApproval: false,
     };
@@ -384,8 +391,13 @@ export function evaluatePackagingExperiment(
     };
   }
 
-  // Bayesian decision
-  if (prob >= cfg.winThreshold) {
+  // Bayesian decision — only reachable once `prob` is a valid, evidence-
+  // backed confidence (see computeBayesianProbBOverA). It is always null
+  // today given the VariantMetrics contract (JOV-6469), so every guardrail-
+  // passing evaluation currently falls through to 'continue' below. Kept so
+  // a future validated estimator can plug in without changing this
+  // function's contract.
+  if (prob !== null && prob >= cfg.winThreshold) {
     const liftPct = computeRatePercent(
       rateTreatment - rateControl,
       rateControl || 1
@@ -408,7 +420,7 @@ export function evaluatePackagingExperiment(
     };
   }
 
-  if (prob <= cfg.loseThreshold) {
+  if (prob !== null && prob <= cfg.loseThreshold) {
     const liftPct = computeRatePercent(
       rateTreatment - rateControl,
       rateControl || 1
@@ -431,7 +443,10 @@ export function evaluatePackagingExperiment(
     watchMinutesPerImpressionControl: rateControl,
     watchMinutesPerImpressionTreatment: rateTreatment,
     guardrailViolations: [],
-    rationale: `Continuing: P(treatment wins) = ${(prob * 100).toFixed(1)}% — neither win nor lose threshold reached.`,
+    rationale:
+      prob === null
+        ? 'Continuing: no statistically valid confidence available (VariantMetrics carries no observed watch-time variance) — retaining control pending a validated estimator.'
+        : `Continuing: P(treatment wins) = ${(prob * 100).toFixed(1)}% — neither win nor lose threshold reached.`,
     decidedAt,
     requiresApproval: false,
   };
