@@ -556,6 +556,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'eslint-server-boundaries',
       'guardrails',
       'ios-fast',
+      'merge-group-guards',
       'node-runtime-contracts',
       'profile-admission',
       'scripts-typecheck',
@@ -1082,6 +1083,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance',
       'ios-fast',
       'profile-admission',
+      'merge-group-guards',
       'billing-coverage',
       'copy-gate',
       'node-runtime-contracts',
@@ -1115,6 +1117,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-governance-enforcement':
         'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
+      'merge-group-guards':
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,
@@ -1248,8 +1252,12 @@ describe('ci-fast bounded parallel workflow', () => {
         '.nvmrc',
         '.node-version',
         'config/node-runtime-policy.json',
+        'apps/ovie/package.json',
+        'packages/jovie-cli/package.json',
         '.github/actions/setup-node-pnpm/**',
         '.github/runner-image/**',
+        '.github/workflows/fleet-gate-refresh.yml',
+        '.github/workflows/rolling-ci-dispatch.yml',
         'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
       ])
     );
@@ -1909,6 +1917,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_GROUPS.web).toEqual([
       'design-conformance',
       'profile-admission',
+      'merge-group-guards',
     ]);
     for (const laneId of LANE_GROUPS.web) {
       expect(LANE_GROUPS.remaining).not.toContain(laneId);

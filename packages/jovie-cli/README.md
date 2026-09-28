@@ -72,7 +72,7 @@ The CLI sends no credentials, caches nothing, and sends no telemetry beyond a
 `jovie-cli/<version>` User-Agent. `profile create` and `report` are its only writes. Reports carry only the CLI
 version, platform, runtime, and the fields you pass. `init`
 writes only `jovie/SKILL.md` into existing agent skill directories, or into
-`--dir`. Commands use Node 22 built-ins (`parseArgs`, `fetch`, `readline`) and
+`--dir`. Commands use Node 24 built-ins (`parseArgs`, `fetch`, `readline`) and
 have no runtime dependencies. The MCP server covers tools only; adopt the
 official SDK when resources, prompts, or HTTP transport are needed.
 

@@ -15,7 +15,9 @@
     "majorPinned": [
       "package.json",
       "apps/console/package.json",
-      "apps/web/package.json"
+      "apps/ovie/package.json",
+      "apps/web/package.json",
+      "packages/jovie-cli/package.json"
     ],
     "minimumOnly": [
       "apps/docs/package.json",

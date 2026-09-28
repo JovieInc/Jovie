@@ -36,7 +36,9 @@ describe('Node runtime contract', () => {
     const majorPinnedPackagePaths = [
       'package.json',
       'apps/console/package.json',
+      'apps/ovie/package.json',
       'apps/web/package.json',
+      'packages/jovie-cli/package.json',
     ];
     const minimumOnlyPackagePaths = [
       'apps/docs/package.json',
@@ -82,6 +84,15 @@ describe('Node runtime contract', () => {
     expect(read('.github/workflows/agent-pipeline.yml')).toMatch(
       /sparse-checkout: \|\n\s+\.nvmrc\n[\s\S]*?node-version-file: '\.nvmrc'/
     );
+
+    for (const workflowPath of [
+      '.github/workflows/fleet-gate-refresh.yml',
+      '.github/workflows/rolling-ci-dispatch.yml',
+    ]) {
+      const workflow = read(workflowPath);
+      expect(workflow, workflowPath).toContain("node-version: '24'");
+      expect(workflow, workflowPath).not.toContain("node-version: '22'");
+    }
   });
 
   it('checks seed-loader compatibility after canonical setup without delaying path detection', () => {
