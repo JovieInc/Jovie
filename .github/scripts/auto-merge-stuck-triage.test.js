@@ -15,7 +15,10 @@ const basePr = {
   url: 'https://github.com/o/r/pull/42',
   mergeable: 'MERGEABLE',
   mergeStateStatus: 'CLEAN',
-  autoMergeRequest: { enabledAt: '2026-09-23T00:00:00Z', mergeMethod: 'SQUASH' },
+  autoMergeRequest: {
+    enabledAt: '2026-09-23T00:00:00Z',
+    mergeMethod: 'SQUASH',
+  },
   comments: { nodes: [] },
 };
 
@@ -27,7 +30,10 @@ const run = (name, status, conclusion, url) => ({
 });
 
 test('diagnose: conflicts surface as blocker', () => {
-  const d = diagnoseStuckPr({ ...basePr, mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }, []);
+  const d = diagnoseStuckPr(
+    { ...basePr, mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' },
+    []
+  );
   assert.ok(d.reasons.some(r => r.includes('merge conflicts')));
 });
 
@@ -36,7 +42,9 @@ test('diagnose: failing checks are named with links', () => {
     run('unit', 'completed', 'failure', true),
     run('lint', 'completed', 'success', true),
   ]);
-  assert.ok(d.reasons.some(r => r.includes('failing checks') && r.includes('unit')));
+  assert.ok(
+    d.reasons.some(r => r.includes('failing checks') && r.includes('unit'))
+  );
   assert.ok(!d.reasons.join(' ').includes('lint'));
 });
 
@@ -56,7 +64,11 @@ test('diagnose: clean-but-unmerged names mergeStateStatus', () => {
 });
 
 test('comment body carries marker and exactly the reasons', () => {
-  const body = buildCommentBody(basePr, { reasons: ['reason-a', 'reason-b'] }, 6);
+  const body = buildCommentBody(
+    basePr,
+    { reasons: ['reason-a', 'reason-b'] },
+    6
+  );
   assert.ok(body.includes(COMMENT_MARKER));
   assert.ok(body.includes('- reason-a'));
   assert.ok(body.includes('- reason-b'));
@@ -66,13 +78,20 @@ test('comment body carries marker and exactly the reasons', () => {
 test('findMarkerComment finds only marker comments', () => {
   const pr = {
     ...basePr,
-    comments: { nodes: [{ databaseId: 1, body: 'hello' }, { databaseId: 2, body: `${COMMENT_MARKER}\nx` }] },
+    comments: {
+      nodes: [
+        { databaseId: 1, body: 'hello' },
+        { databaseId: 2, body: `${COMMENT_MARKER}\nx` },
+      ],
+    },
   };
   assert.equal(findMarkerComment(pr)?.databaseId, 2);
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {
-  const stuckBody = buildIssueBody([{ pr: basePr, diagnosis: { reasons: ['r'] } }]);
+  const stuckBody = buildIssueBody([
+    { pr: basePr, diagnosis: { reasons: ['r'] } },
+  ]);
   assert.ok(stuckBody.includes('#42'));
   assert.ok(buildIssueBody([]).includes('No stuck PRs'));
 });

@@ -20,7 +20,10 @@ const ISSUE_MARKER = '<!-- auto-merge-stuck-tracker -->';
 const TRACKING_ISSUE_TITLE = 'Auto-merge stuck PRs — diagnostic tracker';
 
 function gh(args) {
-  return execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return execFileSync('gh', args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 }
 
 function ghJson(args) {
@@ -36,11 +39,17 @@ function ghGraphql(query, variables) {
 }
 
 function parseArgs(argv) {
-  const opts = { thresholdHours: 6, dryRun: false, pr: null, repo: process.env.GH_REPO };
+  const opts = {
+    thresholdHours: 6,
+    dryRun: false,
+    pr: null,
+    repo: process.env.GH_REPO,
+  };
   for (let i = 2; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--dry-run') opts.dryRun = true;
-    else if (arg === '--threshold-hours') opts.thresholdHours = Number(argv[++i]);
+    else if (arg === '--threshold-hours')
+      opts.thresholdHours = Number(argv[++i]);
     else if (arg === '--pr') opts.pr = Number(argv[++i]);
     else if (arg === '--repo') opts.repo = argv[++i];
     else throw new Error(`Unknown argument: ${arg}`);
@@ -103,7 +112,11 @@ function listCheckRuns(repo, sha) {
 // Pure: given a PR node and its head check runs, explain why it has not merged.
 function diagnoseStuckPr(pr, checkRuns) {
   const failing = checkRuns.filter(
-    r => r.status === 'completed' && ['failure', 'cancelled', 'timed_out', 'action_required'].includes(r.conclusion)
+    r =>
+      r.status === 'completed' &&
+      ['failure', 'cancelled', 'timed_out', 'action_required'].includes(
+        r.conclusion
+      )
   );
   const pending = checkRuns.filter(r => r.status !== 'completed');
   const reasons = [];
@@ -124,11 +137,19 @@ function diagnoseStuckPr(pr, checkRuns) {
       `checks still pending or never reported: ${pending.map(r => r.name).join(', ')}`
     );
   }
-  if (pr.mergeStateStatus === 'BLOCKED' && failing.length === 0 && pending.length === 0) {
-    reasons.push('blocked by branch protection (required check not reporting or review gate)');
+  if (
+    pr.mergeStateStatus === 'BLOCKED' &&
+    failing.length === 0 &&
+    pending.length === 0
+  ) {
+    reasons.push(
+      'blocked by branch protection (required check not reporting or review gate)'
+    );
   }
   if (reasons.length === 0) {
-    reasons.push(`no failing or pending checks detected (mergeStateStatus=${pr.mergeStateStatus}) — GitHub auto-merge may be waiting on a required check that is not reporting`);
+    reasons.push(
+      `no failing or pending checks detected (mergeStateStatus=${pr.mergeStateStatus}) — GitHub auto-merge may be waiting on a required check that is not reporting`
+    );
   }
   return { reasons, failing, pending };
 }
@@ -148,13 +169,17 @@ function buildCommentBody(pr, diagnosis, thresholdHours) {
 }
 
 function findMarkerComment(pr) {
-  return (pr.comments?.nodes || []).find(c => c.body && c.body.includes(COMMENT_MARKER));
+  return (pr.comments?.nodes || []).find(
+    c => c.body && c.body.includes(COMMENT_MARKER)
+  );
 }
 
 function upsertComment(repo, pr, body, dryRun) {
   const existing = findMarkerComment(pr);
   if (dryRun) {
-    console.log(`[dry-run] would ${existing ? 'update' : 'create'} diagnostic comment on PR #${pr.number}`);
+    console.log(
+      `[dry-run] would ${existing ? 'update' : 'create'} diagnostic comment on PR #${pr.number}`
+    );
     return;
   }
   if (existing) {
@@ -162,7 +187,14 @@ function upsertComment(repo, pr, body, dryRun) {
       console.log(`PR #${pr.number}: diagnostic comment already current.`);
       return;
     }
-    gh(['api', `repos/${repo}/issues/comments/${existing.databaseId}`, '-X', 'PATCH', '-F', `body=${body}`]);
+    gh([
+      'api',
+      `repos/${repo}/issues/comments/${existing.databaseId}`,
+      '-X',
+      'PATCH',
+      '-F',
+      `body=${body}`,
+    ]);
     console.log(`PR #${pr.number}: updated diagnostic comment.`);
   } else {
     gh(['pr', 'comment', String(pr.number), '--repo', repo, '--body', body]);
@@ -175,7 +207,11 @@ function findTrackingIssue(repo) {
     'api',
     `search/issues?q=${encodeURIComponent(`repo:${repo} is:issue ${ISSUE_MARKER}`)}&per_page=5`,
   ]);
-  return (result.items || []).find(i => i.state === 'open') || result.items?.[0] || null;
+  return (
+    (result.items || []).find(i => i.state === 'open') ||
+    result.items?.[0] ||
+    null
+  );
 }
 
 function buildIssueBody(stuck) {
@@ -189,7 +225,9 @@ function buildIssueBody(stuck) {
   } else {
     lines.push(`**${stuck.length} stuck PR(s):**`, '');
     for (const s of stuck) {
-      lines.push(`- [#${s.pr.number}](${s.pr.url}) ${s.pr.title} — ${s.diagnosis.reasons.join('; ')}`);
+      lines.push(
+        `- [#${s.pr.number}](${s.pr.url}) ${s.pr.title} — ${s.diagnosis.reasons.join('; ')}`
+      );
     }
   }
   return lines.join('\n');
@@ -199,17 +237,36 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
   const issue = findTrackingIssue(repo);
   const body = buildIssueBody(stuck);
   if (dryRun) {
-    console.log(`[dry-run] would ${issue ? `update issue #${issue.number}` : 'create tracking issue'} (${stuck.length} stuck PRs)`);
+    console.log(
+      `[dry-run] would ${issue ? `update issue #${issue.number}` : 'create tracking issue'} (${stuck.length} stuck PRs)`
+    );
     return;
   }
   if (!issue && stuck.length === 0) return;
   if (!issue) {
-    gh(['issue', 'create', '--repo', repo, '--title', TRACKING_ISSUE_TITLE, '--body', body]);
+    gh([
+      'issue',
+      'create',
+      '--repo',
+      repo,
+      '--title',
+      TRACKING_ISSUE_TITLE,
+      '--body',
+      body,
+    ]);
     console.log('Created tracking issue.');
     return;
   }
   if (stuck.length === 0 && issue.state === 'open') {
-    gh(['issue', 'close', String(issue.number), '--repo', repo, '--comment', 'No stuck PRs remain. Closing.']);
+    gh([
+      'issue',
+      'close',
+      String(issue.number),
+      '--repo',
+      repo,
+      '--comment',
+      'No stuck PRs remain. Closing.',
+    ]);
     console.log(`Closed tracking issue #${issue.number}.`);
     return;
   }
@@ -238,15 +295,29 @@ function main() {
     if (!isStuck) {
       if (hasComment && !opts.dryRun) {
         const body = `${COMMENT_MARKER}\nResolved — this PR is no longer stuck (auto-merge pending normally or merged).`;
-        gh(['api', `repos/${opts.repo}/issues/comments/${findMarkerComment(pr).databaseId}`, '-X', 'PATCH', '-F', `body=${body}`]);
+        gh([
+          'api',
+          `repos/${opts.repo}/issues/comments/${findMarkerComment(pr).databaseId}`,
+          '-X',
+          'PATCH',
+          '-F',
+          `body=${body}`,
+        ]);
       }
       continue;
     }
 
     const checkRuns = listCheckRuns(opts.repo, pr.headRefOid);
     const diagnosis = diagnoseStuckPr(pr, checkRuns);
-    console.log(`PR #${pr.number} stuck since ${pr.autoMergeRequest.enabledAt}: ${diagnosis.reasons.join('; ')}`);
-    upsertComment(opts.repo, pr, buildCommentBody(pr, diagnosis, opts.thresholdHours), opts.dryRun);
+    console.log(
+      `PR #${pr.number} stuck since ${pr.autoMergeRequest.enabledAt}: ${diagnosis.reasons.join('; ')}`
+    );
+    upsertComment(
+      opts.repo,
+      pr,
+      buildCommentBody(pr, diagnosis, opts.thresholdHours),
+      opts.dryRun
+    );
     stuck.push({ pr, diagnosis });
   }
 

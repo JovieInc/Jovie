@@ -1,5 +1,10 @@
 # Auto-Merge Default
 #
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Ovie
+# necessary-trust-boundary: This controller is the single writer that enables GitHub native auto-merge on every PR and the only scheduled triage that comments on stuck PRs; GITHUB_TOKEN mutations stay inside this workflow so per-PR events and the hourly sweep never race a second writer.
+# revisit-trigger: Remove this workflow if GitHub exposes a repo-level "auto-merge on by default" setting or a first-party stuck auto-merge triage surface.
+#
 # PURPOSE: Auto-merge (squash) is ON for every PR by default, forever, with no
 # human action and no manual batch jobs. Policy (2026-09-22): "everything should
 # have automerge on by default"; non-green PRs wait in GitHub's native auto-merge
