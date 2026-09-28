@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { projectCertificationInbox } from '@/lib/agent-os/certification-inbox';
 import { getMarketingCertificationStore } from '@/lib/agent-os/certification-runtime-store';
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
@@ -28,11 +29,20 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   try {
     const projection = await getMarketingCertificationStore().inspectLedger();
+    const queue = projectCertificationInbox(
+      projection.rows.map(row => ({
+        admission: row.admission,
+        domain: 'marketing_component',
+        observedAt: row.updatedAt,
+        packet: row.packet,
+      }))
+    );
     return NextResponse.json(
       {
         contract: projection.contract,
         scope: { domain: 'marketing_components', universal: false },
         registryIds: projection.registryIds,
+        queue,
         rows: projection.rows.map(row => ({
           identityId: row.identityId,
           kind: row.registryKind,

@@ -174,6 +174,9 @@ async function runBenchmark(sampleSize: number) {
   }));
 
   vi.doMock('@/lib/rate-limit', () => ({
+    trackingClicksLimiter: {
+      limit: async () => ({ success: true }),
+    },
     trackingIpClicksLimiter: {
       limit: async () => ({ success: true }),
     },

@@ -441,11 +441,11 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       timeout: 30_000,
     });
 
-    // The certified homepage (JOV-5864) routes onboarding through /start chat;
-    // the hero's conversion control is the name search, not a command center.
-    await expect(
-      page.getByTestId('homepage-editorial-hero-search')
-    ).toBeVisible({
+    // The certified homepage (JOV-5864) routes onboarding through /start chat.
+    // The hero's conversion control carries the homepage-primary-cta testid in
+    // both certified states: the name search when open, or the waitlist-gated
+    // Request access link while prelaunch (JOV-6794) — never a command center.
+    await expect(page.getByTestId('homepage-primary-cta')).toBeVisible({
       timeout: 20_000,
     });
 
@@ -586,7 +586,23 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       syncButton,
       'Claimed Spotify profile did not expose the canonical catalog import action'
     ).toBeVisible({ timeout: 60_000 });
-    await syncButton.click();
+    // A click that lands before hydration is silently dropped and no import
+    // ever starts (intermittent 180s timeouts, 2026-09-26/28). Prove the click
+    // registered: the button goes disabled while syncing, or leaves once the
+    // catalog exists. The import is idempotent, so a retried click is safe.
+    await expect(async () => {
+      if (await syncButton.isVisible()) await syncButton.click();
+      await expect
+        .poll(
+          async () =>
+            !(await syncButton.isVisible()) || (await syncButton.isDisabled()),
+          { timeout: 5_000 }
+        )
+        .toBe(true);
+    }, 'Spotify sync click never registered (button stayed enabled)').toPass({
+      timeout: 60_000,
+      intervals: [1_000, 2_000, 5_000],
+    });
 
     await expect
       .poll(

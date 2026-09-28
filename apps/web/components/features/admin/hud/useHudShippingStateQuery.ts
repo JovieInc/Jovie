@@ -31,7 +31,7 @@ const EMPTY_OPERATIONAL_FEED: OperationalTaskFeed = {
   canonicalSource: 'linear',
   cacheMode: 'local-reconciled',
   syncState: 'syncing',
-  sourceId: 'symphony-runtime',
+  sourceId: 'lane-pull-requests',
   observedAt: null,
   lastSyncedAt: null,
   freshnessDeadline: null,

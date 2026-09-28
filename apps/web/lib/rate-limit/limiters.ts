@@ -340,6 +340,17 @@ export const publicArtistApiLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for anonymous agent profile creation (`POST /api/agents/profiles`).
+ * Limit: 10 requests per hour per IP. Fails closed without Redis.
+ */
+export const agentProfileCreateLimiter = createRateLimiter(
+  RATE_LIMITERS.agentProfileCreate,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for the public claim-token entry route (`/claim/[token]`)
  * Limit: 20 requests per minute per IP. Durable (Redis) so the throttle holds
  * across serverless instances; callers treat a degraded backend as advisory
@@ -1255,6 +1266,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     trackingIpVisits: trackingIpVisitsLimiter,
     publicProfile: publicProfileLimiter,
     publicArtistApi: publicArtistApiLimiter,
+    agentProfileCreate: agentProfileCreateLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,
