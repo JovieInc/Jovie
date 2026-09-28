@@ -2,6 +2,12 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { identifyUser } from '@/lib/analytics/runtime-aware';
+import {
+  SIGNUP_FUNNEL_ALL_STEPS,
+  SIGNUP_FUNNEL_IDS,
+  SIGNUP_FUNNEL_OUTCOMES,
+  SIGNUP_FUNNEL_SURFACES,
+} from '@/lib/analytics/signup-funnel';
 import { db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { withTimeout } from '@/lib/resilience/primitives';
@@ -28,7 +34,9 @@ interface ServerAnalyticsEventDefinition {
     | 'release'
     | 'tour'
     | 'notification'
-    | 'entitlement';
+    | 'entitlement'
+    | 'funnel'
+    | 'billing';
   readonly properties: readonly string[];
   readonly source?: {
     readonly property: string;
@@ -175,6 +183,33 @@ export const SERVER_ANALYTICS_EVENTS = {
     category: 'entitlement',
     properties: ['gate', 'source', 'toolName', 'code', 'planRequired'],
   },
+  // signup-funnel/v1: no source entity, so a step can never be joined back
+  // to a profile, user, or visitor.
+  funnel_step: {
+    category: 'funnel',
+    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason'],
+  },
+  /**
+   * Artist Presence ($199/mo) upgrade offer presented once per claimed
+   * artist after first profile claim (JOV-6675). Keyed by creator profile so
+   * the offer state survives sessions and the funnel resolves
+   * seen → accepted → checkout → paid.
+   */
+  onboarding_upgrade_offer_seen: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  onboarding_upgrade_offer_accepted: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
+  onboarding_upgrade_offer_dismissed: {
+    category: 'billing',
+    properties: ['profileId', 'plan'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
 } as const satisfies Record<string, ServerAnalyticsEventDefinition>;
 
 export type ServerAnalyticsEventName = keyof typeof SERVER_ANALYTICS_EVENTS;
@@ -244,6 +279,15 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['releases_synced'],
   },
   {
+    path: 'lib/onboarding/upgrade-offer.ts',
+    invocations: 1,
+    events: [
+      'onboarding_upgrade_offer_seen',
+      'onboarding_upgrade_offer_accepted',
+      'onboarding_upgrade_offer_dismissed',
+    ],
+  },
+  {
     path: 'app/r/[slug]/page.tsx',
     invocations: 1,
     events: ['smart_link_clicked'],
@@ -265,6 +309,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     invocations: 1,
     events: ['entitlement_denial'],
   },
+  {
+    path: 'lib/analytics/signup-funnel.server.ts',
+    invocations: 1,
+    events: ['funnel_step'],
+  },
 ] as const satisfies ReadonlyArray<{
   readonly path: string;
   readonly invocations: number;
@@ -284,6 +333,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'code',
   'error_type',
   'gate',
+  'plan',
   'planRequired',
   'provider',
   'reason',
@@ -296,6 +346,10 @@ const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   client: new Set(['web', 'ios', 'electron']),
   intent: new Set(['sign_in', 'sign_up']),
   method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
+  funnel_id: new Set(SIGNUP_FUNNEL_IDS),
+  step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
+  outcome: new Set(SIGNUP_FUNNEL_OUTCOMES),
+  surface: new Set(SIGNUP_FUNNEL_SURFACES),
 };
 const UTM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
   utm_source: new Set([

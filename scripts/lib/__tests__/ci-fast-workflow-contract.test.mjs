@@ -958,6 +958,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(warm).toContain("github.ref == 'refs/heads/main' &&");
     expect(warm).not.toMatch(/secrets\.|TURBO_TOKEN|continue-on-error/);
     expect(warm).toContain('persist-credentials: false');
+    // JOV-6835: the only main-scoped node_modules writer must not be gated
+    // on the tsc key, or main's dependency cache goes stale after manifests move.
+    expect(warm).toMatch(
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n {6}- name:/
+    );
     const keys = body =>
       body.split('\n').filter(line => line.includes('jovie-web-tsbuildinfo'));
     const [ciKey, ...ciFallbacks] = keys(restore).map(line => line.trim());
