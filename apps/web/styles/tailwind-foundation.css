@@ -115,9 +115,19 @@
   --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out
     infinite;
-  /* Shared overlay layers — semantic names preserve the stacking contract
-     without encoding numeric z-index values at component call sites. */
+  /* Overlay layer contract. Semantic names preserve the
+     stacking order without encoding numeric z-index values at call sites.
+     Order, low to high: persistent banners < sheets/drawers < modal dialogs
+     < anchored popovers (menus, selects, popovers, submenus) < tooltips.
+     Anchored popovers sit above modals and sheets so a menu or
+     select opened inside a dialog or sheet is never painted behind it, and a
+     dialog opened from a sheet always covers the sheet.
+     This contract keeps the order explicit and ratchets raw z-index values
+     out of component source. */
+  --z-index-banner: 60;
   --z-index-sheet: 65;
+  --z-index-modal: 70;
+  --z-index-popover: 80;
   --z-index-tooltip: 150;
   /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
   --shadow-sm: var(--shadow-sm);
