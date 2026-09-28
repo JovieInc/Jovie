@@ -1,6 +1,6 @@
 export const INSTANT_MERCH_COPY = {
   seo: {
-    title: 'Instant Merch for Artists',
+    title: 'Instant Merch for Creators',
     description:
       'Turn a merch idea into a considered product concept from your Jovie conversation, then review it before it reaches your profile.',
   },
@@ -36,7 +36,7 @@ export const INSTANT_MERCH_COPY = {
     ],
   },
   details: {
-    eyebrow: 'Built for the release cycle',
+    eyebrow: 'Built for the launch cycle',
     title: 'Less coordination. More time making the thing.',
     items: [
       {

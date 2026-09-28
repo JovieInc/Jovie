@@ -40,7 +40,8 @@ describe('Photon lane contract', () => {
     const binding = result?.auth?.attributes?.project_binding;
     expect(binding).toMatch(/^[a-f0-9]{16}$/);
     expect(binding).not.toContain(env.IMESSAGE_PROJECT_ID);
-    expect(result?.context?.[0]).toContain('Jovie Eve');
+    // The identity pack binds once per session (instructions/channel-identity.ts).
+    expect(result?.context).toBeUndefined();
   });
 
   it('binds allowlisted private Summer through Ovie presentation', () => {
@@ -61,7 +62,7 @@ describe('Photon lane contract', () => {
       thread_binding: photonThreadBinding('summer', 'private-thread'),
     });
     expect(result?.title).toBe('Summer via Ovie');
-    expect(result?.context?.[0]).toContain('You are Summer');
+    expect(result?.context).toBeUndefined();
   });
 
   it.each([

@@ -1,6 +1,7 @@
 'use client';
 
-import { Pause, Play, X } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { AudioLines, Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
 import {
@@ -10,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { IconBtn } from './IconBtn';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
+import { Tooltip } from './Tooltip';
 
 /**
  * SidebarBottomNowPlaying — compact now-playing row mounted at the
@@ -38,6 +40,7 @@ export const SidebarBottomNowPlaying = React.memo(
     onPlay,
     onDismiss,
     onExpand,
+    collapsed = false,
     className,
   }: {
     readonly track: NowPlayingTrack;
@@ -46,6 +49,7 @@ export const SidebarBottomNowPlaying = React.memo(
     readonly onDismiss?: () => void;
     /** Reopen the full docked player (JOV-6680). Tapping the track info expands. */
     readonly onExpand?: () => void;
+    readonly collapsed?: boolean;
     readonly className?: string;
   }) {
     const trackTitle = track.trackTitle ?? '';
@@ -54,25 +58,88 @@ export const SidebarBottomNowPlaying = React.memo(
 
     if (!trackTitle && !artworkUrl) return null;
 
+    if (collapsed) {
+      return (
+        <Tooltip label={trackTitle || 'Now playing'} side='right'>
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon-sm'
+            onClick={onPlay}
+            aria-label={
+              isPlaying ? `Pause ${trackTitle}` : `Play ${trackTitle}`
+            }
+            className='mx-auto'
+          >
+            <ArtworkFrame size={28} className='size-7 bg-surface-2'>
+              {artworkUrl ? (
+                <Image
+                  src={artworkUrl}
+                  alt=''
+                  fill
+                  sizes='28px'
+                  className={ARTWORK_FIT_CLASSNAME}
+                  unoptimized
+                />
+              ) : null}
+            </ArtworkFrame>
+            {isPlaying ? (
+              <span className='absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-sidebar-accent text-sidebar-item-foreground ring-1 ring-sidebar-border'>
+                <AudioLines aria-hidden='true' className='size-2.5' />
+              </span>
+            ) : null}
+          </Button>
+        </Tooltip>
+      );
+    }
+
     return (
       <div
         className={cn(
-          'flex items-center gap-2 h-12 px-1.5 rounded-md hover:bg-surface-1/40 transition-colors duration-subtle ease-subtle',
+          'group/now-playing flex h-12 items-center gap-2 rounded-md px-1.5 transition-colors duration-subtle ease-subtle hover:bg-surface-1/40',
           className
         )}
       >
-        <ArtworkFrame size={36} className='h-9 w-9 shrink-0 bg-surface-2'>
-          {artworkUrl && (
-            <Image
-              src={artworkUrl}
-              alt=''
-              fill
-              sizes='36px'
-              className={ARTWORK_FIT_CLASSNAME}
-              unoptimized
-            />
-          )}
-        </ArtworkFrame>
+        <div className='relative size-9 shrink-0'>
+          <ArtworkFrame size={36} className='size-9 bg-surface-2'>
+            {artworkUrl ? (
+              <Image
+                src={artworkUrl}
+                alt=''
+                fill
+                sizes='36px'
+                className={ARTWORK_FIT_CLASSNAME}
+                unoptimized
+              />
+            ) : null}
+          </ArtworkFrame>
+          <div className='absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon-sm'
+              onClick={onPlay}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+            >
+              <span className='pointer-events-none absolute inset-0 rounded-full bg-black/55' />
+              {isPlaying ? (
+                <Pause
+                  aria-hidden='true'
+                  className='relative size-3 text-tooltip-foreground'
+                  strokeWidth={2.5}
+                  fill='currentColor'
+                />
+              ) : (
+                <Play
+                  aria-hidden='true'
+                  className='relative size-3 translate-x-px text-tooltip-foreground'
+                  strokeWidth={2.5}
+                  fill='currentColor'
+                />
+              )}
+            </Button>
+          </div>
+        </div>
         {onExpand ? (
           <button
             type='button'
@@ -103,22 +170,6 @@ export const SidebarBottomNowPlaying = React.memo(
             </div>
           </div>
         )}
-        <button
-          type='button'
-          onClick={onPlay}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
-        >
-          {isPlaying ? (
-            <Pause className='h-3 w-3' strokeWidth={2.5} fill='currentColor' />
-          ) : (
-            <Play
-              className='h-3 w-3 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          )}
-        </button>
         {onDismiss ? (
           <IconBtn
             label='Dismiss Player'

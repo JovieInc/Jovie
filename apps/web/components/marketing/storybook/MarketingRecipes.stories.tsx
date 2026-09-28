@@ -118,13 +118,13 @@ export const pricing: Story = {
             className='system-b-pricing-hero'
             headingId='pricing-hero-heading-story'
             headline='Pricing'
-            subtitle='Artist profiles are free forever. Pro has limited access.'
+            subtitle='Jovie profiles are free forever. Pro has limited access.'
             primaryCta={{
               label: 'Claim your profile',
               href: `${APP_ROUTES.SIGNUP}?plan=free`,
             }}
             secondaryCta={{
-              label: 'Explore Artist Profiles',
+              label: 'Explore Jovie Profiles',
               href: APP_ROUTES.ARTIST_PROFILES,
             }}
             logos={false}

@@ -7,7 +7,6 @@ import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
-import { SymphonyCodexAccountControl } from '@/components/features/admin/hud/SymphonyCodexAccountControl';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -169,7 +168,6 @@ export function OvieMacHud({
         </header>
         <OvieLauncherRail />
         <OperationalTasksPanel />
-        <SymphonyCodexAccountControl />
         <section className='grid min-h-40 gap-3 xl:grid-cols-4'>
           <div className='grid gap-3 md:grid-cols-3 xl:col-span-3'>
             <ContentMetricCard

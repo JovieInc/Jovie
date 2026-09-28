@@ -412,8 +412,7 @@
       "capability": "Execution failure remediation and escalation",
       "canonicalPath": [
         "terminal failure -> delivery state machine -> bounded remediation or human-required blocker",
-        "scripts/backlog-orchestrator/delivery-state-machine.mjs",
-        "scripts/symphony/jobs/delivery-liveness-watchdog.ts"
+        "scripts/backlog-orchestrator/delivery-state-machine.mjs"
       ],
       "implementationState": "already_works",
       "status": "untested",
@@ -447,11 +446,6 @@
             "kind": "file_contains",
             "path": "scripts/backlog-orchestrator/delivery-state-machine.mjs",
             "value": "repair"
-          },
-          {
-            "kind": "file_contains",
-            "path": "scripts/symphony/jobs/delivery-liveness-watchdog.ts",
-            "value": "linear_in_progress_liveness_checked"
           }
         ]
       }

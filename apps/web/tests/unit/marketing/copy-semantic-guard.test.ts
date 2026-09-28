@@ -6,6 +6,10 @@ import {
   type MarketingCopyPageBrief,
   type MarketingCopyPageDraft,
 } from '@/data/marketing';
+import {
+  auditRenderedCopySurface,
+  certifiedLinesFromDraft,
+} from '@/lib/copy/rendered-surface';
 
 const brief: MarketingCopyPageBrief = {
   pageId: 'artist-profiles',
@@ -144,6 +148,38 @@ describe('meaning-first marketing copy guard', () => {
   ] as const)('flags %s in the anti-slop audit', (code, headline) => {
     const issues = auditMarketingCopyPage(brief, draft(headline));
     expect(issues.some(issue => issue.code === code)).toBe(true);
+  });
+
+  it('does not let a registry pass certify a route that renders different words', () => {
+    const passingDraft = draft('One profile for every fan');
+    expect(
+      auditMarketingCopySemantics(brief, passingDraft, { enforcement: 'delta' })
+        .status
+    ).toBe('pass');
+    const issues = auditRenderedCopySurface(
+      {
+        route: brief.route,
+        stateId: 'default',
+        sourceVersion: 'test-source',
+        lines: [
+          {
+            lineId: 'hero/headline',
+            role: 'headline',
+            value: 'Grow your fanbase overnight.',
+          },
+        ],
+      },
+      {
+        route: brief.route,
+        stateId: 'default',
+        sourceVersion: 'test-source',
+        register: 'jovie-marketing',
+        lines: certifiedLinesFromDraft(passingDraft),
+      }
+    );
+    expect(issues.some(entry => entry.code === 'changed-rendered-text')).toBe(
+      true
+    );
   });
 
   it('flags compression failures without banning truthful premium language', () => {

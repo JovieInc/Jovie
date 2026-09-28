@@ -30,17 +30,49 @@ export function formatRelativeDate(value: Date | null | undefined): string {
   return formatter.format(days, 'day');
 }
 
-export function formatSessionDeviceName(
-  browserName: string | null | undefined
-): string {
-  const trimmedName = browserName?.trim();
-  if (!trimmedName) return 'Unknown device';
+const UA_BROWSER_PATTERNS: ReadonlyArray<[RegExp, string]> = [
+  [/edg(a|ios)?\//i, 'Edge'],
+  [/opr\/|opera/i, 'Opera'],
+  [/fxios|firefox/i, 'Firefox'],
+  [/crios|chrome/i, 'Chrome'],
+  [/version\/.*safari/i, 'Safari'],
+];
 
-  if (/electron|jovie\s*desktop|joviedesktop/i.test(trimmedName)) {
+const UA_PLATFORM_PATTERNS: ReadonlyArray<[RegExp, string]> = [
+  [/iphone/i, 'iPhone'],
+  [/ipad/i, 'iPad'],
+  [/android/i, 'Android'],
+  [/mac os x/i, 'Mac'],
+  [/windows/i, 'Windows'],
+  [/linux/i, 'Linux'],
+];
+
+/**
+ * Parse a raw `User-Agent` header (Better Auth session row) into a short,
+ * human-readable label. Also accepts a bare browser name for legacy callers.
+ */
+export function formatSessionDeviceName(
+  userAgent: string | null | undefined
+): string {
+  const trimmed = userAgent?.trim();
+  if (!trimmed) return 'Unknown device';
+
+  if (/electron|jovie\s*desktop|joviedesktop/i.test(trimmed)) {
     return 'Mac OS';
   }
 
-  return trimmedName;
+  const browser = UA_BROWSER_PATTERNS.find(([pattern]) =>
+    pattern.test(trimmed)
+  )?.[1];
+  const platform = UA_PLATFORM_PATTERNS.find(([pattern]) =>
+    pattern.test(trimmed)
+  )?.[1];
+
+  if (browser && platform) return `${browser} on ${platform}`;
+  if (browser) return browser;
+
+  // Not a real UA string (e.g. a bare legacy browser name) — return as-is.
+  return trimmed;
 }
 
 /**

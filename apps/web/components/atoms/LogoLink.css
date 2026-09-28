@@ -1,0 +1,87 @@
+/*
+ * Icon-only logo reveal (Tim direction 2026-09-26).
+ *
+ * When chrome shows only the Jovie mark, hover/focus spins the mark one full
+ * turn and slides the wordmark out to the right. Leaving transitions back to
+ * 0deg, so the mark turns the other way while the wordmark slides home.
+ *
+ * The wordmark is absolutely positioned: revealing it never moves siblings
+ * (zero layout shift). Only compositor-safe properties animate.
+ */
+
+.logo-reveal {
+  position: relative;
+  isolation: isolate;
+}
+
+.logo-reveal__mark {
+  display: inline-flex;
+  rotate: 0deg;
+  transition: rotate var(--ds-motion-cinematic-duration)
+    var(--ds-motion-cinematic-easing);
+}
+
+.logo-reveal__wordmark {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--space-2));
+  color: currentColor;
+  font-family: var(--marketing-font-display, inherit);
+  font-size: 0.86rem;
+  font-weight: 775;
+  letter-spacing: -0.032em;
+  line-height: 0.98;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  translate: calc(-1 * var(--space-2)) -50%;
+  transition:
+    opacity var(--ds-motion-cinematic-duration)
+    var(--ds-motion-cinematic-easing),
+    translate var(--ds-motion-cinematic-duration)
+    var(--ds-motion-cinematic-easing),
+    clip-path var(--ds-motion-cinematic-duration)
+    var(--ds-motion-cinematic-easing);
+}
+
+.logo-reveal:focus-visible .logo-reveal__mark {
+  rotate: 360deg;
+}
+
+.logo-reveal:focus-visible .logo-reveal__wordmark {
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+  translate: 0 -50%;
+}
+
+/* Touch devices report sticky :hover after a tap; only real pointers spin. */
+@media (hover: hover) {
+  .logo-reveal:hover .logo-reveal__mark {
+    rotate: 360deg;
+  }
+
+  .logo-reveal:hover .logo-reveal__wordmark {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    translate: 0 -50%;
+  }
+}
+
+/* Reduced motion: no spin, no slide. The wordmark simply appears. */
+@media (prefers-reduced-motion: reduce) {
+  .logo-reveal__mark,
+  .logo-reveal__wordmark {
+    transition: none;
+  }
+
+  .logo-reveal:hover .logo-reveal__mark,
+  .logo-reveal:focus-visible .logo-reveal__mark {
+    rotate: 0deg;
+  }
+
+  .logo-reveal__wordmark {
+    clip-path: none;
+    translate: 0 -50%;
+  }
+}

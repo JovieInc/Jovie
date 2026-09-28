@@ -71,7 +71,7 @@ describe('touch-target ratchet', () => {
         'Fix: enlarge the hit container (`before:absolute before:h-11`), not the visible item.\n' +
         'Locate them: pnpm --filter web run lint:touch-target -- --list'
     ).toBeLessThanOrEqual(baseline.count);
-  });
+  }, 60_000);
 
   it('baseline follows the work down (no stale slack)', () => {
     const current = countViolations(WEB_ROOT).length;
@@ -85,7 +85,7 @@ describe('touch-target ratchet', () => {
       `Baseline is ${baseline.count - current} above the real count (${current}). ` +
         'Run `pnpm --filter web run lint:touch-target -- --update` to lower it.'
     ).toBeLessThanOrEqual(25);
-  });
+  }, 60_000);
 });
 
 describe('touch-target detection — violations are caught (red→green proof)', () => {

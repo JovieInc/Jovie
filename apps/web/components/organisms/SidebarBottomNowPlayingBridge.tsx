@@ -20,7 +20,9 @@ import {
  * routes through the same `toggleTrack(...)` call as the audio bar so the
  * sidebar mini-player and the persistent bar stay in sync.
  */
-export function SidebarBottomNowPlayingBridge() {
+export function SidebarBottomNowPlayingBridge({
+  collapsed = false,
+}: Readonly<{ collapsed?: boolean }>) {
   const audioChrome = useAudioChromeSnapshot();
   const { playbackState, stop, toggleTrack } = useTrackAudioPlayer();
 
@@ -64,6 +66,7 @@ export function SidebarBottomNowPlayingBridge() {
         onPlay={handlePlay}
         onDismiss={stop}
         onExpand={requestFullAudioPlayer}
+        collapsed={collapsed}
         className='border-0 bg-transparent shadow-none transition-[opacity,transform,background-color] duration-cinematic ease-cinematic'
       />
     </div>

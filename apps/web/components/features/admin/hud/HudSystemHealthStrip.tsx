@@ -47,14 +47,27 @@ function ledgerTone(quarantine: HudMetrics['testing']['quarantine']): HudTone {
   return quarantine.withinRetryBudget ? 'good' : 'warning';
 }
 
+function gbrainEntry(health: HudMetrics['gbrain']): HealthEntry {
+  if (health?.status === 'ok') {
+    return {
+      name: 'gbrain',
+      label: health.version ? `OK · v${health.version}` : 'OK',
+      tone: 'good',
+    };
+  }
+  if (health?.status === 'down') {
+    return { name: 'gbrain', label: 'Down', tone: 'bad' };
+  }
+  // Unconfigured or unreadable: an honest neutral pill, never a guess.
+  return { name: 'gbrain', label: GBRAIN_NO_SIGNAL_LABEL, tone: 'neutral' };
+}
+
 function buildHealthEntries(metrics: HudMetrics): HealthEntry[] {
   const quarantine = metrics.testing.quarantine;
   const jobsRunning = metrics.aiOps.counts.running;
 
   return [
-    // No gbrain health source is wired into the HUD yet — render an honest
-    // neutral pill rather than a fabricated status. Wire when a source lands.
-    { name: 'gbrain', label: GBRAIN_NO_SIGNAL_LABEL, tone: 'neutral' },
+    gbrainEntry(metrics.gbrain),
     {
       name: 'CI',
       label: getDeploymentLabel(metrics.deployments),
@@ -85,12 +98,8 @@ export function HudSystemHealthStrip({
   const entries = buildHealthEntries(metrics);
 
   return (
-    <ContentSurfaceCard
-      surface='details'
-      className='rounded-(--radius-md) p-3 shadow-card-elevated'
-      data-testid='hud-system-health-strip'
-    >
-      <div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
+    <ContentSurfaceCard surface='details' data-testid='hud-system-health-strip'>
+      <div className='flex flex-wrap items-center gap-x-4 gap-y-2 p-3'>
         <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
           System health
         </p>

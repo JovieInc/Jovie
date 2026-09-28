@@ -25,6 +25,7 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   createRateLimitHeaders,
+  trackingClicksLimiter,
   trackingIpClicksLimiter,
 } from '@/lib/rate-limit';
 import { detectPlatformFromUA } from '@/lib/utils';
@@ -420,6 +421,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Profile not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Per-creator bound: a distributed click-inflation attack rotates IPs and
+    // stays under trackingIpClicksLimiter, so also meter by profile identity.
+    // Matches the /api/audience/click creator limit (same limiter/prefix).
+    const creatorRateLimit = await trackingClicksLimiter.limit(profile.id);
+    if (!creatorRateLimit.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', reason: 'Creator rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(creatorRateLimit),
+          },
+        }
       );
     }
 
