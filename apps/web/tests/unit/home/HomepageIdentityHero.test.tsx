@@ -3,12 +3,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  HOMEPAGE_HERO_TEXTURE,
-  HomepageIdentityHero,
-} from '@/components/homepage/HomepageIdentityHero';
-import { HomepageProfileSpecimen } from '@/components/homepage/HomepageProfileSpecimen';
+import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
@@ -64,14 +61,15 @@ describe('HomepageIdentityHero', () => {
 
     const hero = screen.getByTestId('marketing-section-hero');
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveTextContent('A living identity for the internet.');
+    expect(heading).toHaveTextContent('Your living identity on the internet.');
     expect(hero).toHaveAttribute('aria-labelledby', heading.id);
     expect(
       screen.getByText(
         'Your work, your links, your next chapter. Together in your Jovie profile.'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('Jovie / Identity, connected')).toBeInTheDocument();
+    // Pen My0zu (JOV-6914): no kicker above the headline.
+    expect(screen.queryByText('Jovie / Identity, connected')).toBeNull();
 
     expect(screen.getByRole('combobox')).toHaveAttribute(
       'placeholder',
@@ -111,51 +109,30 @@ describe('HomepageIdentityHero', () => {
       'data-marketing-owner',
       'apps/web/components/homepage/HomepageIdentityHero.tsx'
     );
-    const texture = screen.getByTestId('homepage-identity-hero-texture');
-    expect(texture).toHaveAttribute('aria-hidden', 'true');
-    expect(texture).toHaveAttribute(
-      'data-background-image',
-      HOMEPAGE_HERO_TEXTURE.src
-    );
-    const image = texture.querySelector('img');
-    expect(image).toHaveAttribute('src', HOMEPAGE_HERO_TEXTURE.src);
-    expect(image).toHaveAttribute('data-priority', 'true');
-    expect(image).toHaveAttribute('alt', '');
+    // Pen My0zu (JOV-6914): the hero light is pure CSS, no background image.
+    const light = screen.getByTestId('homepage-identity-hero-light');
+    expect(light).toHaveAttribute('aria-hidden', 'true');
+    expect(light).toHaveAttribute('data-hero-visual', 'ion-light');
+    expect(light.querySelector('img')).toBeNull();
     expect(document.querySelectorAll('[data-background-image]')).toHaveLength(
-      1
+      0
     );
     expect(hero.querySelectorAll('video, canvas')).toHaveLength(0);
   });
 
-  it('labels the fictional specimen and keeps its action non-interactive', () => {
+  it("shows Tim White's real jov.ie/tim profile as first-party proof (JOV-6946)", () => {
     render(<HomepageIdentityHero />);
 
-    const specimen = screen.getByTestId('homepage-profile-specimen');
-    expect(specimen).toHaveAttribute('data-illustrative', 'true');
-    expect(
-      within(specimen).getByText('Your Jovie profile · Illustrative preview')
-    ).toBeInTheDocument();
-    const portrait = within(specimen).getByRole('img');
-    expect(portrait).toHaveAttribute(
+    const proof = screen.getByTestId('homepage-hero-real-profile');
+    const screenImage = within(proof).getByRole('img');
+    expect(screenImage).toHaveAttribute(
       'src',
-      '/assets/generated/homepage-avery-chen-portrait-v1.webp'
+      HOMEPAGE_MEDIA_MAP.connected.asset.publicUrl
     );
-    expect(portrait.getAttribute('alt')).toMatch(/fictional example/);
-    expect(within(specimen).queryByRole('link')).toBeNull();
-    expect(within(specimen).queryByRole('button')).toBeNull();
-  });
-
-  it('renders the standalone specimen with a sized portrait and two rows', () => {
-    render(
-      <HomepageProfileSpecimen
-        specimen={HOMEPAGE_IDENTITY_COPY.hero.specimen}
-      />
-    );
-    const specimen = screen.getByTestId('homepage-profile-specimen');
-    expect(within(specimen).getAllByRole('listitem')).toHaveLength(2);
-    const portrait = within(specimen).getByRole('img');
-    expect(portrait).toHaveAttribute('width', '128');
-    expect(portrait).toHaveAttribute('height', '128');
+    expect(screenImage.getAttribute('alt')).toContain('jov.ie/tim');
+    expect(screen.queryByTestId('homepage-profile-specimen')).toBeNull();
+    expect(screen.queryByText(/Avery|Fieldnotes|Illustrative/)).toBeNull();
+    expect(within(proof).queryByRole('link')).toBeNull();
   });
 
   it('keeps hero copy generic and free of em dashes', () => {
@@ -163,13 +140,9 @@ describe('HomepageIdentityHero', () => {
     const copy = [
       seo.title,
       seo.description,
-      hero.eyebrow,
       hero.headline,
       hero.subhead,
-      hero.specimen.name,
-      hero.specimen.bio,
-      hero.specimen.caption,
-      ...hero.specimen.rows.flatMap(row => [row.title, row.detail]),
+      hero.proofAlt,
     ];
     for (const line of copy) {
       expect(line).not.toMatch(ICP_TERMS);
@@ -180,34 +153,23 @@ describe('HomepageIdentityHero', () => {
     expect(container.textContent ?? '').not.toContain('—');
   });
 
-  it('keeps motion CSS-only, bounded, offscreen-paused, and still under reduced motion', () => {
+  it('keeps the hero light static and CSS-only (Pen My0zu, JOV-6914)', () => {
     const source = css();
-    const texture = source.slice(
-      source.indexOf('.homepage-identity-hero__texture {'),
-      source.indexOf('}', source.indexOf('.homepage-identity-hero__texture {'))
+    const light = source.slice(
+      source.indexOf('.homepage-identity-hero__light {'),
+      source.indexOf('}', source.indexOf('.homepage-identity-hero__light {'))
     );
-    expect(texture).toMatch(
-      /animation: homepage-identity-texture-drift 20s ease-in-out infinite/
-    );
-    expect(texture).toContain('content-visibility: auto');
-    const keyframes = source.slice(
-      source.indexOf('@keyframes homepage-identity-texture-drift'),
-      source.indexOf('@media (prefers-reduced-motion: reduce)')
-    );
-    expect(keyframes).toContain('calc(-1 * var(--space-3))');
-    expect(keyframes).toContain('scale(1.02)');
-    expect(keyframes).not.toMatch(/hue-rotate|filter/);
-    expect(source).toMatch(
-      /@media \(prefers-reduced-motion: reduce\) \{\s*\.homepage-identity-hero__texture \{\s*animation: none;/
-    );
-    expect(source.match(/animation:/g)).toHaveLength(2);
+    expect(light).toContain('radial-gradient(');
+    expect(light).toContain('var(--color-accent-blue)');
+    expect(light).not.toMatch(/url\(|animation/);
+    expect(source).not.toContain('homepage-identity-texture-drift');
   });
 
   it('keeps the header and copy legible over the texture with a static scrim', () => {
     const source = css();
     const scrim = source.slice(
       source.indexOf('.homepage-identity-hero::before {'),
-      source.indexOf('.homepage-identity-hero__texture {')
+      source.indexOf('.homepage-identity-hero__light {')
     );
     expect(scrim).toContain('var(--public-shell-header-offset)');
     expect(scrim).toContain('var(--homepage-identity-hero-ground)');

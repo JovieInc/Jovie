@@ -245,6 +245,42 @@ describe('PersistentAudioBar', () => {
     }
   });
 
+  it('converges rendered metadata when the playing release is mutated', () => {
+    setPlaying({
+      releaseTitle: 'Old Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/old.jpg',
+    });
+    const { rerender } = render(<PersistentAudioBar />);
+
+    setPlaying({
+      releaseTitle: 'New Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/new.jpg',
+      trackTitle: 'Renamed Track',
+    });
+    rerender(<PersistentAudioBar />);
+
+    expect(screen.queryByText('Old Title')).toBeNull();
+    expect(screen.getAllByText('Renamed Track').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DJ Cool · New Title').length).toBeGreaterThan(
+      0
+    );
+    for (const artwork of screen.getAllByTestId('artwork-img')) {
+      expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/new.jpg');
+    }
+  });
+
+  it('never renders a collapse/minimize control', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+    render(<PersistentAudioBar />);
+
+    expect(screen.queryByTestId('audio-bar-minimize')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /minimize/i })
+    ).not.toBeInTheDocument();
+  });
+
   it('renders a dismiss control that hides the dock and stops playback', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });

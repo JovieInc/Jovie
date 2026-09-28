@@ -35,7 +35,6 @@ export type HomepageRedesignViewportId =
 export const LIVE_HOMEPAGE_SOURCE_FILES = [
   'apps/web/app/(home)/page.tsx',
   'apps/web/components/homepage/HomepageIdentityHero.tsx',
-  'apps/web/components/homepage/HomepageProfileSpecimen.tsx',
   'apps/web/components/homepage/HomepageIdentity.css',
   'apps/web/data/homepageIdentityCopy.ts',
   'apps/web/components/homepage/HomepageCertifiedSections.tsx',
