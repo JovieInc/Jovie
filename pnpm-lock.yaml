@@ -206,9 +206,15 @@ importers:
 
   apps/docs:
     dependencies:
+      lucide-react:
+        specifier: ^1.47.0
+        version: 1.48.0(react@19.2.8)
       next:
         specifier: 16.3.6
         version: 16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.3)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       nextra:
         specifier: ^4.6.1
         version: 4.6.1(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@26.6.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
