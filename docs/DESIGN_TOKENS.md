@@ -136,7 +136,9 @@ from `ziawi-color-sot-v1` (no parallel theme provider or React-only color root).
 - `--app-shell-header-height`
 - `--app-shell-header-height-compact`
 - `--app-shell-gap`
+- `--app-shell-content-inset`
 - `--app-shell-radius`
+- `--app-shell-radius-nested`
 - `--app-shell-border`
 - `--app-shell-frame-seam`
 - `--app-shell-content-surface`

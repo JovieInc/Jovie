@@ -35,11 +35,14 @@ export type AdminWorkspaceId =
   | 'operations'
   | 'needs_you'
   | 'certifications'
+  | 'ops'
+  | 'shipping'
   | 'people'
   | 'growth'
   | 'platform_connections'
   | 'activity'
   | 'investors'
+  | 'feature_registry'
   | 'screenshots'
   | 'costs'
   | 'revenue_lift'
@@ -72,6 +75,7 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'platform_connections',
   'activity',
   'investors',
+  'feature_registry',
   'screenshots',
   'share_studio',
   'costs',
@@ -132,6 +136,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
+    id: 'shipping',
+    label: 'Shipping',
+    href: APP_ROUTES.ADMIN_SHIPPING,
+    description:
+      'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
+    section: 'workspaces',
+  },
+  {
     id: 'people',
     label: 'People',
     href: APP_ROUTES.ADMIN_PEOPLE,
@@ -158,6 +170,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Investors',
     href: APP_ROUTES.ADMIN_INVESTORS,
     description: 'Fundraising links and investor pipeline utility',
+    section: 'utilities',
+  },
+  {
+    id: 'feature_registry',
+    label: 'Feature Registry',
+    href: APP_ROUTES.ADMIN_FEATURE_REGISTRY,
+    description: 'Founder review packets for canonical product capabilities',
     section: 'utilities',
   },
   {

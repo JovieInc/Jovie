@@ -107,6 +107,28 @@ describe('OperatorMobileNavigation', () => {
     await user.tab();
     expect(within(menu).getByRole('link', { name: 'Product' })).toHaveFocus();
 
+    await user.tab();
+    expect(
+      within(menu).getByRole('link', { name: 'Operations' })
+    ).toHaveFocus();
+
+    await user.tab();
+    expect(within(menu).getByRole('link', { name: 'Needs You' })).toHaveFocus();
+
+    await user.tab();
+    expect(within(menu).getByRole('link', { name: 'Chat' })).toHaveFocus();
+
+    await user.tab();
+    expect(
+      within(menu).getByRole('link', { name: 'Certifications' })
+    ).toHaveFocus();
+
+    await user.tab();
+    expect(within(menu).getByRole('link', { name: 'Shipping' })).toHaveFocus();
+
+    await user.tab();
+    expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
+
     await user.keyboard('{Escape}');
     expect(
       screen.queryByRole('navigation', { name: 'OV Navigation Menu' })
