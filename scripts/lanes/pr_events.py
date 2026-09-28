@@ -31,6 +31,16 @@ TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
 HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
+# Agent/automation-owned prefixes that are not lane branches (a codex run, a manual agent
+# session). Their drafts are still lane-owned work: the reconcile sweep owes them a
+# disposition instead of counting them forever (JOV-7079).
+AGENT_BRANCH = re.compile(r"^(tim|codex|agent|claude|linear|dependabot|devin|hyperagent|n)/")
+# A draft's "keep draft until the parent/dependency lands" note is revalidated against live
+# state every sweep: while the referenced PR is open the draft holds; once it merges or
+# closes the draft is stale work, not parked state.
+DEP_REF = re.compile(
+    r"(?i)(?:blocked\s+by|depends?\s+on|dependency|after|until|waiting\s+on|parent|stacks?\s+on)"
+    r"\D{0,24}?#(\d{3,6})|/(?:pull|pulls)/(\d{3,6})")
 # The cheaper lane owns an attempt first; another lane takes it once this long has passed.
 ESCALATION_GRACE_S = 10 * 60
 # A `green` label whose draft never turns CLEAN (a required check stays red) expires.
@@ -41,6 +51,10 @@ FIX_LEASE_S = 3 * 3600
 # The reconcile sweep recovers missed events only; the relay is the primary path.
 RECONCILE_S = 30 * 60
 STALE_DRAFT_S = 48 * 3600
+# A non-lane agent draft this old that is also stalled (idle past STALE_DRAFT_S, or already
+# conflicting/red) is abandoned work: the sweep closes it unless a dependency it names is
+# still open. Younger or still-moving drafts are left to their writer.
+AGENT_DRAFT_S = 7 * 24 * 3600
 # A PR updated this recently is between events (CI starting, enroll pending), not an orphan.
 ORPHAN_GRACE_S = 30 * 60
 EXHAUSTED = "exhausted"
@@ -182,6 +196,112 @@ def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
     if kind == "green":
         return bool(lane_branch) and bool(pr.get("isDraft"))
     return bool(lane_branch) or not pr.get("isDraft")
+
+
+def agent_owned(pr: dict) -> bool:
+    """Lane branches or an agent/automation prefix (not a human feature branch)."""
+    branch = pr.get("headRefName") or ""
+    return bool(LANE_BRANCH.match(branch) or AGENT_BRANCH.match(branch))
+
+
+def dependency_refs(body: str | None) -> set[int]:
+    """PR numbers a body names as the thing it waits on ("blocked by #n", "pull/n")."""
+    refs = set()
+    for match in DEP_REF.finditer(body or ""):
+        refs.update(int(group) for group in match.groups() if group)
+    return refs
+
+
+def pr_scalar(number: int, field: str, sh=run) -> str:
+    """One field of one PR ("" when unreadable): the body/deps read for stale drafts only."""
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", field,
+                 "--jq", f".{field}"])
+    return (viewed.stdout or "") if viewed.returncode == 0 else ""
+
+
+def stale_agent_drafts(prs: list[dict], now: float) -> list[dict]:
+    """Non-lane agent drafts past the age SLO that are stalled, the set the sweep revalidates
+    dependencies for (lane branches already supersede/close inside the plan)."""
+    return [pr for pr in prs if abandoned_agent_draft(pr, now)]
+
+
+def abandoned_agent_draft(pr: dict, now: float) -> bool:
+    """A draft the lanes do not gate (not a lane branch) on an agent-owned prefix, old enough
+    that age alone is the governor signal, and demonstrably stalled: idle past the stale SLO
+    or already conflicting/red. A recently pushed draft still in motion is left alone."""
+    branch = pr.get("headRefName") or ""
+    if not pr.get("isDraft") or LANE_BRANCH.match(branch) or not AGENT_BRANCH.match(branch):
+        return False
+    created = iso_ts(pr.get("createdAt"))
+    if created is None or now - created <= AGENT_DRAFT_S:
+        return False
+    updated = iso_ts(pr.get("updatedAt"))
+    idle = now - updated if updated is not None else AGENT_DRAFT_S
+    return idle > STALE_DRAFT_S or pr.get("mergeStateStatus") == "DIRTY" \
+        or pr.get("rollup") in ("FAILURE", "ERROR")
+
+
+def open_dependencies(prs: list[dict], now: float, sh=run) -> dict[int, list[int]]:
+    """{draft number: dependency PR numbers still open}. A dependency that merged or closed
+    no longer holds the draft; an absent/unreadable body is no dependency."""
+    open_numbers = {pr["number"] for pr in prs}
+    deps: dict[int, list[int]] = {}
+    for pr in stale_agent_drafts(prs, now):
+        refs = dependency_refs(pr_scalar(pr["number"], "body", sh)) - {pr["number"]}
+        waiting = [n for n in sorted(refs)
+                   if n in open_numbers or pr_scalar(n, "state", sh).upper() == "OPEN"]
+        if waiting:
+            deps[pr["number"]] = waiting
+    return deps
+
+
+def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int, now: float) -> list[dict]:
+    """One truthful disposition per open PR, oldest first (JOV-7079): the reconcile sweep's
+    record is what the doctor and the shipping cockpit render, so an old draft with no
+    advancing event shows its blocker instead of sitting silent."""
+    closing = {number: why for number, why in plan["close"]}
+    dep_holds = {number: waiting for number, waiting in plan["depHolds"]}
+    labeled = {number: kind for number, kind in plan["label"]}
+    rows = []
+    for pr in prs:
+        number, labels = pr["number"], label_names(pr)
+        updated = iso_ts(pr.get("updatedAt"))
+        created = iso_ts(pr.get("createdAt"))
+        idle_s = now - updated if updated is not None else 0
+        holds = ({label.lower() for label in labels} & HOLD_LABELS) or (
+            {EXHAUSTED} if PREFIX + EXHAUSTED in labels else set())
+        live = [kind[len(PREFIX):] for kind in labels
+                if kind.startswith(PREFIX) and kind[len(PREFIX):] in FIX_KINDS + TICK_KINDS]
+        row = {"pr": number, "draft": bool(pr.get("isDraft")),
+               "ageH": round((now - created) / 3600, 1) if created is not None else None,
+               "idleH": round(idle_s / 3600, 1), "head": pr.get("headRefName")}
+        if number in closing:
+            row.update(state="closing", reason=closing[number], next="closed this sweep")
+        elif number in dep_holds:
+            row.update(state="hold:dependency", reason="waits on " + ", ".join(f"#{n}" for n in dep_holds[number]),
+                       next="revalidated every sweep; goes stale when the dependency lands")
+        elif holds:
+            row.update(state="hold:" + sorted(holds)[0], next="explicit hold; rechecked every sweep")
+        elif live or number in labeled:
+            kind = labeled.get(number) or live[0]
+            row.update(state="advancing", reason=f"{PREFIX}{kind}",
+                       next="a lane works the labeled event")
+        elif pr.get("isInMergeQueue"):
+            row.update(state="queued", next="the merge queue lands or ejects it")
+        elif pr.get("mergeStateStatus") == "CLEAN" and not pr.get("isDraft"):
+            row.update(state="ready", next="enroll in the merge queue")
+        elif pr.get("rollup") in ("PENDING", "EXPECTED") or idle_s < ORPHAN_GRACE_S:
+            row.update(state="advancing", reason="settling", next="its own checks/events report")
+        elif attempts.get(str(number), {}).get("count", 0) >= max_attempts:
+            row.update(state="hold:fix-exhausted", next="bug intake / the pool")
+        elif pr.get("isDraft"):
+            row.update(state="draft", reason="inside the 48h stale SLO",
+                       next="its writer, or the sweep at the SLO")
+        else:
+            row.update(state="orphaned", next="orphan-prs alert")
+        rows.append(row)
+    rows.sort(key=lambda row: -(row["ageH"] or 0))
+    return rows[:100]
 
 
 def label_names(pr: dict) -> list[str]:
@@ -467,9 +587,11 @@ def linear_issue(linear, identifier: str) -> dict | None:
 
 def return_to_pool(lane, linear, pr: dict, why: str) -> None:
     """Close a disabled lane's PR and put its issue back in Todo for a live lane."""
-    lane.sh(["gh", "pr", "close", str(pr["number"]), "--repo", lane.REPO_SLUG, "--comment",
-             f"🤖 lanes: closing this {why}; the issue goes back to the pool for a live lane."])
     found = LANE_BRANCH.match(pr.get("headRefName") or "")
+    tail = "the issue goes back to the pool for a live lane." if found else \
+        "reopen it if the work is still wanted."
+    lane.sh(["gh", "pr", "close", str(pr["number"]), "--repo", lane.REPO_SLUG, "--comment",
+             f"🤖 lanes: closing this {why}; {tail}"])
     try:
         issue = linear_issue(linear, found.group("issue")) if found else None
         if issue and issue["state"]["type"] not in ("completed", "canceled"):
@@ -533,7 +655,7 @@ def ledger(host, receipt: dict) -> None:
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
 pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title url isDraft
-headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository updatedAt labels(first:30){nodes{name}}
+headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue isCrossRepository createdAt updatedAt labels(first:30){nodes{name}}
 commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
 
 
@@ -564,11 +686,16 @@ def open_prs_state(lane) -> list[dict] | None:
     return prs
 
 
-def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_attempts: int, now: float) -> dict:
+def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_attempts: int, now: float,
+                   deps: dict | None = None) -> dict:
     """Pure: what the sweep changes, and which open PRs nobody owns. The invariant: every open
     non-draft PR is in the merge queue, carries a fix label the lanes will still act on, or is
-    held with a reason (a hold label, or `lane-fix-exhausted` after bug intake)."""
-    plan = {"label": [], "unlabel": [], "reset": [], "stale": [], "close": [], "orphans": [], "counts": {}}
+    held with a reason (a hold label, or `lane-fix-exhausted` after bug intake). JOV-7079:
+    every open PR also gets one truthful disposition in `dispositions`, and a stale
+    agent-owned draft is either advancing (a `stale` label a lane will work), held on a
+    still-open dependency (`depHolds`), or closed — never just counted forever."""
+    plan = {"label": [], "unlabel": [], "reset": [], "stale": [], "close": [], "orphans": [],
+            "depHolds": [], "dispositions": [], "counts": {}}
     lane_groups: dict[str, list[dict]] = {}
     for pr in prs:
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
@@ -589,6 +716,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         counts["cleanNotQueued"] += pr.get("mergeStateStatus") == "CLEAN" and not pr.get("isInMergeQueue") \
             and not pr.get("isDraft")
         counts["exhausted"] += PREFIX + EXHAUSTED in labels
+        counts.setdefault("staleAgentDrafts", 0)
         if pr.get("mergeStateStatus") == "CLEAN" or pr.get("isInMergeQueue"):
             plan["reset"].append(number)  # the stuck episode is over: attempts and sync start fresh
             if PREFIX + EXHAUSTED in labels:
@@ -603,10 +731,9 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         if pr.get("isDraft") and pr.get("mergeStateStatus") == "CLEAN":
             wanted.append("green")
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
-        if pr.get("isDraft") and age > STALE_DRAFT_S:
-            if not found:
-                counts["staleOtherDrafts"] += 1
-            else:
+        stalled_agent_draft = abandoned_agent_draft(pr, now)
+        if pr.get("isDraft") and (age > STALE_DRAFT_S or stalled_agent_draft):
+            if found:
                 counts["staleLaneDrafts"] += 1
                 group = lane_groups.get(found.group("issue"), [pr])
                 best = max(group, key=lambda item: (not item.get("isDraft"), item.get("mergeStateStatus") != "DIRTY",
@@ -618,6 +745,21 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                     plan["close"].append((number, "stale for 48h after its fix attempts ran out"))
                     continue
                 wanted.append("stale")
+            elif agent_owned(pr):
+                waiting_on = (deps or {}).get(number) if stalled_agent_draft else None
+                if waiting_on:
+                    counts["staleAgentDrafts"] += 1
+                    plan["depHolds"].append((number, waiting_on))
+                elif stalled_agent_draft:
+                    opened = iso_ts(pr.get("createdAt"))
+                    days = int((now - opened) // 86400) if opened is not None else int(age // 86400)
+                    plan["close"].append((number, f"abandoned agent draft: open {days}d with no "
+                                                  "advancing event and no open dependency"))
+                    continue
+                else:
+                    counts["staleAgentDrafts"] += 1
+            else:
+                counts["staleOtherDrafts"] += 1
         scope_kind = {"green": "green"}
         for kind in wanted:
             if PREFIX + kind not in labels and in_scope(pr, scope_kind.get(kind, "red"), disabled):
@@ -631,6 +773,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         if not (held or queued or settling):
             plan["orphans"].append(number)
     plan["counts"] = counts
+    plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now)
     return plan
 
 
@@ -645,7 +788,9 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         return None
     providers = lane.load_providers()
     disabled = set(providers) - set(cost_order(providers))
-    plan = reconcile_plan(prs, read_state(host, "fix-attempts.json"), disabled, lane.MAX_FIX_ATTEMPTS, now)
+    deps = open_dependencies(prs, now, lane.sh)
+    plan = reconcile_plan(prs, read_state(host, "fix-attempts.json"), disabled, lane.MAX_FIX_ATTEMPTS, now,
+                          deps)
     for number, kind in plan["label"]:
         add_label(number, kind, lane.sh)
     for number, kind in plan["unlabel"]:
@@ -670,7 +815,8 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         else:
             lane.sh(["gh", "pr", "close", str(number), "--repo", lane.REPO_SLUG, "--comment", f"🤖 lanes: closing this {why}."])
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
-              "closed": [number for number, _ in plan["close"]], "orphans": plan["orphans"]}
+              "closed": [number for number, _ in plan["close"]], "orphans": plan["orphans"],
+              "depHolds": plan["depHolds"], "dispositions": plan["dispositions"]}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
     return record
 

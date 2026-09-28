@@ -1284,6 +1284,26 @@ class UpdateTest(unittest.TestCase):
                     os.environ["LANES_SELFTEST"] = old_env
 
 
+class UpdateBackoffTest(unittest.TestCase):
+    def test_a_refused_tree_backs_off_instead_of_stalling_every_dispatch_tick(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp) / "state", repo=Path(tmp) / "no-repo")
+            host.state.mkdir()
+            real = lane.sh
+            lane.sh = lambda cmd, **k: SimpleNamespace(returncode=0, stderr="", stdout="t1\n" if "rev-parse" in cmd else "")
+            try:
+                refused = host.state / "update-refused.json"
+                refused.write_text(json.dumps({"tree": "t1", "at": time.time(), "why": "self-test timeout"}))
+                self.assertEqual(lane.install_release(host), 1)
+                self.assertFalse((host.state / "releases").exists(), "no self-test ran inside the backoff window")
+                refused.write_text(json.dumps({"tree": "t1", "at": time.time() - lane.UPDATE_RETRY_S - 1}))
+                with self.assertRaises(Exception):  # past the window it tries again (git archive here fails)
+                    lane.install_release(host)
+                self.assertTrue((host.state / "releases").exists())
+            finally:
+                lane.sh = real
+
+
 class RequeueTest(unittest.TestCase):
     def test_a_failed_enqueue_is_retried_until_queued_and_dropped_when_the_head_moves(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -47,6 +49,13 @@ const baseProps = {
   allowPhotoDownloads: true,
   showOldReleases: false,
 };
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('ProfileAboutTab', () => {
   describe('read-only mode', () => {
@@ -225,5 +234,13 @@ describe('ProfileAboutTab', () => {
 
       expect(onGenresChange).toHaveBeenCalledWith(['electronic']);
     });
+  });
+
+  it('imports LINEAR_SURFACE from the canonical token module', () => {
+    const source = readWebSource(
+      'components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx'
+    );
+    expect(source).toContain('@/components/tokens/linear-surface');
+    expect(source).not.toContain("dashboard/tokens'");
   });
 });

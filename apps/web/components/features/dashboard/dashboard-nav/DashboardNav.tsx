@@ -7,13 +7,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { toast } from '@/components/feedback';
+import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   useSidebar,
-} from '@/components/organisms/Sidebar';
-import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+} from '@/components/organisms/sidebar';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import {
   readThreadReadState,

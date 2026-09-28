@@ -10,7 +10,7 @@ import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { SidebarMenuItem } from '@/components/organisms/Sidebar';
+import { SidebarMenuItem } from '@/components/organisms/sidebar';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
