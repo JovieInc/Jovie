@@ -925,10 +925,13 @@ test('real pinned SDK preserves evaluation billing metadata and restricts free r
   });
   assert.equal(calls, 1);
   assert.equal(raw.providerMetadata.gateway.gatewayCost, '0.000');
-  assert.deepEqual(
-    raw.answers.alignment.probabilities,
-    freeResult().answers.alignment.probabilities
-  );
+  assert.equal(raw.answers.alignment.type, 'choice');
+  if (raw.answers.alignment.type === 'choice') {
+    assert.deepEqual(
+      raw.answers.alignment.probabilities,
+      freeResult().answers.alignment.probabilities
+    );
+  }
 });
 
 test('malformed distributions cannot become evidence, and valid evidence is immutable', async () => {
