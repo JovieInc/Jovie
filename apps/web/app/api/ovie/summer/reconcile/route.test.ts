@@ -307,17 +307,20 @@ describe('GET /api/ovie/summer/reconcile', () => {
   it.each([
     ['unsupported session identity', { sessionId: 'run_unknown' }],
     ['empty turn identity', { turnId: '' }],
-  ])('rejects %s as an invalid result without persistence', async (_field, drift) => {
-    mocks.fetchSummerShadow.mockResolvedValue(resultResponse(drift));
+  ])(
+    'rejects %s as an invalid result without persistence',
+    async (_field, drift) => {
+      mocks.fetchSummerShadow.mockResolvedValue(resultResponse(drift));
 
-    const response = await GET();
+      const response = await GET();
 
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'invalid_summer_result',
-    });
-    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'invalid_summer_result',
+      });
+      expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not persist a failed terminal result', async () => {
     mocks.fetchSummerShadow.mockResolvedValue(

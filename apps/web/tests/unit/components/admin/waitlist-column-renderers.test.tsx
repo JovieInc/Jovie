@@ -46,13 +46,16 @@ describe('waitlist column renderers', () => {
     ['rejected', 'Rejected', 'bg-(--color-error-subtle)'],
     ['expired', 'Expired', 'bg-(--color-warning-subtle)'],
     ['blocked', 'Blocked', 'bg-(--color-error-subtle)'],
-  ] as const)('renders %s as a small badge with consistent table sizing', (status, label, expectedClassToken) => {
-    render(renderStatusCell(status));
+  ] as const)(
+    'renders %s as a small badge with consistent table sizing',
+    (status, label, expectedClassToken) => {
+      render(renderStatusCell(status));
 
-    const badge = screen.getByText(label);
+      const badge = screen.getByText(label);
 
-    expect(badge.className).toContain('text-3xs');
-    expect(badge.className).not.toContain('text-[10px]');
-    expect(badge.className).toContain(expectedClassToken);
-  });
+      expect(badge.className).toContain('text-3xs');
+      expect(badge.className).not.toContain('text-[10px]');
+      expect(badge.className).toContain(expectedClassToken);
+    }
+  );
 });

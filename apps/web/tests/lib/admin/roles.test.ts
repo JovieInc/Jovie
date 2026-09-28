@@ -135,18 +135,18 @@ describe('Admin Roles', () => {
       { userStatus: 'banned', deletedAt: null },
       { userStatus: 'suspended', deletedAt: null },
       { userStatus: 'active', deletedAt: new Date('2026-07-22T00:00:00Z') },
-    ])('denies an admin whose lifecycle is blocked: $userStatus/$deletedAt', async ({
-      userStatus,
-      deletedAt,
-    }) => {
-      const mockUserId = `blocked-${userStatus}-${deletedAt ? 'deleted' : 'live'}`;
-      mockDbResult([{ isAdmin: true, userStatus, deletedAt }]);
+    ])(
+      'denies an admin whose lifecycle is blocked: $userStatus/$deletedAt',
+      async ({ userStatus, deletedAt }) => {
+        const mockUserId = `blocked-${userStatus}-${deletedAt ? 'deleted' : 'live'}`;
+        mockDbResult([{ isAdmin: true, userStatus, deletedAt }]);
 
-      const result = await isAdmin(mockUserId);
+        const result = await isAdmin(mockUserId);
 
-      expect(result).toBe(false);
-      expect(mockCheckUserStatus).toHaveBeenCalledWith(userStatus, deletedAt);
-    });
+        expect(result).toBe(false);
+        expect(mockCheckUserStatus).toHaveBeenCalledWith(userStatus, deletedAt);
+      }
+    );
 
     it('revalidates a cached positive against the current lifecycle state', async () => {
       const mockUserId = 'user_cached_admin_now_banned';

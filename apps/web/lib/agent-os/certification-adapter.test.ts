@@ -692,17 +692,20 @@ describe('MarketingCertificationStore', () => {
       },
       'cannot satisfy more than one requirement',
     ],
-  ])('rejects malformed assurance mapping: %s', async (_label, profile, error) => {
-    const store = new MarketingCertificationStore(memoryBackend(), [
-      REGISTRY[0],
-    ]);
-    await expect(
-      store.projectReviewReady({
-        assuranceProfiles: [profile as MarketingAssuranceProfile],
-        existingEntryId: null,
-      })
-    ).rejects.toThrow(error);
-  });
+  ])(
+    'rejects malformed assurance mapping: %s',
+    async (_label, profile, error) => {
+      const store = new MarketingCertificationStore(memoryBackend(), [
+        REGISTRY[0],
+      ]);
+      await expect(
+        store.projectReviewReady({
+          assuranceProfiles: [profile as MarketingAssuranceProfile],
+          existingEntryId: null,
+        })
+      ).rejects.toThrow(error);
+    }
+  );
 
   it('rejects ambiguous, stale-source, unknown, and duplicate assurance mappings', async () => {
     const entry = REGISTRY[0];
@@ -1080,18 +1083,17 @@ describe('MarketingCertificationStore', () => {
     ).rejects.toThrow('has no resolved canonical source');
   });
 
-  it.each([
-    42,
-    '{',
-    '{}',
-  ] as const)('fails closed for corrupt ledger %j', async raw => {
-    const backend = memoryBackend(
-      new Map([[MARKETING_CERTIFICATION_STORE_KEY, raw]])
-    );
-    await expect(
-      new MarketingCertificationStore(backend, REGISTRY).projectLedger()
-    ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
-  });
+  it.each([42, '{', '{}'] as const)(
+    'fails closed for corrupt ledger %j',
+    async raw => {
+      const backend = memoryBackend(
+        new Map([[MARKETING_CERTIFICATION_STORE_KEY, raw]])
+      );
+      await expect(
+        new MarketingCertificationStore(backend, REGISTRY).projectLedger()
+      ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
+    }
+  );
 
   it('rejects persisted packet, decision, audit, and replay corruption', async () => {
     for (const corruption of [

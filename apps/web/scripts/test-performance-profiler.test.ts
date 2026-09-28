@@ -338,25 +338,28 @@ describe('TestPerformanceProfiler fail-closed behavior', () => {
         ),
       expected: 'vitestJsonDuration(nonSkippedMissingOrInvalid=1)',
     },
-  ])('rejects $name even when console timings look complete', async scenario => {
-    const cwd = createWorkspace();
-    seedBaseline(cwd);
-    let invocation = 0;
-    const profiler = createProfiler(cwd, () => {
-      invocation += 1;
-      if (invocation === 1) {
-        return commandResult({ stdout: 'Duration 1.0s (setup 0.2s)' });
-      }
-      scenario.writeJson(cwd);
-      return commandResult({
-        stdout:
-          '✓ tests/unit/example.test.ts (1 test) 20ms\nDuration 2.0s (transform 100ms, tests 400ms, environment 500ms)',
+  ])(
+    'rejects $name even when console timings look complete',
+    async scenario => {
+      const cwd = createWorkspace();
+      seedBaseline(cwd);
+      let invocation = 0;
+      const profiler = createProfiler(cwd, () => {
+        invocation += 1;
+        if (invocation === 1) {
+          return commandResult({ stdout: 'Duration 1.0s (setup 0.2s)' });
+        }
+        scenario.writeJson(cwd);
+        return commandResult({
+          stdout:
+            '✓ tests/unit/example.test.ts (1 test) 20ms\nDuration 2.0s (transform 100ms, tests 400ms, environment 500ms)',
+        });
       });
-    });
 
-    await expect(profiler.runPerformanceAnalysis()).rejects.toMatchObject({
-      details: expect.stringContaining(scenario.expected),
-    });
-    expectBaselinePreserved(cwd);
-  });
+      await expect(profiler.runPerformanceAnalysis()).rejects.toMatchObject({
+        details: expect.stringContaining(scenario.expected),
+      });
+      expectBaselinePreserved(cwd);
+    }
+  );
 });

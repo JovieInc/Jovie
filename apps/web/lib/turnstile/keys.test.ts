@@ -48,14 +48,12 @@ describe('shouldUseTurnstileDummyKeys', () => {
     expect(shouldUseTurnstileDummyKeys(host)).toBe(true);
   });
 
-  it.each([
-    'jov.ie',
-    'www.jov.ie',
-    'staging.jov.ie',
-    'main.jov.ie',
-  ])('does not use dummy keys on allowlisted host %s', host => {
-    expect(shouldUseTurnstileDummyKeys(host)).toBe(false);
-  });
+  it.each(['jov.ie', 'www.jov.ie', 'staging.jov.ie', 'main.jov.ie'])(
+    'does not use dummy keys on allowlisted host %s',
+    host => {
+      expect(shouldUseTurnstileDummyKeys(host)).toBe(false);
+    }
+  );
 
   it('does not force dummy keys when hostname is unknown (SSR-safe)', () => {
     expect(shouldUseTurnstileDummyKeys(null)).toBe(false);

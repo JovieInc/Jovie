@@ -189,19 +189,22 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       'invalid_event',
     ],
     ['oversized body', 'x'.repeat(32 * 1024 + 1), 413, 'body_too_large'],
-  ])('rejects %s before obtaining a Function token', async (_name, body, status, code) => {
-    const response = await POST(
-      new Request('https://jov.ie/api/internal/ovie/summer-shadow', {
-        method: 'POST',
-        headers: { authorization: 'Bearer test-cron-secret' },
-        body,
-      })
-    );
+  ])(
+    'rejects %s before obtaining a Function token',
+    async (_name, body, status, code) => {
+      const response = await POST(
+        new Request('https://jov.ie/api/internal/ovie/summer-shadow', {
+          method: 'POST',
+          headers: { authorization: 'Bearer test-cron-secret' },
+          body,
+        })
+      );
 
-    expect(response.status).toBe(status);
-    await expect(response.json()).resolves.toMatchObject({ code });
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toMatchObject({ code });
+      expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+    }
+  );
 
   it('proxies a signed, read-only durable stream from an exact cursor', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(

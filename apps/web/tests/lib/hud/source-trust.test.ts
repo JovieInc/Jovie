@@ -78,15 +78,15 @@ describe('source-trust freshness helpers', () => {
     expect(isSourceStale(fetchedAtIso, now)).toBe(true);
   });
 
-  it.each([
-    'invalid',
-    '2026-06-08T12:01:00.000Z',
-  ])('does not format invalid or future timestamps as fresh: %s', value => {
-    expect(formatSourceFreshness(value, Date.parse(fetchedAtIso))).toBe(
-      'time unknown'
-    );
-    expect(isSourceStale(value, Date.parse(fetchedAtIso))).toBe(false);
-  });
+  it.each(['invalid', '2026-06-08T12:01:00.000Z'])(
+    'does not format invalid or future timestamps as fresh: %s',
+    value => {
+      expect(formatSourceFreshness(value, Date.parse(fetchedAtIso))).toBe(
+        'time unknown'
+      );
+      expect(isSourceStale(value, Date.parse(fetchedAtIso))).toBe(false);
+    }
+  );
 });
 
 describe('buildHudMetricSources', () => {

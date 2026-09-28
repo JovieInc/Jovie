@@ -721,47 +721,51 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByTestId('opportunity-inbox-filter-empty')).toBeVisible();
   });
 
-  it.each([
-    '{ArrowRight}',
-    '{ArrowLeft}',
-  ])('does not restore stack focus after a failed %s action', async key => {
-    const user = userEvent.setup();
-    inboxHomeEnabled = true;
-    mutateMock.mockImplementation((_id, options) => {
-      options?.onError?.();
-    });
-    mutateAsyncMock.mockRejectedValueOnce(new Error('decision failed'));
+  it.each(['{ArrowRight}', '{ArrowLeft}'])(
+    'does not restore stack focus after a failed %s action',
+    async key => {
+      const user = userEvent.setup();
+      inboxHomeEnabled = true;
+      mutateMock.mockImplementation((_id, options) => {
+        options?.onError?.();
+      });
+      mutateAsyncMock.mockRejectedValueOnce(new Error('decision failed'));
 
-    render(
-      <OpportunityInboxPageClient
-        inbox={{
-          cards: [
-            {
-              id: 'card-1',
-              sourceKind: 'test.suggestion',
-              signalType: 'other' as const,
-              typeLabel: 'Suggestion',
-              createdAt: '2026-06-28T10:00:00.000Z',
-              title: 'Detroit listeners up 340%',
-              why: 'Promoter email matched your Detroit growth spike.',
-              primaryActionLabel: 'Review pitch',
-              status: 'pending' as const,
-              category: 'suggestion' as const,
-            },
-          ],
-          emptyActionCards: [],
-        }}
-      />
-    );
+      render(
+        <OpportunityInboxPageClient
+          inbox={{
+            cards: [
+              {
+                id: 'card-1',
+                sourceKind: 'test.suggestion',
+                signalType: 'other' as const,
+                typeLabel: 'Suggestion',
+                createdAt: '2026-06-28T10:00:00.000Z',
+                title: 'Detroit listeners up 340%',
+                why: 'Promoter email matched your Detroit growth spike.',
+                primaryActionLabel: 'Review pitch',
+                status: 'pending' as const,
+                category: 'suggestion' as const,
+              },
+            ],
+            emptyActionCards: [],
+          }}
+        />
+      );
 
-    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
-    await user.keyboard(key);
-    const songs = screen.getByRole('button', { name: 'Songs' });
-    await user.click(songs);
+      screen
+        .getByRole('button', { name: 'Review Current Opportunity' })
+        .focus();
+      await user.keyboard(key);
+      const songs = screen.getByRole('button', { name: 'Songs' });
+      await user.click(songs);
 
-    expect(songs).toHaveFocus();
-    expect(screen.getByTestId('opportunity-inbox-filter-empty')).toBeVisible();
-  });
+      expect(songs).toHaveFocus();
+      expect(
+        screen.getByTestId('opportunity-inbox-filter-empty')
+      ).toBeVisible();
+    }
+  );
 
   it('returns focus to a queue item restored after an asynchronous failure', async () => {
     const user = userEvent.setup();

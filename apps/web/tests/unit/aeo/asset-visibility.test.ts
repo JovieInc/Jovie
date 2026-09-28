@@ -237,24 +237,27 @@ describe('asset visibility', () => {
     ['up', ranked(2), oldRanked(5), 0],
     ['down', ranked(5), oldRanked(2), 0],
     ['steady', ranked(5), oldRanked(5), 0],
-  ] as const)('classifies a comparable %s trend', (status, current, previous, rate) => {
-    const report = buildAssetVisibilityReport({
-      asset: asset(),
-      current: [current],
-      previous: [previous],
-    });
-    expect(report.trend).toMatchObject({
-      comparable: true,
-      status,
-      appearanceRateDelta: rate,
-    });
-    if (status === 'down')
-      expect(
-        report.actions.some(
-          action => action.code === 'investigate_visibility_decline'
-        )
-      ).toBe(true);
-  });
+  ] as const)(
+    'classifies a comparable %s trend',
+    (status, current, previous, rate) => {
+      const report = buildAssetVisibilityReport({
+        asset: asset(),
+        current: [current],
+        previous: [previous],
+      });
+      expect(report.trend).toMatchObject({
+        comparable: true,
+        status,
+        appearanceRateDelta: rate,
+      });
+      if (status === 'down')
+        expect(
+          report.actions.some(
+            action => action.code === 'investigate_visibility_decline'
+          )
+        ).toBe(true);
+    }
+  );
 
   it('uses rank movement inside the appearance-rate noise band', () => {
     const observations = Array.from({ length: 20 }, (_, index) => ({
