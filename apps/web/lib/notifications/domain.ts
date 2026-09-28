@@ -1332,32 +1332,29 @@ export const updateContentPreferencesDomain = async (
       );
     }
 
+    const subs = notificationSubscriptions;
+
     // Build WHERE clause to find all matching subscriptions for this artist
     const contactClauses: Array<ReturnType<typeof eq>> = [];
     if (normalizedEmail) {
-      contactClauses.push(eq(notificationSubscriptions.email, normalizedEmail));
+      contactClauses.push(eq(subs.email, normalizedEmail));
     }
     if (normalizedPhone) {
-      contactClauses.push(eq(notificationSubscriptions.phone, normalizedPhone));
+      contactClauses.push(eq(subs.phone, normalizedPhone));
     }
 
     // First read existing preferences so we can merge
     const existing = await db
       .select({
-        id: notificationSubscriptions.id,
-        email: notificationSubscriptions.email,
-        preferences: notificationSubscriptions.preferences,
-        channel: notificationSubscriptions.channel,
-        artistEmailOptInAt: notificationSubscriptions.artistEmailOptInAt,
-        artistEmailOptOutAt: notificationSubscriptions.artistEmailOptOutAt,
+        id: subs.id,
+        email: subs.email,
+        preferences: subs.preferences,
+        channel: subs.channel,
+        artistEmailOptInAt: subs.artistEmailOptInAt,
+        artistEmailOptOutAt: subs.artistEmailOptOutAt,
       })
-      .from(notificationSubscriptions)
-      .where(
-        and(
-          eq(notificationSubscriptions.creatorProfileId, artist_id),
-          or(...contactClauses)
-        )
-      )
+      .from(subs)
+      .where(and(eq(subs.creatorProfileId, artist_id), or(...contactClauses)))
       .limit(2);
 
     if (existing.length === 0) {
@@ -1417,10 +1414,10 @@ export const updateContentPreferencesDomain = async (
       }
 
       const [updated] = await db
-        .update(notificationSubscriptions)
+        .update(subs)
         .set(nextValues)
-        .where(eq(notificationSubscriptions.id, row.id))
-        .returning({ id: notificationSubscriptions.id });
+        .where(eq(subs.id, row.id))
+        .returning({ id: subs.id });
 
       if (updated) totalUpdated++;
     }
