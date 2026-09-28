@@ -163,6 +163,8 @@ function getNewestPublicRelease(
 }
 
 interface ProfileCompactSurfaceProps {
+  /** Opens the release credits sheet from the overflow menu. */
+  readonly onOpenReleaseCredits?: () => void;
   readonly renderMode?: ProfileRenderMode;
   readonly presentation?: ProfileSurfacePresentation;
   readonly artist: Artist;
@@ -180,6 +182,14 @@ interface ProfileCompactSurfaceProps {
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly profilePacAssignment?: ProfilePacAssignment;
+  /**
+   * False while the per-user experiment assignment is still resolving
+   * (AnonCookieBootstrap fetch in flight). Variant-dependent fan-capture
+   * CTAs stay unmounted until this is true so the assigned control never
+   * morphs post-paint. Defaults to true for surfaces without bootstrap
+   * (marketing embeds, previews).
+   */
+  readonly visitorAssignmentResolved?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -270,6 +280,7 @@ function resolveActivePrimaryTab(params: {
 export function ProfileCompactSurface({
   renderMode = 'interactive',
   presentation = 'standalone',
+  onOpenReleaseCredits,
   artist,
   socialLinks,
   contacts,
@@ -282,6 +293,7 @@ export function ProfileCompactSurface({
   subscribeTwoStep = false,
   alertOptInVariant = 'button',
   profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  visitorAssignmentResolved = true,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -481,6 +493,16 @@ export function ProfileCompactSurface({
     isSignedIn,
     forceHidden: hideBackButton || isNotificationsFlowOpen,
   });
+
+  // A pending reveal buffered before the hero CTA mounts is satisfied by the
+  // subscribe tab itself (its inline capture flow opens on mount). Clear it
+  // once the subscribe tab is active so returning home does not unexpectedly
+  // re-open the overlay.
+  useEffect(() => {
+    if (activeVisiblePrimaryTab === 'subscribe') {
+      pendingNotificationsOpenRef.current = false;
+    }
+  }, [activeVisiblePrimaryTab]);
 
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
@@ -693,6 +715,7 @@ export function ProfileCompactSurface({
           )}
         >
           {canGetUpdates &&
+          visitorAssignmentResolved &&
           shouldRenderInteractiveOverlays &&
           activeVisiblePrimaryTab !== 'subscribe' ? (
             <ProfileInlineNotificationsCTA
@@ -806,6 +829,7 @@ export function ProfileCompactSurface({
                 enableDynamicEngagement={enableDynamicEngagement}
                 subscribeTwoStep={subscribeTwoStep}
                 alertOptInVariant={alertOptInVariant}
+                visitorAssignmentResolved={visitorAssignmentResolved}
                 isSubscribed={isSubscribed}
                 contentPrefs={contentPrefs}
                 onTogglePref={onTogglePref}
@@ -871,6 +895,7 @@ export function ProfileCompactSurface({
           creditSegments={creditSegments}
           tourDates={tourDates}
           releases={releases}
+          onOpenReleaseCredits={onOpenReleaseCredits}
         />
       ) : null}
     </div>

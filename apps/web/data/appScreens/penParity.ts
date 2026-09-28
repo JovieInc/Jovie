@@ -407,6 +407,27 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
   },
 ];
 
+export interface PenReferenceHold {
+  readonly decisionId: `D${number}`;
+  /** Pen master whose reference eligibility waits on the decision. */
+  readonly masterId: string;
+  readonly recordedOn: string;
+  readonly summary: string;
+}
+
+/**
+ * Pending design decisions that block Pen reference eligibility without a
+ * single geometry value to compare (anatomy or ownership questions).
+ */
+export const APP_SCREEN_PEN_REFERENCE_HOLDS: readonly PenReferenceHold[] = [
+  {
+    decisionId: 'D6',
+    masterId: 'RosMb',
+    recordedOn: '2026-09-27',
+    summary:
+      'One entity header: Pen odpZ8 vs five code header variants. RosMb instances odpZ8, so its anatomy waits on that owner decision.',
+  },
+];
 /** Reads one property of a master or slot from the committed export. */
 export function penParityValue(
   exported: AppScreenPenGeometryExport,
