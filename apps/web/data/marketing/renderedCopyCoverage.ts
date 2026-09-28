@@ -150,7 +150,7 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
       { id: 'claim-free', statement: 'Claim my free profile.' },
       { id: 'request-access', statement: 'Request access to Pro.' },
       { id: 'contact-sales', statement: 'Contact sales for Enterprise.' },
-      { id: 'explore-profiles', statement: 'Explore Artist Profiles.' },
+      { id: 'explore-profiles', statement: 'Explore Jovie Profiles.' },
     ],
     sections: [
       briefSection(
@@ -295,7 +295,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         body: 'Jovie profiles are free forever. Artist Visibility Pro is $199/month with limited access.',
         supportingText: [
           'Claim my free profile',
-          'Explore Artist Profiles',
+          'Explore Jovie Profiles',
           'Profile',
           'Public Jovie profile and audience capture',
           'Claim profile same day.',
@@ -316,7 +316,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-free-v1',
         controlHeadline: 'Free plan',
         headline: 'Free',
-        body: 'Your artist profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.',
+        body: 'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.',
         supportingText: [
           'Free forever',
           '$0',
