@@ -201,21 +201,24 @@ describe('screenshot registry', () => {
   });
 
   it('waits for the empty Events card on the events-empty capture', () => {
-    const scenario = SCREENSHOT_SCENARIOS.find(
-      item => item.id === 'tim-white-profile-events-empty-mobile'
+    // The tour list only mounts when dates exist, so the capture must wait
+    // for the empty branch that ProfileEventsCard actually renders.
+    const waitTargets = new Map(
+      SCREENSHOT_SCENARIOS.map(({ id, waitFor }) => [id, waitFor])
     );
-    const card = readFileSync(
+    const cardSource = readFileSync(
       resolve(
         process.cwd(),
         'components/features/profile/ProfileEventsCard.tsx'
       ),
       'utf8'
     );
-    // The tour list only mounts when dates exist, so the capture must wait
-    // for the empty branch that ProfileEventsCard actually renders.
-    expect(scenario?.waitFor).toBe(
+
+    expect(cardSource).toContain(
+      "dataTestId='profile-primary-tab-events-empty'"
+    );
+    expect(waitTargets.get('tim-white-profile-events-empty-mobile')).toBe(
       '[data-testid="profile-primary-tab-events-empty"]'
     );
-    expect(card).toContain("dataTestId='profile-primary-tab-events-empty'");
   });
 });
