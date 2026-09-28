@@ -448,7 +448,9 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     if queued.returncode != 0:
         lane.update_json(host.state / "requeue.json",
                          lambda requeue: requeue.update({str(pr["number"]): pr["headRefOid"]}))
-    receipt = {"schema": "jovie-lane-run/v1", "kind": "ready-green", "pr": pr["number"], "headSha": pr["headRefOid"],
+    receipt = {"schema": "jovie-lane-run/v1", "kind": "ready-green", "origin": "autonomous-lane",
+               "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+               "pr": pr["number"], "headSha": pr["headRefOid"],
                "prUrl": pr.get("url"), "verdict": "landing" if queued.returncode == 0 else "verified-not-queued",
                "endedAt": lane.now_iso()}
     ledger(host, receipt)
@@ -516,7 +518,9 @@ def sync_main(host, lane, pr: dict, now: float) -> str:
     ok = result.returncode == 0
     lane.update_json(host.state / "synced.json",
                      lambda synced: synced.update({str(pr["number"]): {"from": pr["headRefOid"], "at": now, "ok": ok}}))
-    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "sync-main", "pr": pr["number"], "headBefore": pr["headRefOid"],
+    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
+                  "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                  "pr": pr["number"], "headBefore": pr["headRefOid"],
                   "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()})
     return "synced" if ok else "sync-failed"
 
