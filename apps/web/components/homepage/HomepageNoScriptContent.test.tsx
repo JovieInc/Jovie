@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { HomepageNoScriptContent } from './HomepageNoScriptContent';
 
@@ -52,19 +53,17 @@ describe('HomepageNoScriptContent', () => {
     expect(section?.hasAttribute('data-testid')).toBe(false);
     expect(rawMarkup).not.toContain('<noscript');
     expect(section?.querySelector('h2')?.textContent).toBe(
-      HOMEPAGE_LAUNCH_COPY.hero.headline
+      HOMEPAGE_IDENTITY_COPY.hero.headline
     );
     expect(section?.hasAttribute('hidden')).toBe(false);
     expect(section?.getAttribute('aria-hidden')).toBeNull();
 
     const ordered = [
-      HOMEPAGE_LAUNCH_COPY.hero.subhead,
+      HOMEPAGE_IDENTITY_COPY.hero.subhead,
       ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
         item.headline,
         item.body,
-        ...('outcomes' in item
-          ? item.outcomes.flatMap(outcome => [outcome.headline, outcome.body])
-          : []),
+        ...item.steps.map(step => step.caption),
       ]),
       HOMEPAGE_LAUNCH_COPY.certified.close.headline,
     ];
@@ -79,13 +78,16 @@ describe('HomepageNoScriptContent', () => {
     }
 
     // The only conversion is the name search; the fallback links it to /start.
+    expect(text).toContain(HOMEPAGE_LAUNCH_COPY.hero.search.placeholder);
     const links = [...(section?.querySelectorAll('a') ?? [])];
     expect(links.map(link => link.textContent)).toEqual([
-      'Request access',
+      'Find me',
       'Contact support',
     ]);
-    expect(links[0]?.getAttribute('href')).toBe('/signup');
-    expect(text).not.toMatch(/Get started|Drop more music|waitlist/i);
+    expect(links[0]?.getAttribute('href')).toBe('/start');
+    expect(text).not.toMatch(
+      /Get started|Request access|Drop more music|waitlist/i
+    );
   });
 
   it('hides only the progressive fallback for scripting-enabled browsers', () => {

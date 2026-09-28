@@ -192,6 +192,17 @@ describe('ProfileCompactSurface identity header layout', () => {
     );
   });
 
+  it('preserves the landscape track minimum when identity text consumes the viewport', () => {
+    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
+
+    // JOV-6535: a compressed track with overflow-y-hidden clips the card's
+    // action without ever growing the scroll region's scrollHeight, so the
+    // overflow-scroll mode never engages and the action is unreachable.
+    expect(contents).toMatch(
+      /\.profile-horizontal-rail\[data-layout="profile-landscape"\]\s*\{[^}]*height:\s*auto;[^}]*min-height:\s*max-content;[^}]*flex-shrink:\s*0/
+    );
+  });
+
   it('eagerly loads the first visible artwork without loading two hero images', () => {
     const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
 

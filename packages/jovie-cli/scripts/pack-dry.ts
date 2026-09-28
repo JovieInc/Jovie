@@ -362,6 +362,9 @@ async function main(): Promise<void> {
       'artist llms <username>',
       'api openapi',
       'docs llms',
+      'profile create <url>',
+      'mcp',
+      'init',
     ]) {
       if (!helpOutput.includes(command)) {
         throw new Error(
@@ -436,7 +439,7 @@ async function main(): Promise<void> {
       ['--help'],
       { cwd: installRoot, maxBuffer: 10 * 1024 * 1024 }
     );
-    if (!installedHelp.includes('Read-only public Jovie resources')) {
+    if (!installedHelp.includes('Jovie for agents')) {
       throw new Error('Installed CLI did not expose the expected help output.');
     }
 

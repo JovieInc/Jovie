@@ -13,6 +13,19 @@ import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
 import { MarketingHeroDeveloperCommand } from './MarketingHeroDeveloperCommand';
+import { MarketingHeroPhoto } from './MarketingHeroPhoto';
+
+/**
+ * Unique per-route hero photograph (marketing-routes-code-spec, 2026-09-26).
+ * Passed to Content/Landing mode to render behind the hero copy — see
+ * `MarketingHeroPhoto` for the scrim contract that keeps text legible.
+ */
+export interface MarketingHeroPhotoInput {
+  readonly src: string;
+  readonly width: number;
+  readonly height: number;
+  readonly opacity?: number;
+}
 
 export interface MarketingHeroCta {
   readonly label: ReactNode;
@@ -88,6 +101,8 @@ export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
    * Defaults to `next/link`.
    */
   readonly linkComponent?: ElementType;
+  /** Unique per-route decorative hero photograph. See `MarketingHeroPhoto`. */
+  readonly photo?: MarketingHeroPhotoInput;
 }
 
 /**
@@ -115,6 +130,8 @@ export interface MarketingHeroLandingProps extends MarketingHeroBaseProps {
   readonly titleClassName?: string;
   readonly mediaClassName?: string;
   readonly gridClassName?: string;
+  /** Unique per-route decorative hero photograph. See `MarketingHeroPhoto`. */
+  readonly photo?: MarketingHeroPhotoInput;
 }
 
 interface MarketingHeroPublicCommon extends MarketingHeroBaseProps {
@@ -337,6 +354,7 @@ function MarketingHeroContent({
   sectionVariant,
   headlineMaxLines = 2,
   linkComponent = Link,
+  photo,
 }: MarketingHeroContentProps) {
   const layout = media ? 'split' : align;
 
@@ -345,12 +363,14 @@ function MarketingHeroContent({
       className={cn(
         'marketing-hero marketing-hero-dock',
         `marketing-hero--${layout}`,
+        photo && 'relative overflow-hidden',
         className
       )}
       headingId={headingId}
       testId={testId}
       sectionVariant={sectionVariant}
     >
+      {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>
@@ -417,6 +437,7 @@ function MarketingHeroLanding({
   titleClassName,
   mediaClassName,
   gridClassName,
+  photo,
 }: MarketingHeroLandingProps) {
   return (
     <MarketingHeroFrame
@@ -424,6 +445,7 @@ function MarketingHeroLanding({
       headingId={headingId}
       testId={testId ?? sectionTestId}
     >
+      {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <div
         aria-hidden='true'
         className='marketing-hero-backdrop pointer-events-none absolute inset-0'
@@ -535,11 +557,13 @@ function MarketingHeroPublic(props: MarketingHeroPublicProps) {
         'marketing-hero',
         `marketing-hero--${layoutVariant}`,
         'relative',
+        props.photo && 'overflow-hidden',
         className
       )}
       headingId={headingId}
       testId={testId}
     >
+      {props.photo ? <MarketingHeroPhoto {...props.photo} /> : null}
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>

@@ -147,6 +147,21 @@ describe('qualifyLead', () => {
     expect(result.disqualificationReason).toBe('commercial_fit_review_needed');
   });
 
+  it('deduplicates music tools when multiple links share a platform', async () => {
+    setupDefaultMocks({
+      links: [
+        { url: 'https://open.spotify.com/artist/123', platformId: 'spotify' },
+        { url: 'https://lnk.to/release-one', platformId: 'linkfire' },
+        { url: 'https://lnk.to/release-two', platformId: 'linkfire' },
+        { url: 'https://ffm.to/album', platformId: 'featurefm' },
+      ],
+    });
+
+    const result = await qualifyLead('https://linktr.ee/testartist');
+
+    expect(result.musicToolsDetected).toEqual(['linkfire', 'featurefm']);
+  });
+
   it('should disqualify when no Spotify link is present', async () => {
     setupDefaultMocks({
       links: [

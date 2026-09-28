@@ -1,18 +1,14 @@
 'use server';
 
 import { and, eq, ne } from 'drizzle-orm';
-import {
-  unstable_noStore as noStore,
-  revalidatePath,
-  revalidateTag,
-} from 'next/cache';
+import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import {
   clearPendingClaimContext,
   readPendingClaimContext,
@@ -443,8 +439,7 @@ export async function connectOnboardingSpotifyArtist(
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    invalidateReleaseCaches(userId, profile.id);
     revalidatePath(APP_ROUTES.RELEASES);
 
     if (!result.success) {

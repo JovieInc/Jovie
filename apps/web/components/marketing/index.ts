@@ -39,6 +39,7 @@ export type {
   MarketingHeroContentProps,
   MarketingHeroCta,
   MarketingHeroLandingProps,
+  MarketingHeroPhotoInput,
   MarketingHeroProps,
   MarketingHeroPublicClaimProps,
   MarketingHeroPublicDesktopProps,
@@ -48,6 +49,8 @@ export type {
   MarketingHeroShellProps,
 } from './MarketingHero';
 export { MarketingHero } from './MarketingHero';
+export type { MarketingHeroPhotoProps } from './MarketingHeroPhoto';
+export { MarketingHeroPhoto } from './MarketingHeroPhoto';
 export type { MarketingMetricCardProps } from './MarketingMetricCard';
 export { MarketingMetricCard } from './MarketingMetricCard';
 export type { MarketingPageShellProps } from './MarketingPageShell';

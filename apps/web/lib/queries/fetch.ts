@@ -496,7 +496,7 @@ function getFetchErrorMessage(response: Response): string {
  * Custom error class for fetch failures with status code.
  *
  * This is the canonical FetchError used across the app. It supports both
- * raw Response objects (from fetchWithTimeout) and string bodies (from dedupedFetch).
+ * raw Response objects (from fetchWithTimeout) and string bodies.
  */
 export class FetchError extends Error {
   public readonly response?: Response;
