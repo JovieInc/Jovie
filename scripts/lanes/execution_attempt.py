@@ -26,11 +26,12 @@ def _file_locked(path: Path, fn):
         return result
 def _gh(coordination: dict, method: str, endpoint: str, body=None):
     token = os.environ.get(coordination.get("tokenEnv", "GH_TOKEN")) or os.environ.get("GITHUB_TOKEN")
-    if not token: raise RuntimeError("execution-coordinator-token-missing")
+    # No token in the environment means `gh` authenticates itself (the lanes' Jovie Bot shim mints
+    # one per call); requiring GH_TOKEN here crashed every fix run once the shim landed.
     args = ["gh", "api", "-X", method, endpoint]
     args += ["--paginate", "--slurp"] if method == "GET" else ["--input", "-"]
     ran = subprocess.run(args, input=None if body is None else json.dumps(body), capture_output=True, text=True,
-                         env={**os.environ, "GH_TOKEN": token}, timeout=30)
+                         env={**os.environ, "GH_TOKEN": token} if token else None, timeout=30)
     if ran.returncode:
         if body and body.get("ref") and "422" in ran.stderr: return None
         raise RuntimeError(f"execution-coordinator-http-{ran.returncode}")
