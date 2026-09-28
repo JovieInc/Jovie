@@ -47,5 +47,7 @@ describe('turnstile siteverify single source of truth', () => {
       offenders,
       `siteverify must only be called from ${CANONICAL_FILE}; found inline call(s) in: ${offenders.join(', ')}`
     ).toEqual([]);
-  }, 15_000);
+    // Sync walk+read of every file in app/lib/components: <1s idle, but the
+    // 15s budget still fired under full-suite shard CPU contention.
+  }, 45_000);
 });

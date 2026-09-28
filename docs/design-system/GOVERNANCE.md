@@ -121,6 +121,12 @@ design-debt registries to the trusted ci-fast base and fails closed on growth.
 A `count-map` ceiling may rise only via a declared `raises` entry in the same
 registry file carrying full exception metadata (owner, reason, JOV issue,
 removalCondition or expiry, evidence); undeclared or expired raises still fail.
+A `count-map` spec with `exceptionPointer` (today: `component-family-counts`)
+may seed a NEW measurement key only with a sibling `exceptions[]` entry keyed
+by that name carrying owner, reason, Linear issue, removal condition or
+expiry, and evidence — the same metadata bar as `design-authority-exceptions`;
+a `raises` entry keyed by that name is an equivalent declaration. Otherwise
+existing-key ceilings stay shrink-only.
 
 Exception (JOV-6280): the remaining-group `shadcn-lint-contracts` lane runs the
 shipped ESLint config against `@jovie/ui` Button/Card/Input fixtures plus an

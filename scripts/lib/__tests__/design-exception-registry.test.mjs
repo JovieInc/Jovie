@@ -104,6 +104,44 @@ describe('design exception-registry contract (JOV-5447)', () => {
         { [BUTTONS]: { maxRemaining: 0, remaining: ['system-b-chat-button'] } },
       ],
       [
+        ISSUE_CODES.COUNT_GROWTH,
+        {
+          [FAMILY]: {
+            ...family,
+            counts: { ...family.counts, button: family.counts.button + 1 },
+          },
+        },
+      ],
+      [
+        ISSUE_CODES.MISSING_EXCEPTION_METADATA,
+        {
+          [FAMILY]: {
+            ...family,
+            counts: { ...family.counts, newFamily: 3 },
+          },
+        },
+      ],
+      [
+        ISSUE_CODES.EXPIRED_EXCEPTION,
+        {
+          [FAMILY]: {
+            ...family,
+            counts: { ...family.counts, newFamily: 3 },
+            exceptions: [
+              ...(family.exceptions ?? []),
+              {
+                key: 'newFamily',
+                owner: '@jovie-design',
+                reason: 'Seeded measurement ceiling for a new family',
+                issue: 'JOV-6777',
+                expiresOn: '2026-01-01',
+                evidence: 'docs/design-system/GOVERNANCE.md',
+              },
+            ],
+          },
+        },
+      ],
+      [
         ISSUE_CODES.PATH_GROWTH,
         {
           [FAMILY]: {
@@ -203,6 +241,28 @@ describe('design exception-registry contract (JOV-5447)', () => {
     expect(added.ok, added.issues.map(item => item.detail).join('\n')).toBe(
       true
     );
+    const family = readJson(FAMILY);
+    const documentedKey = evaluatePair({
+      [FAMILY]: {
+        ...family,
+        counts: { ...family.counts, newFamily: 3 },
+        exceptions: [
+          ...(family.exceptions ?? []),
+          {
+            key: 'newFamily',
+            owner: '@jovie-design',
+            reason: 'Seeded measurement ceiling for a new family',
+            issue: 'JOV-6777',
+            removalCondition: 'Family converges onto one canonical component',
+            evidence: 'docs/design-system/GOVERNANCE.md',
+          },
+        ],
+      },
+    });
+    expect(
+      documentedKey.ok,
+      documentedKey.issues.map(item => item.detail).join('\n')
+    ).toBe(true);
   });
 
   it('allows a count-map raise only with a complete declared raises entry', () => {

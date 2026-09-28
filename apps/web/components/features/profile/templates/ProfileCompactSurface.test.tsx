@@ -84,6 +84,7 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
   ProfilePrimaryTabPanel: ({
     mode,
     catalogLoadFailed,
+    visitorAssignmentResolved,
     creditSegments,
     contacts,
     modeCardAccents,
@@ -91,6 +92,7 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
   }: {
     readonly mode: string;
     readonly catalogLoadFailed?: boolean;
+    readonly visitorAssignmentResolved?: boolean;
     readonly creditSegments?: readonly { readonly type: string }[];
     readonly contacts?: readonly { readonly id: string }[];
     readonly modeCardAccents?: Record<string, { accent: string }>;
@@ -99,6 +101,9 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
     <div
       data-testid={`mock-primary-tab-panel-${mode}`}
       data-catalog-load-failed={catalogLoadFailed ? 'true' : 'false'}
+      data-visitor-assignment-resolved={
+        visitorAssignmentResolved === false ? 'false' : 'true'
+      }
       data-credit-segments={(creditSegments ?? [])
         .map(segment => segment.type)
         .join('|')}
@@ -259,6 +264,27 @@ describe('ProfileCompactSurface', () => {
       'data-catalog-load-failed',
       'true'
     );
+  });
+
+  // JOV-6453: the subscribe CTA must stay a skeleton until the per-user
+  // experiment assignment resolves, so the flag is forwarded verbatim.
+  it('forwards an unresolved visitor assignment into the subscribe panel', () => {
+    renderSurface({
+      activeMode: 'subscribe',
+      visitorAssignmentResolved: false,
+    });
+
+    expect(
+      screen.getByTestId('mock-primary-tab-panel-subscribe')
+    ).toHaveAttribute('data-visitor-assignment-resolved', 'false');
+  });
+
+  it('defaults to a resolved visitor assignment for surfaces without bootstrap', () => {
+    renderSurface({ activeMode: 'subscribe' });
+
+    expect(
+      screen.getByTestId('mock-primary-tab-panel-subscribe')
+    ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
   });
 
   it('routes selected credits into the About panel (JOV-6199)', () => {

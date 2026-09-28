@@ -77,4 +77,38 @@ describe('synthetic monitoring workflow parser', () => {
       );
     }
   });
+
+  it('escapes multiline failed_tests output so the Slack payload stays valid JSON', () => {
+    const failedTests = [
+      'synthetic-production-waitlist: Test results file not found (apps/web/test-results/synthetic-production-waitlist-results.json)',
+      'Skipped tests:',
+      'onboarding-robot-full: creates a profile, verifies dashboard/public profile, and cleans up',
+    ].join('\n');
+    const escapedExpression =
+      "${{ toJSON(format('```{0}```', steps.test-results.outputs.failed_tests)) }}";
+
+    for (const path of [workflowPath, agentTickWorkflowPath]) {
+      const workflow = readFileSync(path, 'utf8');
+      const alertStep = getStepBlock(workflow, 'Send Slack Alert on Failure');
+
+      expect(alertStep).toContain(escapedExpression);
+      expect(alertStep).not.toContain(
+        '${{ steps.test-results.outputs.failed_tests }}'
+      );
+
+      const payload = alertStep
+        .split('custom_payload: |')[1]!
+        .split('\n        env:')[0]!
+        .split('\n')
+        .map(line => line.replace(/^ {12}/, ''))
+        .join('\n')
+        .replace(
+          escapedExpression,
+          JSON.stringify(`\`\`\`${failedTests}\`\`\``)
+        )
+        .replace(/\$\{\{[^}]*\}\}/g, 'x');
+
+      expect(() => JSON.parse(payload)).not.toThrow();
+    }
+  });
 });
