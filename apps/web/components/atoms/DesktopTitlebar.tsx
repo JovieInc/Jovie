@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/atoms/DesktopTitlebar.test.tsx
+
 import { ChevronLeft, ChevronRight, PanelLeft } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useContext } from 'react';
@@ -106,8 +108,14 @@ function readDesktopReleaseIdentity(
   };
 }
 
-/** Existing build identity lives in the page header instead of a second band. */
-export function DesktopReleaseIdentity() {
+interface DesktopReleaseIdentityProps {
+  readonly className?: string;
+}
+
+/** Secondary diagnostics label. Native and web revisions stay distinct. */
+export function DesktopReleaseIdentity({
+  className,
+}: DesktopReleaseIdentityProps) {
   const isDesktop = useIsElectronRuntime();
   const identity = useDesktopBuildIdentity();
   const releaseIdentity = readDesktopReleaseIdentity(identity);
@@ -115,7 +123,10 @@ export function DesktopReleaseIdentity() {
   return (
     <span
       aria-label={releaseIdentity.ariaLabel}
-      className='pointer-events-none hidden max-w-64 shrink truncate rounded-md bg-surface-1 px-2 py-0.5 text-2xs font-medium tabular-nums text-secondary-token lg:inline-block'
+      className={cn(
+        'pointer-events-none max-w-64 shrink truncate text-2xs font-medium tabular-nums text-tertiary-token',
+        className
+      )}
       data-provenance={releaseIdentity.provenance}
       data-testid='electron-release-identity'
       role='status'

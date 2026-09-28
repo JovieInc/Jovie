@@ -342,6 +342,16 @@ describe('surface elevation guardrails', () => {
     }
   });
 
+  it('routes admin lead-table 403s through the step-up unlock state', () => {
+    const leadTable = readComponent(
+      'components/features/admin/leads/LeadTable.tsx'
+    );
+
+    expect(leadTable).toContain('isForbiddenError');
+    expect(leadTable).toContain('AdminStepUp');
+    expect(leadTable).toContain('Admin verification required');
+  });
+
   it('routes library filters through the shared header search contract', () => {
     const librarySurface = readFileSync(
       join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),

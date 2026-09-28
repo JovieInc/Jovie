@@ -21,6 +21,14 @@ describe('independent application source export', () => {
         expect(
           existsSync(join(destination, 'agent/tools/task_update.ts'))
         ).toBe(false);
+        // Eve 0.66 retired the default ask_question and todo tools; orphan
+        // disableTool slots fail discovery the same way task_update did.
+        expect(
+          existsSync(join(destination, 'agent/tools/ask_question.ts'))
+        ).toBe(false);
+        expect(existsSync(join(destination, 'agent/tools/todo.ts'))).toBe(
+          false
+        );
         // Eve requires connection_search when connections exist; this export
         // declares none, and its real compiler proof must expose no tools.
         expect(
