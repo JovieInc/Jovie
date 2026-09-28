@@ -120,7 +120,7 @@ describe('HomepageClose', () => {
       <>
         <form onSubmit={submit}>
           <input
-            id='homepage-name-search'
+            id='homepage-claim-handle'
             aria-label='Name'
             defaultValue='Beyoncé'
           />

@@ -167,7 +167,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageIdentityHero.tsx',
         'hero',
-        'centered-none'
+        'split-claim-card'
       ),
       // The unsupported adoption strip is intentionally omitted until it has
       // an attributable permission or adoption receipt.
@@ -499,7 +499,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'Tim DESIGN_READY ship 2026-09-17 /product hero + claim card',
       notes:
-        'Locked PRODUCT / Be found. Be understood. hero with jov.ie/you claim-card proof. Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
+        'PRODUCT / Your living identity on the internet. hero with jov.ie/you claim-card proof (headline swapped with the homepage 2026-09-28). Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',

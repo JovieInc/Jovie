@@ -1,6 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 /**
  * Keep the homepage useful when JavaScript is unavailable.
@@ -14,8 +13,7 @@ import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
  * `<noscript>` content.
  */
 export function HomepageNoScriptContent() {
-  const { hero } = HOMEPAGE_IDENTITY_COPY;
-  const { certified } = HOMEPAGE_LAUNCH_COPY;
+  const { hero, sections, close } = HOMEPAGE_IDENTITY_COPY;
 
   return (
     <section
@@ -27,21 +25,20 @@ export function HomepageNoScriptContent() {
       <h2 id='homepage-no-script-heading'>{hero.headline}</h2>
       <p>{hero.subhead}</p>
 
-      {certified.sections.map(section => (
+      {sections.map(section => (
         <div key={section.id}>
           <h3>{section.headline}</h3>
           <p>{section.body}</p>
-          {section.steps.map(step => (
-            <p key={step.id}>{step.caption}</p>
-          ))}
         </div>
       ))}
 
-      <h3>{certified.close.headline}</h3>
+      <h3>{close.headline}</h3>
 
       <p>
-        {hero.search.placeholder}{' '}
-        <a href={APP_ROUTES.START}>{hero.search.action}</a>{' '}
+        <a href={APP_ROUTES.START}>
+          {hero.claim.action} {hero.claim.domain}
+          {hero.claim.placeholder}
+        </a>{' '}
         <a href={APP_ROUTES.SUPPORT}>Contact support</a>
       </p>
     </section>
