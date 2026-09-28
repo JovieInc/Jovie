@@ -9,6 +9,7 @@ import {
   main,
   parseModelVerdict,
   pathOf,
+  readFirstVerdictKeyframes,
   readManifest,
   reviewLayout,
   reviewWithModel,
@@ -204,6 +205,22 @@ describe('golden path visual review', () => {
     ).toEqual([]);
   });
 
+  it('throws on a confirm-against file with no keyframes array, never a silent pass (Seer 17141336/0)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gpr-confirm-against-'));
+    try {
+      const missing = join(dir, 'no-keyframes.json');
+      writeFileSync(missing, JSON.stringify({ suspected: ['home'] }));
+      expect(() => readFirstVerdictKeyframes(missing)).toThrow(
+        'no keyframes array'
+      );
+      const ok = join(dir, 'ok.json');
+      writeFileSync(ok, JSON.stringify({ keyframes: [verdict('home', true)] }));
+      expect(readFirstVerdictKeyframes(ok)).toEqual([verdict('home', true)]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('records only the URL path so query tokens never reach the model', () => {
     expect(pathOf('https://jov.ie/tim?mode=listen&token=secret')).toBe('/tim');
     expect(pathOf('not a url')).toBe('not a url');
@@ -326,6 +343,25 @@ describe('golden path visual review', () => {
       // 'other' was not flagged again in the replay, so it drops out
       expect(written.confirmed).toEqual(['public-profile']);
       expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('rejects rather than silently passing when --confirm-against has no keyframes', async () => {
+      const dir = setupDir(record());
+      const confirm = join(dir, 'first.json');
+      writeFileSync(confirm, JSON.stringify({ suspected: ['public-profile'] }));
+      await expect(
+        main(
+          [
+            '--dir',
+            dir,
+            '--out',
+            join(dir, 'replay.json'),
+            '--confirm-against',
+            confirm,
+          ],
+          {}
+        )
+      ).rejects.toThrow('no keyframes array');
     });
   });
 });

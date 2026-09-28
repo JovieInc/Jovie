@@ -203,6 +203,21 @@ export function confirmedBlockers(
     .map(v => v.id);
 }
 
+/**
+ * Reads the prior verdict file for `--confirm-against`. A missing or
+ * non-array `keyframes` field means the replay can never confirm a suspected
+ * blocker, which would silently pass a run that should fail (Seer
+ * 17141336/0) — so this throws instead of returning an empty replay.
+ */
+export function readFirstVerdictKeyframes(path: string): KeyframeVerdict[] {
+  const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
+    keyframes?: unknown;
+  };
+  if (!Array.isArray(parsed.keyframes))
+    throw new Error(`${path} has no keyframes array; cannot confirm replay`);
+  return parsed.keyframes as KeyframeVerdict[];
+}
+
 export async function main(
   argv: readonly string[] = process.argv.slice(2),
   env: Partial<NodeJS.ProcessEnv> = process.env,
@@ -255,11 +270,7 @@ export async function main(
       console.log(`  - ${line}`);
   }
   const first = values['confirm-against']
-    ? (
-        JSON.parse(readFileSync(values['confirm-against'], 'utf8')) as {
-          keyframes: KeyframeVerdict[];
-        }
-      ).keyframes
+    ? readFirstVerdictKeyframes(values['confirm-against'])
     : null;
   const confirmed = first ? confirmedBlockers(first, verdicts) : [];
   const suspected = verdicts.filter(v => v.suspected).map(v => v.id);
