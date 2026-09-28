@@ -279,6 +279,77 @@ export function buildPacket(input: {
   };
 }
 
+/**
+ * Real defects only: a `failed` receipt means the evidence ran and found a
+ * problem. `missing` is registry state (not yet certifiable), never an issue.
+ * One fingerprint per entry+tier, so repeated observations update one issue.
+ */
+export function defectReceipts(packet: CertificationReviewPacket) {
+  return [
+    ...packet.canonicalReferences,
+    ...packet.invariantEvaluation,
+    ...packet.testsCoverage,
+    ...packet.visualProof,
+  ]
+    .filter(receipt => receipt.status === 'failed')
+    .map(receipt => ({
+      fingerprint: `marketing-cert:${packet.subject.id}:${receipt.tier}`,
+      tier: receipt.tier,
+      summary: receipt.summary,
+      ref: receipt.ref,
+    }));
+}
+
+type UpsertIssue = (input: {
+  fingerprint: string;
+  title: string;
+  description: string;
+  priority: number;
+}) => Promise<{ ok: boolean; action?: string; reason?: string }>;
+
+async function linearUpsert(): Promise<UpsertIssue> {
+  const { upsertLinearIssueByTitleFingerprint } = await import(
+    '../../../scripts/lib/linear-issue-intake.mjs'
+  );
+  return upsertLinearIssueByTitleFingerprint as UpsertIssue;
+}
+
+export async function fileDefects(
+  packet: CertificationReviewPacket,
+  sha: string,
+  loadUpsert: () => Promise<UpsertIssue> = linearUpsert
+): Promise<number> {
+  const defects = defectReceipts(packet);
+  if (defects.length === 0 || !process.env.LINEAR_API_KEY) return 0;
+  const upsertLinearIssueByTitleFingerprint = await loadUpsert();
+  for (const defect of defects) {
+    const result = await upsertLinearIssueByTitleFingerprint({
+      fingerprint: defect.fingerprint,
+      title: `Certification defect: ${packet.subject.id} ${defect.tier} (${defect.fingerprint})`,
+      description: [
+        '## Source',
+        '- Workflow: marketing-certification-producer.yml (JOV-6928)',
+        `- Subject: ${packet.subject.id} (${packet.subject.title})`,
+        `- Source SHA: ${sha}`,
+        `- Evidence: ${defect.ref}`,
+        '',
+        '## Failure',
+        defect.summary,
+        '',
+        '## Acceptance',
+        'Fix the defect on main; the next push that touches the source re-evaluates it automatically.',
+        '',
+        `Fingerprint: \`${defect.fingerprint}\``,
+      ].join('\n'),
+      priority: 3,
+    });
+    console.log(
+      `[marketing-cert] ${packet.subject.id} defect ${defect.fingerprint} -> ${result.ok ? ('action' in result ? result.action : 'ok') : result.reason}`
+    );
+  }
+  return defects.length;
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -382,6 +453,7 @@ async function main() {
       `[marketing-cert] ${item.entry.id} -> ${response.status} ${body.slice(0, 300)}`
     );
     if (!response.ok) failures += 1;
+    await fileDefects(packet, sha);
   }
   if (failures > 0) process.exit(1);
 }

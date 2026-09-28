@@ -31,6 +31,7 @@ export type AdminOutreachQueue = (typeof adminOutreachQueues)[number];
 export type AdminWorkspaceId =
   | 'overview'
   | 'chat'
+  | 'certifications'
   | 'ops'
   | 'people'
   | 'growth'
@@ -56,6 +57,7 @@ export interface AdminNavRegistryItem {
 
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'ops',
+  'certifications',
   'people',
   'growth',
   'platform_connections',
@@ -86,6 +88,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_OPS,
     description:
       'Canonical company Ops — decisions, survival, bottleneck, delivery',
+    section: 'workspaces',
+  },
+  {
+    id: 'certifications',
+    label: 'Certifications',
+    href: APP_ROUTES.ADMIN_CERTIFICATIONS,
+    description:
+      'Founder review of certification evidence, with certify and reject',
     section: 'workspaces',
   },
   {

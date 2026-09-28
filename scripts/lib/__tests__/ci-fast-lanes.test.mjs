@@ -88,6 +88,7 @@ describe('CI control selector', () => {
       expect(result.status, result.stderr).toBe(0);
       const scriptCommand = readFileSync(capture, 'utf8')
         .split('\n')
+        // The control pool runs commands concurrently, so match the suite, not the order.
         .find(
           command =>
             command.startsWith('exec vitest --root scripts ') &&
