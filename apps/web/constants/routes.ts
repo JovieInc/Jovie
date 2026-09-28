@@ -114,6 +114,7 @@ export const APP_ROUTES = {
   ADMIN_OUTREACH_REVIEW: '/app/ov/outreach/review',
   ADMIN_INGEST: '/app/ov/ingest',
   ADMIN_SCREENSHOTS: '/app/ov/screenshots',
+  ADMIN_FEATURE_REGISTRY: '/app/ov/feature-registry',
   ADMIN_SHARE_STUDIO: '/app/ov/share-studio',
   ADMIN_RELEASES: '/app/ov/releases',
   ADMIN_USERS_BAN: '/app/ov/users/ban',

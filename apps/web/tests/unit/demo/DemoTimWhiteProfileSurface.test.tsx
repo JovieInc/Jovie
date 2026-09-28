@@ -59,6 +59,9 @@ describe('DemoTimWhiteProfileSurface', () => {
 
       expect(props).toMatchObject({
         mode: 'profile',
+        // Homepage proof captures must match jov.ie/tim, not the dashboard
+        // Preview frame (JOV-6946).
+        presentation: 'full-public',
         artist: expect.objectContaining({
           spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
           name: TIM_WHITE_PROFILE.name,
