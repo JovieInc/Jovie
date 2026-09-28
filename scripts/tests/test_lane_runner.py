@@ -324,7 +324,9 @@ class FakeLinear:
     def __init__(self, issues):
         self.issues, self.moves, self.comments, self.triaged = issues, [], [], []
 
-    def create_triage(self, title, description):
+    def create_triage(self, title, description, dedupe=None):
+        if dedupe and any(dedupe in open_title for open_title in getattr(self, "open_titles", [])):
+            return "existing-id"
         self.triaged.append(title)
         return "triage-id"
 
@@ -1072,6 +1074,24 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual(linear.triaged, ["Fix loop exhausted: PR #7 stuck one"], "escalated exactly once")
             self.assertEqual(len([p for p in posted if p[:3] == ["gh", "pr", "comment"]]), 1)
             self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
+
+    def test_exhausted_intake_dedupes_on_linear_when_local_flag_is_lost(self):
+        stuck = {**self.pr(number=19246), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck"}
+        real = lane.sh
+        lane.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
+        linear = FakeLinear([])
+        linear.open_titles = ["Fix loop exhausted: PR #19246 stuck"]
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            # A later attempt rewrote the record without `escalated` (the duplicate-issue bug).
+            (host.state / "fix-attempts.json").write_text(json.dumps({"19246": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}))
+            try:
+                lane.escalate_exhausted(host, [stuck], linear)
+            finally:
+                lane.sh = real
+        self.assertEqual(linear.triaged, [], "an open intake issue for the PR already exists")
+        linear.open_titles = ["Fix loop exhausted: PR #1924 other"]
+        self.assertEqual(linear.create_triage("t", "d", dedupe="PR #19246 "), "triage-id", "no prefix collisions")
 
     def test_claim_records_attempt_before_work(self):
         real = lane.open_prs_summary, lane.sh

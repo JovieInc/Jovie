@@ -586,7 +586,7 @@ class RunnerHookTest(unittest.TestCase):
         returned = []
         events.return_to_pool = lambda lane, linear, pr, why: returned.append(pr["number"])
         triaged = []
-        linear = SimpleNamespace(create_triage=lambda title, body: triaged.append(body))
+        linear = SimpleNamespace(create_triage=lambda title, body, dedupe=None: triaged.append(body))
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
@@ -608,7 +608,7 @@ class RunnerHookTest(unittest.TestCase):
         runner.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
         runner.load_providers = lambda: PROVIDERS
         events.return_to_pool = lambda *a: None
-        linear = SimpleNamespace(create_triage=lambda title, body: triaged.append(title))
+        linear = SimpleNamespace(create_triage=lambda title, body, dedupe=None: triaged.append(title))
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))

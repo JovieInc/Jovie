@@ -568,7 +568,13 @@ class Linear:
                       n["createdAt"], [l["name"] for l in n["labels"]["nodes"]])
                 for n in data["issues"]["nodes"]]
 
-    def create_triage(self, title: str, description: str) -> str | None:
+    def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
+        """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
+        if dedupe:
+            found = self.gql('query($q:String!){issues(first:1,filter:{title:{contains:$q},'
+                             'state:{type:{nin:["completed","canceled"]}}}){nodes{id}}}', {"q": dedupe})
+            if found["issues"]["nodes"]:
+                return found["issues"]["nodes"][0]["id"]
         team = self.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
                         {})["teams"]["nodes"][0]
         triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
@@ -1014,8 +1020,11 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         title = ("Fix loop exhausted" if record.get("count", 0) else "Unfixable gate hold") \
             + f": PR #{pr['number']} {pr.get('title', '')[:80]}"
         try:
+            # The local `escalated` flag is lost when a later fix attempt rewrites the record (and is
+            # per host), so Linear is the dedupe authority: one open intake issue per PR (JOV-7073).
             linear.create_triage(title,
-                                 pr_events.bug_report(pr, f"{body}\n\nHost `{HOST}`, {now_iso()}.", HOST, record))
+                                 pr_events.bug_report(pr, f"{body}\n\nHost `{HOST}`, {now_iso()}.", HOST, record),
+                                 dedupe=f"PR #{pr['number']} ")
         except Exception:
             pass
         attempts[str(pr["number"])] = {**record, "escalated": True}
