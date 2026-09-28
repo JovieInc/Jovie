@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fireEvent } from '@testing-library/react';
 import {
   afterAll,
   afterEach,
@@ -19,6 +20,8 @@ const mockChatState = vi.hoisted(() => ({
   isLoading: true,
   isSubmitting: false,
   status: 'streaming' as 'ready' | 'streaming',
+  collapsedSummerFailureCount: 0,
+  showCollapsedSummerFailures: vi.fn(),
   messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
 }));
 
@@ -63,6 +66,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       isLoading: mockChatState.isLoading,
       isSubmitting: mockChatState.isSubmitting,
       hasMessages: mockChatState.hasMessages,
+      collapsedSummerFailureCount: mockChatState.collapsedSummerFailureCount,
+      showCollapsedSummerFailures: mockChatState.showCollapsedSummerFailures,
       isLoadingConversation: mockChatState.isLoadingConversation,
       conversationTitle: null,
       status: mockChatState.status,
@@ -161,6 +166,8 @@ afterEach(() => {
   mockChatState.isLoading = true;
   mockChatState.isSubmitting = false;
   mockChatState.status = 'streaming';
+  mockChatState.collapsedSummerFailureCount = 0;
+  mockChatState.showCollapsedSummerFailures = vi.fn();
   mockChatState.messages = [
     { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
   ];
@@ -283,5 +290,36 @@ describe('JovieChat styling regressions', () => {
 
     expect(loadingShell?.getAttribute('aria-busy')).toBe('true');
     expect(loadingShell?.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('surfaces the collapsed unanswered-turns control when the hook reports them', () => {
+    mockChatState.collapsedSummerFailureCount = 2;
+    mockChatState.isLoading = false;
+    mockChatState.status = 'ready';
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const control = container.querySelector(
+      '[data-testid="chat-collapsed-failures"]'
+    );
+    expect(control).toBeTruthy();
+    expect(control?.textContent).toContain(
+      '2 earlier messages went unanswered'
+    );
+
+    fireEvent.click(control as HTMLElement);
+    expect(mockChatState.showCollapsedSummerFailures).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the collapsed unanswered-turns control hidden when there are none', () => {
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(
+      container.querySelector('[data-testid="chat-collapsed-failures"]')
+    ).toBeNull();
   });
 });

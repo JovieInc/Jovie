@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
 import type { ReactNode, RefCallback } from 'react';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
@@ -261,16 +262,17 @@ export function ChatThreadMessages({
     <div>
       {collapsedFailureCount > 0 && onShowCollapsedFailures ? (
         <div className={`${CHAT_CONTENT_SHELL_CLASSNAME} pb-4`}>
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='sm'
             onClick={onShowCollapsedFailures}
-            className='text-xs text-tertiary-token hover:text-secondary-token'
             data-testid='chat-collapsed-failures'
           >
             {collapsedFailureCount === 1
               ? '1 earlier message went unanswered. Show it'
               : `${collapsedFailureCount} earlier messages went unanswered. Show them`}
-          </button>
+          </Button>
         </div>
       ) : null}
       {shouldVirtualizeMessages ? (
