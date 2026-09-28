@@ -57,9 +57,10 @@ describe('telemetry client boundary (JOV-6585)', () => {
     }
   });
 
-  it('keeps the gtag wrapper non-awaiting — track() is fire-and-forget', () => {
+  it('keeps the gtag wrapper synchronous — track() never awaits delivery', () => {
     const source = readWebSource('lib/analytics.ts');
-    expect(source).toContain('if (!analyticsWindow?.gtag) return;');
+    expect(source).toContain('export function track(');
+    expect(source).not.toContain('export async function track(');
     expect(source).not.toContain('await');
   });
 
