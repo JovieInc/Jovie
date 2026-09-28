@@ -16,6 +16,7 @@ import {
   oneTap,
   oneTimeToken,
 } from 'better-auth/plugins';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { db } from '@/lib/db';
 import {
   baAccounts,
@@ -404,6 +405,12 @@ export const auth = betterAuth({
               email: user.email,
               emailVerified: user.emailVerified,
               name: user.name,
+            });
+            // A new account is the signup funnel's auth success. Sign-ins of
+            // existing accounts never reach this hook.
+            await recordFunnelStep({
+              funnel: 'artist_signup',
+              step: 'auth_success',
             });
           } catch (error) {
             // provisionAppUser never throws by contract; this is

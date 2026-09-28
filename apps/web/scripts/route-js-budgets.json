@@ -1,0 +1,26 @@
+{
+  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build.",
+  "defaultMaxGzipKb": 900,
+  "routes": {
+    "/app/chat/[id]": 1385,
+    "/app/chat": 1385,
+    "/app/admin/chat": 1345,
+    "/app/tasks": 1245,
+    "/app/library": 1215,
+    "/app/dashboard/releases": 1080,
+    "/app/admin/people": 1050,
+    "/app/settings/artist-profile": 1035,
+    "/app/admin/system": 1030,
+    "/app/admin/hud": 990,
+    "/app/profiles": 950,
+    "/app": 935,
+    "/app/contacts": 925,
+    "/app/dashboard/releases/[releaseId]/downloads": 920,
+    "/app/settings/contacts": 920,
+    "/app/dashboard/releases/[releaseId]/tasks": 920,
+    "/app/releases/[releaseId]/tasks": 915,
+    "/app/tour-dates": 915,
+    "/app/settings/connectors": 910,
+    "/app/admin/features": 905
+  }
+}

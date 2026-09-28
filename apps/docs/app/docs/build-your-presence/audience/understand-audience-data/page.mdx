@@ -1,0 +1,104 @@
+---
+id: understand-audience-data
+title: Understand basic visitor and audience data
+description: Read Jovie's audience funnel, traffic breakdowns, and privacy-safe visitor states without drawing conclusions the data cannot support.
+documentType: guide
+category: build-your-presence
+productBacked: true
+featureId: click-visit-tracking
+additionalFeatureIds:
+  - audience-intelligence-device-location-intent
+productRoute: /app/contacts?tab=audience
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - analytics
+  - who visited
+  - where are my fans
+  - audience data
+redirectAliases: []
+visualProofRefs:
+  - proof/understand-audience-data.png
+uiLabels:
+  - Audience
+  - Audience funnel
+  - Profile Views
+  - Fans
+  - Subscribed Fans
+  - Link Clicks
+  - Listen Clicks
+  - Cities
+  - Countries
+  - Sources
+  - Links
+productSourceRefs:
+  - apps/web/app/app/(shell)/contacts/page.tsx
+  - apps/web/components/features/dashboard/organisms/AnalyticsSidebar.tsx
+  - apps/web/lib/analytics/metrics.ts
+  - apps/web/lib/analytics/metric-definitions.ts
+launchPath: true
+---
+
+<HelpArticle id="understand-audience-data">
+
+# Understand basic visitor and audience data
+
+<HelpOutcome>Use Jovie's audience numbers as directional evidence while keeping empty, delayed, or privacy-limited data in context.</HelpOutcome>
+
+<HelpSteps>
+
+<HelpStep title="Open the canonical audience view">
+Sign in, open **Contacts**, choose **Audience**, then open the analytics rail. The direct route is [Contacts → Audience](https://jov.ie/app/contacts?tab=audience). **Insights** is a separate interpretation surface; use the audience rail for the underlying visitor and click counts.
+</HelpStep>
+
+<HelpStep title="Choose one date range">
+Select **7D** or **30D** before comparing values. Keep the same range selected when checking the funnel, clicks, and ranked breakdowns.
+
+<HelpScreenshot src="/proof/understand-audience-data.png" alt="Audience funnel showing the 7D and 30D selector, visitor stages, click counts, and Links tab" caption="The audience analytics rail with the 30-day range selected." />
+</HelpStep>
+
+<HelpStep title="Read the funnel and click metrics">
+- **Profile Views**: all profile visits, including repeat visits.
+- **Fans**: the sidebar label for unique visitors, counted once per visitor in the selected range.
+- **Subscribed Fans**: visitors who opted in to notifications. This is the canonical **Followers** metric.
+- **Link Clicks**: all profile-link clicks. **Listen Clicks** are the streaming-link subset. **Tip Link Visits** appears only when its count is above zero.
+
+A percentage beside **Fans** or **Subscribed Fans** compares that stage with Profile Views. Jovie hides the percentage when there are fewer than 30 Profile Views, because a small base is easy to misread.
+</HelpStep>
+
+<HelpStep title="Use breakdowns as coarse context">
+**Cities** and **Countries** rank available coarse location data. **Sources** ranks known referrers and labels an absent referrer **Direct**. **Links** ranks clicked destinations. An empty list means Jovie has no usable breakdown for that selection; it does not prove nobody visited.
+</HelpStep>
+
+<HelpStep title="Keep identity claims bounded">
+**Anonymous** and **Identified** are Jovie data states, not guarantees about a person's real-world identity. A visit can carry a privacy-safe browser fingerprint, coarse location, device, referrer, and activity. Jovie does not learn a visitor's name, email, or phone from a visit alone; **Identified** requires a match to a known fan record with contact information.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Use repeated patterns across a stable date range to decide what to investigate. Do not treat a city, source, or inferred visitor as exact identity or proof of intent.
+
+<HelpTroubleshooting>
+
+### The range has zero or no breakdown data
+
+Confirm the profile is public, keep the intended range selected, and check again after real visits. **No city/source/link data yet** is a valid state when visits lack that attribute.
+
+### Counts are low or have not changed yet
+
+Small samples can omit percentages, and fresh events may not appear immediately. Refresh once after a short wait; do not infer a trend from one visit or repeatedly switch ranges.
+
+### Two values contradict each other
+
+Unique visitors should not exceed Profile Views, Subscribed Fans should not exceed Fans, and Listen Clicks should not exceed Link Clicks for the same range. Refresh without changing the range, then [report the mismatch](/docs/manage-jovie/contact-support/contact-support-or-report-incorrect-data) with a screenshot if it remains.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="understand-audience-data" ids={['manage-privacy-and-account-data', 'contact-support-or-report-incorrect-data']} />
+
+<HelpFeedback articleId="understand-audience-data" />
+
+</HelpArticle>
