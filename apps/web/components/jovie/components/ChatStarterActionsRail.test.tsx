@@ -74,17 +74,13 @@ describe('ChatStarterActionsRail', () => {
     expect(
       screen.getByRole('group', { name: '1 of 3: Plan a Release' })
     ).toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Show Starter Action 2 Of 3: Review Signals',
-      })
-    );
-    fireEvent.keyDown(
-      screen.getByRole('button', {
-        name: 'Show Starter Action 2 Of 3: Review Signals',
-      }),
-      { key: 'ArrowLeft' }
-    );
+    const secondDot = screen.getByRole('button', {
+      name: 'Show Starter Action 2 Of 3: Review Signals',
+    });
+    // JOV-6774: onto the canonical @jovie/ui IconButton, not a hand-rolled tag.
+    expect(secondDot).toHaveAttribute('data-variant', 'ghost');
+    await user.click(secondDot);
+    fireEvent.keyDown(secondDot, { key: 'ArrowLeft' });
     expect(
       screen.getByRole('group', { name: '1 of 3: Plan a Release' })
     ).toBeInTheDocument();
@@ -121,6 +117,8 @@ describe('ChatStarterActionsRail', () => {
       name: 'Show More Starter Actions',
     });
     expect(more).toHaveClass('focus-visible:ring-2');
+    // JOV-6774: onto the canonical @jovie/ui Button, not a hand-rolled tag.
+    expect(more).toHaveAttribute('data-variant', 'ghost');
     expect(more.parentElement).toHaveClass('sm:hidden', 'min-h-11');
     expect(screen.getByText('1 of 3')).toHaveClass('tabular-nums');
 
