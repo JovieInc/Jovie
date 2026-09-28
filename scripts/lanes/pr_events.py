@@ -134,6 +134,12 @@ def relay_targets(event: str, payload: dict) -> list[tuple[int, str, str | None]
     pr = payload.get("pull_request") or {}
     head = (pr.get("head") or {}).get("sha")
     if event == "pull_request_target" and payload.get("action") == "dequeued":
+        # A hand dequeue (re-enqueue, hold), a merge or a deleted branch says nothing about the
+        # code; treating it as a failure sent the fix loop after healthy queued PRs and
+        # escalated #18873 as exhausted (2026-09-28). A missing reason keeps the old behaviour.
+        reason = str(payload.get("reason") or "").lower()
+        if any(word in reason for word in ("manual", "merged", "branch_removed", "branch removed")):
+            return []
         return [(pr["number"], "dequeued", head)]
     if event == "pull_request_review" and payload.get("action") == "submitted":
         review = payload.get("review") or {}
