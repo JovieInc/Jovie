@@ -35,7 +35,7 @@ const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
  * @param {string} markdown - Raw CHANGELOG.md content
  * @param {{ includeFeatured?: boolean }} [options] - `includeFeatured`
  *   recognizes `### Featured` as a section (default false; see file header).
- * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }> }}
+ * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, kind: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }> }}
  */
 export function parseChangelog(markdown, { includeFeatured = false } = {}) {
   const sectionHeadingRe = includeFeatured
@@ -146,7 +146,7 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
  * Get the latest (first) release after [Unreleased].
  *
  * @param {string} markdown
- * @returns {{ version: string, date: string, raw: string, sections: Record<string, string[]> } | null}
+ * @returns {{ version: string, date: string, kind: string, raw: string, sections: Record<string, string[]> } | null}
  */
 export function getLatestRelease(markdown) {
   const { releases } = parseChangelog(markdown);

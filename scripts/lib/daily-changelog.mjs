@@ -282,7 +282,7 @@ export function evaluateDailyWindow({
   drafts = [],
   processedIds = [],
   promptVersion = 'daily-changelog-prompt/1',
-  evaluatedAt,
+  evaluatedAt = null,
   modelReceipt = null,
 }) {
   const window = dailyWindow(windowKey);
