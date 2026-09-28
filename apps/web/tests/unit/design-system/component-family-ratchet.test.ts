@@ -14,7 +14,8 @@ import { findNewEmptyStatePaths } from '../app/app-ia-static-guard';
  * Duplicate-component-family guard (count ratchet).
  *
  * Counts component files per drift-prone family (`*Button`, `*Palette`,
- * `*EmptyState`, `*Shell`) under apps/web/components. The count may only go
+ * `*EmptyState`, `*Shell`, status pills/glyphs, entity headers) under
+ * apps/web/components. The count may only go
  * DOWN. Convergence collapses duplicate implementations onto one canonical
  * per family; this ratchet stops NEW one-off variants from landing while that
  * work is in flight.
@@ -45,6 +46,14 @@ const FAMILIES = {
   palette: /Palette\.tsx$/,
   emptyState: /EmptyState\.tsx$/,
   shell: /Shell\.tsx$/,
+  // Status pills/badges/dots/glyphs: Pen has one status-pill owner (jAcP1);
+  // `@jovie/ui` StatusGlyph is the canonical owner in code (D5, JOV-6841) and
+  // the legacy forks migrate onto it in follow-ups — a NEW file here means
+  // a new fork.
+  status: /(?:Status(?:Pill|Badge|Dot)|Glyph)\.tsx$/,
+  // Entity rail headers: Pen has one entity header (odpZ8); code converges
+  // once design decision D6 names the owner (JOV-6777).
+  entityHeader: /(?:Entity|Drawer|Member|Detail)Header(?:Card)?\.tsx$/,
 } as const;
 type Family = keyof typeof FAMILIES;
 
@@ -68,7 +77,14 @@ function walk(dir: string, out: string[]): void {
 function countFamilies(): Record<Family, number> {
   const files: string[] = [];
   walk(SCAN_DIR, files);
-  const counts = { button: 0, palette: 0, emptyState: 0, shell: 0 };
+  const counts = {
+    button: 0,
+    palette: 0,
+    emptyState: 0,
+    shell: 0,
+    status: 0,
+    entityHeader: 0,
+  };
   for (const name of files) {
     for (const family of Object.keys(FAMILIES) as Family[]) {
       if (FAMILIES[family].test(name)) counts[family] += 1;

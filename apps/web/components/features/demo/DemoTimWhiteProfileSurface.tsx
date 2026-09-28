@@ -821,7 +821,7 @@ export function DemoTimWhiteProfileSurface() {
     <DemoClientProviders>
       <div data-testid='demo-showcase-tim-white-profile'>
         <StaticArtistPage
-          presentation='compact-preview'
+          presentation='full-public'
           mode={mode}
           artist={fixture.artist}
           subtitle='Official artist profile'

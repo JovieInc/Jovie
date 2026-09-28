@@ -27,6 +27,7 @@ const hoisted = vi.hoisted(() => ({
   checkAiChatRateLimitForPlanMock: vi.fn(),
   executeChatTurnMock: vi.fn(),
   reserveChatTurnMock: vi.fn(),
+  markChatTurnTerminalMock: vi.fn(),
   persistTerminalAssistantMessageMock: vi.fn(),
   isAdminMock: vi.fn(),
   getOvieOperatingStoreMock: vi.fn(),
@@ -116,6 +117,7 @@ vi.mock('@/lib/chat/run', () => ({
 vi.mock('@/lib/chat/turns', () => ({
   reserveChatTurn: hoisted.reserveChatTurnMock,
   markChatTurnStreaming: vi.fn(),
+  markChatTurnTerminal: hoisted.markChatTurnTerminalMock,
   persistTerminalAssistantMessage: hoisted.persistTerminalAssistantMessageMock,
   recordChatTurnModel: vi.fn(),
   TURN_IN_PROGRESS_ERROR_CODE: 'TURN_IN_PROGRESS',

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -78,16 +78,50 @@ export async function measureAlphaBounds(filePath, threshold = 8) {
   };
 }
 
+export function assertRealRasterFile(filePath, id, failures) {
+  const head = readFileSync(filePath).subarray(0, 32);
+  const isPng =
+    head[0] === 0x89 &&
+    head[1] === 0x50 &&
+    head[2] === 0x4e &&
+    head[3] === 0x47;
+  const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+  const isGif = head[0] === 0x47 && head[1] === 0x49 && head[2] === 0x46;
+  const isWebp =
+    head.toString('ascii', 0, 4) === 'RIFF' &&
+    head.toString('ascii', 8, 12) === 'WEBP';
+  const isAvif =
+    head.toString('ascii', 4, 8) === 'ftyp' &&
+    ['avif', 'avis'].includes(head.toString('ascii', 8, 12));
+  if (!(isPng || isJpeg || isGif || isWebp || isAvif)) {
+    failures.push(`${id}: ${filePath} is not a real raster image`);
+  }
+}
+
 export async function verifyLogoAssetRegistry() {
   const registry = JSON.parse(await readFile(registryPath, 'utf8'));
   const failures = [];
   if (registry.assets.length < 5)
     failures.push('normal batch requires at least five assets');
   for (const asset of registry.assets) {
-    if (!asset.sourcePath.includes('#')) {
-      const measured = await measureAlphaBounds(
-        path.join(repoRoot, asset.sourcePath)
-      );
+    const [filePart, symbol] = asset.sourcePath.split('#');
+    const absolutePath = path.join(repoRoot, filePart);
+    if (!existsSync(absolutePath)) {
+      failures.push(`${asset.id}: source file missing: ${filePart}`);
+      continue;
+    }
+    if (symbol) {
+      // file#Symbol entries point at an exported inline SVG component.
+      const source = readFileSync(absolutePath, 'utf8');
+      if (!new RegExp(`export function ${symbol}\\b`).test(source)) {
+        failures.push(`${asset.id}: ${symbol} is not exported by ${filePart}`);
+      }
+      if (!source.includes('<svg')) {
+        failures.push(`${asset.id}: ${filePart} does not render an SVG`);
+      }
+    } else {
+      assertRealRasterFile(absolutePath, asset.id, failures);
+      const measured = await measureAlphaBounds(absolutePath);
       if (
         JSON.stringify(measured.visibleBounds) !==
         JSON.stringify(asset.visibleBounds)

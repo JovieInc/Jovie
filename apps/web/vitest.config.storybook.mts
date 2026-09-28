@@ -199,6 +199,7 @@ export default defineConfig({
       'cmdk',
       'nuqs',
       'nuqs/adapters/next/app',
+      'nuqs/adapters/testing',
       'recharts',
       // Analytics
       '@vercel/analytics/react',

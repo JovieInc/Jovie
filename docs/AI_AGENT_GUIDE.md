@@ -126,6 +126,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/cron/process-pre-saves` | GET | CRON_SECRET | Process pre-save queue |
 | `/api/cron/schedule-release-notifications` | GET | CRON_SECRET | Schedule release alerts |
 | `/api/cron/send-release-notifications` | GET | CRON_SECRET | Send release alerts |
+| `/api/cron/web-ai-health` | GET | CRON_SECRET | Probe five production AI surfaces and return a redacted health receipt |
 
 ### Inbox Founder Reviews (authenticated founder surface)
 
@@ -589,7 +590,7 @@ Zod-validated environment variables. Never use `process.env` directly.
 
 For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 
-- **Node 22 + pnpm 9.15.4** -- verify before any command
+- **Node 24 + pnpm 9.15.9** -- verify before any command
 - **Monorepo commands from root** -- `pnpm --filter web ...`, never `cd apps/web`
 - **Server/client boundaries** -- no DB imports in `'use client'` files
 - **No `db.transaction()`** -- requires explicit approval; use approved RLS wrappers

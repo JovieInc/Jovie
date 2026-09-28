@@ -3,7 +3,7 @@
  *
  * Per the amended charter (E4, DX1), this vitest test rides the existing
  * Unit Tests lane and asserts:
- *   1. route-glob ⇔ manifest bidirectional (every (marketing) + (home) + waitlist route is mapped/exempted)
+ *   1. route-glob ⇔ manifest bidirectional (every (marketing), (home), waitlist, and guarded profile-admission route is mapped/exempted)
  *   2. glob-count floor (catches route-group rename — silent-failure guard)
  *   3. recipeId ∈ registry
  *   4. proven recipes reference a real route (CI refuses proven without reference)
@@ -722,7 +722,7 @@ describe('marketing route manifest integrity', () => {
   it('keeps source-verified route bodies explicit even when recipe parity is incomplete', () => {
     for (const [url, expectedParity] of [
       ['/pay', false],
-      ['/support', true],
+      ['/support', false],
       ['/waitlist', false],
     ] as const) {
       const entry = MARKETING_ROUTE_MANIFEST.find(item => item.url === url);
@@ -1546,7 +1546,8 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     expect(bindings.slice(1, -1).map(binding => binding.occurrenceId)).toEqual(
       rows.map(row => row.id)
     );
-    expect(rows.map(row => row.id)).toEqual(['connected', 'relationships']);
+    // Pen My0zu (JOV-6946): one relationships beat.
+    expect(rows.map(row => row.id)).toEqual(['relationships']);
     expect(bindings.map(binding => binding.sectionId)).toEqual([
       'hero',
       ...rows.map(() => 'feature-split'),
