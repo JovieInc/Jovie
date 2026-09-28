@@ -92,7 +92,7 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(events.failure_reason({"verdict": "failed", "reasons": ["timeout:devin"]}, False),
                          {"reason": "agent-timeout", "next_action": "retry-after-backoff"})
         self.assertEqual(events.failure_reason({"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}, True),
-                         {"reason": "no-change", "next_action": "triage"})
+                         {"reason": "no-change", "next_action": "backlog-disposition"})
         self.assertEqual(events.failure_reason({"verdict": "held", "reasons": ["code-change-without-test"]}, False)["reason"],
                          "missing-test")
         self.assertEqual(events.failure_reason({"verdict": "failed"}, False)["reason"], "failed")
@@ -288,10 +288,34 @@ class ClaimTest(unittest.TestCase):
 
     def test_spent_and_already_tried_heads_keep_their_label_and_wait(self):
         shell = Shell()
-        self.attempts({"5": {"sha": "h0", "count": 2}, "6": {"sha": "h1", "count": 1}})
+        # `pushed` without a pushedHead is a legacy record: the current head may be the one our
+        # own fix produced, which is not new evidence (JOV-7089), so the generation stays spent.
+        self.attempts({"5": {"sha": "h0", "count": 2, "pushed": True}, "6": {"sha": "h1", "count": 1}})
         waiting = [pr(kinds=["conflict"], merge="DIRTY"), pr(number=6, kinds=["dequeued"])]
         self.assertIsNone(events.claim_event_pr(self.host, fake_lane(shell), "devin", waiting, NOW))
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], "no relabel churn on every push to main")
+
+    def test_a_new_external_head_reenters_with_a_durable_receipt(self):
+        shell = Shell()
+        # Attempts on h0 are spent; h1 is a head nobody in the fix loop pushed (JOV-7089).
+        self.attempts({"5": {"sha": "h0", "count": 2, "lane": "codex", "at": 0, "endedAt": 1,
+                             "escalated": True}})
+        claimed = events.claim_event_pr(self.host, fake_lane(shell), "devin",
+                                        [pr(kinds=["conflict"], merge="DIRTY")], NOW)
+        self.assertEqual(claimed["number"], 5, "a new head is valid re-entry evidence")
+        record = self.attempts()["5"]
+        self.assertEqual((record["sha"], record["count"]), ("h1", 1), "a new bounded generation")
+        self.assertNotIn("escalated", record, "the new generation escalates on its own failure")
+        self.assertEqual(record["reentry"]["schema"], "jovie-reentry/v1")
+        self.assertEqual(record["reentry"]["fromGeneration"]["head"], "h0")
+        self.assertEqual(record["reentry"]["toGeneration"]["head"], "h1")
+        self.assertEqual(record["reentry"]["materialChange"], "new-pr-head")
+
+    def test_a_self_pushed_head_is_not_reentry_evidence(self):
+        self.attempts({"5": {"sha": "h0", "count": 2, "pushed": True, "pushedHead": "h1"}})
+        self.assertIsNone(events.claim_event_pr(self.host, fake_lane(Shell()), "devin",
+                                                [pr(kinds=["conflict"], merge="DIRTY")], NOW),
+                          "the head our own fix produced stays terminal, not a re-entry")
 
     def test_the_second_attempt_escalates_to_the_next_lane_in_cost_order(self):
         self.attempts({"5": {"sha": "h0", "count": 1, "lane": "devin", "at": NOW - 60}})
@@ -590,7 +614,9 @@ class RunnerHookTest(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
-                (host.state / "fix-attempts.json").write_text(json.dumps({"7": {"sha": "h0", "count": 2}}))
+                # `pushed` marks a head the fix loop may have produced itself: still terminal.
+                (host.state / "fix-attempts.json").write_text(json.dumps(
+                    {"7": {"sha": "h0", "count": 2, "pushed": True}}))
                 runner.escalate_exhausted(host, [stuck], linear)
                 held = json.loads((host.state / "held.json").read_text())["7"]
         finally:
@@ -598,7 +624,7 @@ class RunnerHookTest(unittest.TestCase):
         self.assertEqual(returned, [7])
         self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/7/labels", "-f",
                        "labels[]=lane-fix-exhausted"], calls, "held with a reason, visible on the PR")
-        self.assertIn("jovie.bug-report/v1", triaged[0])
+        self.assertEqual(triaged, [], "a terminal generation is a disposition, not queue inventory")
         self.assertEqual((held["reason"], held["sha"]), ("fix-exhausted", "h1"))
 
     def test_an_unfixable_hold_escalates_once_without_burning_attempts(self):
@@ -619,8 +645,7 @@ class RunnerHookTest(unittest.TestCase):
                 attempts = json.loads((host.state / "fix-attempts.json").read_text())["7"]
         finally:
             runner.sh, runner.load_providers, events.return_to_pool = saved
-        self.assertEqual(len(triaged), 1)
-        self.assertIn("Unfixable gate hold", triaged[0])
+        self.assertEqual(triaged, [], "an unfixable hold gets a terminal disposition, not Triage inventory")
         self.assertEqual((held["reason"], held["sha"]), ("diff-too-large", "h1"),
                          "a zero-attempt hold keeps its real reason instead of fix-exhausted")
         self.assertTrue(attempts["escalated"])

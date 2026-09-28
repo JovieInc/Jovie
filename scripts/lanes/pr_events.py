@@ -110,7 +110,7 @@ def failure_reason(receipt: dict, exhausted: bool) -> dict:
     if code is None and receipt.get("verdict") == "held":
         code = held_reason(reasons)[0]
     return {"reason": code or receipt.get("verdict") or "unknown",
-            "next_action": "triage" if exhausted else "retry-after-backoff"}
+            "next_action": "backlog-disposition" if exhausted else "retry-after-backoff"}
 
 
 def by_reason(held: dict, open_numbers: set[int] | None = None) -> dict[str, int]:
@@ -361,6 +361,44 @@ def in_flight(record: dict, pr: dict, now: float) -> bool:
     return now - record["at"] < FIX_LEASE_S
 
 
+def same_generation(record: dict, sha: str) -> bool:
+    """Whether this head continues the recorded fix generation (JOV-7089). A head is external
+    evidence only when the record proves it is neither the attempted head nor the head our own
+    fix pushed; a self-push never earns re-entry. Records written before `pushedHead` existed
+    fail closed to the same generation."""
+    if not record.get("count"):
+        return False
+    if record.get("sha") is None and record.get("pushedHead") is None:
+        return True  # legacy record: nothing proves the head changed
+    if sha in (record.get("sha"), record.get("pushedHead")):
+        return True
+    return bool(record.get("pushed")) and "pushedHead" not in record
+
+
+def spent(record: dict, sha: str, max_attempts: int) -> bool:
+    """This head's bounded retry budget is gone: a terminal generation that may not re-enter
+    the fix queue without a receipted material change (JOV-7089)."""
+    return record.get("count", 0) >= max_attempts and same_generation(record, sha)
+
+
+def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: float) -> None:
+    """Charge one fix attempt to this PR. A head that is neither the attempted head nor the
+    head our fix produced is new authoritative evidence: it starts a new bounded generation
+    and the record carries a durable receipt linking it to the previous one (JOV-7089)."""
+    record = attempts.get(str(number), {})
+    rollover = record.get("count", 0) > 0 and not same_generation(record, sha)
+    entry = {"sha": sha, "count": 1 if rollover else record.get("count", 0) + 1,
+             "lane": lane_name, "at": now}
+    if not rollover and record.get("pushedHead"):
+        entry["pushedHead"] = record["pushedHead"]  # self-pushes stay in the same generation
+    if rollover:
+        entry["reentry"] = {"schema": "jovie-reentry/v1", "materialChange": "new-pr-head",
+                            "fromGeneration": {"head": record.get("sha"), "attempts": record.get("count", 0),
+                                               "pushedHead": record.get("pushedHead")},
+                            "toGeneration": {"head": sha}, "at": now}
+    attempts[str(number)] = entry
+
+
 def read_state(host, name: str) -> dict:
     path = host.state / name
     try:
@@ -404,7 +442,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         if not in_scope(pr, "red", disabled) or not needs_work(lane, pr):
             consume(lane, pr)
             continue
-        if record.get("count", 0) >= lane.MAX_FIX_ATTEMPTS or in_flight(record, pr, now):
+        if spent(record, pr["headRefOid"], lane.MAX_FIX_ATTEMPTS) or in_flight(record, pr, now):
             continue
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
@@ -420,8 +458,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
         if "dequeued" in (pr.get("eventKinds") or []):
             pr = {**pr, "queueFailure": queue_failure(lane, pr["number"])}
-        attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1,
-                                       "lane": name, "at": now}
+        record_attempt(attempts, pr["number"], pr["headRefOid"], name, now)
         path.write_text(json.dumps(attempts))
         lane.post_claim(pr["number"], pr["headRefOid"], "fix")
         consume(lane, pr)
@@ -460,7 +497,7 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
 def linear_issue(linear, identifier: str) -> dict | None:
     team, _, number = identifier.upper().partition("-")
     data = linear.gql('query($n:Float!,$t:String!){issues(filter:{team:{key:{eq:$t}},number:{eq:$n}})'
-                      '{nodes{id state{name type}}}}', {"n": float(number), "t": team})
+                      '{nodes{id state{name type} comments(last:20){nodes{body}}}}}', {"n": float(number), "t": team})
     nodes = data["issues"]["nodes"]
     return nodes[0] if nodes else None
 
@@ -578,7 +615,8 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
               "exhausted": 0, "staleLaneDrafts": 0, "staleOtherDrafts": 0}
     for pr in prs:
         number, labels = pr["number"], set(label_names(pr))
-        spent = attempts.get(str(number), {}).get("count", 0) >= max_attempts
+        # Spent is generation-scoped: a head nobody here pushed is new evidence, not a dead end.
+        generation_spent = spent(attempts.get(str(number), {}), pr.get("headRefOid"), max_attempts)
         dirty, red = pr.get("mergeStateStatus") == "DIRTY", pr.get("rollup") in ("FAILURE", "ERROR")
         updated = iso_ts(pr.get("updatedAt"))
         age = now - updated if updated is not None else 0
@@ -614,7 +652,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                 if best["number"] != number:
                     plan["close"].append((number, f"superseded by #{best['number']} for the same issue"))
                     continue
-                if spent:
+                if generation_spent:
                     plan["close"].append((number, "stale for 48h after its fix attempts ran out"))
                     continue
                 wanted.append("stale")
@@ -626,7 +664,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         if pr.get("isDraft") or pr.get("isCrossRepository") or pr.get("isInMergeQueue"):
             continue
         held = {label.lower() for label in labels} & HOLD_LABELS or PREFIX + EXHAUSTED in labels
-        queued = any(PREFIX + kind in labels for kind in FIX_KINDS) and not spent
+        queued = any(PREFIX + kind in labels for kind in FIX_KINDS) and not generation_spent
         settling = age < ORPHAN_GRACE_S or pr.get("rollup") in ("PENDING", "EXPECTED")
         if not (held or queued or settling):
             plan["orphans"].append(number)
