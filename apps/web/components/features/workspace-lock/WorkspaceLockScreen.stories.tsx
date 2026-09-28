@@ -14,7 +14,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Locked: Story = {
   render: () => (
-    <div className='h-96 w-[32rem]'>
+    <div className='h-96 w-128'>
       <WorkspaceLockScreen />
     </div>
   ),
