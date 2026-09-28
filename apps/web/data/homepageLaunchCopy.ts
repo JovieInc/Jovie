@@ -63,7 +63,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
           { id: 'pay', caption: 'A direct way to pay Tim, in one tap.' },
           {
             id: 'subscribe',
-            caption: 'Updates from Tim, straight to the people who care.',
+            caption: 'Tim’s updates, sent only to people who asked for them.',
           },
         ],
       },

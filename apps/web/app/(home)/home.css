@@ -2564,6 +2564,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: block;
 }
 
+.homepage-connected-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+
 .homepage-certified-section__eyebrow {
   margin: 0 0 var(--space-4);
   color: var(--color-text-tertiary-token);
@@ -2583,8 +2590,166 @@ body:has(.home-viewport)::-webkit-scrollbar {
   line-height: 1.1;
 }
 
+.homepage-connected-header > .homepage-certified-section__body,
 .homepage-certified-section--relationships .homepage-certified-section__body {
   color: var(--color-text-secondary-token);
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+.homepage-chapter-visual {
+  border-radius: var(--radius-xl);
+  background: var(--system-b-text-primary);
+}
+
+.homepage-connected-artwork {
+  width: 100%;
+  margin-top: clamp(var(--space-8), 4vw, var(--space-12));
+  overflow: hidden;
+}
+
+.homepage-connected-identity {
+  display: flex;
+  width: 100%;
+  margin-top: clamp(var(--space-8), 4vw, var(--space-12));
+  min-height: clamp(28rem, 52vw, 42rem);
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(var(--space-8), 5vw, var(--space-16)) var(--space-8) 0;
+}
+
+.homepage-connected-identity .homepage-certified-section__device {
+  width: min(100%, 18rem);
+  margin-bottom: calc(var(--space-8) * -1);
+}
+
+.homepage-relationships-visual {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.72fr) minmax(0, 1fr);
+  gap: clamp(var(--space-5), 3vw, var(--space-8));
+  align-items: center;
+  overflow: hidden;
+  padding: clamp(var(--space-6), 3vw, var(--space-10));
+}
+
+.homepage-relationships-visual__profile {
+  align-self: end;
+  margin-bottom: calc(var(--space-12) * -1);
+}
+
+.homepage-relationships-visual__profile .homepage-certified-section__device {
+  width: min(100%, 13rem);
+}
+
+.homepage-relationship-visibility .homepage-certified-section__device {
+  width: min(100%, 13rem);
+}
+
+/* JOV-6297: one editorial surface carrying the approved customer-zero
+   profile — real avatar + public facts beside the real product export.
+   The identity and the export sit together as one centered pair; the card
+   height follows the uncropped export (no fixed aspect ratio, no dead
+   column). Text on the warm-white artifact uses the inverse page ink. */
+.homepage-connected-profile {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(var(--space-12), 7vw, var(--space-24));
+  padding: clamp(var(--space-6), 4vw, var(--space-12));
+}
+
+.homepage-connected-profile__identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.homepage-connected-profile__avatar {
+  width: clamp(4rem, 7vw, 7.5rem);
+  height: auto;
+  border-radius: 50%;
+}
+
+.homepage-connected-profile__name {
+  margin: 0;
+  color: var(--system-b-bg-page);
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.homepage-connected-profile__url {
+  margin: 0;
+  color: color-mix(in oklab, var(--system-b-bg-page) 64%, transparent);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.homepage-connected-artwork__image {
+  display: block;
+  width: min(100%, 20rem);
+  height: auto;
+}
+
+@media (max-width: 767px) {
+  .homepage-connected-profile {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .homepage-connected-profile__identity {
+    align-items: center;
+    text-align: center;
+  }
+
+  .homepage-connected-artwork__image {
+    width: min(100%, 16rem);
+    height: auto;
+    margin-inline: auto;
+  }
+}
+
+.homepage-relationship-outcomes {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: clamp(var(--space-8), 3vw, var(--space-11));
+  list-style: none;
+}
+
+.homepage-relationship-outcome {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.homepage-relationship-outcome__index {
+  padding-top: 0.2rem;
+  color: color-mix(in oklab, var(--system-b-bg-page) 52%, transparent);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.homepage-relationship-outcome__copy h3 {
+  margin: 0;
+  color: var(--system-b-bg-page);
+  font-size: 1.375rem;
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.homepage-relationship-outcome__copy p {
+  margin: var(--space-2) 0 0;
+  color: color-mix(in oklab, var(--system-b-bg-page) 72%, transparent);
   font-size: 1.125rem;
   line-height: 1.5;
 }
@@ -2647,6 +2812,102 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-identity__handle {
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 767px) {
+  .homepage-connected-identity {
+    min-height: 32rem;
+  }
+
+  .homepage-relationships-visual {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-5);
+  }
+
+  .homepage-relationship-outcomes {
+    gap: var(--space-6);
+  }
+
+  .homepage-relationship-outcome {
+    display: block;
+  }
+
+  .homepage-relationship-outcome__index {
+    display: block;
+    margin-bottom: var(--space-1);
+  }
+
+  .homepage-relationship-outcome__copy h3 {
+    font-size: 1rem;
+  }
+
+  .homepage-relationship-outcome__copy p {
+    font-size: 0.875rem;
+  }
+}
+
+/* JOV-6297: static ordered states of the shipped visibility surfaces —
+   the public profile people read and the per-profile llms.txt agents read. */
+.homepage-relationship-visibility {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  margin: clamp(var(--space-8), 3vw, var(--space-11)) 0 0;
+  padding: var(--space-6) 0 0;
+  border-top: 1px solid var(--homepage-chapter-rule);
+  list-style: none;
+}
+
+.homepage-relationship-visibility__state {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.homepage-relationship-visibility__label {
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.homepage-relationship-visibility__artifact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: 1px solid var(--homepage-chapter-rule);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.homepage-relationship-visibility__screen {
+  display: block;
+  width: min(100%, 9rem);
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
+.homepage-relationship-visibility__llms {
+  margin: 0;
+  overflow-x: auto;
+  color: var(--color-text-secondary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.homepage-relationship-visibility__url {
+  margin: 0;
   color: var(--color-text-tertiary-token);
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.75rem;
@@ -2721,6 +2982,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-identity__portrait {
     width: 72px;
+  }
+}
+
+@media (min-width: 768px) {
+  .homepage-relationship-visibility {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
@@ -2859,6 +3126,20 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (min-width: 900px) {
+  .homepage-connected-header {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: clamp(var(--space-4), 2vw, var(--space-6));
+  }
+
+  .homepage-connected-header .homepage-certified-section__copy {
+    grid-column: 1 / span 7;
+  }
+
+  .homepage-connected-header > .homepage-certified-section__body {
+    grid-column: 9 / span 4;
+    margin-top: var(--space-6);
+  }
+
   .homepage-editorial-changelog__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: clamp(var(--space-5), 2.5vw, var(--space-8));

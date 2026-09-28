@@ -117,7 +117,7 @@ describe('JOV-5864 locked homepage baseline', () => {
           { id: 'pay', caption: 'A direct way to pay Tim, in one tap.' },
           {
             id: 'subscribe',
-            caption: 'Updates from Tim, straight to the people who care.',
+            caption: 'Tim’s updates, sent only to people who asked for them.',
           },
         ],
       },
@@ -211,15 +211,9 @@ describe('JOV-5864 locked homepage baseline', () => {
       certified.changelog.headline,
       certified.changelog.allPostsLabel,
       ...certified.sections.flatMap(section => [
-        ...('eyebrow' in section ? [section.eyebrow] : []),
         section.headline,
         section.body,
-        ...('outcomes' in section
-          ? section.outcomes.flatMap(outcome => [
-              outcome.headline,
-              outcome.body,
-            ])
-          : []),
+        ...section.steps.map(step => step.caption),
       ]),
       ...HOMEPAGE_EDITORIAL_CARDS.flatMap(card => [
         card.title,

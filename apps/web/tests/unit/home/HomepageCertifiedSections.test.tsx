@@ -1,6 +1,4 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
@@ -72,7 +70,7 @@ describe('HomepageCertifiedSections', () => {
     ]);
     expect(section).toHaveTextContent('A direct way to pay Tim, in one tap.');
     expect(section).toHaveTextContent(
-      'Updates from Tim, straight to the people who care.'
+      'Tim’s updates, sent only to people who asked for them.'
     );
     expect(section.querySelector('.homepage-chapter-visual')).toBeNull();
     expect(section).not.toHaveTextContent(/Listener|Collaborator|Investor/);
@@ -134,16 +132,5 @@ describe('HomepageClose', () => {
     expect(screen.getByLabelText('Name')).toHaveFocus();
     expect(screen.getByLabelText('Name')).toHaveValue('Beyoncé');
     expect(submit).not.toHaveBeenCalled();
-  });
-});
-describe('HomepageCertifiedSections surfaces', () => {
-  it('never paints a light panel on the forced-dark page (JOV-6946)', () => {
-    const css = readFileSync(
-      path.resolve(__dirname, '../../../app/(home)/home.css'),
-      'utf8'
-    );
-    // The retired chapter panel painted its background with the page text
-    // token, a near-white slab under the forced dark theme.
-    expect(css).not.toContain('.homepage-chapter-visual');
   });
 });

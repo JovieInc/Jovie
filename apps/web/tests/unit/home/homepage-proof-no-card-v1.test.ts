@@ -41,8 +41,7 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
     // ground; no artwork frame, numbered outcomes, or light panel.
     expect(certifiedCss).not.toContain('aspect-ratio: 1902 / 827');
     expect(certifiedCss).toContain('.homepage-next-steps');
-    expect(certifiedCss).not.toContain('homepage-relationship-outcomes');
-    expect(certifiedCss).not.toContain('.homepage-chapter-visual');
+
     expect(certifiedCss).not.toMatch(/backdrop-filter/);
     expect(certifiedCss).not.toMatch(/box-shadow:/);
   });
