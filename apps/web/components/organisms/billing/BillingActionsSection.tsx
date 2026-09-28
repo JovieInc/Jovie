@@ -41,7 +41,7 @@ export function BillingActionsSection({
           <Button
             variant='ghost'
             size='sm'
-            className='justify-start text-destructive hover:bg-error-subtle hover:text-destructive'
+            className='justify-start text-error hover:bg-error-subtle hover:text-error'
             onClick={() => {
               track('subscription_cancel_clicked', {
                 source: 'billing_dashboard',
@@ -66,7 +66,7 @@ export function BillingActionsSection({
                 <ul className='space-y-2'>
                   <li className='flex items-start gap-2 text-app'>
                     <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
+                      className='mt-0.5 h-4 w-4 shrink-0 text-error'
                       aria-hidden='true'
                     />
                     <span>
@@ -76,7 +76,7 @@ export function BillingActionsSection({
                   </li>
                   <li className='flex items-start gap-2'>
                     <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
+                      className='mt-0.5 h-4 w-4 shrink-0 text-error'
                       aria-hidden='true'
                     />
                     <span>
@@ -86,7 +86,7 @@ export function BillingActionsSection({
                   </li>
                   <li className='flex items-start gap-2'>
                     <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
+                      className='mt-0.5 h-4 w-4 shrink-0 text-error'
                       aria-hidden='true'
                     />
                     <span>
@@ -96,7 +96,7 @@ export function BillingActionsSection({
                   </li>
                   <li className='flex items-start gap-2'>
                     <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
+                      className='mt-0.5 h-4 w-4 shrink-0 text-error'
                       aria-hidden='true'
                     />
                     <span>
@@ -106,7 +106,7 @@ export function BillingActionsSection({
                   </li>
                   <li className='flex items-start gap-2'>
                     <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-destructive'
+                      className='mt-0.5 h-4 w-4 shrink-0 text-error'
                       aria-hidden='true'
                     />
                     <span>
