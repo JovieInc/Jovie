@@ -7,7 +7,7 @@ import {
   loadArtistsDirectoryProfiles,
 } from '@/lib/profile/public-discovery-catalog';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 interface ArtistsPageProps {
   readonly searchParams?: Promise<

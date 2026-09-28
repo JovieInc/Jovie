@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
-import { loadProfileCompleteness } from '@/lib/profile/completeness.server';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { filterEmail } from './email-filter';
 import { detectRepresentation } from './management-filter';
@@ -42,12 +41,7 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
   // 5. Determine route
   let route: 'email' | 'dm' | 'both' | 'manual_review' | 'skipped';
 
-  const completeness = lead.creatorProfileId
-    ? (await loadProfileCompleteness([lead.creatorProfileId])).get(
-        lead.creatorProfileId
-      )
-    : null;
-  if (!completeness?.eligible || isHighProfile || repResult.hasRepresentation) {
+  if (isHighProfile || repResult.hasRepresentation) {
     route = 'manual_review';
   } else if (!emailResult.invalid && lead.hasInstagram) {
     route = 'both';

@@ -26,7 +26,6 @@ import {
   OUTREACH_QUEUE_CLAIM_TTL_MS,
   processOutreachBatch,
 } from '@/lib/leads/outreach-batch';
-import { loadProfileCompleteness } from '@/lib/profile/completeness.server';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -291,21 +290,9 @@ export async function GET(request: NextRequest) {
       ]);
     }
 
-    const completeness = await loadProfileCompleteness(
-      rows.flatMap(row => (row.creatorProfileId ? [row.creatorProfileId] : []))
-    );
     return NextResponse.json(
       {
-        items: rows.map(row =>
-          completeness.get(row.creatorProfileId ?? '')?.eligible
-            ? { ...row, completenessEligible: true }
-            : {
-                ...row,
-                dmCopy: null,
-                claimToken: null,
-                completenessEligible: false,
-              }
-        ),
+        items: rows,
         total: totalRow?.total ?? 0,
         pendingTotal: pendingTotalRow?.total ?? 0,
         page,

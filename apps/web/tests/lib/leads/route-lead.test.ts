@@ -2,11 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const mockCompleteness = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/profile/completeness.server', () => ({
-  loadProfileCompleteness: mockCompleteness,
-}));
-
 // --- Hoisted mock variables (available inside vi.mock factories) ---
 
 const {
@@ -79,7 +74,6 @@ import { routeLead } from '@/lib/leads/route-lead';
 
 const baseLead = {
   id: 'lead-1',
-  creatorProfileId: 'profile-1',
   contactEmail: 'artist@gmail.com',
   bio: 'I make music',
   hasInstagram: true,
@@ -131,9 +125,6 @@ function setupLead(overrides: Record<string, unknown> = {}) {
 describe('routeLead', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCompleteness.mockResolvedValue(
-      new Map([['profile-1', { eligible: true }]])
-    );
 
     mockGenerateClaimTokenPair.mockResolvedValue(freshTokenPair);
 
@@ -146,17 +137,6 @@ describe('routeLead', () => {
     mockDetectRepresentation.mockReturnValue({
       hasRepresentation: false,
       signal: null,
-    });
-  });
-
-  it('holds an incomplete profile for review without DM copy', async () => {
-    setupLead();
-    mockCompleteness.mockResolvedValue(
-      new Map([['profile-1', { eligible: false }]])
-    );
-    expect(await routeLead('lead-1')).toMatchObject({
-      route: 'manual_review',
-      dmCopy: null,
     });
   });
 

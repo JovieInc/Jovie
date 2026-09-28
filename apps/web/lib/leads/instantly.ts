@@ -1,12 +1,10 @@
 import 'server-only';
-import { requireLeadCompleteness } from '@/lib/profile/completeness.server';
 
 import { pipelineError, pipelineLog } from './pipeline-logger';
 
 const INSTANTLY_API_BASE = 'https://api.instantly.ai/api/v2';
 
 interface PushLeadParams {
-  leadId: string;
   email: string;
   firstName: string;
   claimLink: string;
@@ -75,7 +73,6 @@ async function attemptLeadPush(
 export async function pushLeadToInstantly(
   params: PushLeadParams
 ): Promise<string> {
-  await requireLeadCompleteness(params.leadId);
   const apiKey = process.env.INSTANTLY_API_KEY;
   const campaignId = process.env.INSTANTLY_CAMPAIGN_ID;
 
