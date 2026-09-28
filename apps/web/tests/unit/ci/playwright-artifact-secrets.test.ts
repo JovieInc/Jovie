@@ -1138,6 +1138,10 @@ ${fixtureCheckout}
               expect.stringContaining(
                 '--only-secrets=CRON_SECRET --no-fallback'
               ),
+              // JOV-6870: limiter-store probe of /api/health/redis.
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
             ]
           : []),
       ];

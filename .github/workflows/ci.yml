@@ -1656,7 +1656,7 @@ jobs:
           rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
           (
             set +e
-            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+            git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
             echo "$?" > "$BASE_FETCH_DIR/status.tmp"
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
@@ -1699,6 +1699,13 @@ jobs:
             echo "::error title=Base-branch fetch::git fetch exited $fetch_status"
             exit 1
           fi
+          # No command in this job may kick detached `git maintenance run
+          # --auto` (or gc --auto): it keeps rewriting
+          # .git/objects/info/commit-graph while the structural lane's
+          # provenance guards read it, which intermittently flips
+          # `merge-base --is-ancestor` to a false "not an ancestor".
+          git config maintenance.auto false
+          git config gc.auto 0
           if [[ "$(git rev-parse --is-shallow-repository)" != 'false' ]]; then
             echo "::error title=Base-branch fetch::checkout is still shallow"
             exit 1
@@ -1903,6 +1910,9 @@ jobs:
       - name: Run structural ci-fast lane
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: &structural-run-env
+          # Lets the story-quality guard repair a checkout a concurrent
+          # depth-limited fetch re-shallowed mid-lane (JOV-6623).
+          GH_TOKEN: ${{ github.token }}
           CI_FAST_LANE_GROUP: remaining
           CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -2039,7 +2049,7 @@ jobs:
         run: |
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
       - name: Select public-profile browser admission
         id: profile-browser
         shell: bash
@@ -5025,7 +5035,7 @@ jobs:
           [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           if [[ "$EVENT_NAME" == pull_request ]]; then
             base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
             COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"
@@ -5204,7 +5214,7 @@ jobs:
           [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           if [[ "$EVENT_NAME" == pull_request ]]; then
             base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
             COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"

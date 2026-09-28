@@ -103,6 +103,20 @@ test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', ()
     false
   );
   assert.equal(needsAutoMergeEnable(basePr), false);
+  for (const name of ['hold', 'Queue-Poison', 'do-not-merge']) {
+    assert.equal(
+      needsAutoMergeEnable({ ...eligible, labels: { nodes: [{ name }] } }),
+      false,
+      name
+    );
+  }
+  assert.equal(
+    needsAutoMergeEnable({
+      ...eligible,
+      labels: { nodes: [{ name: 'codex' }] },
+    }),
+    true
+  );
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {

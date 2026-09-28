@@ -82,6 +82,7 @@ query($owner: String!, $name: String!, $cursor: String) {
         isCrossRepository
         headRefOid
         autoMergeRequest { enabledAt mergeMethod }
+        labels(first: 30) { nodes { name } }
         comments(last: 100) {
           nodes { databaseId body }
         }
@@ -286,10 +287,24 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
   console.log(`Updated tracking issue #${issue.number}.`);
 }
 
+// Same set merge-queue-green-enroll.yml refuses. On a merge-queue repo,
+// enabling auto-merge on a CLEAN PR enqueues it at once, so a held PR must be skipped.
+const BLOCKING_LABELS = new Set([
+  'hold',
+  'gated',
+  'incident',
+  'do-not-merge',
+  'queue-poison',
+]);
+
 // Pure: a PR needs the enable pass when it is open, not a draft, lives in
-// this repo (fork tokens are read-only), and has no autoMergeRequest yet.
+// this repo (fork tokens are read-only), carries no blocking label, and has no
+// autoMergeRequest yet.
 function needsAutoMergeEnable(pr) {
-  return !pr.isDraft && !pr.isCrossRepository && !pr.autoMergeRequest;
+  const held = (pr.labels?.nodes ?? []).some(l =>
+    BLOCKING_LABELS.has(l.name.toLowerCase())
+  );
+  return !pr.isDraft && !pr.isCrossRepository && !held && !pr.autoMergeRequest;
 }
 
 function enableMissingAutoMerge(repo, prs, dryRun) {

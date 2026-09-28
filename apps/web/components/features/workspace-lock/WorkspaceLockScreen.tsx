@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Fingerprint } from 'lucide-react';
 import { useState } from 'react';
+import { isDesktopEnvironment } from '@/lib/desktop/electron-bridge';
 import { unlockWithPasskey } from '@/lib/workspace-lock/unlock-with-passkey';
 import { clearWorkspaceLock } from '@/lib/workspace-lock/workspace-lock';
 
@@ -59,6 +60,17 @@ export function WorkspaceLockScreen() {
         <p role='alert' className='text-sm text-destructive'>
           {message}
         </p>
+      ) : null}
+      {status === 'error' && isDesktopEnvironment() ? (
+        <Button
+          variant='tertiary'
+          type='button'
+          onClick={() =>
+            window.open(window.location.href, '_blank', 'noopener,noreferrer')
+          }
+        >
+          Open In Browser
+        </Button>
       ) : null}
     </div>
   );
