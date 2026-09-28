@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { SidebarInboxButton } from './SidebarInboxButton';
+import { SidebarInboxLink } from './SidebarInboxLink';
 
 const meta = {
-  title: 'Shell/SidebarInboxButton',
-  component: SidebarInboxButton,
+  title: 'Shell/SidebarInboxLink',
+  component: SidebarInboxLink,
   decorators: [
     Story => (
       <div className='flex items-center gap-3 p-4'>
@@ -11,7 +11,7 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof SidebarInboxButton>;
+} satisfies Meta<typeof SidebarInboxLink>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

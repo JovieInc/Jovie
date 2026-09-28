@@ -32,7 +32,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import { SidebarInboxButton } from '@/components/shell/SidebarInboxButton';
+import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -334,7 +334,7 @@ function SidebarHeaderNav({
       </div>
       {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
         <>
-          <SidebarInboxButton availability={inboxNavigation} />
+          <SidebarInboxLink availability={inboxNavigation} />
           <HeaderSearchSurfaceFromContext compact />
         </>
       ) : null}

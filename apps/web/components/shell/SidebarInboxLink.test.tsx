@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { SidebarInboxButton } from './SidebarInboxButton';
+import { SidebarInboxLink } from './SidebarInboxLink';
 
 describe('central Inbox bell', () => {
   it('keeps pending work on view and keyboard navigation', async () => {
     render(
-      <SidebarInboxButton
+      <SidebarInboxLink
         availability={{ state: 'available', pendingCount: 3 }}
       />
     );
@@ -25,7 +25,7 @@ describe('central Inbox bell', () => {
       'Inbox — Status Unavailable',
     ],
   ])('keeps the destination available for %s', (availability, name) => {
-    render(<SidebarInboxButton availability={availability} />);
+    render(<SidebarInboxLink availability={availability} />);
     expect(screen.getByRole('link', { name })).toHaveAttribute('href', '/app');
   });
 });

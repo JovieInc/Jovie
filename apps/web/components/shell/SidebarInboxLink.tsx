@@ -7,7 +7,7 @@ import type { InboxNavigationAvailability } from '@/lib/inbox/navigation-availab
 import { Tooltip } from './Tooltip';
 
 /** Pending work is server-derived; opening the Inbox never resolves it. */
-export function SidebarInboxButton({
+export function SidebarInboxLink({
   availability,
 }: {
   readonly availability?: InboxNavigationAvailability;
