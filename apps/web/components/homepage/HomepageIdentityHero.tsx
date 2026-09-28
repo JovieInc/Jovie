@@ -1,14 +1,13 @@
 // @coverage-via apps/web/tests/unit/home/HomepageIdentityHero.test.tsx
 import Image from 'next/image';
-import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
+import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
 import {
-  HOMEPAGE_CERTIFIED_CONTEXT,
-  HOMEPAGE_CERTIFIED_EVENTS,
-} from '@/data/homepageCertifiedOptimization';
+  MarketingHero,
+  MarketingHeroPhoto,
+  MarketingSurfaceCard,
+} from '@/components/marketing';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 import { HomepageCertifiedExposure } from './HomepageCertifiedExposure';
-import { HomepagePrimaryAction } from './HomepagePrimaryAction';
 import './HomepageIdentity.css';
 
 export type HomepageIdentityHeroCopy = typeof HOMEPAGE_IDENTITY_COPY.hero;
@@ -18,81 +17,99 @@ export interface HomepageIdentityHeroProps {
   readonly headingId?: string;
 }
 
-const HERO_PROOF = HOMEPAGE_MEDIA_MAP.connected.asset;
+const HERO_TEXTURE = {
+  src: '/assets/generated/homepage-hero-technical-texture-v1.webp',
+  width: 1600,
+  height: 900,
+} as const;
+
+const PREVIEW_PORTRAIT = '/assets/generated/homepage-identity-portrait-v1.webp';
 
 /**
- * Canonical Pen homepage hero (My0zu, JOV-6914): one Ion light entering from
- * the lower right and fading to the page ground (pure CSS, no image), one
- * headline, one support line, the certified name search (JOV-5085: Search
- * your name, Find me, /start; never Request access), and Tim White's real
- * jov.ie/tim profile as first-party proof (JOV-6946). The header band and centre stay dark for the copy.
+ * Homepage identity + link-claim hero (Pen STAGING Cyuz2 / xm2iz, Tim
+ * 2026-09-28): one headline, one support line, and an illustrative claimed
+ * page whose only action is claiming jov.ie/you. No product screenshot and
+ * nothing single-ICP on the homepage.
  */
 export function HomepageIdentityHero({
   copy = HOMEPAGE_IDENTITY_COPY.hero,
   headingId = 'homepage-identity-hero-heading',
 }: HomepageIdentityHeroProps) {
+  const { preview, claim } = copy;
+
   return (
-    <section
-      className='homepage-identity-hero marketing-hero-dock marketing-hero-dock--inset'
-      aria-labelledby={headingId}
-      data-testid='marketing-section-hero'
+    <div
+      className='homepage-identity-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'
       data-homepage-testid='homepage-hero-shell'
       data-marketing-owner='apps/web/components/homepage/HomepageIdentityHero.tsx'
-      data-marketing-variant='centered-none'
     >
       <HomepageCertifiedExposure />
+      <MarketingHeroPhoto {...HERO_TEXTURE} />
       <div
-        className='homepage-identity-hero__light'
         aria-hidden='true'
-        data-hero-layer='decorative'
-        data-hero-visual='ion-light'
-        data-testid='homepage-identity-hero-light'
+        className='marketing-hero-backdrop pointer-events-none absolute inset-0'
       />
-      <div className='homepage-identity-hero__inner' data-hero-layer='active'>
-        <h1 id={headingId} className='homepage-identity-hero__headline'>
-          {copy.headline}
-        </h1>
-        <p className='homepage-identity-hero__support'>{copy.subhead}</p>
-        <div
-          className='homepage-identity-hero__action'
-          data-testid='homepage-editorial-hero-search'
-        >
-          <HomepagePrimaryAction
-            appearance='editorial'
-            inputId='homepage-name-search'
-            placeholder={copy.search.placeholder}
-            submitLabel={copy.search.action}
-            submitTestId='homepage-primary-cta'
-            submitAnalytics={{
-              eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-              properties: {
-                ...HOMEPAGE_CERTIFIED_CONTEXT,
-                placement: 'hero',
-              },
-            }}
-          />
-        </div>
-        <figure
-          className='homepage-identity-hero__proof'
-          data-testid='homepage-hero-real-profile'
-        >
-          <ArtistProfilePhoneFrame
-            className='homepage-identity-hero__device'
-            size='md'
+      <MarketingHero
+        variant='split'
+        headingId={headingId}
+        testId='marketing-section-hero'
+      >
+        <div className='max-w-xl'>
+          <p className='marketing-kicker'>{copy.kicker}</p>
+          <h1
+            id={headingId}
+            className='marketing-h1-linear mt-6 text-primary-token'
           >
+            {copy.headline.split(/(?<=\.) /).map(line => (
+              <span key={line} className='block'>
+                {line}
+              </span>
+            ))}
+          </h1>
+          <p className='marketing-lead-linear mt-6 max-w-xl text-secondary-token'>
+            {copy.subhead}
+          </p>
+        </div>
+        <MarketingSurfaceCard
+          variant='floating'
+          glowTone='none'
+          testId='homepage-claim-card'
+          className='product-claim-card w-full max-w-120'
+          contentClassName='flex flex-col gap-4 px-5 py-5 sm:gap-5 sm:px-9 sm:py-10'
+        >
+          <div className='hidden items-center gap-4 sm:flex'>
             <Image
-              alt={copy.proofAlt}
-              className='homepage-identity-hero__screen'
-              height={HERO_PROOF.height}
+              alt={preview.portraitAlt}
+              className='size-14 shrink-0 rounded-full object-cover object-[74%_32%]'
+              height={112}
               priority
-              quality={85}
-              sizes='(min-width: 900px) 18rem, 70vw'
-              src={HERO_PROOF.publicUrl}
-              width={HERO_PROOF.width}
+              src={PREVIEW_PORTRAIT}
+              width={112}
             />
-          </ArtistProfilePhoneFrame>
-        </figure>
-      </div>
-    </section>
+            <p className='product-claim-card__status text-secondary-token'>
+              {preview.label}
+            </p>
+          </div>
+          <p className='product-claim-card__path text-primary-token'>
+            <span className='text-tertiary-token'>{claim.domain}</span>
+            <span>{preview.handle}</span>
+          </p>
+          <p className='hidden text-base text-secondary-token sm:block'>
+            {preview.name} · {preview.role}
+          </p>
+          <p className='text-sm text-tertiary-token'>{preview.note}</p>
+          <div className='w-full' data-testid='homepage-editorial-hero-search'>
+            <ProductClaimHandleForm
+              domain={claim.domain}
+              placeholder={claim.placeholder}
+              submitLabel={claim.action}
+              inputId='homepage-claim-handle'
+              testIdPrefix='homepage'
+              submitTestId='homepage-primary-cta'
+            />
+          </div>
+        </MarketingSurfaceCard>
+      </MarketingHero>
+    </div>
   );
 }

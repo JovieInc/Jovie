@@ -3,7 +3,7 @@
 // deliberately duplicate nothing already asserted verbatim in
 // homepage-hero-next-move-contract.test.ts (hero headline/subhead/search).
 
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
@@ -102,9 +102,9 @@ function LockedHomepageBody() {
 describe('JOV-5864 locked homepage baseline', () => {
   it('pins the certified body, close, changelog, and SEO copy verbatim', () => {
     expect(HOMEPAGE_IDENTITY_COPY.seo).toEqual({
-      title: 'Jovie | Your living identity on the internet',
+      title: 'Jovie | Be found. Be understood.',
       description:
-        'Your work, your links, your next chapter. Together in your Jovie profile.',
+        'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.',
     });
 
     // Pen My0zu (JOV-6946): one relationships beat with real next steps.
@@ -143,7 +143,7 @@ describe('JOV-5864 locked homepage baseline', () => {
         section.getAttribute('data-testid')
     );
     expect(sectionIds).toEqual([
-      'homepage-hero-shell',
+      'marketing-section-hero',
       'homepage-section-relationships',
       'homepage-editorial-changelog',
       'homepage-close',
@@ -152,7 +152,7 @@ describe('JOV-5864 locked homepage baseline', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Your living identity on the internet.',
+        name: 'Be found.Be understood.',
       })
     ).toBeInTheDocument();
     expect(
@@ -166,34 +166,31 @@ describe('JOV-5864 locked homepage baseline', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps the name search and /start handoff when the waitlist gate is on', () => {
-    gate.WAITLIST_ENABLED = true;
-    render(<LockedHomepageBody />);
-    expect(screen.getByPlaceholderText('Search your name')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Find me' })).toBeEnabled();
-    expect(
-      screen.queryByRole('link', { name: 'Request access' })
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText('Get started')).toBeNull();
+  it('keeps the jov.ie/you claim and /start handoff whatever the waitlist gate', () => {
+    for (const waitlist of [true, false]) {
+      gate.WAITLIST_ENABLED = waitlist;
+      const { unmount } = render(<LockedHomepageBody />);
+      expect(screen.getByTestId('homepage-claim-form')).toHaveAttribute(
+        'action',
+        '/start'
+      );
+      expect(screen.getByRole('button', { name: 'Claim' })).toBeEnabled();
+      expect(screen.queryByPlaceholderText('Search your name')).toBeNull();
+      expect(screen.queryByText('Request access')).toBeNull();
+      expect(screen.queryByText('Get started')).toBeNull();
+      unmount();
+    }
   });
 
-  it('keeps one canonical name search with one terminal return action', () => {
+  it('keeps one hero claim with one terminal return action', () => {
     render(<LockedHomepageBody />);
 
-    const searches = screen.getAllByPlaceholderText('Search your name');
-    expect(searches).toHaveLength(1);
-    expect(document.getElementById('homepage-name-search')).toBe(searches[0]);
-
-    expect(screen.getAllByRole('button', { name: 'Find me' })).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: 'Search' })).toBeNull();
-    expect(screen.queryByText('Get started')).toBeNull();
-
+    expect(screen.getAllByRole('button', { name: 'Claim' })).toHaveLength(1);
     const close = screen.getByTestId('marketing-section-cta');
-    expect(
+    fireEvent.click(
       within(close).getByRole('button', { name: 'Find your profile' })
-    ).toBeInTheDocument();
-    expect(within(close).queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('homepage-close-search')).toBeNull();
+    );
+    expect(document.getElementById('homepage-claim-handle')).toHaveFocus();
   });
 
   it('keeps the mounted baseline person-first and category-neutral', () => {
@@ -204,8 +201,8 @@ describe('JOV-5864 locked homepage baseline', () => {
       seo.description,
       hero.headline,
       hero.subhead,
-      hero.search.placeholder,
-      hero.search.action,
+      hero.claim.placeholder,
+      hero.claim.action,
       certified.close.headline,
       certified.close.action,
       certified.changelog.headline,
