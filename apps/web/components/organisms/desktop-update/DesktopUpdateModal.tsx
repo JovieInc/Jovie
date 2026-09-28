@@ -11,7 +11,6 @@ import {
 } from '@/components/organisms/Dialog';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
 import type { DesktopUpdatePhase } from '@/lib/desktop/desktop-updates';
-import { DesktopUpdateModalPrimaryAction } from './DesktopUpdateModalPrimaryAction';
 
 export interface DesktopUpdateReleaseNotes {
   readonly summary: string;
@@ -58,6 +57,15 @@ export function DesktopUpdateModalView({
   onRetry,
   onLater,
 }: DesktopUpdateModalViewProps) {
+  // Exactly one primary action per state (one-primary-action-per-screen-v1).
+  const primaryAction =
+    state.state === 'available'
+      ? { label: COPY.downloadAction, onClick: onDownload }
+      : state.state === 'ready'
+        ? { label: COPY.restartAction, onClick: onInstall }
+        : state.state === 'error'
+          ? { label: COPY.retryAction, onClick: onRetry }
+          : null;
   return (
     <Dialog open={open} onClose={onLater} size='md'>
       <DialogTitle>{modalTitle(state)}</DialogTitle>
@@ -116,12 +124,11 @@ export function DesktopUpdateModalView({
         <Button variant='secondary' onClick={onLater}>
           {COPY.laterAction}
         </Button>
-        <DesktopUpdateModalPrimaryAction
-          state={state}
-          onDownload={onDownload}
-          onInstall={onInstall}
-          onRetry={onRetry}
-        />
+        {primaryAction ? (
+          <Button variant='primary' onClick={primaryAction.onClick}>
+            {primaryAction.label}
+          </Button>
+        ) : null}
       </DialogActions>
     </Dialog>
   );
