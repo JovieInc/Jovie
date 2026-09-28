@@ -1,0 +1,126 @@
+name: Golden Path Nightly
+# clock-class: skip-if-unchanged
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted schedule dispatches the existing manual real-auth + Stripe test-mode Golden Path lane in ci.yml on main (actions: write only) and files one fingerprinted Linear issue on red; it holds no Stripe, auth, database or deploy credentials.
+# removal-trigger: Remove when Production Controller or ci.yml runs the real-auth Golden Path lane on its own clock.
+#
+# JOV-6920: the revenue gate must return to RED automatically. The Golden Path
+# lane (signup -> claim -> live profile + checkout -> verified payment ->
+# entitlement -> refund) only runs on workflow_dispatch of ci.yml, so without
+# this clock a regression stays invisible until someone dispatches it by hand.
+
+on:
+  schedule:
+    - cron: '23 9 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: golden-path-nightly
+  cancel-in-progress: false
+
+jobs:
+  golden-path:
+    name: Dispatch and verify the Golden Path lane
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Skip when main is unchanged since the last green Golden Path
+        id: skip
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          echo "main_sha=$main_sha" >> "$GITHUB_OUTPUT"
+          last_green="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=workflow_dispatch&branch=main&status=completed&per_page=20" \
+            --jq '.workflow_runs[].id' | while read -r run; do
+              ok="$(gh api "repos/$REPO/actions/runs/$run/jobs?per_page=100" \
+                --jq '[.jobs[] | select(.name == "Golden Path (manual)" and .conclusion == "success")] | length')"
+              if [ "$ok" != "0" ]; then gh api "repos/$REPO/actions/runs/$run" --jq .head_sha; break; fi
+            done)"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$last_green" = "$main_sha" ]; then
+            echo "Golden Path already green on $main_sha; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dispatch the Golden Path lane and wait for it
+        id: run
+        if: ${{ steps.skip.outputs.skip != 'true' }}
+        env:
+          MAIN_SHA: ${{ steps.skip.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run ci.yml --repo "$REPO" --ref main
+          run_id=""
+          for _ in $(seq 1 30); do
+            sleep 10
+            run_id="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=workflow_dispatch&branch=main&created=>=$since&per_page=5" \
+              --jq '.workflow_runs[0].id // empty')"
+            [ -n "$run_id" ] && break
+          done
+          if [ -z "$run_id" ]; then echo "::error::dispatched ci.yml run not found"; exit 1; fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "run_url=https://github.com/$REPO/actions/runs/$run_id" >> "$GITHUB_OUTPUT"
+          for _ in $(seq 1 480); do
+            status="$(gh api "repos/$REPO/actions/runs/$run_id" --jq .status)"
+            [ "$status" = "completed" ] && break
+            sleep 10
+          done
+          conclusion="$(gh api "repos/$REPO/actions/runs/$run_id/jobs?per_page=100" --paginate \
+            --jq '.jobs[] | select(.name == "Golden Path (manual)") | .conclusion')"
+          echo "Golden Path (manual) on $MAIN_SHA: ${conclusion:-missing}"
+          echo "conclusion=${conclusion:-missing}" >> "$GITHUB_OUTPUT"
+          if [ "$conclusion" != "success" ]; then exit 1; fi
+
+      - name: File Linear issue on red
+        if: ${{ failure() && steps.run.outputs.run_id != '' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          RUN_URL: ${{ steps.run.outputs.run_url }}
+          CONCLUSION: ${{ steps.run.outputs.conclusion }}
+          MAIN_SHA: ${{ steps.skip.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { upsertLinearIssueByTitleFingerprint } from "./scripts/lib/linear-issue-intake.mjs";
+            const { RUN_URL, CONCLUSION, MAIN_SHA } = process.env;
+            const fingerprint = "golden-path-nightly:" + (CONCLUSION || "missing");
+            const result = await upsertLinearIssueByTitleFingerprint({
+              fingerprint,
+              title: "P0: Golden Path nightly is red (" + fingerprint + ")",
+              description: [
+                "## Source",
+                "- Workflow: golden-path-nightly.yml (JOV-6920 revenue gate)",
+                "- Golden Path run: " + RUN_URL,
+                "- main: " + MAIN_SHA,
+                "",
+                "## Why it matters",
+                "The real-auth signup -> claim -> live profile and checkout -> verified payment -> entitlement -> refund journey failed on main. The revenue gate is RED until this passes.",
+                "",
+                "## Acceptance",
+                "Fix the failing step; this issue stays open until the nightly Golden Path is green again.",
+                "",
+                "Fingerprint: " + fingerprint,
+              ].join("\n"),
+              priority: 1,
+              apiKey: process.env.LINEAR_API_KEY,
+            });
+            if (!result.ok) throw new Error("Linear intake failed: " + result.reason);
+            console.log(JSON.stringify(result));
+          '

@@ -438,6 +438,18 @@ describe('runStructural screenshot contract discovery', () => {
     expect(web).toContain(
       'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
     );
+    // Merge-group-only guards also gate PRs so they cannot poison the queue.
+    expect(
+      web.some(
+        command =>
+          command.includes(
+            'tests/unit/analytics-metrics-layer-guard.test.ts'
+          ) &&
+          command.includes(
+            'tests/unit/design-system/component-family-ratchet.test.ts'
+          )
+      )
+    ).toBe(true);
     expect(web.every(command => !python.includes(command))).toBe(true);
     // Every @jovie/web Vitest run (shared apps/web coverage lock) is web's.
     for (const command of all) {

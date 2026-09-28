@@ -45,6 +45,7 @@ describe('applyBillingUpdateWithAudit', () => {
         {
           appUserId: input.userId,
           billingVersion: 8,
+          deduplicated: false,
         },
       ],
     });
@@ -54,13 +55,18 @@ describe('applyBillingUpdateWithAudit', () => {
     expect(result).toEqual({
       appUserId: input.userId,
       billingVersion: 8,
+      deduplicated: false,
     });
     expect(mockDbExecute).toHaveBeenCalledOnce();
 
     const statement = mockDbExecute.mock.calls[0]?.[0];
     const query = new PgDialect().sqlToQuery(statement);
-    expect(query.sql.toLowerCase()).toContain('with updated_user as');
+    expect(query.sql.toLowerCase()).toContain('with existing_audit as');
+    expect(query.sql.toLowerCase()).toContain('updated_user as');
     expect(query.sql.toLowerCase()).toContain('update "users"');
+    expect(query.sql.toLowerCase()).toContain(
+      'not exists (select 1 from existing_audit)'
+    );
     expect(query.sql).not.toMatch(/set\s+"users"\./i);
     expect(query.sql.toLowerCase()).toContain(
       'insert into "billing_audit_log"'
@@ -87,6 +93,30 @@ describe('applyBillingUpdateWithAudit', () => {
     expect(mockDbExecute).toHaveBeenCalledOnce();
   });
 
+  it('returns the existing receipt without repeating a Stripe event mutation', async () => {
+    mockDbExecute.mockResolvedValue({
+      rows: [
+        {
+          appUserId: input.userId,
+          billingVersion: 8,
+          deduplicated: true,
+        },
+      ],
+    });
+
+    await expect(applyBillingUpdateWithAudit(input)).resolves.toEqual({
+      appUserId: input.userId,
+      billingVersion: 8,
+      deduplicated: true,
+    });
+
+    const statement = mockDbExecute.mock.calls[0]?.[0];
+    const query = new PgDialect().sqlToQuery(statement);
+    expect(query.params).toContain(input.stripeEventId);
+    expect(query.sql.toLowerCase()).toContain('union all');
+    expect(query.sql.toLowerCase()).toContain('from existing_audit');
+  });
+
   it('preserves omitted Stripe fields and records retry metadata', async () => {
     const retryInput: AtomicBillingUpdateInput = {
       userId: input.userId,
@@ -104,7 +134,13 @@ describe('applyBillingUpdateWithAudit', () => {
       retryCount: 2,
     };
     mockDbExecute.mockResolvedValue({
-      rows: [{ appUserId: input.userId, billingVersion: 8 }],
+      rows: [
+        {
+          appUserId: input.userId,
+          billingVersion: 8,
+          deduplicated: false,
+        },
+      ],
     });
 
     await applyBillingUpdateWithAudit(retryInput);

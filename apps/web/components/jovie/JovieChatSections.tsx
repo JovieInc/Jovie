@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
 import type { ReactNode, RefCallback } from 'react';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
@@ -204,6 +205,9 @@ interface ChatThreadMessagesProps {
   readonly onScrollToBottom: () => void;
   /** Conversation id for 👍/👎 feedback attribution. */
   readonly conversationId?: string | null;
+  /** Earlier unanswered turns hidden behind one control (Summer only). */
+  readonly collapsedFailureCount?: number;
+  readonly onShowCollapsedFailures?: () => void;
 }
 
 export function ChatThreadMessages({
@@ -224,6 +228,8 @@ export function ChatThreadMessages({
   isStuckToBottom,
   onScrollToBottom,
   conversationId,
+  collapsedFailureCount = 0,
+  onShowCollapsedFailures,
 }: ChatThreadMessagesProps) {
   // Reads live `virtualizer` state each render; see JovieChat (JOV-6702).
   'use no memo';
@@ -256,6 +262,21 @@ export function ChatThreadMessages({
 
   return (
     <div>
+      {collapsedFailureCount > 0 && onShowCollapsedFailures ? (
+        <div className={`${CHAT_CONTENT_SHELL_CLASSNAME} pb-4`}>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={onShowCollapsedFailures}
+            data-testid='chat-collapsed-failures'
+          >
+            {collapsedFailureCount === 1
+              ? '1 earlier message went unanswered. Show it'
+              : `${collapsedFailureCount} earlier messages went unanswered. Show them`}
+          </Button>
+        </div>
+      ) : null}
       {shouldVirtualizeMessages ? (
         <div
           ref={totalSizeRef}
