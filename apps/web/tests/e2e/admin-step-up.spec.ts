@@ -19,6 +19,8 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
  *    looping back to "admin access required".
  * 3. A ceremony whose prompt never appears resolves to an actionable error
  *    with retry, not an indefinite wait.
+ * 4. A canceled enrollment (the 1Password cancel regression) never reaches
+ *    the sign-in prompt and offers an immediate retry.
  *
  * @admin @critical
  */
@@ -71,15 +73,68 @@ function fakeAssertionScript(mode: 'resolve' | 'hang') {
   `;
 }
 
+const REGISTER_OPTIONS = {
+  challenge: 'ZmFrZS1jaGFsbGVuZ2U',
+  rp: { name: 'Jovie', id: 'localhost' },
+  user: { id: 'dXNlcg', name: 'admin@jovie.test', displayName: 'Admin' },
+  pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+  timeout: 60_000,
+  attestation: 'none',
+  userVerification: 'preferred',
+};
+
+/**
+ * Simulates the founder canceling the passkey setup inside the authenticator
+ * (e.g. dismissing the 1Password sheet): navigator.credentials.create rejects
+ * with NotAllowedError, which SimpleWebAuthn surfaces as a passthrough error —
+ * no credential is created and verify-registration is never called.
+ */
+const CANCELLED_REGISTRATION_SCRIPT = `
+  window.PublicKeyCredential = function PublicKeyCredential() {};
+  window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable =
+    function () { return Promise.resolve(true); };
+  navigator.credentials = {
+    create: function () {
+      return Promise.reject(
+        new DOMException(
+          'The operation either timed out or was not allowed.',
+          'NotAllowedError'
+        )
+      );
+    },
+    get: function () { return Promise.reject(new Error('not stubbed')); },
+  };
+`;
+
 async function mockPasskeyApi(
   page: import('@playwright/test').Page,
-  { unlocked }: { unlocked: boolean }
+  {
+    unlocked,
+    passkeys = [{ id: 'pk_1', name: 'Ovie' }],
+  }: {
+    unlocked: boolean;
+    passkeys?: { id: string; name: string }[];
+  }
 ) {
   await page.route(`${PASSKEY_API}/list-user-passkeys`, route =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ id: 'pk_1', name: 'Ovie' }]),
+      body: JSON.stringify(passkeys),
+    })
+  );
+  await page.route(`${PASSKEY_API}/generate-register-options`, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(REGISTER_OPTIONS),
+    })
+  );
+  await page.route(`${PASSKEY_API}/verify-registration`, route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 'pk_new', name: 'Ovie' }),
     })
   );
   await page.route(`${PASSKEY_API}/generate-authenticate-options`, route =>
@@ -150,6 +205,38 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
       'cannot unlock admin access'
     );
     // Recovery is available — the user can retry instead of looping.
+    await expect(
+      page.getByRole('button', { name: 'Unlock to continue' })
+    ).toBeEnabled();
+  });
+
+  test('a canceled enrollment never reaches the sign-in prompt and can retry', async ({
+    page,
+  }) => {
+    await page.addInitScript(CANCELLED_REGISTRATION_SCRIPT);
+    await mockPasskeyApi(page, { unlocked: true, passkeys: [] });
+
+    await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
+    const unlock = page.getByRole('button', { name: 'Unlock to continue' });
+    await expect(unlock).toBeVisible();
+
+    let authenticateRequested = false;
+    page.on('request', request => {
+      if (
+        request
+          .url()
+          .includes('/api/auth/passkey/generate-authenticate-options')
+      )
+        authenticateRequested = true;
+    });
+    await unlock.click();
+
+    // Canceled setup must fail as a recoverable enrollment state — no
+    // phantom credential, no fall-through into the authenticate ceremony.
+    await expect(page.getByRole('alert')).toContainText('no passkey was saved');
+    await expect
+      .poll(() => authenticateRequested, { timeout: 5_000 })
+      .toBe(false);
     await expect(
       page.getByRole('button', { name: 'Unlock to continue' })
     ).toBeEnabled();
