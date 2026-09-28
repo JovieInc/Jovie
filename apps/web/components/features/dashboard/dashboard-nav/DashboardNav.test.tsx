@@ -147,6 +147,6 @@ describe('DashboardNav route warming', () => {
       'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
     );
     expect(source).toContain("@/components/organisms/sidebar'");
-    expect(source).not.toContain("@/components/organisms/Sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });

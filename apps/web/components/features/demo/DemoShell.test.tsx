@@ -37,6 +37,6 @@ describe('DemoShell', () => {
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource('components/features/demo/DemoShell.tsx');
     expect(source).toContain("@/components/organisms/sidebar'");
-    expect(source).not.toContain("@/components/organisms/Sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });

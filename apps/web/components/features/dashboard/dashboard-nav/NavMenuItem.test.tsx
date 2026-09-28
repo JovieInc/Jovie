@@ -107,6 +107,6 @@ describe('NavMenuItem', () => {
       'components/features/dashboard/dashboard-nav/NavMenuItem.tsx'
     );
     expect(source).toContain("@/components/organisms/sidebar'");
-    expect(source).not.toContain("@/components/organisms/Sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });

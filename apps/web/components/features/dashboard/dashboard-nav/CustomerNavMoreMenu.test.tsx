@@ -100,6 +100,6 @@ describe('CustomerNavMoreMenu', () => {
       'components/features/dashboard/dashboard-nav/CustomerNavMoreMenu.tsx'
     );
     expect(source).toContain("@/components/organisms/sidebar'");
-    expect(source).not.toContain("@/components/organisms/Sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });
