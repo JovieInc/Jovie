@@ -743,6 +743,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       storageState: { cookies: [], origins: [] },
     });
     const fanPage = await fanContext.newPage();
+    watchKeyframeErrors(fanPage);
     await interceptTrackingCalls(fanPage);
 
     try {
