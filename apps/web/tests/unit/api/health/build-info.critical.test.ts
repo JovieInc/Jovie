@@ -56,6 +56,16 @@ describe('@critical GET /api/health/build-info', () => {
     expect(body.commitSha).toBe('a'.repeat(40));
   });
 
+  it('publishes the immutable Vercel deployment identity', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_DEPLOYMENT_ID', 'dpl_exactStaging123');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const body = await GET().json();
+
+    expect(body.deploymentId).toBe('dpl_exactStaging123');
+  });
+
   it('does not publish an abbreviated commit as exact production identity', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1');
