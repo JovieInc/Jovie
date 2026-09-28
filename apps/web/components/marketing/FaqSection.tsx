@@ -36,6 +36,7 @@ export function FaqSection({
       )}
     >
       <h2
+        data-wrap='editorial-title'
         className={cn(
           'faq-section__heading',
           headingClassName ??
