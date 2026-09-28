@@ -45,7 +45,7 @@ export function ArtistNotificationsHero({
       <MarketingContainer width='landing' className='relative'>
         <div className='system-b-artist-notifications-hero-grid'>
           <div className='system-b-artist-notifications-hero-copy'>
-            <h1 className='system-b-artist-notifications-hero-title line-clamp-2'>
+            <h1 className='system-b-artist-notifications-hero-title'>
               {hero.headlineLines?.length
                 ? hero.headlineLines.map(line =>
                     line ? (
