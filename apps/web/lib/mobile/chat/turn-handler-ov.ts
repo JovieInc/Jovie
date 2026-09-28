@@ -157,6 +157,7 @@ function streamSummerTurn(input: {
           | 'unavailable' = 'unavailable';
         let bound = false;
         let eveWorkId: string | null = null;
+        let noticeText = '';
         const fail = async (
           status: Parameters<typeof persistFailure>[0]['status'],
           errorCode: string,
@@ -205,6 +206,8 @@ function streamSummerTurn(input: {
               ) {
                 terminal = event.state;
               }
+            } else if (event.type === 'notice') {
+              noticeText = event.text;
             } else if (event.type === 'text-delta' && bound) {
               // Buffer assistant text: it is only emitted after the durable
               // completion is persisted, so a disconnect or a rejected
@@ -276,7 +279,7 @@ function streamSummerTurn(input: {
             await fail(
               'failed_model_error',
               'SUMMER_TRANSPORT_FAILED',
-              'Turn failed.',
+              noticeText || 'Turn failed.',
               'failed'
             );
           } else if (terminal === 'completed') {
@@ -290,7 +293,7 @@ function streamSummerTurn(input: {
             await fail(
               'failed_timeout',
               'SUMMER_TRANSPORT_UNAVAILABLE',
-              'Unavailable.',
+              noticeText || 'Unavailable.',
               'failed'
             );
           }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   signOut: vi.fn(),
+  getSession: vi.fn(),
   getCachedAuth: vi.fn(),
   createStoredAuthState: vi.fn(),
   readStoredAuthState: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock('@/lib/auth/better-auth', () => ({
   auth: {
     api: {
       signOut: hoisted.signOut,
+      getSession: hoisted.getSession,
     },
   },
 }));
@@ -84,6 +86,9 @@ describe('GET /auth/start', () => {
         },
       })
     );
+    hoisted.getSession.mockResolvedValue({
+      user: { id: 'user_123', email: 'tim@jov.ie' },
+    });
     hoisted.generalLimiter.limit.mockResolvedValue({ success: true });
     hoisted.localLimiter.limit.mockResolvedValue({ success: true });
     hoisted.createStoredAuthState.mockResolvedValue({
@@ -129,6 +134,115 @@ describe('GET /auth/start', () => {
         state: '00000000000040008000000000000123',
       })
     );
+  });
+
+  it('offers the signed-in account behind an explicit click, with the address escaped', async () => {
+    hoisted.getSession.mockResolvedValueOnce({
+      user: { id: 'user_123', email: 'a"><script>x</script>@jov.ie' },
+    });
+    const response = await GET(
+      new Request(
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    );
+    const body = await response.text();
+
+    expect(body).toContain('name="choice" value="continue"');
+    expect(body).toContain('value="Use a Different Account"');
+    expect(body).not.toContain('<script>x</script>');
+    expect(body).toContain(
+      'Continue as a&quot;&gt;&lt;script&gt;x&lt;/script&gt;@jov.ie'
+    );
+    // Never a GET link that a prefetch could follow.
+    expect(body).not.toContain('/auth/callback');
+  });
+
+  it('falls back to a generic continue label when the address is unavailable', async () => {
+    hoisted.getSession.mockRejectedValueOnce(new Error('db'));
+    const response = await GET(
+      new Request(
+        'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    );
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(body).toContain('value="Continue With This Account"');
+    expect(body).toContain('You are already signed in.');
+  });
+
+  it('continues with the signed-in account without signing the browser out', async () => {
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'http://localhost:3112',
+        },
+        body: 'auth_state=state_1234567890&intent=sign_in&choice=continue',
+      })
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3112/auth/callback?state=state_1234567890'
+    );
+    expect(hoisted.readStoredAuthState).toHaveBeenCalledWith({
+      state: 'state_1234567890',
+    });
+    expect(hoisted.signOut).not.toHaveBeenCalled();
+  });
+
+  it('sends continue to sign-in when the browser session is gone', async () => {
+    hoisted.getCachedAuth.mockResolvedValueOnce({
+      userId: null,
+      sessionId: null,
+      orgId: null,
+    });
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'http://localhost:3112',
+        },
+        body: 'auth_state=state_1234567890&intent=sign_in&choice=continue',
+      })
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3112/signin?auth_state=state_1234567890'
+    );
+  });
+
+  it('rejects a cross-origin continue before reading state', async () => {
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'https://attacker.example',
+        },
+        body: 'auth_state=state_1234567890&intent=sign_in&choice=continue',
+      })
+    );
+    expect(response.status).toBe(403);
+    expect(hoisted.readStoredAuthState).not.toHaveBeenCalled();
+  });
+
+  it('refuses to continue an expired or web auth state', async () => {
+    hoisted.readStoredAuthState.mockResolvedValueOnce(null);
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'http://localhost:3112',
+        },
+        body: 'auth_state=state_1234567890&intent=sign_in&choice=continue',
+      })
+    );
+    expect(response.status).toBe(410);
   });
 
   it('records whether the Mac app can redeem a typed return code', async () => {

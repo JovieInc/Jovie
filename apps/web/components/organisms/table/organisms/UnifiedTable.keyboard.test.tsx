@@ -186,6 +186,32 @@ describe('UnifiedTable keyboard interaction', () => {
     expect(spinner).toHaveAttribute('data-tone', 'muted');
   });
 
+  it('keeps the column sort control keyboard-reachable with an announced state', () => {
+    const onSortingChange = vi.fn();
+
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        sorting={[{ id: 'name', desc: false }]}
+        onSortingChange={onSortingChange}
+      />
+    );
+
+    const sortButton = screen.getByRole('button', {
+      name: 'Name: sorted ascending',
+    });
+    expect(sortButton).not.toHaveAttribute('tabindex', '-1');
+
+    sortButton.focus();
+    expect(document.activeElement).toBe(sortButton);
+
+    fireEvent.click(sortButton);
+    expect(onSortingChange).toHaveBeenCalled();
+  });
+
   it('applies column meta alignment to rendered body cells', () => {
     const { container } = render(
       <UnifiedTable

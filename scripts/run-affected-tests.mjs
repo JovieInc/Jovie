@@ -23,6 +23,13 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/tests/setup.ts',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
+const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+const KNOWN_VITEST_FIXTURE_TESTS = new Map([
+  [
+    'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
+    ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
+  ],
+]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
 const VIRTUALIZER_COMPILER_INVARIANT_TEST =
@@ -446,6 +453,15 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
   [
     '.github/scripts/vercel-output-manifest.test.mjs',
     '.github/scripts/vercel-output-manifest.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/vercel-output-validate.test.mjs',
+    '.github/scripts/vercel-output-validate.mjs',
     [
       '--test-coverage-lines=90',
       '--test-coverage-branches=85',
@@ -922,6 +938,15 @@ function unique(values) {
   return [...new Set(values)];
 }
 
+function fullSuitePlan(fallbackReason) {
+  return {
+    mode: 'full',
+    fallbackReason,
+    relatedFiles: [],
+    mandatoryTests: [],
+  };
+}
+
 const VERCEL_DEPLOY_DIAGNOSTICS_PAIR = new Set([
   '.github/scripts/vercel-prebuilt-deploy.sh',
   'scripts/tests/test_vercel_prebuilt_deploy.py',
@@ -956,8 +981,9 @@ export function buildAffectedTestPlan(
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
-  if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
-    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
+  if (globalTestInput) {
+    return fullSuitePlan(`global test input changed: ${globalTestInput}`);
   }
   const isLinearSyncOnMerge =
     files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
@@ -966,7 +992,7 @@ export function buildAffectedTestPlan(
     if (
       !isFileAvailable('scripts/lib/__tests__/linear-sync-on-merge.test.mjs')
     ) {
-      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+      return fullSuitePlan('linear sync focused-test proof is unavailable');
     }
     return {
       mode: 'selected',
@@ -1000,7 +1026,9 @@ export function buildAffectedTestPlan(
         ...AFFECTED_TEST_SELECTOR_TESTS,
       ].every(isFileAvailable)
     ) {
-      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+      return fullSuitePlan(
+        'deploy diagnostics focused-test proof is unavailable'
+      );
     }
     return {
       mode: 'selected',
@@ -1023,7 +1051,9 @@ export function buildAffectedTestPlan(
       !files.every(file => RETOUCH_PROMPT_LANE.has(file)) ||
       !RETOUCH_PROMPT_PROOFS.every(isFileAvailable)
     ) {
-      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+      return fullSuitePlan(
+        'retouch prompt lane is mixed or its focused-test proof is unavailable'
+      );
     }
     return {
       mode: 'selected',
@@ -1078,7 +1108,9 @@ export function buildAffectedTestPlan(
     };
   }
   if (files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file))) {
-    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    return fullSuitePlan(
+      'Summer commissioning change exceeds its focused lane'
+    );
   }
   const isBoundedBacklogRemediationChange =
     files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
@@ -1174,7 +1206,9 @@ export function buildAffectedTestPlan(
         ...NO_UNATTENDED_RED_SCRIPT_TESTS,
       ].every(isFileAvailable)
     ) {
-      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+      return fullSuitePlan(
+        'No Unattended Red focused-test proof is unavailable'
+      );
     }
     return {
       mode: 'selected',
@@ -1236,7 +1270,9 @@ export function buildAffectedTestPlan(
     };
   }
   if (hasMergeGroupAdmissionPrimaryInput) {
-    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    return fullSuitePlan(
+      'merge-group admission change exceeds its focused lane'
+    );
   }
   const earlySelectorInputCount = files.filter(file =>
     AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
@@ -1464,7 +1500,7 @@ export function buildAffectedTestPlan(
   );
   const directTests = relatedFiles.filter(
     file =>
-      /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
+      VITEST_TEST_FILE.test(file) &&
       !(
         isExactPrerequisiteTrain &&
         PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS.has(file)
@@ -1542,6 +1578,9 @@ export function buildAffectedTestPlan(
     mandatoryTests.push(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
+  }
+  for (const file of files) {
+    mandatoryTests.push(...(KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []));
   }
   const hasHomepageSystemBGuardInput = files.some(isHomepageSystemBGuardInput);
   if (hasHomepageSystemBGuardInput) {
@@ -1664,7 +1703,9 @@ export function buildAffectedTestPlan(
     ...(isExactLayoutGuardContract ? LAYOUT_GUARD_CONTRACT_SCRIPT_TESTS : []),
   ]);
   const isCoveredSource = file => {
-    if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
+    if (VITEST_TEST_FILE.test(file)) return true;
+    const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
+    if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
     if (file.startsWith('apps/web/app/[username]/')) return true;
     if (file.startsWith('apps/web/components/')) return true;
@@ -1733,12 +1774,7 @@ export function buildAffectedTestPlan(
         file === 'apps/web/lib/events/insert.ts')
     )
       return true;
-    if (file.startsWith('apps/web/eslint-rules/canonical-ui-label-casing'))
-      return true;
-    return (
-      file ===
-      'apps/web/tests/unit/design-system/arbitrary-values.baseline.json'
-    );
+    return file.startsWith('apps/web/eslint-rules/canonical-ui-label-casing');
   };
   const hasUnknownCiCancellationHealerPeer =
     hasCiCancellationHealerChange &&
@@ -1885,8 +1921,11 @@ export function buildAffectedTestPlan(
   const hasUnboundedBacklogRemediationChange =
     files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
     !isBoundedBacklogRemediationChange;
+  const uncoveredSourceFiles = relatedFiles.filter(
+    file => !isCoveredSource(file)
+  );
   const hasUncoveredSource =
-    relatedFiles.some(file => !isCoveredSource(file)) ||
+    uncoveredSourceFiles.length > 0 ||
     (mergeQueueControllerInputCount > 0 &&
       !isBoundedMergeQueueControllerChange &&
       !isExactScannerLoadRepairPrimary &&
@@ -1914,33 +1953,45 @@ export function buildAffectedTestPlan(
     rootVitestTests.length > 0 ||
     pythonTests.length > 0 ||
     scriptVitestTests.length > 0;
+  const hasFocusedLane =
+    hasSelectedTests &&
+    (relatedFiles.length > 0 ||
+      hasCiCancellationHealerChange ||
+      hasHomepageSystemBGuardInput ||
+      hasAppScreenCanvasGuardInput ||
+      isExactPrerequisiteTrain ||
+      isExactVercelCongestionControl ||
+      isExactAffectedTestSelector ||
+      isExactAuthenticatedA11yRepair ||
+      isExactPrSizeGuard ||
+      isExactPrSizeGuardWithSelector ||
+      isExactGoldenPathSmokeContractRepair ||
+      isExactNeonAttemptArtifactRepair ||
+      isExactPerformanceProfilerRepair ||
+      isExactPersistedAuthFixtureRepair ||
+      isExactVisualQaSelectorRepair ||
+      isExactMobileOverflowNavigationRace ||
+      isExactRunnerIoPressure ||
+      isExactRunnerPrerequisiteRepair ||
+      isExactLayoutGuardContract);
+  const mode = hasUncoveredSource
+    ? 'full'
+    : hasFocusedLane
+      ? 'selected'
+      : relatedFiles.length === 0
+        ? 'none'
+        : 'full';
+  const fallbackReason =
+    mode !== 'full'
+      ? undefined
+      : uncoveredSourceFiles.length > 0
+        ? `uncovered source path(s): ${uncoveredSourceFiles.join(', ')}`
+        : hasUncoveredSource
+          ? `incomplete or mixed focused-test lane: ${files.join(', ')}`
+          : `no focused test mapping for: ${relatedFiles.join(', ')}`;
   return {
-    mode: hasUncoveredSource
-      ? 'full'
-      : hasSelectedTests &&
-          (relatedFiles.length > 0 ||
-            hasCiCancellationHealerChange ||
-            hasHomepageSystemBGuardInput ||
-            hasAppScreenCanvasGuardInput ||
-            isExactPrerequisiteTrain ||
-            isExactVercelCongestionControl ||
-            isExactAffectedTestSelector ||
-            isExactAuthenticatedA11yRepair ||
-            isExactPrSizeGuard ||
-            isExactPrSizeGuardWithSelector ||
-            isExactGoldenPathSmokeContractRepair ||
-            isExactNeonAttemptArtifactRepair ||
-            isExactPerformanceProfilerRepair ||
-            isExactPersistedAuthFixtureRepair ||
-            isExactVisualQaSelectorRepair ||
-            isExactMobileOverflowNavigationRace ||
-            isExactRunnerIoPressure ||
-            isExactRunnerPrerequisiteRepair ||
-            isExactLayoutGuardContract)
-        ? 'selected'
-        : relatedFiles.length === 0
-          ? 'none'
-          : 'full',
+    mode,
+    fallbackReason,
     relatedFiles,
     mandatoryTests: unique(mandatoryTests),
     selectedTests,
@@ -1965,6 +2016,14 @@ function formatCommand(command, args) {
   return [command, ...args]
     .map(part => (/[\s]/.test(part) ? JSON.stringify(part) : part))
     .join(' ');
+}
+
+export function formatAffectedTestPlanDiagnostic(plan) {
+  const fallback =
+    plan.mode === 'full'
+      ? ` fallbackReason=${JSON.stringify(plan.fallbackReason ?? 'unspecified')}`
+      : '';
+  return `[affected-tests] mode=${plan.mode} related=${plan.relatedFiles.length} mandatory=${plan.mandatoryTests.length}${fallback}`;
 }
 
 function changedFiles(base) {
@@ -2519,9 +2578,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);
   }
-  console.log(
-    `[affected-tests] mode=${plan.mode} related=${plan.relatedFiles.length} mandatory=${plan.mandatoryTests.length}`
-  );
+  console.log(formatAffectedTestPlanDiagnostic(plan));
 
   if (plan.mode === 'none') process.exit(0);
   if (plan.mode === 'full') {

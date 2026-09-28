@@ -2,9 +2,8 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import { cache } from 'react';
-import { auth } from '@/lib/auth/better-auth';
+import { getRequestSession } from '@/lib/auth/request-session';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -497,8 +496,8 @@ async function handleMissingDbUser(
 }
 
 /**
- * Resolve the current Better Auth identity. Reads `auth.api.getSession`
- * directly (NOT through cached.ts) so gate.ts sees the BA user id — the
+ * Resolve the current Better Auth identity. Reads the request-scoped
+ * Better Auth session (NOT through cached.ts) so gate.ts sees the BA user id — the
  * app `users` lookup then goes through `users.better_auth_user_id`.
  *
  * The `clerkUserId` field name is preserved in the return shape for
@@ -554,8 +553,7 @@ async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
   }
 
   try {
-    const headerStore = await headers();
-    const session = await auth.api.getSession({ headers: headerStore });
+    const session = await getRequestSession();
     if (!session) {
       return { clerkUserId: null, email: null };
     }

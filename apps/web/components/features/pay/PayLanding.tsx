@@ -1,9 +1,8 @@
 // @coverage-via apps/web/tests/unit/pay/pay-landing-system-b-source.test.tsx
 import {
+  Calendar,
   Mail,
   MapPin,
-  Mic,
-  Music,
   QrCode,
   Scan,
   Send,
@@ -13,6 +12,7 @@ import {
 import {
   MarketingContainer,
   MarketingHero,
+  MarketingHeroPhoto,
   MarketingPageShell,
 } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
@@ -21,9 +21,16 @@ import { ClaimHandleForm } from '@/features/home/claim-handle';
 /*  Hero                                                                      */
 /* -------------------------------------------------------------------------- */
 
+const PAY_HERO_PHOTO = {
+  src: '/images/marketing-hero/pay.webp',
+  width: 1600,
+  height: 901,
+} as const;
+
 function TipsHero() {
   return (
     <section className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
+      <MarketingHeroPhoto {...PAY_HERO_PHOTO} />
       <div className='hero-glow pointer-events-none absolute inset-0' />
       <MarketingHero
         variant='centered'
@@ -36,15 +43,15 @@ function TipsHero() {
         {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
         <h1
           id='pay-hero-heading'
-          className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'
+          className='marketing-h1-linear mt-6 max-w-[12ch] text-primary-token'
         >
-          Turn every payment into a fan.
+          Turn every payment into a follower.
         </h1>
         {/* eslint-enable @jovie/canonical-ui-label-casing */}
 
         <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
-          Scan. Pay. Stream. One QR code turns a stranger into a superfan and
-          keeps the relationship going after the show ends.
+          Scan the code, pay in seconds, and land on a Jovie profile that keeps
+          the relationship going after the moment ends.
         </p>
 
         <div className='mt-8 w-full max-w-[29rem] text-left'>
@@ -66,21 +73,21 @@ function TipsHero() {
 const STEPS = [
   {
     icon: QrCode,
-    title: 'Print your QR code',
+    title: 'Get your QR code',
     description:
-      'We generate a unique QR code linked to your Jovie profile. Print it, stick it on your tip jar, or display it at your merch table.',
+      'We generate a unique QR code linked to your Jovie profile. Print it for a tip jar, a counter, or a table, anywhere someone is ready to pay you.',
   },
   {
     icon: Scan,
-    title: 'Fan scans & pays',
+    title: 'They scan and pay',
     description:
-      'A fan scans the code, leaves a payment, and lands on your profile. No app download required. Works with any phone camera.',
+      'Someone scans the code, pays in seconds, and lands on your profile. No app download required. Works with any phone camera.',
   },
   {
     icon: Mail,
-    title: 'You get their email + they get your music',
+    title: "You get their email, they get what's next",
     description:
-      'You capture their contact info. They get an automatic thank-you with links to stream your music everywhere.',
+      'You capture their contact info. They get an automatic thank-you with links to whatever you want them to see next.',
   },
 ] as const;
 
@@ -94,14 +101,14 @@ function HowItWorksSection() {
               <p className='marketing-kicker'>How it works</p>
               {/* ui-casing-allow: marketing display headline */}
               <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
-                Three steps to your first fan.
+                Three steps to your first follower.
               </h2>
             </div>
             <div className='homepage-section-copy'>
               <p className='marketing-lead-linear text-secondary-token'>
                 Put a QR code where people already pay, capture their contact
-                info, and send them directly into your music without another
-                tool in the loop.
+                info, and send them directly to what matters most without
+                another tool in the loop.
               </p>
             </div>
           </div>
@@ -140,21 +147,21 @@ function HowItWorksSection() {
 const BENEFITS = [
   {
     icon: Users,
-    title: 'Every payment becomes a fan email',
+    title: 'Every payment becomes a contact',
     description:
-      'Stop losing fans after the show. Every payment automatically captures their contact info so you can keep the conversation going.',
+      'Stop losing people after the moment passes. Every payment automatically captures their contact info so you can keep the conversation going.',
   },
   {
     icon: Send,
-    title: 'Auto thank-you with your music links',
+    title: 'Auto thank-you with your links',
     description:
-      'The moment they pay, fans receive a personalized thank-you with links to stream your music on Spotify, Apple Music, and more.',
+      'The moment they pay, they receive a personalized thank-you with links to whatever matters most, your music, your site, or your next release.',
   },
   {
     icon: MapPin,
     title: 'See who paid you and where',
     description:
-      'Track every payment by location and time. Know which venues, events, and cities your biggest fans come from.',
+      'Track every payment by location and time. Know which places and moments bring in your biggest supporters.',
   },
 ] as const;
 
@@ -210,13 +217,14 @@ function BenefitsSection() {
 /* -------------------------------------------------------------------------- */
 
 const USE_CASES = [
-  { icon: Music, label: 'Buskers' },
   // ui-casing-allow: marketing display label
-  { icon: Mic, label: 'Open mic nights' },
+  { icon: Store, label: 'Market stalls' },
   // ui-casing-allow: marketing display label
-  { icon: Store, label: 'Merch tables' },
+  { icon: Users, label: 'Service providers' },
   // ui-casing-allow: marketing display label
-  { icon: Users, label: 'House shows' },
+  { icon: Calendar, label: 'Live events' },
+  // ui-casing-allow: marketing display label
+  { icon: Scan, label: 'Pop-up shops' },
 ] as const;
 
 function SocialProofSection() {
@@ -226,16 +234,18 @@ function SocialProofSection() {
         <div className='mx-auto max-w-300'>
           <div className='homepage-section-intro'>
             <div>
-              <p className='marketing-kicker'>Built for real-world artists</p>
+              <p className='marketing-kicker'>
+                Built for getting paid in person
+              </p>
               {/* ui-casing-allow: marketing display headline */}
-              <h2 className='marketing-h2-linear mt-6 max-w-[10ch] text-primary-token'>
-                Perfect for every stage.
+              <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
+                Perfect for every setup.
               </h2>
             </div>
             <div className='homepage-section-copy'>
               <p className='marketing-lead-linear text-secondary-token'>
-                Whether you are playing a subway platform or a sold-out basement
-                show, Jovie turns your audience into a reachable fan base.
+                Whether you are behind a counter or on a stage, Jovie turns a
+                moment of payment into a reachable audience.
               </p>
             </div>
           </div>
@@ -276,11 +286,11 @@ function TipsFinalCTA() {
             <p className='marketing-kicker'>Claim your handle</p>
             {/* ui-casing-allow: marketing display headline */}
             <h2 className='marketing-h2-linear mt-6 text-primary-token'>
-              Start turning payments into fans.
+              Start turning payments into followers.
             </h2>
             <p className='mt-4 marketing-lead-linear text-secondary-token'>
-              Keep the QR code simple, the follow-up automatic, and the listener
-              path clean.
+              Keep the QR code simple, the follow-up automatic, and the next
+              step clear.
             </p>
           </div>
 
