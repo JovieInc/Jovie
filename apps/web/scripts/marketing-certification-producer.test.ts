@@ -4,9 +4,11 @@ import { MARKETING_COMPONENT_REGISTRY } from '../data/marketing/componentRegistr
 import {
   affectedEntries,
   buildPacket,
+  certificationPlans,
   defectReceipts,
   fileDefects,
   storyFileFor,
+  testFilesFor,
 } from './marketing-certification-producer';
 
 const SHA = 'b'.repeat(40);
@@ -52,7 +54,7 @@ function packetFor(overrides: Partial<Parameters<typeof buildPacket>[0]> = {}) {
       'renders',
       'passed'
     ),
-    ownTestFile: 'components/site/MarketingFooter.test.tsx',
+    ownTestFiles: ['components/site/MarketingFooter.test.tsx'],
     stories: report(
       'components/marketing/storybook/MarketingShells.stories.tsx',
       'MarketingFooter',
@@ -68,17 +70,66 @@ function packetFor(overrides: Partial<Parameters<typeof buildPacket>[0]> = {}) {
 }
 
 describe('marketing certification producer', () => {
-  it('selects only entries whose repo-relative canonical source changed', () => {
-    const picked = affectedEntries(MARKETING_COMPONENT_REGISTRY, [
-      footer.resolvedSource!,
-      'README.md',
-    ]);
-    expect(picked.map(entry => entry.id)).toEqual(['shell.footer']);
+  it('selects entries whose source, declared tests or story changed', () => {
+    const plans = [
+      { id: 'a', dependencies: ['apps/web/a.tsx', 'apps/web/a.test.tsx'] },
+      { id: 'b', dependencies: ['apps/web/b.tsx', 'apps/web/b.stories.tsx'] },
+    ];
     expect(
-      affectedEntries(MARKETING_COMPONENT_REGISTRY, [
-        'components/site/MarketingFooter.tsx',
-      ])
-    ).toEqual([]);
+      affectedEntries(plans, ['apps/web/a.test.tsx']).map(p => p.id)
+    ).toEqual(['a']);
+    expect(
+      affectedEntries(plans, ['apps/web/b.stories.tsx', 'README.md']).map(
+        p => p.id
+      )
+    ).toEqual(['b']);
+    expect(affectedEntries(plans, ['a.tsx'])).toEqual([]);
+  });
+
+  it('certifies with the sibling test plus declared @coverage-via targets', () => {
+    const source =
+      '// @coverage-via apps/web/tests/unit/x.test.ts\n// @coverage-via apps/web/tests/unit/gone.test.ts\nexport {};';
+    const existing = new Set([
+      'apps/web/c/X.test.tsx',
+      'apps/web/tests/unit/x.test.ts',
+    ]);
+    expect(
+      testFilesFor('apps/web/c/X.tsx', source, p => existing.has(p))
+    ).toEqual(['apps/web/c/X.test.tsx', 'apps/web/tests/unit/x.test.ts']);
+    expect(testFilesFor('apps/web/c/Y.tsx', 'export {};', () => false)).toEqual(
+      []
+    );
+  });
+
+  it('plans each entry with source+test+story dependencies and re-runs on any hit', () => {
+    const via = 'apps/web/tests/unit/marketing/footer-links.test.ts';
+    const storyFiles = [
+      { path: 'shells.stories.tsx', title: footer!.storybookTitle },
+    ];
+    const base = {
+      entries: [footer!],
+      storyFiles,
+      exists: (path: string) => path === via,
+      readSource: () => `// @coverage-via ${via}\nexport {};`,
+    };
+    const all = certificationPlans({ ...base, all: true, changed: [] });
+    expect(all).toHaveLength(1);
+    expect(all[0].dependencies).toEqual([
+      footer!.resolvedSource,
+      via,
+      'apps/web/shells.stories.tsx',
+    ]);
+    expect(all[0].ownTestFiles).toEqual([
+      'tests/unit/marketing/footer-links.test.ts',
+    ]);
+    const selected = (changed: string[]) =>
+      certificationPlans({ ...base, all: false, changed }).map(
+        plan => plan.entry.id
+      );
+    expect(selected(['README.md'])).toEqual([]);
+    expect(selected([via])).toEqual(['shell.footer']);
+    expect(selected(['apps/web/shells.stories.tsx'])).toEqual(['shell.footer']);
+    expect(selected([footer!.resolvedSource!])).toEqual(['shell.footer']);
   });
 
   it('resolves a story from its meta title plus story name', () => {
@@ -106,8 +157,44 @@ describe('marketing certification producer', () => {
     expect(admission.state).toBe('review_ready');
   });
 
+  it('aggregates multiple certifying test files: any failure fails, any gap reports', () => {
+    const twoFiles = [
+      'components/site/MarketingFooter.test.tsx',
+      'tests/unit/marketing/footer-links.test.ts',
+    ];
+    const failed = packetFor({
+      ownTests: {
+        testResults: [
+          {
+            name: '/repo/apps/web/components/site/MarketingFooter.test.tsx',
+            status: 'passed',
+            assertionResults: [{ title: 'renders', status: 'passed' }],
+          },
+          {
+            name: '/repo/apps/web/tests/unit/marketing/footer-links.test.ts',
+            status: 'failed',
+            assertionResults: [{ title: 'links resolve', status: 'failed' }],
+          },
+        ],
+      },
+      ownTestFiles: twoFiles,
+    });
+    expect(failed.testsCoverage[0].status).toBe('failed');
+    const missingAndFailed = packetFor({
+      ownTests: report(
+        'tests/unit/marketing/footer-links.test.ts',
+        'links resolve',
+        'failed'
+      ),
+      ownTestFiles: twoFiles,
+    });
+    expect(missingAndFailed.testsCoverage[0].status).toBe('failed');
+    const partialMissing = packetFor({ ownTestFiles: twoFiles });
+    expect(partialMissing.testsCoverage[0].status).toBe('missing');
+  });
+
   it('never reports missing or failed evidence as passed', () => {
-    const noTest = packetFor({ ownTestFile: null, ownTests: null });
+    const noTest = packetFor({ ownTestFiles: [], ownTests: null });
     expect(noTest.testsCoverage[0].status).toBe('missing');
     const brokenStory = packetFor({
       stories: report(
@@ -135,7 +222,7 @@ describe('marketing certification producer', () => {
   it('files real defects once per entry and tier, never missing evidence', () => {
     expect(defectReceipts(packetFor())).toEqual([]);
     expect(
-      defectReceipts(packetFor({ ownTestFile: null, ownTests: null }))
+      defectReceipts(packetFor({ ownTestFiles: [], ownTests: null }))
     ).toEqual([]);
     const broken = packetFor({
       stories: report(
