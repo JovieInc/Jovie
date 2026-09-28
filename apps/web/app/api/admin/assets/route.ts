@@ -36,9 +36,16 @@ export async function GET(request: Request) {
   const rawVerified = searchParams.get('verified') ?? 'all';
   const q = searchParams.get('q') ?? '';
 
-  if (!adminAssetSortFields.includes(rawSort as AdminAssetSort)) {
+  const invalid = (
+    [
+      ['sort', rawSort, adminAssetSortFields],
+      ['issues', rawIssues, adminAssetIssuesFilters],
+      ['verified', rawVerified, adminAssetVerifiedFilters],
+    ] as const
+  ).find(([, raw, allowed]) => !(allowed as readonly string[]).includes(raw));
+  if (invalid) {
     return NextResponse.json(
-      { error: `Invalid sort: ${rawSort}` },
+      { error: `Invalid ${invalid[0]}: ${invalid[1]}` },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
@@ -48,20 +55,6 @@ export async function GET(request: Request) {
   ) {
     return NextResponse.json(
       { error: `Invalid type: ${rawType}` },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!adminAssetIssuesFilters.includes(rawIssues as AdminAssetIssuesFilter)) {
-    return NextResponse.json(
-      { error: `Invalid issues filter: ${rawIssues}` },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (
-    !adminAssetVerifiedFilters.includes(rawVerified as AdminAssetVerifiedFilter)
-  ) {
-    return NextResponse.json(
-      { error: `Invalid verified filter: ${rawVerified}` },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }

@@ -119,6 +119,14 @@ interface InfinitePage<T> {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+function nextAdminPageParam<TRow>(
+  lastPage: InfinitePage<TRow>,
+  allPages: InfinitePage<TRow>[]
+) {
+  const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
+  return loaded < lastPage.total ? allPages.length + 1 : undefined;
+}
+
 const parseDate = (value: Date | string | null | undefined) => {
   if (!value) {
     return null;
@@ -339,10 +347,7 @@ export function useAdminAssetsInfiniteQuery({
         })),
       };
     },
-    getNextPageParam: (lastPage, allPages) => {
-      const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
-      return loaded < lastPage.total ? allPages.length + 1 : undefined;
-    },
+    getNextPageParam: nextAdminPageParam,
     initialPageParam: 1,
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
