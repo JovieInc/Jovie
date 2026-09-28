@@ -1477,7 +1477,11 @@ function runProfileAdmission() {
  * groups, so without this a PR that trips a guard or breaks its own test is
  * green on PR CI and fails every merge group behind it (JOV-5301, JOV-6904).
  */
-function runMergeGroupGuards() {
+export function runMergeGroupGuards({
+  execute = shell,
+  changed,
+  exists = file => existsSync(resolve(REPO_ROOT, file)),
+} = {}) {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
@@ -1487,15 +1491,15 @@ function runMergeGroupGuards() {
     };
   }
   const ownTests = (
-    changedFiles(['apps/web/**/*.test.ts', 'apps/web/**/*.test.tsx']) || []
+    changed ??
+    changedFiles(['apps/web/**/*.test.ts', 'apps/web/**/*.test.tsx']) ??
+    []
   )
-    .filter(
-      file =>
-        !file.startsWith('apps/web/tests/e2e/') &&
-        existsSync(resolve(REPO_ROOT, file))
-    )
-    .map(file => file.replace(/^apps\/web\//, ''));
-  return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
+    .filter(file => !file.startsWith('apps/web/tests/e2e/') && exists(file))
+    .map(file => file.replace(/^apps\/web\//, ''))
+    // Shell-quote: Next.js route groups contain `(` `)` which break sh -c.
+    .map(file => `'${file.replaceAll("'", "'\\''")}'`);
+  return execute([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
 }
 
 /** Async twin of shell() so structural commands can overlap. */
