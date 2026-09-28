@@ -36,7 +36,9 @@ describe('WorkspaceLockScreen', () => {
       screen.getAllByRole('button', { name: /unlock to continue/i }).length
     ).toBeGreaterThan(0);
     expect(screen.getByText('Unlock to continue')).toBeTruthy();
-    expect(screen.getByText('Unlock to continue').tagName).toBe('BUTTON');
+    expect(
+      screen.getByText('Unlock to continue').closest('button')
+    ).toBeTruthy();
     expect(document.querySelector('[data-workspace-lock="true"]')).toBeTruthy();
   });
 

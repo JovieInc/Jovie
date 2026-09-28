@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Fingerprint } from 'lucide-react';
 import { useState } from 'react';
 import { unlockWithPasskey } from '@/lib/workspace-lock/unlock-with-passkey';
@@ -40,23 +41,20 @@ export function WorkspaceLockScreen() {
       data-workspace-lock='true'
       className='flex h-full min-h-1/2 w-full flex-col items-center justify-center gap-4 px-6'
     >
-      <button
-        type='button'
-        onClick={unlock}
-        disabled={status === 'working'}
-        aria-label='Unlock To Continue'
-        className='flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-1 text-destructive transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive disabled:opacity-70'
+      <div
+        aria-hidden='true'
+        className='flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-1 text-destructive'
       >
-        <Fingerprint className='h-8 w-8' aria-hidden='true' />
-      </button>
-      <button
+        <Fingerprint className='h-8 w-8' />
+      </div>
+      <Button
+        variant='tertiary'
         type='button'
         onClick={unlock}
         disabled={status === 'working'}
-        className='text-sm font-medium text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive disabled:opacity-70'
       >
         {status === 'working' ? 'Waiting for passkey…' : 'Unlock to continue'}
-      </button>
+      </Button>
       {message ? (
         <p role='alert' className='text-sm text-destructive'>
           {message}
