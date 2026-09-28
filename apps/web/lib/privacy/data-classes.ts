@@ -285,6 +285,22 @@ export const DATA_CLASSES: DataClass[] = [
     vendors: ['Printful (fulfillment)', 'Stripe (payment)'],
   },
   {
+    id: 'profile-inquiries',
+    title: 'Profile inquiries and visitor intents',
+    purpose:
+      'Visitor messages, unanswered questions, and follow intents (with ' +
+      'optional name/email/city) captured by the public Ask Jovie surface.',
+    owner: 'app/profiles',
+    classification: 'communications',
+    tables: ['profile_inquiries'],
+    retention: 'For the life of the parent profile; no automated retention.',
+    deletion: ['fk-cascade', 'unmanaged'],
+    export: ['none'],
+    notes:
+      'Visitors are not account holders, so their rows are not covered by ' +
+      'account-export — documented gap, same class as audience members.',
+  },
+  {
     id: 'chat',
     title: 'Chat conversations',
     purpose:
