@@ -300,15 +300,28 @@ export function defectReceipts(packet: CertificationReviewPacket) {
     }));
 }
 
-async function fileDefects(
-  packet: CertificationReviewPacket,
-  sha: string
-): Promise<void> {
-  const defects = defectReceipts(packet);
-  if (defects.length === 0 || !process.env.LINEAR_API_KEY) return;
+type UpsertIssue = (input: {
+  fingerprint: string;
+  title: string;
+  description: string;
+  priority: number;
+}) => Promise<{ ok: boolean; action?: string; reason?: string }>;
+
+async function linearUpsert(): Promise<UpsertIssue> {
   const { upsertLinearIssueByTitleFingerprint } = await import(
     '../../../scripts/lib/linear-issue-intake.mjs'
   );
+  return upsertLinearIssueByTitleFingerprint as UpsertIssue;
+}
+
+export async function fileDefects(
+  packet: CertificationReviewPacket,
+  sha: string,
+  loadUpsert: () => Promise<UpsertIssue> = linearUpsert
+): Promise<number> {
+  const defects = defectReceipts(packet);
+  if (defects.length === 0 || !process.env.LINEAR_API_KEY) return 0;
+  const upsertLinearIssueByTitleFingerprint = await loadUpsert();
   for (const defect of defects) {
     const result = await upsertLinearIssueByTitleFingerprint({
       fingerprint: defect.fingerprint,
@@ -334,6 +347,7 @@ async function fileDefects(
       `[marketing-cert] ${packet.subject.id} defect ${defect.fingerprint} -> ${result.ok ? ('action' in result ? result.action : 'ok') : result.reason}`
     );
   }
+  return defects.length;
 }
 
 async function main() {
