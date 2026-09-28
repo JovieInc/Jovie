@@ -38,9 +38,9 @@ def model(**overrides) -> dict:
             "lastLanding": "2026-09-26T20:30:00Z", "held": {"18712": {"sha": "a", "evidence": ["check-failed:bash scripts/hooks/pre-push-gate.sh affected"]}},
             "failures": {"JOV-1": {"count": 1, "at": 0}}, "gateTimeouts": {}, "requeue": {"18720": "h"},
             "cooldowns": {"hyperagent": 600}, "gateSeats": 2,
-            "codex": {"accounts": {"alpha": {"available": True, "leased": False, "resetsInS": 0},
-                                   "beta": {"available": False, "leased": False, "resetsInS": 5400},
-                                   "gamma": {"available": True, "leased": True, "resetsInS": 0}},
+            "codex": {"accounts": {"alpha": {"available": True, "leased": False, "resetsInS": 0, "remainingPercent": 48, "naturalResetInS": 600, "bankedResetCount": 2},
+                                   "beta": {"available": False, "leased": False, "resetsInS": 5400, "remainingPercent": 0, "naturalResetInS": 5400, "bankedResetCount": 1},
+                                   "gamma": {"available": True, "leased": True, "resetsInS": 0, "remainingPercent": 90, "naturalResetInS": 7200, "bankedResetCount": 0}},
                       "available": ["alpha"], "count": 3},
             "doctor": {"alerts": {"dispatch-crash": "dispatch failed 3 ticks in a row"}},
         },
@@ -99,9 +99,9 @@ class RenderTest(unittest.TestCase):
         self.assertIn("JOV-6544   Audio browsing: verify and close intent prefetch", text)
         self.assertIn("worker polling · pool 87 (own 0, shared 87)", text)
         self.assertIn("codex  vacant · no worker", text)
-        self.assertIn("✓ alpha", text)
-        self.assertIn("✕ beta banked 1h30m", text)
-        self.assertIn("● gamma leased", text)
+        self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
+        self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
+        self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
 
     def test_pipeline_attention_and_backlog_rows(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
