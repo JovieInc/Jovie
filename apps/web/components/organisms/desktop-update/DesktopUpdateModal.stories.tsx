@@ -35,6 +35,21 @@ export const Available: Story = {
   },
 };
 
+// loading state: notes are still streaming in, so the body renders nothing
+// under the title until they resolve.
+export const AvailableLoadingNotes: Story = {
+  args: {
+    state: {
+      state: 'available',
+      version: '26.9.16',
+      releaseDate: '2026-09-27T00:00:00.000Z',
+      notesUrl: NOTES_URL,
+    },
+    notes: null,
+    notesLoading: true,
+  },
+};
+
 export const AvailableFallbackLink: Story = {
   args: {
     state: {
