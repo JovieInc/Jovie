@@ -99,6 +99,24 @@ the deterministic result from being returned or persisted.
 5. Show that exact saved/rendered version in the founder conversation. Only an
    explicit human decision may certify it; edits invalidate affected evidence.
 
+## Writing-quality layer (JOV-3721)
+
+`scripts/invariants/jev-writing-quality.mjs` returns atomic, non-compensating
+writing findings on this transport. Deterministic detectors run first:
+`@jovie/copy` register lint for mapped surfaces (the canonical successor to
+retired `slopcheck.py`), the universal `'all'`-register floor for ops and
+uncovered surfaces, plus injection-residue and repetition screens.
+Register-scoped bans (hedging, apologies, promotion vocabulary) are never
+generalised to ops diagnoses. Only axes left unresolved reach the evaluator,
+as one bounded choice question per code-assigned passage ID per axis; the
+model picks `clean` / `violation` / `insufficient-evidence` and never writes
+free-form explanations or rewrites. Missing answers, out-of-range choices,
+confidence below the per-axis JOV-6476 calibration floor, ambiguity,
+unadmitted budget, stale evidence, timeout, cancellation and provider failure
+stay unreviewed rather than passing; an all-empty answer set is
+`invalid-response`. Output is observation-mode only — no certification,
+approval, or publishing authority, and no compensating overall score.
+
 ## Evidence and limits
 
 On 2026-09-19, existing FX/Doppler credits reported $27.741510768 before the

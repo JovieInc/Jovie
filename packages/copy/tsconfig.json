@@ -4,6 +4,7 @@
     "allowJs": false,
     "module": "esnext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["node", "vitest/globals"]
   },
