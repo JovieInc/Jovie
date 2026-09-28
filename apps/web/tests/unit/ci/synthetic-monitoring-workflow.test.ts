@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { GATEWAY_ALLOWLIST_NAME } from '@/lib/constants/ai-models';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -12,6 +13,10 @@ const workflowPath = resolve(
 const agentTickWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/agent-tick.yml'
+);
+const webAiHealthRunnerPath = resolve(
+  repoRoot,
+  '.github/scripts/run-web-ai-health.mjs'
 );
 
 function getStepBlock(workflow: string, stepName: string): string {
@@ -76,5 +81,60 @@ describe('synthetic monitoring workflow parser', () => {
         'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-production-waitlist-results.json'
       );
     }
+  });
+
+  it('escapes multiline failed_tests output so the Slack payload stays valid JSON', () => {
+    const failedTests = [
+      'synthetic-production-waitlist: Test results file not found (apps/web/test-results/synthetic-production-waitlist-results.json)',
+      'Skipped tests:',
+      'onboarding-robot-full: creates a profile, verifies dashboard/public profile, and cleans up',
+    ].join('\n');
+    const escapedExpression =
+      "${{ toJSON(format('```{0}```', steps.test-results.outputs.failed_tests)) }}";
+
+    for (const path of [workflowPath, agentTickWorkflowPath]) {
+      const workflow = readFileSync(path, 'utf8');
+      const alertStep = getStepBlock(workflow, 'Send Slack Alert on Failure');
+
+      expect(alertStep).toContain(escapedExpression);
+      expect(alertStep).not.toContain(
+        '${{ steps.test-results.outputs.failed_tests }}'
+      );
+
+      const payload = alertStep
+        .split('custom_payload: |')[1]!
+        .split('\n        env:')[0]!
+        .split('\n')
+        .map(line => line.replace(/^ {12}/, ''))
+        .join('\n')
+        .replace(
+          escapedExpression,
+          JSON.stringify(`\`\`\`${failedTests}\`\`\``)
+        )
+        .replace(/\$\{\{[^}]*\}\}/g, 'x');
+
+      expect(() => JSON.parse(payload)).not.toThrow();
+    }
+  });
+
+  it('runs the five-surface Web AI health probe once daily through production cron auth', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(workflow).toContain("- cron: '47 7 * * *'");
+    expect(workflow).toContain("github.event.schedule == '47 7 * * *'");
+    expect(workflow).toContain('name: Web AI Health (Daily)');
+    expect(workflow).toContain('--only-secrets=CRON_SECRET --no-fallback');
+    expect(workflow).toContain('--url https://jov.ie/api/cron/web-ai-health');
+    expect(workflow).toContain('scripts/web-ai-health-intake.mjs');
+    expect(workflow).toContain('name: File high-priority Linear bug signal');
+    expect(workflow).not.toContain(
+      '--only-secrets=AI_GATEWAY_API_KEY --no-fallback'
+    );
+  });
+
+  it('keeps the workflow receipt validator on the canonical gateway allowlist name', () => {
+    const runner = readFileSync(webAiHealthRunnerPath, 'utf8');
+
+    expect(runner).toContain(`'${GATEWAY_ALLOWLIST_NAME}'`);
   });
 });

@@ -73,38 +73,39 @@ describe('audio format registry', () => {
     );
   });
 
-  it.each(
-    AUDIO_FORMAT_REGISTRY
-  )('round-trips every $id MIME alias and extension', format => {
-    expect(format.mimeTypes).toContain(format.canonicalMimeType);
-    expect(format.uploadSurfaces).toEqual([
-      'library',
-      'chat',
-      'promo_download',
-    ]);
-    expect(format.platforms).toEqual({
-      web: true,
-      desktop: true,
-      ios: false,
-    });
+  it.each(AUDIO_FORMAT_REGISTRY)(
+    'round-trips every $id MIME alias and extension',
+    format => {
+      expect(format.mimeTypes).toContain(format.canonicalMimeType);
+      expect(format.uploadSurfaces).toEqual([
+        'library',
+        'chat',
+        'promo_download',
+      ]);
+      expect(format.platforms).toEqual({
+        web: true,
+        desktop: true,
+        ios: false,
+      });
 
-    for (const mimeType of format.mimeTypes) {
-      expect(getAudioFormatByMimeType(mimeType)?.id).toBe(format.id);
-      expect(isSupportedAudioMimeType(mimeType)).toBe(true);
-      expect(getAudioFormatLabel(mimeType)).toBe(format.label);
-      expect(AUDIO_FILE_ACCEPT).toContain(mimeType);
-    }
+      for (const mimeType of format.mimeTypes) {
+        expect(getAudioFormatByMimeType(mimeType)?.id).toBe(format.id);
+        expect(isSupportedAudioMimeType(mimeType)).toBe(true);
+        expect(getAudioFormatLabel(mimeType)).toBe(format.label);
+        expect(AUDIO_FILE_ACCEPT).toContain(mimeType);
+      }
 
-    for (const extension of format.extensions) {
-      const fileName = `TRACK.${extension.toUpperCase()}`;
-      expect(getAudioFormatByFileName(fileName)?.id).toBe(format.id);
-      expect(getCanonicalAudioMimeType(fileName)).toBe(
-        format.canonicalMimeType
-      );
-      expect(isSupportedAudioFile({ name: fileName, type: '' })).toBe(true);
-      expect(AUDIO_FILE_ACCEPT).toContain(`.${extension}`);
+      for (const extension of format.extensions) {
+        const fileName = `TRACK.${extension.toUpperCase()}`;
+        expect(getAudioFormatByFileName(fileName)?.id).toBe(format.id);
+        expect(getCanonicalAudioMimeType(fileName)).toBe(
+          format.canonicalMimeType
+        );
+        expect(isSupportedAudioFile({ name: fileName, type: '' })).toBe(true);
+        expect(AUDIO_FILE_ACCEPT).toContain(`.${extension}`);
+      }
     }
-  });
+  );
 
   it('normalizes parameterized MIME values and falls back to the extension', () => {
     expect(getAudioFormatByMimeType(' AUDIO/MPEG; charset=binary ')?.id).toBe(
@@ -172,7 +173,10 @@ describe('audio numeric units', () => {
       () => bpm(Number.POSITIVE_INFINITY),
       'bpm must be greater than 0 and at most 400',
     ],
-  ] as const)('rejects invalid or ambiguous numeric values', (createValue, message) => {
-    expect(createValue).toThrow(new RangeError(message));
-  });
+  ] as const)(
+    'rejects invalid or ambiguous numeric values',
+    (createValue, message) => {
+      expect(createValue).toThrow(new RangeError(message));
+    }
+  );
 });

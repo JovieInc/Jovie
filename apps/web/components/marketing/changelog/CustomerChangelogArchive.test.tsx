@@ -64,7 +64,9 @@ describe('CustomerChangelogArchive', () => {
       screen.getByText('August 16, 2026 · v26.8.1').closest('a')
     ).toHaveAttribute('href', '/changelog/26.8.1');
     expect(screen.queryByText(/^v26\.8\.1$/)).not.toBeInTheDocument();
-    expect(screen.getByText('New')).toBeVisible();
+    expect(
+      screen.getByText('New', { selector: '.changelog-entry__category' })
+    ).toBeVisible();
     expect(screen.getAllByText('Product update')).toHaveLength(2);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
@@ -121,5 +123,49 @@ describe('CustomerChangelogArchive', () => {
     expect(
       screen.queryByRole('button', { name: 'Load Earlier Updates' })
     ).not.toBeInTheDocument();
+  });
+
+  it('filters by category as a secondary control without hiding outcome titles', () => {
+    render(<CustomerChangelogArchive months={MONTHS} />);
+
+    const toolbar = screen.getByRole('toolbar', {
+      name: 'Filter Updates By Category',
+    });
+    expect(toolbar).toBeVisible();
+
+    const allChip = screen.getByRole('button', { name: 'All' });
+    expect(allChip).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fixed' }));
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Sign-out stays available when the store is missing',
+      })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Review qualified brand deals in your Inbox',
+      })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fixed' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Removed' }));
+    expect(screen.getByText('No removed updates yet.')).toBeVisible();
+  });
+
+  it('offers every category filter even when the archive only has one', () => {
+    render(<CustomerChangelogArchive months={MONTHS.slice(0, 1)} />);
+
+    expect(
+      screen.getByRole('toolbar', { name: 'Filter Updates By Category' })
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Removed' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
   });
 });

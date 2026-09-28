@@ -90,7 +90,7 @@ describe('app-shell Tailwind context boundary (JOV-2269)', () => {
     expect(payRoute).toContain("from '@/features/pay/PayLanding'");
     expect(legalError).toContain("from '@/components/organisms/ErrorBoundary'");
     expect(errorBoundary).toContain("from '@/features/feedback/ErrorDetails'");
-    expect(payLanding).toContain('max-w-[10ch]');
+    expect(payLanding).toContain('max-w-[12ch]');
     expect(errorDetails).toContain('break-words');
 
     const publicFeatureSources = GLOBALS_CSS.split('\n').filter(line =>
@@ -111,9 +111,11 @@ describe('app-shell Tailwind context boundary (JOV-2269)', () => {
       { from: join(WEB_ROOT, 'app', 'globals.css') }
     );
     const selectors: string[] = [];
-    postcss.parse(css.css).walkRules(rule => selectors.push(rule.selector));
+    postcss.parse(css.css).walkRules(rule => {
+      selectors.push(rule.selector);
+    });
 
-    expect(selectors).toContain('.max-w-\\[10ch\\]');
+    expect(selectors).toContain('.max-w-\\[12ch\\]');
     expect(selectors).toContain('.break-words');
     expect(publicFeatureSources).toContain(
       '@source "../components/features/pay/PayLanding.tsx";'

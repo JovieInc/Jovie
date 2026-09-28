@@ -335,6 +335,7 @@ describe('source PR path-output reachability contract', () => {
       'ci-integration-ready',
       'ci-build-layout',
       'ci-build-ovie',
+      'ci-typecheck-ovie',
       'ci-storybook-surfaces',
       'ci-ios',
       'ci-build-public',
@@ -907,7 +908,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(classifierJob).toContain(
       'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
     );
-    expect(classifierJob).toContain("node-version: '22'");
+    expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
     // JOV-4446: merge_group uses exact base/head SHA vars; push alone binds event.before.
     expect([classifierJob.includes('fetch-depth: 0'), classifierJob.includes('filter: blob:none'), classifierJob.includes('git cat-file -e "${DIFF_BASE}^{commit}"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "$HEAD_SHA"'), classifierJob.includes('DIFF_BASE="${{ github.event.before }}"'), classifierJob.includes('|| git show')]).toEqual([true, true, true, true, true, false]);
@@ -963,6 +964,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
     const migrationJob = getJobBlock(workflow, 'migrate-production');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const stagingOnlineIndexStep = getStepBlock(
+      stagingJob,
+      'DB migrate (staging - online indexes)'
+    );
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const resultJob = getJobBlock(workflow, 'release-result');
     const credentialStep = getStepBlock(
@@ -976,6 +981,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const migrateStep = getStepBlock(
       migrationJob,
       'DB migrate (production - Drizzle)'
+    );
+    const onlineIndexStep = getStepBlock(
+      migrationJob,
+      'DB migrate (production - online indexes)'
     );
     const verifyStep = getStepBlock(
       migrationJob,
@@ -1019,12 +1028,27 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrationIndex).toBeGreaterThan(productionHeadIndex);
     expect(stagingJob).toContain('needs: [release-head]');
     expect(stagingJob).not.toContain('migrate-production');
+    expect(stagingJob).toContain('DB migrate (staging - online indexes)');
+    expect(stagingJob.indexOf('staging - Drizzle')).toBeLessThan(
+      stagingJob.indexOf('staging - online indexes')
+    );
+    expect(stagingOnlineIndexStep).toContain('timeout-minutes: 12');
+    expect(stagingOnlineIndexStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}'
+    );
+    expect(stagingOnlineIndexStep).toContain('--config stg');
+    expect(stagingOnlineIndexStep).not.toContain('DOPPLER_TOKEN_PRD');
     expect(promotionJob).toContain('migrate-production');
     expect(promotionJob).toContain(
       "needs.migrate-production.result == 'success'"
     );
 
-    for (const step of [preflightStep, migrateStep, verifyStep]) {
+    for (const step of [
+      preflightStep,
+      migrateStep,
+      onlineIndexStep,
+      verifyStep,
+    ]) {
       expect(step).toContain('DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}');
       expect(step).not.toContain('if:');
       expect(step).toContain('doppler run --project jovie-web --config prd');
@@ -1036,11 +1060,18 @@ describe('deploy workflow Vercel env resolution', () => {
     }
     expect(preflightStep).toContain('scripts/drizzle-migrate-preflight.ts');
     expect(migrateStep).toContain('drizzle:migrate:ci');
+    expect(onlineIndexStep).toContain("ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'");
+    expect(onlineIndexStep).toContain('drizzle:migrate:online-indexes:ci');
+    expect(onlineIndexStep).toContain('timeout-minutes: 12');
+    expect(migrationJob).toContain('timeout-minutes: 30');
     expect(verifyStep).toContain('drizzle:verify:ci');
     expect(migrationJob.indexOf('production preflight')).toBeLessThan(
       migrationJob.indexOf('production - Drizzle')
     );
     expect(migrationJob.indexOf('production - Drizzle')).toBeLessThan(
+      migrationJob.indexOf('production - online indexes')
+    );
+    expect(migrationJob.indexOf('production - online indexes')).toBeLessThan(
       migrationJob.indexOf('production schema check')
     );
     expect(resultJob).toContain(
@@ -1218,6 +1249,10 @@ describe('deploy workflow Vercel env resolution', () => {
       'Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT'
     );
     expect(readinessJob).toContain('Ovie Build:$OVIE_BUILD_RESULT');
+    expect(readinessJob).toContain(
+      'Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT'
+    );
+    expect(readinessJob).toContain('Ovie Typecheck:$OVIE_TYPECHECK_RESULT');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
     expect(readinessJob).toContain('RUN_PROMPTFOO');
@@ -1573,7 +1608,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       /\n {6}vercel:\n {8}specifier: 56\.3\.2\n {8}version: 56\.3\.2[(\n]/
     );
     expect(dependabot).toMatch(
-      /- dependency-name: 'vercel'\n\s+versions: \['>=57'\]/
+      /- dependency-name: 'vercel'\n\s+versions: \['>=56\.4'\]/
     );
   });
 
@@ -2247,15 +2282,29 @@ describe('unit-test runner capacity', () => {
       "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_test == 'true'"
     );
     expect(unitJob).not.toContain('&& 5 || 3');
-    expect(unitJob).toContain('Each ephemeral runner has 2 CPUs');
     // fileParallelism: !isCI in the fast config clamps maxWorkers to 1 unless
-    // the shard opts back in; without it one of the two CPUs sits idle.
+    // the shard opts back in; forks track nproc (4 hosted, 2 self-hosted).
     expect(unitJob).toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=2 --fileParallelism"'
+      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=$(nproc) --fileParallelism"'
     );
     expect(unitJob).not.toContain(
       'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
     );
+    // Each isolated fork re-parses the DOM environment and other externals;
+    // the shared V8 compile cache lets later forks load bytecode instead.
+    const compileCacheEnv =
+      'NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache';
+    for (const stepName of [
+      'Run unit tests',
+      'Run quarantined unit tests (retries)',
+      'Run packages/ui unit tests',
+    ]) {
+      const start = unitJob.indexOf(`- name: ${stepName}\n`);
+      expect(start, stepName).toBeGreaterThan(-1);
+      const next = unitJob.indexOf('\n      - ', start + 1);
+      const step = unitJob.slice(start, next === -1 ? undefined : next);
+      expect(step, stepName).toContain(compileCacheEnv);
+    }
   });
 });
 
@@ -4369,9 +4418,9 @@ describe('ci-fast critical deploy contract', () => {
     // the tests/unit/ci directory run excludes it); setup-doppler-action and
     // the rest of tests/unit/ci run in the directory command.
     const byName =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts ${DEPLOY_WORKFLOW_CI_TEST}';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts ${DEPLOY_WORKFLOW_CI_TEST}';
     const directory =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci';
 
     expect(ciFastLanes).toContain(
       "const DEPLOY_WORKFLOW_CI_TEST = 'tests/unit/ci/deploy-workflow.test.ts';"
@@ -4383,6 +4432,21 @@ describe('ci-fast critical deploy contract', () => {
       expect(command).not.toContain('--affected');
       expect(command).not.toContain('--passWithNoTests');
     }
+
+    // The contract config swaps only the environment: node, no browser setup,
+    // scoped to tests/unit/ci, everything else inherited from the fast config.
+    const contractConfig = readFileSync(
+      resolve(repoRoot, 'apps/web/vitest.config.ci-contracts.mts'),
+      'utf8'
+    );
+    expect(contractConfig).toContain(
+      "import baseConfig from './vitest.config.fast.mts';"
+    );
+    expect(contractConfig).toContain("environment: 'node',");
+    expect(contractConfig).toContain('setupFiles: [],');
+    expect(contractConfig).toContain(
+      "include: ['tests/unit/ci/**/*.test.ts'],"
+    );
   });
 });
 
@@ -5151,8 +5215,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
     expect(evaluator).toContain("default: '5'");
     expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('failingRunAttempt < 2');
-    expect(evaluator).toContain('repair_state_unavailable');
+    expect(evaluator).toContain('attemptEvidenceTrusted');
+    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {

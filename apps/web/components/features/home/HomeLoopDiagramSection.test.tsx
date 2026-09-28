@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { HomeLoopDiagramSection } from './HomeLoopDiagramSection';
 
 describe('HomeLoopDiagramSection', () => {
@@ -9,7 +10,7 @@ describe('HomeLoopDiagramSection', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Stop Letting Momentum Decay.',
+        name: segmentedAccessibleName('Stop Letting', 'Momentum Decay.'),
       })
     ).toHaveClass('line-clamp-2');
     expect(screen.getByText('The Jovie Loop')).toBeInTheDocument();

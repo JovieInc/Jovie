@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from './DashboardHeader';
@@ -28,6 +30,15 @@ describe('DashboardHeader', () => {
     expect(screen.queryByText('Jovie')).not.toBeInTheDocument();
   });
 
+  it('uses the single unified header-height token (founder lock 2026-09-25)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('sm:h-(--app-shell-header-height)');
+    expect(source).not.toContain('sm:h-(--app-shell-header-height-compact)');
+  });
+
   it('exposes the header row as an Electron drag region', () => {
     render(<DashboardHeader breadcrumbs={[{ label: 'New Chat' }]} />);
 
@@ -37,11 +48,13 @@ describe('DashboardHeader', () => {
     );
   });
 
-  it('renders the desktop release identity inside the header, not a second titlebar band', () => {
+  it('keeps build diagnostics out of the header', () => {
     document.documentElement.dataset.desktopRuntime = 'electron';
     render(<DashboardHeader breadcrumbs={[{ label: 'New Chat' }]} />);
 
-    expect(screen.getByTestId('electron-release-identity')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('electron-release-identity')
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('electron-titlebar-row')
     ).not.toBeInTheDocument();
@@ -57,5 +70,52 @@ describe('DashboardHeader', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Help' })).toBeInTheDocument();
+  });
+
+  it('places a route-owned primary action to the right of the right-rail toggle (header IA, 2026-09-25)', () => {
+    render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Library' }]}
+        railToggle={<button type='button'>Rail Toggle</button>}
+        action={<button type='button'>Add Asset</button>}
+      />
+    );
+
+    const railSlot = screen.getByTestId('dashboard-header-rail-slot');
+    const action = screen.getByRole('button', { name: 'Add Asset' });
+
+    expect(
+      Boolean(
+        railSlot.compareDocumentPosition(action) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
+  });
+
+  it('keeps the title/breadcrumb slot first, ahead of the rail toggle and action', () => {
+    render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Library' }]}
+        railToggle={<button type='button'>Rail Toggle</button>}
+        action={<button type='button'>Add Asset</button>}
+      />
+    );
+
+    const titleSlot = screen.getByTestId('dashboard-header-title-slot');
+    const railSlot = screen.getByTestId('dashboard-header-rail-slot');
+    const action = screen.getByRole('button', { name: 'Add Asset' });
+
+    expect(
+      Boolean(
+        titleSlot.compareDocumentPosition(railSlot) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
+    expect(
+      Boolean(
+        titleSlot.compareDocumentPosition(action) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
   });
 });

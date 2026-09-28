@@ -46,7 +46,6 @@ function qualification(): QualificationResult {
 function spotify(): SpotifyLeadEnrichment {
   return {
     status: 'enriched',
-    reason: null,
     artistId: 'artist123',
     spotifyPopularity: 30,
     spotifyFollowers: 900,
@@ -116,6 +115,33 @@ describe('public requalification contract', () => {
       'https://linktr.ee/publicartist',
       'https://open.spotify.com/artist/artist123',
     ]);
+    expect(run.jobQualification).toMatchObject({
+      candidateRunId: run.runId,
+      activeGoal: null,
+      supportedJob: {
+        id: 'premade-artist-profile',
+        offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+      },
+      evidenceDecision: {
+        state: 'review_needed',
+        reasons: expect.arrayContaining([
+          'identity_ambiguous',
+          'active_goal_unknown',
+        ]),
+      },
+      commercialDecision: { state: 'review_needed' },
+      contactDecisions: [
+        expect.objectContaining({
+          channel: 'public-profile',
+          decision: 'review_needed',
+        }),
+      ],
+    });
+    expect(run.jobQualification?.observations[0]?.provenance).toMatchObject({
+      sourceUrl: 'https://linktr.ee/publicartist',
+      sourceDigest: run.sourceDigest,
+      immutableRef: run.sourceRevision,
+    });
   });
 
   it('maps public DSP presence into fit inputs and preserves it in the digest', () => {
@@ -154,7 +180,9 @@ describe('public requalification contract', () => {
     });
 
     expect(withDspLinks.fitScoreBreakdown.multiDspPresence).toBe(5);
-    expect(withDspLinks.fitScoreBreakdown.meta?.dspPlatformCount).toBe(3);
+    expect(withDspLinks.fitScoreBreakdown.meta).toMatchObject({
+      dspPlatformCount: 3,
+    });
     expect(withDspLinks.fitScoreBreakdown.hasContactEmail).toBe(0);
     expect(withDspLinks.sourceRevision).not.toBe(base.sourceRevision);
     expect(withDspLinks.publicObservation.qualification.allLinks).toEqual(

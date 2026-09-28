@@ -36,6 +36,11 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The beforeEach hooks below transform and import the gate.ts module graph
+// per test; under sharded/loaded runners that exceeds the 5s default hook
+// timeout, so give the hooks explicit headroom.
+vi.setConfig({ hookTimeout: 30_000 });
+
 // ============================================================================
 // Tests for status-checker.ts
 // ============================================================================

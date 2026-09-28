@@ -5,6 +5,7 @@ import {
   HomepageArtistProfiles,
 } from '@/components/homepage/HomepageArtistProfiles';
 import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const PREVIEWS: HomepageArtistProfilePreviews = [
   {
@@ -56,7 +57,10 @@ describe('HomepageMeetJovie', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Jovie is the AI workspace for artists. Built around your artist presence.',
+        name: segmentedAccessibleName(
+          'Jovie is the AI workspace for artists.',
+          'Built around your artist presence.'
+        ),
       })
     ).toBeInTheDocument();
     expect(

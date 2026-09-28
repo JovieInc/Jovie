@@ -496,7 +496,7 @@ function getFetchErrorMessage(response: Response): string {
  * Custom error class for fetch failures with status code.
  *
  * This is the canonical FetchError used across the app. It supports both
- * raw Response objects (from fetchWithTimeout) and string bodies (from dedupedFetch).
+ * raw Response objects (from fetchWithTimeout) and string bodies.
  */
 export class FetchError extends Error {
   public readonly response?: Response;
@@ -611,6 +611,14 @@ export class FetchPayloadLimitError extends FetchError {
     super(message, 413, undefined, undefined, { kind: 'payload-limit', cause });
     this.name = 'FetchPayloadLimitError';
   }
+}
+
+/**
+ * True when a failed request was rejected with HTTP 403 (e.g. an admin
+ * endpoint hit without the passkey step-up on this session).
+ */
+export function isForbiddenError(error: unknown): boolean {
+  return error instanceof FetchError && error.status === 403;
 }
 
 /**

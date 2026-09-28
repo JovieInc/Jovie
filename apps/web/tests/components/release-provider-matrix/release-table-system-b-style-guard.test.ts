@@ -47,6 +47,9 @@ describe('ReleaseTable System B style guard', () => {
     // Table API must route through the v9 compat adapter, never the package root.
     expect(sources).toContain("'@/lib/tanstack-table'");
     expect(sources).not.toContain("'@tanstack/react-table'");
+    // Banned icon guard (Tim, 2026-09-25): the empty-state icon is Layers.
+    expect(sources).not.toContain('Disc3');
+    expect(sources).toContain("name='Layers'");
   });
 
   it('keeps ReleaseTable primitives token-backed', () => {

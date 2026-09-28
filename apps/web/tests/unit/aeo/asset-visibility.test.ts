@@ -9,6 +9,15 @@ import {
   type CreatorAssetDescriptor,
 } from '@/lib/aeo/asset-visibility';
 
+type AssetRecordResult = ReturnType<typeof aeo.recordAssetObservation>;
+
+function rejected(
+  result: AssetRecordResult
+): Extract<AssetRecordResult, { ok: false }> {
+  if (result.ok) throw new Error('expected recordAssetObservation to reject');
+  return result;
+}
+
 const asset = (
   kind: CreatorAssetDescriptor['kind'] = 'video',
   patch: Partial<CreatorAssetDescriptor> = {}
@@ -787,10 +796,12 @@ it('covers the AEO asset visibility contract regressions', () => {
         '{"competitors":{"status":"known","items":[{"name":"Rival","email":"fan@example.com"}]}}'
       )
     ),
-    aeo.recordAssetObservation({
-      observation: row('{"presence":{"status":"unknown","fanId":"fan-99"}}'),
-      consent: null,
-    }).reason,
+    rejected(
+      aeo.recordAssetObservation({
+        observation: row('{"presence":{"status":"unknown","fanId":"fan-99"}}'),
+        consent: null,
+      })
+    ).reason,
     out(
       '{"asset":{"assetId":"m1","kind":"music","creatorScopeId":"c1","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"private"}}'
     ).rejected[0]?.reason,
@@ -897,10 +908,12 @@ describe('recordAssetObservation asset id', () => {
       assetId: null,
     });
     expect(
-      aeo.recordAssetObservation({
-        observation: 'fan-1',
-        consent: null,
-      }).assetId
+      rejected(
+        aeo.recordAssetObservation({
+          observation: 'fan-1',
+          consent: null,
+        })
+      ).assetId
     ).toBeNull();
   });
 });

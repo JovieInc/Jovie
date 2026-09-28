@@ -1,7 +1,7 @@
 import AVKit
 import SwiftUI
 
-enum AppShellTab: Equatable, Hashable {
+enum AppShellTab: Equatable, Hashable, CaseIterable {
   case chat
   case library
   case calendar
@@ -1144,31 +1144,45 @@ struct AppShellView<
 
       Spacer(minLength: 0)
 
-      if chatEnabled {
-        Button(action: openQuickVlogMode) {
-          Image(systemName: "video")
-        }
-        .buttonStyle(JovieIconButtonStyle())
-        .accessibilityLabel("Open Vlog Mode")
-        .accessibilityHint("Start a private on-device vlog in Prompt Mode")
-        .accessibilityIdentifier("shell-vlog-open")
+      // One trailing action only (ios-nav-one-trailing-action, JOV-5353):
+      // vlog, Talk, and Settings live in a single Actions overflow menu.
+      Menu {
+        if chatEnabled {
+          Button(action: openQuickVlogMode) {
+            Label("Vlog Mode", systemImage: "video")
+          }
+          .accessibilityLabel("Open Vlog Mode")
+          .accessibilityHint("Start a private on-device vlog in Prompt Mode")
+          .accessibilityIdentifier("shell-vlog-open")
 
-        Button(action: openTalkOverlay) {
-          Image(systemName: "mic.fill")
+          Button(action: openTalkOverlay) {
+            Label("Talk", systemImage: "mic.fill")
+          }
+          .accessibilityIdentifier("shell-talk-fab")
+          .accessibilityHint("Opens full-screen voice capture")
         }
-        .buttonStyle(JovieIconButtonStyle())
-        .accessibilityLabel("Talk")
-        .accessibilityIdentifier("shell-talk-fab")
-        .accessibilityHint("Opens full-screen voice capture")
-      }
 
-      Button {
-        isShowingSettings = true
+        Button {
+          isShowingSettings = true
+        } label: {
+          Label("Settings", systemImage: "gearshape")
+        }
+        .accessibilityLabel("Open Settings")
       } label: {
-        Image(systemName: "gearshape")
+        Image(systemName: "ellipsis")
+          .font(.system(size: 17, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+          .frame(
+            width: JovieIconButtonStyle.targetSize,
+            height: JovieIconButtonStyle.targetSize
+          )
+          .background(JovieColor.surface1, in: Circle())
+          .overlay {
+            Circle().stroke(JovieColor.borderDefault, lineWidth: 1)
+          }
       }
-      .buttonStyle(JovieIconButtonStyle())
-      .accessibilityLabel("Open Settings")
+      .accessibilityLabel("Actions")
+      .accessibilityIdentifier("shell-actions-menu")
     }
     .padding(.horizontal, JovieSpacing.large)
     .padding(.vertical, JovieSpacing.small)

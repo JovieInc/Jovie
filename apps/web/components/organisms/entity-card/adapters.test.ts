@@ -368,15 +368,25 @@ describe('showToEntityCard', () => {
     expect(model.datePill).toBeNull();
   });
 
-  it('formats the date pill in UTC so it always matches the events list', () => {
-    // 02:30 UTC is still the previous day in US timezones — the card and the
-    // TourModePanel list (also UTC) must agree on "Jul 29".
+  it('uses deterministic UTC when no venue timezone is available', () => {
+    // No venue timezone was supplied; retain a viewer-independent fallback.
     const model = showToEntityCard({
       id: 's3',
       venueName: 'The Echo',
       startDate: '2026-07-29T02:30:00.000Z',
     });
     expect(model.datePill).toEqual({ month: 'Jul', day: '29' });
+  });
+
+  it('uses the venue calendar day for a show after UTC midnight', () => {
+    expect(
+      showToEntityCard({
+        id: 'radius',
+        venueName: 'Radius',
+        startDate: '2026-09-24T03:00:00Z',
+        timezone: 'America/Chicago',
+      }).datePill
+    ).toEqual({ month: 'Sep', day: '23' });
   });
 
   it('never links a cancelled or sold-out show to tickets', () => {

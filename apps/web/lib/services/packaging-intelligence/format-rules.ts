@@ -102,6 +102,18 @@ export function applyPackagingAnalyzeGate(input: {
   };
 }
 
+function packagingRefusalReason(input: {
+  readonly refused: boolean;
+  readonly allowed: boolean;
+  readonly both: string;
+  readonly allowedMissed: string;
+  readonly refusedMissed: string;
+}): string {
+  if (!input.refused) return input.refusedMissed;
+  if (!input.allowed) return input.allowedMissed;
+  return input.both;
+}
+
 export function evaluatePackagingRuleCase(
   id: PackagingRuleCaseId
 ): PackagingRuleCaseResult {
@@ -118,11 +130,13 @@ export function evaluatePackagingRuleCase(
       return {
         id,
         passed: refused && allowed,
-        reason: refused
-          ? allowed
-            ? 'Hook text on a face is refused; off-face hook is allowed'
-            : 'Off-face hook was incorrectly refused'
-          : 'Hook text on a face was not refused',
+        reason: packagingRefusalReason({
+          refused,
+          allowed,
+          both: 'Hook text on a face is refused; off-face hook is allowed',
+          allowedMissed: 'Off-face hook was incorrectly refused',
+          refusedMissed: 'Hook text on a face was not refused',
+        }),
       };
     }
     case 'cover-with-hook-text': {
@@ -137,11 +151,13 @@ export function evaluatePackagingRuleCase(
       return {
         id,
         passed: refused && allowed,
-        reason: refused
-          ? allowed
-            ? 'Cover hooky text is refused; square contain is allowed'
-            : 'Valid cover rule was incorrectly refused'
-          : 'Cover hooky text was not refused',
+        reason: packagingRefusalReason({
+          refused,
+          allowed,
+          both: 'Cover hooky text is refused; square contain is allowed',
+          allowedMissed: 'Valid cover rule was incorrectly refused',
+          refusedMissed: 'Cover hooky text was not refused',
+        }),
       };
     }
     case 'no-image-unknown': {

@@ -1,39 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleasesEmptyState } from '@/components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
-
-vi.mock('@/components/molecules/drawer', () => ({
-  DrawerButton: ({
-    children,
-    onClick,
-    className,
-  }: {
-    children: ReactNode;
-    onClick?: () => void;
-    className?: string;
-  }) => (
-    <button type='button' onClick={onClick} className={className}>
-      {children}
-    </button>
-  ),
-  DrawerSurfaceCard: ({
-    children,
-    testId,
-    className,
-    variant,
-  }: {
-    children: ReactNode;
-    testId?: string;
-    className?: string;
-    variant?: string;
-  }) => (
-    <div data-testid={testId} data-variant={variant} className={className}>
-      {children}
-    </div>
-  ),
-}));
 
 describe('ReleasesEmptyState', () => {
   it('renders the disconnected state and wires connect action', async () => {
@@ -86,10 +54,15 @@ describe('ReleasesEmptyState', () => {
 
     const state = screen.getByTestId('releases-empty-state-partial');
     expect(state).toHaveClass('min-h-55');
-    expect(state).toHaveAttribute('data-variant', 'card');
+    expect(state).toHaveClass('bg-(--app-shell-content-surface)');
+    expect(state).not.toHaveAttribute('data-variant', 'card');
     expect(screen.getByRole('status')).toHaveAttribute(
       'data-content-state',
       'empty'
+    );
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'data-empty-state-presentation',
+      'workspace'
     );
     expect(
       screen.getByRole('heading', { name: 'Some Music Found' })

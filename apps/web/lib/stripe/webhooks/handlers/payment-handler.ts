@@ -22,8 +22,13 @@
 
 import type Stripe from 'stripe';
 
-import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import {
+  captureCriticalError,
+  captureWarning,
+  logFallback,
+} from '@/lib/error-tracking';
 import { recordCommission } from '@/lib/referrals/service';
+import { trackServerEvent } from '@/lib/server-analytics';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -232,11 +237,43 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         stripeEventId,
         stripeEventTimestamp,
         eventType: 'payment_succeeded',
+        paymentFacts: {
+          logicalOrderId: invoice.id,
+          invoiceId: invoice.id,
+          grossAmountCents: invoice.amount_paid,
+          currency: invoice.currency,
+          attemptCount: invoice.attempt_count ?? 0,
+        },
       });
 
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
+
+      // Durable revenue event emitted from the verified webhook, not the
+      // buyer's return page. `stripe:${stripeEventId}` deduplicates Stripe
+      // retries; a failed write throws so the webhook stays unprocessed and
+      // Stripe redelivers instead of leaving a paid transition unmeasured.
+      const paymentDelivery = await trackServerEvent(
+        invoice.billing_reason === 'subscription_cycle'
+          ? 'subscription_renewed'
+          : 'payment_succeeded',
+        {
+          stripeEventId,
+          billingReason: invoice.billing_reason ?? undefined,
+        },
+        undefined,
+        {
+          eventIdentity: `stripe:${stripeEventId}`,
+          occurredAt: stripeEventTimestamp,
+        }
+      );
+      if (!paymentDelivery.ok) {
+        throw new Error(
+          `Payment analytics delivery failed: ${paymentDelivery.error}`
+        );
+      }
+
       await invalidateBillingCache(result.appUserId);
       await this.tryRecordReferralCommission(result.appUserId, invoice);
       this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
@@ -279,8 +316,10 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     stripeEventId: string,
     stripeEventTimestamp: Date
   ): Promise<HandlerResult> {
-    // Log payment failure with safe metadata only (invoice ID is safe, no customer/subscription IDs)
-    await captureCriticalError(
+    // Log payment failure as a warning: expected dunning attempts must not
+    // page as critical. Critical is reserved for processing failures below.
+    // Safe metadata only (invoice ID is safe, no customer/subscription IDs).
+    await captureWarning(
       'Payment failed for invoice',
       new Error('Invoice payment failed'),
       {

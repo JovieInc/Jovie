@@ -142,8 +142,29 @@ vi.mock('@/components/molecules/drawer', () => ({
         {children}
       </div>
     ),
-  EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
+  EntityHeader: ({
+    thumbnail,
+    title,
+    subtitle,
+    statusGlyph,
+    actions,
+  }: {
+    thumbnail?: React.ReactNode;
+    title?: React.ReactNode;
+    subtitle?: React.ReactNode;
+    statusGlyph?: React.ReactNode;
+    actions?: React.ReactNode;
+  }) => (
+    <div>
+      {thumbnail}
+      {title}
+      {subtitle}
+      {statusGlyph}
+      {actions}
+    </div>
+  ),
+  EntityHeaderStatusGlyph: ({ label }: { label?: string }) => (
+    <span role='img' aria-label={label} />
   ),
   DrawerInlineNote: ({ message }: { message: string }) => <p>{message}</p>,
   DrawerSection: ({ children }: { children?: React.ReactNode }) => (

@@ -8,6 +8,8 @@
  * the output is safe to bake into ISR pages.
  */
 
+import { isCanonicalPublicProfileHandle } from './opaque-internal-profile-handle';
+
 export interface EntityMentionRelease {
   readonly title: string;
   readonly slug?: string | null;
@@ -78,8 +80,16 @@ function buildCandidates(context: EntityMentionContext): MentionCandidate[] {
   for (const artist of context.artists ?? []) {
     const name = artist.name?.trim();
     const handle = artist.handle?.trim();
-    // Artists without a Jovie profile stay plain text — internal interlinking only.
-    if (!name || name.length < MIN_PHRASE_LENGTH || !handle) continue;
+    // Artists without a Jovie profile stay plain text — internal interlinking
+    // only. Raw-ID handles (QA `tmoc*`, encoded unclaimed `a_*`) are never
+    // public link destinations either (JOV-6612).
+    if (
+      !name ||
+      name.length < MIN_PHRASE_LENGTH ||
+      !handle ||
+      !isCanonicalPublicProfileHandle(handle)
+    )
+      continue;
     // Self-mentions stay plain text: an artist's own bio mentioning their own
     // name must not link back to this profile (or to a duplicate profile row
     // carrying the same handle) — the page already IS that entity.

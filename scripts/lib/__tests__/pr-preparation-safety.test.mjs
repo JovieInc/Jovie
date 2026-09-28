@@ -238,35 +238,38 @@ describe('complete GitHub snapshots', () => {
     ['auto-merge', { autoMergeRequest: { enabledAt: 'now' } }],
     ['review', { reviewDecision: 'CHANGES_REQUESTED' }],
     ['hold label', { labels: [{ name: 'hold' }] }],
-  ])('fails closed when final %s state changes after context pagination', async (_name, change) => {
-    let call = 0;
-    await expect(
-      fetchPrSnapshot('JovieInc/Jovie', 16001, {
-        ghJsonImpl: async () => {
-          call += 1;
-          const response = page({
-            nodes: checks(),
-            totalCount: checks().length,
-            hasNextPage: false,
-            endCursor: null,
-            metadata: true,
-          });
-          if (call === 2) {
-            const finalPr = response.data.repository.pullRequest;
-            Object.assign(finalPr, change);
-            if ('labels' in change && change.labels) {
-              finalPr.labels = {
-                nodes: change.labels,
-                totalCount: change.labels.length,
-                pageInfo: { hasNextPage: false, endCursor: null },
-              };
+  ])(
+    'fails closed when final %s state changes after context pagination',
+    async (_name, change) => {
+      let call = 0;
+      await expect(
+        fetchPrSnapshot('JovieInc/Jovie', 16001, {
+          ghJsonImpl: async () => {
+            call += 1;
+            const response = page({
+              nodes: checks(),
+              totalCount: checks().length,
+              hasNextPage: false,
+              endCursor: null,
+              metadata: true,
+            });
+            if (call === 2) {
+              const finalPr = response.data.repository.pullRequest;
+              Object.assign(finalPr, change);
+              if ('labels' in change && change.labels) {
+                finalPr.labels = {
+                  nodes: change.labels,
+                  totalCount: change.labels.length,
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                };
+              }
             }
-          }
-          return response;
-        },
-      })
-    ).rejects.toThrow(/state changed after statusCheckRollup pagination/);
-  });
+            return response;
+          },
+        })
+      ).rejects.toThrow(/state changed after statusCheckRollup pagination/);
+    }
+  );
 
   it.each([
     ['missing cursor', null, 2, /omitted the next cursor/],
@@ -368,47 +371,47 @@ describe('mutation and receipt races', () => {
     ).toBe(false);
   });
 
-  it.each([
-    'SIGINT',
-    'SIGTERM',
-  ])('persists process-level %s cancellation', async signal => {
-    const directory = await import('node:fs/promises').then(({ mkdtemp }) =>
-      mkdtemp(join(tmpdir(), 'jovie-signal-'))
-    );
-    const target = join(directory, 'receipt.json');
-    const driver = `
+  it.each(['SIGINT', 'SIGTERM'])(
+    'persists process-level %s cancellation',
+    async signal => {
+      const directory = await import('node:fs/promises').then(({ mkdtemp }) =>
+        mkdtemp(join(tmpdir(), 'jovie-signal-'))
+      );
+      const target = join(directory, 'receipt.json');
+      const driver = `
       const mod=await import(process.argv[1]);
       const writer=mod.createAtomicReceiptWriter(process.argv[2],{beforeRenameImpl:async({receipt})=>{if(receipt.outcome==='started'){console.log('READY');await new Promise(r=>setTimeout(r,200));}}});
       mod.installProcessSignalHandlers({getLatest:writer.getLatest,writeReceiptImpl:writer.write});
       writer.write({schema:mod.RECEIPT_SCHEMA,outcome:'started',mutationAttempted:true,mutationApplied:null,observedHeadOid:'${HEAD}',requiresExactRereadBeforeRetry:false});
       setInterval(()=>{},1000);`;
-    const child = spawn(process.execPath, [
-      '--input-type=module',
-      '-e',
-      driver,
-      MODULE_URL,
-      target,
-    ]);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error('child not ready')),
-        3000
-      );
-      child.stdout.on('data', chunk => {
-        if (String(chunk).includes('READY')) {
-          clearTimeout(timeout);
-          resolve();
-        }
+      const child = spawn(process.execPath, [
+        '--input-type=module',
+        '-e',
+        driver,
+        MODULE_URL,
+        target,
+      ]);
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('child not ready')),
+          3000
+        );
+        child.stdout.on('data', chunk => {
+          if (String(chunk).includes('READY')) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
       });
-    });
-    child.kill(signal === 'SIGINT' ? 'SIGINT' : 'SIGTERM');
-    await new Promise(resolve => child.once('exit', resolve));
-    expect(JSON.parse(await readFile(target, 'utf8'))).toMatchObject({
-      outcome: 'cancelled_indeterminate',
-      mutationAttempted: null,
-      mutationApplied: null,
-      observedHeadOid: null,
-      requiresExactRereadBeforeRetry: true,
-    });
-  });
+      child.kill(signal === 'SIGINT' ? 'SIGINT' : 'SIGTERM');
+      await new Promise(resolve => child.once('exit', resolve));
+      expect(JSON.parse(await readFile(target, 'utf8'))).toMatchObject({
+        outcome: 'cancelled_indeterminate',
+        mutationAttempted: null,
+        mutationApplied: null,
+        observedHeadOid: null,
+        requiresExactRereadBeforeRetry: true,
+      });
+    }
+  );
 });

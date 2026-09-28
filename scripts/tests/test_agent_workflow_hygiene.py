@@ -13,7 +13,6 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 HOT_PATH_WORKFLOWS = (
     "auto-ready-agent-drafts.yml",
     "agent-tick.yml",
-    "auto-fix-lint-agent-drafts.yml",
     "stuck-draft-autoclose.yml",
 )
 
@@ -34,7 +33,6 @@ MODEL_OR_ADVISORY_JOBS = (
     ("eval.yml", "eval"),
     ("eval-real-model.yml", "real-model-eval"),
     ("github-ai-orchestrator.yml", "implement_and_open_pr"),
-    ("main-autofix.yml", "autofix"),
     ("sentry-autofix.yml", "autofix"),
     ("taste-classifier.yml", "classify"),
     ("taste-label-guard.yml", "guard"),
@@ -132,7 +130,6 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("agent-tick.yml", "dispatch"),
     ("agent-tick.yml", "neon-cleanup"),
     ("agent-tick.yml", "synthetic-monitoring"),
-    ("auto-fix-lint-agent-drafts.yml", "auto-fix-lint"),
     ("doc-gardening-agent.yml", "garden"),
     ("github-ai-dispatcher.yml", "dispatch"),
     ("github-ai-orchestrator.yml", "guard"),
@@ -368,21 +365,6 @@ def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
     assert "ci-harness/manifest.json" not in workflow
 
 
-def test_slop_gate_is_post_merge_informational() -> None:
-    """Copy smell stays off PR Ready; taste is post-ship."""
-    workflow = (WORKFLOWS / "slop-gate.yml").read_text(encoding="utf-8")
-    trigger_block = workflow.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert "schedule:" in trigger_block
-    assert "workflow_dispatch:" in trigger_block
-    assert "pull_request" not in trigger_block
-    assert "ci-harness/manifest.json" in workflow
-    assert "continue-on-error: true" in workflow
-    assert "HEAD~1" not in workflow
-    assert "--before='7 days ago'" in workflow
-
-
 def test_agent_pipeline_retires_dead_qc_wires() -> None:
     """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
     workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
@@ -442,40 +424,16 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
         "actionlint.yml",
         "brand-scrub.yml",
         "ci.yml",
-        "slop-gate.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert install_command in workflow, workflow_name
         assert "pip install pytest" not in workflow, workflow_name
 
 
-def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
-    """Avoid an unhashed npm global install on the automated repair path."""
-    script = (REPO_ROOT / "scripts" / "auto-fix-lint-agent-drafts.sh").read_text(
-        encoding="utf-8"
-    )
-    workflow = (WORKFLOWS / "auto-fix-lint-agent-drafts.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "npm install -g pnpm@" not in script
-    assert "corepack prepare pnpm@9.15.9 --activate" in script
-    assert "pnpm install --frozen-lockfile --ignore-scripts" in script
-    assert "env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN" in script
-    assert ".headOwner == $repo_owner" in script
-    assert "headOwner/$headRepo.git" not in script
-    assert "persist-credentials: false" in workflow
-    assert "TARGET_PR_NUMBER" in script
-    assert 'gh_retry pr view "$TARGET_PR_NUMBER"' in script
-    assert "github.event.workflow_run.conclusion == 'failure'" in workflow
-    assert "github.event.workflow_run.pull_requests[0].number != null" in workflow
 
 
 def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
     """Repairs run from the state change they reconcile, without duplicate clocks."""
-    autofix = (WORKFLOWS / "auto-fix-lint-agent-drafts.yml").read_text(
-        encoding="utf-8"
-    )
     receipts = (WORKFLOWS / "delivery-control-receipts.yml").read_text(
         encoding="utf-8"
     )
@@ -483,8 +441,6 @@ def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
         encoding="utf-8"
     )
 
-    assert "schedule:" not in autofix
-    assert "workflows: ['CI']" in autofix
     assert "schedule:" not in receipts
     assert "workflow_run:" in receipts
     assert "--reconcile" not in receipts
@@ -550,7 +506,6 @@ def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> N
         "agent-pipeline.yml",
         "agent-landing-sweep.yml",
         "agent-tick.yml",
-        "main-autofix.yml",
         "sentry-autofix.yml",
         "github-ai-orchestrator.yml",
     ):
@@ -943,51 +898,30 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
         assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
 
 
-def test_main_autofix_waits_for_rerun_and_exact_sha_repair_ownership() -> None:
-    """Schedule ticks must not dispatch or alert repeatedly for owned failures."""
+def test_main_health_monitor_alerts_once_and_reruns_once() -> None:
+    """Schedule ticks fail closed on evidence gaps and self-heal with one rerun."""
     evaluator = (
         REPO_ROOT / ".github/actions/eval-main-health/action.yml"
     ).read_text(encoding="utf-8")
-    autofix = (WORKFLOWS / "main-autofix.yml").read_text(encoding="utf-8")
+    monitor = (WORKFLOWS / "main-ci-health-monitor.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "const failingRunAttempt = Number(latestFailure?.run_attempt ?? 0)" in evaluator
-    assert "failingRunAttempt < 2" in evaluator
-    assert "autofixSkipReason = 'awaiting_one_shot_rerun'" in evaluator
-    assert "repairInFlight = openPulls.some" in evaluator
-    assert "run.head_sha === failingSha" in evaluator
-    assert "github.rest.repos.listCommitStatusesForRef" in evaluator
     assert "github.rest.repos.getCommit" in evaluator
     assert "latestFailure.head_sha !== currentMainSha" in evaluator
-    assert "ownedAttempts >= autofixAttemptLimit" in evaluator
-    assert "withinLease(latestOwnershipStatus.created_at)" in evaluator
-    assert "uncertain:repair_state_unavailable" in evaluator
-    assert "status.context === 'main-autofix/ownership'" in evaluator
-    assert "description.match(/^owned:run-" in evaluator
-    assert "description.startsWith('terminal:')" in evaluator
-    assert "const recentAttemptShas = new Set([currentFailingSha])" in evaluator
-    assert "(status.description ?? '').startsWith('owned:')" in evaluator
-    assert "candidateStatuses = await github.paginate" in evaluator
-    assert "if (r.head_sha) recentShas.add(r.head_sha)" not in evaluator
-    assert "autofixSkipReason = 'repair_in_flight'" in evaluator
-    assert "autofixSkipReason = 'repair_marker_owned'" in evaluator
-    assert "autofixSkipReason = 'terminal_repair_recorded'" in evaluator
-    assert "autofixSkipReason = 'repair_state_unavailable'" in evaluator
     assert "const shouldAlert =" in evaluator
-    assert "(repairStateKnown || firstUncertaintyAlert)" in evaluator
+    assert "detectedIssue && evidenceKnown" in evaluator
     assert "failingRunAttempt === 1" in evaluator
-    assert autofix.count("context: 'main-autofix/ownership'") == 2
-    assert "Record exact-SHA repair ownership" in autofix
-    assert "Finalize exact-SHA repair ownership" in autofix
-    assert "terminal:no_changes" in autofix
-    assert "released:pr-${prNumber}" in autofix
-    assert "forcing autofix" not in autofix
-    assert "dispatch_target_not_current_failure" in autofix
+    assert "canaryOrSentryFailed" in evaluator
+    # The retired main-autofix workflow must not be dispatched or inspected.
+    assert "main-autofix" not in evaluator
+    assert "needs_autofix" not in evaluator
+    assert "main-autofix" not in monitor
+    assert "needs_autofix" not in monitor
 
-    for workflow, job_name in (
-        ("main-ci-health-monitor.yml", "monitor"),
-        ("main-autofix.yml", "evaluate"),
-    ):
-        assert "statuses: write" in _job_block(workflow, job_name)
+    monitor_job = _job_block("main-ci-health-monitor.yml", "monitor")
+    assert "statuses: write" not in monitor_job
 
     agent_tick = (WORKFLOWS / "agent-tick.yml").read_text(encoding="utf-8")
     assert "\n  main-ci-health:\n" not in agent_tick
@@ -1338,6 +1272,20 @@ def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     assert "pnpm --filter=@jovie/web run test" in job
 
 
+def test_nightly_bypass_server_warms_auth_landing_route() -> None:
+    """The chaos sweep's first navigation must not eat a cold dev compile.
+
+    Playwright global setup skips route warmup when BASE_URL is external, so
+    the readiness step has to compile /app via the test-auth enter route or
+    auth.setup times out on page.goto (JOV-6818).
+    """
+    step = _step_block("nightly-tests.yml", "Start route QA bypass server")
+
+    assert "api/dev/test-auth/enter?persona=creator&redirect=/app" in step
+    assert "curl -fsSL" in step
+    assert "--max-time" in step
+
+
 def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     """Missing Slack credentials must not make the notification job fail."""
     job = _job_block("nightly-tests.yml", "notify")
@@ -1378,28 +1326,6 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     ):
         assert result in all_success
     assert "env.SLACK_WEBHOOK_URL != ''" in all_success
-
-
-def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
-    """Large public pitch assets must be referenced by the checked-in deck."""
-    pitch_dir = REPO_ROOT / "apps" / "web" / "public" / "pitch"
-    assets_dir = pitch_dir / "assets"
-    deck_sources = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in pitch_dir.iterdir()
-        if path.is_file() and path.suffix in {".css", ".html", ".js"}
-    )
-    referenced_assets = set(re.findall(r"assets/([^\"')\s>]+)", deck_sources))
-
-    large_unreferenced = sorted(
-        path.name
-        for path in assets_dir.iterdir()
-        if path.is_file()
-        and path.stat().st_size > 250_000
-        and path.name not in referenced_assets
-    )
-
-    assert large_unreferenced == []
 
 
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
@@ -1445,6 +1371,15 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert "hold-screenshot-mq-during-controller.mjs" in publication
     assert publication.count('gh pr edit --add-label "merge-queue"') == 0
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
+
+
+def test_product_screenshots_preserve_the_active_exact_head_capture() -> None:
+    """Frequent main pushes must not discard an in-progress capture."""
+    workflow = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split("\njobs:\n", 1)[0]
+
+    assert "group: screenshots" in concurrency
+    assert "cancel-in-progress: false" in concurrency
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
@@ -1628,7 +1563,7 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
-        REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
+        # codex-issue-shipper moved to JovieInc/symphony-control and is checked there.
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1700,10 +1635,63 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
     assert scheduled_fixed == ["runner-heartbeat.yml"]
 
 
+ADMISSION_MUTATION_PATTERNS = (
+    re.compile(r"triage-event-assess\.mjs"),
+    re.compile(r"backlog-orchestrator\.mjs[\"'\s]+(gate-next|admit-next|approve-plan|approve-research|reconcile|remediate)(?![^\n]*--dry-run)"),
+    re.compile(r"run-backlog\.sh\s+(gate-next|admit-next)"),
+)
+
+
+def test_one_workflow_owns_automatic_issue_admission() -> None:
+    """JOV-5467: a single workflow under one concurrency group may mutate
+    Linear issue admission; Linear dispatch and capacity events share it."""
+    writers: set[str] = set()
+    dispatch_listeners: set[str] = set()
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        if any(pattern.search(text) for pattern in ADMISSION_MUTATION_PATTERNS):
+            writers.add(path.name)
+        if "linear_triage_assess" in text:
+            dispatch_listeners.add(path.name)
+
+    assert writers == {"fleet-gate-refresh.yml"}
+    assert dispatch_listeners == {"fleet-gate-refresh.yml"}
+    assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
+
+    workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+    # One file-level concurrency group serializes every admission event.
+    assert workflow.count("concurrency:") == 1
+    assert "group: fleet-gate-event-refresh" in workflow
+    assert workflow.index("concurrency:") < workflow.index("jobs:")
+
+
+def test_symphony_wake_requires_verified_admitted_receipt() -> None:
+    """The assess job writes the exact-issue receipt before any Symphony wake,
+    and the wake is conditioned on the reconciler's mutated Todo transition."""
+    block = _job_block("fleet-gate-refresh.yml", "assess")
+    assert "github.event_name == 'repository_dispatch'" in block
+    receipt_write = block.index('> "$RECEIPT_FILE"')
+    wake_gate = block.index(".wakeSymphony == true")
+    wake_call = block.index("http://127.0.0.1:4041/api/v1/refresh")
+    assert receipt_write < wake_gate < wake_call
+    assert "requiresImmediateInvestigation == true" in block
+
+
+def test_retired_admission_commands_stay_disabled() -> None:
+    """gate-next/admit-next/approve-plan fail closed at the shared CLI."""
+    cli = (REPO_ROOT / "scripts/backlog-orchestrator/backlog-orchestrator.mjs").read_text(
+        encoding="utf-8"
+    )
+    for command in ("admit-next", "gate-next", "approve-plan"):
+        assert f"'{command}'" in cli
+    assert "owns Linear pickup and dispatch" in cli
+    assert "process.exit(78)" in cli
+
+
 def test_fleet_controllers_share_one_evaluate_action() -> None:
     """FGR and production-controller share the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
-    script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
+    script = REPO_ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
@@ -1712,7 +1700,7 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     for workflow, job_name, _step in callers:
         text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
         assert f"uses: ./{action}" in text, workflow
-        assert "python3 scripts/symphony/gem-priority-gate.py" not in text, workflow
+        assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production

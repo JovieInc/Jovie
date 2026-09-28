@@ -40,6 +40,10 @@ const strykerConfig = {
     'lib/entitlements/**/*.ts',
     // Billing helpers (existing)
     'lib/billing/verified-upgrade.ts',
+    // Retry/idempotency seam (JOV-6050): duplicate-effect suppression, lock
+    // release on throw, fail-closed requireBackend, key builders. Strengthened
+    // contract + property tests in tests/unit/lib/idempotency.test.ts.
+    'lib/idempotency.ts',
     'lib/stripe/connect-readiness.ts',
     'lib/stripe/plan-change.ts',
     // High-blast-radius additions per docs/TEST_RISK_REGISTER.md.

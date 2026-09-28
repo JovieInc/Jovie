@@ -72,7 +72,7 @@ File count, checkout/history size, dependency/build complexity, and organization
 | --- | ---: |
 | Single changed file / binary | 10 MiB / 10 MiB |
 | Changed payload / binaries | 60 MiB / 120 files and 60 MiB |
-| Tracked regular / binary payload | 180 MiB / 96 MiB |
+| Tracked regular / binary payload | 198 MiB / 96 MiB |
 | Canonical visual baselines | 100 files / 12 MiB |
 | Forbidden tracked outputs | Zero new violations |
 
@@ -119,11 +119,28 @@ Keep it unless one extraction candidate satisfies every split rule below for two
 
 ### Raise a budget
 
+Approved raise (JOV-6635, measured 2026-09-27): `maxTrackedBytes` 180 → 198 MiB
+(+10%, the per-raise cap). Exact `origin/main` measured 178.14 MiB of tracked
+regular files — 99.0% of the prior budget, over the ≥90% qualifying threshold —
+leaving ~1.9 MiB of headroom that blocked any PR adding tracked bytes. Fresh
+measurements (`git ls-tree -r -l` blob sums on `origin/main`): tree payload
+158,180,819 B 90 days ago → 187,760,331 B 30 days ago → 184,001,777 B now
+(+25.8 MB / 90d; the 30-day figure exceeds today because a recent binary purge
+shrunk the tree); tracked regular files 8,627 → 10,988 → 13,299; 11 distinct
+contributors over 90 days. `pnpm knip` reports only three small unused
+dependency entries (no tracked-byte savings); the prior hash audit's 15.52 MiB
+of duplicates are intentional export/catalog pairs, logos, and fonts; the
+largest blobs (9.06 MiB pitch PDF, 4.04 MiB demo video, catalog PNGs, ~32 MiB
+migration metadata) have live consumers. No safe removal approaches the scale
+of the shortfall, so the budget, test, and this rationale change together.
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive
 
 Delete only after an owner, consumer/import search, replacement proof, history, and focused tests show obsolescence. Knip is evidence, not sole authorization. Remove generated output only when regeneration/retrieval and retention are tested. Never delete user work for a budget. History rewriting or LFS migration requires explicit approval, coordinated clone/worktree migration, and at least 25% measured reachable-history savings.
+
+Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/*_snapshot.json` files. Each snapshot is a ~1 MiB full-schema copy; the directory grew to 83 files / ~54 MiB, the single largest tracked cost class, and pushed main to ~99% of the tracked-bytes budget. `drizzle-kit generate` reads only the newest snapshot as its diff base and `drizzle-kit check`/`up` only validate the snapshots that remain; the runtime migrator reads `_journal.json` + `*.sql` and never touches snapshots. Ship now: retain only the newest snapshot (deleted 0000–0116, kept `0117_snapshot.json`), recover ~52.7 MiB, and cap retention at 8 snapshots — enforced by `scripts/repo-hygiene-guard.test.mjs`, which tells the crossing PR to `git rm` the oldest snapshots. Re-evaluate when: a `drizzle-kit` upgrade consumes older snapshots (`up`/`generate` fails citing a missing `*_snapshot.json`) or the diff history is needed for a schema audit. Then: restore from git history (`git checkout <sha> -- <path>`) or regenerate via `drizzle-kit` from the live database.
 
 ### Split a package or repository
 

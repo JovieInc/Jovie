@@ -414,6 +414,76 @@ describe('spotify-import', () => {
   });
 
   describe('release metadata precedence', () => {
+    it('imports one canonical release for duplicate Spotify editions', async () => {
+      const baseAlbum = {
+        name: 'All This Noise EP',
+        album_type: 'album' as const,
+        total_tracks: 4,
+        release_date: '2024-01-01',
+        release_date_precision: 'day' as const,
+        artists: [{ id: 'artist-1', name: 'Artist Name' }],
+        images: [],
+      };
+      const sparseEdition = {
+        ...baseAlbum,
+        id: 'album-us',
+        uri: 'spotify:album:album-us',
+        external_urls: { spotify: 'https://open.spotify.com/album/album-us' },
+      };
+      const enrichedEdition = {
+        ...baseAlbum,
+        id: 'album-gb',
+        uri: 'spotify:album:album-gb',
+        external_urls: { spotify: 'https://open.spotify.com/album/album-gb' },
+      };
+
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [sparseEdition, enrichedEdition],
+        total: 2,
+      });
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          ...sparseEdition,
+          tracks: { items: [], total: 0, next: null },
+          label: 'Test Label',
+          popularity: 20,
+          copyrights: [],
+          external_ids: {},
+        },
+        {
+          ...enrichedEdition,
+          images: [
+            { url: 'https://example.com/art.jpg', height: 640, width: 640 },
+          ],
+          tracks: { items: [], total: 0, next: null },
+          label: 'Test Label',
+          popularity: 30,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      const result = await importReleasesFromSpotify(
+        'profile-123',
+        '6Ghvu1VvMGScGpOUJBAHNH'
+      );
+
+      expect(result.total).toBe(1);
+      expect(result.imported).toBe(1);
+      expect(mockUpsertRelease).toHaveBeenCalledTimes(1);
+      expect(mockUpsertRelease).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artworkUrl: 'https://example.com/image.jpg',
+          upc: '123456789012',
+          metadata: expect.objectContaining({ spotifyId: 'album-gb' }),
+        })
+      );
+    });
+
     it('preserves imported metadata when marking an explicit release and publishes the first import', async () => {
       const album = {
         id: 'album-explicit',

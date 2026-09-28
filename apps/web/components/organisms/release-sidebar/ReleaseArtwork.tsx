@@ -11,10 +11,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
-import {
-  DrawerMediaThumb,
-  EntityHeaderCard,
-} from '@/components/molecules/drawer';
+import { DrawerMediaThumb, EntityHeader } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
@@ -70,7 +67,7 @@ export function ReleaseArtwork({
       sizes='96px'
       fallback={
         <Icon
-          name='Disc3'
+          name='AudioLines'
           className='h-6 w-6 text-tertiary-token'
           aria-hidden='true'
         />
@@ -108,8 +105,8 @@ export function ReleaseArtwork({
   );
 
   return (
-    <EntityHeaderCard
-      image={artworkImage}
+    <EntityHeader
+      thumbnail={artworkImage}
       title={title || 'Untitled'}
       subtitle={artistName}
       data-testid='release-artwork'

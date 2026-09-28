@@ -8,6 +8,7 @@ All caching utilities are centralized in `lib/cache/`:
 
 - **`lib/cache/tags.ts`** - Cache tag constants and helper functions
 - **`lib/cache/profile.ts`** - Server-side cache invalidation functions
+- **`lib/cache/releases.ts`** - Release mutation invalidation map
 - **`lib/cache/index.ts`** - Public exports
 
 ### Quick Reference
@@ -18,6 +19,7 @@ All caching utilities are centralized in `lib/cache/`:
 | Username change | `invalidateUsernameChange()` | `public-profile`, `dashboard-data`, homepage |
 | Social links add/update/delete | `invalidateSocialLinksCache()` | `social-links:<profileId>`, `public-profile`, `dashboard-data` |
 | Avatar upload | `invalidateAvatarCache()` | `avatar:<userId>`, `public-profile`, `dashboard-data` |
+| Release mutation | `invalidateReleaseCaches()` | `releases:<userId>:<profileId>`, `smartlink-content:<profileId>`, `public-releases:<profileId>`, `profiles-all`, `sitemap-catalog` |
 
 ### Usage Example
 
@@ -48,6 +50,19 @@ await invalidateAvatarCache(userId, usernameNormalized);
 - Cache lifetime uses the `hours` profile to keep profiles snappy while still refreshing in the background.
 - Mutations call `updateTag()` and `revalidateTag(..., 'max')` via `invalidateProfileCache()` to keep read-your-write behavior immediate.
 
+### Redis edge cache + stampede protection
+
+**Scope:** `lib/services/profile/queries.ts` (`getProfileWithLinks`)
+
+- Profiles are cached in Redis for 5 minutes (`profile:data:<username>`). A Redis
+  read failure falls through to the database — the outage contract is graceful
+  degradation to origin, never a silent correctness failure.
+- Concurrent cache misses for the same username are coalesced through a
+  single-flight in-flight map, so a stampede on a hot or expired profile issues
+  one multi-query Neon fetch per instance instead of one per request. The
+  `skipCache` option (post-mutation readers) bypasses coalescing to guarantee
+  freshness.
+
 ## Social links
 
 **Scope:** `app/api/dashboard/social-links/route.ts`
@@ -70,6 +85,26 @@ await invalidateAvatarCache(userId, usernameNormalized);
 
 - User-specific dashboard reads remain request-time to protect privacy and avoid cross-user bleed.
 - Mutations call `updateTag('dashboard-data')` and `revalidateTag('dashboard-data', 'max')` so any future Cache Components can safely opt in.
+
+## Release projections
+
+**Scope:** authenticated release matrix/entities, public profile releases,
+release feeds, smart links, and sitemap release URLs.
+
+- Authenticated entries use one `(userId, profileId)` key family. Mutable
+  handles are applied after the cached data read, so a rename cannot fork or
+  poison the cache.
+- Public page/feed projections use `public-releases:<profileId>` through
+  `lib/releases/public-release-loader.ts`.
+- Every successful release mutation calls `invalidateReleaseCaches()`; the
+  map also invalidates `profiles-all` because the public profile snapshot
+  embeds latest-release data and is currently keyed by handle.
+- **Ship now:** invalidate the global `profiles-all` family for release writes
+  to guarantee freshness without another profile lookup.
+- **Re-evaluate when:** the public profile loader accepts an immutable
+  profile-ID tag.
+- **Then:** replace the global invalidation with that targeted tag while
+  retaining the profile-ID public-release and sitemap invalidations.
 
 ## Featured creators
 

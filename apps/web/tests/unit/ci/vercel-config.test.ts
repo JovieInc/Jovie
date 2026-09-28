@@ -36,6 +36,7 @@ type VercelConfig = {
 };
 
 type NextConfigForTest = {
+  outputFileTracingRoot?: string;
   outputFileTracingIncludes?: Record<string, string[]>;
   outputFileTracingExcludes?: Record<string, string[]>;
 };
@@ -50,7 +51,7 @@ function readVercelConfig(relativePath: string): VercelConfig {
   return JSON.parse(readFileSync(configPath, 'utf8')) as VercelConfig;
 }
 
-function loadNextConfigForTracingTest(): NextConfigForTest {
+function loadNextConfigForTracingTest(vercelEnv = ''): NextConfigForTest {
   const configPath = resolve(repoRoot, 'apps/web/next.config.js');
   const configDirectory = dirname(configPath);
   const configModule: { exports: NextConfigForTest } = { exports: {} };
@@ -88,7 +89,7 @@ function loadNextConfigForTracingTest(): NextConfigForTest {
           CI: 'false',
           NODE_ENV: 'test',
           NEXT_ENABLE_TOOLBAR: '0',
-          VERCEL_ENV: '',
+          VERCEL_ENV: vercelEnv,
         },
       },
       require: configRequire,
@@ -103,6 +104,7 @@ function loadNextConfigForTracingTest(): NextConfigForTest {
         )
       : undefined;
   return {
+    outputFileTracingRoot: configModule.exports.outputFileTracingRoot,
     outputFileTracingIncludes: copyRouteGlobs(
       configModule.exports.outputFileTracingIncludes
     ),
@@ -144,6 +146,25 @@ function turbopackGlobSource(exclude: string): string {
 }
 
 describe('Vercel function config', () => {
+  it.each(['', 'preview', 'production'])(
+    'never traces files outside apps/web (VERCEL_ENV=%s)',
+    vercelEnv => {
+      // Vercel's project root is apps/web. Traced '../../' files broke
+      // deployment extraction and froze prod 2026-09-21..26; monorepo files
+      // are staged into runtime-data/ by scripts/stage-runtime-data.mjs.
+      const nextConfig = loadNextConfigForTracingTest(vercelEnv);
+      const appDirectory = resolve(repoRoot, 'apps/web');
+      for (const globs of Object.values(
+        nextConfig.outputFileTracingIncludes ?? {}
+      )) {
+        for (const glob of globs) {
+          const fromApp = relative(appDirectory, resolve(appDirectory, glob));
+          expect(fromApp.startsWith('..'), glob).toBe(false);
+        }
+      }
+    }
+  );
+
   it('uses App Router function globs that Vercel can match', () => {
     const configs = ['vercel.json', 'apps/web/vercel.json'];
 
@@ -253,7 +274,6 @@ describe('Vercel function config', () => {
     const runtimePaths = [
       'CHANGELOG.md',
       'docs/FEATURE_REGISTRY.md',
-      'scripts/symphony/symphony-codex-account-control.py',
       'apps/eve-pilot/identities/jovie/instructions.md',
       'apps/eve-pilot/identities/summer/instructions.md',
       'apps/web/content/legal/cookies.md',
@@ -264,7 +284,7 @@ describe('Vercel function config', () => {
     const excludedPaths = [
       'apps/web/lib/services/retouching/styles/white-space.md',
       'docs/ordinary-reference.md',
-      'scripts/symphony/unrelated-helper.py',
+      'scripts/fleet-gate/unrelated-helper.py',
       'apps/web/lib/services/retouching/styles/other-style.md',
       'apps/web/tests/fixtures/private-fixture.json',
     ];
@@ -284,11 +304,10 @@ describe('Vercel function config', () => {
 
     expect(includes).toEqual(
       expect.arrayContaining([
-        '../../CHANGELOG.md',
-        '../../docs/FEATURE_REGISTRY.md',
-        '../../scripts/symphony/symphony-codex-account-control.py',
-        '../../apps/eve-pilot/identities/jovie/instructions.md',
-        '../../apps/eve-pilot/identities/summer/instructions.md',
+        'runtime-data/CHANGELOG.md',
+        'runtime-data/docs/FEATURE_REGISTRY.md',
+        'runtime-data/apps/eve-pilot/identities/jovie/instructions.md',
+        'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
         'tests/quarantine.json',
         'content/**/*',
         'lib/chat/knowledge/topics/**/*',
@@ -312,9 +331,22 @@ describe('Vercel function config', () => {
       expect.arrayContaining(screenshotIncludes)
     );
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
+
+    // Certification packet files are staged into runtime-data and traced only
+    // into the certification API routes that read them.
+    const certificationIncludes = ['runtime-data/docs/certification/**/*'];
+    expect(includesByRoute['/api/ovie/certifications']).toEqual(
+      certificationIncludes
+    );
+    expect(includesByRoute['/api/ovie/certifications/**']).toEqual(
+      certificationIncludes
+    );
+    expect(includes).not.toEqual(expect.arrayContaining(certificationIncludes));
   });
 
-  it('excludes non-runtime repo files from traces without dropping runtime reads', () => {
+  it('excludes non-runtime repo files from traces without dropping runtime reads', async () => {
+    // The build stages monorepo runtime files into runtime-data/ first.
+    await import('../../../scripts/stage-runtime-data.mjs');
     const nextConfig = loadNextConfigForTracingTest();
     const excludesByRoute = nextConfig.outputFileTracingExcludes ?? {};
     // '**' is the only route glob that also matches the root route '/'.
@@ -351,8 +383,8 @@ describe('Vercel function config', () => {
       .map(file => relative(repoRoot, resolve(appWebRoot, file)));
     expect(includedRuntimeFiles).toEqual(
       expect.arrayContaining([
-        'CHANGELOG.md',
-        'docs/FEATURE_REGISTRY.md',
+        'apps/web/runtime-data/CHANGELOG.md',
+        'apps/web/runtime-data/docs/FEATURE_REGISTRY.md',
         'apps/web/tests/quarantine.json',
         'apps/web/screenshot-catalog/current/manifest.json',
       ])

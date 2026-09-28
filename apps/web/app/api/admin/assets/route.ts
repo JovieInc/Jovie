@@ -1,0 +1,90 @@
+import { NextResponse } from 'next/server';
+import {
+  type AdminAssetIssuesFilter,
+  type AdminAssetSort,
+  type AdminAssetType,
+  type AdminAssetVerifiedFilter,
+  adminAssetIssuesFilters,
+  adminAssetSortFields,
+  adminAssetTypes,
+  adminAssetVerifiedFilters,
+  getAdminAssets,
+} from '@/lib/admin/assets';
+import { requireAdmin } from '@/lib/admin/middleware';
+import { captureError } from '@/lib/error-tracking';
+
+export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+export async function GET(request: Request) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
+  const { searchParams } = new URL(request.url);
+  const page = Math.min(
+    10000,
+    Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
+  );
+  const pageSize = Math.min(
+    100,
+    Math.max(1, Number(searchParams.get('pageSize') ?? '20') || 20)
+  );
+  const rawSort = searchParams.get('sort') ?? 'created_desc';
+  const rawType = searchParams.get('type') ?? 'all';
+  const rawIssues = searchParams.get('issues') ?? 'all';
+  const rawVerified = searchParams.get('verified') ?? 'all';
+  const q = searchParams.get('q') ?? '';
+
+  const invalid = (
+    [
+      ['sort', rawSort, adminAssetSortFields],
+      ['issues', rawIssues, adminAssetIssuesFilters],
+      ['verified', rawVerified, adminAssetVerifiedFilters],
+    ] as const
+  ).find(([, raw, allowed]) => !(allowed as readonly string[]).includes(raw));
+  if (invalid) {
+    return NextResponse.json(
+      { error: `Invalid ${invalid[0]}: ${invalid[1]}` },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+  if (
+    rawType !== 'all' &&
+    !adminAssetTypes.includes(rawType as AdminAssetType)
+  ) {
+    return NextResponse.json(
+      { error: `Invalid type: ${rawType}` },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  try {
+    const result = await getAdminAssets({
+      page,
+      pageSize,
+      sort: rawSort as AdminAssetSort,
+      type: rawType as AdminAssetType | 'all',
+      issues: rawIssues as AdminAssetIssuesFilter,
+      verified: rawVerified as AdminAssetVerifiedFilter,
+      search: q,
+    });
+
+    return NextResponse.json(
+      {
+        rows: result.assets.map(asset => ({
+          ...asset,
+          createdAt: asset.createdAt?.toISOString() ?? null,
+        })),
+        total: result.total,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    captureError('Failed to fetch admin assets', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch assets' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}

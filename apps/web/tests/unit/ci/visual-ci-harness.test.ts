@@ -192,13 +192,55 @@ describe('visual CI harness', () => {
     expect(legacy).toContain("expect(new URL(page.url()).pathname).toBe('/')");
     expect(legacy).toContain("page.getByTestId('marketing-section-hero')");
     expect(legacy).toContain("page.locator('h1').first()");
-    expect(legacy).toContain('document.fonts.status');
-    expect(legacy).toContain('image.complete');
-    expect(legacy).toContain('image.naturalWidth === 0');
+    expect(legacy).toContain("await waitForVisualReadiness(page, 'homepage')");
     expect(
       legacy.match(/await openHomepageForScreenshot\(page\)/g)
     ).toHaveLength(3);
     expect(legacy.match(/toHaveScreenshot\('homepage-/g)).toHaveLength(3);
+  });
+
+  it('waits on fonts and viewport images in the shared visual readiness helper', () => {
+    const source = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/visual-regression.spec.ts'),
+      'utf8'
+    );
+    const start = source.indexOf('async function waitForVisualReadiness(');
+    const end = source.indexOf(
+      'async function openHomepageForScreenshot(',
+      start
+    );
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const helper = source.slice(start, end);
+    expect(helper).not.toContain('networkidle');
+    expect(helper).toContain('document.fonts.status');
+    expect(helper).toContain('image.complete');
+    expect(helper).toContain('image.naturalWidth === 0');
+    expect(helper).toContain('.toEqual([])');
+  });
+
+  it('keeps pricing screenshots on document and visual readiness, not network idle', () => {
+    const source = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/visual-regression.spec.ts'),
+      'utf8'
+    );
+    const start = source.indexOf("test.describe('pricing visual regression'");
+    const end = source.indexOf('\n// JOV-2081', start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const pricing = source.slice(start, end);
+    expect(pricing).not.toContain('networkidle');
+    expect(pricing.match(/page\.goto\('\/pricing'/g)).toHaveLength(2);
+    expect(pricing.match(/waitUntil: 'domcontentloaded'/g)).toHaveLength(2);
+    expect(
+      pricing.match(
+        /expect\(response\?\.status\(\), 'pricing document must succeed'\)\.toBe\(200\)/g
+      )
+    ).toHaveLength(2);
+    expect(
+      pricing.match(/await waitForVisualReadiness\(page, 'pricing'\)/g)
+    ).toHaveLength(2);
+    expect(pricing.match(/toHaveScreenshot\('pricing-/g)).toHaveLength(2);
   });
 
   it('does not gate any homepage viewport navigation on whole-page network idle', () => {

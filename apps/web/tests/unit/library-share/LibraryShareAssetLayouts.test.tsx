@@ -34,6 +34,20 @@ describe('LibraryShareAssetLayouts', () => {
     expect(image).not.toHaveClass('object-cover');
   });
 
+  it('uses the banned-icon-safe AudioLines glyph without artwork', () => {
+    const { container } = render(
+      <LibraryShareAssetCard
+        asset={{ ...asset, artworkUrl: null }}
+        downloadsEnabled={false}
+        layout='list'
+      />
+    );
+
+    const icon = container.querySelector('svg.lucide-audio-lines');
+    expect(icon).toBeTruthy();
+    expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
+  });
+
   it('renders the grid layout by default', () => {
     render(
       <LibraryShareAssetLayouts

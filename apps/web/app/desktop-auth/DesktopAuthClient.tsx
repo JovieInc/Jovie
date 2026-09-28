@@ -1,19 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
+import { Button } from '@jovie/ui';
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
   copyDesktopAuthUrl,
   type DesktopAuthActionResult,
   openDesktopAuthUrl,
+  redeemDesktopAuthReturnCode,
+  supportsDesktopAuthReturnCode,
   useDesktopAppBootSignal,
 } from '@/lib/desktop/electron-bridge';
+import { MacCinematicSurface } from './MacCinematicSurface';
 
 export type DesktopAuthOpenState = 'idle' | 'opening' | 'opened' | 'error';
 type CopyState = 'idle' | 'copying' | 'copied' | 'error';
+type RedeemState = 'idle' | 'redeeming' | 'redeemed' | 'error';
 
 interface DesktopAuthClientProps {
   readonly authUrlParam: string | null;
@@ -27,6 +37,54 @@ interface DesktopAuthHandoffActionsProps {
 }
 
 const DESKTOP_AUTH_ACTION_TIMEOUT_MS = 5000;
+const DESKTOP_AUTH_REDEEM_TIMEOUT_MS = 15_000;
+// Most browser sign-ins return well inside this window. After it, the browser
+// probably opened somewhere unseen (another Space, a full-screen app, a
+// different default browser) so point at the copy-link path. Any browser can
+// finish it; its return page shows a code for "Enter a Code".
+export const DESKTOP_AUTH_STILL_WAITING_MS = 30_000;
+const STATUS_CHECK_BROWSER = 'Check your browser.';
+const STATUS_STILL_WAITING =
+  'Not seeing it? Copy the sign-in link and paste it into any browser.';
+const STATUS_COPIED = 'Sign-in link copied. Paste it into any browser.';
+const STATUS_ENTER_CODE =
+  'Signed in but Jovie did not open? Enter the code your browser shows.';
+const STATUS_REDEEMING = 'Signing in...';
+// Matches the return page: consonants only, formatted XXXX-XXXX.
+const RETURN_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
+const RETURN_CODE_LENGTH = 8;
+const INPUT_CLASS =
+  'h-11 w-full rounded-full border border-white/10 bg-white/5 px-4 text-center font-mono text-app uppercase tracking-widest text-white placeholder:text-white/32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25';
+export function normalizeReturnCodeInput(value: string): string {
+  let normalized = '';
+  for (const char of value.toUpperCase()) {
+    if (RETURN_CODE_ALPHABET.includes(char)) normalized += char;
+    if (normalized.length === RETURN_CODE_LENGTH) break;
+  }
+  return normalized.length > 4
+    ? `${normalized.slice(0, 4)}-${normalized.slice(4)}`
+    : normalized;
+}
+
+function isCompleteReturnCode(value: string): boolean {
+  return value.replace('-', '').length === RETURN_CODE_LENGTH;
+}
+
+function formatRedeemError(reason?: string): string {
+  switch (reason) {
+    case 'invalid-code':
+      return 'That code did not match. Check it and try again.';
+    case 'pkce-expired':
+      return 'This sign-in expired. Open the browser again for a new code.';
+    case 'no-pending-flow':
+      return 'Open the browser to sign in first. It shows a code when you finish.';
+    case 'rate-limited':
+      return 'Too many tries. Wait a minute and try again.';
+    default:
+      return 'Could not reach Jovie. Check your connection and try again.';
+  }
+}
+
 const PRIMARY_ACTION_CLASS =
   'inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-app font-medium text-(--color-bg-base) transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white';
 const SECONDARY_ACTION_CLASS =
@@ -50,7 +108,8 @@ function formatCopyError(reason?: string): string {
 
 async function runWithTimeout(
   action: Promise<DesktopAuthActionResult>,
-  timeoutReason: string
+  timeoutReason: string,
+  timeoutMs = DESKTOP_AUTH_ACTION_TIMEOUT_MS
 ): Promise<DesktopAuthActionResult> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -59,7 +118,7 @@ async function runWithTimeout(
       new Promise<DesktopAuthActionResult>(resolve => {
         timeoutId = setTimeout(
           () => resolve({ ok: false, reason: timeoutReason }),
-          DESKTOP_AUTH_ACTION_TIMEOUT_MS
+          timeoutMs
         );
       }),
     ]);
@@ -86,7 +145,32 @@ export function DesktopAuthHandoffActions({
   const [openError, setOpenError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [stillWaiting, setStillWaiting] = useState(false);
+  const [codeMode, setCodeMode] = useState(false);
+  const [returnCode, setReturnCode] = useState('');
+  const [redeemState, setRedeemState] = useState<RedeemState>('idle');
+  const [redeemError, setRedeemError] = useState<string | null>(null);
+  const [canRedeemCode, setCanRedeemCode] = useState(false);
   const primaryActionRef = useRef<HTMLButtonElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setCanRedeemCode(supportsDesktopAuthReturnCode());
+  }, []);
+
+  useEffect(() => {
+    if (codeMode) codeInputRef.current?.focus();
+  }, [codeMode]);
+
+  useEffect(() => {
+    setStillWaiting(false);
+    if (openState !== 'opened') return;
+    const timeoutId = setTimeout(
+      () => setStillWaiting(true),
+      DESKTOP_AUTH_STILL_WAITING_MS
+    );
+    return () => clearTimeout(timeoutId);
+  }, [openState]);
 
   useEffect(() => {
     if (openState === 'error') primaryActionRef.current?.focus();
@@ -157,6 +241,43 @@ export function DesktopAuthHandoffActions({
     }
   }, [copyState, getAuthUrl, openState]);
 
+  const submitReturnCode = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!isCompleteReturnCode(returnCode) || redeemState === 'redeeming') {
+        return;
+      }
+
+      setRedeemState('redeeming');
+      setRedeemError(null);
+      try {
+        const result = await runWithTimeout(
+          redeemDesktopAuthReturnCode(returnCode),
+          'desktop-auth-return-code-timeout',
+          // A network round trip, unlike the local open/copy actions.
+          DESKTOP_AUTH_REDEEM_TIMEOUT_MS
+        );
+        if (result.ok) {
+          setRedeemState('redeemed');
+          return;
+        }
+        setRedeemState('error');
+        setRedeemError(formatRedeemError(result.reason));
+      } catch {
+        setRedeemState('error');
+        setRedeemError(formatRedeemError());
+      }
+      codeInputRef.current?.focus();
+    },
+    [redeemState, returnCode]
+  );
+
+  const toggleCodeMode = useCallback(() => {
+    setCodeMode(current => !current);
+    setRedeemState('idle');
+    setRedeemError(null);
+  }, []);
+
   const hasAuthUrl = authUrl !== null || resolveAuthUrl !== undefined;
   const isBusy = openState === 'opening' || copyState === 'copying';
   const openLabel =
@@ -169,48 +290,97 @@ export function DesktopAuthHandoffActions({
           : 'Continue in Browser';
   const copyLabel =
     copyState === 'copying' ? 'Copying Sign-In Link...' : 'Copy Sign-In Link';
-  const statusText =
+  const openedStatus = stillWaiting
+    ? STATUS_STILL_WAITING
+    : STATUS_CHECK_BROWSER;
+  const actionStatusText =
     copyState === 'copied'
-      ? 'Sign-in link copied.'
-      : (copyError ??
-        (openState === 'opened' ? 'Check your browser.' : openError));
+      ? STATUS_COPIED
+      : (copyError ?? (openState === 'opened' ? openedStatus : openError));
+  const codeStatusText =
+    redeemState === 'redeeming' || redeemState === 'redeemed'
+      ? STATUS_REDEEMING
+      : (redeemError ?? STATUS_ENTER_CODE);
+  const statusText = codeMode ? codeStatusText : actionStatusText;
+  const cancelButton = showCancelSignIn ? (
+    <button
+      type='button'
+      className={SECONDARY_ACTION_CLASS}
+      onClick={() => {
+        closeDesktopAuthWindow().catch(() => {});
+      }}
+    >
+      Cancel Sign-In
+    </button>
+  ) : null;
 
   return (
     <>
-      <div
-        className='mt-8 flex w-full flex-col items-center justify-center gap-2'
-        data-desktop-auth-state={openState}
-        data-testid='desktop-auth-actions'
-      >
-        <button
-          ref={primaryActionRef}
-          type='button'
-          className={PRIMARY_ACTION_CLASS}
-          disabled={!hasAuthUrl || isBusy}
-          onClick={openAuthUrl}
+      {codeMode ? (
+        <form
+          className='mt-8 flex w-full flex-col items-center justify-center gap-2'
+          data-desktop-auth-state='code'
+          data-testid='desktop-auth-code-form'
+          onSubmit={submitReturnCode}
         >
-          {openLabel}
-        </button>
-        <button
-          type='button'
-          className={SECONDARY_ACTION_CLASS}
-          disabled={!hasAuthUrl || isBusy}
-          onClick={copyAuthUrl}
+          <input
+            ref={codeInputRef}
+            aria-label='Code From Your Browser'
+            autoCapitalize='characters'
+            autoComplete='one-time-code'
+            className={INPUT_CLASS}
+            inputMode='text'
+            maxLength={9}
+            placeholder='XXXX-XXXX'
+            spellCheck={false}
+            value={returnCode}
+            onChange={event => {
+              setReturnCode(normalizeReturnCodeInput(event.target.value));
+              if (redeemState === 'error') {
+                setRedeemState('idle');
+                setRedeemError(null);
+              }
+            }}
+          />
+          <button
+            type='submit'
+            className={PRIMARY_ACTION_CLASS}
+            disabled={
+              !isCompleteReturnCode(returnCode) ||
+              redeemState === 'redeeming' ||
+              redeemState === 'redeemed'
+            }
+          >
+            {redeemState === 'redeeming' ? 'Signing In...' : 'Continue'}
+          </button>
+          {cancelButton}
+        </form>
+      ) : (
+        <div
+          className='mt-8 flex w-full flex-col items-center justify-center gap-2'
+          data-desktop-auth-state={openState}
+          data-testid='desktop-auth-actions'
         >
-          {copyLabel}
-        </button>
-        {showCancelSignIn ? (
+          <button
+            ref={primaryActionRef}
+            type='button'
+            className={PRIMARY_ACTION_CLASS}
+            disabled={!hasAuthUrl || isBusy}
+            onClick={openAuthUrl}
+          >
+            {openLabel}
+          </button>
           <button
             type='button'
             className={SECONDARY_ACTION_CLASS}
-            onClick={() => {
-              closeDesktopAuthWindow().catch(() => {});
-            }}
+            disabled={!hasAuthUrl || isBusy}
+            onClick={copyAuthUrl}
           >
-            Cancel Sign-In
+            {copyLabel}
           </button>
-        ) : null}
-      </div>
+          {cancelButton}
+        </div>
+      )}
       <p
         aria-live='polite'
         role='status'
@@ -218,6 +388,22 @@ export function DesktopAuthHandoffActions({
       >
         {hasAuthUrl ? statusText : 'Start sign-in again from Jovie.'}
       </p>
+      {canRedeemCode && hasAuthUrl ? (
+        <Button
+          type='button'
+          variant='link'
+          size='sm'
+          className='mt-3'
+          disabled={redeemState === 'redeeming' || redeemState === 'redeemed'}
+          onClick={toggleCodeMode}
+        >
+          {codeMode ? 'Back to Browser Sign-In' : 'Enter a Code'}
+        </Button>
+      ) : (
+        // Reserve the row so the centered shell does not shift once the
+        // bridge capability check resolves after mount.
+        <div aria-hidden='true' className='mt-3 h-7' />
+      )}
     </>
   );
 }
@@ -232,13 +418,8 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
   );
 
   return (
-    <main
-      className='relative isolate grid min-h-dvh place-items-center bg-base px-6 text-primary-token [color-scheme:dark]'
-      data-desktop-auth-state={openState}
-      data-testid='desktop-auth-handoff'
-    >
+    <MacCinematicSurface state={openState} testId='desktop-auth-handoff'>
       <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
-        <BrandLogo aria-hidden size={BRAND_MARK_SIZE.splash} tone='white' />
         <h1 className='sr-only'>Sign In To Jovie</h1>
         <DesktopAuthHandoffActions
           authUrl={authUrl}
@@ -246,6 +427,6 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
           showCancelSignIn
         />
       </section>
-    </main>
+    </MacCinematicSurface>
   );
 }

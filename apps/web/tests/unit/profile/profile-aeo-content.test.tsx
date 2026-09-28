@@ -124,7 +124,7 @@ function buildContent(): ProfileAeoContentModel {
       {
         artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
         name: 'Guest Vocalist',
-        href: '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
+        href: '/guestvocalist',
         profileState: 'unclaimed',
         role: 'featured_artist',
         releaseId: 'release-1',
@@ -605,7 +605,7 @@ describe('Profile AEO content', () => {
     ).toHaveAttribute('href', 'https://itstimwhite.com/');
   });
 
-  it('omits empty touring and merch FAQs from the public surface', () => {
+  it('omits empty touring, merch, and unknown-release FAQs from the public surface', () => {
     const content = buildProfileAeoContent({
       artist: baseArtist,
       tourDates: [],
@@ -615,7 +615,6 @@ describe('Profile AEO content', () => {
 
     expect(content.faqs.map(faq => faq.question)).toEqual([
       'Where is DJ Test from?',
-      "What is DJ Test's latest release?",
     ]);
     expect(content.faqs.some(faq => faq.question.includes('touring'))).toBe(
       false
@@ -623,6 +622,9 @@ describe('Profile AEO content', () => {
     expect(content.faqs.some(faq => faq.question.includes('merch'))).toBe(
       false
     );
+    expect(
+      content.faqs.some(faq => faq.question.includes('latest release'))
+    ).toBe(false);
   });
 
   it('uses profile DSP URL columns for the listen row when no social links exist', () => {
@@ -669,9 +671,9 @@ describe('Profile AEO content', () => {
     expect(facts.querySelectorAll('dt')).toHaveLength(4);
     expect(facts.querySelectorAll('dd')).toHaveLength(4);
     for (const definition of facts.querySelectorAll('dd')) {
-      expect(definition.firstElementChild).toHaveClass(
-        'profile-aeo-content__fact-value'
-      );
+      expect(
+        definition.querySelector('.profile-aeo-content__fact-value')
+      ).not.toBeNull();
     }
 
     const listen = screen.getByTestId('profile-about-listen');
@@ -808,6 +810,8 @@ describe('Profile AEO content', () => {
     expect(screen.queryByTestId('profile-about-facts')).toBeNull();
     expect(screen.queryByTestId('profile-about-listen')).toBeNull();
     expect(screen.queryByTestId('profile-about-follow')).toBeNull();
+    // No sourced facts means no FAQ block — sparse stays sparse.
+    expect(screen.queryByText('DJ Test FAQ')).toBeNull();
     expect(screen.getByTestId('profile-about-share')).toBeVisible();
     expect(screen.getByTestId('profile-aeo-content')).toBeVisible();
   });
@@ -855,17 +859,10 @@ describe('Profile AEO content', () => {
     expect(first.description.join(' ')).not.toBe(second.description.join(' '));
     expect(first.description.join(' ')).toContain('@first-artist');
     expect(second.description.join(' ')).toContain('@second-artist');
-    // Sparse profiles only keep origin + latest-release FAQs (no empty tour/merch).
-    expect(first.faqs).toHaveLength(2);
-    expect(
-      first.faqs.every(
-        faq =>
-          faq.source.href.startsWith('/') ||
-          faq.source.href.startsWith('https://')
-      )
-    ).toBe(true);
-    // Same-origin FAQ sources stay environment-relative (no hard-coded prod).
-    expect(first.faqs[0]?.source.href).toBe('/first-artist');
+    // Sparse profiles keep no FAQs at all: unknown origin and unknown release
+    // answers are filler, not evidence (JOV-6199).
+    expect(first.faqs).toHaveLength(0);
+    expect(second.faqs).toHaveLength(0);
   });
 
   it('renders visible FAQ and source links into static HTML', () => {
@@ -890,7 +887,7 @@ describe('Profile AEO content', () => {
     expect(html).toContain('Source: Official merch card');
     expect(
       screen.getByRole('link', { name: 'Guest Vocalist' })
-    ).toHaveAttribute('href', '/artists/f5441adb-6789-449a-9553-ab7460c9c61c');
+    ).toHaveAttribute('href', '/guestvocalist');
   });
 
   it('links entity mentions in the description while keeping plain-text paragraphs', () => {
@@ -995,6 +992,7 @@ describe('Profile AEO content', () => {
       artistProfileId: `profile-collaborator-${position}`,
       profileIsPublic: true,
       profileIsClaimed: false,
+      profileUsername: `collaborator-${position}`,
       creditName: null,
       role: 'main_artist' as const,
       releaseDate: new Date(`2026-0${position + 1}-01T00:00:00.000Z`),
@@ -1044,7 +1042,7 @@ describe('Profile AEO content', () => {
         {
           artistId: '57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
           name: 'Alex Lee',
-          href: '/artists/57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
+          href: '/alexlee',
           profileState: 'claimed',
           role: 'featured_artist',
           releaseId: 'release-alex-one',
@@ -1056,7 +1054,7 @@ describe('Profile AEO content', () => {
         {
           artistId: 'e061a679-466c-465a-a545-64a7e39aa3c6',
           name: 'Alex Lee',
-          href: '/artists/e061a679-466c-465a-a545-64a7e39aa3c6',
+          href: '/alex-lee',
           profileState: 'unclaimed',
           role: 'main_artist',
           releaseId: 'release-alex-two',
@@ -1076,24 +1074,27 @@ describe('Profile AEO content', () => {
       {
         type: 'artist',
         text: 'Alex Lee',
-        href: '/artists/57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
+        href: '/alexlee',
       },
       {
         type: 'artist',
         text: 'Alex Lee',
-        href: '/artists/e061a679-466c-465a-a545-64a7e39aa3c6',
+        href: '/alex-lee',
       },
     ]);
   });
 
-  it('links unavailable exact collaborator identities through the stable route', () => {
+  it.each([
+    '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
+    '/a_15ivccsfpjhtappd1vh15i8jj',
+  ])('never links a collaborator name to a raw-ID destination: %s', href => {
     const content = buildProfileAeoContent({
       artist: baseArtist,
       releaseCollaborators: [
         {
           artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
-          name: 'Private Artist',
-          href: '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
+          name: 'Credit Only Artist',
+          href,
           profileState: 'unavailable',
           reconciliationEligible: true,
           role: 'featured_artist',
@@ -1109,11 +1110,11 @@ describe('Profile AEO content', () => {
 
     render(<ProfileAeoContent content={content} />);
     expect(screen.getByTestId('profile-aeo-content')).toHaveTextContent(
-      'Private Artist'
+      'Credit Only Artist'
     );
     expect(
-      screen.getByRole('link', { name: 'Private Artist' })
-    ).toHaveAttribute('href', '/artists/f5441adb-6789-449a-9553-ab7460c9c61c');
+      screen.queryByRole('link', { name: 'Credit Only Artist' })
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Quiet Signal' })).toHaveAttribute(
       'href',
       '/dj-test/quiet-signal'

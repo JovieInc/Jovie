@@ -140,7 +140,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     const buildLayoutJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(prReadyJob).not.toMatch(
-      /ci-a11y|ci-layout-guard|ci-build-layout|ci-build-ovie|ci-storybook-surfaces/
+      /ci-a11y|ci-layout-guard|ci-build-layout|ci-build-ovie|ci-typecheck-ovie|ci-storybook-surfaces/
     );
     expect(mergeReadyJob).toContain('ci-build-layout');
     expect(mergeReadyJob).toContain(
@@ -150,11 +150,81 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       'OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"'
     );
     expect(mergeReadyJob).toContain(
+      'OVIE_TYPECHECK_RESULT="${{ needs.ci-typecheck-ovie.result }}"'
+    );
+    expect(mergeReadyJob).toContain(
       'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
     );
     expect(buildLayoutJob).toContain('runs-on: ubuntu-latest');
     expect(buildLayoutJob).toContain('Build exact combined head');
     expect(buildLayoutJob).toContain('Run deterministic layout behavior guard');
+  });
+
+  it('runs the combined Storybook surface matrix on two workers of a 4-vCPU hosted runner', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const storybookJob = getJobBlock(workflow, 'ci-storybook-surfaces');
+    const storybookConfig = readFileSync(
+      resolve(repoRoot, 'apps/web/playwright.config.storybook.ts'),
+      'utf8'
+    );
+
+    // Public-repo ubuntu-latest has 4 vCPU: one Vite dev server plus two
+    // Chromium workers. The specs write only per-test evidence names and
+    // compare (never update) committed baselines, so workers stay isolated.
+    expect(storybookJob).toContain('runs-on: ubuntu-latest');
+    expect(storybookJob).toMatch(
+      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line \\\n\s+--workers=2\n/
+    );
+    expect(storybookJob).not.toContain('--update-snapshots');
+    expect(storybookJob).not.toMatch(/--retries|--repeat-each|--shard/);
+    // The config keeps its CI retry budget and one-worker default for every
+    // other Storybook lane; only this lane opts into two workers.
+    expect(storybookConfig).toContain('fullyParallel: true');
+    expect(storybookConfig).toContain('retries: isCI ? 2 : 0');
+    expect(storybookConfig).toContain('workers: isCI ? 1 : undefined');
+  });
+
+  it('boots the combined Storybook server ahead of independent setup and still gates on it', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const storybookJob = getJobBlock(workflow, 'ci-storybook-surfaces');
+    const startAt = storybookJob.indexOf('- name: Start Storybook dev server');
+    const checksAt = storybookJob.indexOf(
+      '- name: Check extension and observability ingest'
+    );
+    const playwrightAt = storybookJob.indexOf(
+      '- name: Setup Playwright (Chromium)'
+    );
+    const matrixAt = storybookJob.indexOf(
+      '- name: Run surface elevation matrix (Storybook)'
+    );
+    const start = storybookJob.slice(startAt, checksAt);
+    const matrix = storybookJob.slice(matrixAt);
+
+    // The server boots first so its startup and Vite dependency bundling
+    // overlap the independent checks and browser setup.
+    expect(startAt).toBeGreaterThanOrEqual(0);
+    expect(startAt).toBeLessThan(checksAt);
+    expect(checksAt).toBeLessThan(playwrightAt);
+    expect(playwrightAt).toBeLessThan(matrixAt);
+    // Same server config as before the move: the manual axe suite drops the
+    // automatic a11y addon server-side, so the start step must carry it.
+    expect(start).toContain("JOVIE_STORYBOOK_MANUAL_AXE: '1'");
+    expect(start).toContain('pnpm exec storybook dev -p 6006 --no-open');
+    // Detached output goes to a file, never the finished step's stdout.
+    expect(start).toContain('> "$RUNNER_TEMP/storybook-dev.log" 2>&1 &');
+    expect(start).toContain('echo "STORYBOOK_PID=$!" >> "$GITHUB_ENV"');
+    // The matrix fails closed without the server, on its death, and on a
+    // readiness timeout, then prints its log and stops it.
+    expect(matrix).not.toContain('storybook dev');
+    expect(matrix).toContain(
+      ': "${STORYBOOK_PID:?Storybook dev server was not started}"'
+    );
+    expect(matrix).toContain('kill -0 "$STORYBOOK_PID"');
+    expect(matrix).toContain('echo "::error::Storybook dev server died"');
+    expect(matrix).toContain(
+      'echo "::error::Storybook dev server failed to start within 300s"'
+    );
+    expect(matrix).toContain('cat "$RUNNER_TEMP/storybook-dev.log"');
   });
 
   it('keeps refresh self-healing and makes missing-baseline compare fail-closed', () => {
@@ -192,6 +262,9 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(compareJob).not.toContain('--update-snapshots');
     expect(compareJob).not.toContain('continue-on-error');
     expect(compareJob).not.toContain('neon-create-branch');
+    // Restore-only cache: read it, never persist or save it.
+    expect(compareJob).toContain("TURBO_ENGINE_READ_ONLY: '1'");
+    expect(compareJob).not.toContain('actions/cache/save@');
     expect(mergeReadyJob).toContain('ci-visual-snapshot-compare');
     expect(mergeReadyJob).toContain(
       'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
@@ -209,6 +282,45 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
     );
     expect(prReadyJob).toContain('skipped is not green (JOV-5960)');
+  });
+
+  it('warms the homepage compare build from the trusted main Turbopack cache read-only', () => {
+    const compareJob = getJobBlock(
+      readFileSync(workflowPath, 'utf8'),
+      'ci-visual-snapshot-compare'
+    );
+    const stepAt = (name: string) =>
+      compareJob.indexOf(`      - name: ${name}\n`);
+    const step = (name: string) => {
+      const start = stepAt(name);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = compareJob.indexOf('\n      - ', start + 1);
+      return compareJob.slice(start, next === -1 ? undefined : next);
+    };
+    const restore = step('Restore Next build cache (read-only)');
+    const homepageGate =
+      "if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'";
+
+    expect(stepAt('Restore Next build cache (read-only)')).toBeLessThan(
+      stepAt('Build homepage for rendered snapshot compare')
+    );
+    expect(step('Resolve Next build cache hour')).toContain(homepageGate);
+    expect(restore).toContain(homepageGate);
+    expect(restore).toContain('uses: actions/cache/restore@');
+    expect(restore).toContain('path: apps/web/.next/cache/turbopack');
+    // Same key family Build + Layout writes from push-to-main only.
+    expect(restore).toContain(
+      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
+    );
+    expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
+
+    // PR-controlled code never writes the cache, and only compiler state is
+    // restored: no fetch/image cache and no build output.
+    expect(compareJob).not.toContain('actions/cache/save@');
+    expect(compareJob).not.toContain('uses: actions/cache@');
+    expect(compareJob).not.toMatch(/path: apps\/web\/\.next\/cache\s*$/m);
+    expect(compareJob).not.toContain('pull_request_target');
+    expect(compareJob).not.toContain('secrets.');
   });
 
   it('scopes chat visual interactions to the active visible composer', () => {

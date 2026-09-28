@@ -4,12 +4,12 @@ import { APP_ROUTES } from '@/constants/routes';
  * Canonical Ops entry for web and the packaged-app M1 owner.
  *
  * One product: the authenticated `/hud` Ops screen. Fullscreen and kiosk are
- * presentation modes of the same `HudDashboardClient` + metrics contract.
+ * presentation modes of the same `OpsCockpitClient` + metrics contract.
  * This module is the handoff surface — do not add a desktop shell here.
  */
 export const OVIE_OPS_PRODUCT_NAME = 'Ops' as const;
 
-export const OVIE_OPS_COMPONENT = 'HudDashboardClient' as const;
+export const OVIE_OPS_COMPONENT = 'OpsCockpitClient' as const;
 
 export const OVIE_OPS_ROUTE = APP_ROUTES.HUD;
 

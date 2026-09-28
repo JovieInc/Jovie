@@ -14,6 +14,7 @@ import {
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { cn } from '@/lib/utils';
 import { MarketingFooterControls } from './MarketingFooterControls';
@@ -30,9 +31,13 @@ import { MarketingFooterCta } from './MarketingFooterCta';
  * - Keep production nav from `marketingNavigation`. Do not invent columns.
  */
 
+// JOV marketing routes 2026-09-26: every marketing page gets the FULL footer
+// (all link columns, never compact) — /artist-profiles opted out of that
+// previously; it now shares the same full-footer treatment as every other
+// route. Its own ArtistProfileFinalCta still owns the page's single footer
+// CTA (see PAGE_OWNS_FINAL_CTA_PATHS below).
 const MINIMAL_FOOTER_PATHS = new Set<string>([
   APP_ROUTES.PRICING,
-  APP_ROUTES.ARTIST_PROFILES,
   APP_ROUTES.ARTIST_PROFILE_LEGACY,
   APP_ROUTES.LEGAL_PRIVACY,
   APP_ROUTES.LEGAL_TERMS,
@@ -48,6 +53,13 @@ const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.SUPPORT,
   APP_ROUTES.CLI,
   APP_ROUTES.CARD,
+  APP_ROUTES.ABOUT,
+  APP_ROUTES.AI,
+  APP_ROUTES.PRODUCT,
+  // Renders its own MarketingFooterCta with route-specific copy — see
+  // isEditorialFooterCtaPath for the blog/changelog-release/engineering
+  // routes that own a different (email-signup) bottom-of-page CTA.
+  APP_ROUTES.CHANGELOG,
 ]);
 
 interface MarketingFooterProps {
@@ -134,7 +146,9 @@ export function MarketingFooter({
   const resolvedVariant = resolveFooterVariant(variant, pathname);
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
-    typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
+    typeof pathname === 'string' &&
+    (PAGE_OWNS_FINAL_CTA_PATHS.has(pathname) ||
+      isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
   const footerColumns = MARKETING_FOOTER_COLUMNS;
 

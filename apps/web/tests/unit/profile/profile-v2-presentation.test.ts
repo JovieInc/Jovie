@@ -14,10 +14,11 @@ describe('resolveProfileV2Presentation', () => {
     ['listen', { initialOverlay: 'listen', scrollTarget: null }],
     ['subscribe', { initialOverlay: 'subscribe', scrollTarget: null }],
     ['contact', { initialOverlay: 'contact', scrollTarget: null }],
-  ] satisfies ReadonlyArray<
-    readonly [ProfileMode, unknown]
-  >)('maps %s into the expected pane and overlay', (mode, expected) => {
-    expect(PROFILE_MODE_KEYS).toContain(mode);
-    expect(resolveProfileV2Presentation(mode)).toEqual(expected);
-  });
+  ] satisfies ReadonlyArray<readonly [ProfileMode, unknown]>)(
+    'maps %s into the expected pane and overlay',
+    (mode, expected) => {
+      expect(PROFILE_MODE_KEYS).toContain(mode);
+      expect(resolveProfileV2Presentation(mode)).toEqual(expected);
+    }
+  );
 });

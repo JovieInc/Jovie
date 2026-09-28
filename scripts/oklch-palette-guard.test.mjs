@@ -65,12 +65,12 @@ test('OKLCH syntax, gamut, contrast, and monotonic interpolation', () => {
     Math.max(mint.l, orange.l, red.l) - Math.min(mint.l, orange.l, red.l) > 0.08
   );
   const steps = [0, 0.33, 0.66, 1].map(t =>
-    interpolateOklch(hexToOklch('#06080D'), hexToOklch('#1B2436'), t)
+    interpolateOklch(hexToOklch('#07080A'), hexToOklch('#232427'), t)
   );
   assert.equal(isMonotonicLightness(steps), true);
   assert.equal(formatOklch(steps[0]).startsWith('oklch('), true);
   assert.ok(
-    contrastRatioOklch(hexToOklch('#F5F7FB'), hexToOklch('#06080D')) >= 4.5
+    contrastRatioOklch(hexToOklch('#F5F7FB'), hexToOklch('#07080A')) >= 4.5
   );
 });
 
@@ -113,4 +113,24 @@ test('React palette hexes must project ZiaWI; ion cannot drift to #1F7BF5', () =
   drifted.swatches.ion.dark.hex = '#1F7BF5';
   const codes = validateOklchPalette(drifted).map(i => i.code);
   assert.ok(codes.includes('color-sot'));
+});
+
+test('light elevation is raised = lighter; the retired inverted ramp is rejected', () => {
+  const palette = loadPalette();
+  assert.deepEqual(
+    validateOklchPalette(palette)
+      .filter(i => i.code === 'elevation-light')
+      .map(i => i.detail),
+    []
+  );
+  const inverted = structuredClone(palette);
+  inverted.swatches.canvas.light.oklch = 'oklch(99.60% 0.0020 258.32)';
+  inverted.swatches['surface-3'].light.oklch = 'oklch(88.35% 0.0110 256.70)';
+  const details = validateOklchPalette(inverted)
+    .filter(i => i.code === 'elevation-light')
+    .map(i => i.detail);
+  assert.ok(
+    details.includes('light surface-3 must not be darker than surface-0')
+  );
+  assert.ok(details.includes('light canvas must be darker than surface-0'));
 });

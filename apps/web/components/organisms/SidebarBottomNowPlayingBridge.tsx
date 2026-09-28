@@ -4,7 +4,10 @@ import { useCallback } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { cn } from '@/lib/utils';
-import { useAudioChromeSnapshot } from './audio-chrome-state';
+import {
+  requestFullAudioPlayer,
+  useAudioChromeSnapshot,
+} from './audio-chrome-state';
 
 /**
  * SidebarBottomNowPlayingBridge — production audio adapter for the shell
@@ -17,7 +20,9 @@ import { useAudioChromeSnapshot } from './audio-chrome-state';
  * routes through the same `toggleTrack(...)` call as the audio bar so the
  * sidebar mini-player and the persistent bar stay in sync.
  */
-export function SidebarBottomNowPlayingBridge() {
+export function SidebarBottomNowPlayingBridge({
+  collapsed = false,
+}: Readonly<{ collapsed?: boolean }>) {
   const audioChrome = useAudioChromeSnapshot();
   const { playbackState, stop, toggleTrack } = useTrackAudioPlayer();
 
@@ -60,6 +65,8 @@ export function SidebarBottomNowPlayingBridge() {
         isPlaying={playbackState.isPlaying}
         onPlay={handlePlay}
         onDismiss={stop}
+        onExpand={requestFullAudioPlayer}
+        collapsed={collapsed}
         className='border-0 bg-transparent shadow-none transition-[opacity,transform,background-color] duration-cinematic ease-cinematic'
       />
     </div>

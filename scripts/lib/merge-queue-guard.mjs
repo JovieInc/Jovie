@@ -537,6 +537,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Build + Layout (combined)',
   'CI / Ovie Build (combined)',
   'Ovie Build (combined)',
+  'CI / Ovie Typecheck (combined)',
+  'Ovie Typecheck (combined)',
   'CI / Storybook Surface Matrix (combined)',
   'Storybook Surface Matrix (combined)',
   'CI / iOS Fast Unit + Coverage (combined)',
@@ -560,6 +562,11 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Lighthouse (dashboard manual)',
   'CI / Lighthouse (onboarding manual)',
   'Lighthouse (onboarding manual)',
+  // Merge-group launch gates (JOV-6002) — same rule: aggregated under PR Ready.
+  'CI / Lighthouse (dashboard gate)',
+  'Lighthouse (dashboard gate)',
+  'CI / Lighthouse (onboarding gate)',
+  'Lighthouse (onboarding gate)',
   'CI / Lighthouse (admin manual)',
   'Lighthouse (admin manual)',
   'CI / E2E Smoke (manual)',
@@ -1009,12 +1016,6 @@ export function serializationKeysForFile(file) {
     keys.push({
       key: `subsystem:${firstDirectory(normalized, 4)}`,
       reason: 'web library subsystem',
-      file: normalized,
-    });
-  } else if (normalized.startsWith('scripts/symphony/')) {
-    keys.push({
-      key: `subsystem:${firstDirectory(normalized, 3)}`,
-      reason: 'Symphony automation subsystem',
       file: normalized,
     });
   } else if (normalized.startsWith('scripts/')) {

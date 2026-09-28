@@ -8,8 +8,8 @@ vi.mock('next/image', () => ({
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
-  EntityHeaderCard: ({ image }: { image: ReactNode }) => (
-    <div data-testid='entity-header-card'>{image}</div>
+  EntityHeader: ({ thumbnail }: { thumbnail: ReactNode }) => (
+    <div data-testid='entity-header-card'>{thumbnail}</div>
   ),
   DrawerMediaThumb: ({
     children,
@@ -60,7 +60,7 @@ describe('ReleaseArtwork', () => {
   });
 
   it('renders drawer media thumb fallback when artwork is missing', () => {
-    render(
+    const { container } = render(
       <ReleaseArtwork
         artworkUrl={null}
         title='Midnight Echo'
@@ -69,6 +69,9 @@ describe('ReleaseArtwork', () => {
     );
 
     expect(screen.getByTestId('drawer-media-thumb')).toBeInTheDocument();
+    const icon = container.querySelector('svg.lucide-audio-lines');
+    expect(icon).toBeTruthy();
+    expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
   });
 
   it('preserves the full static release artwork without a cover crop', () => {

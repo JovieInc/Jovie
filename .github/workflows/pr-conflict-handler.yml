@@ -190,6 +190,16 @@ jobs:
             MAX_CONCURRENT=1
           fi
 
+          # JOV-6233: paid-model FX spend is authorized only by an explicit
+          # human/queue-owner workflow_dispatch apply. Automatic push and
+          # workflow_run(CI-completion) events never carry this flag, so a
+          # true conflict on those paths always denies escalation instead of
+          # silently reaching the paid AI Gateway path.
+          escalation_args=()
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' && "$apply" == 'true' ]]; then
+            escalation_args=(--allow-paid-escalation)
+          fi
+
           event_args=()
           if [[ "$EVENT_NAME" == 'pull_request_target' ]]; then
             test -n "$EVENT_PAYLOAD_PATH"
@@ -199,6 +209,7 @@ jobs:
 
           node scripts/pr-conflict-handler.mjs "$MODE" \
             "${event_args[@]}" \
+            "${escalation_args[@]}" \
             --repo "$REPOSITORY" \
             --max-concurrent "$MAX_CONCURRENT" \
             --runner-capacity "$RUNNER_CAPACITY" \
@@ -1007,7 +1018,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE:/workspace:rw" \
             --volume "$RUNNER_TEMP/trusted-run-affected-tests.mjs:/workspace/scripts/run-affected-tests.mjs:ro" \
             --workdir /workspace \
-            'node:22.23.2-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d' \
+            'node:24.21.0-bookworm@sha256:6dac556d980b7f0e5498d08f08cee0ca67798b4ad6c23964a9214920e67758d0' \
             bash -lc 'corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'
           verify_rc=$?
           set -e

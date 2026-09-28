@@ -1,6 +1,15 @@
 import 'server-only';
 
-import { and, desc, sql as drizzleSql, eq, lt } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  sql as drizzleSql,
+  eq,
+  isNull,
+  lt,
+  notInArray,
+  or,
+} from 'drizzle-orm';
 import { withSanitizedConversationTitles } from '@/lib/chat/title';
 import {
   decodeToolEvents,
@@ -12,6 +21,7 @@ import {
   chatMessages,
   chatTurns,
 } from '@/lib/db/schema/chat';
+import { tasks } from '@/lib/db/schema/tasks';
 import { logger } from '@/lib/utils/logger';
 
 export interface CreatorConversationSummary {
@@ -56,7 +66,27 @@ export async function listCreatorConversations(input: {
         ),
     })
     .from(chatConversations)
-    .where(eq(chatConversations.creatorProfileId, input.creatorProfileId))
+    // JOV-4514: hide conversations whose work record is completed/cancelled
+    // or archived from the active chat listing.
+    .leftJoin(
+      tasks,
+      and(
+        eq(tasks.conversationId, chatConversations.id),
+        isNull(tasks.deletedAt)
+      )
+    )
+    .where(
+      and(
+        eq(chatConversations.creatorProfileId, input.creatorProfileId),
+        or(
+          isNull(tasks.id),
+          and(
+            notInArray(tasks.status, ['done', 'cancelled']),
+            isNull(tasks.archivedAt)
+          )
+        )
+      )
+    )
     .orderBy(desc(chatConversations.updatedAt))
     .limit(limit);
 

@@ -41,6 +41,11 @@
 
 // Admin infinite queries
 export {
+  type AdminAssetIssuesFilter,
+  type AdminAssetRow,
+  type AdminAssetSort,
+  type AdminAssetType,
+  type AdminAssetVerifiedFilter,
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
   type AdminLeadsSortBy,
@@ -49,6 +54,7 @@ export {
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
+  useAdminAssetsInfiniteQuery,
   useAdminCreatorsInfiniteQuery,
   useAdminReleasesInfiniteQuery,
   useAdminUsersInfiniteQuery,
@@ -93,6 +99,7 @@ export {
   createQueryFn,
   FetchError,
   fetchWithTimeout,
+  isForbiddenError,
 } from './fetch';
 // Client-side hydration boundary
 export { HydrateClient } from './HydrateClient';
@@ -506,6 +513,7 @@ export {
 // Release queries and mutations
 export { useReleasesQuery } from './useReleasesQuery';
 export {
+  prefetchReleaseTracks,
   type ReleaseTrack,
   useReleaseTracksQuery,
 } from './useReleaseTracksQuery';

@@ -280,7 +280,11 @@ describe('draft-first rolling CI policy wiring', () => {
     expect(read('AGENTS.md')).toMatch(
       /Before publication follow `docs\/PR_FLOW\.md`: coherent draft/
     );
+    expect(read('.claude/rules/release.md')).toContain(
+      '(../../docs/PR_FLOW.md#draft-first-rolling-ci-contract)'
+    );
     const flow = read('docs/PR_FLOW.md');
+    expect(flow).toContain('## Draft-first rolling CI contract');
     for (const text of [
       'Publish the first coherent commit as a draft.',
       'JOVIE_PUSH_PHASE=publication git push',

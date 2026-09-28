@@ -1,0 +1,102 @@
+{
+  "label": "reasoning-job",
+  "maxJobsPerDay": 6,
+  "maxResearchPerDay": 2,
+  "maxContextChars": 60000,
+  "maxFailures": 2,
+  "defaultTopN": 5,
+  "highConfidenceFloor": 0.6,
+  "reviewerCooldownS": 21600,
+  "proposer": {
+    "name": "claude-opus",
+    "model": "claude-opus-5-5",
+    "timeoutS": 900,
+    "maxBudgetUsd": 3,
+    "stdin": true,
+    "env": "~/.config/jovie-lanes/claude.env",
+    "health": ["claude", "auth", "status"],
+    "healthy": "\"loggedIn\": true",
+    "cmd": [
+      "claude",
+      "-p",
+      "--model",
+      "claude-opus-5-5",
+      "--output-format",
+      "json",
+      "--json-schema",
+      "{schema}",
+      "--tools",
+      "",
+      "--no-session-persistence",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--max-budget-usd",
+      "{max_budget_usd}"
+    ]
+  },
+  "reviewers": [
+    {
+      "name": "grok-cli",
+      "model": "grok-4.7",
+      "timeoutS": 600,
+      "health": ["grok", "models"],
+      "healthy": "logged in",
+      "cmd": [
+        "grok",
+        "-m",
+        "grok-4.7",
+        "--prompt-file",
+        "{prompt_file}",
+        "--json-schema",
+        "{schema}",
+        "--tools",
+        "",
+        "--max-turns",
+        "3",
+        "--no-subagents",
+        "--disable-web-search"
+      ]
+    },
+    {
+      "name": "hyperagent-grok-reviewer",
+      "model": "grok-4.7",
+      "timeoutS": 900,
+      "health": ["hyperagent", "models", "--json"],
+      "healthy": "models",
+      "cmd": [
+        "hyperagent",
+        "execute",
+        "--model",
+        "grok-4.7",
+        "--agent-id",
+        "cmuc8gpim010407adjkkj85s5",
+        "--json",
+        "--timeout",
+        "840",
+        "-p",
+        "{prompt}"
+      ]
+    }
+  ],
+  "research": {
+    "name": "hyperagent-glm-research",
+    "model": "z-ai/glm-5.3",
+    "timeoutS": 1900,
+    "health": ["hyperagent", "models", "--json"],
+    "healthy": "models",
+    "cmd": [
+      "hyperagent",
+      "execute",
+      "--model",
+      "z-ai/glm-5.3",
+      "--agent-id",
+      "cmuk33ew70r2e06adfqx6gbpy",
+      "--json",
+      "--timeout",
+      "1800",
+      "-p",
+      "{prompt}"
+    ]
+  }
+}

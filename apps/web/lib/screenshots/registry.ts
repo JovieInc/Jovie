@@ -12,6 +12,20 @@ export const SCREENSHOT_VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 } as const;
 
+/**
+ * Top safe-area inset for mobile captures (Dynamic Island iPhones: 59px).
+ * Marketing phone frames draw an island over the screen; without the inset
+ * the profile's `env(safe-area-inset-top)` padding resolves to 0 and content
+ * sits under the island. The bottom stays 0: frames draw no home indicator,
+ * and a bottom inset shrinks the scroll area enough to clip the last card.
+ */
+export const SCREENSHOT_MOBILE_SAFE_AREA = {
+  top: 59,
+  bottom: 0,
+  left: 0,
+  right: 0,
+} as const;
+
 export const GROUP_LABELS: Record<ScreenshotGroup, string> = {
   marketing: 'Marketing',
   onboarding: 'Onboarding',
@@ -104,6 +118,7 @@ interface TimWhiteProfileMobileVariant {
   readonly slug: string;
   readonly title: string;
   readonly queryKey: 'mode' | 'release';
+  readonly featureFocus?: ScreenshotScenario['featureFocus'];
 }
 
 /**
@@ -117,7 +132,7 @@ interface TimWhiteProfileMobileVariant {
 function timWhiteProfileMobile(
   variant: TimWhiteProfileMobileVariantWithTimestamp
 ): ScreenshotScenarioSeed {
-  const { slug, title, queryKey, playerTimestamp } = variant;
+  const { slug, title, queryKey, playerTimestamp, featureFocus } = variant;
   return {
     id: `tim-white-profile-${slug}-mobile`,
     title: `Tim White Profile — ${title}`,
@@ -126,6 +141,7 @@ function timWhiteProfileMobile(
     viewport: 'mobile',
     publicExportPath: `tim-white-profile-${slug}-phone.png`,
     ...(playerTimestamp !== undefined && { playerTimestamp }),
+    ...(featureFocus !== undefined && { featureFocus }),
   };
 }
 
@@ -150,7 +166,18 @@ const TIM_WHITE_PROFILE_MOBILE_VARIANTS: readonly TimWhiteProfileMobileVariantWi
       playerTimestamp: '1:24',
     },
     { slug: 'tour', title: 'Tour', queryKey: 'mode' },
-    { slug: 'pay', title: 'Pay', queryKey: 'mode', playerTimestamp: '2:47' },
+    {
+      slug: 'pay',
+      title: 'Pay',
+      queryKey: 'mode',
+      playerTimestamp: '2:47',
+      featureFocus: {
+        label: 'Pay with Venmo',
+        // The Venmo pay CTA and custom-amount control in the pay sheet —
+        // verified against tim-white-profile-pay-phone.png.
+        region: { x: 4, y: 80, width: 92, height: 15 },
+      },
+    },
     {
       slug: 'live',
       title: 'Latest Release',
@@ -304,11 +331,13 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       publicExportPath: 'tim-white-profile-alerts-fallback-phone.png',
     },
     {
+      // With no dates, ProfileEventsCard renders its empty branch; the tour
+      // list (tour-drawer-content) is only mounted when events exist.
       id: 'tim-white-profile-events-empty-mobile',
       title: 'Tim White Profile — Events Empty',
       route: '/demo/showcase/tim-white-profile?state=events-empty',
-      waitFor: '[data-testid="tour-drawer-content"]',
       viewport: 'mobile',
+      waitFor: '[data-testid="profile-primary-tab-events-empty"]',
       publicExportPath: 'tim-white-profile-events-empty-phone.png',
     },
     {
@@ -526,6 +555,12 @@ export const SCREENSHOT_SCENARIO_IDS = new Set(
 
 export function getScreenshotScenario(id: string): ScreenshotScenario | null {
   return SCREENSHOT_SCENARIOS.find(scenario => scenario.id === id) ?? null;
+}
+
+export function getScreenshotFeatureFocus(
+  id: string
+): ScreenshotScenario['featureFocus'] | null {
+  return getScreenshotScenario(id)?.featureFocus ?? null;
 }
 
 const PUBLIC_EXPORT_URL_PREFIX = '/product-screenshots';

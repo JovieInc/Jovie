@@ -78,22 +78,20 @@ describe('persisted Summer commercial observation', () => {
   const readback = () =>
     createSummerCommercialReadback({ authenticate, read, now: () => NOW });
 
-  it.each([
-    'sessionId',
-    'receiptPath',
-    'authority',
-    'schema',
-  ])('does not attest malformed terminal %s', async field => {
-    await handler()(event());
-    const path = `summer-shadow/terminal/${summerShadowKey('event-0001')}.json`;
-    const terminal = await read(path);
-    await writeFile(
-      join(root, path),
-      JSON.stringify({ ...terminal, [field]: 'wrong' })
-    );
-    const body = await (await readback()(request(), 'event-0001')).json();
-    expect(body.consumption).toBe('UNKNOWN');
-  });
+  it.each(['sessionId', 'receiptPath', 'authority', 'schema'])(
+    'does not attest malformed terminal %s',
+    async field => {
+      await handler()(event());
+      const path = `summer-shadow/terminal/${summerShadowKey('event-0001')}.json`;
+      const terminal = await read(path);
+      await writeFile(
+        join(root, path),
+        JSON.stringify({ ...terminal, [field]: 'wrong' })
+      );
+      const body = await (await readback()(request(), 'event-0001')).json();
+      expect(body.consumption).toBe('UNKNOWN');
+    }
+  );
 
   it('persists before session dispatch, survives fresh handlers, and reevaluates changed evidence', async () => {
     dispatch.mockImplementationOnce(async input => {
@@ -101,9 +99,9 @@ describe('persisted Summer commercial observation', () => {
         `summer-shadow/receipts/${summerShadowKey('event-0001')}.json`
       );
       expect(stored?.commercialProjection).toMatchObject({
-        selectedCandidateId: 'thumbnails',
+        selectedCandidateId: 'lyb-sales',
       });
-      expect(input.message).toContain('"selectedCandidateId":"thumbnails"');
+      expect(input.message).toContain('"selectedCandidateId":"lyb-sales"');
       expect(input.message).toContain('not independently verified facts');
       expect(input.message).toContain('Never dispatch work');
       return { sessionId: 'ses_commercial' };
@@ -116,7 +114,7 @@ describe('persisted Summer commercial observation', () => {
     expect(persisted.consumption).toBe(
       'eve_session_accepted; model_decision_unverified'
     );
-    expect(persisted.currentProjection.selectedCandidateId).toBe('thumbnails');
+    expect(persisted.currentProjection.selectedCandidateId).toBe('lyb-sales');
     expect((await handler()(event())).status).toBe(409);
     const input = snapshot();
     input.candidates.push({
@@ -145,7 +143,7 @@ describe('persisted Summer commercial observation', () => {
     const stale = await (await staleReadback(request(), 'event-0001')).json();
     expect(stale.currentProjection.verdict).toBe('hold');
     expect(stale.receipt.commercialProjection.selectedCandidateId).toBe(
-      'thumbnails'
+      'lyb-sales'
     );
   });
   it('does not claim a consumed decision after failed dispatch or tampered projection', async () => {

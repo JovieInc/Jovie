@@ -12,7 +12,6 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { afterEach, describe, expect, it } from 'vitest';
-import { diagnoseCiFailure } from '../../../../../scripts/symphony/jobs/ci-failure-diagnosis';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 const readHostFile = (name: string) =>
@@ -434,24 +433,5 @@ describe('Gem runner process-capacity contract', () => {
     expect(repaired.status).toBe(0);
     expect(repaired.stdout).toContain('runner_tasks_status=ok');
     expect(repaired.stdout).toContain('runner_tasks_ratio_pct=46');
-  });
-
-  it('classifies Node EAGAIN as runner capacity, not a test assertion', () => {
-    expect(
-      diagnoseCiFailure(
-        'Caused by: Error: spawn /opt/hostedtoolcache/node/22.23.1/x64/bin/node EAGAIN'
-      )
-    ).toMatchObject({ failureClass: 'runner_process_exhaustion' });
-    expect(
-      diagnoseCiFailure('AssertionError: expected 1 to be 2')
-    ).toMatchObject({ failureClass: 'unknown' });
-  });
-
-  it('classifies proactive slice saturation diagnostics', () => {
-    expect(
-      diagnoseCiFailure(
-        'runner_tasks_status=critical\nrunner_tasks_current=958\nrunner_tasks_max=1024\nrunner_tasks_ratio_pct=93'
-      )
-    ).toMatchObject({ failureClass: 'runner_slice_task_saturation' });
   });
 });

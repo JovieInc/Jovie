@@ -131,7 +131,7 @@ export interface RouteManifestEntry {
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
   };
-  /** noindex flag — true if the route is noindex today (e.g. /ai, /investors, /demo/video). */
+  /** noindex flag — true if the route is noindex today (e.g. /ai, /demo/video). */
   readonly noindex?: boolean;
   /** Alias-of — when this route is an alias of another (e.g. /artist-profile → /artist-profiles). */
   readonly aliasOf?: string;
@@ -149,11 +149,11 @@ export interface RouteManifestEntry {
 
 /**
  * The route manifest. Per JOV-5650 — every recursive page.tsx under
- * (marketing), (home), and waitlist is represented exactly once. Dynamic
- * engineering article routes are explicit exemptions rather than being hidden
- * behind their index-route entries. This array is the current source authority;
- * generated ledgers and capture catalogs derive their counts instead of copying
- * a prose inventory that can drift.
+ * (marketing), (home), waitlist, and the guarded profile-admission route is
+ * represented exactly once. Dynamic engineering article routes are explicit
+ * exemptions rather than being hidden behind their index-route entries. This
+ * array is the current source authority; generated ledgers and capture catalogs
+ * derive their counts instead of copying a prose inventory that can drift.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -165,18 +165,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        'apps/web/components/homepage/HomepageIdentityHero.tsx',
         'hero',
         'centered-none'
       ),
       // The unsupported adoption strip is intentionally omitted until it has
       // an attributable permission or adoption receipt.
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'connected'
-      ),
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         'feature-split',
@@ -193,7 +187,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'source history #17063, #17185, #17353; pinned 12b203f9',
       notes:
-        'Locked connected and relationships beats plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
+        'Locked relationships beat (real jov.ie/tim pay and updates captures, JOV-6946) plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',
@@ -324,6 +318,33 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     specVersion: '1.0.0',
     url: '/artist-profile',
     aliasOf: '/artist-profiles',
+  },
+  {
+    glob: '(marketing)/solutions/artists/page.tsx',
+    recipeId: 'artist-lp',
+    renderedSections: approvedBindings(
+      'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
+      'hero',
+      'logo-cloud',
+      'feature-split',
+      'feature-grid',
+      'capture',
+      'comparison',
+      'spec-wall',
+      'how-it-works',
+      'feature-grid',
+      'faq',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-09-26 (JOV-5861)',
+      notes:
+        'Real artist solution route; renders the same artist-lp component and chrome as /artist-profiles. /artists remains the directory. Release-cycle gallery is product evidence, not social proof.',
+    },
+    status: 'active',
+    specVersion: '1.3.0',
+    url: '/solutions/artists',
   },
   {
     glob: '(marketing)/artist-notifications/page.tsx',
@@ -605,14 +626,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'apps/web/app/(marketing)/support/page.tsx',
       'hero',
       'content-prose',
-      'faq',
       'cta'
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'source binding audit 2026-09-01',
+      source: 'source binding audit 2026-09-26',
       notes:
-        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and SupportCta in that order.',
+        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body pointing at the canonical Help Center on docs.jov.ie, and SupportCta in that order. FAQs rehomed to the canonical troubleshooting article under JOV-5897, so the seo recipe faq beat intentionally no longer applies.',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1038,25 +1058,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     noindex: true,
   },
   {
-    glob: '(marketing)/investors/page.tsx',
-    renderedSections: [],
-    bindingEvidence: {
-      status: 'exempt',
-      source: 'sanctioned route manifest exemption',
-    },
-    exempt: {
-      reason:
-        'noindex investor brief — hand-rolled layout; not recipe-composable',
-      linearId: 'JOV-4063',
-      approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
-    },
-    status: 'active',
-    specVersion: '1.0.0',
-    url: '/investors',
-    noindex: true,
-  },
-  {
     glob: '(marketing)/renders/page.tsx',
     renderedSections: [],
     bindingEvidence: {
@@ -1097,7 +1098,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
-    glob: '(marketing)/renders/profile-admission/page.tsx',
+    glob: '(profile-admission)/renders/profile-admission/page.tsx',
     renderedSections: [],
     bindingEvidence: {
       status: 'exempt',

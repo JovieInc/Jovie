@@ -66,7 +66,6 @@ function qualification() {
 function spotify() {
   return {
     status: 'enriched' as const,
-    reason: null,
     artistId: '3z907l4sbiy6gyQ7BaWQlH',
     spotifyPopularity: 42,
     spotifyFollowers: 1200,
@@ -148,7 +147,7 @@ describe('requalifyPublicLead', () => {
     expect(result.candidateId).toBe('lead-rhirhi');
     expect(result.state).toBe('human_review');
     expect(
-      result.machineCertification.criteria.find(item => item.id === 'contact')
+      result.preflightReadiness.criteria.find(item => item.id === 'contact')
         ?.passed
     ).toBe(true);
     expect(result.sourceRevision).toMatch(/^sha256:[0-9a-f]{64}$/);
@@ -156,7 +155,7 @@ describe('requalifyPublicLead', () => {
     expect(result.decisionDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(result.expiresAt).toBe('2026-10-12T22:30:00.000Z');
     expect(
-      result.machineCertification.receipts.every(
+      result.preflightReadiness.receipts.every(
         receipt =>
           receipt.sourceSha?.startsWith('sha256:') &&
           receipt.digest?.startsWith('sha256:') &&
@@ -213,7 +212,7 @@ describe('requalifyPublicLead', () => {
     );
 
     expect(result.state).toBe('machine_failed');
-    expect(result.machineCertification.failures.map(item => item.id)).toEqual(
+    expect(result.preflightReadiness.failures.map(item => item.id)).toEqual(
       expect.arrayContaining([
         'identity',
         'spotify',

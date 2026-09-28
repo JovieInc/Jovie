@@ -15,6 +15,15 @@ describe('ThreadAudioCard', () => {
     expect(screen.getByText('Bahamas · 3:33')).toBeInTheDocument();
   });
 
+  it('uses the banned-icon-safe AudioLines glyph for the artwork slot', () => {
+    const { container } = render(
+      <ThreadAudioCard title='t' artist='a' duration='0:42' />
+    );
+    const icon = container.querySelector('.system-b-thread-audio-artwork svg');
+    expect(icon).toHaveClass('lucide-audio-lines');
+    expect(icon).not.toHaveClass('lucide-disc-3');
+  });
+
   it('disables the play button when no onPlay is provided', () => {
     render(<ThreadAudioCard title='t' artist='a' duration='0:42' />);
     expect(screen.getByRole('button', { name: /Play/ })).toBeDisabled();

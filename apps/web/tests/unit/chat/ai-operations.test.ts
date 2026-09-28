@@ -239,6 +239,7 @@ describe('createProfileEditTool (mocked tool invocation)', () => {
       toolCallId: `mock-${args.field}`,
       messages: [],
       abortSignal: new AbortController().signal,
+      context: {},
     });
     return result as {
       success: boolean;
