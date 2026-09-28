@@ -165,18 +165,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        'apps/web/components/homepage/HomepageIdentityHero.tsx',
         'hero',
         'centered-none'
       ),
       // The unsupported adoption strip is intentionally omitted until it has
       // an attributable permission or adoption receipt.
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'connected'
-      ),
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         'feature-split',
@@ -193,7 +187,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'source history #17063, #17185, #17353; pinned 12b203f9',
       notes:
-        'Locked connected and relationships beats plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
+        'Locked relationships beat (real jov.ie/tim pay and updates captures, JOV-6946) plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',
@@ -632,14 +626,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'apps/web/app/(marketing)/support/page.tsx',
       'hero',
       'content-prose',
-      'faq',
       'cta'
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'source binding audit 2026-09-01',
+      source: 'source binding audit 2026-09-26',
       notes:
-        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and SupportCta in that order.',
+        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body pointing at the canonical Help Center on docs.jov.ie, and SupportCta in that order. FAQs rehomed to the canonical troubleshooting article under JOV-5897, so the seo recipe faq beat intentionally no longer applies.',
     },
     status: 'active',
     specVersion: '1.0.0',

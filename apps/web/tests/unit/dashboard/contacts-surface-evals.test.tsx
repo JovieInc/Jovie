@@ -38,9 +38,9 @@ describe('Contacts authenticated-surface evals', () => {
   it('keeps Contacts on one primary workspace surface', () => {
     const page = readWeb('app/app/(shell)/contacts/page.tsx');
 
-    expect(page).toContain(
-      "className='flex h-full min-h-0 flex-col bg-(--app-shell-content-surface)'"
-    );
+    expect(page.match(/<WorkspacePage/g) ?? []).toHaveLength(1);
+    expect(page).toContain("frame='none'");
+    expect(page).toContain("contentPadding='none'");
   });
 
   it('keeps Contact and Audience details on one shared flat rail surface and reserves elevation for overlays', () => {

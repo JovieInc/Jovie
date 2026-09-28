@@ -22,6 +22,9 @@ import pr_events  # noqa: E402  (sibling module of the release)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
+# Workers spawning but no agent run starting or ending: the 2026-09-28 spawn-exit deadlock
+# (every worker exited on claim), which looked busy to every other rule.
+NO_WORK_S = 60 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
@@ -84,8 +87,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     github = None
     try:
         lane.load_github_env()
-        result = subprocess.run(["gh", "api", "rate_limit"], capture_output=True, text=True, timeout=30)
-        github = json.loads(result.stdout)["resources"]["graphql"]["remaining"] if result.returncode == 0 else None
+        budget = lane.graphql_budget()
+        github = budget[0] if budget else None
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         pass
     held = read_json(state / "held.json", {})
@@ -101,6 +104,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "gateTimeouts24h": sum(1 for r in receipts if r.get("verdict") == "gate-timeout"),
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
+        "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
+        "worktrees": len(list((state / "worktrees").glob("*"))),
         "busy": len([p for p in (state / "slots").glob("*.lock") if not p.name.startswith("gate.") and _locked(p)]),
         "codex": accounts, "pool": pool, "linearError": linear_error, "githubRemaining": github,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -171,6 +176,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if pool and busy and obs.get("runs24h") and (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S):
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = f"{busy} slots busy with {pool} issues waiting but nothing passed the gate ({last})"
+    spawned = len((obs.get("tick") or {}).get("spawned") or [])
+    if pool and spawned and not obs.get("worktrees", 1) and (obs.get("lastWorkAge") or NO_WORK_S + 1) > NO_WORK_S:
+        alerts["spawn-exit"] = (f"{spawned} workers spawn each tick but no agent run started or ended in "
+                                f"{NO_WORK_S // 60}m with {pool} issues waiting; workers exit on claim")
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:

@@ -89,7 +89,6 @@ import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
-import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -99,8 +98,12 @@ import {
   PageToolbarActionButton,
   PageToolbarTabButton,
   TableEmptyState,
+  type ToolbarFilterSuggestion,
+  ToolbarFilterSuggestions,
   UnifiedTable,
   UnifiedTableSkeleton,
+  ViewModeSlider,
+  type ViewModeSliderOption,
 } from '@/components/organisms/table';
 import {
   type ContextMenuItemType,
@@ -109,6 +112,7 @@ import {
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
 import { alignment } from '@/components/organisms/table/table.styles';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
@@ -354,6 +358,20 @@ function parseLibraryViewParam(value: string | null): LibraryPresetId {
   return PRESETS.some(preset => preset.id === value)
     ? (value as LibraryPresetId)
     : 'all';
+}
+
+let libraryFilterPillFallbackCounter = 0;
+
+/** Mirrors PillSearch's id scheme so quick-suggestion pills stay indistinguishable from search-created ones. */
+function newLibraryFilterPillId(): string {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID();
+  }
+  libraryFilterPillFallbackCounter += 1;
+  return `library-pill-${Date.now()}-${libraryFilterPillFallbackCounter}`;
 }
 
 function toggleSet<T>(set: ReadonlySet<T>, value: T): Set<T> {
@@ -723,11 +741,12 @@ const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
 
 export function LibraryLoadingState() {
   return (
-    <PageShell
+    <WorkspacePage
       aria-busy='true'
       aria-label='Loading Library'
       frame='content-container'
       contentPadding='none'
+      surfaceMode='table'
       data-testid='library-surface-loading'
       toolbar={
         <PageToolbar
@@ -757,7 +776,7 @@ export function LibraryLoadingState() {
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
         containerClassName='h-full'
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
 
@@ -1266,6 +1285,13 @@ function SortDropdown({
   );
 }
 
+const LIBRARY_VIEW_MODE_OPTIONS: readonly ViewModeSliderOption<LibraryViewMode>[] =
+  [
+    { value: 'grid', label: 'Grid View', icon: Grid3x3 },
+    { value: 'list', label: 'List View', icon: LayoutList },
+    { value: 'table', label: 'Table View', icon: Table2 },
+  ];
+
 function ViewToggle({
   view,
   onView,
@@ -1274,35 +1300,13 @@ function ViewToggle({
   readonly onView: (view: LibraryViewMode) => void;
 }) {
   return (
-    <div className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5')}>
-      <PageToolbarActionButton
-        label='Grid View'
-        icon={<Grid3x3 className={PAGE_TOOLBAR_ICON_CLASS} />}
-        active={view === 'grid'}
-        onClick={() => onView('grid')}
-        iconOnly
-        tooltipLabel='Grid View'
-        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
-      />
-      <PageToolbarActionButton
-        label='List View'
-        icon={<LayoutList className={PAGE_TOOLBAR_ICON_CLASS} />}
-        active={view === 'list'}
-        onClick={() => onView('list')}
-        iconOnly
-        tooltipLabel='List View'
-        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
-      />
-      <PageToolbarActionButton
-        label='Table View'
-        icon={<Table2 className={PAGE_TOOLBAR_ICON_CLASS} />}
-        active={view === 'table'}
-        onClick={() => onView('table')}
-        iconOnly
-        tooltipLabel='Table View'
-        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
-      />
-    </div>
+    <ViewModeSlider
+      aria-label='Library View'
+      data-testid='library-view-mode-slider'
+      value={view}
+      onChange={onView}
+      options={LIBRARY_VIEW_MODE_OPTIONS}
+    />
   );
 }
 
@@ -1351,6 +1355,10 @@ function LibraryToolbar({
   activeFilterCount,
   filterPanel,
   isDesktop,
+  suggestedFilters,
+  canSyncSpotify,
+  isSyncingSpotify,
+  onSyncSpotify,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly preset: LibraryPresetId;
@@ -1368,11 +1376,29 @@ function LibraryToolbar({
   readonly activeFilterCount: number;
   readonly filterPanel: ReactNode;
   readonly isDesktop: boolean;
+  readonly suggestedFilters: readonly ToolbarFilterSuggestion[];
+  readonly canSyncSpotify: boolean;
+  readonly isSyncingSpotify: boolean;
+  readonly onSyncSpotify: () => void;
 }) {
   return (
     <PageToolbar
       start={
         <div className='flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2'>
+          <div className='group/toolbar-filters flex min-w-0 shrink-0 items-center gap-1'>
+            <LibraryFiltersControl
+              activeFilterCount={activeFilterCount}
+              filterPanel={filterPanel}
+              isDesktop={isDesktop}
+              open={filtersOpen}
+              onOpenChange={onFiltersOpenChange}
+            />
+            <ToolbarFilterSuggestions
+              data-testid='library-filter-suggestions'
+              suggestions={suggestedFilters}
+              hidden={filtersOpen}
+            />
+          </div>
           <LibraryViewFilterChips
             assets={assets}
             preset={preset}
@@ -1386,13 +1412,6 @@ function LibraryToolbar({
       }
       end={
         <>
-          <LibraryFiltersControl
-            activeFilterCount={activeFilterCount}
-            filterPanel={filterPanel}
-            isDesktop={isDesktop}
-            open={filtersOpen}
-            onOpenChange={onFiltersOpenChange}
-          />
           <SortDropdown sort={sort} onSort={onSort} />
           {view === 'grid' ? (
             <GridDensityToggle
@@ -1401,6 +1420,11 @@ function LibraryToolbar({
             />
           ) : null}
           <ViewToggle view={view} onView={onView} />
+          <LibraryFirstAction
+            canSyncSpotify={canSyncSpotify}
+            isSyncing={isSyncingSpotify}
+            onSyncSpotify={onSyncSpotify}
+          />
         </>
       }
     />
@@ -1735,6 +1759,45 @@ function LibraryReleaseTable({
   );
 }
 
+function LibraryFirstAction({
+  canSyncSpotify,
+  isSyncing,
+  onSyncSpotify,
+  testId,
+}: {
+  readonly canSyncSpotify: boolean;
+  readonly isSyncing: boolean;
+  readonly onSyncSpotify: () => void;
+  readonly testId?: string;
+}) {
+  if (!canSyncSpotify) {
+    return (
+      <Button asChild size='sm'>
+        <Link href={APP_ROUTES.RELEASES}>Open Releases</Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      type='button'
+      size='sm'
+      disabled={isSyncing}
+      onClick={onSyncSpotify}
+      data-testid={testId}
+    >
+      <RefreshCw
+        className={cn(
+          'h-4 w-4',
+          isSyncing && 'animate-spin motion-reduce:animate-none'
+        )}
+        aria-hidden='true'
+      />
+      {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+    </Button>
+  );
+}
+
 function EmptyCatalog({
   canSyncSpotify,
   isSyncing,
@@ -1745,12 +1808,25 @@ function EmptyCatalog({
   readonly onSyncSpotify: () => void;
 }) {
   return (
-    <PageShell
+    <WorkspacePage
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'
       data-testid='library-surface'
+      toolbar={
+        <PageToolbar
+          start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
+          end={
+            <LibraryFirstAction
+              canSyncSpotify={canSyncSpotify}
+              isSyncing={isSyncing}
+              onSyncSpotify={onSyncSpotify}
+              testId='library-sync-spotify-toolbar'
+            />
+          }
+        />
+      }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
@@ -1761,37 +1837,15 @@ function EmptyCatalog({
         testId='library-workspace-empty-state'
         className='min-h-90'
         actionSlot={
-          canSyncSpotify ? (
-            <Button
-              type='button'
-              size='sm'
-              disabled={isSyncing}
-              onClick={onSyncSpotify}
-              data-testid='library-sync-spotify-empty-state'
-            >
-              <RefreshCw
-                className={cn(
-                  'h-4 w-4',
-                  isSyncing && 'animate-spin motion-reduce:animate-none'
-                )}
-                aria-hidden='true'
-              />
-              {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-            </Button>
-          ) : (
-            <Link
-              href={APP_ROUTES.RELEASES}
-              className={cn(
-                'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
-                LIBRARY_BUTTON_FOCUS_CLASS
-              )}
-            >
-              Open Releases
-            </Link>
-          )
+          <LibraryFirstAction
+            canSyncSpotify={canSyncSpotify}
+            isSyncing={isSyncing}
+            onSyncSpotify={onSyncSpotify}
+            testId='library-sync-spotify-empty-state'
+          />
         }
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
 
@@ -2997,6 +3051,99 @@ export function LibrarySurface({
     [effectiveAssets, filters, handleSavedViewChange, savedView]
   );
 
+  // Quick-apply suggestions surfaced next to the filter button (hover/focus
+  // revealed). Each suggestion reuses a real, live filtering mechanism —
+  // the "Type" suggestion switches the view preset, "Status"/"Approval"
+  // add a FilterPill to the same pill-search state the header's Search
+  // Library input writes to — so a click is never a decorative no-op.
+  const suggestedFilters = useMemo<ToolbarFilterSuggestion[]>(() => {
+    const suggestions: ToolbarFilterSuggestion[] = [];
+
+    const typeCandidate = PRESETS.filter(
+      item => item.id !== 'all' && item.id !== preset
+    )
+      .map(item => ({
+        item,
+        count: effectiveAssets.filter(item.predicate).length,
+      }))
+      .filter(entry => entry.count > 0)
+      .toSorted((a, b) => b.count - a.count)[0];
+    if (typeCandidate) {
+      const { item } = typeCandidate;
+      suggestions.push({
+        id: `library-suggestion-type-${item.id}`,
+        // No separate ariaLabel: the visible pill text is the accessible
+        // name (WCAG 2.5.3 Label in Name) so voice-control users can refer
+        // to the control by what it says.
+        label: `Type · ${item.label}`,
+        onSelect: () => handlePresetChange(item.id),
+      });
+    }
+
+    const activeStatusValues = new Set(
+      pills
+        .filter(pill => pill.field === 'status')
+        .flatMap(pill => pill.values.map(normalizePillValue))
+    );
+    const statusCandidate = Array.from(
+      countBy(effectiveAssets, asset => [asset.status]).entries()
+    )
+      .filter(([status]) => !activeStatusValues.has(normalizePillValue(status)))
+      .toSorted((a, b) => b[1] - a[1])[0];
+    if (statusCandidate) {
+      const [status] = statusCandidate;
+      const label = formatReleaseStatus(status);
+      suggestions.push({
+        id: `library-suggestion-status-${status}`,
+        label: `Status · ${label}`,
+        onSelect: () => {
+          setPills(previous => [
+            ...previous,
+            {
+              id: newLibraryFilterPillId(),
+              field: 'status',
+              op: 'is',
+              values: [status],
+            },
+          ]);
+        },
+      });
+    }
+
+    const activeApprovalValues = new Set(
+      pills
+        .filter(pill => pill.field === 'approval')
+        .flatMap(pill => pill.values.map(normalizePillValue))
+    );
+    const approvalCandidate = Array.from(
+      countBy(effectiveAssets, asset => [
+        formatLibraryApprovalStatus(asset.approvalStatus),
+      ]).entries()
+    )
+      .filter(([label]) => !activeApprovalValues.has(normalizePillValue(label)))
+      .toSorted((a, b) => b[1] - a[1])[0];
+    if (approvalCandidate) {
+      const [label] = approvalCandidate;
+      suggestions.push({
+        id: `library-suggestion-approval-${label}`,
+        label: `Approval · ${label}`,
+        onSelect: () => {
+          setPills(previous => [
+            ...previous,
+            {
+              id: newLibraryFilterPillId(),
+              field: 'approval',
+              op: 'is',
+              values: [label],
+            },
+          ]);
+        },
+      });
+    }
+
+    return suggestions.slice(0, 3);
+  }, [effectiveAssets, handlePresetChange, pills, preset]);
+
   const handleAudioUploaded = useCallback(
     (assetId: string, previewUrl: string) => {
       setAudioOverrides(previous => ({
@@ -3078,7 +3225,7 @@ export function LibrarySurface({
   }
 
   return (
-    <PageShell
+    <WorkspacePage
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
@@ -3102,6 +3249,10 @@ export function LibrarySurface({
           activeFilterCount={activeFilterCount}
           filterPanel={filterPanel}
           isDesktop={isDesktopLayout}
+          suggestedFilters={suggestedFilters}
+          canSyncSpotify={canSyncSpotify}
+          isSyncingSpotify={isSyncingSpotify}
+          onSyncSpotify={handleSyncSpotify}
         />
       }
     >
@@ -3155,6 +3306,6 @@ export function LibrarySurface({
           />
         </div>
       </div>
-    </PageShell>
+    </WorkspacePage>
   );
 }
