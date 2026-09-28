@@ -33,6 +33,7 @@ export default defineConfig({
     '**/catalog.spec.ts',
     '**/marketing-routes.spec.ts',
     '**/public-profile-screen-proof.spec.ts',
+    '**/public-export-serving.spec.ts',
   ],
   fullyParallel: false, // Run sequentially for deterministic screenshots
   forbidOnly: true,

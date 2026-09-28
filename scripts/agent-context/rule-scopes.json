@@ -7,17 +7,17 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "aeaf66b744e87693197d3862601e2b33c49d19100049f8ba98e7176bdc94c500"
+    "bodySha256": "b538ae4a2b72eb4f2db4c330ec18b51a25d2bbb886039ce0b120183033180914"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "a3e201248490d4f7607afb1dde495bdd8b672948cba3ee9b8143df8400df81d5"
+    "bodySha256": "d2dda48623eeb3cdc8361ffc0308398d169c4c782cc5e06ca7cb38a9b21e345c"
   },
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "f63b9f10c6a648253edb94de57708f6ae569eef6834638b2e8f9569115e26656"
+    "bodySha256": "4e1b3dc1066ae0ce224369eac942cbc97d07e4d30c518c47ec1885ff429688b0"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "d4c714ad1d20c53284aabdcbaf63cd465a47ee30d502d867f1f62ba38f21a8c2"
+    "bodySha256": "24aea12457f61413c4674d614e8c83b1ae8334acfd6276d28366b190951f4571"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -39,18 +39,18 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "2524497e7f69a6fc2fe20bee4b1735bc3797d5c375d38ced0bb34c2090ac1142"
+    "bodySha256": "9b131030c0af79bf2f897eb8c577d868c93b493220a9e9a030f97ecb208c9d1e"
   },
   {
     "file": ".claude/rules/hermes-air.md",
-    "paths": ["scripts/hermes/**", "docs/hermes/**"],
-    "bodySha256": "a8e1c32a2b612b5c3757357e063442b173513929642771fb228cab8796fbceb6"
+    "paths": ["docs/HERMES_AIR.md"],
+    "bodySha256": "26c7560e73f11bf7137a09a2b962eaa023feec0691251b7c3d70368d8ff404d8"
   },
   {
     "file": ".claude/rules/infra.md",
     "paths": [
       ".github/**",
-      "scripts/hermes/**",
+      "scripts/fleet-gate/**",
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
@@ -65,10 +65,10 @@
     "file": ".claude/rules/linear.md",
     "paths": [
       "scripts/backlog-orchestrator/**",
-      "scripts/hermes/**",
+      "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "73e61f1035f4d715e08422a99a0577f72f3f9f84c87d43554a7b9a7c9bdc53ee"
+    "bodySha256": "61546096d949fab333264a7dc4a34a40edfe5d61502f01e85f6910398b1ba9d9"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -94,7 +94,7 @@
   {
     "file": ".claude/rules/pr-stacking.md",
     "paths": [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"],
-    "bodySha256": "c399abcf344dc0f107c6131a3524e63d345c2cd211b627ef57ae5f522ba3cfba"
+    "bodySha256": "43c5a50289369ce1152ca8716058e858fac5375a1701ab536b977bcd425840d5"
   },
   {
     "file": ".claude/rules/release.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "f3f532b94ec106dc5b9000eeaf4347463b1848c95dc50fff2378c6d5d49e888d"
+    "bodySha256": "7a5552255695e9b6787b09e0d42a283e09d0decc42ca1a4339e780dbdcd1fd77"
   },
   {
     "file": ".claude/rules/security.md",
@@ -121,7 +121,7 @@
   {
     "file": ".claude/rules/swarm.md",
     "paths": [
-      "scripts/hermes/**",
+      "scripts/lanes/**",
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
@@ -147,6 +147,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "1b9a4c8bf35485f87bdc4f6d7154be9da5996460e8144dcd74dc2eb21a10e51b"
+    "bodySha256": "f888b7c0a2f120391392b7f67bbd656e21bc32958d2515a24715b900e33784d6"
   }
 ]

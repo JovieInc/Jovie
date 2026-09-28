@@ -22,9 +22,9 @@ function isLimiterUnavailable(reason: string | undefined): boolean {
  * Rate limit: 1 per 60 seconds (Redis-backed in production)
  */
 export async function POST() {
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
 
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
   const rateLimitResult = await deployPromoteLimiter.limit(

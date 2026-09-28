@@ -72,6 +72,7 @@ export function ChangelogEmailSignup({
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
   const [turnstileFailed, setTurnstileFailed] = useState(false);
+  const [turnstileRetryable, setTurnstileRetryable] = useState(false);
 
   const settled = status === 'success' || status === 'subscribed';
   const heading = settled
@@ -112,12 +113,18 @@ export function ChangelogEmailSignup({
             setErrorMessage('');
           }
           setTurnstileFailed(false);
+          setTurnstileRetryable(false);
         }
         return;
       }
 
       turnstileFailureActiveRef.current = true;
       setTurnstileFailed(true);
+      setTurnstileRetryable(
+        state.status === 'error' ||
+          state.status === 'expired' ||
+          state.status === 'timeout'
+      );
       setTurnstileToken('');
       setStatus('error');
       setErrorMessage(
@@ -126,6 +133,15 @@ export function ChangelogEmailSignup({
     },
     []
   );
+
+  function retryTurnstile() {
+    turnstileFailureActiveRef.current = false;
+    setTurnstileFailed(false);
+    setTurnstileRetryable(false);
+    setStatus('idle');
+    setErrorMessage('');
+    setTurnstileResetSignal(signal => signal + 1);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -297,6 +313,18 @@ export function ChangelogEmailSignup({
       >
         {status === 'error' ? errorMessage : ''}
       </p>
+      <div className='min-h-8'>
+        {turnstileFailed && turnstileRetryable ? (
+          <Button
+            type='button'
+            variant='link'
+            size='sm'
+            onClick={retryTurnstile}
+          >
+            Retry Security Check
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }

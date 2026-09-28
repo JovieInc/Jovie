@@ -60,12 +60,12 @@ export function hashRevision(input: {
 }
 
 export function assertScriptCanBeApproved(claims: readonly EvidenceClaim[]) {
-  const unsupportedFact = claims.find(
+  const hasUnsupportedFact = claims.some(
     claim =>
       claim.kind === 'fact' &&
       (claim.evidenceState !== 'supported' || !claim.sourceRecordId)
   );
-  if (unsupportedFact) {
+  if (hasUnsupportedFact) {
     throw new Error('Every factual script claim needs supporting evidence');
   }
 }

@@ -29,3 +29,12 @@ export const Editorial: Story = {
     ),
   },
 };
+
+export const CompactDisabled: Story = {
+  args: {
+    disabled: true,
+    title: 'Downloading Jovie Update…',
+    description:
+      'The update will be ready to install when the download completes.',
+  },
+};

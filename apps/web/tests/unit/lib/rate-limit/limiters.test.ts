@@ -689,6 +689,84 @@ describe('limiters.ts', () => {
       );
     });
 
+    it('degrades a first touch to the first-touch decision when the session limiter backend is unavailable (JOV-6579)', async () => {
+      mockLimit.mockImplementation((key: string) =>
+        Promise.resolve(
+          key.startsWith('session:')
+            ? makeDeniedResult({
+                reason:
+                  'Anonymous Onboarding Chat (Session) rate limiter is temporarily unavailable',
+                unavailable: true,
+                backend: 'unavailable',
+              })
+            : makeAllowedResult()
+        )
+      );
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-new',
+        isFirstTouch: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.degraded).toBe(true);
+      expect(result.unavailable).not.toBe(true);
+      expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
+        'first_touch:203.0.113.10',
+        'session:sess-new',
+      ]);
+    });
+
+    it('still denies a first touch when the first-touch pool itself is exhausted during a session-limiter outage', async () => {
+      mockLimit.mockImplementation((key: string) =>
+        Promise.resolve(
+          key.startsWith('first_touch:')
+            ? makeDeniedResult()
+            : makeDeniedResult({ unavailable: true, backend: 'unavailable' })
+        )
+      );
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-new',
+        isFirstTouch: true,
+      });
+
+      expect(result.success).toBe(false);
+      expect(mockLimit).toHaveBeenCalledExactlyOnceWith(
+        'first_touch:203.0.113.10'
+      );
+    });
+
+    it('keeps an established session fail-closed when the session limiter backend is unavailable', async () => {
+      mockLimit.mockImplementation((key: string) =>
+        Promise.resolve(
+          key.startsWith('session:')
+            ? makeDeniedResult({ unavailable: true, backend: 'unavailable' })
+            : makeAllowedResult()
+        )
+      );
+
+      const { checkAnonymousChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAnonymousChatRateLimit({
+        ip: '203.0.113.10',
+        sessionId: 'sess-old',
+        isFirstTouch: false,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.unavailable).toBe(true);
+    });
+
     it('checks ip, asn, then session for an established session', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult());
 
@@ -766,6 +844,42 @@ describe('limiters.ts', () => {
   // =========================================================================
   // checkSpotifySearchRateLimit
   // =========================================================================
+
+  describe('checkAuthenticatedOnboardingChatRateLimit', () => {
+    it('charges a signed-in account and session without shared IP or ASN keys', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+      const { checkAuthenticatedOnboardingChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+
+      const result = await checkAuthenticatedOnboardingChatRateLimit(
+        'ba-user-1',
+        'session-1'
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockLimit.mock.calls.map(call => call[0])).toEqual([
+        'session:session-1',
+        'better-auth:ba-user-1',
+        'better-auth:ba-user-1',
+      ]);
+    });
+
+    it('stops when the session lifetime cap is exhausted', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+      const { checkAuthenticatedOnboardingChatRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+
+      const result = await checkAuthenticatedOnboardingChatRateLimit(
+        'ba-user-1',
+        'session-1'
+      );
+
+      expect(result.success).toBe(false);
+      expect(mockLimit).toHaveBeenCalledExactlyOnceWith('session:session-1');
+    });
+  });
 
   describe('checkSpotifySearchRateLimit', () => {
     it('returns success when under limit', async () => {

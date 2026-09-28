@@ -95,12 +95,35 @@ async function openStory(
     },
     { key: STORYBOOK_THEME_STORAGE_KEY, value: theme }
   );
+  // A story whose module fails to load in the Vite dev server leaves
+  // #storybook-root empty forever; the loader error only reaches the browser
+  // console. Capture it so an empty root reports the real cause instead of a
+  // bare visibility timeout (JOV-6541 merge-group diagnosis).
+  const previewErrors: string[] = [];
+  const record = (text: string) => {
+    if (previewErrors.length < 10) previewErrors.push(text);
+  };
+  page.on('pageerror', error => record(`pageerror: ${error}`));
+  page.on(
+    'console',
+    message => message.type() === 'error' && record(message.text())
+  );
   await page.goto(`/iframe.html?id=${storyId}&viewMode=story`, {
     waitUntil: 'domcontentloaded',
   });
   const root = page.locator('#storybook-root');
   await expect(root).toBeVisible({ timeout: STORYBOOK_RENDER_TIMEOUT_MS });
-  await expect(root).not.toBeEmpty({ timeout: STORYBOOK_RENDER_TIMEOUT_MS });
+  try {
+    await expect(root).not.toBeEmpty({ timeout: STORYBOOK_RENDER_TIMEOUT_MS });
+  } catch (error) {
+    if (previewErrors.length) {
+      throw new Error(
+        `Storybook preview did not render ${storyId}: ${previewErrors.join(' | ')}`,
+        { cause: error }
+      );
+    }
+    throw error;
+  }
   return root;
 }
 
@@ -174,6 +197,51 @@ test.describe('surface elevation matrix', () => {
   });
 });
 
+test.describe('chat welcome sample matches the canonical user bubble', () => {
+  for (const theme of THEMES) {
+    for (const width of [390, 1200]) {
+      test(`sample stays legible and rounded [${theme}, ${width}]`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 760 });
+        await openStory(
+          page,
+          'chat-emptystate-composerregion--just-ask-docked',
+          theme
+        );
+        const welcome = page.getByTestId('chat-empty-state-welcome');
+        const bubble = page.getByTestId('chat-empty-state-sample-user');
+        const reply = page.getByTestId('chat-empty-state-sample-reply');
+        const composer = page.getByTestId('chat-composer-surface');
+        await expect(welcome).toBeVisible();
+        await expect(bubble).toBeVisible();
+        await expect(reply).toBeVisible();
+        await expect(composer).toBeVisible();
+        await expect(bubble).toHaveAttribute('data-bubble-shape', 'pill');
+        const bubbleStyle = await bubble.evaluate(element => {
+          const style = getComputedStyle(element);
+          return {
+            background: style.backgroundColor,
+            radius: Number.parseFloat(style.borderTopLeftRadius),
+            height: element.getBoundingClientRect().height,
+          };
+        });
+        expect(bubbleStyle.background).not.toBe('rgba(0, 0, 0, 0)');
+        expect(bubbleStyle.radius).toBeGreaterThanOrEqual(
+          bubbleStyle.height / 2
+        );
+        const sampleBox = (await welcome.boundingBox())!;
+        const composerBox = (await composer.boundingBox())!;
+        expect(sampleBox.x).toBeGreaterThanOrEqual(0);
+        expect(sampleBox.x + sampleBox.width).toBeLessThanOrEqual(width);
+        expect(composerBox.y).toBeGreaterThanOrEqual(
+          sampleBox.y + sampleBox.height
+        );
+      });
+    }
+  }
+});
+
 // The existing elevation lane exercises the actual theme CSS and portaled
 // overlays; jsdom cannot prove contrast or sidebar geometry.
 test.describe('sidebar account and tooltip regressions', () => {
@@ -205,7 +273,7 @@ test.describe('sidebar account and tooltip regressions', () => {
         return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
       });
       expect(contrast).toBeGreaterThanOrEqual(4.5);
-      await testInfo.attach(`tooltip-${theme}`, {
+      await testInfo.attach(`tooltip-${theme}.png`, {
         body: await page.screenshot(),
         contentType: 'image/png',
       });
@@ -261,7 +329,7 @@ test.describe('sidebar account and tooltip regressions', () => {
         );
         expect(await panel.boundingBox()).toEqual(initial);
         await page.keyboard.press('Escape');
-        await testInfo.attach(`account-${state}-${theme}`, {
+        await testInfo.attach(`account-${state}-${theme}.png`, {
           body: await page.screenshot(),
           contentType: 'image/png',
         });
@@ -354,7 +422,7 @@ test.describe('unified composer palette and dictation feedback', () => {
         expect(plusItems[0]).toContain('Attach Files');
         const filter = page.getByLabel('Filter Commands And References');
         await expect(filter).toBeFocused();
-        await testInfo.attach(`plus-${theme}-${width}`, {
+        await testInfo.attach(`plus-${theme}-${width}.png`, {
           body: await page.screenshot(),
           contentType: 'image/png',
         });
@@ -386,7 +454,7 @@ test.describe('unified composer palette and dictation feedback', () => {
         expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(initial!.y);
         expect(alertBox.x).toBeGreaterThanOrEqual(0);
         expect(alertBox.x + alertBox.width).toBeLessThanOrEqual(width);
-        await testInfo.attach(`microphone-error-${theme}-${width}`, {
+        await testInfo.attach(`microphone-error-${theme}-${width}.png`, {
           body: await page.screenshot(),
           contentType: 'image/png',
         });
@@ -459,5 +527,74 @@ test.describe('desktop header shares the traffic-light row', () => {
       '-webkit-app-region',
       'none'
     );
+  });
+});
+
+test.describe('central runtime notifications', () => {
+  test('desktop update stays pending and is actionable in Inbox', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const fixture = window as unknown as {
+        available?: () => void;
+        downloaded?: () => void;
+        installs: number;
+        electronAPI: unknown;
+      };
+      fixture.installs = 0;
+      fixture.electronAPI = {
+        platform: 'darwin',
+        electronVersion: 'fixture',
+        onUpdateAvailable: (cb: () => void) => {
+          fixture.available = cb;
+          return () => {};
+        },
+        onUpdateDownloaded: (cb: () => void) => {
+          fixture.downloaded = cb;
+          return () => {};
+        },
+        installUpdateAndRestart: () => {
+          fixture.installs++;
+        },
+      };
+    });
+    await openStory(
+      page,
+      'dashboard-navigation-customer-rail--runtime-update',
+      'light'
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => typeof (window as unknown as { available?: unknown }).available
+        )
+      )
+      .toBe('function');
+    await page.evaluate(() =>
+      (window as unknown as { available: () => void }).available()
+    );
+    await expect(
+      page.getByRole('button', { name: 'Downloading Jovie Update…' })
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('link', { name: 'Inbox — App Update Available' })
+    ).toHaveAttribute('href', '/app');
+    await page.evaluate(() =>
+      (window as unknown as { downloaded: () => void }).downloaded()
+    );
+    await expect(
+      page.getByRole('button', { name: 'Restart Jovie To Update' })
+    ).toBeEnabled();
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { installs: number }).installs
+      )
+    ).toBe(0);
+    await page.getByRole('button', { name: 'Restart Jovie To Update' }).click();
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { installs: number }).installs
+      )
+    ).toBe(1);
   });
 });

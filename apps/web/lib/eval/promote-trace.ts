@@ -92,7 +92,7 @@ const PII_PATTERNS: readonly {
     replacement: '[REDACTED_API_KEY]',
   },
   {
-    pattern: /\bBearer\s+[A-Za-z0-9._-]{8,}\b/gi,
+    pattern: /\bBearer\s+[A-Z0-9._-]{8,}\b/gi,
     replacement: 'Bearer [REDACTED_TOKEN]',
   },
 ];

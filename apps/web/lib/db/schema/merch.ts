@@ -2,6 +2,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -22,6 +23,9 @@ import {
   merchGenerationStatusEnum,
   merchOrderStatusEnum,
   merchPayoutStatusEnum,
+  merchQaDispositionEnum,
+  merchQaSeverityEnum,
+  merchQaVerdictEnum,
   merchTechniqueEnum,
 } from './enums';
 import { creatorProfiles } from './profiles';
@@ -219,6 +223,16 @@ export const merchDesignOptions = pgTable(
       .notNull()
       .default({}),
     learning: jsonb('learning').$type<MerchLearningSnapshot>().notNull(),
+    /**
+     * JOV-4739: targeted-remediation retry lineage — set when this candidate
+     * was spawned from a quarantined option to carry a remediation
+     * instruction back through the pipeline.
+     */
+    remediationOfOptionId: uuid('remediation_of_option_id').references(
+      (): AnyPgColumn => merchDesignOptions.id,
+      { onDelete: 'set null' }
+    ),
+    remediationInstruction: text('remediation_instruction'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -230,6 +244,56 @@ export const merchDesignOptions = pgTable(
       table.creatorProfileId,
       table.status
     ),
+  })
+);
+
+/**
+ * JOV-4739: immutable QA-review receipt per merch candidate. One row per
+ * review attempt — the publish gate always reads the LATEST receipt for the
+ * candidate and rejects stale (hash-mismatched) or missing evidence.
+ */
+export const merchCandidateQaReviews = pgTable(
+  'merch_candidate_qa_reviews',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    designOptionId: uuid('design_option_id')
+      .notNull()
+      .references(() => merchDesignOptions.id, { onDelete: 'cascade' }),
+    merchCardId: uuid('merch_card_id').references(() => merchCards.id, {
+      onDelete: 'set null',
+    }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    verdict: merchQaVerdictEnum('verdict').notNull(),
+    severity: merchQaSeverityEnum('severity').notNull().default('info'),
+    reasonCodes: text('reason_codes').array().notNull().default([]),
+    reviewerVersion: text('reviewer_version').notNull(),
+    confidence: doublePrecision('confidence').notNull().default(0),
+    /** sha256 over the reviewed candidate payload — staleness detector. */
+    inputHash: text('input_hash').notNull(),
+    /** sha256 over the contract/reviewer versions the review ran under. */
+    referenceHash: text('reference_hash').notNull(),
+    retryCount: integer('retry_count').notNull().default(0),
+    remediationInstruction: text('remediation_instruction'),
+    disposition: merchQaDispositionEnum('disposition')
+      .notNull()
+      .default('pending'),
+    details: jsonb('details')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    reviewedAt: timestamp('reviewed_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    optionCreatedIdx: index('merch_candidate_qa_reviews_option_created_idx').on(
+      table.designOptionId,
+      table.createdAt
+    ),
+    creatorDispositionIdx: index(
+      'merch_candidate_qa_reviews_creator_disposition_idx'
+    ).on(table.creatorProfileId, table.disposition),
   })
 );
 
@@ -497,6 +561,12 @@ export const insertMerchFulfillmentJobSchema =
   createInsertSchema(merchFulfillmentJobs);
 export const selectMerchFulfillmentJobSchema =
   createSelectSchema(merchFulfillmentJobs);
+export const insertMerchCandidateQaReviewSchema = createInsertSchema(
+  merchCandidateQaReviews
+);
+export const selectMerchCandidateQaReviewSchema = createSelectSchema(
+  merchCandidateQaReviews
+);
 
 export type MerchGenerationBatch = typeof merchGenerationBatches.$inferSelect;
 export type NewMerchGenerationBatch =
@@ -513,3 +583,7 @@ export type NewMerchPayoutLedgerEntry =
   typeof merchPayoutLedgerEntries.$inferInsert;
 export type MerchFulfillmentJob = typeof merchFulfillmentJobs.$inferSelect;
 export type NewMerchFulfillmentJob = typeof merchFulfillmentJobs.$inferInsert;
+export type MerchCandidateQaReview =
+  typeof merchCandidateQaReviews.$inferSelect;
+export type NewMerchCandidateQaReview =
+  typeof merchCandidateQaReviews.$inferInsert;

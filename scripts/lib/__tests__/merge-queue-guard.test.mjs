@@ -1,5 +1,6 @@
+// biome-ignore-all format: keep origin/main layout under PR Size Guard
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -25,7 +26,6 @@ import {
   fastTrackPolicy,
   frontItemChurnDecision,
   isAutonomousBranch,
-  MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
   mapGraphqlCheckResponseTimeoutToMinutes,
   mergeNativeQueuePolicyObservations,
@@ -44,7 +44,6 @@ import {
   unmergeableReenqueueDecision,
   validateAggregateRequiredChecks,
   validateLiveMergeQueueRuleset,
-  validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
   validateNativeDrainQueueLabelIsolation,
 } from '../merge-queue-guard.mjs';
@@ -245,7 +244,7 @@ describe('fast-track policy', () => {
   it('permits generated UI fast-track when labels, files, screenshots, checks, and audit trail are present', () => {
     const policy = fastTrackPolicy({
       headRefName: 'codex/jov-3894-text-token-fix',
-      labels: [{ name: 'fast' }, { name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'fast' }, { name: 'ui' }],
       title: 'fix(ui): reduce oversized title token',
       changedFiles: [
         'apps/web/components/features/profile/ProfileHeader.tsx',
@@ -283,21 +282,26 @@ describe('fast-track policy', () => {
       { why: false },
       'missing fast-track UI eligibility audit trail in PR body',
     ],
-  ])('denies UI fast-track when %s is missing', (_name, bodyOptions, blocker) => {
-    const policy = uiFastTrackPolicy({
-      headRefName: 'codex/jov-3894-text-token-fix',
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
-      changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
-      body: buildUiFastTrackBody(bodyOptions),
-    });
+  ])(
+    'denies UI fast-track when %s is missing',
+    (_name, bodyOptions, blocker) => {
+      const policy = uiFastTrackPolicy({
+        headRefName: 'codex/jov-3894-text-token-fix',
+        labels: [{ name: 'ui' }, { name: 'fast' }],
+        changedFiles: [
+          'apps/web/components/features/profile/ProfileHeader.tsx',
+        ],
+        body: buildUiFastTrackBody(bodyOptions),
+      });
 
-    expect(policy.eligible).toBe(false);
-    expect(policy.blockers).toContain(blocker);
-  });
+      expect(policy.eligible).toBe(false);
+      expect(policy.blockers).toContain(blocker);
+    }
+  );
 
   it('ignores negated evidence claims in the fast-track UI section', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
       body: [
         '## Fast-track UI eligibility',
@@ -319,7 +323,7 @@ describe('fast-track policy', () => {
 
   it('denies UI fast-track when changed files are unavailable', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       body: buildUiFastTrackBody({
         checks: 'Checks run: typecheck; biome; affected component test.',
       }),
@@ -333,7 +337,7 @@ describe('fast-track policy', () => {
 
   it('warns but does not block when affected test evidence is absent', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
       body: buildUiFastTrackBody({
         checks: 'Checks run: typecheck; biome.',
@@ -348,7 +352,7 @@ describe('fast-track policy', () => {
 
   it('denies UI fast-track for API, auth, billing, DB, security, infra, and routing paths', () => {
     const policy = uiFastTrackPolicy({
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+      labels: [{ name: 'ui' }, { name: 'fast' }],
       changedFiles: [
         'apps/web/app/api/profile/route.ts',
         'apps/web/lib/entitlements/server.ts',
@@ -479,14 +483,14 @@ describe('aggregate required checks', () => {
     expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
-  it('runs required Storybook geometry contracts in the combined layout gate', () => {
+  it('runs required Storybook geometry contracts in the combined Storybook gate', () => {
     const ciWorkflowYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
       'utf8'
     );
     const combinedLayoutBlock = extractWorkflowJobBlock(
       ciWorkflowYaml,
-      'ci-build-layout'
+      'ci-storybook-surfaces'
     );
 
     expect(combinedLayoutBlock).toMatch(
@@ -500,21 +504,14 @@ describe('aggregate required checks', () => {
     );
   });
 
-  it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
-    const autoenrollYaml = readFileSync(
-      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
-      'utf8'
-    );
-    const enrollBlock = extractWorkflowJobBlock(autoenrollYaml, 'enroll');
-
-    expect(enrollBlock).toMatch(/drain-pr-queue\.sh/);
-    for (const rule of MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN) {
-      expect(rule.pattern.test(enrollBlock), rule.id).toBe(false);
-    }
-
-    const result = validateMergeQueueEnrollHotPath(autoenrollYaml);
-    expect(result.ok).toBe(true);
-    expect(result.errors).toEqual([]);
+  it('retires custom source admission and its automatic wake paths', () => {
+    expect(existsSync(resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow))).toBe(false);
+    const heartbeat = readFileSync(resolve(REPO_ROOT, '.github/workflows/runner-heartbeat.yml'), 'utf8');
+    const ownerless = readFileSync(resolve(REPO_ROOT, 'scripts/ownerless-recovery-sweeper.mjs'), 'utf8');
+    const loop = readFileSync(resolve(REPO_ROOT, 'scripts/loop-orchestrator.sh'), 'utf8');
+    expect(heartbeat).not.toContain('gh workflow run merge-queue-autoenroll.yml');
+    expect(ownerless).not.toContain('ownerless-recovery-admission');
+    expect(loop).not.toContain('run_logged drain.log');
   });
 
   it('isolates the legacy label from native drain enrollment and dequeue', () => {
@@ -615,6 +612,30 @@ describe('aggregate required checks', () => {
       expect(malformed.errors).toContain(
         'live ruleset bypass_actors must be an array'
       );
+    }
+
+    // GitHub omits bypass_actors for a workflow GITHUB_TOKEN; the read-only
+    // observer opts in explicitly and must still reject malformed/non-empty.
+    const { bypass_actors: _omitted, ...tokenView } = {
+      bypass_actors: [],
+      rules: nativeRules,
+    };
+    const unavailable = validateLiveMergeQueueRuleset(tokenView, {
+      backend: 'native',
+      allowUnavailableBypassActors: true,
+    });
+    expect(unavailable).toMatchObject({
+      ok: true,
+      errors: [],
+      bypassActorsVisible: false,
+    });
+    expect(result.bypassActorsVisible).toBe(true);
+    for (const bypass_actors of [{}, [{ actor_id: 158384 }]]) {
+      const stillUnsafe = validateLiveMergeQueueRuleset(
+        { bypass_actors, rules: nativeRules },
+        { backend: 'native', allowUnavailableBypassActors: true }
+      );
+      expect(stillUnsafe.ok).toBe(false);
     }
 
     for (const actor_id of [158384, 2934433]) {
@@ -1783,6 +1804,26 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(parseMergeQueueFrontBranch(null)).toBeNull();
   });
 
+  it('returns unknown instead of blocking when the head commit time is missing', () => {
+    // An empty or failed commit-date lookup must not count earlier heads'
+    // failures against a new, untested head (Sentry on #18341).
+    for (const headCommittedAt of ['', null, 'not-a-date']) {
+      const decision = frontItemChurnDecision({
+        prNumber: 15849,
+        currentBaseSha: BASE,
+        headCommittedAt,
+        observedAt: '2026-08-13T01:53:00.000Z',
+        mergeGroupRuns: [
+          groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+          groupRun(15849, BASE, 'failure', '2026-08-13T01:31:17.000Z'),
+          groupRun(15849, BASE, 'failure', '2026-08-13T01:11:17.000Z'),
+        ],
+      });
+      expect(decision.action).toBe('unknown');
+      expect(decision.evidence).toBeNull();
+    }
+  });
+
   it('suppresses an unchanged source head after repeated unit-test failures', () => {
     // Incident regression: #15849 fronted repeated failed group attempts on
     // base 9bd3fade9 while its head b499576 stayed unchanged.
@@ -2173,6 +2214,83 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.reason).toContain('infrastructure-recovery retry');
   });
 
+  it('spends the single unclassified retry per head across bases and time', () => {
+    // Live #18287 (2026-09-24): the unchanged head failed four merge-group
+    // attempts in 40 minutes. Counting only exact-current-base failures plus a
+    // five-minute cooldown re-enqueued it after every ejection.
+    const OTHER_BASE = '40622e96bc1378fac9c9be03e225fa6102d9deac';
+    const decision = frontItemChurnDecision({
+      prNumber: 18287,
+      currentBaseSha: NEW_BASE,
+      headCommittedAt: '2026-09-24T23:00:00.000Z',
+      observedAt: '2026-09-25T02:00:00.000Z',
+      mergeGroupRuns: [
+        groupRun(18287, BASE, 'failure', '2026-09-24T23:41:46.000Z', 'completed', [
+          'Evaluate combined-head checks',
+        ]),
+        groupRun(18287, OTHER_BASE, 'failure', '2026-09-24T23:57:01.000Z', 'completed', [
+          'Join exact lane results',
+        ]),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('retry is spent');
+    expect(decision.evidence).toMatchObject({
+      failureClass: 'retry-exhausted',
+      failedAttempts: 2,
+      baseSha: OTHER_BASE,
+    });
+  });
+
+  it('does not charge cancelled runs against the single infrastructure retry', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 18287,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-24T23:00:00.000Z',
+      observedAt: '2026-09-25T02:00:00.000Z',
+      mergeGroupRuns: [
+        groupRun(18287, BASE, 'failure', '2026-09-24T23:41:46.000Z', 'completed', [
+          'Set up job',
+        ]),
+        groupRun(18287, BASE, 'cancelled', '2026-09-24T23:50:00.000Z'),
+        groupRun(18287, NEW_BASE, 'cancelled', '2026-09-24T23:55:00.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.evidence).toMatchObject({
+      failureClass: 'unclassified',
+      failedAttempts: 1,
+    });
+  });
+
+  it('classifies repeated structural ci-fast lane failures as product failures', () => {
+    // #18287's failed step: coverage 99.13% below the 100% threshold.
+    const decision = frontItemChurnDecision({
+      prNumber: 18287,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-24T23:00:00.000Z',
+      observedAt: '2026-09-25T00:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(18287, BASE, 'failure', '2026-09-25T00:03:36.000Z', 'completed', [
+          'Run structural ci-fast lane',
+        ]),
+        groupRun(18287, BASE, 'failure', '2026-09-25T00:19:44.000Z', 'completed', [
+          'Run structural ci-fast lane',
+        ]),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+  });
+
+  it('maps an exhausted retry to the durable product-failure tombstone in drain', () => {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain('"$failure_class" == "retry-exhausted"');
+  });
+
   it('ignores cancelled and in-progress runs and other fronts', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
@@ -2356,13 +2474,13 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         { ...NATIVE_QUEUE_POLICY },
         { checkResponseTimeout: null }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 20 });
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
     const secondsReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
       checkResponseTimeout: 1200,
     });
     expect(secondsReadback.observed.check_response_timeout_minutes).toBe(20);
-    expect(secondsReadback.drift).not.toContain(
+    expect(secondsReadback.drift).toContain(
       'check_response_timeout_minutes'
     );
     const liveGraphql = validateLiveMergeQueueRuleset(
@@ -2533,18 +2651,18 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     },
   ];
 
-  it.each(stampCases)('evaluates a recognized stamp with $name', ({
-    members,
-    expected,
-  }) => {
-    expect(
-      changelogGroupCollisionDecision({
-        candidateFiles: ['CHANGELOG.md', 'package.json'],
-        queuedMemberFiles: members,
-        branch: stampBranch,
-      })
-    ).toEqual(expected);
-  });
+  it.each(stampCases)(
+    'evaluates a recognized stamp with $name',
+    ({ members, expected }) => {
+      expect(
+        changelogGroupCollisionDecision({
+          candidateFiles: ['CHANGELOG.md', 'package.json'],
+          queuedMemberFiles: members,
+          branch: stampBranch,
+        })
+      ).toEqual(expected);
+    }
+  );
 
   it('does not claim a clear queue from missing or malformed stamp evidence', () => {
     for (const members of [
@@ -2588,7 +2706,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       ) +
       drain.slice(
         drain.indexOf('pr_changed_paths_json() {'),
-        drain.indexOf('deferred_state_is_releasable() {')
+        drain.indexOf('reconcile_deferred_auto_merge_after_main_push() {')
       );
     const snapshot = [{ n: 17463, head: branch, q: false }];
     const files = Object.fromEntries([
@@ -2708,14 +2826,12 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     }
   }
 
-  it.each(
-    stampCases
-  )('runs the canonical shell and CLI for a stamp with $name', ({
-    members,
-    expected,
-  }) => {
-    expect(runDrainChangelogDecision({ members })).toEqual(expected);
-  });
+  it.each(stampCases)(
+    'runs the canonical shell and CLI for a stamp with $name',
+    ({ members, expected }) => {
+      expect(runDrainChangelogDecision({ members })).toEqual(expected);
+    }
+  );
 
   it('keeps implementation rejection and unavailable candidate evidence through the real drain caller', () => {
     expect(

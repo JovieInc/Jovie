@@ -260,8 +260,10 @@ export function AdminFeaturesTable({
         void writeCell(flagKey, tier, next).catch(() => undefined);
         return;
       }
-      const action =
-        next === null ? 'reset to its default' : next ? 'enable' : 'disable';
+      let action: string;
+      if (next === null) action = 'reset to its default';
+      else if (next) action = 'enable';
+      else action = 'disable';
       setProdChange({
         flagKey,
         flagName,

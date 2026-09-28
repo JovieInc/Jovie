@@ -11,6 +11,19 @@ on:
   schedule:
     # Hosted API measurement, offset from the deeper scheduled suites.
     - cron: '25 6 * * *'
+  # Causal trigger for the dev-loop job: a change to a local gate lands.
+  push:
+    branches: [main]
+    paths:
+      - '.husky/**'
+      - 'package.json'
+      - 'scripts/check-conflict-markers.sh'
+      - 'scripts/security/scan-secrets.sh'
+      - 'scripts/repo-hygiene-guard.mjs'
+      - 'scripts/skill-governance-guard.mjs'
+      - 'scripts/hooks/**'
+      - 'scripts/dev-loop-latency.mjs'
+      - 'apps/web/scripts/next-proxy-guard.mjs'
   workflow_dispatch:
     inputs:
       sample_limit:
@@ -21,14 +34,56 @@ on:
 permissions:
   contents: read
   actions: read
+  # JOV-6836: promotion-loss metrics read PR queue timelines.
+  pull-requests: read
 
 concurrency:
   group: ci-duration-ratchet
   cancel-in-progress: true
 
 jobs:
+  dev-loop:
+    # Local (pre-CI) loop: every .husky/pre-commit rung + pre-push publication
+    # against budgets in scripts/dev-loop-latency.mjs.
+    name: Measure dev-loop hook latency
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Skip unchanged scheduled SHA
+        id: unchanged
+        uses: ./.github/actions/skip-if-unchanged
+        with:
+          workflow: ci-duration-ratchet.yml
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.unchanged.outputs.skip != 'true'
+
+      - name: Time pre-commit and pre-push rungs
+        if: steps.unchanged.outputs.skip != 'true'
+        run: node scripts/dev-loop-latency.mjs
+
+      - name: Enforce repeated typecheck performance ratchet
+        if: github.event_name != 'push' && steps.unchanged.outputs.skip != 'true'
+        run: pnpm typecheck:performance -- --scenario ci --samples 3 --enforce --output "$RUNNER_TEMP/typecheck-performance.json"
+
+      - name: Slack alert on failure
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        run: |
+          set -euo pipefail
+          jq -n --arg run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{text: ("Dev-loop latency budget breached (pre-commit/pre-push). <" + $run + "|View summary>")}' \
+            | curl -sS -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL"
+
   measure:
     name: Measure p95 gate duration + check ratchet
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
@@ -143,6 +198,14 @@ jobs:
             echo "_Baseline lockfile: \`.github/ci-harness/duration-ratchet.json\`_"
             echo "_Update with: \`node scripts/ci-duration-ratchet.mjs update --p95 <seconds> --sample-size ${SAMPLE_SIZE:-0}\`_"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Promotion-loss metrics (JOV-6836)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Runner-minutes per merged PR is opt-in (`--runner-minutes`): one jobs call per CI run
+        # is too many API calls for this 8-minute job.
+        run: node scripts/promotion-loss-metrics.mjs --since 24h >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when SLO is breached
         if: ${{ steps.measure.outputs.p95_seconds != '' && steps.ratchet.outputs.ratchet_ok != 'true' }}

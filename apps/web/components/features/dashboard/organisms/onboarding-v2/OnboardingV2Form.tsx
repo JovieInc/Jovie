@@ -1,7 +1,9 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/dashboard/organisms/onboarding-v2-performance.test.tsx
+
 import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
-import { ArrowRight, Disc3, Lock, Music2, RefreshCw } from 'lucide-react';
+import { ArrowRight, AudioLines, Music2, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -48,62 +50,12 @@ import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
 } from '@/lib/onboarding/session-keys';
+import { presentUnmanagedListing } from '@/lib/profile/artist-status-presentation';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
 const DISCOVERY_AUTO_ADVANCE_MS = 800;
-
-/**
- * Reserved Spotify artist IDs — top DJs.
- * These appear in search results as "unavailable" to create social proof.
- */
-const RESERVED_SPOTIFY_IDS = new Set([
-  '1Cs0zKBU1kc0i8ypK3B9ai', // David Guetta
-  '60d24wfXkVzDSfLS6hyCjZ', // Martin Garrix
-  '64KEffDW9EtZ1y2vBYgq8T', // Marshmello
-  '1vCWHaC5f2uS3yhpwWbIA6', // Avicii
-  '6VuMaDnrHyPL1p4EHjYLi7', // Charlie Puth (crossover DJ/producer)
-  '5fMUXHkw8R8eOP2RNVYEZX', // Diplo
-  '4q3ewBCX7sLwd24euuV69X', // Bad Bunny
-  '1McMsnEElThX1knmY4oliG', // Olivia Rodrigo
-  '738wLrAtLtCtFOLvQBXOXp', // Kygo
-  '0EmeFodog0BfCgMzAIvKQp', // Skrillex
-  '5he5w2lnU9x7JFhnwcekXX', // Tiësto
-  '2o5jDhtHVPhrJdv3UGqLyI', // Armin van Buuren
-  '6nB0iY1cjSY1KyhYyuIIKH', // Deadmau5
-  '4YLtL2W80ytGNMKnW7ALBx', // Calvin Harris
-  '6hyMWrxGBsOx6sWcVj1DqP', // Zedd
-  '20s0P9QLxGqKuCsGwFsp7w', // Alesso
-  '4AVFqumd2ogHFlRbKIjp1t', // Afrojack
-  '77AiFEVeAVj2ORpC85QVJs', // Steve Aoki
-  '4pbG9SUmhZhrQKoSCxZyHc', // Don Diablo
-  '5YGY8feqx7naU7z4HrwZM6', // Miley Cyrus
-  '540vIaP2JwjQb9dm3aArA4', // DJ Snake
-  '2wY79sveU1sp5g7SokKOiI', // Sam Smith
-  '2ye2Wgw4gimLv2eAKyk1NB', // Metallica
-  '23fqKkggKUBHNkbKtXEls4', // Kylie Minogue
-  '0C8ZW7ezQVs4URX5aX7Kqx', // Selena Gomez
-  '2YZyLoL8N0Wb9xBt1NhZWg', // Kendrick Lamar
-  '3TVXtAsR1Inumwj472S9r4', // Drake
-  '06HL4z0CvFAxyc27GXpf02', // Taylor Swift
-  '6eUKZXaKkcviH0Ku9w2n3V', // Ed Sheeran
-  '1HY2Jd0NmPuamShAr6KMms', // Lady Gaga
-  '4gzpq5DPGxSnKTe4SA8HAU', // Coldplay
-  '3WrFJ7ztbogyGnTHbHJFl2', // The Beatles
-  '0du5cEVh5yTK9QJze8zA0C', // Bruno Mars
-  '4dpARuHxo51G3z768sgnrY', // Adele
-  '66CXWjxzNUsdJxJ2JdwvnR', // Ariana Grande
-  '7dGJo4pcD2V6oG8kP0tJRR', // Eminem
-  '3Nrfpe0tUJi4K4DXYWgMUX', // BTS
-  '6qqNVTkY8uBg9cP3Jd7DAH', // Billie Eilish
-  '1Xyo4u8uXC1ZmMpatF05PJ', // The Weeknd
-  '5K4W6rqBFWDnAN6FQUkS6x', // Kanye West
-]);
-
-function isReservedArtist(artist: SpotifyArtistResult): boolean {
-  return artist.isClaimed === true || RESERVED_SPOTIFY_IDS.has(artist.id);
-}
 
 type StepId =
   | 'handle'
@@ -1618,7 +1570,6 @@ export function OnboardingV2Form({
         className='absolute top-full right-0 left-0 z-10 mt-2 max-h-80 overflow-y-auto p-1'
       >
         {results.map(artist => {
-          const unavailable = isReservedArtist(artist);
           const followerLabel = artist.followers
             ? `${artist.followers.toLocaleString()} followers`
             : 'Spotify';
@@ -1627,7 +1578,6 @@ export function OnboardingV2Form({
             <li key={artist.id}>
               <button
                 type='button'
-                disabled={unavailable}
                 onClick={() => {
                   connectArtist({
                     id: artist.id,
@@ -1637,10 +1587,7 @@ export function OnboardingV2Form({
                   });
                 }}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors',
-                  unavailable
-                    ? 'cursor-default opacity-35'
-                    : 'hover:bg-surface-0'
+                  'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors hover:bg-surface-0'
                 )}
               >
                 {artist.imageUrl ? (
@@ -1663,12 +1610,17 @@ export function OnboardingV2Form({
                     {artist.name}
                   </p>
                   <p className='text-xs text-secondary-token'>
-                    {unavailable ? 'Unavailable' : followerLabel}
+                    {followerLabel}
                   </p>
                 </div>
 
-                {unavailable ? (
-                  <Lock className='h-4 w-4 shrink-0 text-tertiary-token' />
+                {artist.isClaimed ? (
+                  <span
+                    className='shrink-0 text-2xs text-tertiary-token'
+                    data-testid='listing-badge'
+                  >
+                    {presentUnmanagedListing().label}
+                  </span>
                 ) : (
                   <ArrowRight className='h-4 w-4 shrink-0 text-tertiary-token' />
                 )}
@@ -2055,7 +2007,7 @@ export function OnboardingV2Form({
                       />
                     ) : (
                       <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-0 text-tertiary-token'>
-                        <Disc3 className='h-5 w-5' />
+                        <AudioLines className='h-5 w-5' />
                       </div>
                     )}
                     <div className='min-w-0'>

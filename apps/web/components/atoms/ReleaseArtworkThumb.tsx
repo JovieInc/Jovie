@@ -16,13 +16,13 @@ interface ReleaseArtworkThumbProps {
   readonly size?: number;
   /** Additional classes on the outer container */
   readonly className?: string;
-  /** Icon size class for the fallback Disc3 icon */
+  /** Icon size class for the fallback AudioLines icon */
   readonly fallbackIconClass?: string;
 }
 
 /**
  * Square artwork thumbnail with rounded corners.
- * Shows a Disc3 fallback icon when:
+ * Shows an AudioLines fallback icon when:
  * - No src is provided
  * - The image fails to load (404, CORS, expired CDN URL, etc.)
  */

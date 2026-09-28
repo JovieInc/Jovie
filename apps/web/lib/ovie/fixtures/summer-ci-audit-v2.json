@@ -3,9 +3,17 @@
   "observedAt": "2026-09-14T22:00:00Z",
   "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "sourceDigest": "aa52df09d7227751b0adb49ae8b7a4c659da9bbbf5f5d561018269085faba880",
-  "classes": [],
+  "classes": [
+    {
+      "id": "affected-only-unit-selection",
+      "state": "open",
+      "owner": "ci-risk-classifier",
+      "impact-rule": "affected-unit-paths-only",
+      "action": "remediate-selected-ci-audit-class",
+      "handle": "audit:affected-only-units"
+    }
+  ],
   "excludedClasses": [
-    { "id": "affected-only-unit-selection", "reason": "mapping-unaccepted" },
     { "id": "auto-enroll-self-cancel-churn", "reason": "mapping-unaccepted" },
     { "id": "controller-cascade-coalescing", "reason": "mapping-unaccepted" },
     {

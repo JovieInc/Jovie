@@ -20,6 +20,8 @@ function buildInput(
       mrrGrowth30dUsd: 100,
       isConfigured: true,
       isAvailable: true,
+      excludedInternalSubscribers: 0,
+      excludedInternalMrrUsd: 0,
     },
     mercury: {
       balanceUsd: 5000,
@@ -102,6 +104,8 @@ describe('buildHudMetricSources', () => {
     expect(sources.github.dashboardUrl).toBe(
       'https://github.com/JovieInc/Jovie/actions'
     );
+    expect(sources.github.state).toBe('ok');
+    expect(sources.github.nextStep).toBeNull();
   });
 
   it('preserves provider observation timestamps instead of restamping cache hits', () => {
@@ -132,6 +136,8 @@ describe('buildHudMetricSources', () => {
           mrrGrowth30dUsd: 0,
           isConfigured: true,
           isAvailable: false,
+          excludedInternalSubscribers: 0,
+          excludedInternalMrrUsd: 0,
           errorMessage: 'Stripe API error: timeout',
         },
         mercury: {
@@ -185,6 +191,8 @@ describe('buildHudMetricSources', () => {
           mrrGrowth30dUsd: 0,
           isConfigured: true,
           isAvailable: false,
+          excludedInternalSubscribers: 0,
+          excludedInternalMrrUsd: 0,
           errorMessage: 'Stripe API error (401): unauthorized',
         },
       })
@@ -207,6 +215,37 @@ describe('buildHudMetricSources', () => {
 
     expect(sources.github.state).toBe('no_data');
     expect(sources.github.nextStep).toContain('No workflow runs yet');
+  });
+
+  it('tells operators how to configure or retry GitHub deploys', () => {
+    const missing = buildHudMetricSources(
+      buildInput({
+        deployments: {
+          availability: 'not_configured',
+          current: null,
+          recent: [],
+        },
+      })
+    );
+    expect(missing.github.state).toBe('not_configured');
+    expect(missing.github.nextStep).toBe(
+      'Add HUD_GITHUB_TOKEN, HUD_GITHUB_OWNER, and HUD_GITHUB_REPO to load deploys.'
+    );
+
+    const failed = buildHudMetricSources(
+      buildInput({
+        deployments: {
+          availability: 'error',
+          current: null,
+          recent: [],
+          errorMessage: 'GitHub API error (401)',
+        },
+      })
+    );
+    expect(failed.github.state).toBe('unavailable');
+    expect(failed.github.nextStep).toBe(
+      'Check GitHub API credentials and retry.'
+    );
   });
 });
 

@@ -1,7 +1,7 @@
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getFreshAuth } from '@/lib/auth/cached';
 import { maskUserIdForLog } from '@/lib/auth/mask-user-id';
 import { captureWarning } from '@/lib/error-tracking';
 import { isAdmin } from './roles';
@@ -26,8 +26,11 @@ import { isAdmin } from './roles';
  *
  * @returns NextResponse with 403 status if not admin, null if authorized
  */
-export async function requireAdmin(): Promise<NextResponse | null> {
-  const { userId } = await getCachedAuth();
+export async function requireAdmin(options?: {
+  session?: 'cookie' | 'fresh';
+}): Promise<NextResponse | null> {
+  const readAuth = options?.session === 'fresh' ? getFreshAuth : getCachedAuth;
+  const { userId } = await readAuth();
 
   // User not authenticated. This is routine traffic (unauth hits to admin
   // routes) — not an actionable signal, so we record a breadcrumb for

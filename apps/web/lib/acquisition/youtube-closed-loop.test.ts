@@ -19,8 +19,11 @@ describe('YouTube closed-loop ICP (JOV-5881)', () => {
           { videoId: 'b', publishedAt: daysAgo(40) },
           { videoId: 'c', publishedAt: daysAgo(200) },
         ],
-      }).qualified
-    ).toBe(true);
+      })
+    ).toMatchObject({
+      qualified: true,
+      reason: 'regularly_uploading_music_channel',
+    });
     expect(
       qualifyRegularlyUploadingChannel({
         now,

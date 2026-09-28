@@ -490,6 +490,24 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       .getByRole('button', { name: 'Actions for Spotify' })
       .closest('tr');
     expect(
+      within(spotifyRow as HTMLElement).getByRole('cell', { name: 'Tim White' })
+    ).toBeInTheDocument();
+    expect(
+      within(spotifyRow as HTMLElement).getByRole('cell', {
+        name: /Spotify/,
+      })
+    ).toHaveTextContent('Spotify');
+    const status = within(spotifyRow as HTMLElement)
+      .getAllByText('Limit Reached')[0]
+      ?.closest('[tabindex="0"]');
+    expect(status).toHaveAttribute('tabindex', '0');
+    fireEvent.focus(status as HTMLElement);
+    expect(
+      await screen.findByText(
+        'Upgrade the monitoring limit to track this page.'
+      )
+    ).toBeInTheDocument();
+    expect(
       within(spotifyRow as HTMLElement).queryByText(/open\.spotify\.com/)
     ).not.toBeInTheDocument();
 
@@ -1141,6 +1159,12 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.getByRole('columnheader', { name: 'Status' })
     ).toHaveTextContent('Status');
+    expect(
+      screen.getByRole('columnheader', { name: 'Platform / Page' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Artist' })
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('connections-toolbar-actions')).toBeNull();
   });
 

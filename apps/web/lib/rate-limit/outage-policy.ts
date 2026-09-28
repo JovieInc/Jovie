@@ -1,6 +1,10 @@
 /** Redis outage inventory. Tests pin completeness and requireRedis. */
 
-import { RATE_LIMITERS, type RateLimiterName } from './config';
+import type { RateLimiterName } from './config';
+import type { RateLimitConfig } from './types';
+
+/** Any limiter map keyed like RATE_LIMITERS (tests pass mutated copies). */
+type RateLimiterConfigMap = Readonly<Record<RateLimiterName, RateLimitConfig>>;
 
 export type RedisOutageClass = 'mandatory' | 'advisory' | 'optional' | 'local';
 export type RedisCallerUnavailableAction = 'deny' | 'allow' | 'drop';
@@ -8,13 +12,13 @@ export type RedisCallerUnavailableAction = 'deny' | 'allow' | 'drop';
 export interface RedisLimiterOutagePolicy {
   readonly class: RedisOutageClass;
   readonly callerOnUnavailable: RedisCallerUnavailableAction;
-  readonly quotaContribution: 'analytics' | 'fixed-window' | 'none';
+  readonly quotaContribution: 'sliding-window' | 'fixed-window' | 'none';
 }
 
 const mandatoryDeny = {
   class: 'mandatory',
   callerOnUnavailable: 'deny',
-  quotaContribution: 'analytics',
+  quotaContribution: 'sliding-window',
 } as const satisfies RedisLimiterOutagePolicy;
 
 const mandatoryDenyFixed = {
@@ -32,7 +36,7 @@ const advisoryAllow = {
 const advisoryDeny = {
   class: 'advisory',
   callerOnUnavailable: 'deny',
-  quotaContribution: 'analytics',
+  quotaContribution: 'sliding-window',
 } as const satisfies RedisLimiterOutagePolicy;
 
 const advisoryDenyFixed = {
@@ -79,6 +83,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   deployPromote: mandatoryDeny,
   accountDelete: mandatoryDeny,
   publicArtistApi: mandatoryDenyFixed,
+  agentProfileCreate: mandatoryDenyFixed,
   general: mandatoryDenyFixed,
   changelogSubscribe: mandatoryDenyFixed,
   musicBrainzLookup: mandatoryDeny,
@@ -142,9 +147,10 @@ export interface RedisDataConsumerPolicy {
 }
 
 export const REDIS_DATA_CONSUMERS = {
-  'auth/secondary-storage': {
-    class: 'mandatory',
-    recovery: 'Postgres sessions; delete fail-closed when Redis is reachable',
+  'auth/rate-limit': {
+    class: 'advisory',
+    recovery:
+      'Degrade open when Redis is missing. Sessions stay in Postgres plus the cookie cache',
   },
   'musicfetch/budget-guard': {
     class: 'mandatory',
@@ -183,10 +189,8 @@ export const REDIS_DATA_CONSUMERS = {
   },
 } as const satisfies Record<string, RedisDataConsumerPolicy>;
 
-function limiterRequiresRedis(
-  config: (typeof RATE_LIMITERS)[RateLimiterName]
-): boolean {
-  return 'requireRedis' in config && config.requireRedis === true;
+function limiterRequiresRedis(config: RateLimitConfig): boolean {
+  return config.requireRedis === true;
 }
 
 export function unpinnedLimiterPolicies(
@@ -199,7 +203,7 @@ export function unpinnedLimiterPolicies(
 }
 
 export function mandatoryLimitersMissingRequireRedis(
-  configs: typeof RATE_LIMITERS,
+  configs: RateLimiterConfigMap,
   policies: typeof RATE_LIMIT_OUTAGE_POLICY = RATE_LIMIT_OUTAGE_POLICY
 ): string[] {
   return (Object.keys(policies) as RateLimiterName[])
@@ -210,7 +214,7 @@ export function mandatoryLimitersMissingRequireRedis(
 }
 
 export function wrongPolicyLimiters(
-  configs: typeof RATE_LIMITERS,
+  configs: RateLimiterConfigMap,
   policies: typeof RATE_LIMIT_OUTAGE_POLICY = RATE_LIMIT_OUTAGE_POLICY
 ): string[] {
   return (Object.keys(policies) as RateLimiterName[])

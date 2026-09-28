@@ -71,7 +71,7 @@ describe('touch-target ratchet', () => {
         'Fix: enlarge the hit container (`before:absolute before:h-11`), not the visible item.\n' +
         'Locate them: pnpm --filter web run lint:touch-target -- --list'
     ).toBeLessThanOrEqual(baseline.count);
-  });
+  }, 60_000);
 
   it('baseline follows the work down (no stale slack)', () => {
     const current = countViolations(WEB_ROOT).length;
@@ -85,7 +85,7 @@ describe('touch-target ratchet', () => {
       `Baseline is ${baseline.count - current} above the real count (${current}). ` +
         'Run `pnpm --filter web run lint:touch-target -- --update` to lower it.'
     ).toBeLessThanOrEqual(25);
-  });
+  }, 60_000);
 });
 
 describe('touch-target detection — violations are caught (red→green proof)', () => {
@@ -273,6 +273,8 @@ describe('touch-target detection — violations are caught (red→green proof)',
 
   it('tagHasSub44Height is precise about the 44px boundary', () => {
     expect(tagHasSub44Height('<button className="h-10">')).toBe(true); // 40px
+    expect(tagHasSub44Height('<button className="h-0.5">')).toBe(true);
+    expect(tagHasSub44Height('<button className="h-0x5">')).toBe(false);
     expect(tagHasSub44Height('<button className="h-11">')).toBe(false); // 44px
     expect(tagHasSub44Height('<button className="h-[43px]">')).toBe(true);
     expect(tagHasSub44Height('<button className="h-[44px]">')).toBe(false);

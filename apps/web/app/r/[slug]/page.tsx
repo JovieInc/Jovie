@@ -21,10 +21,7 @@ import { isSmartLinkCrawler } from '@/lib/analytics/smart-link-admission';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  derivePreviewState,
-  getProviderConfidence,
-} from '@/lib/discography/audio-qa';
+import { getProviderConfidence } from '@/lib/discography/audio-qa';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
@@ -284,21 +281,12 @@ export default async function ReleaseSmartLinkPage({
     .filter(p => p.url);
 
   const allProviders = [...providers, ...secondaryProviders];
-  const previewState = derivePreviewState({
-    audioUrl: null,
-    previewUrl: null,
-    metadata: null,
-    providerLinks: links,
-  });
-
   return (
     <ReleaseLandingPage
       release={{
         title: release.title,
         artworkUrl: release.artworkUrl ?? null,
         releaseDate: release.releaseDate?.toISOString() ?? null,
-        previewVerification: previewState.previewVerification,
-        previewSource: previewState.previewSource,
       }}
       artist={{
         name: creator.displayName ?? creator.username,

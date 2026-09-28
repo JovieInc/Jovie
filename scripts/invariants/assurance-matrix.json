@@ -1,0 +1,836 @@
+{
+  "schema": "jovie.assurance-matrix/v1",
+  "contract": "jovie.certification/v1",
+  "issue": "JOV-6064",
+  "extends": "JOV-5853",
+  "matrixRevision": "2026-09-27.1",
+  "asOf": "2026-09-27T00:00:00Z",
+  "evidenceMaxAgeMs": 2592000000,
+  "scope": {
+    "requiredObjects": [
+      { "id": "journey:marketing-home-render", "kind": "user-journey" },
+      { "id": "journey:signup-onboarding", "kind": "user-journey" },
+      { "id": "journey:artist-profile-public", "kind": "user-journey" },
+      { "id": "journey:checkout-billing", "kind": "user-journey" },
+      { "id": "journey:chat-agent-turn", "kind": "user-journey" },
+      { "id": "journey:release-publish", "kind": "user-journey" },
+      { "id": "journey:smartlink-fan-click", "kind": "user-journey" },
+      { "id": "boundary:tenant-isolation", "kind": "trust-boundary" },
+      { "id": "boundary:auth-identity", "kind": "trust-boundary" },
+      { "id": "boundary:billing-entitlement", "kind": "trust-boundary" },
+      { "id": "state:postgres", "kind": "persistent-state" },
+      { "id": "state:redis-idempotency", "kind": "persistent-state" },
+      { "id": "deploy:web-production", "kind": "deployment" },
+      { "id": "deploy:promotion-control", "kind": "deployment" },
+      { "id": "agent:delivery-control", "kind": "agent" },
+      { "id": "provider:stripe", "kind": "provider" },
+      { "id": "provider:upstash-redis", "kind": "provider" },
+      { "id": "ops:invariant-runner", "kind": "operational-subsystem" },
+      { "id": "ops:commissioning-registry", "kind": "operational-subsystem" }
+    ]
+  },
+  "sourceAudits": [
+    { "issue": "JOV-6042", "ref": "scripts/invariants/gate-integrity.mjs" },
+    { "issue": "JOV-6044", "ref": "docs/data-integrity-audit-jov-6044.md" },
+    {
+      "issue": "JOV-6048",
+      "ref": "docs/engineering/DEPENDENCY_DEGRADATION_CONTRACTS.md"
+    },
+    { "issue": "JOV-6050", "ref": "apps/web/stryker.config.mjs" },
+    { "issue": "JOV-6051", "ref": "scripts/invariants/run-outcome.mjs" },
+    {
+      "issue": "JOV-6052",
+      "ref": "apps/web/lib/observability/p0-journey-slos.ts"
+    },
+    { "issue": "JOV-5853", "ref": "scripts/summer-commissioning/registry.json" }
+  ],
+  "rows": [
+    {
+      "id": "AM-001",
+      "surface": "Tenant-private profile, billing, chat, tip and ingestion data",
+      "failureClass": "cross-tenant-access",
+      "whatCanGoWrong": "A user reads or mutates another tenant's private state.",
+      "covers": [
+        "boundary:tenant-isolation",
+        "state:postgres",
+        "journey:artist-profile-public",
+        "journey:chat-agent-turn"
+      ],
+      "owner": "security",
+      "sources": ["JOV-6044", "JOV-6042"],
+      "invalidatesOn": [
+        "apps/web/lib/db/schema",
+        "apps/web/drizzle/migrations",
+        "apps/web/lib/auth",
+        "apps/web/tests/integration/rls"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/drizzle/migrations/0086_sensitive_tables_rls.sql",
+              "summary": "Forced RLS on sensitive tables."
+            },
+            {
+              "kind": "source",
+              "ref": "apps/web/drizzle/migrations/0089_fancy_roulette.sql",
+              "summary": "Ownership policies continued."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/integration/rls-access-control.test.ts",
+              "summary": "Cross-tenant denial exercised via non-BYPASSRLS role on PostgreSQL."
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/integration/rls-identity-pin.test.ts"
+            }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "cross-tenant-access certificate proven blocking through ci-fast / Structural Contract."
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/lib/auth/gate.critical.test.ts"
+            }
+          ]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-002",
+      "surface": "Signup, provider identity binding and account uniqueness",
+      "failureClass": "identity-collision",
+      "whatCanGoWrong": "A provider identity, email or Stripe customer maps to more than one user.",
+      "covers": ["boundary:auth-identity", "journey:signup-onboarding"],
+      "owner": "engineering",
+      "sources": ["JOV-6044"],
+      "invalidatesOn": [
+        "apps/web/lib/db/schema/auth.ts",
+        "apps/web/lib/db/schema/better-auth.ts",
+        "apps/web/app/auth",
+        "apps/web/lib/auth"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/db/schema/auth.ts",
+              "summary": "Unique identity constraints."
+            },
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/db/schema/better-auth.ts",
+              "summary": "Provider constraints."
+            },
+            { "kind": "doc", "ref": "docs/data-integrity-audit-jov-6044.md" }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/integration/onboarding-completion.test.ts"
+            }
+          ]
+        },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-003",
+      "surface": "Billing entitlement writes and Stripe Connect mapping",
+      "failureClass": "entitlement-drift",
+      "whatCanGoWrong": "Concurrent entitlement writers silently overwrite each other or one Connect account maps to multiple payout profiles.",
+      "covers": [
+        "boundary:billing-entitlement",
+        "provider:stripe",
+        "journey:checkout-billing"
+      ],
+      "owner": "engineering",
+      "sources": ["JOV-6044"],
+      "invalidatesOn": [
+        "apps/web/lib/db/schema/billing.ts",
+        "apps/web/lib/stripe",
+        "apps/web/drizzle/migrations/0111"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/db/schema/billing.ts",
+              "summary": "billing_version compare-and-swap plus billing audit FK."
+            },
+            {
+              "kind": "source",
+              "ref": "apps/web/drizzle/migrations/0111_slimy_hardball.sql",
+              "summary": "Partial unique Connect-account index."
+            },
+            { "kind": "doc", "ref": "docs/data-integrity-audit-jov-6044.md" }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/integration/billing-persistence-concurrency.test.ts",
+              "summary": "Races both concurrency boundaries on PostgreSQL."
+            }
+          ]
+        },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "slo",
+              "ref": "apps/web/lib/observability/p0-journey-slos.ts",
+              "summary": "checkout-billing journey SLO with Stripe/Postgres SLI sources."
+            }
+          ]
+        },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-004",
+      "surface": "Retryable mutations, webhook consumers and idempotency locks",
+      "failureClass": "duplicate-retry-effect",
+      "whatCanGoWrong": "A retry or provider redelivery duplicates a business effect, or a Redis outage silently drops exclusion.",
+      "covers": [
+        "state:redis-idempotency",
+        "provider:upstash-redis",
+        "deploy:web-production"
+      ],
+      "owner": "engineering",
+      "sources": ["JOV-6048", "JOV-6042"],
+      "invalidatesOn": [
+        "apps/web/lib/idempotency.ts",
+        "apps/web/lib/redis.ts",
+        "apps/web/lib/rate-limit/outage-policy.ts",
+        "apps/web/app/api/webhooks"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/idempotency.ts",
+              "summary": "SET NX EX lock contract."
+            },
+            {
+              "kind": "contract",
+              "ref": "docs/engineering/DEPENDENCY_DEGRADATION_CONTRACTS.md",
+              "summary": "Cache/Redis degradation contract."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/lib/idempotency-faults.test.ts",
+              "summary": "Fault injection: outage at acquire, mid-operation flap, release failure, post-recovery arbitration."
+            }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "duplicate-retry-effect certificate."
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/api/webhooks/linear.test.ts"
+            }
+          ]
+        },
+        "detectProduction": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "docs/engineering/DEPENDENCY_DEGRADATION_CONTRACTS.md",
+              "summary": "Upstash operability canary owns the standing alert."
+            }
+          ]
+        },
+        "recover": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/rate-limit/outage-policy.ts",
+              "summary": "Fail-closed/typed-degradation policy."
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/lib/idempotency-faults.test.ts",
+              "summary": "Post-recovery arbitration asserted; locks self-heal at TTL."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "AM-005",
+      "surface": "Save and publish acknowledgements",
+      "failureClass": "false-success-save",
+      "whatCanGoWrong": "The product acknowledges a write that never persisted.",
+      "covers": ["journey:release-publish", "state:postgres"],
+      "owner": "engineering",
+      "sources": ["JOV-6042"],
+      "invalidatesOn": [
+        "scripts/agent/pen-save-receipt.mjs",
+        "apps/web/lib/db",
+        "apps/web/app/api"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "scripts/agent/pen-save-receipt.mjs",
+              "summary": "Acknowledgement requires a durable save receipt."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            { "kind": "test", "ref": "scripts/agent/pen-save-receipt.test.mjs" }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "false-success-save certificate."
+            },
+            { "kind": "test", "ref": "scripts/agent/pen-save-receipt.test.mjs" }
+          ]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-006",
+      "surface": "Cache invalidation after mutation and revocation",
+      "failureClass": "stale-cache-after-mutation",
+      "whatCanGoWrong": "A mutation or revocation leaves stale cached state readable.",
+      "covers": ["boundary:auth-identity", "journey:artist-profile-public"],
+      "owner": "engineering",
+      "sources": ["JOV-6042"],
+      "invalidatesOn": [
+        "apps/web/lib/db/cache.ts",
+        "apps/web/lib/auth",
+        "apps/web/lib/fetch"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/db/cache.ts",
+              "summary": "Invalidation lives in the shared cache module; coverage of every mutation path is unverified."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/lib/auth/gate-cache.test.ts"
+            }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "stale-cache-after-mutation certificate."
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/lib/auth/gate-cache.test.ts"
+            }
+          ]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-007",
+      "surface": "Certification and promotion evidence pipeline",
+      "failureClass": "invalid-evidence-counted-green",
+      "whatCanGoWrong": "Missing, stale, forged, swallowed or non-applicable evidence is counted green and certifies a change.",
+      "covers": [
+        "deploy:promotion-control",
+        "agent:delivery-control",
+        "ops:invariant-runner"
+      ],
+      "owner": "summer",
+      "sources": ["JOV-6042", "JOV-6051"],
+      "invalidatesOn": [
+        "scripts/invariants/gate-integrity.mjs",
+        "scripts/invariants/run-outcome.mjs",
+        "scripts/invariants/screen-certification.mjs",
+        ".github/workflows"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/run-outcome.mjs",
+              "summary": "Only the executable harness may set certified:true; models always get false."
+            },
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "Unknown applicability and rejected evidence states fail closed."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "scripts/invariants/gate-integrity.test.mjs",
+              "summary": "Deliberate reds for every representative defect and tampered certifier."
+            },
+            { "kind": "test", "ref": "scripts/invariants/run-outcome.test.mjs" }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "invalid-evidence-counted-green certificate consumed by Structural Contract on ci-fast."
+            }
+          ]
+        },
+        "detectProduction": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "scripts/invariants/validate.mjs",
+              "summary": "Composed validator re-runs the contract on every invariant pass."
+            }
+          ]
+        },
+        "recover": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/run-outcome.mjs",
+              "summary": "Rejection receipts are typed and immutable; containment is the gate itself."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "AM-008",
+      "surface": "Production artifact and runtime-config promotion",
+      "failureClass": "artifact-config-mismatch",
+      "whatCanGoWrong": "The promoted artifact or runtime config differs from what was certified.",
+      "covers": ["deploy:web-production"],
+      "owner": "operations",
+      "sources": ["JOV-6042"],
+      "invalidatesOn": [
+        ".github/scripts/production-input-provenance.mjs",
+        ".github/workflows",
+        "vercel.json"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": ".github/scripts/production-input-provenance.mjs",
+              "summary": "Provenance binds promoted inputs to the certified build."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": ".github/scripts/production-input-provenance.test.mjs"
+            }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "artifact-config-mismatch certificate; promotion boundary is the production promotion controller."
+            }
+          ]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-009",
+      "surface": "Public marketing and smartlink readability",
+      "failureClass": "unreadable-contrast",
+      "whatCanGoWrong": "A shipped UI change makes foreground/background contrast unreadable.",
+      "covers": [
+        "journey:marketing-home-render",
+        "journey:smartlink-fan-click"
+      ],
+      "owner": "engineering",
+      "sources": ["JOV-6042"],
+      "invalidatesOn": [
+        "apps/web/scripts/lint-contrast-ratchet.mjs",
+        "apps/web/app",
+        "packages/ui",
+        "design.tokens.json"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "design.tokens.json",
+              "summary": "Semantic token authority."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/scripts/lint-contrast-ratchet.mjs",
+              "summary": "Contrast ratchet lints web UI color/token changes."
+            }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "unreadable-contrast certificate."
+            }
+          ]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-010",
+      "surface": "P0 journey production observability",
+      "failureClass": "slo-blind-spot",
+      "whatCanGoWrong": "A P0 journey fails in production with no outcome-bound SLI, alert owner, or correlation path.",
+      "covers": [
+        "journey:marketing-home-render",
+        "journey:signup-onboarding",
+        "journey:artist-profile-public",
+        "journey:checkout-billing",
+        "journey:chat-agent-turn",
+        "journey:release-publish",
+        "journey:smartlink-fan-click"
+      ],
+      "owner": "operations",
+      "sources": ["JOV-6052"],
+      "invalidatesOn": [
+        "apps/web/lib/observability/p0-journey-slos.ts",
+        "apps/web/lib/observability"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/lib/observability/p0-journey-slos.ts",
+              "summary": "Typed registry forces outcome SLI/SLO, alert severity, owner, runbook and trace hops per P0 journey."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/lib/observability/p0-journey-slos.test.ts"
+            }
+          ]
+        },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "slo",
+              "ref": "apps/web/lib/observability/p0-journey-slos.ts",
+              "summary": "Alert wiring exists as typed registry; live paging not yet proven end-to-end."
+            }
+          ]
+        },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-011",
+      "surface": "Agent-run outcome truth and tool-safety certification",
+      "failureClass": "agent-outcome-false-success",
+      "whatCanGoWrong": "An agent or eval run reports success its evidence does not prove.",
+      "covers": ["agent:delivery-control", "ops:invariant-runner"],
+      "owner": "summer",
+      "sources": ["JOV-6051", "JOV-6042"],
+      "invalidatesOn": [
+        "scripts/invariants/run-outcome.mjs",
+        "scripts/invariants/screen-certification.mjs",
+        "apps/eve-pilot"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/run-outcome.mjs",
+              "summary": "Claim vs evidence vs explicit outcome; harness-only certification."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            { "kind": "test", "ref": "scripts/invariants/run-outcome.test.mjs" }
+          ]
+        },
+        "blockPromotion": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "contract",
+              "ref": "scripts/invariants/gate-integrity.mjs",
+              "summary": "Certifier tampering cannot manufacture certification (deliberate red)."
+            }
+          ]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-012",
+      "surface": "Test-strength on critical paths",
+      "failureClass": "weak-test-false-confidence",
+      "whatCanGoWrong": "Mutation-viable but assertion-weak tests let defects through while coverage looks green.",
+      "covers": ["ops:invariant-runner", "deploy:promotion-control"],
+      "owner": "engineering",
+      "sources": ["JOV-6050"],
+      "invalidatesOn": [
+        "apps/web/stryker.config.mjs",
+        "apps/web/tests",
+        "scripts/invariants"
+      ],
+      "layers": {
+        "prevent": { "state": "absent", "evidence": [] },
+        "detectPreRelease": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/stryker.config.mjs",
+              "summary": "Mutation testing configured; not yet a blocking lane."
+            },
+            {
+              "kind": "source",
+              "ref": "apps/web/reports/test-coverage-snapshot.json"
+            }
+          ]
+        },
+        "blockPromotion": { "state": "absent", "evidence": [] },
+        "detectProduction": { "state": "absent", "evidence": [] },
+        "recover": { "state": "absent", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-013",
+      "surface": "Commissioned capability claims",
+      "failureClass": "capability-overclaim",
+      "whatCanGoWrong": "A capability is declared commissioned without runtime receipts.",
+      "covers": ["ops:commissioning-registry"],
+      "owner": "summer",
+      "sources": ["JOV-5853"],
+      "invalidatesOn": [
+        "scripts/summer-commissioning/registry.json",
+        "scripts/summer-commissioning",
+        "apps/eve-pilot"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "scripts/summer-commissioning/receipt-trust.mjs",
+              "summary": "Receipt trust policy; claims require runtime receipts."
+            },
+            {
+              "kind": "source",
+              "ref": "scripts/summer-commissioning/registry.json"
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "scripts/summer-commissioning/canonical-registry.test.mjs"
+            },
+            {
+              "kind": "test",
+              "ref": "scripts/summer-commissioning/receipt-trust.test.mjs"
+            },
+            {
+              "kind": "test",
+              "ref": "scripts/summer-commissioning/commissioning.test.mjs"
+            }
+          ]
+        },
+        "blockPromotion": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "scripts/summer-commissioning/registry.json",
+              "summary": "Blocked capabilities are recorded, but commissioning is not wired as a promotion gate."
+            }
+          ]
+        },
+        "detectProduction": {
+          "state": "detection-only",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "scripts/summer-commissioning/architecture-freshness.test.mjs",
+              "summary": "Architecture-freshness rescan invalidates stale commissioning claims."
+            }
+          ]
+        },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    },
+    {
+      "id": "AM-014",
+      "surface": "Schema migration safety and drift",
+      "failureClass": "unsafe-migration",
+      "whatCanGoWrong": "A migration ships dirty state, drops a needed structure, or diverges from the effective schema.",
+      "covers": ["state:postgres", "deploy:web-production"],
+      "owner": "engineering",
+      "sources": ["JOV-6044"],
+      "invalidatesOn": [
+        "apps/web/drizzle",
+        "apps/web/lib/db/schema",
+        "apps/web/package.json"
+      ],
+      "layers": {
+        "prevent": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "source",
+              "ref": "apps/web/drizzle/migrations/0111_slimy_hardball.sql",
+              "summary": "Migration fails on dirty duplicate mappings instead of deleting or choosing a winner."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/data-integrity-audit-jov-6044.md",
+              "summary": "migration:validate + drizzle:check are the certification commands."
+            }
+          ]
+        },
+        "detectPreRelease": {
+          "state": "proven",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/db/sensitive-tables-rls-migration.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/db/library-post-release-migration.test.ts"
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/db/library-graph-private-migration.test.ts"
+            }
+          ]
+        },
+        "blockPromotion": {
+          "state": "blocking-unproven",
+          "evidence": [
+            {
+              "kind": "doc",
+              "ref": "docs/data-integrity-audit-jov-6044.md",
+              "summary": "Ephemeral-Neon CI lane exists; blocking proof not yet bound per JOV-6042 promotion criteria."
+            }
+          ]
+        },
+        "detectProduction": { "state": "unknown", "evidence": [] },
+        "recover": { "state": "unknown", "evidence": [] }
+      }
+    }
+  ]
+}

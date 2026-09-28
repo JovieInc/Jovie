@@ -147,6 +147,7 @@ export const APP_ROUTES = {
   ALTERNATIVES: '/alternatives',
   ARTIST_NOTIFICATIONS: '/artist-notifications',
   ARTIST_PROFILES: '/artist-profiles',
+  SMART_LINKS: '/smart-links',
   ARTIST_PROFILE_LEGACY: '/artist-profile',
   ARTISTS: '/artists',
   BLOG: '/blog',
@@ -161,8 +162,6 @@ export const APP_ROUTES = {
   CLI: '/cli',
   API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',
-  INVESTORS: '/investors',
-  PITCH: '/pitch',
   PLAYLISTS: '/playlists',
   LANDING_NEW: '/new',
   PRICING: '/pricing',
@@ -174,11 +173,18 @@ export const APP_ROUTES = {
   ENGINEERING_PREVIEW: '/engineering/preview',
   DOWNLOAD: '/download',
   SUPPORT: '/support',
+  /** Public abuse/security report intake page (JOV-6599). */
+  REPORT: '/report',
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
+  /** Artist solution page (artist-lp recipe). /artists stays the directory. */
+  SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
+  VOICE: '/voice',
+  /** Internal render-fixture index; the page itself 404s unless fixtures are enabled. */
+  RENDERS: '/renders',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',

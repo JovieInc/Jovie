@@ -87,6 +87,8 @@ describe('ReleasesEmptyState', () => {
     const state = screen.getByTestId('releases-empty-state-partial');
     expect(state).toHaveClass('min-h-55');
     expect(state).toHaveAttribute('data-variant', 'card');
+    expect(state.querySelector('svg.lucide-layers')).toBeTruthy();
+    expect(state.querySelector('svg.lucide-disc-3')).toBeNull();
     expect(screen.getByRole('status')).toHaveAttribute(
       'data-content-state',
       'empty'

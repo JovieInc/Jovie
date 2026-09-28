@@ -276,7 +276,30 @@ describe('creator document persistence boundaries', () => {
         evidenceState: 'supported',
         sourceRecordId: '44444444-4444-4444-8444-444444444444',
       })
-    ).rejects.toMatchObject({ code: 'claim_source_inaccessible' });
+    ).rejects.toMatchObject({
+      code: 'claim_source_inaccessible',
+      message: 'Evidence source is inaccessible',
+    });
+  });
+
+  it('rejects a claim when the document row is missing', async () => {
+    execute.mockResolvedValueOnce({ rows: [] });
+    await expect(
+      addCreatorRevisionClaim({
+        creatorProfileId: '22222222-2222-4222-8222-222222222222',
+        userId: '33333333-3333-4333-8333-333333333333',
+        documentId: '11111111-1111-4111-8111-111111111111',
+        revision: 3,
+        idempotencyKey: '55555555-5555-4555-8555-555555555555',
+        claimText: 'A claim without a document',
+        kind: 'fact',
+        evidenceState: 'supported',
+        sourceRecordId: '44444444-4444-4444-8444-444444444444',
+      })
+    ).rejects.toMatchObject({
+      code: 'claim_ineligible',
+      message: 'Claim does not belong to the current document revision',
+    });
   });
 
   it('rejects an optimistic revision conflict', async () => {

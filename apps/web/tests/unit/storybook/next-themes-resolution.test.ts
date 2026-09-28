@@ -1,18 +1,51 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import storybookConfig, {
   storybookAddonsForEnvironment,
 } from '../../../.storybook/main';
 
 describe('Storybook next-themes resolution', () => {
-  it('keeps automatic a11y enabled outside the dedicated live-cert build', () => {
-    expect(storybookAddonsForEnvironment(false)).toContain(
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('keeps automatic a11y enabled outside dedicated manual Axe suites', () => {
+    expect(storybookAddonsForEnvironment(false, false)).toContain(
       '@storybook/addon-a11y'
     );
-    expect(storybookAddonsForEnvironment(true)).not.toContain(
+    expect(storybookAddonsForEnvironment(true, false)).not.toContain(
       '@storybook/addon-a11y'
     );
+    expect(storybookAddonsForEnvironment(false, true)).not.toContain(
+      '@storybook/addon-a11y'
+    );
+  });
+
+  it('uses manual Axe mode only when explicitly enabled', () => {
+    vi.stubEnv('JOVIE_STORYBOOK_MANUAL_AXE', '1');
+    expect(storybookAddonsForEnvironment(false)).not.toContain(
+      '@storybook/addon-a11y'
+    );
+
+    for (const disabled of ['0', 'true', '']) {
+      vi.stubEnv('JOVIE_STORYBOOK_MANUAL_AXE', disabled);
+      expect(storybookAddonsForEnvironment(false)).toContain(
+        '@storybook/addon-a11y'
+      );
+    }
+  });
+
+  it('keeps the full story catalog when Playwright owns the Axe scans', async () => {
+    vi.stubEnv('JOVIE_LIVE_STORYBOOK_CERT', '0');
+    vi.stubEnv('JOVIE_STORYBOOK_MANUAL_AXE', '1');
+    vi.resetModules();
+    const { default: manualConfig } = await import('../../../.storybook/main');
+
+    expect(manualConfig.addons).not.toContain('@storybook/addon-a11y');
+    expect(manualConfig.stories).toEqual([
+      './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+      '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+      '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+    ]);
   });
 
   it('resolves the bare package import to the script-free mock', async () => {

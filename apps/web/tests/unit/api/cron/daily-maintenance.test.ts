@@ -12,9 +12,19 @@ const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
 const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
+const mockGetLybDailyMrr = vi.hoisted(() => vi.fn());
+const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/ai/gateway-spend', () => ({
+  recordDailyGatewaySpend: mockRecordDailyGatewaySpend,
+}));
 
 vi.mock('@/lib/founder-review/server', () => ({
   cleanupFounderReviewUploadLeases: mockCleanupFounderReviewUploadLeases,
+}));
+
+vi.mock('@/lib/ovie/lyb-mrr.server', () => ({
+  getLybDailyMrr: mockGetLybDailyMrr,
 }));
 
 vi.mock('@/lib/analytics/data-retention', () => ({
@@ -77,6 +87,7 @@ describe('GET /api/cron/daily-maintenance', () => {
     vi.clearAllMocks();
     vi.resetModules();
     vi.stubEnv('CRON_SECRET', 'test-secret');
+    vi.stubEnv('REVENUECAT_LYB_SECRET_API_KEY', 'secret-for-test');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-29T00:00:00.000Z'));
 
@@ -90,6 +101,12 @@ describe('GET /api/cron/daily-maintenance', () => {
       stats: { mismatches: 0 },
       duration: 10,
       errors: [],
+    });
+    mockGetLybDailyMrr.mockResolvedValue({
+      schema: 'jovie.lyb-daily-mrr/v1',
+      product: 'logyourbody',
+      state: 'fresh',
+      mrrCents: 4250,
     });
     mockRunDataRetentionCleanup.mockResolvedValue({ deleted: 3 });
     mockCleanupSmsIntents.mockResolvedValue({ expired: 4, deleted: 5 });
@@ -142,6 +159,14 @@ describe('GET /api/cron/daily-maintenance', () => {
       reconciled: 0,
       failed: 0,
     });
+    mockRecordDailyGatewaySpend.mockResolvedValue({
+      day: '2026-03-28',
+      totalUsd: 1.25,
+      observed30dUsd: 30,
+      byTag: [{ key: 'feature:jovie-chat', costUsd: 1, requests: 10 }],
+      byModel: [],
+      alerts: [],
+    });
   });
 
   afterEach(() => {
@@ -174,6 +199,11 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(data.results.cleanupPhotos.success).toBe(true);
     expect(data.results.cleanupKeys.success).toBe(true);
     expect(data.results.billingReconciliation.success).toBe(true);
+    expect(data.results.lybDailyMrr).toMatchObject({
+      success: true,
+      data: { product: 'logyourbody', state: 'fresh', mrrCents: 4250 },
+    });
+    expect(mockGetLybDailyMrr).toHaveBeenCalledTimes(1);
     expect(data.results.cleanupSmsIntents.success).toBe(true);
     expect(data.results.waitlistAutoAccept.success).toBe(true);
     expect(data.results.profileSearchMonitoring.success).toBe(true);
@@ -217,6 +247,16 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(mockReconcileReleaseWorkflowRunOutcomes).toHaveBeenCalledTimes(1);
     expect(data.results.founderReviewUploadLeases.success).toBe(true);
     expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
+    expect(data.results.aiGatewaySpend).toEqual({
+      success: true,
+      data: {
+        day: '2026-03-28',
+        totalUsd: 1.25,
+        observed30dUsd: 30,
+        topTags: [{ key: 'feature:jovie-chat', costUsd: 1, requests: 10 }],
+        alerts: [],
+      },
+    });
     expect(data.results.dataRetention.success).toBe(true);
   });
 
@@ -243,6 +283,48 @@ describe('GET /api/cron/daily-maintenance', () => {
       error: '1 release outcome reconciliation failed',
     });
     expect(data.results.dataRetention).toMatchObject({ success: true });
+  });
+
+  it('reports a missing daily MRR measurement without suppressing other jobs', async () => {
+    mockGetLybDailyMrr.mockResolvedValue({
+      schema: 'jovie.lyb-daily-mrr/v1',
+      product: 'logyourbody',
+      state: 'unavailable',
+      mrrCents: null,
+    });
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.results.lybDailyMrr).toMatchObject({
+      success: false,
+      error: 'LogYourBody MRR source unavailable',
+    });
+    expect(data.results.cleanupSmsIntents.success).toBe(true);
+  });
+
+  it('skips the unbound MRR feed without failing existing maintenance', async () => {
+    vi.stubEnv('REVENUECAT_LYB_SECRET_API_KEY', undefined);
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.results.lybDailyMrr).toMatchObject({
+      success: true,
+      skipped: true,
+      data: { state: 'unavailable', mrrCents: null },
+    });
+    expect(mockGetLybDailyMrr).not.toHaveBeenCalled();
   });
 
   it('reports quarantined founder-review leases as a maintenance failure', async () => {

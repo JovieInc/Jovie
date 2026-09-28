@@ -146,20 +146,22 @@ export function applyExperimentOutcome(
         totalSample
       : outcome.confidence;
 
+  let recordedOutcome: ProvenanceEntry['outcome'] = 'inconclusive';
+  if (outcome.winner === 'B') recordedOutcome = 'win';
+  else if (outcome.winner === 'A') recordedOutcome = 'loss';
+
   const provenanceEntry: ProvenanceEntry = {
     experimentId: outcome.experimentId,
-    outcome:
-      outcome.winner === 'B'
-        ? 'win'
-        : outcome.winner === 'A'
-          ? 'loss'
-          : 'inconclusive',
+    outcome: recordedOutcome,
     recordedAt: now,
   };
 
+  let liftDirection: DimensionRule['liftDirection'] = 'neutral';
+  if (newLift > 0) liftDirection = 'positive';
+  else if (newLift < 0) liftDirection = 'negative';
+
   const updatedDimension: DimensionRule = {
-    liftDirection:
-      newLift > 0 ? 'positive' : newLift < 0 ? 'negative' : 'neutral',
+    liftDirection,
     liftPercent: newLift,
     confidence: newConf,
     sampleSize: totalSample,
@@ -189,29 +191,23 @@ function dimensionOverridesGlobalPrior(rule: DimensionRule): boolean {
 }
 
 function liftDirectionToFaceEffect(rule: DimensionRule): FaceEffect {
-  return rule.liftDirection === 'positive'
-    ? 'helps'
-    : rule.liftDirection === 'negative'
-      ? 'hurts'
-      : 'neutral';
+  if (rule.liftDirection === 'positive') return 'helps';
+  if (rule.liftDirection === 'negative') return 'hurts';
+  return 'neutral';
 }
 
 function liftDirectionToTextEffect(rule: DimensionRule): TextEffect {
-  return rule.liftDirection === 'positive'
-    ? 'helps'
-    : rule.liftDirection === 'negative'
-      ? 'hurts'
-      : 'neutral';
+  if (rule.liftDirection === 'positive') return 'helps';
+  if (rule.liftDirection === 'negative') return 'hurts';
+  return 'neutral';
 }
 
 function liftDirectionToTitleLengthBias(rule: DimensionRule): TitleLengthBias {
   // positive lift on titleLength dimension means the tested variant (B) had more words
   // we expose this as the bias signal; callers interpret accordingly
-  return rule.liftDirection === 'positive'
-    ? 'long'
-    : rule.liftDirection === 'negative'
-      ? 'short'
-      : 'medium';
+  if (rule.liftDirection === 'positive') return 'long';
+  if (rule.liftDirection === 'negative') return 'short';
+  return 'medium';
 }
 
 /**

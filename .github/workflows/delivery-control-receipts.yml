@@ -10,7 +10,6 @@ on:
     types: [delivery-control-failure]
   workflow_run:
     workflows:
-      - Merge Queue Auto-Enroll
       - PR Size Guard
       - CI
       - Production Controller
@@ -19,9 +18,11 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: jovie-delivery-receipt-ingress
-  cancel-in-progress: false
+# No workflow concurrency group: GitHub keeps only one pending run per group
+# and cancels the older pending one, so a burst of failed runs (including the
+# job-skipped successes, which still enter the group) silently dropped repair
+# receipts. The delivery-state-machine writer lock serializes the durable
+# write; each receipt holds it for about a second.
 
 jobs:
   receipt:
@@ -48,4 +49,5 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/backlog-orchestrator/delivery-state-machine.mjs \
-            --event-file="$GITHUB_EVENT_PATH"
+            --event-file="$GITHUB_EVENT_PATH" | \
+            jq -e '{status, receipt, task, loop: (.loop | {loopKey, state, owner, action, dispatchState, outcome}), queuePath}'

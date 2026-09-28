@@ -54,6 +54,13 @@ vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: hoisted.fetchSummerShadowMock,
 }));
 
+vi.mock('@/lib/ovie/summer-production-pin', () => ({
+  resolveSummerEveCallerOrigin: vi.fn(async () => ({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_test',
+  })),
+}));
+
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
   getOvieOperatingStore: hoisted.getOvieOperatingStoreMock,
 }));
@@ -131,8 +138,8 @@ vi.mock('@/lib/eval/scorers/online', () => ({
 }));
 
 vi.mock('@/lib/services/album-art/provider-xai', () => ({
-  isXaiConfigured: vi.fn().mockReturnValue(false),
-  XaiApiKeyMissingError: class XaiApiKeyMissingError extends Error {},
+  isAlbumArtGatewayConfigured: vi.fn().mockReturnValue(false),
+  AlbumArtGatewayUnconfiguredError: class AlbumArtGatewayUnconfiguredError extends Error {},
   buildAlbumArtBackgroundPrompt: vi.fn(),
   generateAlbumArtBackgrounds: vi.fn(),
 }));
@@ -362,7 +369,6 @@ describe('POST /api/chat guard wiring', () => {
       'OVIE_SUMMER_FOUNDER_APP_USER_ID',
       '00000000-0000-4000-8000-000000000123'
     );
-    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_test');
     hoisted.tryHandleAnonymousOnboardingChatMock.mockResolvedValue(null);
     hoisted.getOptionalAuthMock.mockResolvedValue({
       userId: '00000000-0000-4000-8000-000000000123',
@@ -545,6 +551,20 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
   });
 
+  it('returns the Summer unavailable state without an artist profile when transport is disabled', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+    disableSummerTransport();
+
+    const response = await POST(
+      chatRequest(validBody({ chatMode: 'ov', profileId: undefined }))
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-ovie-summer-state')).toBe('unavailable');
+    expect(await response.text()).toMatch(/unavailable/i);
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+  });
+
   it('streams bound current Summer on OV turns without artist Jovie generation', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
     hoisted.fetchSummerShadowMock
@@ -585,6 +605,7 @@ describe('POST /api/chat guard wiring', () => {
       chatRequest(
         validBody({
           chatMode: 'ov',
+          profileId: undefined,
           clientTurnId: 'ov-turn-1',
           messages: [
             {

@@ -175,6 +175,20 @@ describe('access route matrix (JOV-3087)', () => {
         isActive: false,
         isBanned: false,
       });
+      expect(toProxyUserState(CanonicalUserState.USER_CREATION_FAILED)).toEqual(
+        {
+          needsWaitlist: false,
+          needsOnboarding: true,
+          isActive: false,
+          isBanned: false,
+        }
+      );
+      expect(toProxyUserState('UNRECOGNIZED' as CanonicalUserState)).toEqual({
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+        isBanned: false,
+      });
     });
   });
 });

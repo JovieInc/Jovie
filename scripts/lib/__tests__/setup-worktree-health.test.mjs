@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -43,7 +44,7 @@ function writeExecutable(filePath, contents) {
 
 function makeToolStubs({
   nodeVersion = 'v22.23.2',
-  pnpmVersion = '9.15.4',
+  pnpmVersion = '9.15.9',
 } = {}) {
   const bin = makeTempDir('jovie-setup-health-bin-');
   writeExecutable(join(bin, 'node'), `#!/bin/sh\necho ${nodeVersion}\n`);
@@ -290,5 +291,112 @@ describe('SessionStart still uses setup.sh for the skip', () => {
     );
     expect(codexSetupSh).toContain('GBrain sync');
     expect(codexSetupSh).toContain('independent and always runs');
+  });
+});
+
+describe('package prepare hook lifecycle', () => {
+  const prepare = JSON.parse(
+    readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+  ).scripts.prepare;
+  const configurator = readFileSync(
+    resolve(repoRoot, 'scripts/hooks/configure-git-hooks.sh'),
+    'utf8'
+  );
+
+  function fixture() {
+    const root = makeTempDir('jovie-prepare-hooks-');
+    mkdirSync(join(root, 'scripts/hooks'), { recursive: true });
+    mkdirSync(join(root, '.husky'));
+    writeFileSync(
+      join(root, 'scripts/hooks/configure-git-hooks.sh'),
+      configurator
+    );
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({
+        name: 'prepare-fixture',
+        private: true,
+        scripts: { prepare },
+      })
+    );
+    writeExecutable(
+      join(root, '.husky/pre-push'),
+      '#!/bin/sh\nprintf "gate executed\\n" > "$HOOK_MARKER"\nexit 17\n'
+    );
+    symlinkSync(
+      resolve(repoRoot, 'node_modules'),
+      join(root, 'node_modules'),
+      'dir'
+    );
+    const env = {
+      PATH: process.env.PATH,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_COUNT: '0',
+      GIT_AUTHOR_NAME: 'Hook Fixture',
+      GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+      GIT_COMMITTER_NAME: 'Hook Fixture',
+      GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+      NPM_CONFIG_USERCONFIG: '/dev/null',
+      COREPACK_ENABLE_NETWORK: '0',
+      HOOK_MARKER: join(root, 'hook-marker'),
+    };
+    const run = (command, args, cwd = root) =>
+      spawnSync(command, args, { cwd, env, encoding: 'utf8', timeout: 10000 });
+    return { root, env, run };
+  }
+
+  it('keeps tracked push gates active in another linked worktree after package prepare', () => {
+    const { root, env, run } = fixture();
+    const git = (args, cwd = root) => {
+      const result = run('git', args, cwd);
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+    git(['init', '--initial-branch=main']);
+    git(['config', 'core.hooksPath', '.husky/_']);
+    git([
+      'add',
+      'package.json',
+      'scripts/hooks/configure-git-hooks.sh',
+      '.husky/pre-push',
+    ]);
+    git(['commit', '-m', 'seed fixture']);
+    const linked = join(root, 'linked');
+    git(['worktree', 'add', '-b', 'linked-fixture', linked]);
+    const remote = join(root, 'remote.git');
+    git(['init', '--bare', remote]);
+    const result = run('pnpm', ['run', 'prepare']);
+    expect(result.status, result.stderr).toBe(0);
+    const push = run('git', ['push', remote, 'HEAD:refs/heads/proof'], linked);
+    expect(push.status, push.stdout + push.stderr).not.toBe(0);
+    expect(readFileSync(env.HOOK_MARKER, 'utf8')).toBe('gate executed\n');
+    expect(git(['config', '--get', 'core.hooksPath'], linked)).toBe('.husky');
+    expect(
+      run('git', [
+        '--git-dir',
+        remote,
+        'show-ref',
+        '--verify',
+        'refs/heads/proof',
+      ]).status
+    ).not.toBe(0);
+  });
+
+  it('keeps manifest-only package preparation working without Git or helper files', () => {
+    const { root, run } = fixture();
+    rmSync(join(root, 'scripts'), { recursive: true });
+    rmSync(join(root, '.husky'), { recursive: true });
+    const result = run('pnpm', ['run', 'prepare']);
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it('propagates a broken tracked-hook configuration inside Git', () => {
+    const { root, run } = fixture();
+    expect(run('git', ['init']).status).toBe(0);
+    chmodSync(join(root, '.husky/pre-push'), 0o644);
+    const result = run('pnpm', ['run', 'prepare']);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('expected tracked hook missing');
   });
 });

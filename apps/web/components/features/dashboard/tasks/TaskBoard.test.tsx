@@ -60,6 +60,14 @@ describe('TaskBoard geometry', () => {
   });
 });
 
+describe('banned icon guard (Tim, 2026-09-25)', () => {
+  it('drops the retired Disc3 release-title glyph', () => {
+    const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');
+    expect(source).not.toContain('Disc3');
+    expect(source).toContain('<Layers className=');
+  });
+});
+
 describe('JOV-5466 token retire', () => {
   it('does not keep retired --linear-app-* tokens', () => {
     const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');

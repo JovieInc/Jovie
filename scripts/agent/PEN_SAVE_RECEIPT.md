@@ -6,7 +6,7 @@
 
 Canonical identity is not a CLI argument. `--profile jovie-founder-design-studio` resolves through `pen-workspace-locks.json` to:
 
-- approved writable identity, only when active path matches: `$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen`
+- approved writable identity, only when active path matches: `$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen`
 - source-backed read-only catalog: `$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Marketing Workspace.pen`
 
 An agent cannot make a side file canonical by passing it as the expected path.

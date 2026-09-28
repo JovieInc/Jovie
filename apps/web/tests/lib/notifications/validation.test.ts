@@ -13,7 +13,10 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
-import { notificationCaptureSchema } from '@/lib/validation/schemas/notifications';
+import {
+  notificationCaptureSchema,
+  subscribeSchema,
+} from '@/lib/validation/schemas/notifications';
 
 describe('Notification Validation', () => {
   describe('getNotificationCaptureError', () => {
@@ -274,5 +277,47 @@ describe('Notification Validation', () => {
         '+14155551234'
       );
     });
+  });
+});
+
+describe('subscribeSchema capture path', () => {
+  const artistId = '11111111-1111-4111-8111-111111111111';
+
+  function issuePath(input: Record<string, unknown>): string | undefined {
+    const parsed = subscribeSchema.safeParse(input);
+    if (parsed.success) return undefined;
+    return parsed.error.issues[0]?.path[0] as string | undefined;
+  }
+
+  it('reports an empty email on the email field', () => {
+    expect(
+      issuePath({
+        artist_id: artistId,
+        channel: 'email',
+        email: '',
+      })
+    ).toBe('email');
+  });
+
+  it('reports a non-US SMS country on the country field', () => {
+    expect(
+      issuePath({
+        artist_id: artistId,
+        channel: 'sms',
+        phone: '+15551234567',
+        country_code: 'GB',
+      })
+    ).toBe('country_code');
+  });
+
+  it('reports a missing US phone on the phone field', () => {
+    expect(
+      issuePath({
+        artist_id: artistId,
+        channel: 'sms',
+        phone: '',
+        country_code: 'US',
+      })
+    ).toBe('phone');
   });
 });

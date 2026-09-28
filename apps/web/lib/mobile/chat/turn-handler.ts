@@ -293,6 +293,7 @@ export async function handleMobileChatTurn(
 
   const artistContext = await fetchMobileArtistContext({
     profileId,
+    userId,
     authorizedProfile: session.profile,
   });
 

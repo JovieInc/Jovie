@@ -1710,3 +1710,71 @@ struct AuthenticatedUserIDChangePolicyTests {
     )
   }
 }
+
+struct WhatsNewFeedPolicyTests {
+  private func entry(_ id: String) -> WhatsNewFeedEntry {
+    WhatsNewFeedEntry(
+      id: id,
+      title: "Title \(id)",
+      date: "2026-09-26",
+      summary: "Summary",
+      url: URL(string: "https://jov.ie/changelog/\(id)")!,
+      highlights: [],
+      dogfood: []
+    )
+  }
+
+  private func feed(_ ids: [String]) -> WhatsNewFeed {
+    WhatsNewFeed(
+      version: 1,
+      changelogUrl: URL(string: "https://jov.ie/changelog")!,
+      entries: ids.map(entry)
+    )
+  }
+
+  @Test func showsNothingForAnEmptyFeed() {
+    #expect(WhatsNewFeedPolicy.resolve(feed: feed([]), lastSeenID: nil) == nil)
+  }
+
+  @Test func showsNothingWhenTheNewestReleaseWasSeen() {
+    #expect(WhatsNewFeedPolicy.resolve(feed: feed(["3", "2"]), lastSeenID: "3") == nil)
+  }
+
+  @Test func showsTheNewestPostOnFirstLaunch() {
+    let unseen = WhatsNewFeedPolicy.resolve(feed: feed(["3", "2"]), lastSeenID: nil)
+    #expect(unseen?.entry.id == "3")
+    #expect(unseen?.unseenCount == 1)
+    #expect(unseen?.link.absoluteString == "https://jov.ie/changelog/3")
+  }
+
+  @Test func linksTheChangelogIndexWhenSeveralAreUnseen() {
+    let unseen = WhatsNewFeedPolicy.resolve(feed: feed(["3", "2", "1"]), lastSeenID: "1")
+    #expect(unseen?.entry.id == "3")
+    #expect(unseen?.unseenCount == 2)
+    #expect(unseen?.link.absoluteString == "https://jov.ie/changelog")
+  }
+
+  @Test func treatsAnAgedOutLastSeenIDAsOneNewRelease() {
+    let unseen = WhatsNewFeedPolicy.resolve(feed: feed(["3", "2"]), lastSeenID: "0.1")
+    #expect(unseen?.unseenCount == 1)
+  }
+
+  @Test func decodesTheWebContract() throws {
+    let json = """
+    {"version":1,"changelogUrl":"https://jov.ie/changelog","entries":[
+      {"id":"26.9.2","title":"Chat is home","date":"2026-09-26",
+       "summary":"Ask first.","url":"https://jov.ie/changelog/26.9.2",
+       "highlights":["Library filters"],"dogfood":["Open chat and ask"]}
+    ]}
+    """
+    let decoded = try #require(WhatsNewFeedPolicy.decode(Data(json.utf8)))
+    #expect(decoded.entries.first?.dogfood == ["Open chat and ask"])
+    #expect(decoded.changelogUrl.absoluteString == "https://jov.ie/changelog")
+  }
+
+  @Test func rejectsOtherContractVersionsAndGarbage() {
+    let future = #"{"version":2,"changelogUrl":"https://jov.ie/changelog","entries":[]}"#
+    #expect(WhatsNewFeedPolicy.decode(Data(future.utf8)) == nil)
+    #expect(WhatsNewFeedPolicy.decode(Data("not json".utf8)) == nil)
+  }
+}

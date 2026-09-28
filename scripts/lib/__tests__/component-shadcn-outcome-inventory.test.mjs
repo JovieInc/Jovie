@@ -234,8 +234,10 @@ describe('shadcn outcome inventory composition', () => {
       section: 'shadcnOutcome',
       ok: true,
     });
-    expect(rendered.receipt.landingBatch).toHaveLength(4);
-    expect(rendered.receipt.fixtures).toHaveLength(3);
+    // b0bcd609dc (#16698) added two ArtworkFrame contain landing samples and
+    // two deliberate-red ArtworkFrame crop fixtures.
+    expect(rendered.receipt.landingBatch).toHaveLength(6);
+    expect(rendered.receipt.fixtures).toHaveLength(5);
     const report = runComponentShipGate({
       diffBase: null,
       skipQuality: true,

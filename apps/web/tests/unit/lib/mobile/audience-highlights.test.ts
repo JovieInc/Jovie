@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  getUserDashboardAnalyticsMock: vi.fn(),
+  readAuthorizedDashboardAnalyticsMock: vi.fn(),
 }));
 
-vi.mock('@/lib/db/queries/analytics', () => ({
-  getUserDashboardAnalytics: hoisted.getUserDashboardAnalyticsMock,
+vi.mock('@/lib/analytics/authorized-read', () => ({
+  readAuthorizedDashboardAnalytics:
+    hoisted.readAuthorizedDashboardAnalyticsMock,
 }));
 
 const modulePromise = import('@/lib/mobile/audience-highlights');
@@ -13,20 +14,34 @@ const modulePromise = import('@/lib/mobile/audience-highlights');
 describe('buildMobileAudienceHighlights', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.getUserDashboardAnalyticsMock.mockImplementation(
-      async (_userId: string, range: string) => {
-        if (range === '7d') {
+    hoisted.readAuthorizedDashboardAnalyticsMock.mockImplementation(
+      async (input: { range?: string }) => {
+        if (input.range === '7d') {
           return {
-            profile_views: 120,
-            unique_users: 80,
-            subscribers: 40,
-            total_clicks: 55,
-            listen_clicks: 21,
+            range: '7d',
+            view: 'traffic',
+            analytics: {
+              profile_views: 120,
+              unique_users: 80,
+              subscribers: 40,
+              total_clicks: 55,
+              listen_clicks: 21,
+              top_cities: [],
+              top_countries: [],
+              top_referrers: [],
+            },
           };
         }
 
         return {
-          profile_views: 300,
+          range: '30d',
+          view: 'traffic',
+          analytics: {
+            profile_views: 300,
+            top_cities: [],
+            top_countries: [],
+            top_referrers: [],
+          },
         };
       }
     );
@@ -48,5 +63,28 @@ describe('buildMobileAudienceHighlights', () => {
       'Listen clicks',
     ]);
     expect(payload.chatPrompt).toContain('audience');
+  });
+
+  it('omits the week-over-week delta when retention clamps both windows together', async () => {
+    hoisted.readAuthorizedDashboardAnalyticsMock.mockResolvedValue({
+      range: '7d',
+      view: 'traffic',
+      analytics: {
+        profile_views: 120,
+        unique_users: 80,
+        subscribers: 40,
+        total_clicks: 55,
+        listen_clicks: 21,
+        top_cities: [],
+        top_countries: [],
+        top_referrers: [],
+      },
+    });
+
+    const { buildMobileAudienceHighlights } = await modulePromise;
+    const payload = await buildMobileAudienceHighlights('user_123');
+
+    expect(payload.heroValue).toBe(120);
+    expect(payload.heroDeltaLabel).toBeNull();
   });
 });

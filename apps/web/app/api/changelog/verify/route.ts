@@ -9,7 +9,7 @@ import { productUpdateSubscribers } from '@/lib/db/schema/product-update-subscri
  *
  * Rendered outside the Next document tree, so System B tokens cannot reach it
  * as utilities — the inline <style> below projects the ZiaWI dark ramp by hand:
- * canvas #030407, card surface #0f1420, ink #f5f7fb, muted ink #a8b0c3,
+ * canvas #030406, card surface #131417, ink #f5f7fb, muted ink #a8b0c3,
  * border-default rgba(168,176,195,0.16), shadow-deep rgba(0,0,0,0.25),
  * ion #11afff reserved for the semantic focus ring. The CTA stays a neutral
  * high-contrast pill (light pill, dark text) per DESIGN.md.
@@ -29,11 +29,11 @@ function htmlPage(
   <title>${title} | ${APP_NAME}</title>
   <style>
     :root { color-scheme: dark; }
-    body { margin: 0; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #030407; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .card { max-width: 420px; background: #0f1420; border: 1px solid rgba(168, 176, 195, 0.16); border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+    body { margin: 0; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #030406; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { max-width: 420px; background: #131417; border: 1px solid rgba(168, 176, 195, 0.16); border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
     h1 { font-size: 20px; margin: 0 0 12px; color: #f5f7fb; }
     p { font-size: 15px; line-height: 1.5; color: #a8b0c3; margin: 0 0 24px; }
-    a.btn { display: inline-block; padding: 12px 32px; background: #f5f7fb; color: #030407; text-decoration: none; border-radius: 9999px; font-weight: 500; font-size: 14px; }
+    a.btn { display: inline-block; padding: 12px 32px; background: #f5f7fb; color: #030406; text-decoration: none; border-radius: 9999px; font-weight: 500; font-size: 14px; }
     a.btn:focus-visible { outline: 2px solid #11afff; outline-offset: 2px; }
   </style>
 </head>

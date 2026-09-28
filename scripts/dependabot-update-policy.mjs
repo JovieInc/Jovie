@@ -14,10 +14,49 @@ export const DURABLE_HOLD_LABELS = new Set([
   'hold',
   'needs-manual-rebase',
   'queue-deferred',
+  'incident',
 ]);
 
 export const CONFLICT_LABEL = 'needs-conflict-resolution';
 export const QUEUE_LABEL = 'merge-queue';
+
+const MINOR_UPDATE_TYPE = 'version-update:semver-minor';
+const SEMVER_CORE =
+  /^[v=]?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+function semverMajor(version) {
+  const match =
+    typeof version === 'string' ? SEMVER_CORE.exec(version.trim()) : null;
+  return match ? Number(match[1]) : null;
+}
+
+function minorVersionHoldReason({ updatedDependenciesJson }) {
+  let updates;
+  try {
+    updates = Array.isArray(updatedDependenciesJson)
+      ? updatedDependenciesJson
+      : JSON.parse(updatedDependenciesJson ?? '');
+  } catch {
+    return 'minor-version-evidence-unavailable';
+  }
+  if (!Array.isArray(updates) || updates.length === 0)
+    return 'minor-version-evidence-unavailable';
+
+  let foundMinor = false;
+  for (const update of updates) {
+    if (!update || typeof update !== 'object')
+      return 'minor-version-evidence-unavailable';
+    if (update.updateType !== MINOR_UPDATE_TYPE) continue;
+    foundMinor = true;
+    const previousMajor = semverMajor(update.prevVersion);
+    const nextMajor = semverMajor(update.newVersion);
+    if (previousMajor === null || nextMajor === null)
+      return 'minor-version-evidence-unavailable';
+    if (previousMajor === 0 || nextMajor === 0)
+      return 'pre-1x-minor-requires-review';
+  }
+  return foundMinor ? null : 'minor-version-evidence-unavailable';
+}
 
 function labelNames(pullRequest) {
   return new Set(
@@ -47,6 +86,7 @@ export function classifyDependabotUpdate({
   eventLabelName = '',
   pullRequest,
   updateType,
+  updatedDependenciesJson,
 }) {
   const labels = labelNames(pullRequest);
   const noop = reason => decision('noop', reason, labels);
@@ -69,6 +109,11 @@ export function classifyDependabotUpdate({
 
   if (!SAFE_UPDATE_TYPES.has(updateType)) {
     return noop('update-type-not-auto-eligible');
+  }
+
+  if (updateType === MINOR_UPDATE_TYPE) {
+    const holdReason = minorVersionHoldReason({ updatedDependenciesJson });
+    if (holdReason) return noop(holdReason);
   }
 
   if (action === 'closed') {
@@ -113,6 +158,8 @@ export function classifyDependabotEventPayload(event, environment = {}) {
     eventLabelName: event.label?.name ?? '',
     pullRequest: event.pull_request,
     updateType: environment.DEPENDABOT_UPDATE_TYPE ?? '',
+    updatedDependenciesJson:
+      environment.DEPENDABOT_UPDATED_DEPENDENCIES_JSON ?? '',
   });
 }
 

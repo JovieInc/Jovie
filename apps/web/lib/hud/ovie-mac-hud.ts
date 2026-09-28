@@ -1,10 +1,14 @@
+import {
+  composeDecisionHudView,
+  type DecisionHudView,
+} from '@/lib/hud/decision-signals';
+import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
+
 export const YC_EXCEPTIONAL_GROWTH = 0.1;
 export const YC_GOOD_GROWTH_MIN = 0.05;
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const PROD_SHA_RE = /^[0-9a-f]{7,40}$/i;
 export const OVIE_MAC_HUD_IN_FLIGHT_PR_LIMIT = 8;
-const SHIPPING_DETAIL =
-  'Dogfood-receipted ships (Linear → Symphony → native MQ → prod SHA → receipt). Merges without receipts do not count.';
+/** Lane-owned heads. Dependabot and human branches are not in flight. */
+const LANE_BRANCH_RE = /^(?:devin|codex)\//;
 
 export type OvieMacHudStatus = 'alive' | 'dead' | 'unknown';
 export type OvieMacHudGrowthSource = 'revenue' | 'active-users';
@@ -84,6 +88,9 @@ export type OvieMacHudSnapshot = {
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
   inFlightPullRequests: OvieMacHudInFlightPullRequests;
+  /** JOV-5924 decision-value ranking view; absent in older fixtures/tests. */
+  decisionHud?: DecisionHudView;
+  lybMrr?: LybDailyMrr;
   generatedAtIso: string;
 };
 
@@ -308,6 +315,9 @@ export function composeOvieMacHudInFlightPullRequests(input: {
   }
 
   const items = [...byNumber.values()]
+    .filter(
+      pr => memberships.has(pr.number) || LANE_BRANCH_RE.test(pr.headRefName)
+    )
     .map((pr): OvieMacHudInFlightPullRequest => {
       const membership = memberships.get(pr.number) ?? null;
       const mergeQueuePosition = membership?.position ?? null;
@@ -335,14 +345,16 @@ export function composeOvieMacHudInFlightPullRequests(input: {
     })
     .sort(comparePullRequests);
 
+  // `totalOpen` counts in-flight (lane or queued) PRs, not every open PR:
+  // dependabot and parked human branches are not in flight. A truncated
+  // source page can hide more, so its reported total stays the lower bound.
   const sourceTruncated = input.sourceTruncated === true;
-  const displayTotalOpen = sourceTruncated
-    ? Math.max(input.totalOpen, items.length)
-    : items.length;
   const shownItems = items.slice(0, limit);
   return {
     availability: 'available',
-    totalOpen: Math.max(displayTotalOpen, shownItems.length),
+    totalOpen: sourceTruncated
+      ? Math.max(input.totalOpen, items.length)
+      : items.length,
     items: shownItems,
     truncated: sourceTruncated || shownItems.length < items.length,
     errorMessage: null,
@@ -491,100 +503,57 @@ export function computeWowGrowth(
   };
 }
 
-function textField(
-  record: Record<string, unknown>,
-  keys: readonly string[]
-): string | null {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-      return String(Math.trunc(value));
-    }
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return null;
-}
-
-export function parseReceiptedShip(value: unknown): {
-  linearIssue: string;
-  symphonyRef: string;
-  mergeQueueRef: string;
-  prodSha: string;
-  receiptAt: string;
-} | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const record = value as Record<string, unknown>;
-  const linearIssue = textField(record, [
-    'linearIssue',
-    'issueNumber',
-    'issue',
-  ]);
-  const symphonyRef = textField(record, ['symphonyRef', 'symphony']);
-  const mergeQueueRef = textField(record, [
-    'mergeQueueRef',
-    'mergeQueue',
-    'mergeQueueEntry',
-  ]);
-  const prodSha = textField(record, ['prodSha', 'prodSHA']);
-  const receiptAt = textField(record, ['receiptAt', 'receiptedAt']);
-  if (
-    !linearIssue ||
-    !symphonyRef ||
-    !mergeQueueRef ||
-    !prodSha ||
-    !receiptAt ||
-    !PROD_SHA_RE.test(prodSha) ||
-    Number.isNaN(Date.parse(receiptAt))
-  ) {
-    return null;
-  }
-  return { linearIssue, symphonyRef, mergeQueueRef, prodSha, receiptAt };
-}
-
-export function countReceiptedShipsThisWeek(
-  entries: readonly unknown[],
-  nowMs: number = Date.now(),
-  sourceAvailable = true
+/**
+ * Shipping throughput is merged PRs across the org: the last seven days,
+ * with today's count since Pacific midnight in the detail line.
+ */
+export function shippingFromMerges(
+  merges: {
+    readonly last7Days: number | null;
+    readonly today: number | null;
+  } | null
 ): OvieMacHudShippingMetric {
-  if (!sourceAvailable) {
+  if (merges?.last7Days == null) {
     return {
       shipsThisWeek: 0,
       available: false,
-      detail: 'Shipping receipts unavailable.',
+      detail: 'GitHub merge counts unavailable.',
     };
   }
-
-  const weekStart = nowMs - WEEK_MS;
-  let shipsThisWeek = 0;
-  for (const entry of entries) {
-    const ship = parseReceiptedShip(entry);
-    if (!ship) continue;
-    const receiptMs = Date.parse(ship.receiptAt);
-    if (receiptMs >= weekStart && receiptMs <= nowMs) shipsThisWeek += 1;
-  }
-  return { shipsThisWeek, available: true, detail: SHIPPING_DETAIL };
+  return {
+    shipsThisWeek: merges.last7Days,
+    available: true,
+    detail:
+      merges.today == null
+        ? 'PRs merged across JovieInc in the last 7 days.'
+        : `PRs merged across JovieInc in the last 7 days. ${merges.today.toLocaleString('en-US')} since midnight PT.`,
+  };
 }
 
 export function composeOvieMacHudSnapshot(input: {
   alive: OvieMacHudAliveInput;
   growth: OvieMacHudGrowthInput;
-  shippingEntries: readonly unknown[];
-  shippingAvailable?: boolean;
+  shipping: OvieMacHudShippingMetric;
   inFlightPullRequests?: OvieMacHudInFlightPullRequests;
+  decisionExtras?: import('@/lib/hud/decision-signals').DecisionHudExtras;
+  lybMrr?: LybDailyMrr;
   generatedAtIso: string;
-  nowMs?: number;
 }): OvieMacHudSnapshot {
-  return {
+  const snapshot: OvieMacHudSnapshot = {
     alive: computeDefaultAlive(input.alive),
     growth: computeWowGrowth(input.growth),
-    shipping: countReceiptedShipsThisWeek(
-      input.shippingEntries,
-      input.nowMs ?? Date.parse(input.generatedAtIso),
-      input.shippingAvailable ?? true
-    ),
+    shipping: input.shipping,
     inFlightPullRequests:
       input.inFlightPullRequests ??
       emptyOvieMacHudInFlightPullRequests('not_configured'),
+    ...(input.lybMrr ? { lybMrr: input.lybMrr } : {}),
     generatedAtIso: input.generatedAtIso,
   };
+  if (input.decisionExtras !== undefined) {
+    snapshot.decisionHud = composeDecisionHudView(
+      snapshot,
+      input.decisionExtras
+    );
+  }
+  return snapshot;
 }

@@ -1,32 +1,42 @@
 import 'server-only';
 
-import { xai } from '@ai-sdk/xai';
+import { GatewayAuthenticationError } from '@ai-sdk/gateway';
 import { generateImage } from 'ai';
+import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
+import { gateway } from '@/lib/ai/sdk';
+import { ALBUM_ART_GATEWAY_IMAGE_MODEL } from '@/lib/constants/ai-models';
 import { env } from '@/lib/env-server';
 
 export { buildAlbumArtBackgroundPrompt } from './prompts';
 
-const DEFAULT_MODEL = 'grok-imagine-image';
-
 /**
- * Thrown when XAI_API_KEY is not configured. This is an *expected operational
- * state* (provider key not provisioned in an env), not an application error.
- * Callers should treat it as `feature_disabled` and skip Sentry capture.
+ * Thrown when AI Gateway auth is not configured or rejected. This is an
+ * *expected operational state* (gateway auth not provisioned in an env), not
+ * an application error. Callers should treat it as `feature_disabled` and
+ * skip Sentry capture.
  */
-export class XaiApiKeyMissingError extends Error {
-  readonly code = 'XAI_API_KEY_MISSING' as const;
-  constructor(message = 'XAI_API_KEY is not configured') {
+export class AlbumArtGatewayUnconfiguredError extends Error {
+  readonly code = 'ALBUM_ART_GATEWAY_UNCONFIGURED' as const;
+  constructor(message = 'AI Gateway authentication is not configured') {
     super(message);
-    this.name = 'XaiApiKeyMissingError';
+    this.name = 'AlbumArtGatewayUnconfiguredError';
   }
 }
 
-export function isXaiConfigured(): boolean {
-  return Boolean(env.XAI_API_KEY?.trim());
+export function isAlbumArtGatewayConfigured(): boolean {
+  // The AI Gateway SDK resolves Vercel OIDC through @vercel/oidc at request
+  // time; do not probe VERCEL_OIDC_TOKEN directly here.
+  return isAiGatewayAvailable({ apiKey: env.AI_GATEWAY_API_KEY });
 }
 
 function getAlbumArtModelId(): string {
-  return env.ALBUM_ART_IMAGE_MODEL ?? DEFAULT_MODEL;
+  const override = env.ALBUM_ART_IMAGE_MODEL?.trim();
+  // Legacy bare ids (for example `grok-imagine-image`) are direct-xAI slugs.
+  // Ignore them so a stale override cannot bypass the Gateway model string.
+  if (override?.includes('/')) {
+    return override;
+  }
+  return ALBUM_ART_GATEWAY_IMAGE_MODEL;
 }
 
 function bufferFromImage(image: unknown): Buffer {
@@ -41,7 +51,7 @@ function bufferFromImage(image: unknown): Buffer {
   if (candidate.base64) {
     return Buffer.from(candidate.base64, 'base64');
   }
-  throw new TypeError('xAI image result did not include image bytes');
+  throw new TypeError('Gateway image result did not include image bytes');
 }
 
 export async function generateAlbumArtBackgrounds(params: {
@@ -50,19 +60,26 @@ export async function generateAlbumArtBackgrounds(params: {
   readonly model: string;
   readonly images: readonly Buffer[];
 }> {
-  if (!isXaiConfigured()) {
-    throw new XaiApiKeyMissingError();
+  if (!isAlbumArtGatewayConfigured()) {
+    throw new AlbumArtGatewayUnconfiguredError();
   }
   const model = getAlbumArtModelId();
-  const result = await generateImage({
-    model: xai.image(model),
-    prompt: params.prompt,
-    aspectRatio: '1:1',
-    n: 3,
-  });
+  try {
+    const result = await generateImage({
+      model: gateway.image(model),
+      prompt: params.prompt,
+      aspectRatio: '1:1',
+      n: 3,
+    });
 
-  return {
-    model,
-    images: (result.images as readonly unknown[]).map(bufferFromImage),
-  };
+    return {
+      model,
+      images: (result.images as readonly unknown[]).map(bufferFromImage),
+    };
+  } catch (error) {
+    if (GatewayAuthenticationError.isInstance(error)) {
+      throw new AlbumArtGatewayUnconfiguredError();
+    }
+    throw error;
+  }
 }

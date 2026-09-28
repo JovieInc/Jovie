@@ -8,7 +8,6 @@ import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
-const REDIS_CACHE_TTL_SECONDS = 60;
 const REDIS_KEY_PREFIX = 'admin:role:';
 
 async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
@@ -27,46 +26,18 @@ async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
   return !checkUserStatus(user.userStatus, user.deletedAt).isBlocked;
 }
 
-async function tryRedisPath(
-  userId: string,
-  cacheKey: string,
-  redis: NonNullable<ReturnType<typeof getRedis>>
-): Promise<boolean> {
-  const cached = await redis.get(cacheKey);
-  if (cached !== null && String(cached) !== '1') {
-    return false;
-  }
-
-  // Positive authorization is always revalidated against lifecycle state.
-  // Ban/delete writes invalidate this cache, but a transient Redis failure
-  // must not leave a suspended administrator authorized until the TTL expires.
-  const isUserAdmin = await queryAdminRoleFromDB(userId);
-  await redis.set(cacheKey, isUserAdmin ? '1' : '0', {
-    ex: REDIS_CACHE_TTL_SECONDS,
-  });
-
-  return isUserAdmin;
-}
-
+/**
+ * Postgres is the source of truth. A cached "yes" was always rechecked
+ * against this query, so the Redis GET+SET on the admin path did not
+ * change the result and only spent Upstash commands. Denials are read
+ * here too: a stale Redis "0" must not hide admin, and a stale "1" must
+ * not grant it.
+ */
 export const isAdmin = cache(async function isAdmin(
   userId: string
 ): Promise<boolean> {
   if (!userId) return false;
   if (isVisualCaptureSyntheticAuthEnabled()) return false;
-
-  const redis = getRedis();
-  const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
-
-  if (redis) {
-    try {
-      return await tryRedisPath(userId, cacheKey, redis);
-    } catch (error) {
-      captureWarning(
-        '[admin/roles] Redis cache failed, falling back to database query',
-        error
-      );
-    }
-  }
 
   try {
     return await queryAdminRoleFromDB(userId);
@@ -82,6 +53,11 @@ export const isAdmin = cache(async function isAdmin(
   }
 });
 
+/**
+ * Deletes a leftover `admin:role:*` key. `isAdmin` does not read Redis.
+ * Grant and revoke still delete the key so an older instance during
+ * rollout cannot keep a cached denial.
+ */
 export function invalidateAdminCache(userId: string): void {
   const redis = getRedis();
   if (!redis) return;

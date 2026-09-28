@@ -16,6 +16,7 @@ import {
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
+import { presentUnmanagedListing } from '@/lib/profile/artist-status-presentation';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { cn } from '@/lib/utils';
@@ -441,7 +442,12 @@ export function HeroSpotifySearch({
         className={isEditorial ? 'rounded-full' : undefined}
       >
         <div className={fieldClassName}>
-          {isEditorial ? null : (
+          {isEditorial ? (
+            <Search
+              aria-hidden='true'
+              className='homepage-name-search__icon size-4 shrink-0 text-tertiary-token'
+            />
+          ) : (
             <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
               <SocialIcon
                 platform='spotify'
@@ -476,7 +482,11 @@ export function HeroSpotifySearch({
             autoCorrect='off'
             autoComplete='off'
             className={cn(
-              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
+              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none',
+              // The editorial pill owns focus (JOV-6946): no square ring
+              // inside pill geometry. The default field keeps its own ring.
+              !isEditorial &&
+                'focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
               isEditorial ? 'homepage-name-search__input' : 'text-sm'
             )}
             role='combobox'
@@ -664,8 +674,11 @@ export function HeroSpotifySearch({
                       ) : null}
                     </div>
                     {artist.isClaimed && (
-                      <span className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-3xs font-semibold text-brand-spotify'>
-                        On Jovie
+                      <span
+                        className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-3xs font-semibold text-brand-spotify'
+                        data-testid='listing-badge'
+                      >
+                        {presentUnmanagedListing().label}
                       </span>
                     )}
                     {artist.verified && (

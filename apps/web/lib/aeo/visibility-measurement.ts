@@ -145,7 +145,7 @@ export function isAiVisibilityMetricKey(
 ): value is AiVisibilityMetricKey {
   return (
     typeof value === 'string' &&
-    Object.prototype.hasOwnProperty.call(AI_VISIBILITY_METRIC_CATALOG, value)
+    Object.hasOwn(AI_VISIBILITY_METRIC_CATALOG, value)
   );
 }
 
@@ -273,6 +273,24 @@ export function requireMeasuredAiVisibilityMetric<
   return found as AiVisibilityMetric<K> & { readonly status: 'measured' };
 }
 
+function summarizeReadiness(
+  measured: ReadonlyArray<{ readonly value: unknown }>
+): 'ready' | 'not_ready' | 'unmeasured' {
+  if (measured.length === 0) return 'unmeasured';
+  if (measured.every(item => item.value === true)) return 'ready';
+  return 'not_ready';
+}
+
+function summarizeObservedVisibility(
+  measured: ReadonlyArray<{ readonly value: unknown }>
+): 'observed' | 'collecting' | 'unmeasured' {
+  if (measured.length === 0) return 'unmeasured';
+  if (measured.some(item => typeof item.value === 'number' && item.value > 0)) {
+    return 'observed';
+  }
+  return 'collecting';
+}
+
 export function summarizeAiVisibilityLayers(
   measurement: AiVisibilityMeasurement
 ): {
@@ -293,20 +311,8 @@ export function summarizeAiVisibilityLayers(
 
   return {
     contract: measurement.contract,
-    readiness:
-      readinessMeasured.length === 0
-        ? 'unmeasured'
-        : readinessMeasured.every(item => item.value === true)
-          ? 'ready'
-          : 'not_ready',
-    observedVisibility:
-      observedMeasured.length === 0
-        ? 'unmeasured'
-        : observedMeasured.some(
-              item => typeof item.value === 'number' && item.value > 0
-            )
-          ? 'observed'
-          : 'collecting',
+    readiness: summarizeReadiness(readinessMeasured),
+    observedVisibility: summarizeObservedVisibility(observedMeasured),
     businessOutcome: outcomeMeasured.length === 0 ? 'unmeasured' : 'attributed',
   };
 }

@@ -178,6 +178,8 @@ function makeOption(
     productionWarnings: [],
     qualityReview: {},
     learning: learningSnapshot,
+    remediationOfOptionId: null,
+    remediationInstruction: null,
     createdAt: new Date('2026-09-01T00:00:00Z'),
     updatedAt: new Date('2026-09-01T00:00:00Z'),
     ...overrides,

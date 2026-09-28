@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** The cache subset of the Redis client the route touches. */
+interface ShippingVelocityRedisStub {
+  get: (key: string) => unknown;
+  set: (...args: unknown[]) => unknown;
+}
+
 const hoisted = vi.hoisted(() => ({
   getCurrentUserEntitlements: vi.fn(),
   checkAdminRole: vi.fn(),
@@ -10,7 +16,7 @@ const hoisted = vi.hoisted(() => ({
     VERCEL_ENV: 'development' as string | undefined,
     NODE_ENV: 'test' as string | undefined,
   },
-  getRedis: vi.fn(() => null),
+  getRedis: vi.fn((): ShippingVelocityRedisStub | null => null),
   captureError: vi.fn(),
   logger: { error: vi.fn(), warn: vi.fn() },
 }));

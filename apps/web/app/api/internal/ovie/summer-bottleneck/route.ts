@@ -8,7 +8,14 @@ import { summerAdmissionsSchema } from '@/lib/ovie/summer-admissions';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
 import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
-import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
+import {
+  resolveSummerEveCallerOrigin,
+  SummerPinInvalidError,
+} from '@/lib/ovie/summer-production-pin';
+import {
+  eveShadowTransportHeaders,
+  InvalidEveProtectionBypassSecretError,
+} from '@/lib/ovie/summer-shadow-client';
 import { summerTaskAdmissionsSchema } from '@/lib/ovie/summer-task-admissions';
 import { logger } from '@/lib/utils/logger';
 
@@ -107,7 +114,7 @@ const ciAuditSchema = z.union([
 const existingRepairSchema = z
   .object({
     mode: z.literal('isolated-cli'),
-    identifier: z.string().regex(/^JOV-[1-9][0-9]*$/u),
+    identifier: z.string().regex(/^JOV-[1-9]\d*$/u),
     issueId: z.uuid(),
     ownerId: z.uuid(),
     issueRevision: timestamp,
@@ -348,9 +355,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   let destination: URL;
   try {
-    destination = new URL(EVE_BOTTLENECK_PATH, getEveShadowOrigin());
-  } catch {
-    return json({ ok: false, code: 'eve_destination_unavailable' }, 503);
+    const target = await resolveSummerEveCallerOrigin();
+    destination = new URL(EVE_BOTTLENECK_PATH, target.origin);
+  } catch (error) {
+    if (error instanceof SummerPinInvalidError) {
+      return json({ ok: false, code: 'summer_pin_invalid' }, 503);
+    }
+    throw error;
   }
 
   const body = signSummerBottleneckSnapshot(
@@ -377,14 +388,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     return json({ ok: false, code: 'wrong_oidc_audience' }, 503);
   }
 
+  let transportHeaders: Record<string, string>;
+  try {
+    transportHeaders = eveShadowTransportHeaders(oidcToken);
+  } catch (error) {
+    if (error instanceof InvalidEveProtectionBypassSecretError) {
+      logger.error(
+        '[ovie-summer-bottleneck] Eve protection bypass secret is invalid'
+      );
+      return json({ ok: false, code: 'eve_protection_bypass_invalid' }, 503);
+    }
+    throw error;
+  }
+
   let upstream: Response;
   try {
     // No retry: an uncertain submission is resolved by Eve's immutable event ID.
     upstream = await boundedFetch(destination, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${oidcToken}`,
-        'x-vercel-trusted-oidc-idp-token': oidcToken,
+        ...transportHeaders,
         'content-type': 'application/json',
       },
       body: JSON.stringify(body),

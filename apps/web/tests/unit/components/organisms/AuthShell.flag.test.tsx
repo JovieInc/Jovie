@@ -1,7 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as renderUI, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { AuthShell } from '@/components/organisms/AuthShell';
+import {
+  AuthShell,
+  isWhatsNewBannerEnabled,
+} from '@/components/organisms/AuthShell';
+import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
@@ -65,6 +70,12 @@ vi.mock('@/components/organisms/UnifiedSidebar', () => ({
   },
 }));
 
+vi.mock('@/components/organisms/whats-new/WhatsNewBanner', () => ({
+  WhatsNewBanner: ({ enabled }: { enabled: boolean }) => (
+    <div data-testid='whats-new-slot' data-enabled={String(enabled)} />
+  ),
+}));
+
 vi.mock('@/contexts/RightPanelContext', () => ({
   useRightPanel: () => null,
 }));
@@ -89,6 +100,18 @@ vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
   MobileProfileDrawer: () => <button type='button'>Mobile Profile</button>,
 }));
 
+function render(ui: ReactNode) {
+  return renderUI(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      {ui}
+    </QueryClientProvider>
+  );
+}
+
 function renderAuthShell(showMobileTabs = false) {
   return render(
     <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
@@ -112,6 +135,28 @@ function renderOvAuthShell() {
     </AppFlagProvider>
   );
 }
+
+describe('AuthShell runtime update wiring', () => {
+  it('renders the shell frame inside the runtime update provider', () => {
+    renderUI(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+          <SidebarProvider>
+            <AuthShell section='dashboard' breadcrumbs={[]}>
+              <div>Shell Content</div>
+            </AuthShell>
+          </SidebarProvider>
+        </AppFlagProvider>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByTestId('app-shell-frame')).toBeInTheDocument();
+  });
+});
 
 describe('AuthShell canonical wiring', () => {
   it('uses the single shell frame and in-sidebar collapse control', () => {
@@ -171,5 +216,44 @@ describe('AuthShell canonical wiring', () => {
     expect(screen.getByTestId('app-shell-frame')).not.toHaveAttribute(
       'data-content-class'
     );
+  });
+});
+
+describe("AuthShell What's New banner gating", () => {
+  it('mounts the banner slot but keeps it off in automated tests', () => {
+    renderOvAuthShell();
+
+    expect(screen.getByTestId('whats-new-slot')).toHaveAttribute(
+      'data-enabled',
+      'false'
+    );
+  });
+
+  it('enables the banner in the Mac app and the operator shell only', () => {
+    const base = { isAutomatedTest: false } as const;
+    expect(
+      isWhatsNewBannerEnabled({
+        ...base,
+        section: 'dashboard',
+        isElectron: true,
+      })
+    ).toBe(true);
+    expect(
+      isWhatsNewBannerEnabled({ ...base, section: 'ov', isElectron: false })
+    ).toBe(true);
+    expect(
+      isWhatsNewBannerEnabled({
+        ...base,
+        section: 'dashboard',
+        isElectron: false,
+      })
+    ).toBe(false);
+    expect(
+      isWhatsNewBannerEnabled({
+        section: 'ov',
+        isElectron: true,
+        isAutomatedTest: true,
+      })
+    ).toBe(false);
   });
 });

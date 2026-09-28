@@ -112,8 +112,8 @@ describe('Contrast baseline schema (JOV-#11028)', () => {
     );
   });
 
-  it('baseline schema is valid when the file exists', () => {
-    if (!existsSync(BASELINE_PATH)) return;
+  it('baseline schema is valid when the file exists', ({ skip }) => {
+    if (!existsSync(BASELINE_PATH)) skip();
 
     const parsed: unknown = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
     expect(isContrastInventory(parsed)).toBe(true);

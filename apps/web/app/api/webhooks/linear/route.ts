@@ -3,18 +3,17 @@
  *
  * Invariant consumer: JOV-INV-005.
  *
- * Bridges Linear → GitHub repository_dispatch when CodeRabbit posts an
- * implementation-plan comment. It dispatches
- *    `linear_plan_ready` (with verify_required / simplify_bounded / model_tier
- *    parsed from the comment body's automation contract)
+ * Bridges signed Linear changes to bounded GitHub repository_dispatch events:
+ * CodeRabbit plan comments become `linear_plan_ready`; JOV Issue changes in
+ * Triage become `linear_triage_assess` for a trusted exact-issue reread.
  *
- * Issue pickup is owned by upstream OpenAI Symphony polling Linear directly.
+ * Issue pickup is owned by upstream OpenAI Symphony. The Triage event is
+ * an assessment wake-up, not an admission or worker dispatch.
  *
  * Auth: HMAC-SHA256 verification against LINEAR_WEBHOOK_SECRET via the
  * `linear-signature` header. Missing → 400, invalid → 401.
  *
- * Dedupe: provider webhook identity (with a deterministic fallback) held for
- * six hours. Definite dispatch rejection releases the lock; an ambiguous
+ * Dedupe: keyed digest of the verified webhook body held for six hours. Definite dispatch rejection releases the lock; an ambiguous
  * timeout stays locked for the reconciliation backstop instead of replaying.
  *
  * Side effects: POSTs to
@@ -41,6 +40,8 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const DEDUPE_TTL_SECONDS = 6 * 60 * 60;
 const DISPATCH_TIMEOUT_MS = 4500;
 const MAX_PROVIDER_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
+const JOV_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+const JOV_TRIAGE_STATE_ID = '9844cfe6-6cf4-4347-842c-893a68f349b8';
 
 interface LinearIssueState {
   id?: string;
@@ -55,6 +56,7 @@ interface LinearIssueData {
   description?: string;
   url?: string;
   updatedAt?: string;
+  teamId?: string;
   team?: {
     key?: string;
   };
@@ -127,6 +129,24 @@ function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
     /coderabbit-plan-ready|##\s+Implementation\s+Plan/i.test(body);
 
   return isCodeRabbitAuthor && hasPlanMarker;
+}
+
+function isJovTriageIssueChange(payload: LinearWebhookPayload): boolean {
+  if (
+    payload.type !== 'Issue' ||
+    !['create', 'update'].includes(payload.action ?? '')
+  ) {
+    return false;
+  }
+  const issue = payload.data as LinearIssueData | undefined;
+  return Boolean(
+    issue?.id &&
+      /^JOV-\d+$/.test(issue.identifier ?? '') &&
+      (issue.teamId === JOV_TEAM_ID || issue.team?.key === 'JOV') &&
+      (issue.stateId === JOV_TRIAGE_STATE_ID ||
+        issue.state?.id === JOV_TRIAGE_STATE_ID ||
+        issue.state?.name === 'Triage')
+  );
 }
 
 function getIssueData(
@@ -216,8 +236,9 @@ export async function POST(request: NextRequest) {
     const payload = JSON.parse(body) as LinearWebhookPayload;
 
     const isPlanReadyEvent = isCodeRabbitPlanComment(payload);
+    const isTriageEvent = isJovTriageIssueChange(payload);
 
-    if (!isPlanReadyEvent) {
+    if (!isPlanReadyEvent && !isTriageEvent) {
       return NextResponse.json(
         { received: true, ignored: true },
         { headers: NO_STORE_HEADERS }
@@ -247,11 +268,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const providerDeliveryId =
-      payload.webhookId?.trim() ||
-      request.headers.get('linear-delivery')?.trim() ||
-      request.headers.get('linear-event')?.trim();
-    const dedupeKey = `${providerDeliveryId || `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}`}:plan`;
+    // The signature authenticates the body, not Linear-Delivery. A replay with
+    // a changed header must remain the same event; distinct signed revisions
+    // get independent keys. The keyed digest does not expose issue content.
+    const eventKind = isTriageEvent ? 'triage-assess' : 'plan';
+    const authenticatedDeliveryId = createHmac('sha256', webhookSecret)
+      .update(body)
+      .digest('hex');
+    const dedupeKey = `${authenticatedDeliveryId}:${eventKind}`;
     dedupeKeyForRetry = dedupeKey;
     const dedupeResult = await acquireRecentDispatch(
       'linear',
@@ -281,7 +305,9 @@ export async function POST(request: NextRequest) {
 
     const owner = env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
     const repo = env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
-    const automationContract = getAutomationContract(payload);
+    const automationContract = isPlanReadyEvent
+      ? getAutomationContract(payload)
+      : null;
 
     const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -293,22 +319,28 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          event_type: 'linear_plan_ready',
+          event_type: isTriageEvent
+            ? 'linear_triage_assess'
+            : 'linear_plan_ready',
           client_payload: {
-            delivery_id: providerDeliveryId ?? dedupeKey,
+            delivery_id: authenticatedDeliveryId,
             provider_timestamp: observedAt ?? payload.createdAt ?? null,
             issue_id: issueId,
             issue_identifier: issueData?.identifier ?? null,
             issue_updated_at: issueData?.updatedAt ?? null,
-            team_key: issueData?.team?.key ?? null,
-            state_name: issueData?.state?.name ?? null,
+            team_key: isTriageEvent ? 'JOV' : (issueData?.team?.key ?? null),
+            state_name: isTriageEvent
+              ? 'Triage'
+              : (issueData?.state?.name ?? null),
             action: payload.action ?? null,
-            automation: {
-              plan_ready: isPlanReadyEvent,
-              verify_required: automationContract.verifyRequired,
-              simplify_bounded: automationContract.simplifyBounded,
-              model_tier: automationContract.modelTier,
-            },
+            ...(automationContract && {
+              automation: {
+                plan_ready: true,
+                verify_required: automationContract.verifyRequired,
+                simplify_bounded: automationContract.simplifyBounded,
+                model_tier: automationContract.modelTier,
+              },
+            }),
           },
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,

@@ -41,7 +41,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getCachedAuth();
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -213,7 +213,7 @@ export async function GET() {
  */
 export async function DELETE() {
   try {
-    const { userId } = await getCachedAuth();
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

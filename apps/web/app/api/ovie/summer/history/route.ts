@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
+import { canUseOvChatMode } from '@/lib/chat/ov-mode';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import { authorizeFounderSummerUser } from '@/lib/ovie/summer-founder-auth';
 import {
@@ -72,6 +73,15 @@ export async function GET() {
       authorization === 'unconfigured' ? 503 : 403
     );
   }
+  try {
+    if (!(await canUseOvChatMode(userId))) {
+      return unavailable('Summer history requires current admin access.', 403);
+    }
+  } catch {
+    return unavailable(
+      'Summer history is unavailable. Do not resend the original turn.'
+    );
+  }
   let raw: string | undefined;
   try {
     // Despite its name, this is a read-only authoritative read (no cache fill).
@@ -101,46 +111,89 @@ export async function GET() {
       409
     );
   }
-  const messages = [...session.turns]
-    .sort((a, b) => a.turnIndex - b.turnIndex)
-    .flatMap(turn => {
-      const id = `summer-history:${turn.turnIndex}`;
-      const content = [
-        turn.assistantText,
-        turn.toolReceipt
-          ? `Recorded tool result (${turn.toolReceipt.ok ? 'succeeded' : 'failed'}): ${turn.toolReceipt.summary}`
-          : '',
-        turn.state !== 'completed'
-          ? `Summer turn status: ${turn.state}. Do not resend this message until the original turn has been reconciled.`
-          : '',
-      ]
-        .filter(Boolean)
-        .join('\n\n');
-      return [
-        ...(turn.userText
-          ? [
-              {
-                id: `${id}:user`,
-                role: 'user' as const,
-                content: turn.userText,
-                clientMessageId: turn.clientTurnId
-                  ? `${turn.clientTurnId}:user`
-                  : null,
-                createdAt: turn.createdAt,
-              },
-            ]
-          : []),
-        {
-          id: `${id}:assistant`,
-          role: 'assistant' as const,
-          content,
-          clientMessageId: turn.clientTurnId
-            ? `assistant:${turn.clientTurnId}`
-            : null,
-          createdAt: turn.createdAt,
-        },
-      ];
-    });
+  const sorted = [...session.turns].sort((a, b) => a.turnIndex - b.turnIndex);
+  // Turns that recorded no answer and no tool receipt are dead-end noise that
+  // never reconciles itself; collapse each run into a single summary row
+  // instead of one permanent "do not resend" bubble per turn.
+  const isSilentFailure = (turn: (typeof sorted)[number]) =>
+    turn.state !== 'completed' && !turn.assistantText && !turn.toolReceipt;
+  const collapseSummary = (turns: (typeof sorted)[number][]) => {
+    const counts = new Map<string, number>();
+    for (const turn of turns) {
+      counts.set(turn.state, (counts.get(turn.state) ?? 0) + 1);
+    }
+    const breakdown = [...counts.entries()]
+      .map(([state, count]) => (count > 1 ? `${state} ×${count}` : state))
+      .join(', ');
+    const first = turns[0];
+    const last = turns[turns.length - 1];
+    return {
+      id: `summer-history:failed:${first.turnIndex}-${last.turnIndex}`,
+      role: 'assistant' as const,
+      content: `${turns.length} earlier Summer ${turns.length === 1 ? 'turn' : 'turns'} ended without a reply (${breakdown}). Nothing was recorded for ${turns.length === 1 ? 'it' : 'them'}; resend the message to retry.`,
+      clientMessageId: null,
+      createdAt: last.createdAt,
+    };
+  };
+  type HistoryMessage = {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    clientMessageId: string | null;
+    createdAt: string;
+  };
+  const messages: HistoryMessage[] = [];
+  let collapsedRun: typeof sorted = [];
+  const flushCollapsed = () => {
+    if (collapsedRun.length > 0) {
+      messages.push(collapseSummary(collapsedRun));
+      collapsedRun = [];
+    }
+  };
+  for (const turn of sorted) {
+    if (isSilentFailure(turn)) {
+      collapsedRun.push(turn);
+      continue;
+    }
+    flushCollapsed();
+    const id = `summer-history:${turn.turnIndex}`;
+    const content = [
+      turn.assistantText,
+      turn.toolReceipt
+        ? `Recorded tool result (${turn.toolReceipt.ok ? 'succeeded' : 'failed'}): ${turn.toolReceipt.summary}`
+        : '',
+      turn.state !== 'completed'
+        ? `Summer turn status: ${turn.state}. Resend the message to retry it.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+    messages.push(
+      ...(turn.userText
+        ? [
+            {
+              id: `${id}:user`,
+              role: 'user' as const,
+              content: turn.userText,
+              clientMessageId: turn.clientTurnId
+                ? `${turn.clientTurnId}:user`
+                : null,
+              createdAt: turn.createdAt,
+            },
+          ]
+        : []),
+      {
+        id: `${id}:assistant`,
+        role: 'assistant' as const,
+        content,
+        clientMessageId: turn.clientTurnId
+          ? `assistant:${turn.clientTurnId}`
+          : null,
+        createdAt: turn.createdAt,
+      }
+    );
+  }
+  flushCollapsed();
   // Explicit projection: never expose provider receipts, checkpoints or raw rows.
   return NextResponse.json(
     {

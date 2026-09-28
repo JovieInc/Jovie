@@ -164,7 +164,7 @@ export async function GET() {
  * PATCH /api/admin/leads/settings — Update pipeline settings.
  */
 export async function PATCH(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

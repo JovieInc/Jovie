@@ -2,11 +2,22 @@ import * as Sentry from '@sentry/nextjs';
 import { Redis } from '@upstash/redis';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  createLocalRedisClient,
+  resetLocalRedisClientForTests,
+} from '@/lib/redis-local-client';
+import {
+  redisStoreEnvFrom,
+  resetRedisStoreWarningForTests,
+  selectRedisStore,
+  warnRedisStoreDecision,
+} from '@/lib/redis-store';
 import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 // Lazy initialization with retry capability
 // This prevents permanent null state if Redis is briefly unavailable during deployment
 let _redis: Redis | null = null;
+let _localRedis: Redis | null = null;
 let _redisInitAttempted = false;
 let _redisLastAttempt = 0;
 let _redisMissingConfigWarned = false;
@@ -108,7 +119,25 @@ function captureMissingRedisConfigWarningOnce(): void {
  * If Redis was unavailable during initial module load, this will retry
  * initialization periodically (every 30s) to recover from transient failures.
  */
+function currentRedisStoreDecision() {
+  return selectRedisStore(redisStoreEnvFrom(env));
+}
+
 export function getRedis(options?: GetRedisOptions): Redis | null {
+  const decision = currentRedisStoreDecision();
+  warnRedisStoreDecision(decision);
+
+  if (decision.kind === 'memory') {
+    return null;
+  }
+
+  if (decision.kind === 'local-redis' && decision.localRedisUrl) {
+    if (!_localRedis) {
+      _localRedis = createLocalRedisClient(decision.localRedisUrl) as Redis;
+    }
+    return _localRedis;
+  }
+
   if (!options?.bypassQuotaCircuit && isRedisQuotaCircuitOpen()) {
     return null;
   }
@@ -196,8 +225,11 @@ export type RedisClient = Redis | null;
 /** Test-only helper to clear the singleton client and quota circuit. */
 export function resetRedisStateForTests(): void {
   _redis = null;
+  _localRedis = null;
   _redisInitAttempted = false;
   _redisLastAttempt = 0;
   _redisMissingConfigWarned = false;
   redisQuotaCircuitOpenUntil = 0;
+  resetLocalRedisClientForTests();
+  resetRedisStoreWarningForTests();
 }

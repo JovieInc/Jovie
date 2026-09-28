@@ -29,6 +29,19 @@ const FORBIDDEN_PUBLIC_OFFERS = Object.freeze([
   '/signup?plan=pro&interval=year',
   '/signup?plan=pro&interval=annual',
 ]);
+const ARTIST_VISIBILITY_OFFER_CONTRACT_ID =
+  'artist-visibility-offer-contract-v1';
+const FORBIDDEN_PRICING_PAGE_MARKERS = Object.freeze([
+  '$149',
+  '149/mo',
+  'Max Early Access',
+  'marketing-pricing-plan-max',
+]);
+const REQUIRED_PRICING_PAGE_MARKERS = Object.freeze([
+  ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+  '$199',
+  'Request access',
+]);
 const FORBIDDEN_DIRECTORY_IDENTITIES = Object.freeze([
   'e2e+jordan@example.com',
   '+clerk_test',
@@ -52,6 +65,7 @@ export const SEED_DONE_INVARIANTS = Object.freeze([
       "plan === 'pro' && validateBillingInterval(interval) === 'month'",
       'Only monthly Pro is available for new subscriptions',
       'rejects stale annual and Max signup offers',
+      ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
     ]),
     forbidden: FORBIDDEN_PUBLIC_OFFERS,
   }),
@@ -131,6 +145,14 @@ export function scanDoneSprintSources(repoRoot = DEFAULT_ROOT) {
   return errors;
 }
 
+const safeHost = value => {
+  try {
+    return typeof value === 'string' && value ? new URL(value).host : '';
+  } catch {
+    return '';
+  }
+};
+
 /**
  * @param {{
  *   env?: NodeJS.ProcessEnv,
@@ -153,6 +175,10 @@ export async function rescanProduction({
     ];
   }
 
+  // Immutable Vercel deployment URLs sit behind deployment protection. Send
+  // the automation bypass when the release passes it; otherwise a followed
+  // redirect lands on the SSO page and every marker reads as missing.
+  const bypassSecret = (env.VERCEL_AUTOMATION_BYPASS_SECRET || '').trim();
   const errors = [];
   let fetched = 0;
   for (const path of paths) {
@@ -160,7 +186,12 @@ export async function rescanProduction({
     let response;
     try {
       response = await fetchImpl(url, {
-        headers: { Accept: 'text/html' },
+        headers: {
+          Accept: 'text/html',
+          ...(bypassSecret
+            ? { 'x-vercel-protection-bypass': bypassSecret }
+            : {}),
+        },
         redirect: 'follow',
       });
     } catch (error) {
@@ -175,6 +206,13 @@ export async function rescanProduction({
       );
       continue;
     }
+    const landedHost = safeHost(response?.url);
+    if (landedHost && landedHost !== safeHost(url)) {
+      errors.push(
+        `done-sprint: production fetch ${url} was redirected to ${landedHost} (deployment protection without a bypass secret); fail closed`
+      );
+      continue;
+    }
     fetched += 1;
     const body = await response.text();
     if (path === '/pricing' || path === '/') {
@@ -182,6 +220,22 @@ export async function rescanProduction({
         if (body.includes(forbidden)) {
           errors.push(
             `done-sprint JOV-6218: production ${url} still offers ${forbidden}`
+          );
+        }
+      }
+    }
+    if (path === '/pricing') {
+      for (const marker of FORBIDDEN_PRICING_PAGE_MARKERS) {
+        if (body.includes(marker)) {
+          errors.push(
+            `done-sprint JOV-6218: production ${url} still shows ${marker} (${ARTIST_VISIBILITY_OFFER_CONTRACT_ID})`
+          );
+        }
+      }
+      for (const marker of REQUIRED_PRICING_PAGE_MARKERS) {
+        if (!body.includes(marker)) {
+          errors.push(
+            `done-sprint JOV-6218: production ${url} missing ${marker} (${ARTIST_VISIBILITY_OFFER_CONTRACT_ID})`
           );
         }
       }

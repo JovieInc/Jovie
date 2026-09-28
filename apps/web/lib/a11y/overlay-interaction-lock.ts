@@ -51,13 +51,13 @@ const INTENTIONAL_INERT_SELECTOR = [
 function isVisibleBlockingOverlay(element: HTMLElement): boolean {
   if (element.getAttribute('aria-hidden') === 'true') return false;
   if (element.hasAttribute('inert')) return false;
-  if (element.getAttribute('data-state') === 'closed') return false;
+  if (element.dataset.state === 'closed') return false;
   const style = globalThis.getComputedStyle(element);
   return style.display !== 'none' && style.visibility !== 'hidden';
 }
 
 function classifyOverlay(element: HTMLElement): OverlayLockReason {
-  const slot = element.getAttribute('data-slot');
+  const slot = element.dataset.slot;
   if (slot === 'dialog-overlay' || slot === 'sheet-overlay') return 'overlay';
   const role = element.getAttribute('role');
   if (role === 'menu') return 'menu';
@@ -119,12 +119,9 @@ function restoreStuckFocus(restored: string[]): void {
     '[aria-label="Chat Message Input"]'
   );
   const main = document.getElementById('main-content');
-  const target =
-    composer && !composer.closest('[inert]')
-      ? composer
-      : main && !main.closest('[inert]')
-        ? main
-        : null;
+  let target: HTMLElement | null = null;
+  if (composer && !composer.closest('[inert]')) target = composer;
+  else if (main && !main.closest('[inert]')) target = main;
   if (!target || typeof target.focus !== 'function') return;
   target.focus({ preventScroll: true });
   restored.push('focus');

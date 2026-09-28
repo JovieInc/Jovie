@@ -3,8 +3,8 @@ import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
-// Prelaunch front-door label and destination. Server-side waitlist gate
-// still handles post-auth routing.
+// Prelaunch front-door label. JOV-5085 locks Get started → /start.
+// Server-side waitlist gate handles post-/start routing, not the homepage href.
 export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract(
   FEATURE_FLAGS.WAITLIST_ENABLED
 );
@@ -51,32 +51,19 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   // Certified nine-section homepage: sections 2-9. Section 1 is `hero`.
   certified: {
+    // Pen My0zu (JOV-6946): one relationships section. The hero shows the
+    // profile; this section proves the next steps, with real jov.ie/tim
+    // captures in visual accent order (pay: blue, updates: purple).
     sections: [
-      {
-        id: 'connected',
-        eyebrow: 'IDENTITY, ACROSS THE INTERNET',
-        headline: 'Everything about you, connected.',
-        body: 'Your work and story are scattered across the internet. Your identity should be easier to see.',
-      },
       {
         id: 'relationships',
         headline: 'Turn attention into relationships.',
-        body: 'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-        outcomes: [
+        body: 'Give every person a tailored next step, without forcing everyone through the same funnel.',
+        steps: [
+          { id: 'pay', caption: 'A direct way to pay Tim, in one tap.' },
           {
-            id: 'found',
-            headline: 'Be found. Be understood.',
-            body: 'Share the right version of you, legible wherever people want to know how you can help.',
-          },
-          {
-            id: 'know',
-            headline: 'Know who cares.',
-            body: 'See who is paying attention, what brought them to you, and what they may want next.',
-          },
-          {
-            id: 'built',
-            headline: 'Built around who you are.',
-            body: 'Jovie adapts to your work without reducing you to a category.',
+            id: 'subscribe',
+            caption: 'Tim’s updates, sent only to people who asked for them.',
           },
         ],
       },

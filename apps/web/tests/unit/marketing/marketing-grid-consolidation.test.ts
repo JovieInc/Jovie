@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 const firstBatchRoutes = [
   'app/(marketing)/voice/page.tsx',
   'app/(marketing)/ai/page.tsx',
-  'app/(marketing)/investors/page.tsx',
 ] as const;
 
 const CANONICAL_CONTAINER = "MarketingContainer width='page'";

@@ -119,7 +119,7 @@ if (!db) {
       });
 
       // With proper RLS, user A should not see user B's private profile
-      expect(rows.rows.length).toBe(0);
+      expect(rows.rows).toHaveLength(0);
     });
 
     it('allows the owner to read their own private profile', async () => {
@@ -132,7 +132,7 @@ if (!db) {
       });
 
       // User B should be able to see their own private profile
-      expect(rows.rows.length).toBe(1);
+      expect(rows.rows).toHaveLength(1);
       expect(rows.rows[0]?.id).toBe(privateProfileId);
     });
 
@@ -146,7 +146,7 @@ if (!db) {
       });
 
       // With proper RLS, user A should not be able to update user B's profile
-      expect(updated.rows.length).toBe(0);
+      expect(updated.rows).toHaveLength(0);
     });
 
     it('allows reads of public profiles', async () => {
@@ -159,7 +159,7 @@ if (!db) {
         );
       });
 
-      expect(publicRows.rows.length).toBe(1);
+      expect(publicRows.rows).toHaveLength(1);
       expect(publicRows.rows[0]?.id).toBe(publicProfileId);
     });
 
@@ -173,7 +173,7 @@ if (!db) {
       });
 
       // Anonymous users should not see private profiles
-      expect(privateRows.rows.length).toBe(0);
+      expect(privateRows.rows).toHaveLength(0);
     });
 
     it('allows reads of public profile photos', async () => {
@@ -186,7 +186,7 @@ if (!db) {
         );
       });
 
-      expect(publicRows.rows.length).toBe(1);
+      expect(publicRows.rows).toHaveLength(1);
       expect(publicRows.rows[0]?.id).toBe(publicPhotoId);
     });
 
@@ -200,7 +200,7 @@ if (!db) {
       });
 
       // Anonymous users should not see photos for private profiles
-      expect(privateRows.rows.length).toBe(0);
+      expect(privateRows.rows).toHaveLength(0);
     });
 
     it('prevents non-owners from reading billing audit rows (JOV-3061)', async () => {
@@ -220,7 +220,7 @@ if (!db) {
           )
         );
       });
-      expect(asB.rows.length).toBe(0);
+      expect(asB.rows).toHaveLength(0);
     });
 
     it('prevents non-owners from reading another user chat conversation (JOV-3061)', async () => {
@@ -246,7 +246,7 @@ if (!db) {
           )
         );
       });
-      expect(asA.rows.length).toBe(0);
+      expect(asA.rows).toHaveLength(0);
 
       const messagesAsA = await withRlsUser(userAClerkId, async tx => {
         return tx.execute(
@@ -255,7 +255,7 @@ if (!db) {
           )
         );
       });
-      expect(messagesAsA.rows.length).toBe(0);
+      expect(messagesAsA.rows).toHaveLength(0);
     });
 
     it('prevents non-owners from reading tips for another creator (JOV-3061)', async () => {
@@ -274,7 +274,7 @@ if (!db) {
           drizzleSql.raw(`SELECT id FROM tips WHERE id = '${tip.id}'`)
         );
       });
-      expect(asA.rows.length).toBe(0);
+      expect(asA.rows).toHaveLength(0);
 
       // Sanity: row exists for the privileged test connection
       const [row] = await db

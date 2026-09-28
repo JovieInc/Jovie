@@ -586,7 +586,36 @@ export function evaluateSkillGovernance({ root = process.cwd() } = {}) {
   return errors;
 }
 
+/** Every path evaluateSkillGovernance reads; other staged changes cannot affect it. */
+export const GOVERNED_PATH_PREFIXES = Object.freeze([
+  '.claude/skills/',
+  '.agents/skills/',
+  '.claude/rules/gstack.md',
+  'skills-lock.json',
+  COVERAGE_MAP_PATH,
+  'docs/vendor/vercel-labs/',
+  'scripts/skill-governance-guard',
+]);
+
+export function touchesGovernedPath(paths) {
+  return paths.some(path =>
+    GOVERNED_PATH_PREFIXES.some(prefix => path.startsWith(prefix))
+  );
+}
+
 function evaluateStagedSkillGovernance() {
+  // Materializing the index copies the whole repo (~13k files); skip it when
+  // nothing governed is staged.
+  const staged = spawnSync('git', ['diff', '--cached', '--name-only', '-z'], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+  });
+  if (
+    staged.status === 0 &&
+    !touchesGovernedPath(staged.stdout.split('\0').filter(Boolean))
+  ) {
+    return [];
+  }
   const temporaryRoot = mkdtempSync(
     resolve(tmpdir(), 'jovie-skill-governance-index-')
   );

@@ -62,6 +62,14 @@ import {
   MERCH_DEFAULT_MARGIN_PRESET,
   type MerchSellabilityResult,
 } from './pricing';
+import {
+  assertMerchCandidateSelectable,
+  assertMerchQaPublishableForCard,
+  createMerchRemediationCandidate,
+  getMerchQaPublishBlockers,
+  listMerchQaQuarantine,
+  type MerchQuarantinedCandidate,
+} from './qa-gate';
 import { getMerchCardSellability } from './safety';
 import { hasHumanSafeMerchContract } from './source-candidates';
 import type {
@@ -1066,6 +1074,9 @@ export async function selectMerchDesign(params: {
       contentReviewBlockers[0] ?? MERCH_PERSON_CONTENT_PUBLISH_BLOCKER
     );
   }
+  // JOV-4739: a QA-FAIL receipt (or a fresh review that fails) hard-blocks
+  // selection — quarantined candidates can never become publishable cards.
+  await assertMerchCandidateSelectable(rawSelected);
   const existingCard = await getCardForSelectedDesignOption(rawSelected.id);
   assertSelectedProductMatchesCard(existingCard, params.catalogProductId);
 
@@ -1074,7 +1085,13 @@ export async function selectMerchDesign(params: {
     : await hydrateOptionPrintfulEconomics(rawSelected);
   const profile = await getCreatorProfileForMerch(selected.creatorProfileId);
   const publishSellability = getDesignOptionSellability(selected);
-  const shouldPublish = params.publish === true && publishSellability.sellable;
+  // JOV-4739: re-check the latest immutable QA receipt; stale or missing
+  // evidence fail-closes the publish path.
+  const qaPublishBlockers = await getMerchQaPublishBlockers(selected);
+  const shouldPublish =
+    params.publish === true &&
+    publishSellability.sellable &&
+    qaPublishBlockers.length === 0;
 
   let card = existingCard;
   if (card) {
@@ -1199,7 +1216,7 @@ export async function selectMerchDesign(params: {
   });
   // JOV-4743: a terminal mockup failure on the selected option is a
   // user-visible publish blocker even when the card's own economics pass.
-  const publishBlockers = [...cardSellability.reasons];
+  const publishBlockers = [...cardSellability.reasons, ...qaPublishBlockers];
   if (
     readOptionMockupStatus(selected.qualityReview) === 'mockup_failed' &&
     !publishBlockers.includes(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER)
@@ -1466,6 +1483,7 @@ export async function publishMerchCard(params: {
   if (!current) throw new Error('Merch card not found');
   // Cards generated before Printful cost hydration can still publish once costs refresh.
   const hydrated = await hydrateMerchCardPrintfulEconomics(current);
+  await assertMerchQaPublishableForCard(hydrated);
   validateMerchCardForPublishing(
     hydrated,
     await readSelectedOptionQualityReview(hydrated)
@@ -1557,6 +1575,7 @@ export async function updateMerchCardDetails(params: {
   };
 
   if (wantsLive) {
+    await assertMerchQaPublishableForCard(current);
     validateMerchCardForPublishing(
       candidate,
       await readSelectedOptionQualityReview(current)
@@ -1621,6 +1640,7 @@ export async function updateMerchCardStatus(params: {
       )
       .limit(1);
     if (!current) throw new Error('Merch card not found');
+    await assertMerchQaPublishableForCard(current);
     validateMerchCardForPublishing(
       current,
       await readSelectedOptionQualityReview(current)
@@ -1930,6 +1950,53 @@ export async function refreshMerchRank(cardId: string): Promise<void> {
     .update(merchCards)
     .set({ rankScore: calculateRankScore(card), updatedAt: new Date() })
     .where(eq(merchCards.id, cardId));
+}
+
+/**
+ * JOV-4739: queryable quarantine queue — candidates whose latest QA receipt
+ * is FAIL (quarantined) or BORDERLINE (escalated for human review).
+ */
+export async function getMerchQaQuarantine(params: {
+  readonly profileId: string;
+  readonly clerkUserId: string;
+}): Promise<MerchQuarantinedCandidate[]> {
+  await assertCanManageMerchProfile(params.profileId, params.clerkUserId);
+  return listMerchQaQuarantine(params.profileId);
+}
+
+/**
+ * JOV-4739: targeted remediation — spawn a fresh candidate from a quarantined
+ * option with the human's instruction attached so the pipeline can re-review it.
+ */
+export async function remediateMerchCandidate(params: {
+  readonly optionId: string;
+  readonly profileId: string;
+  readonly clerkUserId: string;
+  readonly instruction: string;
+}): Promise<MerchDesignOption> {
+  await assertCanManageMerchProfile(params.profileId, params.clerkUserId);
+  const instruction = params.instruction.trim();
+  if (!instruction) {
+    throw new Error('A remediation instruction is required');
+  }
+  const [option] = await db
+    .select()
+    .from(merchDesignOptions)
+    .where(
+      and(
+        eq(merchDesignOptions.id, params.optionId),
+        eq(merchDesignOptions.creatorProfileId, params.profileId)
+      )
+    )
+    .limit(1);
+  if (option?.status !== 'quarantined') {
+    throw new Error('Only quarantined merch candidates can be remediated');
+  }
+  return createMerchRemediationCandidate({
+    option,
+    instruction,
+    createdByClerkUserId: params.clerkUserId,
+  });
 }
 
 export function resolveVariantId(

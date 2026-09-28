@@ -101,11 +101,75 @@ describe('AgentOS gate evidence', () => {
     );
 
     expect(evaluation.passed).toBe(false);
-    expect(evaluation.missingGateNames).toEqual([
-      'gstack.qa.exhaustive',
-      'gstack.review',
-      'gstack.ship',
-    ]);
+    expect(evaluation.missingGateNames).toEqual(['gstack.qa.exhaustive']);
+  });
+
+  it('does not require any gstack skill; agent-chosen gates are the contract', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        verificationGates: [
+          {
+            name: 'github.ci',
+            required: true,
+            status: 'passed',
+            evidenceUrl:
+              'https://github.com/JovieInc/Jovie/actions/runs/123/job/456',
+            summary: null,
+            checkedAt: '2026-05-08T04:00:00.000Z',
+          },
+        ],
+      })
+    );
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.missingGateNames).toEqual([]);
+    expect(evaluation.passedGateNames).toEqual(['github.ci']);
+  });
+
+  it('fails when no gate has passed with recorded evidence', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        verificationGates: [],
+      })
+    );
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.passedGateNames).toEqual([]);
+  });
+
+  it('blocks on a gate the agent declared required but has not passed', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        verificationGates: [
+          ...baseArtifact.verificationGates,
+          {
+            name: 'github.ci',
+            required: true,
+            status: 'queued',
+            evidenceUrl: null,
+            summary: 'PR CI runs after push.',
+            checkedAt: null,
+          },
+        ],
+      })
+    );
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.missingGateNames).toEqual(['github.ci']);
+  });
+
+  it('still enforces an explicit required gate list when a caller passes one', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment(baseArtifact),
+      ['gstack.qa.exhaustive', 'sentry.canary']
+    );
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.missingGateNames).toEqual(['sentry.canary']);
+    expect(evaluation.passedGateNames).toEqual(['gstack.qa.exhaustive']);
   });
 
   it('ignores malformed artifact comments', () => {

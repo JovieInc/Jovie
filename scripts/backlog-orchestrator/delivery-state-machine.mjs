@@ -32,6 +32,7 @@ import {
 import {
   classifyAndOpenFromDelivery,
   DELIVERY_WORKFLOW_FAILURES,
+  loopRecordSnapshot,
   persistDraftStackResolutions,
   persistLoopOutcome,
   readSummerQueue,
@@ -349,8 +350,12 @@ async function loadLifecycleActions(stateDir) {
   return records;
 }
 
-async function persistLifecycleAction(action, { stateDir, dryRun }) {
-  const records = dryRun ? [] : await loadLifecycleActions(stateDir);
+/**
+ * `records` is the snapshot's single directory load. Re-reading the whole
+ * receipt directory per action made the summer-queue lock hold O(actions x
+ * receipts) and starved Delivery Control Receipts past its 30s lock timeout.
+ */
+async function persistLifecycleAction(action, { stateDir, dryRun, records }) {
   const previous = records
     .filter(record => record.lifecycleKey === action.lifecycleKey)
     .sort((left, right) => {
@@ -407,6 +412,7 @@ async function persistLifecycleAction(action, { stateDir, dryRun }) {
   ) {
     throw new Error('PR lifecycle action key collision');
   }
+  if (persisted.status === 'created') records.push(persisted.value);
   return {
     status: persisted.status,
     receipt: persisted.value,
@@ -604,7 +610,13 @@ function failureRoute(failure, externalAction) {
 export function normalizeDeliveryEvent(raw = {}) {
   const payload = raw.client_payload || raw.payload || raw;
   const workflow = raw.workflow_run || payload.workflow_run || {};
-  const workflowName = nonEmpty(workflow.name);
+  const productionController =
+    workflow.path === '.github/workflows/production-controller.yml';
+  // GitHub's run name can include the source SHA and CI attempt. Route by the
+  // immutable workflow path, not the user-visible dynamic title.
+  const workflowName = productionController
+    ? 'Production Controller'
+    : nonEmpty(workflow.name);
   const failure =
     nonEmpty(payload.failure) ||
     (workflow.conclusion === 'cancelled'
@@ -626,10 +638,24 @@ export function normalizeDeliveryEvent(raw = {}) {
   if (!repository) {
     throw new Error('delivery event requires repository owner/name');
   }
+  const runAttempt = exactPositiveInteger(workflow.run_attempt);
+  if (
+    productionController &&
+    (!exactPositiveInteger(workflow.id) ||
+      !runAttempt ||
+      !headSha ||
+      workflow.head_branch !== 'main' ||
+      workflow.status !== 'completed')
+  ) {
+    throw new Error(
+      'production controller event requires an exact completed main run attempt'
+    );
+  }
   const deliveryKey =
     nonEmpty(payload.delivery_key) ||
     nonEmpty(payload.event_id) ||
     nonEmpty(raw.delivery_id) ||
+    (productionController ? `${workflow.id}:attempt:${runAttempt}` : null) ||
     nonEmpty(workflow.id && String(workflow.id)) ||
     digest({
       repository,
@@ -650,14 +676,24 @@ export function normalizeDeliveryEvent(raw = {}) {
     repository,
     deliveryKey,
     source: nonEmpty(payload.source) || (workflow.id ? 'github' : 'linear'),
+    workflow: workflowName,
     event: nonEmpty(payload.event) || nonEmpty(raw.action) || 'changed',
     issue: nonEmpty(payload.issue_identifier) || nonEmpty(payload.issue),
     pr,
     headSha,
     failure,
     externalAction: nonEmpty(payload.external_action),
-    evidence:
-      payload.evidence && typeof payload.evidence === 'object'
+    evidence: productionController
+      ? {
+          workflowRun: {
+            id: workflow.id,
+            attempt: runAttempt,
+            path: workflow.path,
+            conclusion: workflow.conclusion,
+            url: `https://github.com/${repository}/actions/runs/${workflow.id}/attempts/${runAttempt}`,
+          },
+        }
+      : payload.evidence && typeof payload.evidence === 'object'
         ? payload.evidence
         : {},
   };
@@ -810,6 +846,9 @@ export function repairTaskForReceipt(receipt) {
     failure: receipt.event.failure,
     safety: 'normal-pr-ci-review-native-queue-deploy-gates-remain-required',
     ...(stackEvidence ? { evidence: stackEvidence } : {}),
+    ...(receipt.event.evidence?.workflowRun
+      ? { evidence: receipt.event.evidence }
+      : {}),
   };
 }
 
@@ -871,6 +910,7 @@ export async function persistDeliveryOutcome(
     reactivateDraftStack = false,
     queueLockHeld = false,
     draftStackGeneration = null,
+    loopRecords = null,
   } = {}
 ) {
   const receiptDestination = receiptPath(stateDir, receipt);
@@ -902,6 +942,7 @@ export async function persistDeliveryOutcome(
     stateDir,
     reactivateDraftStack,
     queueLockHeld,
+    loopRecords,
   });
   return {
     status: persistedReceipt.status,
@@ -1010,6 +1051,7 @@ export async function persistClosureHealthActions(
   }
   const persistSnapshot = async (queueLockHeld, draftStackAuthority = null) => {
     const results = [];
+    const loopRecords = queueLockHeld ? loopRecordSnapshot(stateDir) : null;
     for (const action of boundedActions) {
       const receipt = buildStackHealthReceipt(action, { now: observedAt });
       results.push(
@@ -1020,10 +1062,15 @@ export async function persistClosureHealthActions(
           reactivateDraftStack:
             activeViolationRoots?.has(action.rootPr) === true,
           draftStackGeneration: draftStackAuthority?.snapshotKey || null,
+          loopRecords,
         })
       );
     }
     const lifecycle = [];
+    const lifecycleRecords =
+      dryRun || boundedLifecycleRows.every(row => row.error)
+        ? []
+        : await loadLifecycleActions(stateDir).catch(error => error);
     for (const row of boundedLifecycleRows) {
       if (row.error) {
         lifecycle.push({
@@ -1034,9 +1081,11 @@ export async function persistClosureHealthActions(
         continue;
       }
       try {
+        if (lifecycleRecords instanceof Error) throw lifecycleRecords;
         const persisted = await persistLifecycleAction(row.action, {
           stateDir,
           dryRun,
+          records: lifecycleRecords,
         });
         lifecycle.push({
           status: persisted.status,
@@ -1086,6 +1135,7 @@ export async function persistClosureHealthActions(
           dryRun,
           queueLockHeld,
           reactivateDraftStack: true,
+          loopRecords,
         })
       );
     }
@@ -1098,6 +1148,7 @@ export async function persistClosureHealthActions(
         queueLockHeld,
         draftStackAuthority,
         repository,
+        loopRecords,
       }
     );
     const rejectedLifecycle = lifecycle.filter(

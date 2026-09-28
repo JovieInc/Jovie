@@ -259,6 +259,18 @@ export function buildProfileRedesignProposals(params: {
   };
 }
 
+async function readExistingProposalStatus(
+  proposalPath: string
+): Promise<DesignProposal['status'] | null> {
+  try {
+    const raw = await fs.readFile(proposalPath, 'utf8');
+    const parsed = DesignProposalSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data.status : null;
+  } catch {
+    return null;
+  }
+}
+
 async function writeProposalFiles(
   rootDirectory: string,
   dayBucket: string,
@@ -269,6 +281,15 @@ async function writeProposalFiles(
     dayBucket,
     proposal.id
   );
+
+  // A reviewed version never reopens: an approved or rejected proposal keeps
+  // its decision even if the loop runs again for the same day bucket. Only a
+  // genuinely new version (new proposal id) can re-enter the inbox.
+  const existingStatus = await readExistingProposalStatus(proposalPath);
+  if (existingStatus === 'approved' || existingStatus === 'rejected') {
+    return [];
+  }
+
   await fs.mkdir(path.dirname(proposalPath), { recursive: true });
   await fs.writeFile(
     proposalPath,
@@ -307,7 +328,7 @@ export async function runProfileRedesignProposalLoop(
 ): Promise<ProfileRedesignLoopResult> {
   const now = params.createdAt ? new Date(params.createdAt) : new Date();
   if (Number.isNaN(now.getTime())) {
-    throw new Error(`Invalid createdAt: ${params.createdAt}`);
+    throw new TypeError(`Invalid createdAt: ${params.createdAt}`);
   }
 
   const dayBucket = params.dayBucket ?? utcDayBucket(now);

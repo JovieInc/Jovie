@@ -1,8 +1,23 @@
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createGoldenPathLinearIssue } from '../golden-path-intake.mjs';
 import {
+  AUTOFIX_ESCALATION_MARKER,
+  AUTOFIX_LAUNCH_MARKER,
+  AUTOFIX_PR_MARKER,
+  autofixBranchPrefix,
   buildAutofixPrompt,
   buildMergeGateReceipt,
+  buildProdProbeChatPayload,
   buildProdProbeReceipt,
   classifyChangedPaths,
   cursorAuthHeader,
@@ -13,12 +28,28 @@ import {
   evaluateProdProbe,
   evaluateStripeWebhookLiveness,
   evaluateWaitlistUnauth,
+  executeAutofix,
+  findFingerprintPrs,
+  findOpenAutofixPr,
   findOwnedAgents,
+  GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
   GOLDEN_PATH_LOCK_SCHEMA,
+  GOLDEN_PATH_LOCK_SELF_TEST_FILES,
   MERGE_GATE_TEST_FILES,
   planAutofix,
   validateReceipt,
 } from '../golden-path-lock.mjs';
+
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+const COMPLETE_CHAT_STREAM = [
+  { type: 'start', messageId: 'assistant-1' },
+  { type: 'text-start', id: 'text-1' },
+  { type: 'text-delta', id: 'text-1', delta: 'Hello.' },
+  { type: 'text-end', id: 'text-1' },
+  { type: 'finish', finishReason: 'stop' },
+]
+  .map(event => `data: ${JSON.stringify(event)}\n\n`)
+  .join('');
 
 describe('golden-path lock test files', () => {
   it('keeps merge-gate files inside the web package', () => {
@@ -26,6 +57,13 @@ describe('golden-path lock test files', () => {
     for (const file of MERGE_GATE_TEST_FILES) {
       expect(file.startsWith('apps/web/tests/unit/')).toBe(true);
     }
+  });
+
+  it('runs both lock behavior and workflow contract tests in the required self gate', () => {
+    expect(GOLDEN_PATH_LOCK_SELF_TEST_FILES).toEqual([
+      'lib/__tests__/golden-path-lock.test.mjs',
+      'lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+    ]);
   });
 });
 
@@ -55,6 +93,19 @@ describe('golden-path lock classifier', () => {
 });
 
 describe('golden-path lock evaluators', () => {
+  it('sends the anonymous first-message probe in the current UIMessage envelope', () => {
+    expect(buildProdProbeChatPayload()).toEqual({
+      mode: 'onboarding',
+      messages: [
+        {
+          id: 'golden-path-lock-probe',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Hi.' }],
+        },
+      ],
+    });
+  });
+
   it('requires the JOV-5864 name search as the homepage conversion', () => {
     const certified = `<a href="/start">Find yourself</a>
       <form><input placeholder="Search your name" /><button>Find me</button></form>`;
@@ -99,6 +150,29 @@ describe('golden-path lock evaluators', () => {
     expect(evaluateHomepageHtml('')).toMatchObject({ ok: false });
   });
 
+  it('accepts the certified waitlist-gated front door (JOV-6794)', () => {
+    const gated = `<a href="/signup">Request access</a>`;
+    expect(evaluateHomepageHtml(gated)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+      reason: expect.stringContaining('waitlist-gated'),
+    });
+    // Gated label without the /signup handoff is still a drift failure.
+    expect(
+      evaluateHomepageHtml('<button>Request access</button>')
+    ).toMatchObject({
+      ok: false,
+    });
+    // A bare /signup link without the certified CTA label is also a failure.
+    expect(
+      evaluateHomepageHtml('<a href="/signup">Get started</a>')
+    ).toMatchObject({ ok: false });
+    // An uncertified waitlist wall remains forbidden.
+    expect(
+      evaluateHomepageHtml('<a href="/waitlist">Request access</a>')
+    ).toMatchObject({ ok: false });
+  });
+
   it('fails 401 and fake rate-limit copy on logged-out first message', () => {
     expect(
       evaluateChatFirstMessage({ status: 401, body: { error: 'Unauthorized' } })
@@ -120,10 +194,83 @@ describe('golden-path lock evaluators', () => {
         status: 403,
         body: { errorCode: 'TURNSTILE_REQUIRED' },
       })
-    ).toMatchObject({ ok: true });
-    expect(
-      evaluateChatFirstMessage({ status: 200, body: { ok: true } })
     ).toMatchObject({
+      ok: false,
+      inconclusive: true,
+      reason: expect.stringContaining('post-challenge'),
+    });
+    expect(
+      evaluateChatFirstMessage({
+        status: 200,
+        body: COMPLETE_CHAT_STREAM,
+      })
+    ).toMatchObject({
+      ok: true,
+    });
+    expect(
+      evaluateChatFirstMessage({ status: 200, body: '{"ok":true}' })
+    ).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('finish event'),
+    });
+    expect(
+      evaluateChatFirstMessage({
+        status: 200,
+        body: [
+          'data: { "type": "error", "errorText": "stream failed" }\n\n',
+          'data: { "type": "finish", "finishReason": "stop" }\n\n',
+        ].join(''),
+      })
+    ).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('error event'),
+    });
+  });
+
+  it('rejects malformed and incomplete SSE frames even after a valid finish', () => {
+    const finish = 'data: {"type":"finish","finishReason":"stop"}\n\n';
+    const invalidFrames = [
+      'data: {"type": "not-json",\n\n',
+      'data: [ {"type":"text-delta"} ]\n\n',
+      'data: null\n\n',
+      'data: {"type":"text-delta"}',
+      'data: {"type":"text-delta"}\n',
+    ];
+
+    for (const invalidFrame of invalidFrames) {
+      expect(
+        evaluateChatFirstMessage({
+          status: 200,
+          body: `${finish}${invalidFrame}`,
+        })
+      ).toMatchObject({
+        ok: false,
+        reason: expect.stringContaining('malformed or unterminated'),
+      });
+    }
+  });
+
+  it('accepts an explicit protocol DONE sentinel after a clean finish', () => {
+    expect(
+      evaluateChatFirstMessage({
+        status: 200,
+        body: `${COMPLETE_CHAT_STREAM}data: [DONE]\n\n`,
+      })
+    ).toMatchObject({ ok: true });
+  });
+
+  it('accepts finish-like text inside a data event without treating it as control', () => {
+    const body = [
+      `data: ${JSON.stringify({
+        type: 'text-delta',
+        id: 'text-1',
+        delta:
+          'The literal "type":"finish" and CHAT_STREAM_FAILED are only message text.',
+      })}\n\n`,
+      'data: {"type":"finish","finishReason":"stop"}\n\n',
+    ].join('');
+
+    expect(evaluateChatFirstMessage({ status: 200, body })).toMatchObject({
       ok: true,
     });
   });
@@ -172,13 +319,28 @@ describe('golden-path lock evaluators', () => {
     const ok = evaluateProdProbe({
       homepageHtml:
         '<a href="/start">Find yourself</a><input placeholder="Search your name" /><button>Find me</button>',
-      chatStatus: 403,
-      chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
+      chatStatus: 200,
+      chatBody: COMPLETE_CHAT_STREAM,
       waitlistStatus: 401,
       ...liveExtras,
     });
     expect(ok.ok).toBe(true);
     expect(ok.checks).toHaveLength(6);
+
+    const challengeOnly = evaluateProdProbe({
+      homepageHtml:
+        '<a href="/start">Find yourself</a><input placeholder="Search your name" /><button>Find me</button>',
+      chatStatus: 403,
+      chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
+      waitlistStatus: 401,
+      ...liveExtras,
+    });
+    expect(challengeOnly.ok).toBe(false);
+    expect(
+      challengeOnly.checks.find(
+        check => check.id === 'logged-out-first-message'
+      )
+    ).toMatchObject({ ok: false, inconclusive: true });
 
     const broken = evaluateProdProbe({
       homepageHtml:
@@ -240,8 +402,8 @@ describe('golden-path lock receipts', () => {
     const evaluated = evaluateProdProbe({
       homepageHtml:
         '<a href="/start">Find yourself</a><input placeholder="Search your name" /><button>Find me</button>',
-      chatStatus: 403,
-      chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
+      chatStatus: 200,
+      chatBody: COMPLETE_CHAT_STREAM,
       waitlistStatus: 401,
       claimStatus: 401,
       billingStatus: 200,
@@ -253,7 +415,46 @@ describe('golden-path lock receipts', () => {
       checks: evaluated.checks,
     });
     expect(receipt.fingerprint).toBe('golden-path-lock:prod:ok');
+    expect(receipt.inconclusive).toBe(false);
     expect(validateReceipt(receipt)).toEqual({ ok: true, errors: [] });
+  });
+
+  it('records a challenge-only chat check as inconclusive and never passing', () => {
+    const receipt = buildProdProbeReceipt({
+      ok: true,
+      checks: [
+        {
+          id: 'logged-out-first-message',
+          ok: false,
+          inconclusive: true,
+          reason: 'probe reached Turnstile without a valid token',
+        },
+      ],
+    });
+
+    expect(receipt).toMatchObject({
+      ok: false,
+      inconclusive: true,
+      fingerprint: 'golden-path-lock:prod:inconclusive',
+    });
+    expect(validateReceipt(receipt)).toEqual({ ok: true, errors: [] });
+    expect(validateReceipt({ ...receipt, ok: true }).ok).toBe(false);
+    expect(validateReceipt({ ...receipt, inconclusive: false }).ok).toBe(false);
+  });
+
+  it('rejects an inconclusive receipt flag without an inconclusive check', () => {
+    const receipt = buildProdProbeReceipt({
+      ok: false,
+      checks: [
+        {
+          id: 'logged-out-first-message',
+          ok: false,
+          reason: 'rate limiter unavailable',
+        },
+      ],
+    });
+
+    expect(validateReceipt({ ...receipt, inconclusive: true }).ok).toBe(false);
   });
 });
 
@@ -274,6 +475,107 @@ describe('golden-path lock autofix planner', () => {
       action: 'fail_closed',
       reason: 'missing_cursor_api_key',
     });
+  });
+
+  it('does not plan autofix for an inconclusive-only probe', () => {
+    const checks = [
+      {
+        id: 'logged-out-first-message',
+        ok: false,
+        inconclusive: true,
+        reason:
+          'Turnstile was reached, but the post-challenge path was not tested',
+      },
+    ];
+    const plan = planAutofix({
+      cursorApiKey: 'available-but-not-needed',
+      fingerprint: 'golden-path-lock:prod:inconclusive',
+      checks,
+    });
+
+    expect(plan).toMatchObject({
+      action: 'fail_closed',
+      reason: 'probe_inconclusive',
+    });
+    expect(buildAutofixPrompt({ fingerprint: 'x', checks })).not.toContain(
+      'Turnstile was reached'
+    );
+  });
+
+  it('refuses a direct inconclusive autofix command before credential lookup', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'golden-path-inconclusive-'));
+    const receiptPath = join(directory, 'receipt.json');
+    const receipt = buildProdProbeReceipt({
+      ok: false,
+      checks: [
+        {
+          id: 'logged-out-first-message',
+          ok: false,
+          inconclusive: true,
+          reason: 'Turnstile was reached without a valid token',
+        },
+      ],
+    });
+    writeFileSync(receiptPath, `${JSON.stringify(receipt)}\n`);
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          resolve(REPO_ROOT, 'scripts/golden-path-lock.mjs'),
+          'autofix',
+          '--receipt',
+          receiptPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, CURSOR_API_KEY: '' },
+        }
+      );
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no autofix was attempted');
+      expect(result.stderr).not.toContain('CURSOR_API_KEY is missing');
+      expect(result.stderr).not.toContain('Linear intake');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a real failure actionable when another check is inconclusive', () => {
+    const checks = [
+      {
+        id: 'logged-out-first-message',
+        ok: false,
+        inconclusive: true,
+        reason:
+          'Turnstile was reached, but the post-challenge path was not tested',
+      },
+      {
+        id: 'waitlist-after-auth',
+        ok: false,
+        reason: 'unauthenticated waitlist write returned 500',
+      },
+    ];
+    const plan = planAutofix({
+      cursorApiKey: 'available',
+      fingerprint: 'golden-path-lock:prod:waitlist-after-auth',
+      checks,
+    });
+
+    expect(plan.action).toBe('launch');
+    const prompt = buildAutofixPrompt({ fingerprint: 'x', checks });
+    const failedCheckSection = prompt
+      .split('Failed checks:\n')[1]
+      .split('\n\n')[0];
+    expect(failedCheckSection).toContain('waitlist-after-auth');
+    expect(failedCheckSection).not.toContain('logged-out-first-message');
+    expect(prompt).toContain(JSON.stringify(buildProdProbeChatPayload()));
+    expect(prompt).toContain('supplies no Turnstile token');
+    expect(prompt).toContain('Do not bypass or weaken Turnstile');
+    expect(prompt).not.toContain(
+      '{"messages":[{"role":"user","content":"hi"}]}'
+    );
   });
 
   it('dedups when an agent already owns the fingerprint', () => {
@@ -462,5 +764,442 @@ describe('golden-path Linear-only intake', () => {
       reason: 'linear_search_429',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('golden-path autofix dedupe planner (JOV-6827)', () => {
+  const fingerprint = 'golden-path-lock:prod:homepage-cta';
+
+  it('dedups when an open PR carries the fingerprint marker', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint,
+      openPrs: [
+        {
+          number: 19016,
+          title: 'fix golden path',
+          body: `repairs probe\n\n${AUTOFIX_PR_MARKER}: ${fingerprint}`,
+        },
+      ],
+    });
+    expect(plan).toMatchObject({
+      action: 'dedup',
+      reason: 'open_pr_owns_fingerprint',
+      openPr: { number: 19016 },
+    });
+  });
+
+  it('caps launches to one per fingerprint per 24h', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint,
+      recentAttemptCount: 1,
+    });
+    expect(plan).toMatchObject({
+      action: 'dedup',
+      reason: 'launch_capped_24h',
+    });
+  });
+
+  it('escalates instead of relaunching after repeated failed attempts', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint,
+      priorAttemptCount: GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
+    });
+    expect(plan).toMatchObject({
+      action: 'escalate',
+      reason: 'max_attempts_exceeded',
+      priorAttemptCount: GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
+    });
+    expect(plan.request).toBeUndefined();
+  });
+
+  it('matches PRs by fingerprint in body or title', () => {
+    expect(
+      findFingerprintPrs(
+        [
+          { number: 1, title: 'unrelated', body: 'nothing' },
+          {
+            number: 2,
+            title: 'fix',
+            body: `${AUTOFIX_PR_MARKER}: ${fingerprint}`,
+          },
+        ],
+        fingerprint
+      ).map(pr => pr.number)
+    ).toEqual([2]);
+  });
+});
+
+describe('golden-path autofix executor contract (JOV-6827)', () => {
+  const fingerprint = 'golden-path-lock:prod:homepage-cta';
+  const failedReceipt = buildProdProbeReceipt({
+    ok: false,
+    checks: [
+      { id: 'homepage-cta', ok: false, reason: 'homepage name search missing' },
+      { id: 'waitlist-after-auth', ok: true, reason: '401' },
+    ],
+  });
+
+  function mockAutofixBackend(state) {
+    const calls = { cursorLaunches: 0, prComments: [], linearComments: 0 };
+    const fetchImpl = async (input, init = {}) => {
+      const url = String(input);
+      const payload =
+        typeof init.body === 'string' ? JSON.parse(init.body) : {};
+      if (url.includes('api.linear.app')) {
+        const query = String(payload.query ?? '');
+        if (query.includes('FindIssueByFingerprint')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                team: { states: { nodes: [{ id: 'todo', name: 'Todo' }] } },
+                issues: {
+                  nodes: [
+                    {
+                      id: 'linear-1',
+                      identifier: 'JOV-7000',
+                      url: 'https://linear.app/jovie/issue/JOV-7000',
+                      title: `P0: golden path broken in prod (${fingerprint})`,
+                      state: { id: 'todo', name: 'Todo', type: 'unstarted' },
+                    },
+                  ],
+                },
+              },
+            })
+          );
+        }
+        if (query.includes('ListLinearIssueComments')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                issue: {
+                  comments: {
+                    nodes: state.linearComments.map((body, index) => ({
+                      id: `c-${index}`,
+                      body,
+                      createdAt: new Date(state.now).toISOString(),
+                    })),
+                  },
+                },
+              },
+            })
+          );
+        }
+        if (query.includes('commentCreate')) {
+          state.linearComments.push(String(payload.variables?.body ?? ''));
+          calls.linearComments += 1;
+          return new Response(
+            JSON.stringify({
+              data: {
+                commentCreate: { success: true, comment: { id: 'cx' } },
+              },
+            })
+          );
+        }
+        if (query.includes('issueUpdate')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                issueUpdate: {
+                  success: true,
+                  issue: { id: 'linear-1', identifier: 'JOV-7000', url: 'u' },
+                },
+              },
+            })
+          );
+        }
+        return new Response(`unexpected linear query: ${query}`, {
+          status: 400,
+        });
+      }
+      if (url.includes('api.github.com/search/issues')) {
+        return new Response(JSON.stringify({ items: state.openPrs }));
+      }
+      if (url.includes('api.github.com/repos/') && url.endsWith('/comments')) {
+        calls.prComments.push(String(payload.body ?? ''));
+        return new Response(JSON.stringify({ id: 1 }), { status: 201 });
+      }
+      if (url.includes('api.cursor.com')) {
+        if ((init.method ?? 'GET') === 'POST') {
+          calls.cursorLaunches += 1;
+          state.cursorAgents.push({
+            id: `bc-${calls.cursorLaunches}`,
+            createdAt: new Date(state.now).toISOString(),
+            prompt: fingerprint,
+          });
+          return new Response(
+            JSON.stringify({ id: `bc-${calls.cursorLaunches}` }),
+            {
+              status: 200,
+            }
+          );
+        }
+        return new Response(JSON.stringify({ agents: state.cursorAgents }));
+      }
+      return new Response(`unexpected url ${url}`, { status: 500 });
+    };
+    return { fetchImpl, calls };
+  }
+
+  it('launches exactly once across two consecutive failing probe runs', async () => {
+    const state = {
+      now: Date.now(),
+      cursorAgents: [],
+      openPrs: [],
+      linearComments: [],
+    };
+    const { fetchImpl, calls } = mockAutofixBackend(state);
+    const deps = {
+      receipt: failedReceipt,
+      cursorApiKey: 'key',
+      linearApiKey: 'linear-key',
+      githubToken: 'gh-token',
+      fetchImpl,
+      now: state.now,
+    };
+
+    const first = await executeAutofix(deps);
+    expect(first.action).toBe('launch');
+    expect(state.linearComments.join('\n')).toContain(
+      `${AUTOFIX_LAUNCH_MARKER}:${fingerprint}`
+    );
+
+    // The launched agent opened a draft PR carrying the fingerprint marker.
+    state.openPrs.push({
+      number: 19016,
+      title: 'fix golden path homepage',
+      body: `autofix\n\n${AUTOFIX_PR_MARKER}: ${fingerprint}`,
+      pull_request: {},
+    });
+
+    const second = await executeAutofix(deps);
+    expect(second.action).toBe('dedup');
+    expect(second.reason).toBe('open_pr_owns_fingerprint');
+    expect(calls.cursorLaunches).toBe(1);
+    expect(calls.prComments).toHaveLength(1);
+    expect(calls.prComments[0]).toContain(fingerprint);
+  });
+
+  it('caps a second failure inside 24h even without a visible agent or PR', async () => {
+    const state = {
+      now: Date.now(),
+      cursorAgents: [],
+      openPrs: [],
+      linearComments: [],
+    };
+    const { fetchImpl, calls } = mockAutofixBackend(state);
+    const deps = {
+      receipt: failedReceipt,
+      cursorApiKey: 'key',
+      linearApiKey: 'linear-key',
+      githubToken: 'gh-token',
+      fetchImpl,
+      now: state.now,
+    };
+
+    expect((await executeAutofix(deps)).action).toBe('launch');
+    // Next probe run sees no listed agent and no PR, but the durable launch
+    // marker on the canonical issue still caps the launch.
+    state.cursorAgents = [];
+    const second = await executeAutofix(deps);
+    expect(second.action).toBe('dedup');
+    expect(second.reason).toBe('launch_capped_24h');
+    expect(calls.cursorLaunches).toBe(1);
+  });
+
+  it('escalates to a Summer signal after the attempt ceiling instead of relaunching', async () => {
+    const staleNow = Date.now();
+    const state = {
+      now: staleNow,
+      cursorAgents: [],
+      openPrs: [],
+      linearComments: Array.from(
+        { length: GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS },
+        (_, index) =>
+          `${AUTOFIX_LAUNCH_MARKER}:${fingerprint} agent=old-${index}`
+      ),
+    };
+    const { fetchImpl, calls } = mockAutofixBackend(state);
+    // Prior launches are older than 24h so the cap no longer applies; seed
+    // stale timestamps by intercepting the comment-list response.
+    const wrappedFetch = async (input, init = {}) => {
+      const url = String(input);
+      const payload =
+        typeof init?.body === 'string' ? JSON.parse(init.body) : {};
+      if (
+        url.includes('api.linear.app') &&
+        String(payload.query ?? '').includes('ListLinearIssueComments')
+      ) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              issue: {
+                comments: {
+                  nodes: state.linearComments.map((body, index) => ({
+                    id: `c-${index}`,
+                    body,
+                    createdAt: new Date(
+                      staleNow - 48 * 60 * 60 * 1000
+                    ).toISOString(),
+                  })),
+                },
+              },
+            },
+          })
+        );
+      }
+      return fetchImpl(input, init);
+    };
+
+    const result = await executeAutofix({
+      receipt: failedReceipt,
+      cursorApiKey: 'key',
+      linearApiKey: 'linear-key',
+      githubToken: 'gh-token',
+      fetchImpl: wrappedFetch,
+      now: staleNow,
+    });
+    expect(result.action).toBe('escalate');
+    expect(result.reason).toBe('max_attempts_exceeded');
+    expect(calls.cursorLaunches).toBe(0);
+    expect(calls.linearComments).toBeGreaterThan(0);
+    expect(state.linearComments.join('\n')).toContain(
+      `${AUTOFIX_ESCALATION_MARKER}:${fingerprint}`
+    );
+    expect(state.linearComments.join('\n')).toContain('Summer signal');
+  });
+});
+
+describe('golden-path autofix dedupe (JOV-6832)', () => {
+  const FINGERPRINT = 'golden-path-lock:prod:homepage-cta';
+  const CHECKS = [{ id: 'homepage-cta', ok: false, reason: 'no name search' }];
+
+  it('derives a stable branch per fingerprint and launches on it', () => {
+    expect(autofixBranchPrefix(FINGERPRINT)).toBe(
+      'cursor/golden-path-homepage-cta'
+    );
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      fingerprint: FINGERPRINT,
+      checks: CHECKS,
+      now: 36,
+    });
+    expect(plan.request.target.branchName).toBe(
+      'cursor/golden-path-homepage-cta-10'
+    );
+    expect(plan.request.prompt.text).toContain('pnpm screen-registration-gate');
+  });
+
+  it('dedups on an open PR before any agent lookup', () => {
+    const plan = planAutofix({
+      cursorApiKey: 'key',
+      openPrNumber: 19073,
+      fingerprint: FINGERPRINT,
+      checks: CHECKS,
+    });
+    expect(plan).toMatchObject({
+      action: 'dedup',
+      reason: 'open_pr_owns_fingerprint',
+      openPrNumber: 19073,
+    });
+  });
+
+  it('finds the open Cursor fix PR by branch, fingerprint, or JOV-5085', () => {
+    const prs = [
+      { number: 1, headRefName: 'feature/x', title: 'JOV-5085 docs', body: '' },
+      {
+        number: 2,
+        headRefName: 'cursor/other',
+        title: 'fix(home)',
+        body: `Fingerprint: \`${FINGERPRINT}\``,
+      },
+    ];
+    expect(findOpenAutofixPr(prs, FINGERPRINT)).toBe(2);
+    expect(
+      findOpenAutofixPr(
+        [
+          {
+            number: 3,
+            headRefName: 'cursor/golden-path-homepage-cta-abc',
+            title: '',
+            body: '',
+          },
+        ],
+        FINGERPRINT
+      )
+    ).toBe(3);
+    expect(findOpenAutofixPr([prs[0]], FINGERPRINT)).toBeNull();
+  });
+
+  it('counts only active agents, matched by prompt or branch', () => {
+    const agents = [
+      {
+        id: 'running',
+        status: 'RUNNING',
+        target: { branchName: 'cursor/golden-path-homepage-cta-1' },
+      },
+      {
+        id: 'done',
+        status: 'FINISHED',
+        target: { branchName: 'cursor/golden-path-homepage-cta-0' },
+      },
+      {
+        id: 'other',
+        status: 'RUNNING',
+        target: { branchName: 'cursor/unrelated' },
+      },
+    ];
+    expect(findOwnedAgents(agents, FINGERPRINT)).toEqual(['running']);
+  });
+
+  it('existing open PR: launches nothing and skips intake', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'golden-path-dedupe-'));
+    const receiptPath = join(directory, 'receipt.json');
+    const calls = join(directory, 'gh-calls.log');
+    writeFileSync(
+      receiptPath,
+      `${JSON.stringify(buildProdProbeReceipt({ ok: false, checks: CHECKS }))}\n`
+    );
+    const fakeGh = join(directory, 'gh');
+    writeFileSync(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        `echo "$*" >> '${calls}'`,
+        'case "$1 $2" in',
+        `  "pr list") echo '[{"number":19073,"headRefName":"cursor/golden-path-production-regression-cd2b","title":"fix(home): restore name search (JOV-5085)","body":""}]' ;;`,
+        'esac',
+      ].join('\n')
+    );
+    chmodSync(fakeGh, 0o755);
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          resolve(REPO_ROOT, 'scripts/golden-path-lock.mjs'),
+          'autofix',
+          '--receipt',
+          receiptPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            CURSOR_API_KEY: 'fake-key-no-network',
+            LINEAR_API_KEY: '',
+          },
+        }
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('open autofix PR #19073 owns');
+      expect(result.stderr).not.toContain('Launched Cursor-direct');
+      expect(result.stderr).not.toContain('Linear intake');
+      expect(readFileSync(calls, 'utf8').trim()).toMatch(/^pr list /);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

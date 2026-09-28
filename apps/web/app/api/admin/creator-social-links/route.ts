@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
 
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(

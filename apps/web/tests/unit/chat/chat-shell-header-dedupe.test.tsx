@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -77,18 +78,24 @@ describe('/app/chat composed shell header (JOV-4347)', () => {
       });
 
       render(
-        <AuthShell
-          section='dashboard'
-          breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
-          headerAction={
-            <button type='button' aria-label='Show Tim White profile'>
-              TW
-            </button>
+        <QueryClientProvider
+          client={
+            new QueryClient({ defaultOptions: { queries: { retry: false } } })
           }
-          isChatRoute
         >
-          <div>Chat workspace</div>
-        </AuthShell>
+          <AuthShell
+            section='dashboard'
+            breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
+            headerAction={
+              <button type='button' aria-label='Show Tim White profile'>
+                TW
+              </button>
+            }
+            isChatRoute
+          >
+            <div>Chat workspace</div>
+          </AuthShell>
+        </QueryClientProvider>
       );
 
       expect(screen.getByTestId('composed-chat-shell')).toBeInTheDocument();

@@ -7,6 +7,27 @@ const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
+const screenshotCatalogTraceIncludes = [
+  'screenshot-catalog/current/**/*',
+  'public/product-screenshots/**/*',
+];
+// Relative to apps/web; only paths no runtime code reads. Turbopack matches
+// these as unanchored globs (no extglobs) against repo-relative module paths.
+// It does not apply them to outputFileTracingIncludes, which it adds last.
+const traceExcludes = [
+  // Test suites, fixtures and Playwright snapshots. The runtime reads only
+  // tests/quarantine.json (lib/testing/quarantine-ledger.server.ts), the one
+  // top-level tests/ entry starting with `q`. Use `[^q]`: Next's picomatch
+  // reads `[!q]` as "! or q".
+  'tests/[^q]*',
+  'tests/*/**',
+  // Migrations run from scripts, never from a request.
+  'drizzle/**',
+  // CI and agent report output.
+  'reports/**',
+  // Lint rule sources and their options.
+  'eslint-rules/**',
+];
 
 const nextConfig = {
   // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
@@ -35,6 +56,37 @@ const nextConfig = {
   outputFileTracingRoot: isVercelPreview
     ? undefined
     : path.join(__dirname, '../../'),
+  // These request-time readers build data paths dynamically, so NFT cannot
+  // reliably infer their files from the compiled route bundles. Keep this
+  // list limited to the data they actually read; the broad directory entries
+  // are small content and chat-topic catalogs.
+  // Monorepo files are staged into apps/web/runtime-data by
+  // scripts/stage-runtime-data.mjs; never trace outside apps/web (Vercel's
+  // project root), which breaks deployment extraction.
+  outputFileTracingIncludes: {
+    '/*': [
+      'runtime-data/CHANGELOG.md',
+      'runtime-data/docs/FEATURE_REGISTRY.md',
+      'runtime-data/apps/eve-pilot/identities/jovie/instructions.md',
+      'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
+      'tests/quarantine.json',
+      'content/**/*',
+      'lib/chat/knowledge/topics/**/*',
+      'public/fonts/Satoshi-Bold.ttf',
+      'public/fonts/DMSans-Regular.ttf',
+    ],
+    '/app/admin/screenshots': screenshotCatalogTraceIncludes,
+    '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
+    // Gated investor deck PDF: kept out of public/ so no CDN URL serves it.
+    '/investor-portal/deck/[...path]': ['assets/investor-deck/**/*'],
+  },
+  // Dynamic fs paths make NFT over-approximate and copy repo files no route
+  // reads into server functions (e2e PNG snapshots, 45 MB of drizzle migration
+  // snapshots). tests/unit/ci/vercel-config.test.ts proves no exclude drops a
+  // runtime file.
+  outputFileTracingExcludes: {
+    '**': traceExcludes,
+  },
   // Note: previously we set outputFileTracingIncludes with globs into
   // node_modules/.pnpm/node_modules/{import,require}-in-the-middle. Those
   // paths start with pnpm's virtual-store symlink layer AND the target
@@ -240,7 +292,7 @@ const nextConfig = {
         ],
       },
       {
-        source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
+        source: '/(pricing|support|engagement-engine|blog|changelog)',
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
@@ -305,18 +357,28 @@ const nextConfig = {
           },
         ],
       },
-      // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
-      // embedded as a same-origin iframe from the /pitch wrapper page.
-      // Override X-Frame-Options DENY → SAMEORIGIN for these assets only,
-      // AFTER the catch-all (Next.js merges headers; later rules win).
-      // The wrapper page itself (/pitch) stays DENY via the catch-all.
-      {
-        source: '/pitch/:path+',
+      // Investor surfaces are never indexable or shared-cacheable, including
+      // their 404s and static-extension URLs that proxy.ts does not run for.
+      // Later rules win, so this overrides the public catch-all above. The
+      // retired public /pitch and /investors paths keep the headers too.
+      ...[
+        '/investor-portal',
+        '/investor-portal/:path*',
+        '/pitch',
+        '/pitch/:path*',
+        '/investors',
+        '/investors/:path*',
+        '/Jovie-Pitch-Deck.pdf',
+      ].map(source => ({
+        source,
         headers: [
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'Cache-Control', value: cacheHeaders.immutable.value },
+          cacheHeaders.noStore,
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow, noarchive, nosnippet',
+          },
         ],
-      },
+      })),
     ];
   },
   async redirects() {
@@ -556,13 +618,14 @@ const nextConfig = {
       beforeFiles: [
         // Default /hud is a filesystem route outside /app/(shell). Intercept
         // it before that page so Ops inherits sidebar + app chrome. Isolated
-        // query modes stay on /hud: fullscreen, kiosk token, packaged Mac.
+        // query modes stay on /hud: fullscreen and kiosk token. The packaged
+        // Mac door (?ovie=mac) also gets the shell so the founder can reach
+        // Chat, Growth and revenue from Ops (JOV-6164).
         {
           source: '/hud',
           missing: [
             { type: 'query', key: 'fs', value: '1' },
             { type: 'query', key: 'kiosk' },
-            { type: 'query', key: 'ovie', value: 'mac' },
             { type: 'query', key: 'mode', value: 'kiosk' },
           ],
           destination: '/app/ov/hud',
@@ -714,6 +777,8 @@ function exposeBaseStaticConfigForTooling(config) {
     experimental: nextConfig.experimental,
     headers: nextConfig.headers,
     images: nextConfig.images,
+    outputFileTracingIncludes: nextConfig.outputFileTracingIncludes,
+    outputFileTracingExcludes: nextConfig.outputFileTracingExcludes,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,
   });

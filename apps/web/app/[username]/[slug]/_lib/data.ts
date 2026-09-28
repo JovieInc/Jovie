@@ -237,6 +237,12 @@ function attachCanonicalCredits(
   return { credits, primaryArtists };
 }
 
+export async function loadPublicReleaseCredits(
+  releaseId: string
+): Promise<SmartLinkCreditGroup[]> {
+  return fetchReleaseCredits(releaseId);
+}
+
 async function fetchReleaseCredits(
   releaseId: string
 ): Promise<SmartLinkCreditGroup[]> {

@@ -46,14 +46,17 @@ describe('PR screenshot catalog integrity enforcement', () => {
 
     expect(workflow).toContain('pull_request:');
     expect(detection).toContain(
-      'git diff --quiet "${{ github.event.pull_request.base.sha }}" HEAD'
+      'PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}'
     );
+    expect(detection).toContain('if git diff --quiet "$PR_DIFF_BASE" HEAD --');
+    expect(detection).toContain('set -euo pipefail');
     expect(detection).toContain('apps/web/lib/screenshots/');
     expect(detection).toContain('apps/web/screenshot-catalog/current/');
     expect(detection).toContain('apps/web/public/product-screenshots/');
     expect(detection).toContain(
       "'apps/web/scripts/check-screenshot-catalog*.ts'"
     );
+    expect(detection).toContain('[[ "$status" -eq 1 ]] || exit "$status"');
     expect(detection).toContain('echo "required=true" >> "$GITHUB_OUTPUT"');
   });
 

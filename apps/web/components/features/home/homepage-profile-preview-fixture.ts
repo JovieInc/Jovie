@@ -191,7 +191,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST: Artist = {
   image_url: TIM_WHITE_PROFILE.avatarSrc,
   tagline: HOMEPAGE_PROFILE_PREVIEW_ARTIST.tagline,
   settings: {
-    ...(HOMEPAGE_PROFILE_PREVIEW_ARTIST.settings ?? {}),
+    ...HOMEPAGE_PROFILE_PREVIEW_ARTIST.settings,
     heroRoleLabel: 'DJ / Producer',
   },
   theme: {

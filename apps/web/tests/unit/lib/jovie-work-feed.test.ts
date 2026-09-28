@@ -3,6 +3,7 @@ import {
   humanizeSlug,
   JOVIE_WORK_OUTCOME_SLOT,
   mapAgentRunStatusToPhase,
+  mapAgentRunToJovieWorkItem,
   mapFanNotificationToJovieWorkItem,
   mapMetadataSubmissionStatusToPhase,
   mapSuggestedActionToJovieWorkItem,
@@ -65,6 +66,22 @@ describe('jovie work feed contract', () => {
       );
     }
   );
+
+  it('uses a Date completedAt as the agent run timestamp', () => {
+    const completedAt = new Date('2026-06-21T15:04:00.000Z');
+    const item = mapAgentRunToJovieWorkItem({
+      id: 'run-9',
+      agentSlug: 'calendar.create_event',
+      status: 'completed',
+      completedAt,
+      startedAt: '2026-06-21T10:00:00.000Z',
+      createdAt: null,
+    });
+
+    expect(item.timestamp).toBe(completedAt.toISOString());
+    expect(item.id).toBe('agent:run-9');
+    expect(item.phase).toBe('completed');
+  });
 
   it('maps suggested actions to pending approvals', () => {
     const item = mapSuggestedActionToJovieWorkItem({

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formatCents } from './revenue-lift-dashboard';
 
 /**
  * Pure presentation helpers for the revenue-lift dashboard.
@@ -14,6 +15,14 @@ function median(values: readonly number[]): number | null {
   }
   return sorted[mid]!;
 }
+
+describe('formatCents', () => {
+  it('keeps cents below one hundred dollars and drops them at the boundary', () => {
+    expect(formatCents(9_999)).toBe('$99.99');
+    expect(formatCents(10_000)).toBe('$100');
+    expect(formatCents(150)).toBe('$1.50');
+  });
+});
 
 describe('revenue-lift dashboard helpers', () => {
   it('computes median for odd and even lengths', () => {

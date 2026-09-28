@@ -39,7 +39,7 @@ export function MarketingFooterCta({
   ctaAnalyticsSource,
   prefetch,
 }: Readonly<MarketingFooterCtaProps>) {
-  const instanceId = useId().replace(/:/g, '-');
+  const instanceId = useId().replaceAll(':', '-');
   const primaryGradientId = `marketing-footer-cta-primary-${instanceId}`;
   const secondaryGradientId = `marketing-footer-cta-secondary-${instanceId}`;
 

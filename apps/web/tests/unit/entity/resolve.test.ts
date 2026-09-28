@@ -41,7 +41,7 @@ describe('resolveEntityIds', () => {
           url: { resource: 'https://www.wikidata.org/wiki/Q12345' },
         },
       ],
-      isnis: ['0000 0001 2103 2683'],
+      isnis: ['0000-0001 2103-2683'],
     });
 
     const result = await resolveEntityIds(
@@ -53,7 +53,7 @@ describe('resolveEntityIds', () => {
 
     expect(result).toEqual({
       wikidata: 'Q12345',
-      isnis: ['0000 0001 2103 2683'],
+      isnis: ['0000-0001 2103-2683'],
     });
     expect(mockStoreRawIdentityLinks).toHaveBeenCalledWith(
       tx,

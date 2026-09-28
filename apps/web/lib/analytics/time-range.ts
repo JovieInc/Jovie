@@ -66,6 +66,23 @@ export const RECENT_ACTIVITY_RANGE: AnalyticsRange = '7d';
 /** Concrete lower bound representing "no lower bound" for SQL comparisons. */
 export const ANALYTICS_EPOCH = new Date(0);
 
+/**
+ * A fully resolved reporting window: one inclusive start (null = unbounded
+ * 'all'), one as-of end, elapsed-hours length, and the display timezone.
+ * Carried on evidence receipts (lib/analytics/evidence-receipt.ts) so every
+ * consumer agrees on the exact population/period a value covers.
+ */
+export interface ResolvedWindow {
+  /** Inclusive lower bound as ISO string, or null for the unbounded 'all' range. */
+  readonly start: string | null;
+  /** Exclusive upper bound (the query's as-of instant) as ISO string. */
+  readonly end: string;
+  /** Rolling elapsed-hours length, or null for unbounded. */
+  readonly hours: number | null;
+  /** IANA timezone requested for display; this layer never groups by calendar day. */
+  readonly timezone: string;
+}
+
 export function isAnalyticsRange(value: string): value is AnalyticsRange {
   return (ANALYTICS_RANGE_VALUES as readonly string[]).includes(value);
 }

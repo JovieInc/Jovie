@@ -47,20 +47,29 @@ const guardScriptName = 'guard-playwright-artifacts.mjs';
 const guardScript = join(githubRoot, 'scripts', guardScriptName);
 const generated: string[] = [];
 const configLoaders = Object.fromEntries(
-  Object.entries(
-    import.meta.glob<{ default: PlaywrightTestConfig }>(
-      '../../../playwright*.config*.ts'
-    )
-  ).map(([path, load]) => [path.split('/').at(-1), load])
+  Object.entries(import.meta.glob('../../../playwright*.config*.ts')).map(
+    ([path, load]) => [path.split('/').at(-1), load]
+  )
 );
 const expectedConfigs = Object.keys(configLoaders).sort();
+function isPlaywrightConfigModule(
+  value: unknown
+): value is { default: PlaywrightTestConfig } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'default' in value &&
+    typeof value.default === 'object' &&
+    value.default !== null
+  );
+}
 const localTrace = Object.fromEntries(
   'playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
     .map(value => value.split('='))
 );
 const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const imageUploads =
@@ -68,6 +77,10 @@ const imageUploads =
     '|'
   );
 const markdownUploads = [
+  'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
   'production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}',
@@ -76,7 +89,7 @@ const markdownUploads = [
 const protectedJobs: Record<string, string[]> = {
   'agent-tick.yml': ['synthetic-monitoring'],
   'ci.yml':
-    'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
+    'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
       ' '
     ),
   'e2e-full-matrix.yml': ['e2e-full-matrix'],
@@ -98,7 +111,7 @@ const producerCounts: Record<string, number> = {
   'postdeploy-probes.yml': 1,
   'production-controller.yml': 1,
   'production-release.yml': 3,
-  'screenshots.yml': 3,
+  'screenshots.yml': 4,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 6,
 };
@@ -477,10 +490,12 @@ async function configs(ci: boolean, producer = false, bypass = '') {
   vi.resetModules();
   return Object.fromEntries(
     await Promise.all(
-      expectedConfigs.map(async name => [
-        name,
-        (await configLoaders[name]()).default,
-      ])
+      expectedConfigs.map(async name => {
+        const loaded = await configLoaders[name]();
+        if (!isPlaywrightConfigModule(loaded))
+          throw new Error(`${name} must default-export a Playwright config`);
+        return [name, loaded.default] as const;
+      })
     )
   );
 }
@@ -495,7 +510,7 @@ async function port() {
   });
 }
 
-function chunk(type: string, data = Buffer.alloc(0)) {
+function chunk(type: string, data: Buffer<ArrayBufferLike> = Buffer.alloc(0)) {
   const output = Buffer.alloc(data.length + 12);
   output.writeUInt32BE(data.length);
   output.write(type, 4, 4, 'ascii');
@@ -533,8 +548,13 @@ function png(
   ]);
 }
 
-function baseEnv(workspace: string, runner: string, extra = {}) {
+function baseEnv(
+  workspace: string,
+  runner: string,
+  extra: Record<string, string | undefined> = {}
+): NodeJS.ProcessEnv {
   return {
+    NODE_ENV: process.env.NODE_ENV,
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     GITHUB_WORKSPACE: workspace,
@@ -542,12 +562,18 @@ function baseEnv(workspace: string, runner: string, extra = {}) {
     GITHUB_RUN_ID: '14442',
     GITHUB_RUN_ATTEMPT: '1',
     GITHUB_JOB: 'artifact-test',
+    GITHUB_ACTIONS: 'true',
     PLAYWRIGHT_ARTIFACT_PATHS: 'out',
     ...extra,
   };
 }
 
-function runChild(workspace: string, runner: string, code: string, extra = {}) {
+function runChild(
+  workspace: string,
+  runner: string,
+  code: string,
+  extra: Record<string, string | undefined> = {}
+) {
   return spawnSync(
     process.execPath,
     [guardScript, '--run', '--', process.execPath, '-e', code],
@@ -685,7 +711,24 @@ describe('Playwright artifact secret boundary', () => {
     await expect(configs(true, false, 'sentinel')).rejects.toThrow(
       'Global Vercel bypass headers are forbidden'
     );
-  }, 20_000);
+  }, 90_000);
+
+  it('keeps fixture Playwright configs from fetching into the enclosing checkout', () => {
+    // Fixtures live under apps/web, inside the real checkout. With CI's
+    // GITHUB_ACTIONS and a pull_request event, Playwright's git-commit-info
+    // plugin runs `git fetch origin <base.sha> --depth=1` from the config dir,
+    // which shallows the checkout under concurrent structural commands.
+    const source = readFileSync(import.meta.filename, 'utf8');
+    const fixtureConfigs = source
+      .split(['export default', 'defineConfig({'].join(' '))
+      .slice(1);
+    expect(fixtureConfigs.length).toBeGreaterThan(0);
+    for (const config of fixtureConfigs) {
+      expect(
+        config.startsWith('captureGitInfo:{commit:false,diff:false},')
+      ).toBe(true);
+    }
+  });
 
   it('inherits child env without JSON disclosure and rejects a real credential trace', async () => {
     const directory = fixture('.artifact-json-', webRoot);
@@ -702,7 +745,7 @@ describe('Playwright artifact secret boundary', () => {
     );
     write(
       join(directory, 'playwright.config.ts'),
-      `import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:${JSON.stringify(outputDir)},reporter:[['json',{outputFile:${JSON.stringify(report)}}]],use:{trace:'on',extraHTTPHeaders:{'x-secret':process.env.TRACE_HEADER_SENTINEL}},webServer:{command:${JSON.stringify(`${process.execPath} server.mjs`)},cwd:${JSON.stringify(directory)},env:{SAFE:'1'},url:'http://127.0.0.1:${serverPort}'}})`
+      `import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:${JSON.stringify(outputDir)},reporter:[['json',{outputFile:${JSON.stringify(report)}}]],use:{trace:'on',extraHTTPHeaders:{'x-secret':process.env.TRACE_HEADER_SENTINEL}},webServer:{command:${JSON.stringify(`${process.execPath} server.mjs`)},cwd:${JSON.stringify(directory)},env:{SAFE:'1'},url:'http://127.0.0.1:${serverPort}'}})`
     );
     const result = spawnSync(
       'pnpm',
@@ -769,7 +812,7 @@ describe('Playwright artifact secret boundary', () => {
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
       const command = step
-        .split('        run: |\n')[1]
+        .split(/ {8}run: (?:&[\w-]+ )?\|\n/)[1]
         .replaceAll('${{ github.event_name }}', 'pull_request')
         .replaceAll('${{ github.base_ref }}', 'main');
       const directory = fixture();
@@ -790,6 +833,9 @@ describe('Playwright artifact secret boundary', () => {
     `,
         ],
         {
+          // The step runs from the repository root in CI; it invokes
+          // repo-relative scripts (scripts/invariants/scanned-paths.mjs).
+          cwd: repoRoot,
           encoding: 'utf8',
           env: {
             ...process.env,
@@ -805,12 +851,50 @@ describe('Playwright artifact secret boundary', () => {
       expect(invoked[0]).toBe(
         `-c http.https://github.com/.extraheader=AUTHORIZATION: basic ${Buffer.from('x-access-token:fixture-token').toString('base64')} fetch origin main --no-tags`
       );
-      expect(invoked).toHaveLength(fetchExit === 0 ? 2 : 1);
+      // After the authenticated fetch: the new-scripts-test diff and the
+      // selector diff, both without the auth header.
+      expect(invoked.slice(1)).toEqual(
+        fetchExit === 0
+          ? [
+              'diff --diff-filter=AR --name-only origin/main HEAD',
+              'diff --name-only origin/main HEAD',
+            ]
+          : []
+      );
       expect(`${result.stdout}\n${result.stderr}`).not.toContain(
         'fixture-token'
       );
     }
   );
+
+  it('keeps every combined Storybook run on manual Axe with scanned Markdown evidence', () => {
+    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    const job = jobBlock(source, 'ci-storybook-surfaces');
+    const steps = workflowStepBlocks(job);
+    const surface = steps.find(step =>
+      step.startsWith(
+        '      - name: Run surface elevation matrix (Storybook)\n'
+      )
+    );
+    const upload = steps.find(step =>
+      step.startsWith(
+        '      - name: Upload combined Storybook failure evidence\n'
+      )
+    );
+
+    expect(surface).toContain("JOVIE_STORYBOOK_MANUAL_AXE: '1'");
+    expect(surface).not.toContain('JOVIE_LIVE_STORYBOOK_CERT');
+    expect(surface).toContain('guard-playwright-artifacts.mjs" --run --');
+    expect(surface).toContain('tests/e2e/storybook-sheet.spec.ts');
+    expect(surface).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(yamlPropertyBlock(job, 'env', 4)).not.toContain(
+      'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+    );
+    expect(upload).toContain(
+      'uses: ./.github/actions/upload-safe-playwright-artifact'
+    );
+    expect(upload).toContain("allow-markdown: 'true'");
+  });
 
   it('routes the exact upload and producer inventory through staged-only guards', () => {
     const uploads: string[] = [];
@@ -860,13 +944,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(uploads.sort()).toEqual(uploadInventory.sort());
     expect(images.sort()).toEqual(imageUploads.sort());
     expect(markdown.sort()).toEqual(markdownUploads.sort());
-    expect(safeUploadJobs).toHaveLength(28);
+    expect(safeUploadJobs).toHaveLength(29);
     expect(
       safeUploadJobs.reduce(
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(34);
+    ).toBe(35);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
@@ -1062,6 +1146,10 @@ ${fixtureCheckout}
       screenshots,
       'Capture screenshot catalog'
     );
+    const screenshotServing = stepBlock(
+      screenshots,
+      'Verify public screenshot exports from production build'
+    );
     const screenshotStart = stepBlock(screenshots, 'Start production server');
     const screenshotStop = stepBlock(screenshots, 'Stop production server');
     const screenshotIntegrity = stepBlock(
@@ -1069,6 +1157,10 @@ ${fixtureCheckout}
       'Verify screenshot catalog integrity and budgets'
     );
     const screenshotDiff = stepBlock(screenshots, 'Check for changes');
+    const screenshotStage = stepBlock(
+      screenshots,
+      'Stage generated screenshot catalog for transfer'
+    );
     const screenshotUpload = stepBlock(
       screenshots,
       'Upload generated screenshot catalog'
@@ -1089,6 +1181,7 @@ ${fixtureCheckout}
     expect(screenshotJob).not.toBe('');
     expect(screenshotPublisherJob).not.toBe('');
     expect(screenshotCapture).not.toBe('');
+    expect(screenshotServing).not.toBe('');
     expect(screenshotJob).toMatch(
       /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?persist-credentials: false/
     );
@@ -1103,6 +1196,27 @@ ${fixtureCheckout}
     const screenshotCaptureEnv = yamlPropertyBlock(screenshotCapture, 'env', 8);
     expect(screenshotWorkflowEnv).toBe('');
     expect(screenshotCaptureEnv).not.toBe('');
+    expect(screenshotJob).toContain(screenshotServing);
+    expect(screenshotJob.indexOf(screenshotServing)).toBeLessThan(
+      screenshotJob.indexOf(screenshotCapture)
+    );
+    expect(screenshotServing).toContain(
+      'tests/product-screenshots/public-export-serving.spec.ts'
+    );
+    expect(screenshotServing).toContain(
+      '--config=playwright.config.screenshots.ts'
+    );
+    expect(screenshotServing).toContain('--project=screenshots');
+    expect(screenshotServing).toContain('BASE_URL: http://localhost:3000');
+    expect(screenshotServing).toContain('SCREENSHOT_BUILD_MODE: production');
+    expect(
+      secretReferenceViolations(
+        screenshotWorkflowEnv,
+        screenshotJobEnv,
+        screenshotServing
+      )
+    ).toEqual([]);
+    expect(screenshotServing).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(
       secretReferenceViolations(
         screenshotWorkflowEnv,
@@ -1134,6 +1248,7 @@ ${fixtureCheckout}
       screenshotStop,
       screenshotIntegrity,
       screenshotDiff,
+      screenshotStage,
       screenshotUpload,
       screenshotDownload,
       screenshotDownloadedIntegrity,
@@ -1151,7 +1266,15 @@ ${fixtureCheckout}
       screenshotJob.indexOf(screenshotDiff)
     );
     expect(screenshotJob.indexOf(screenshotDiff)).toBeLessThan(
+      screenshotJob.indexOf(
+        '- name: Stage generated screenshot catalog for transfer'
+      )
+    );
+    expect(screenshotJob.indexOf(screenshotStage)).toBeLessThan(
       screenshotJob.indexOf('- name: Upload generated screenshot catalog')
+    );
+    expect(screenshotUpload).toContain(
+      'path: .artifacts/screenshot-catalog-transfer/'
     );
     expect(screenshotJob).not.toContain('${{ secrets.');
     expect(screenshotJob).not.toContain('Create or update screenshot PR');
@@ -1164,7 +1287,7 @@ ${fixtureCheckout}
         '- name: Verify downloaded screenshot catalog'
       )
     );
-    expect(screenshotDownload).toContain('path: apps/web');
+    expect(screenshotDownload).toContain('path: .');
     expect(
       screenshotPublisherJob.indexOf(
         '- name: Verify downloaded screenshot catalog'
@@ -1426,10 +1549,10 @@ ${fixtureCheckout}
     expect(normalizeTelemetry).toContain(
       'node .github/scripts/guard-playwright-artifacts.mjs --run --'
     );
-    expect(normalizeTelemetry).toContain(
+    expect(normalizeTelemetry).not.toContain(
       'UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}'
     );
-    expect(normalizeTelemetry).toContain(
+    expect(normalizeTelemetry).not.toContain(
       'UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}'
     );
     expect(normalizeTelemetry).toContain(
@@ -1879,7 +2002,7 @@ ${fixtureCheckout}
     });
   });
 
-  it('stages sanitized error-context.md and does not poison markdown-only failures', () => {
+  it.each([0, 1])('stages safe Markdown (exit %i)', producerExit => {
     const email = 'standing-user@example.test';
     const authCode = 'oauth-authorization-code-value';
     const workspace = fixture();
@@ -1900,7 +2023,7 @@ ${fixtureCheckout}
       `'- /url: /app?code=${authCode}',`,
       "'const cookies = await page.context().cookies();',",
       "].join('\\n'));",
-      'process.exit(1);',
+      `process.exit(${producerExit});`,
     ].join('');
 
     const result = runChild(workspace, runner, child, {
@@ -1909,7 +2032,7 @@ ${fixtureCheckout}
       PLAYWRIGHT_DYNAMIC_SECRETS_FILE: receipt,
     });
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(producerExit);
     const output = `${result.stdout}\n${result.stderr}`;
     expect(output).toContain('secret guard passed');
     expect(output).not.toContain('PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE');
@@ -2088,7 +2211,7 @@ ${fixtureCheckout}
       env: baseEnv(workspace, fixture(), {
         PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
         PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
-      }) as NodeJS.ProcessEnv,
+      }),
     });
     expect(diagnostic.status).toBe(1);
     expect(`${diagnostic.stdout}\n${diagnostic.stderr}`).toContain(
@@ -2105,7 +2228,7 @@ ${fixtureCheckout}
         env: baseEnv(workspace, fixture(), {
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
           PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
-        }) as NodeJS.ProcessEnv,
+        }),
       }
     );
     expect(sensitiveDiagnostic.status).toBe(1);
@@ -2127,7 +2250,7 @@ ${fixtureCheckout}
         env: baseEnv(workspace, fixture(), {
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
           PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
-        }) as NodeJS.ProcessEnv,
+        }),
       }
     );
     expect(outsideDiagnostic.status).toBe(1);
@@ -2139,7 +2262,7 @@ ${fixtureCheckout}
     const comparisonSpec = join(comparison, 'comparison.spec.ts');
     write(
       comparisonConfig,
-      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:'test-results',snapshotPathTemplate:'snapshots/{arg}{ext}',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:16,height:16}}})"
+      "import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',snapshotPathTemplate:'snapshots/{arg}{ext}',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:16,height:16}}})"
     );
     const comparisonSource = (color: string) =>
       `import{expect,test}from'@playwright/test';test('comparison',async({page})=>{await page.setContent('<style>html,body{margin:0;width:16px;height:16px;background:${color}}</style>');await expect(page).toHaveScreenshot('comparison.png',{animations:'disabled'})})`;
@@ -2180,7 +2303,7 @@ ${fixtureCheckout}
     const chromiumConfig = join(chromiumDir, 'playwright.config.ts');
     write(
       chromiumConfig,
-      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
+      "import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
     );
     write(
       join(chromiumDir, 'route.spec.ts'),
@@ -2271,6 +2394,30 @@ ${fixtureCheckout}
       expect(() => resolveArtifactFiles([path], workspace), path).toThrow();
     expect(() => resolveArtifactFiles(['real/safe.json'], rootAlias)).toThrow();
   });
+
+  it.each([undefined, 'false'])(
+    'does not print mask commands outside GitHub Actions (%s)',
+    githubActions => {
+      const workspace = fixture();
+      const runner = fixture();
+      const secret = 'local%mask-sentinel';
+      const result = runChild(
+        workspace,
+        runner,
+        "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json',JSON.stringify({value:process.env.FLAGS_SECRET}));console.log('CHILD_SENTINEL')",
+        { FLAGS_SECRET: secret, GITHUB_ACTIONS: githubActions }
+      );
+      const output = `${result.stdout}\n${result.stderr}`;
+      expect(result.status).toBe(1);
+      expect(output).not.toContain('::add-mask::');
+      expect(output).not.toContain(secret);
+      expect(output).toContain('CHILD_SENTINEL');
+      expect(output).toContain('PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE');
+      expect(existsSync(join(runner, 'safe-playwright-producer/blocked'))).toBe(
+        true
+      );
+    }
+  );
 
   it('masks before the child, scans after failure, and permanently poisons leaks', () => {
     const workspace = fixture();
@@ -2391,7 +2538,9 @@ ${fixtureCheckout}
       ).toBe(1);
       expect(existsSync(join(shortWorkspace, 'child-ran'))).toBe(false);
     }
-  }, 20_000);
+    // ~38 sequential guard CLI runs, each with its own env/workspace: 4.1s
+    // alone, 10.8s in the full tests/unit/ci run, 12.1s under CPU contention.
+  }, 45_000);
 
   it('publishes safe nonzero output, immutable unions, and producer image policy', () => {
     const workspace = fixture();

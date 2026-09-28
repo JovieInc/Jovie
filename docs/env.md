@@ -88,6 +88,33 @@ Server-side API key for Vercel AI Gateway chat completions. On Vercel
 authenticates via OIDC (`VERCEL_OIDC_TOKEN` is auto-injected at runtime).
 Local development and CI keep using the static key via Doppler.
 
+Album art image generation uses this same Gateway auth. It does not read
+`XAI_API_KEY`. On Vercel, leave `AI_GATEWAY_API_KEY` unset and let OIDC cover
+the call. The model id is `ALBUM_ART_GATEWAY_IMAGE_MODEL` in
+`apps/web/lib/constants/ai-models.ts` (`spacexai/grok-imagine-image`).
+
+### `ALBUM_ART_IMAGE_MODEL`
+
+Optional override for the album-art Gateway model. Set a `provider/model` id
+only when swapping models without a code change. Bare ids (the old direct-xAI
+slug `grok-imagine-image`) are ignored. Unset in production unless you intend
+to override the constant.
+
+### `FX_AI_GATEWAY_API_KEY`
+
+Dedicated GitHub Actions repository secret for the draft Rolling CI Dispatch FX
+canary. It is separate from the shared `AI_GATEWAY_API_KEY` and is available only
+to the hosted FX model step. The key is named `jovie-fx-ci-canary-2026-09-23` in
+Vercel team `jovie`; its owner is Jovie CI remediation. On 2026-09-23, the
+nonrenewing $10 soft spend cap, 50/75/100% alerts, and expiry at
+2026-09-30T13:51:49Z were read back from Vercel. The key value belongs only in
+GitHub Actions secrets. Vercel may complete a request that crosses the cap.
+
+Provisioning this secret does not activate model work. Both repository
+variables `FX_HOSTED_REMEDIATION_ENABLED=true` and
+`FX_HOSTED_REMEDIATION_CANARY_PR=<one PR number>` are required; leave them unset
+until the draft workflow lands and the exclusive canary handoff is verified.
+
 ## Vercel Blob
 
 ### `BLOB_READ_WRITE_TOKEN`

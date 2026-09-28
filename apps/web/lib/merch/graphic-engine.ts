@@ -134,7 +134,7 @@ export function weightedPick<T extends { readonly key: string }>(
     roll -= weight;
     if (roll <= 0) return model;
   }
-  return weighted[weighted.length - 1][0];
+  return weighted.at(-1)![0];
 }
 
 /**

@@ -52,7 +52,7 @@ export function main(
     return c.nodes;
   };
   const entryFields =
-    'id position state enqueuedAt headCommit {oid} baseCommit {oid} enqueuer {login}';
+    'id position state enqueuedAt headCommit {oid} baseCommit {oid} enqueuer {__typename login}';
   function groupEvidence(run) {
     if (!run) return null;
     const jobs = pages(
@@ -138,6 +138,10 @@ export function main(
       merges: [],
     };
   }
+  if (bundle.schema !== SCHEMA || bundle.repository !== repository)
+    throw new Error(
+      'Incompatible evidence bundle; start a new native v2 cohort'
+    );
   if (evaluatorSha) bundle.evaluatorSha = evaluatorSha;
   if (command === 'collect') {
     const s = {
@@ -171,28 +175,6 @@ export function main(
         full,
       };
       s.policyDigest = digest(s.policy);
-      // Snapshot the actual event-driven controller budget. No unrelated timer
-      // or saved heartbeat is treated as proof of successful future execution.
-      const policySource = path => ({
-        ...api(`contents/${path}?ref=${s.main}`),
-        ref: s.main,
-      });
-      s.scheduler = {
-        workflow: policySource('.github/workflows/merge-queue-autoenroll.yml'),
-        drain: policySource('scripts/drain-pr-queue.sh'),
-      };
-      // Historical source can be read later because the API lookup is pinned to
-      // its immutable commit. Keep original snapshots intact and date this read.
-      bundle.policySources ??= {};
-      for (const ref of new Set(bundle.snapshots.map(snap => snap.policySha))) {
-        if (bundle.policySources[ref]) continue;
-        const source = path => ({ ...api(`contents/${path}?ref=${ref}`), ref });
-        bundle.policySources[ref] = {
-          readAt: new Date().toISOString(),
-          workflow: source('.github/workflows/merge-queue-autoenroll.yml'),
-          drain: source('scripts/drain-pr-queue.sh'),
-        };
-      }
       const prs = [];
       let cursor = null;
       do {
@@ -256,9 +238,15 @@ export function main(
         }
         s.prs.push(p);
       }
-      s.cycles = api(
-        'actions/workflows/merge-queue-autoenroll.yml/runs?per_page=30'
-      ).workflow_runs;
+      // Close the live inventory observation before refreshing historical merge proof.
+      s.readback = connection(
+        graphql(`query InventoryReadback {repository(owner:"JovieInc",name:"Jovie") {pullRequests(first:100,states:OPEN) {
+        nodes {number headRefOid isInMergeQueue mergeQueueEntry {id headCommit {oid} baseCommit {oid}}} pageInfo {hasNextPage}}}}`)
+          .pullRequests
+      );
+      s.readbackAt = new Date().toISOString();
+      if (inventoryIdentity(s.prs) !== inventoryIdentity(s.readback))
+        throw new Error('Inventory changed during collection');
       const tracked = new Map(
         bundle.snapshots
           .flatMap(snap => snap.prs ?? [])
@@ -268,18 +256,16 @@ export function main(
       for (const [number, p] of tracked) {
         const current = api(`pulls/${number}`);
         if (!current.merged) continue;
-        const admission = bundle.snapshots.find(snap =>
+        const admission = bundle.snapshots.findLast(snap =>
           snap.prs?.some(
-            q => q.number === number && q.headRefOid === p.headRefOid
+            q =>
+              q.number === number &&
+              q.headRefOid === p.headRefOid &&
+              q.mergeQueueEntry?.id === p.mergeQueueEntry.id &&
+              q.mergeQueueEntry.headCommit?.oid ===
+                p.mergeQueueEntry.headCommit.oid
           )
         );
-        const timeline =
-          graphql(`query {repository(owner:"JovieInc",name:"Jovie") {pullRequest(number:${number}) {
-        timelineItems(last:100,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,MERGED_EVENT]) {
-          nodes {__typename ... on AddedToMergeQueueEvent {id createdAt actor {login} enqueuer {login}}
-            ... on RemovedFromMergeQueueEvent {id createdAt reason actor {login} enqueuer {login} beforeCommit {oid}}
-            ... on MergedEvent {id createdAt actor {login} commit {oid} mergeRefName}}
-          pageInfo {hasPreviousPage}}}}}`).pullRequest.timelineItems;
         const groupHead = p.mergeQueueEntry.headCommit.oid;
         const runs = api(
           `actions/workflows/ci.yml/runs?head_sha=${groupHead}&event=merge_group&per_page=100`
@@ -291,7 +277,8 @@ export function main(
           commit: current.merge_commit_sha,
           groupHead,
           groupBase: p.mergeQueueEntry.baseCommit.oid,
-          timeline,
+          entryId: p.mergeQueueEntry.id,
+          nativeMerge: current,
           main: s.main,
           policyDigest: admission.policyDigest,
           observedAt: new Date().toISOString(),
@@ -303,14 +290,6 @@ export function main(
         bundle.merges = bundle.merges.filter(m => m.number !== number);
         bundle.merges.push(receipt);
       }
-      s.readback = connection(
-        graphql(`query InventoryReadback {repository(owner:"JovieInc",name:"Jovie") {pullRequests(first:100,states:OPEN) {
-        nodes {number headRefOid isInMergeQueue mergeQueueEntry {id headCommit {oid} baseCommit {oid}}} pageInfo {hasNextPage}}}}`)
-          .pullRequests
-      );
-      s.readbackAt = new Date().toISOString();
-      if (inventoryIdentity(s.prs) !== inventoryIdentity(s.readback))
-        throw new Error('Inventory changed during collection');
       if (bundle.evaluatorSha) {
         const run = api(
           `actions/workflows/ci.yml/runs?head_sha=${bundle.evaluatorSha}&per_page=100`

@@ -64,6 +64,8 @@ export interface UserStateInput {
   hasDbUser: boolean;
   /** User status from DB (e.g., 'active', 'banned', 'waitlist_pending') */
   userStatus: string | null;
+  /** Durable waitlist receipt linked to this app user, if one exists. */
+  waitlistEntryId: string | null;
   /** Soft deletion timestamp */
   deletedAt: Date | null;
   /** Whether the waitlist gate is enabled globally */
@@ -127,7 +129,9 @@ export function resolveCanonicalState(
   // admin approves them. Turning the launch gate off only opens daily intake
   // capacity; it must not unlock already-waitlisted accounts by navigation.
   if (input.userStatus === 'waitlist_pending') {
-    return CanonicalUserState.WAITLIST_PENDING;
+    return input.waitlistEntryId
+      ? CanonicalUserState.WAITLIST_PENDING
+      : CanonicalUserState.NEEDS_WAITLIST_SUBMISSION;
   }
 
   // Waitlist gate is enabled and user is not approved
@@ -226,16 +230,6 @@ export function toProxyUserState(
         isActive: true,
         isBanned: false,
       };
-    case CanonicalUserState.NEEDS_ONBOARDING:
-    case CanonicalUserState.NEEDS_DB_USER:
-    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
-    case CanonicalUserState.USER_CREATION_FAILED:
-      return {
-        needsWaitlist: false,
-        needsOnboarding: true,
-        isActive: false,
-        isBanned: false,
-      };
     case CanonicalUserState.WAITLIST_PENDING:
       return {
         needsWaitlist: true,
@@ -250,6 +244,10 @@ export function toProxyUserState(
         isActive: false,
         isBanned: true,
       };
+    case CanonicalUserState.NEEDS_ONBOARDING:
+    case CanonicalUserState.NEEDS_DB_USER:
+    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
+    case CanonicalUserState.USER_CREATION_FAILED:
     default:
       return {
         needsWaitlist: false,

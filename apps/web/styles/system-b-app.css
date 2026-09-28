@@ -3,8 +3,56 @@
  *
  * Kept outside the root public-profile stylesheet so unrelated route CSS is
  * downloaded only by the layouts that render these primitives.
+ *
+ * JOV-2269: this file is also the app's second Tailwind context. The layouts
+ * that import it (app/(shell), onboarding, demo, exp, ui, (dynamic)/start,
+ * unavailable) render component trees that the global scan in
+ * app/globals.css deliberately excludes, so their utility classes compile
+ * here — into the app-route chunk — instead of the shared public stylesheet.
+ * `source(none)` disables automatic source detection; the @source list below
+ * is exactly the set excluded from the global scan, plus streamdown's
+ * markdown runtime. The `reference` imports register the shared theme,
+ * variant, and custom utilities for compilation without emitting the token
+ * blocks a second time (app/globals.css already emits them on every route).
  */
 
+@layer theme, base, clerk, components, utilities;
+
+@import "tailwindcss" source(none);
+@import "tw-animate-css" reference;
+@import "./tailwind-foundation.css" reference;
+
+@source "../app/app";
+@source "../app/onboarding";
+@source "../app/demo";
+@source "../app/exp";
+@source "../app/ui";
+@source "../app/(dynamic)/start";
+@source "../app/unavailable";
+@source "../components/features/dashboard";
+@source "../components/features/admin";
+@source "../components/features/chat";
+@source "../components/features/bridge";
+@source "../components/features/connectors";
+@source "../components/features/creator";
+@source "../components/features/examples";
+@source "../components/features/feedback";
+@source "../components/features/library";
+@source "../components/features/listen";
+@source "../components/features/monitoring";
+@source "../components/features/onboarding";
+@source "../components/features/opportunity-inbox";
+@source "../components/features/pay";
+@source "../components/features/releases";
+@source "../components/features/settings";
+@source "../components/features/tracking";
+@source "../components/features/ui";
+@source "../components/jovie";
+@source "../components/onboarding";
+@source "../components/canonical";
+@source "../components/design-studio";
+@source "../components/effects";
+@source "../components/seo";
 @source "../node_modules/streamdown/dist/*.js";
 
 /* ============================================
@@ -4837,13 +4885,14 @@
 }
 
 :root.dark {
-  /* Sidebar tokens — Noir Ion shell; active uses Ion selection tint */
+  /* Sidebar tokens — Noir Ion shell. Founder lock 2026-09-25: active/selected
+     rows use a neutral hover-level tint, not the ion accent (no blue bg). */
   --sidebar-background: var(--app-shell-sidebar-background-rgb);
   --sidebar-foreground: 245 247 251;
   --sidebar-primary: 245 247 251;
   --sidebar-primary-foreground: 2 3 7;
   --sidebar-accent: 168 176 195 / 0.06;
-  --sidebar-accent-active: 17 175 255 / 0.1;
+  --sidebar-accent-active: 168 176 195 / 0.1;
   --sidebar-accent-foreground: 245 247 251;
   --sidebar-border: 168 176 195 / 0.1;
   --sidebar-ring: 17 175 255 / 0.72;
@@ -4851,7 +4900,7 @@
   --sidebar-muted-foreground: 125 135 157;
   --sidebar-surface: var(--app-shell-sidebar-background-rgb);
   --sidebar-surface-hover: 168 176 195 / 0.06;
-  --sidebar-input-background: 15 20 32 / 1;
+  --sidebar-input-background: 19 20 23 / 1;
   --sidebar-input-border: 168 176 195 / 0.16;
   --sidebar-item-foreground: 215 220 232;
   --sidebar-item-icon: 125 135 157;
@@ -5888,15 +5937,20 @@
   --system-b-release-provider-accent-hover: var(--color-accent-hover);
 }
 
-:where(.system-b-spotify-connect-card) {
+:where(.system-b-spotify-connect-card),
+:where([data-spotify-connect-surface="card"]) {
   overflow: visible;
   background: var(--system-b-app-content-surface);
+  padding: calc(var(--space-3) + var(--space-0-5));
 }
 
-:where(.system-b-spotify-connect-status-card) {
+:where(.system-b-spotify-connect-status-card),
+:where([data-spotify-connect-surface="status"]) {
   display: flex;
   min-height: calc(var(--space-10) + var(--space-4));
   align-items: center;
+  gap: var(--space-2-5);
+  padding-inline: var(--space-2-5);
   background: color-mix(
     in oklab,
     var(--system-b-app-content-surface) 88%,

@@ -6,11 +6,19 @@ import {
   parseChangelog,
   parseChangelogDocument,
 } from './changelog-parser';
-import { resolveMonorepoPath } from './filesystem-paths';
+import { resolveAppPath, resolveMonorepoPath } from './filesystem-paths';
 
 function resolveChangelogPath(): string | null {
-  const changelogPath = resolveMonorepoPath('CHANGELOG.md');
-  return fs.existsSync(changelogPath) ? changelogPath : null;
+  // Deployed functions read the build-time copy in runtime-data/.
+  const candidates = [
+    resolveAppPath('runtime-data', 'CHANGELOG.md'),
+    resolveMonorepoPath('CHANGELOG.md'),
+  ];
+  return (
+    candidates.find(candidate =>
+      fs.existsSync(/* turbopackIgnore: true */ candidate)
+    ) ?? null
+  );
 }
 
 const getChangelogMarkdown = unstable_cache(
@@ -18,7 +26,7 @@ const getChangelogMarkdown = unstable_cache(
     const changelogPath = resolveChangelogPath();
     if (!changelogPath) return '';
     try {
-      return fs.readFileSync(changelogPath, 'utf8');
+      return fs.readFileSync(/* turbopackIgnore: true */ changelogPath, 'utf8');
     } catch {
       return '';
     }

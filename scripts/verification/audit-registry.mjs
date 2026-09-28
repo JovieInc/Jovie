@@ -197,6 +197,9 @@ export function validateAuditEvidenceShape(evidence) {
   ]) {
     if (!isSha256(evidence[field])) errors.push(`${field} must be sha256`);
   }
+  if (!isNonEmptyString(evidence.configVersion)) {
+    errors.push('configVersion is required');
+  }
   if (!isRecord(evidence.authority)) errors.push('authority is required');
   if (
     !isRecord(evidence.producer) ||

@@ -19,6 +19,7 @@ import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import { activateReferral } from '@/lib/referrals/service';
+import { extractCheckoutCorrelation } from '@/lib/stripe/checkout-correlation';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 
@@ -131,6 +132,7 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       stripeEventId,
       stripeEventTimestamp,
       eventType: 'subscription_created',
+      correlation: extractCheckoutCorrelation(session.metadata),
     });
 
     // Invalidate the same canonical identity used by billing-status reads
@@ -158,7 +160,8 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
-          subscription.id
+          subscription.id,
+          result.correlation
         );
       } catch (error) {
         await captureCriticalError(

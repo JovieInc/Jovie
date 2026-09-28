@@ -23,7 +23,7 @@ export async function POST() {
     });
   }
 
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated || !entitlements.email) {
     return NextResponse.json(
       { success: false, error: 'Not authenticated' },

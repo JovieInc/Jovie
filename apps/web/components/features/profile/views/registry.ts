@@ -1,7 +1,7 @@
 import {
   Bell,
-  Disc3,
   Info,
+  Layers,
   Mail,
   Menu as MenuIcon,
   Play,
@@ -135,7 +135,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   tour: {
     key: 'tour',
     title: 'Events',
-    subtitle: 'Tour dates and ticket updates.',
+    subtitle: 'Upcoming events and tickets.',
     icon: Ticket,
     menuOrder: 5,
     analyticsEvent: 'tour_drawer_open',
@@ -144,7 +144,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   releases: {
     key: 'releases',
     title: 'Releases',
-    icon: Disc3,
+    icon: Layers,
     menuOrder: null,
     analyticsEvent: 'releases_drawer_open',
     shouldShow: ({ hasReleases }) => hasReleases,

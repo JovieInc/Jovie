@@ -1,8 +1,17 @@
 'use client';
 
 import { getAvatarShapeClassName, getAvatarSizePx } from '@jovie/ui';
-import { Activity, Pause, Play } from 'lucide-react';
-import type { ReactNode } from 'react';
+import {
+  Activity,
+  Clock,
+  EyeOff,
+  Megaphone,
+  Pause,
+  PencilLine,
+  Play,
+  Radio,
+} from 'lucide-react';
+import type { ComponentType, ReactNode } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -10,7 +19,9 @@ import {
   DrawerFormGridRow,
   DrawerMediaThumb,
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
+  EntityHeaderStatusGlyph,
+  type EntityHeaderStatusTone,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { DropDateChip } from '@/components/shell/DropDateChip';
@@ -22,9 +33,8 @@ import {
 import { MetaPill } from '@/components/shell/MetaPill';
 import {
   type ReleaseStatus,
-  StatusBadge,
+  STATUS_CHIP,
 } from '@/components/shell/StatusBadge';
-import { TypeBadge } from '@/components/shell/TypeBadge';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
@@ -150,6 +160,31 @@ function getShellReleaseStatus(release: Release): ReleaseStatus {
   return 'live';
 }
 
+// Entity Header status glyph — icon-only. The status word (e.g. "Live",
+// "Scheduled") only ever surfaces through STATUS_CHIP's tooltip + aria-label
+// text on EntityHeaderStatusGlyph, never as a visible label in the rail.
+const RELEASE_STATUS_ICON: Record<
+  ReleaseStatus,
+  ComponentType<{
+    readonly className?: string;
+    readonly 'aria-hidden'?: boolean;
+  }>
+> = {
+  live: Radio,
+  scheduled: Clock,
+  announced: Megaphone,
+  draft: PencilLine,
+  hidden: EyeOff,
+};
+
+const RELEASE_STATUS_TONE: Record<ReleaseStatus, EntityHeaderStatusTone> = {
+  live: 'neutral',
+  scheduled: 'warning',
+  announced: 'warning',
+  draft: 'neutral',
+  hidden: 'neutral',
+};
+
 function getDspStatus({
   url,
   confidence,
@@ -167,7 +202,7 @@ function getDspStatus({
 }
 
 function getProviderGlyph(label: string, fallback: string): string {
-  return (label.match(/[a-z0-9]/iu)?.[0] ?? fallback[0] ?? '?').toUpperCase();
+  return (/[a-z0-9]/iu.exec(label)?.[0] ?? fallback[0] ?? '?').toUpperCase();
 }
 
 function getDspAvatarItems(
@@ -241,23 +276,33 @@ export function ReleaseEntityHeader({
     : null;
   const dspItems = getDspAvatarItems(release, providerConfig);
   const trackLabel = formatTrackCount(release.totalTracks);
+  const releaseStatus = getShellReleaseStatus(release);
+  const detailsLine =
+    artistLine || releaseTypeLabel ? (
+      <>
+        {artistLine}
+        {artistLine && releaseTypeLabel ? (
+          <span className='mx-1 text-quaternary-token'>·</span>
+        ) : null}
+        {releaseTypeLabel}
+      </>
+    ) : null;
+  const hasMetaStrip = Boolean(releaseDate || trackLabel || dspItems.length);
 
   return (
     <div className='overflow-hidden' data-testid='release-header-card'>
-      <EntityHeaderCard
+      <EntityHeader
         title={release.title}
-        stableLayout
-        titleLineClamp={1}
-        subtitleLineClamp={1}
-        reserveSubtitleSlot
-        reserveMetaSlot
-        metaOverflow='scroll'
-        subtitle={
-          artistLine ? (
-            <span className='line-clamp-2 block'>{artistLine}</span>
-          ) : null
+        details={detailsLine}
+        statusGlyph={
+          <EntityHeaderStatusGlyph
+            icon={RELEASE_STATUS_ICON[releaseStatus]}
+            label={STATUS_CHIP[releaseStatus].label}
+            tone={RELEASE_STATUS_TONE[releaseStatus]}
+          />
         }
-        image={
+        actions={actionBar}
+        thumbnail={
           <div className='group/artwork relative shrink-0'>
             <AlbumArtworkContextMenu
               title={release.title}
@@ -291,7 +336,7 @@ export function ReleaseEntityHeader({
                   sizes={`${RELEASE_HEADER_ARTWORK_SIZE_PX}px`}
                   fallback={
                     <Icon
-                      name='Disc3'
+                      name='AudioLines'
                       className='h-6 w-6 text-tertiary-token'
                       aria-hidden='true'
                     />
@@ -323,20 +368,19 @@ export function ReleaseEntityHeader({
             </button>
           </div>
         }
-        meta={
-          <>
-            <StatusBadge status={getShellReleaseStatus(release)} />
-            {releaseTypeLabel ? <TypeBadge label={releaseTypeLabel} /> : null}
-            {releaseDate ? (
-              <DropDateChip tone={releaseDate.tone} label={releaseDate.label} />
-            ) : null}
-            {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
-            <DspAvatarStack dsps={dspItems} />
-          </>
-        }
-        actions={actionBar}
-        bodyClassName={cn('pb-2.5', actionBar && 'pr-9')}
       />
+      {hasMetaStrip ? (
+        <div
+          className='mt-2 flex flex-wrap items-center gap-1.5'
+          data-testid='release-header-meta-strip'
+        >
+          {releaseDate ? (
+            <DropDateChip tone={releaseDate.tone} label={releaseDate.label} />
+          ) : null}
+          {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
+          <DspAvatarStack dsps={dspItems} />
+        </div>
+      ) : null}
       {footer ? (
         <div className='border-t border-(--app-shell-frame-seam) px-3 py-2.5'>
           {footer}

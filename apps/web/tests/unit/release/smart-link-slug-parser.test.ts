@@ -30,7 +30,7 @@ describe('@smoke parseSmartLinkSlug', () => {
   });
 
   it('returns null when there is no -- separator', () => {
-    expect(parseSmartLinkSlug('no-separator')).toBe(null);
+    expect(parseSmartLinkSlug('no-separator')).toBeNull();
   });
 
   it('uses the last occurrence of -- when multiple separators exist', () => {
@@ -44,14 +44,14 @@ describe('@smoke parseSmartLinkSlug', () => {
   });
 
   it('returns null when releaseSlug is empty', () => {
-    expect(parseSmartLinkSlug('--empty-release')).toBe(null);
+    expect(parseSmartLinkSlug('--empty-release')).toBeNull();
   });
 
   it('returns null when profileId is empty', () => {
-    expect(parseSmartLinkSlug('empty-profile--')).toBe(null);
+    expect(parseSmartLinkSlug('empty-profile--')).toBeNull();
   });
 
   it('returns null when both parts are empty', () => {
-    expect(parseSmartLinkSlug('--')).toBe(null);
+    expect(parseSmartLinkSlug('--')).toBeNull();
   });
 });

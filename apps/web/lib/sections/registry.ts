@@ -158,17 +158,17 @@ export function composeHomepageSections(flags: HomepageCompositionFlags): {
     sections.push('homepage-go-live-steps');
   }
 
-  sections.push('homepage-workspace-section');
-  sections.push('homepage-artist-profiles-carousel');
+  sections.push(
+    'homepage-workspace-section',
+    'homepage-artist-profiles-carousel'
+  );
 
   if (flags.showFridayRhythm) {
     sections.push('friday-rhythm-section');
   }
 
   if (flags.showHomeRefresh2026) {
-    sections.push('home-bento-pairs');
-    sections.push('home-loop-diagram');
-    sections.push('home-stat-quote');
+    sections.push('home-bento-pairs', 'home-loop-diagram', 'home-stat-quote');
   }
 
   if (flags.showV2Pricing) {

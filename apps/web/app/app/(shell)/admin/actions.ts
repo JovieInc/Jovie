@@ -67,7 +67,7 @@ function validateAvatarUrl(url: string): string {
 }
 
 async function requireAdmin(): Promise<string> {
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
 
   if (!userId) {
     throw new AdminUnauthorizedError();

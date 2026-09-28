@@ -1,14 +1,22 @@
 import json
 import os
 import re
+import shlex
 import subprocess
 import textwrap
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
+# GNU timeout accepts fractional budgets. The fake CLI prints its URL within
+# milliseconds and ignores TERM, so these still exercise TERM -> KILL (exit 137)
+# without spending whole seconds of wall clock per timed-out attempt.
+FAST_TIMEOUT_SECONDS = "0.5"
+FAST_KILL_GRACE_SECONDS = "0.2"
 PRODUCTION_PROMOTION_SCRIPT = (
     REPO_ROOT / ".github/scripts/promote-production-deployment.sh"
 )
@@ -106,9 +114,9 @@ echo "https://jovie-timeout-test.vercel.app"
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
         }
     )
@@ -168,9 +176,9 @@ echo "https://jovie-source-fallback.vercel.app"
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
             "VERCEL_GIT_COMMIT_SHA": "0123456789abcdef",
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
             "VERCEL_ENV_LOG": str(tmp_path / "vercel-env"),
@@ -359,9 +367,9 @@ sleep 5
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
-            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
-            "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "1",
-            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
+            "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": FAST_TIMEOUT_SECONDS,
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": FAST_KILL_GRACE_SECONDS,
         }
     )
 
@@ -1406,3 +1414,396 @@ def test_alias_verifier_rejects_wrong_current_id_even_with_expected_sha(
     assert (tmp_path / "github-output").read_text().strip() == (
         "failure_subtype=production_alias_not_updated"
     )
+
+
+@pytest.mark.parametrize("provider_output, expected", [
+    ("token=synthetic-private-token\n::error::untrusted-provider-command\n"
+     "https://user:" + "synthetic-private-token" + "@bad.vercel.app\nhttps://safe-deployment.vercel.app\n"
+     "ENOENT: readlink '/vercel/path0/apps/web/lib/services/retouching/styles/white-space.md'\n",
+     ("ENOENT", "retouch-style-prompt", "https://safe-deployment.vercel.app")),
+    ("synthetic-private-token " * 5000 + "\n::error::untrusted-provider-command\n",
+     ("UNKNOWN", None, None)),
+    ("EACCES\nhttps://user:" + "synthetic-private-token" + "@bad.vercel.app\n"
+     "https://bad.vercel.app?token=synthetic-private-token\n", ("EACCES", None, None)),
+    ("synthetic-private-token " * 5000 + "\nENOENT /vercel/path0/apps/web/tests/quarantine.json\n",
+     ("ENOENT", "runtime-quarantine-ledger", None)),
+    ("ETIMEDOUT\nhttps://synthetic-private-token.vercel.app\n", ("ETIMEDOUT", None, None)),
+    ("", ("UNKNOWN", None, None)),
+])
+def test_failed_deploy_emits_bounded_allowlisted_diagnostics_without_secrets(
+    tmp_path: Path, provider_output: str, expected: tuple,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "vercel"
+    fake.write_text("#!/usr/bin/env bash\nprintf '%s' " + shlex.quote(provider_output) + "\nexit 23\n")
+    fake.chmod(0o755)
+    output = tmp_path / ".vercel/output"
+    output.mkdir(parents=True)
+    (output / "config.json").write_text("{}")
+    env = os.environ.copy()
+    env.update(PATH=f"{bin_dir}:{env['PATH']}", VERCEL_TOKEN="synthetic-private-token",
+               VERCEL_ORG_ID="test-org", VERCEL_ENABLE_SOURCE_FALLBACK="false",
+               VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK="false", RUNNER_TEMP=str(tmp_path))
+    result = subprocess.run(["bash", str(DEPLOY_SCRIPT), "url", "--yes"], cwd=tmp_path,
+                            env=env, capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    assert "synthetic-private-token" not in combined
+    assert "untrusted-provider-command" not in combined
+    assert "user:" not in combined
+    lines = [line for line in result.stderr.splitlines() if line.startswith("Deploy failure diagnostic: ")]
+    assert len(lines) == 1, combined
+    assert len(lines[0]) < 500
+    receipt = json.loads(lines[0].split(": ", 1)[1])
+    code, asset, url = expected
+    assert receipt == {"schema": "jovie-vercel-deploy-failure/v1", "mode": "tgz", "attempt": 1,
+                       "exitStatus": 23, "errorCode": code, "asset": asset, "deploymentUrl": url}
+    assert not list(tmp_path.glob("jovie-vercel-deploy.*"))
+
+
+def test_failed_deploy_emits_redacted_cli_tail_and_error_annotation(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "vercel"
+    fake.write_text(textwrap.dedent("""\
+        #!/usr/bin/env bash
+        for i in $(seq 1 60); do echo "upload progress line $i"; done
+        echo "Vercel CLI 48.0.0 --token synthetic-private-token" >&2
+        echo "Authorization: Bearer synthetic-bearer-value" >&2
+        echo "VERCEL_TOKEN=synthetic-env-value" >&2
+        echo "::add-mask::untrusted-provider-command" >&2
+        echo "Error: Response Error (400): Invalid filePathMap entry for synthetic-private-token" >&2
+        echo "Retrying in 0s" >&2
+        exit 1
+        """))
+    fake.chmod(0o755)
+    output = tmp_path / ".vercel/output"
+    output.mkdir(parents=True)
+    (output / "config.json").write_text("{}")
+    env = os.environ.copy()
+    env.update(PATH=f"{bin_dir}:{env['PATH']}", VERCEL_TOKEN="synthetic-private-token",
+               VERCEL_ORG_ID="test-org", VERCEL_ENABLE_SOURCE_FALLBACK="false",
+               VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK="false", RUNNER_TEMP=str(tmp_path))
+    result = subprocess.run(["bash", str(DEPLOY_SCRIPT), "url", "--yes"], cwd=tmp_path,
+                            env=env, capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 1
+    combined = result.stdout + result.stderr
+    for secret in ("synthetic-private-token", "synthetic-bearer-value", "synthetic-env-value",
+                   "untrusted-provider-command"):
+        assert secret not in combined
+    assert '"errorCode":"PREBUILT_OUTPUT_INVALID"' in result.stderr
+    tail = [line for line in result.stderr.splitlines() if line.startswith("  | ")]
+    assert len(tail) == 40
+    assert "upload progress line 20\n" not in combined
+    assert "  | upload progress line 60" in tail
+    assert "  | Vercel CLI 48.0.0 --token [redacted]" in tail
+    assert "  | Authorization: Bearer [redacted]" in tail
+    assert "  | VERCEL_TOKEN=[redacted]" in tail
+    assert "  | [workflow command line removed]" in tail
+    annotations = [line for line in result.stdout.splitlines() if line.startswith("::")]
+    assert annotations == [
+        "::error title=Vercel deploy failed::Vercel tgz deploy attempt 1 failed (exit 1, "
+        "PREBUILT_OUTPUT_INVALID): Error: Response Error (400): Invalid filePathMap entry "
+        "for [redacted]"
+    ]
+
+
+def _write_ignore_probe_vercel(bin_dir: Path, prebuilt_exit: int) -> None:
+    fake_vercel = bin_dir / "vercel"
+    fake_vercel.write_text(
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+if [ -f .vercelignore ]; then state=present; else state=hidden; fi
+printf '%s %s\\n' "$state" "$*" >> "${{VERCEL_CALL_LOG}}"
+if [[ " $* " == *" --prebuilt "* ]]; then
+  echo "https://jovie-prebuilt-probe.vercel.app"
+  exit {prebuilt_exit}
+fi
+echo "https://jovie-source-probe.vercel.app"
+"""
+    )
+    fake_vercel.chmod(0o755)
+
+
+def _prebuilt_fixture(tmp_path: Path) -> dict[str, str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    func_dir = tmp_path / ".vercel/output/functions/index.func"
+    func_dir.mkdir(parents=True)
+    (tmp_path / ".vercel/output/config.json").write_text("{}")
+    (func_dir / ".vc-config.json").write_text(
+        json.dumps({"filePathMap": {"CHANGELOG.md": "CHANGELOG.md"}})
+    )
+    (tmp_path / "CHANGELOG.md").write_text("# traced runtime file\n")
+    (tmp_path / ".vercelignore").write_text("*.md\n**/tests/\n")
+    return {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "VERCEL_TOKEN": "test-token",
+        "VERCEL_ORG_ID": "test-org",
+        "GITHUB_OUTPUT": str(tmp_path / "github-output"),
+        "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
+        "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
+        "RUNNER_TEMP": str(tmp_path),
+    }
+
+
+def _run_deploy(tmp_path: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["bash", str(DEPLOY_SCRIPT), "deploy_url", "--yes"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+
+def test_prebuilt_upload_hides_vercelignore_so_traced_files_are_not_dropped(
+    tmp_path: Path,
+) -> None:
+    """Vercel CLI >= 59 drops .vercelignore-matched filePathMap entries from
+    prebuilt uploads; every staging deploy after the 56.3.2 -> 59.16.0 bump
+    then failed server-side. The prebuilt call must run without the file and
+    the file must be restored byte-for-byte afterwards."""
+
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    original = (tmp_path / ".vercelignore").read_text()
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    assert len(calls) == 1
+    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
+    assert (tmp_path / ".vercelignore").read_text() == original
+    assert not list(tmp_path.glob("jovie-vercelignore.*"))
+
+
+def test_failed_prebuilt_restores_vercelignore_before_source_fallback(
+    tmp_path: Path,
+) -> None:
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=1)
+    original = (tmp_path / ".vercelignore").read_text()
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    assert len(calls) == 2
+    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
+    assert calls[1].startswith("present deploy --yes")
+    assert (tmp_path / ".vercelignore").read_text() == original
+
+
+def test_failed_prebuilt_without_fallback_still_restores_vercelignore(
+    tmp_path: Path,
+) -> None:
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=1)
+    original = (tmp_path / ".vercelignore").read_text()
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    assert (tmp_path / ".vercelignore").read_text() == original
+
+
+@pytest.mark.parametrize(
+    ("kind", "secret_path"),
+    [
+        ("filePathMap", ".env.production"),
+        ("filePathMap", "apps/web/.env"),
+        ("filePathMap", "certs/signing.pem"),
+        ("filePathMap", ".vercel/project.json"),
+        ("filePathMap", ".npmrc"),
+        ("output", ".vercel/output/functions/index.func/.env.local"),
+        ("output", ".vercel/output/static/private.key"),
+    ],
+)
+def test_prebuilt_upload_fails_closed_on_credential_bearing_files(
+    tmp_path: Path, kind: str, secret_path: str
+) -> None:
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    if kind == "filePathMap":
+        vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+        vc_config.write_text(
+            json.dumps(
+                {"filePathMap": {"CHANGELOG.md": "CHANGELOG.md", secret_path: secret_path}}
+            )
+        )
+    else:
+        (tmp_path / secret_path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / secret_path).write_text("fixture=never-uploaded\n")
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    assert "credential-bearing files" in result.stderr
+    assert secret_path in result.stderr
+    assert not (tmp_path / "vercel-calls").exists()
+    assert (tmp_path / ".vercelignore").exists()
+
+
+def test_env_example_in_trace_is_not_treated_as_a_credential(tmp_path: Path) -> None:
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+    vc_config.write_text(json.dumps({"filePathMap": {".env.example": ".env.example"}}))
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("dangling", [False, True])
+def test_prebuilt_upload_fails_closed_on_file_symlink_trace_targets(
+    tmp_path: Path, dangling: bool
+) -> None:
+    """Function traces that name a file symlink (the JOV-6576
+    public/product-screenshots include) are packed as symlink entries, and
+    Vercel's remote build fails at "Extracting deployment files" on every
+    retry. The deploy must refuse before uploading anything."""
+
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    catalog = tmp_path / "apps/web/screenshot-catalog/current"
+    catalog.mkdir(parents=True)
+    if not dangling:
+        (catalog / "public-profile-desktop.png").write_bytes(b"png")
+    link = "apps/web/public/product-screenshots/profile-desktop.png"
+    export = tmp_path / link
+    export.parent.mkdir(parents=True)
+    export.symlink_to("../../screenshot-catalog/current/public-profile-desktop.png")
+    vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+    vc_config.write_text(
+        json.dumps({"filePathMap": {"CHANGELOG.md": "CHANGELOG.md", link: link}})
+    )
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    assert "file symlinks" in result.stderr
+    assert link in result.stderr
+    assert not (tmp_path / "vercel-calls").exists()
+
+
+def test_prebuilt_upload_allows_directory_symlink_trace_targets(tmp_path: Path) -> None:
+    """pnpm's node_modules layer is traced as directory links in every build,
+    including the last successful 56.3.2 deploy; those must still upload."""
+
+    env = _prebuilt_fixture(tmp_path)
+    _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+    package = tmp_path / "node_modules/.pnpm/next@16/node_modules/next"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text("{}")
+    link = tmp_path / "apps/web/node_modules/next"
+    link.parent.mkdir(parents=True)
+    link.symlink_to("../../../node_modules/.pnpm/next@16/node_modules/next")
+    vc_config = tmp_path / ".vercel/output/functions/index.func/.vc-config.json"
+    vc_config.write_text(
+        json.dumps(
+            {
+                "filePathMap": {
+                    "CHANGELOG.md": "CHANGELOG.md",
+                    "apps/web/node_modules/next": "apps/web/node_modules/next",
+                    "apps/web/screenshot.png": "CHANGELOG.md",
+                }
+            }
+        )
+    )
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
+
+
+def test_every_prebuilt_build_dereferences_function_trace_links() -> None:
+    """Each workflow that feeds vercel-prebuilt-deploy.sh must run the
+    materializer between `vercel build` and the deploy preflight."""
+
+    invocation = "node .github/scripts/materialize-vercel-static.mjs"
+    for workflow_path, deploy_marker in (
+        (PRODUCTION_RELEASE_WORKFLOW, "- name: Deploy (staging preview, prebuilt)"),
+        (CI_WORKFLOW, "- name: Deploy (PR preview, fast deployment for UI-only changes)"),
+    ):
+        workflow = workflow_path.read_text()
+        deploy = workflow.index(deploy_marker)
+        build = workflow.rindex("./node_modules/.bin/vercel build", 0, deploy)
+        materialize = workflow.index(invocation, build)
+        assert build < materialize < deploy, workflow_path.name
+
+
+def _write_manifest_probe_vercel(bin_dir: Path, prebuilt_exit: int) -> None:
+    fake_vercel = bin_dir / "vercel"
+    fake_vercel.write_text(
+        f"""#!/usr/bin/env bash
+if [[ " $* " == *" --prebuilt "* ]]; then
+  echo "Extracted 7021 deployment files"
+  echo "https://jovie-manifest-probe.vercel.app"
+  exit {prebuilt_exit}
+fi
+echo "https://jovie-source-probe.vercel.app"
+"""
+    )
+    fake_vercel.chmod(0o755)
+
+
+def test_tgz_attempt_records_output_manifest_and_extracted_count(tmp_path: Path) -> None:
+    """Every tgz attempt leaves a names/sizes/modes manifest of the upload so
+    an "Extracting deployment files" failure can be diffed against a success."""
+
+    env = _prebuilt_fixture(tmp_path)
+    manifest_file = tmp_path / "manifest.json"
+    env["VERCEL_OUTPUT_MANIFEST_FILE"] = str(manifest_file)
+    (tmp_path / ".vercel/output/static").mkdir(parents=True)
+    (tmp_path / ".vercel/output/static/secret.txt").write_text("sk_live_manifest_probe")
+    _write_manifest_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+
+    result = _run_deploy(tmp_path, env)
+
+    combined = result.stdout + result.stderr
+    assert result.returncode == 0, combined
+    assert "Vercel remote build: Extracted 7021 deployment files" in result.stdout
+    assert "vercel-output-manifest| output: entries=" in result.stdout
+    assert "sk_live_manifest_probe" not in combined
+    assert "test-token" not in combined
+    manifest = json.loads(manifest_file.read_text())
+    assert manifest["schema"] == "jovie-vercel-output-manifest/v1"
+    assert manifest["filePathMap"]["uniqueTargets"] == 1
+    assert manifest["filePathMap"]["totals"]["files"] == 1
+    assert "Vercel output manifest:" not in result.stderr
+
+
+def test_failed_tgz_attempt_prints_compact_manifest_summary(tmp_path: Path) -> None:
+    env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
+    env["VERCEL_OUTPUT_MANIFEST_FILE"] = str(tmp_path / "manifest.json")
+    _write_manifest_probe_vercel(tmp_path / "bin", prebuilt_exit=1)
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 1
+    summaries = [line for line in result.stderr.splitlines()
+                 if line.startswith("Vercel output manifest: ")]
+    assert len(summaries) == 1, result.stdout + result.stderr
+    assert re.search(r"entries=\d+ files=\d+ dirs=\d+ symlinks=0 ", summaries[0])
+    assert "tracedUnique=1 tracedFiles=1" in summaries[0]
+
+
+def test_manifest_failure_never_changes_deploy_outcome(tmp_path: Path) -> None:
+    env = _prebuilt_fixture(tmp_path)
+    env["VERCEL_OUTPUT_MANIFEST_FILE"] = str(tmp_path / "missing-dir" / "manifest.json")
+    _write_manifest_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
+
+    result = _run_deploy(tmp_path, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Vercel output manifest unavailable" in result.stderr
+    assert "Deploy succeeded on attempt 1 with tgz upload" in result.stdout

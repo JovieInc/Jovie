@@ -39,8 +39,8 @@ describe('tool-errors', () => {
   it('classifies thrown provider errors without rethrowing semantics', () => {
     const failure = classifyThrownToolError(
       'generateAlbumArt',
-      Object.assign(new Error('XAI_API_KEY is not configured'), {
-        code: 'XAI_API_KEY_MISSING',
+      Object.assign(new Error('AI Gateway authentication is not configured'), {
+        code: 'ALBUM_ART_GATEWAY_UNCONFIGURED',
       })
     );
 
@@ -77,5 +77,50 @@ describe('tool-errors', () => {
         errorCode: TOOL_ERROR_CODES.TOOL_UNPROVISIONED,
       }).errorCode
     ).toBe('TOOL_UNPROVISIONED');
+  });
+
+  it('reads a plan-lock code from a non-Error object', () => {
+    const failure = classifyThrownToolError('manageTasks', {
+      code: 'TASKS_WORKSPACE_LOCKED',
+    });
+
+    expect(failure).toMatchObject({
+      errorCode: 'PLAN_UNAVAILABLE',
+      error: 'Tool execution failed.',
+      retryable: false,
+    });
+  });
+
+  it('keeps a string throw as the failure message', () => {
+    const failure = classifyThrownToolError('manageTasks', 'disk full');
+
+    expect(failure).toMatchObject({
+      errorCode: 'TOOL_EXECUTION_FAILED',
+      error: 'disk full',
+    });
+  });
+
+  it('uses a legacy message when the error field is blank', () => {
+    const normalized = normalizeToolFailureOutput('manageTasks', {
+      success: false,
+      error: '   ',
+      message: '  from the tool  ',
+    });
+
+    expect(normalized).toMatchObject({
+      error: 'from the tool',
+      errorCode: 'TOOL_EXECUTION_FAILED',
+    });
+  });
+
+  it('uses the generic failure text when a payload has no message', () => {
+    const normalized = normalizeToolFailureOutput('manageTasks', {
+      success: false,
+    });
+
+    expect(normalized).toMatchObject({
+      error: 'Tool execution failed.',
+      errorCode: 'TOOL_EXECUTION_FAILED',
+    });
   });
 });

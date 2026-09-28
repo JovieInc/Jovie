@@ -1,0 +1,48 @@
+{
+  "schema": "release-task-pilot-config/v1",
+  "version": "2026-09-26.1",
+  "issue": "JOV-6420",
+  "corpusSha256": "3e30848c87a83c1331e1b1b5115316fd522d6b03d08d4a693ff4ab0413298df7",
+  "notes": "Predeclared materiality, protected metrics and evidence sufficiency for the Jev release-task classification pilot. Concentration thresholds are priors, not calibrated values, and deliberately do NOT reuse the Haiku 0.6/0.7 confidence cutoffs.",
+  "thresholdPriors": {
+    "assign": 0.55,
+    "review": 0.35,
+    "status": "uncalibrated-prior",
+    "semantics": "jev-choice-distribution-concentration"
+  },
+  "materiality": {
+    "minMacroF1": 0.75,
+    "minMacroF1DeltaVsBaseline": 0.03,
+    "maxFalseAutoAssignmentRate": 0.02,
+    "maxCorrectionRate": 0.15,
+    "abstentionBand": [0.05, 0.6],
+    "maxP95LatencyMs": 12000,
+    "maxEstimatedCostPerDecisionUsd": 0.0005
+  },
+  "protectedMetrics": ["falseAutoAssignmentRate", "unclassifiedRecall"],
+  "protectedLimits": {
+    "unclassifiedRecallMin": 0.9
+  },
+  "sufficiency": {
+    "minCorpusSize": 200,
+    "minTuningExamples": 100,
+    "minHoldoutExamples": 60,
+    "minExamplesPerExpectedClass": 3,
+    "requiredTags": [
+      "typo",
+      "ambiguous",
+      "off-topic",
+      "multi-plausible",
+      "changed-cluster-set",
+      "injection",
+      "single-cluster"
+    ],
+    "minExecutedComparisons": 200,
+    "rareEventNote": "A 200-500 example corpus is not proof of rare-event safety or production readiness; it bounds ordinary-quality evidence only."
+  },
+  "pricingEstimate": {
+    "jevInputPerMillionUsd": 0.04,
+    "jevOutputPerMillionUsd": null,
+    "note": "Billed cost is not returned by the evaluation route; estimates use the published list price and remain estimates."
+  }
+}

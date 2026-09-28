@@ -29,6 +29,12 @@ Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
 included in delivery receipts so a runtime can reject a mismatched contract.
 
+When a phase fails badly enough to hit a trigger in
+[post-mortems](postmortems/README.md#when-a-post-mortem-is-required) (for
+example a production freeze, red `main`, or a stalled lane), the agent that
+resolves it writes a post-mortem and files `postmortem-action` issues for the
+systemic controls.
+
 ## North star
 
 - **CI-green → auto-merge.** No human. Correctness is a machine job.
@@ -75,16 +81,20 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | **Merge queue** | combined-head `ci-fast`, exact-combined-head web coverage, path-selected Web unit/build, Mac test/package artifact, iOS unit + coverage fast gate, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; JOV-INV-033 Done-sprint production HTML rescan (`DONE_INVARIANT_RESCAN=release`) against that same URL; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
-| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
+| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
 
 Rules:
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
   ×5 + the full security suite per-PR saturated the runner pool and made the
   native queue retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
-  *merged* code on `main` + nightly. **Slop Gate** is the same class: a weekly
-  post-merge copy-smell report on `main`. Taste/copy judgment is post-ship
-  (`taste-classifier` + production walkthroughs). Do not add slopcheck to
-  `PR Ready` or `ci-harness/manifest.json`.
+  *merged* code on `main` + nightly.
+- **Exception: the deterministic copy gate runs on PRs.** The `copy-gate`
+  ci-fast lane lints only lines a PR adds in customer-facing copy paths
+  (`@jovie/copy`, policy in `canon/VOICE.md`). It is pure regex, runs in about a
+  second, and blocks new harm, legal, platform-ToS, leak, and slop violations
+  (founder decision 2026-09-25). Legacy lines stay advisory. LLM judge panels
+  never run in PR CI; they run in the authoring loop (`copywriting` skill) and
+  taste stays post-ship. Slop Gate and `slopcheck.py` are retired.
 - **Exception — secret scanning gates PRs.** A diff-scoped gitleaks + trufflehog
   runs on every PR (~10s, 1 slot): a leaked key on this **public** repo is scraped
   within seconds of hitting `main`, so it is EVENT-class and must be caught
@@ -100,30 +110,17 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **Source qualification is separate from production certification.** A pending,
-  missing, or failed release checkpoint by itself does not make an otherwise
-  qualified source PR ineligible. Exact-head source checks, explicit scoped
-  incident holds, and required native merge-group correctness, provenance, and
-  ancestry checks remain enforced. Admission receipts say `source-qualified`;
-  they never certify production.
+- **Source qualification is separate from production certification.** An agent
+  requests GitHub's normal Merge when ready for the exact checked head. GitHub
+  enforces required source checks and the native merge queue validates the
+  combined head. The merge-group helper checks live membership, the exact queue
+  ref and source head, and required synthetic-head checks. GitHub's current queue
+  entry is authoritative for membership; historical timeline events are not an
+  admission prerequisite. Native User and Bot enqueue requests use this same path
+  without an Auto-Enroll receipt.
   The production controller owns deployment serialization and exact runtime
-  certification. When main and production are healthy, exact-main review is
-  current, and integrity is clear, controller containment and production SHA
-  lag select `hold-intake`: clean exact-head PRs may enter the native queue
-  while new implementation and deployment stay held, subject to the separate
-  release-wave pause below.
-  A separate active release-wave lease pauses only new native queue enrollment
-  and re-entry while a Production Controller run is queued, concurrency-pending
-  (GitHub status `pending`), or in progress. The workflow fixes each run's deadline
-  at 30 minutes from `created_at`. Terminal completion releases that run's hold
-  sooner; another queued, pending, or in-progress run can keep the pause active
-  against its own deadline. Repeated observations do
-  not restart a run's deadline. Already-admitted native entries remain in the
-  queue, subject to ordinary safety-dequeue checks, throughout the pause.
-  Unavailable or malformed controller state fails closed before enrollment.
-  Capacity-dependent mutation requires its own accepted evidence. Unknown
-  source/review/integrity evidence still blocks admission. An existing incident
-  hold is cleared only by its own evidence.
+  certification after merge. A pending or failed release checkpoint is not a
+  source-merge prerequisite. The legacy Auto-Enroll workflow is retired.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
@@ -156,23 +153,10 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
-- **Enrollment is automatic, exact-head, and bounded.**
-  `merge-queue-autoenroll` first revalidates the PR associated with the
-  triggering PR/CI event at that event's exact published head. Because GitHub's
-  shared concurrency group retains only one pending run, every surviving pass
-  may also recover a deterministic cohort whose source-required checks are
-  freshly green. The event target, native re-entry, and missed-event recovery
-  share one admission path bounded only by native queue depth (a positive
-  `DRAIN_QUEUE_REENTRY_MAX_PER_RUN` re-caps admissions per run; default `0` =
-  uncapped), the App-backed controller remains
-  the sole writer, and every mutation rechecks the live head, labels, base,
-  queue depth, and native postcondition. Enrollment uses GitHub's native queue
-  only. The `merge-queue` label is retired and must not be added, read, or
-  retained. You don't merge by hand.
-  Each proven native enrollment emits a `pull_request: enqueued` continuation.
-  Its already-queued exact-head target is an idempotent no-op while the surviving
-  pass advances the next bounded cohort; when no eligible remainder exists, no
-  new enrollment event is created and the chain converges.
+- **The writer requests GitHub Merge when ready for the checked PR head.**
+  GitHub enforces required checks, queue admission, merge-group checks, and the
+  final merge. Do not use a direct merge or the retired `merge-queue` label.
+  The retired Auto-Enroll bot identity and status receipt are not merge-group gates.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -187,12 +171,19 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 **Ship now:** two concurrent native speculative groups. The
 `max_entries_to_build: 1 → 2` apply to live ruleset 10512119 is complete — the
-2026-09-20 live readback shows `max_entries_to_build=2`, with the 20-minute
+2026-09-20 live readback shows `max_entries_to_build=2`, with the then 20-minute
 budget, ALLGREEN, all required checks, empty bypass actors, and min/max merge
 1/5 with wait zero preserved. The separate pending source cohort minimum/wait
 cutover is not part of this apply and remains pending. Roll back only the
 build count to one if runner waits or speculative invalidation outweigh the
 measured throughput gain.
+
+On 2026-09-23 the 20-minute response deadline proved shorter than required
+CI paths configured for 30 and 40 minutes. The source-first repair landed and
+live ruleset `10512119` was read back at 60 minutes on 2026-09-24. Re-read the
+live ruleset before changing capacity and retain exact queue attempts and
+removal reasons as outcome evidence. This changes waiting time, not required
+checks or ALLGREEN.
 
 Capacity figures: the 2026-09-08 Team-plan readback and
 [GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
@@ -219,46 +210,28 @@ Mac demand fit with background headroom. This is a capacity ceiling, not a
 permanent preference for two. Required tests run on every synthetic head;
 GitHub's merge batch limit does not combine their builds or reuse stale results.
 
-### Native queue reconciliation
+### Native admission and production health
 
-`drain-pr-queue.sh` reads authoritative GitHub queue state, not the audit
-label. Every enrollment uses the exact current head SHA and proves the PR is
-queued after mutation. Hard-gated, conflicting, or terminal-red entries are
-dequeued through the native API and then have their audit label removed.
-Pending, queued, and cancelled check runs are not terminal failures, preventing
-dequeue/re-enroll loops during ordinary CI cancellation or main movement.
-An agent conflict that already carries `needs-conflict-resolution` is reported
-without repeating the same label mutation on every drain pass.
-When a non-draft main PR's required source checks never registered any
-check-run on its exact head (missing, not failing), the drain re-fires source
-CI with a bounded close+reopen: at most two per run, heads at least two hours
-old, and never twice on the same exact head (a bot-comment marker is the
-idempotency record). Terminal red checks still route to the fix agent instead.
-When a merge-group run proves a classified product failure, Gem writes the
-bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
-refusal. That success status preserves source-head cleanliness while acting as
-an exact-head tombstone after bounded Actions history rolls over; only a new
-source commit resets the product-failure memory.
+The finishing agent requests normal GitHub Merge when ready for its qualified
+exact head. GitHub's current queue entry, required checks, and combined-head
+result determine admission and landing. The Auto-Enroll and Queue-Deferred
+Release workflows are retired; do not wait for a drain pass, bot receipt, or
+fleet-health status before making that normal request. Historical product
+failure tombstones do not replace fresh source and combined-head evidence.
 
-### Fleet degradation policy
-
-The normal queue requires a fresh `GREEN` fleet receipt. When production is
-explicitly red but source `main` is green, the same controller may admit one
-exact-head UI/docs delta only after the semantic-isolation contract in
-`.github/MERGE_QUEUE.md` succeeds. All ordinary queue entries are held, and the
-production controller continues to reject deployment and promotion. Labels
-remain mechanical intent/hold signals and are never proof of isolation.
-
-When source `main` is red, no PR may merge and no deployment may start; UI/docs
-work may exist only as a draft. Unknown or stale production/main/controller/
-integrity evidence and severe integrity incidents admit nothing. The exception
-never permits business logic, auth, data, API, runtime, dependency, config, or
-control-plane changes, and a path-only classification is insufficient.
+Production health still governs deployment and promotion through the existing
+production controls. A production hold does not prohibit source repairs or
+create another source-admission controller. Required source, review, security,
+and combined-head gates stay in force. See
+[the native merge policy](../.github/MERGE_QUEUE.md) for live configuration
+receipts and the distinction between source landing and runtime certification.
 
 ### Summer closure-health stop-line
 
-Summer owns closure health; Gem remains the only native-queue and promotion
-writer. The closure observer classifies every open PR as `close`, `repair`,
+Summer owns closure health and the existing production writer retains
+promotion authority. The finishing agent requests native source admission;
+Gem is not the exclusive source-queue writer. The closure observer classifies
+every open PR as `close`, `repair`,
 `promote`, `queued`, or `held` with an owner, reason, and seven-day expiry.
 `close` requires the repository's explicit `duplicate` lifecycle label;
 matching titles or Linear issue IDs never prove semantic redundancy.
@@ -270,9 +243,11 @@ systems-down and fail every product closed. Promotion and deploy holds remain
 Jovie-scoped. Missing or malformed closure evidence fails new Jovie intake
 closed.
 
-Closure health is red when the sole queue controller stays non-green for more
-than 10 minutes, the native queue stays empty with eligible clean PRs for more
-than 15 minutes, an open PR stays unclassified for more than 15 minutes,
+The legacy closure observer includes a controller-health predicate that needs
+separate runtime reconciliation after Auto-Enroll retirement; its old result
+does not authorize another source-admission gate. Remaining closure signals
+include the native queue staying empty with eligible clean PRs for more than
+15 minutes, an open PR stays unclassified for more than 15 minutes,
 overlapping active artifacts for one Linear issue remain unresolved, an
 explicit hold expires, or no PR merges for one hour while open PRs remain.
 Held or draft PRs are not duplicate active writers; hold expiry governs them
@@ -342,7 +317,7 @@ each plane as separate evidence, never as a reason to repeat the mutation.
 |---|---|---|
 | `pr-size-guard` | Oversized PRs (codemods use `big-pr`) |
 | stack-depth guard (JOV-3457) | Runaway base-on-base agent stacks |
-| `drain-pr-queue.sh` (terminal-failure-only) | Zombie-check churn dequeuing green PRs |
+| GitHub native queue and exact-head merge-group checks | Landing without current combined-head proof |
 | `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
 
@@ -391,7 +366,8 @@ existed. Contract:
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
    repeats it on the synthetic combined head and must finish inside the
-   20-minute merge-queue check budget. Non-web heads emit an explicit
+   current merge-queue check budget (20 minutes until the 60-minute ruleset
+   cutover). Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.
    Regression receipt: source run 32547855063 spent 3180.55 seconds collecting
@@ -439,8 +415,8 @@ Before you open a PR:
    on (the old 👍 `taste-approve` workflow was removed 2026-07-06). Don't add
    `needs-human`.
 4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
-   CI, then qualify the final exact, current head before ready. Don't hand-merge;
-   the queue does it.
+   CI, then qualify the final exact, current head before ready. Request normal
+   GitHub Merge when ready; the queue performs the final merge.
 5. **Do not add or edit `CHANGELOG.md`.** Implementation PRs that touch it fail
    admission. What's New is written after land/runtime proof. Linear is SoR.
 6. If a PR's base branch was deleted, **retarget to `main`** before debugging a

@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -10,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { delimiter, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
@@ -83,11 +84,129 @@ describe('self-hosted runner setup action', () => {
     expect(setupNodeStep).toContain('uses: actions/setup-node@');
     expect(setupNodeStep).toContain("node-version-file: '.nvmrc'");
     expect(setupNodeStep).toContain(
-      "runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
+      "runner.environment == 'github-hosted' && inputs.package_cache == 'true' && github.event_name != 'merge_group' &&"
     );
     expect(setupNodeStep).toContain(
       "cache-dependency-path: '**/pnpm-lock.yaml'"
     );
+  });
+
+  describe('GitHub-hosted installed-tree cache', () => {
+    const stepBlock = (name: string) =>
+      action.match(
+        new RegExp(
+          `- name: ${name.replace(/[.()]/g, '\\$&')}\\n(?<step>[\\s\\S]*?)(?=\\n    - name:|$)`
+        )
+      )?.groups?.step ?? '';
+    const restoreStep = stepBlock(
+      'Restore installed node_modules (GitHub-hosted)'
+    );
+    const saveStep = stepBlock('Save installed node_modules (GitHub-hosted)');
+    const cachedPaths = [
+      '          node_modules',
+      '          apps/*/node_modules',
+      '          packages/*/node_modules',
+      '          workers/*/node_modules',
+    ].join('\n');
+
+    it('restores only on GitHub-hosted runners, pinned, with an exact key', () => {
+      expect(restoreStep).toContain('id: node-modules-cache');
+      expect(restoreStep).toContain(
+        "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
+      );
+      expect(restoreStep).toContain(
+        'uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+      );
+      expect(restoreStep).toContain(cachedPaths);
+      // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
+      // workspace, patches and .npmrc, and no prefix match may restore.
+      expect(restoreStep).toContain(
+        "key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}"
+      );
+      expect(restoreStep).not.toContain('restore-keys');
+    });
+
+    it('skips the store restore and pnpm fetch only on an exact hit', () => {
+      const setupNodeStep = stepBlock('Setup Node.js with pnpm cache');
+      expect(setupNodeStep).toContain(
+        "steps.node-modules-cache.outputs.cache-hit != 'true' && 'pnpm' || ''"
+      );
+      expect(stepBlock('Warm pnpm store')).toContain(
+        "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'"
+      );
+      // Only validated merge-group consumers skip the redundant frozen install.
+      const installStep = stepBlock('Install dependencies');
+      expect(installStep).toContain(
+        "inputs.reuse_merge_group_workspace != 'true'"
+      );
+      expect(installStep).toContain('pnpm install --frozen-lockfile');
+    });
+
+    it('saves right after install, only from trusted same-repository refs', () => {
+      expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
+        action.indexOf('- name: Save installed node_modules (GitHub-hosted)')
+      );
+      expect(action.trimEnd().endsWith(saveStep.trimEnd())).toBe(true);
+      expect(saveStep).toContain(
+        'uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0'
+      );
+      expect(saveStep).toContain(
+        "steps.node-modules-cache.outcome == 'success' &&"
+      );
+      expect(saveStep).toContain(
+        "steps.node-modules-cache.outputs.cache-hit != 'true' &&"
+      );
+      expect(saveStep).toContain("(github.event_name == 'push' ||");
+      expect(saveStep).toContain(
+        "(github.event_name == 'pull_request' &&\n        github.event.pull_request.head.repo.full_name == github.repository))"
+      );
+      expect(saveStep).toContain(
+        "github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true'"
+      );
+      for (const untrusted of ['pull_request_target', 'workflow_run']) {
+        expect(saveStep).not.toContain(`== '${untrusted}'`);
+      }
+      expect(saveStep).toContain(cachedPaths);
+      expect(saveStep).toContain(
+        'key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}'
+      );
+    });
+
+    it('drops only unloadable binaries, on Linux, just before a save', () => {
+      const name = '- name: Drop unloadable binaries before save';
+      const prune = stepBlock('Drop unloadable binaries before save');
+      expect(action.indexOf('- name: Install dependencies')).toBeLessThan(
+        action.indexOf(name)
+      );
+      expect(action.indexOf(name)).toBeLessThan(
+        action.indexOf('- name: Save installed node_modules (GitHub-hosted)')
+      );
+      expect(prune).toContain("runner.os == 'Linux' &&");
+      const saveIf = saveStep.match(/if: >-\n[\s\S]*?\)\)/)?.[0] ?? '';
+      expect(saveIf).not.toBe('');
+      expect(prune).toContain(saveIf.replace('if: >-\n', ''));
+      expect(prune.match(/rm -rf.*/g)).toEqual([
+        'rm -rf app-builder-bin@*/node_modules/app-builder-bin/{mac,win}',
+      ]);
+      // Hollow musl builds but keep package.json, so a restored tree stays
+      // "Already up to date" instead of refetching them on every hit.
+      const hollow =
+        '          -exec find {}/node_modules -type f ! -name package.json -delete \\;';
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name '*-musl@*' -o -name '*linuxmusl-*@*' \\) \\\n" +
+          hollow
+      );
+      // Promptfoo-only native payloads hollow the same way. These exact
+      // patterns leave the SDK wrappers (codex-sdk, claude-agent-sdk) and
+      // onnxruntime-common intact.
+      expect(prune).toContain(
+        "find . -maxdepth 1 \\( -name 'onnxruntime-node@*' -o -name 'onnxruntime-web@*' \\\n" +
+          "          -o -name '@openai+codex@*-linux-*' \\\n" +
+          "          -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \\) \\\n" +
+          hollow
+      );
+      expect(prune.match(/-exec find /g)).toHaveLength(2);
+    });
   });
 
   it('disables cache teardown only for the exact Mac product lane', () => {
@@ -313,8 +432,21 @@ describe('baked runner prerequisite contract', () => {
       playwrightBrowsersPath: browsersPath,
     };
     writeFileSync(fixtureRequirementsPath, JSON.stringify(fixtureRequirements));
+    // Real `pnpm --version` costs ~600ms per verifier run. Marker cases prove
+    // marker logic, so they probe a pinned shim; one case keeps the host pnpm.
+    const pnpmShimDirectory = resolve(directory, 'pnpm-shim');
+    mkdirSync(pnpmShimDirectory);
+    const setPnpmShimVersion = (version: string) =>
+      writeFileSync(
+        resolve(pnpmShimDirectory, 'pnpm'),
+        `#!/bin/sh\necho ${version}\n`,
+        { mode: 0o755 }
+      );
+    setPnpmShimVersion(fixtureRequirements.pnpmVersion);
     return {
       browsersPath,
+      pnpmShimDirectory,
+      setPnpmShimVersion,
       installedTreeArchivePath,
       markerPath: resolve(directory, 'manifest.json'),
       requirementsPath: fixtureRequirementsPath,
@@ -324,12 +456,16 @@ describe('baked runner prerequisite contract', () => {
 
   function verifierEnvironment(
     fixture: ReturnType<typeof makeFixture>,
-    environment: NodeJS.ProcessEnv = process.env
+    environment: NodeJS.ProcessEnv = process.env,
+    { hostPnpm = false }: { readonly hostPnpm?: boolean } = {}
   ) {
     const { GITHUB_OUTPUT: _githubOutput, ...environmentWithoutGithubOutput } =
       environment;
     return {
       ...environmentWithoutGithubOutput,
+      PATH: hostPnpm
+        ? environment.PATH
+        : `${fixture.pnpmShimDirectory}${delimiter}${environment.PATH ?? ''}`,
       JOVIE_RUNNER_PREREQUISITES_MARKER: fixture.markerPath,
       JOVIE_RUNNER_REQUIREMENTS_PATH: fixture.requirementsPath,
       JOVIE_RUNNER_REPO_ROOT: repoRoot,
@@ -341,6 +477,7 @@ describe('baked runner prerequisite contract', () => {
       readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
     ) as {
       readonly packageManager: string;
+      readonly engines: { readonly pnpm: string };
       readonly devDependencies: Readonly<Record<string, string>>;
     };
     expect(requirements.nodeMajor).toBe(22);
@@ -349,6 +486,8 @@ describe('baked runner prerequisite contract', () => {
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
     expect(`pnpm@${requirements.pnpmVersion}`).toBe(packageJson.packageManager);
+    // JOV-6603: Vercel resolves a newer pnpm 9.15 patch than an exact engines pin.
+    expect(packageJson.engines.pnpm).toBe('>=9.15.4 <10');
     expect(requirements.playwrightVersion).toBe(
       packageJson.devDependencies.playwright
     );
@@ -424,6 +563,20 @@ describe('baked runner prerequisite contract', () => {
   });
 
   it('builds a deterministic filtered context before a streamed Docker build', () => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));
+    temporaryDirectories.push(directory);
+    const gitBinDirectory = resolve(directory, 'bin');
+    const gitWrapper = resolve(gitBinDirectory, 'git');
+    const catFileCount = resolve(directory, 'cat-file-count');
+    const gitExecutable = execFileSync('sh', ['-c', 'command -v git'], {
+      encoding: 'utf8',
+    }).trim();
+    mkdirSync(gitBinDirectory);
+    writeFileSync(
+      gitWrapper,
+      '#!/usr/bin/env bash\nset -euo pipefail\nif [[ "${1:-}" == "cat-file" ]]; then\n  printf \'1\\n\' >> "${GIT_CAT_FILE_COUNT}"\nfi\nexec "${REAL_GIT}" "$@"\n'
+    );
+    chmodSync(gitWrapper, 0o755);
     const buildTree = execFileSync('git', ['write-tree'], {
       cwd: repoRoot,
       encoding: 'utf8',
@@ -432,10 +585,22 @@ describe('baked runner prerequisite contract', () => {
     const listedPaths = execFileSync(
       'bash',
       [runnerBuildContextScript, buildTree, '--list'],
-      { cwd: repoRoot, encoding: 'utf8' }
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_CAT_FILE_COUNT: catFileCount,
+          PATH: `${gitBinDirectory}:${process.env.PATH ?? ''}`,
+          REAL_GIT: gitExecutable,
+        },
+      }
     )
       .trim()
       .split('\n');
+    expect(readFileSync(catFileCount, 'utf8').trim().split('\n')).toHaveLength(
+      1
+    );
     const firstArchive = execFileSync(
       'bash',
       [runnerBuildContextScript, buildTree],
@@ -469,6 +634,40 @@ describe('baked runner prerequisite contract', () => {
       expect(listedPaths).toContain(patchPath);
     }
   }, 15_000);
+
+  it('fails closed when a required filtered-context entry is missing', () => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-build-context-'));
+    temporaryDirectories.push(directory);
+    const environment = {
+      ...process.env,
+      GIT_INDEX_FILE: resolve(directory, 'index'),
+    };
+    execFileSync('git', ['read-tree', 'HEAD'], {
+      cwd: repoRoot,
+      env: environment,
+    });
+    execFileSync('git', ['rm', '--cached', '--quiet', '.npmrc'], {
+      cwd: repoRoot,
+      env: environment,
+    });
+    const missingTree = execFileSync('git', ['write-tree'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: environment,
+    }).trim();
+
+    const result = spawnSync(
+      'bash',
+      [runnerBuildContextScript, missingTree, '--list'],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'runner build context contains a missing tree entry:'
+    );
+    expect(result.stderr).toContain('.npmrc');
+  });
 
   it('dispatches an exact-SHA canary only to the dedicated image label', () => {
     expect(runnerImageCanaryStart).toBeGreaterThan(-1);
@@ -846,6 +1045,54 @@ describe('baked runner prerequisite contract', () => {
     expect(drifted.stderr).toContain('lockfileSha256');
     expect(drifted.stderr).toContain('got "stale"');
   }, 15_000);
+
+  it('binds the marker to the pnpm version reported by the host binary', () => {
+    const fixture = makeFixture();
+    const env = verifierEnvironment(fixture, process.env, { hostPnpm: true });
+    // Like nodeMajor/nodeMinimum in makeFixture, require the runtime under
+    // test: the verifier fails closed on pnpm drift (covered by the drift test
+    // below), and this case proves the marker records the host binary's own
+    // report on any host, not only one that happens to match the image pin.
+    const hostPnpmVersion = execFileSync('pnpm', ['--version'], {
+      encoding: 'utf8',
+      env,
+    }).trim();
+    writeFileSync(
+      fixture.requirementsPath,
+      JSON.stringify({ ...fixture.requirements, pnpmVersion: hostPnpmVersion })
+    );
+    execFileSync(
+      process.execPath,
+      [verifierPath, '--write-marker', fixture.markerPath],
+      { env }
+    );
+    const marker = JSON.parse(readFileSync(fixture.markerPath, 'utf8')) as {
+      readonly pnpmVersion: string;
+    };
+    expect(marker.pnpmVersion).toBe(hostPnpmVersion);
+  }, 15_000);
+
+  it('falls back on required pnpm version drift', () => {
+    const fixture = makeFixture();
+    const env = verifierEnvironment(fixture);
+    execFileSync(
+      process.execPath,
+      [verifierPath, '--write-marker', fixture.markerPath],
+      { env }
+    );
+
+    fixture.setPnpmShimVersion('0.0.0');
+    const pnpmDrift = spawnSync(
+      process.execPath,
+      [verifierPath, '--component', 'dependencies'],
+      { encoding: 'utf8', env }
+    );
+    expect(pnpmDrift.status).toBe(0);
+    expect(pnpmDrift.stdout).toContain('dependencies_warm=false');
+    expect(pnpmDrift.stderr).toContain(
+      `pnpm 0.0.0 does not match required ${requirements.pnpmVersion}`
+    );
+  });
 
   it('falls back on required runtime or Playwright version drift', () => {
     const fixture = makeFixture();

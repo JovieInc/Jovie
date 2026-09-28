@@ -176,7 +176,7 @@ function isThrottlingConfigInvalid(config: {
  */
 export async function POST(request: NextRequest) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

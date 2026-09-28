@@ -98,6 +98,7 @@ describe('no unattended red loop', () => {
       'stale-conflicted-head': 'typed-remediation',
       'queue-eviction': 'typed-remediation',
       'production-deployment-unbound': 'collect-evidence',
+      'production-controller-failed': 'typed-remediation',
       'provider-unavailable': 'typed-remediation',
       'missing-owner-lease': 'typed-remediation',
       'dropped-controller-event': 'typed-remediation',
@@ -121,6 +122,14 @@ describe('no unattended red loop', () => {
   });
 
   it('maps event-local workflow failures without waiting on merge-queue state', () => {
+    assert.equal(
+      inferStallClass({ workflowName: 'Production Controller', conclusion: 'failure' }),
+      'production-controller-failed'
+    );
+    assert.equal(
+      inferStallClass({ productionClaimed: true, deployedSha: null }),
+      'production-deployment-unbound'
+    );
     assert.equal(
       inferStallClass({ workflowName: 'PR Size Guard', conclusion: 'failure' }),
       'size-guard'
@@ -648,10 +657,10 @@ describe('no unattended red loop', () => {
 
   it('splits verified mechanical size-guard failures and recovers only missed events', () => {
     const splits = splitSizeGuardChange(
-      ['apps/web/app/page.tsx', 'scripts/symphony/gem-ops-hud.py', 'canon/invariants.jsonl'],
+      ['apps/web/app/page.tsx', 'scripts/fleet-gate/gem-priority-gate.py', 'canon/invariants.jsonl'],
       { mechanical: true }
     );
-    assert.deepEqual(splits.map(item => item.alignment), ['apps/web', 'canon', 'scripts/symphony']);
+    assert.deepEqual(splits.map(item => item.alignment), ['apps/web', 'canon', 'scripts/fleet-gate']);
     assert.ok(splits.every(item => item.preserveBehavior && item.requalify && item.proven === false));
     assert.throws(() => splitSizeGuardChange(['apps/web/app/page.tsx']), /verified mechanical failure/);
     const recovered = reconcileMissedEvents(

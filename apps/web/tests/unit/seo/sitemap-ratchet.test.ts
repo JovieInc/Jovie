@@ -26,21 +26,19 @@ vi.mock('@/lib/blog/getBlogPosts', async importOriginal => {
 });
 
 const whereMock = vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([]));
-const innerJoinMock = vi.fn(() => ({
-  innerJoin: innerJoinMock,
-  leftJoin: leftJoinMock,
-  where: whereMock,
-}));
-const leftJoinMock = vi.fn(() => ({
-  innerJoin: innerJoinMock,
-  leftJoin: leftJoinMock,
-  where: whereMock,
-}));
-const fromMock = vi.fn(() => ({
+const innerJoinMock = vi.fn();
+const leftJoinMock = vi.fn();
+const orderByMock = vi.fn();
+const queryBuilder = {
   where: whereMock,
   innerJoin: innerJoinMock,
   leftJoin: leftJoinMock,
-}));
+  orderBy: orderByMock,
+};
+innerJoinMock.mockReturnValue(queryBuilder);
+leftJoinMock.mockReturnValue(queryBuilder);
+orderByMock.mockReturnValue(queryBuilder);
+const fromMock = vi.fn(() => queryBuilder);
 const selectMock = vi.fn(() => ({ from: fromMock }));
 
 vi.mock('@/lib/db', () => ({

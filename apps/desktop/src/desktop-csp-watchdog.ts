@@ -19,6 +19,25 @@ const MINIMUM_SHELL_CSP_DIRECTIVES = [
 
 export const SHELL_FALLBACK_CSP = MINIMUM_SHELL_CSP_DIRECTIVES.join('; ');
 
+// JOV-5290: the watchdog must intercept ONLY app-origin main-frame responses.
+// Without a `urls` filter, Electron routes every response in the session
+// (subresources, service workers, third-party hosts, devtools, etc.) through
+// this blocking main-process listener just to be told "not for you". Scoping
+// at the registration site keeps non-app requests entirely off the
+// interceptor's hot path; the in-listener guards below stay as
+// defense-in-depth (cheap no-ops for filtered-in traffic).
+function buildCspWatchdogRequestFilter(appOrigin: string): {
+  urls: string[];
+  types: Array<'mainFrame'>;
+} {
+  const origin = new URL(appOrigin).origin;
+
+  return {
+    urls: [`${origin}/*`],
+    types: ['mainFrame'],
+  };
+}
+
 function getHeaderValue(
   headers: Record<string, string | string[] | undefined>,
   name: string
@@ -83,62 +102,70 @@ export function installDesktopCspWatchdog(input: {
   readonly appOrigin: string;
   readonly report: DesktopSecurityReporter;
 }): void {
-  input.session.webRequest.onHeadersReceived((details, callback) => {
-    if (details.resourceType !== 'mainFrame') {
-      callback({ cancel: false });
-      return;
-    }
+  // Registration-site scope: Electron only invokes the listener for
+  // app-origin main-frame responses, so every other request never round-trips
+  // the main process (JOV-5290).
+  const requestFilter = buildCspWatchdogRequestFilter(input.appOrigin);
 
-    let responseUrl: URL;
-    try {
-      responseUrl = new URL(details.url);
-    } catch {
-      callback({ cancel: false });
-      return;
-    }
-
-    if (responseUrl.origin !== input.appOrigin) {
-      callback({ cancel: false });
-      return;
-    }
-
-    // Redirects (3xx) and error responses carry no CSP header and no body to
-    // protect; evaluating them floods telemetry with false 'missing' positives
-    // and injects a pointless fallback onto a bodiless response.
-    if (
-      typeof details.statusCode !== 'number' ||
-      details.statusCode < 200 ||
-      details.statusCode >= 300
-    ) {
-      callback({ cancel: false });
-      return;
-    }
-
-    const headers = { ...details.responseHeaders };
-    const status = evaluateTrustedOriginCspHeaders({
-      responseHeaders: headers,
-    });
-
-    if (status === 'missing' || status === 'weakened') {
-      input.report(
-        status === 'missing' ? 'csp-header-missing' : 'csp-header-weakened',
-        responseUrl.pathname
-      );
-      // Drop any existing CSP header (any casing) before injecting the fallback.
-      // Browsers enforce the INTERSECTION of multiple CSP headers, so leaving a
-      // stale (possibly differently-cased) policy alongside the fallback would
-      // over-restrict the page. Replace, don't stack.
-      const cspHeaderNames: readonly string[] = CSP_HEADER_NAMES;
-      for (const key of Object.keys(headers)) {
-        if (cspHeaderNames.includes(key.toLowerCase())) {
-          delete headers[key];
-        }
+  input.session.webRequest.onHeadersReceived(
+    requestFilter,
+    (details, callback) => {
+      if (details.resourceType !== 'mainFrame') {
+        callback({ cancel: false });
+        return;
       }
-      headers['Content-Security-Policy'] = [SHELL_FALLBACK_CSP];
-      callback({ cancel: false, responseHeaders: headers });
-      return;
-    }
 
-    callback({ cancel: false });
-  });
+      let responseUrl: URL;
+      try {
+        responseUrl = new URL(details.url);
+      } catch {
+        callback({ cancel: false });
+        return;
+      }
+
+      if (responseUrl.origin !== input.appOrigin) {
+        callback({ cancel: false });
+        return;
+      }
+
+      // Redirects (3xx) and error responses carry no CSP header and no body to
+      // protect; evaluating them floods telemetry with false 'missing' positives
+      // and injects a pointless fallback onto a bodiless response.
+      if (
+        typeof details.statusCode !== 'number' ||
+        details.statusCode < 200 ||
+        details.statusCode >= 300
+      ) {
+        callback({ cancel: false });
+        return;
+      }
+
+      const headers = { ...details.responseHeaders };
+      const status = evaluateTrustedOriginCspHeaders({
+        responseHeaders: headers,
+      });
+
+      if (status === 'missing' || status === 'weakened') {
+        input.report(
+          status === 'missing' ? 'csp-header-missing' : 'csp-header-weakened',
+          responseUrl.pathname
+        );
+        // Drop any existing CSP header (any casing) before injecting the fallback.
+        // Browsers enforce the INTERSECTION of multiple CSP headers, so leaving a
+        // stale (possibly differently-cased) policy alongside the fallback would
+        // over-restrict the page. Replace, don't stack.
+        const cspHeaderNames: readonly string[] = CSP_HEADER_NAMES;
+        for (const key of Object.keys(headers)) {
+          if (cspHeaderNames.includes(key.toLowerCase())) {
+            delete headers[key];
+          }
+        }
+        headers['Content-Security-Policy'] = [SHELL_FALLBACK_CSP];
+        callback({ cancel: false, responseHeaders: headers });
+        return;
+      }
+
+      callback({ cancel: false });
+    }
+  );
 }

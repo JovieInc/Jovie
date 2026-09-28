@@ -128,6 +128,31 @@ describe('GET /api/v1/[username]', () => {
     expect((await res.json()).artist.username).toBe('realartist');
   });
 
+  it('hides a private profile the same way as a missing one', async () => {
+    hoisted.getProfileByUsername.mockResolvedValue({
+      id: 'profile-1',
+      username: 'realartist',
+      displayName: 'Real Artist',
+      isPublic: false,
+      bio: null,
+      location: null,
+      genres: [],
+      avatarUrl: null,
+      spotifyUrl: null,
+      appleMusicUrl: null,
+      youtubeUrl: null,
+    });
+
+    const { GET } = await import('./route');
+    const res = await GET(new Request('https://jov.ie/api/v1/realartist'), {
+      params: Promise.resolve({ username: 'realartist' }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Artist not found' });
+    expect(hoisted.getReleasesForProfileLite).not.toHaveBeenCalled();
+  });
+
   it('returns typed 404 responses with the caller rate-limit fields', async () => {
     hoisted.getProfileByUsername.mockResolvedValue(null);
 

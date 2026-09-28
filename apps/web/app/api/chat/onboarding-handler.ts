@@ -9,6 +9,7 @@ import {
   isGatewayBudgetExceededError,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
+import { auth } from '@/lib/auth/better-auth';
 import {
   decideFallbackTurn,
   type FallbackTurn,
@@ -44,6 +45,7 @@ import {
 } from '@/lib/onboarding/session';
 import {
   checkAnonymousChatRateLimit,
+  checkAuthenticatedOnboardingChatRateLimit,
   createRateLimitHeaders,
   rateLimitDenialStatus,
 } from '@/lib/rate-limit';
@@ -243,6 +245,13 @@ export async function tryHandleAnonymousOnboardingChat(
     looksLikeImplicitOnboardingEnvelope(peeked.raw);
   if (!isExplicitOnboarding && !isImplicitOnboarding) return null;
 
+  // A verified Better Auth identity has its own spend quota. The /start
+  // envelope remains onboarding-shaped after OTP, so routing by body alone
+  // would keep charging the shared anonymous IP/ASN pools.
+  const signedInSession = await auth.api
+    .getSession({ headers: req.headers, query: { disableCookieCache: true } })
+    .catch(() => null);
+
   const corsHeaders = createAuthenticatedCorsHeaders(
     req.headers.get('origin'),
     'POST, OPTIONS'
@@ -268,7 +277,7 @@ export async function tryHandleAnonymousOnboardingChat(
   }
 
   Sentry.setTag('chat_mode', 'onboarding');
-  Sentry.setTag('chat_anonymous', 'true');
+  Sentry.setTag('chat_anonymous', signedInSession ? 'false' : 'true');
 
   // --- Statsig kill switch (ai_chat_disabled) ---
   // Anonymous onboarding is a live route, not a default-off rollout. Reuse the
@@ -387,12 +396,17 @@ export async function tryHandleAnonymousOnboardingChat(
     // visitor's first message. It already cleared Turnstile, so it draws on
     // the dedicated first-touch budget instead of the shared IP/ASN pools
     // that carrier NATs and corporate egress routinely exhaust (JOV-6114).
-    const rate = await checkAnonymousChatRateLimit({
-      ip,
-      sessionId,
-      asn,
-      isFirstTouch: !existingSessionId,
-    });
+    const rate = signedInSession?.user.id
+      ? await checkAuthenticatedOnboardingChatRateLimit(
+          signedInSession.user.id,
+          sessionId
+        )
+      : await checkAnonymousChatRateLimit({
+          ip,
+          sessionId,
+          asn,
+          isFirstTouch: !existingSessionId,
+        });
     if (!rate.success) {
       // `retryAfter` is only meaningful when the limit is actually exhausted.
       // When the check FAILED (Redis outage → rate.unavailable), the reset

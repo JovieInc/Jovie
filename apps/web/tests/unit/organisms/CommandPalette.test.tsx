@@ -26,6 +26,7 @@ import {
   HeaderActionsProvider,
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const pushMock = vi.fn();
 const assignMock = vi.fn();
@@ -294,7 +295,11 @@ describe('CommandPalette', () => {
     expect(input).toHaveValue('Calendar');
     expect(
       screen.getByRole('option', {
-        name: 'Calendar Plan release dates and campaign moments. ⌘1',
+        name: segmentedAccessibleName(
+          'Calendar',
+          'Plan release dates and campaign moments.',
+          '⌘1'
+        ),
       })
     ).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -398,9 +403,7 @@ describe('CommandPalette', () => {
   it('toggles closed when Cmd+K is pressed again', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    expect(
-      screen.queryByLabelText('Command Palette Search')
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Command Palette Search')).toBeInTheDocument();
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     expect(
       screen.queryByLabelText('Command Palette Search')

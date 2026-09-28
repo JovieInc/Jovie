@@ -1,3 +1,4 @@
+import { lintCopy } from '@jovie/copy';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
@@ -612,83 +613,6 @@ export function auditMarketingCopySemantics(
   };
 }
 
-interface CopyPatternRule {
-  readonly code: string;
-  readonly pattern: RegExp;
-  readonly message: string;
-  readonly headlineOnly?: boolean;
-}
-
-/**
- * Small, explainable anti-slop layer. These are review signals, not a thesaurus
- * or a global word ban: a truthful, outcome-bound line can still use any word.
- */
-const COPY_PATTERN_RULES: readonly CopyPatternRule[] = [
-  {
-    code: 'artifact-language',
-    pattern:
-      /\b(?:mockups?|concept renders?|screenshots?|registry-backed|captured from|annotated|design artifact)\b/i,
-    message: 'Sell the product outcome, never the marketing artifact.',
-  },
-  {
-    code: 'ai-vocabulary',
-    pattern:
-      /\b(?:delve|crucial|robust|comprehensive|nuanced|multifaceted|furthermore|moreover|additionally|pivotal|landscape|tapestry|underscore|foster|showcase|intricate|vibrant|fundamental|significant|interplay)\b/i,
-    message:
-      'Replace stock model vocabulary with plain, product-specific words.',
-  },
-  {
-    code: 'marketing-slop',
-    pattern:
-      /\b(?:seamless(?:ly)?|unlock(?:s|ed|ing)?|elevat(?:e|es|ed|ing)|reimagin(?:e|es|ed|ing)|empower(?:s|ed|ing)?|leverage|cutting-edge|game-changing|world-class|supercharge(?:s|d|ing)?|all-in-one|ecosystem)\b/i,
-    message: 'Replace generic promotion with a concrete action or consequence.',
-  },
-  {
-    code: 'formulaic-contrast',
-    pattern: /\b(?:not|more than) (?:just|only)\b/i,
-    message:
-      'State the stronger idea directly instead of using a stock contrast.',
-  },
-  {
-    code: 'formulaic-range',
-    pattern: /\bfrom .{1,60} to\b/i,
-    message: 'Name the exact moments without a generic from-X-to-Y frame.',
-  },
-  {
-    code: 'filler-intro',
-    pattern: /\b(?:in today'?s|when it comes to|at the end of the day)\b/i,
-    message: 'Delete the introduction and lead with the point.',
-  },
-  {
-    code: 'vague-attribution',
-    pattern: /\b(?:experts say|studies show|many believe|industry leaders)\b/i,
-    message: 'Name the source or remove the attribution.',
-  },
-  {
-    code: 'chat-residue',
-    pattern:
-      /\b(?:as an ai|here is a revised|option [abc]:|i cannot assist)\b/i,
-    message: 'Remove model or drafting residue.',
-  },
-  {
-    code: 'dash-habit',
-    pattern: /[—–]/,
-    message: 'Use a period, comma, or colon. Do not use an em or en dash.',
-  },
-  {
-    code: 'generic-heading',
-    pattern: /^(?:built|designed) (?:for|to|around)\b/i,
-    message: 'Lead with the customer consequence, not a generic construction.',
-    headlineOnly: true,
-  },
-  {
-    code: 'rhetorical-heading',
-    pattern: /\?\s*$/,
-    message: 'Answer the question in the heading instead of asking it.',
-    headlineOnly: true,
-  },
-];
-
 function findDuplicates(values: readonly string[]): string[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
@@ -707,17 +631,23 @@ export function normalizeMarketingCopyVisibleCopy(
     .join('|');
 }
 
+/**
+ * Anti-slop signals come from @jovie/copy, the one executable rule set
+ * (canon/VOICE.md). A truthful, outcome-bound line can still use most words;
+ * the semantic audit above owns meaning.
+ */
 function auditCopyPatterns(
   sectionId: string,
   value: string,
   headline: boolean
 ): MarketingCopyAuditIssue[] {
-  return COPY_PATTERN_RULES.filter(
-    rule => (!rule.headlineOnly || headline) && rule.pattern.test(value)
-  ).map(rule => ({
-    code: rule.code,
+  return lintCopy(value, {
+    register: 'jovie-marketing',
+    headline,
+  }).blocking.map(finding => ({
+    code: finding.rule,
     sectionId,
-    message: `${rule.message} Found in: "${value}"`,
+    message: `${finding.message} Found in: "${value}"`,
   }));
 }
 

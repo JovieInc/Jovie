@@ -126,7 +126,7 @@ export async function POST(req: Request) {
     return developmentOnlyForbiddenJson();
   }
 
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

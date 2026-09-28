@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
-import { optimizePngLosslessly } from './png-optimization';
+import { validPlaywrightPng } from '../../../scripts/lib/playwright-png.mjs';
+import {
+  optimizePngLosslessly,
+  stripPngAncillaryChunks,
+} from './png-optimization';
 
 const fixtureRoots: string[] = [];
 
@@ -43,13 +47,15 @@ describe('optimizePngLosslessly', () => {
     const beforePixels = await sharp(path).raw().toBuffer();
     const result = await optimizePngLosslessly(path);
     const afterPixels = await sharp(path).raw().toBuffer();
+    const after = await readFile(path);
 
     expect(result.rewritten).toBe(true);
     expect(result.afterBytes).toBeLessThan(result.beforeBytes);
     expect(afterPixels.equals(beforePixels)).toBe(true);
+    expect(validPlaywrightPng(after)).toBe(true);
   });
 
-  it('keeps an already-smaller encoding instead of growing it', async () => {
+  it('rewrites a smaller non-Playwright encoding into the strict transport form', async () => {
     const path = await fixturePath('palette.png');
     const width = 32;
     const height = 32;
@@ -65,11 +71,26 @@ describe('optimizePngLosslessly', () => {
     const result = await optimizePngLosslessly(path);
     const after = await readFile(path);
 
-    expect(result).toEqual({
-      afterBytes: before.length,
-      beforeBytes: before.length,
-      rewritten: false,
-    });
-    expect(after.equals(before)).toBe(true);
+    expect(validPlaywrightPng(before)).toBe(false);
+    expect(result.rewritten).toBe(true);
+    expect(after.equals(before)).toBe(false);
+    expect(validPlaywrightPng(after)).toBe(true);
+  });
+
+  it('fails closed when optimizer metadata has an invalid CRC', async () => {
+    const path = await fixturePath('metadata.png');
+    await sharp(Buffer.alloc(16 * 16 * 3, 42), {
+      raw: { channels: 3, height: 16, width: 16 },
+    })
+      .png({ palette: false })
+      .toFile(path);
+    const corrupted = Buffer.from(await readFile(path));
+    const metadataType = corrupted.indexOf(Buffer.from('pHYs'));
+    expect(metadataType).toBeGreaterThan(0);
+    corrupted[metadataType + 4] ^= 1;
+
+    expect(() => stripPngAncillaryChunks(corrupted)).toThrow(
+      'invalid pHYs CRC'
+    );
   });
 });

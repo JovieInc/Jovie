@@ -10,7 +10,7 @@
 # Skip (return 0) only when ALL of:
 #   1. JOVIE_SETUP_FORCE is not 1
 #   2. Node pin is 22.23.2+
-#   3. pnpm pin is exactly 9.15.4
+#   3. pnpm pin is exactly 9.15.9
 #   4. $repo/node_modules/.modules.yaml exists
 #   5. deps fingerprint matches node_modules/.cache/jovie-setup/deps.sha256
 #
@@ -89,7 +89,7 @@ jovie_setup_node_pin_ok() {
 
 jovie_setup_pnpm_pin_ok() {
   command -v pnpm &>/dev/null || return 1
-  [[ "$(pnpm --version 2>/dev/null || true)" == "9.15.4" ]]
+  [[ "$(pnpm --version 2>/dev/null || true)" == "9.15.9" ]]
 }
 
 jovie_setup_worktree_healthy() {

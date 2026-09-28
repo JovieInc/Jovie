@@ -3,7 +3,7 @@
 
 import './HeaderNav.css';
 import { Button } from '@jovie/ui';
-import { ChevronDown } from 'lucide-react';
+import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
@@ -42,6 +42,51 @@ export interface HeaderNavProps {
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
   readonly penContractId?: MarketingPenContractId;
+  /**
+   * Icon-only logo reveals the wordmark on hover/focus (spin + slide).
+   * Only meaningful with `logoVariant='icon'`.
+   */
+  readonly logoReveal?: boolean;
+}
+
+/** Scroll distance (px) before the docked header fades in its glass layer. */
+export const HEADER_DOCK_SCROLL_THRESHOLD_PX = 8;
+
+/**
+ * Tracks whether the page has scrolled past the dock threshold. Prefers an
+ * IntersectionObserver on a top-of-document sentinel (no per-frame scroll
+ * work); falls back to a passive scroll listener where IO is unavailable.
+ */
+function useDockScrolled(enabled: boolean) {
+  const sentinelRef = useRef<HTMLSpanElement | null>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const sentinel = sentinelRef.current;
+    if (sentinel && typeof IntersectionObserver === 'function') {
+      const observer = new IntersectionObserver(entries => {
+        const entry = entries[entries.length - 1];
+        if (entry) {
+          setIsScrolled(!entry.isIntersecting);
+        }
+      });
+      observer.observe(sentinel);
+      return () => observer.disconnect();
+    }
+
+    const handleScroll = () =>
+      setIsScrolled(window.scrollY > HEADER_DOCK_SCROLL_THRESHOLD_PX);
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [enabled]);
+
+  return { isScrolled, sentinelRef };
 }
 
 export interface HeaderNavCta {
@@ -62,7 +107,8 @@ export interface HeaderFlyoutMenu {
   readonly links: ReadonlyArray<{
     readonly href: string;
     readonly label: string;
-    readonly description: string;
+    /** Omit for a compact list menu (label + arrow), e.g. Customers. */
+    readonly description?: string;
   }>;
 }
 
@@ -217,11 +263,14 @@ function MarketingGlassFlyout({
     return null;
   }
 
+  const compact = menu.links.every(link => !link.description);
+
   return (
     <div
       id={`marketing-header-flyout-${menu.id}`}
       className={cn(
         'marketing-glass-header__flyout',
+        compact && 'marketing-glass-header__flyout--compact',
         animateOpen && 'marketing-glass-header__flyout--open'
       )}
     >
@@ -234,20 +283,32 @@ function MarketingGlassFlyout({
               key={`${menu.id}-${link.label}`}
               className='marketing-glass-header__flyout-link focus-ring-themed'
             >
-              <span
-                className='marketing-glass-header__flyout-number'
-                aria-hidden='true'
-              >
-                {(index + 1).toString().padStart(2, '0')}
-              </span>
+              {compact ? null : (
+                <span
+                  className='marketing-glass-header__flyout-number'
+                  aria-hidden='true'
+                >
+                  {(index + 1).toString().padStart(2, '0')}
+                </span>
+              )}
               <span className='min-w-0'>
                 <span className='marketing-glass-header__flyout-label'>
                   {link.label}
                 </span>
-                <span className='marketing-glass-header__flyout-description'>
-                  {link.description}
-                </span>
+                {link.description ? (
+                  <span className='marketing-glass-header__flyout-description'>
+                    {link.description}
+                  </span>
+                ) : null}
               </span>
+              {compact ? (
+                <ArrowUpRight
+                  aria-hidden='true'
+                  className='marketing-glass-header__flyout-arrow'
+                  size={16}
+                  strokeWidth={1.8}
+                />
+              ) : null}
             </Link>
           ))}
         </div>
@@ -331,15 +392,17 @@ export function HeaderNav({
   flyoutMenus,
   showContactLink = true,
   penContractId,
+  logoReveal = false,
 }: HeaderNavProps = {}) {
   const headerRef = useRef<HTMLElement | null>(null);
   const closeFlyoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
   const [openFlyoutId, setOpenFlyoutId] = useState<string | null>(null);
-  const [isScrolled, setIsScrolled] = useState(false);
   const isMarketingGlass = presentation === 'marketing-glass';
   const isHomepagePresentation = presentation === 'homepage-embedded';
+  const isDocked = isMarketingGlass || isHomepagePresentation;
+  const { isScrolled, sentinelRef } = useDockScrolled(isDocked);
   const resolvedFlyoutMenus = isMarketingGlass ? (flyoutMenus ?? []) : [];
 
   const clearFlyoutCloseTimer = useCallback(() => {
@@ -383,18 +446,6 @@ export function HeaderNav({
       closeFlyoutTimerRef.current = null;
     }, 170);
   }, [clearFlyoutCloseTimer]);
-
-  useEffect(() => {
-    if (!isMarketingGlass && !isHomepagePresentation) {
-      return;
-    }
-
-    const handleScroll = () => setIsScrolled(window.scrollY > 16);
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isHomepagePresentation, isMarketingGlass]);
 
   useEffect(() => {
     if (!isMarketingGlass || openFlyoutId === null) {
@@ -541,128 +592,149 @@ export function HeaderNav({
     _containerSize === 'homepage'
       ? 'flex h-(--linear-header-height) w-full items-center gap-3 sm:gap-4 md:gap-6'
       : 'flex h-(--linear-header-height) w-full items-center gap-6';
+  const hasDesktopWordmark =
+    hasDesktopNavLinks &&
+    !!leadingMarketingLinks?.some(link => link.treatment === 'wordmark');
   return (
-    <header
-      ref={headerRef}
-      data-testid='header-nav'
-      data-pen-contract={penContractId}
-      data-presentation={presentation}
-      data-scrolled={isScrolled ? 'true' : undefined}
-      className={cn(
-        'header-nav',
-        isMarketingGlass
-          ? 'marketing-glass-header fixed top-0 left-0 right-0 w-full'
-          : 'fixed top-0 left-0 right-0 w-full transition-colors duration-subtle motion-reduce:transition-none',
-        presentation === 'homepage-embedded' || isMarketingGlass
-          ? 'border-b border-transparent'
-          : 'border-b',
-        className
-      )}
-      style={{
-        fontSynthesisWeight: 'none',
-        borderColor:
-          presentation === 'homepage-embedded' || isMarketingGlass
-            ? 'transparent'
-            : 'var(--linear-border-default)',
-        backgroundColor:
-          presentation === 'homepage-embedded' || isMarketingGlass
-            ? 'transparent'
-            : 'var(--linear-bg-header)',
-        zIndex: 100,
-        backdropFilter:
-          presentation === 'homepage-embedded' || isMarketingGlass
-            ? 'none'
-            : `blur(var(--blur-header))`,
-        WebkitBackdropFilter:
-          presentation === 'homepage-embedded' || isMarketingGlass
-            ? 'none'
-            : `blur(var(--blur-header))`,
-        minWidth: 0,
-        minHeight: 0,
-        /* iOS safe area: push header content below the notch/Dynamic Island */
-        paddingTop: 'env(safe-area-inset-top)',
-        ...style,
-      }}
-    >
-      {/* Linear-style full-width content container */}
-      <nav
+    <>
+      {isDocked ? (
+        <span
+          ref={sentinelRef}
+          aria-hidden='true'
+          className='header-nav__scroll-sentinel'
+          data-testid='header-nav-scroll-sentinel'
+        />
+      ) : null}
+      <header
+        ref={headerRef}
+        data-testid='header-nav'
+        data-pen-contract={penContractId}
+        data-presentation={presentation}
+        data-scrolled={isScrolled ? 'true' : undefined}
+        data-brand-lockup={hasDesktopWordmark ? 'desktop' : undefined}
         className={cn(
-          'mx-auto w-full px-5 sm:px-6',
-          getNavContainerVariantClass({
-            containerSize: _containerSize,
-            isMarketingGlass,
-          })
+          'header-nav',
+          isDocked && 'header-nav--docked',
+          isMarketingGlass
+            ? 'marketing-glass-header fixed top-0 left-0 right-0 w-full'
+            : 'fixed top-0 left-0 right-0 w-full transition-colors duration-subtle motion-reduce:transition-none',
+          presentation === 'homepage-embedded' || isMarketingGlass
+            ? 'border-b border-transparent'
+            : 'border-b',
+          className
         )}
-        aria-label='Primary Navigation'
+        style={{
+          fontSynthesisWeight: 'none',
+          borderColor:
+            presentation === 'homepage-embedded' || isMarketingGlass
+              ? 'transparent'
+              : 'var(--linear-border-default)',
+          backgroundColor:
+            presentation === 'homepage-embedded' || isMarketingGlass
+              ? 'transparent'
+              : 'var(--linear-bg-header)',
+          zIndex: 100,
+          backdropFilter:
+            presentation === 'homepage-embedded' || isMarketingGlass
+              ? 'none'
+              : `blur(var(--blur-header))`,
+          WebkitBackdropFilter:
+            presentation === 'homepage-embedded' || isMarketingGlass
+              ? 'none'
+              : `blur(var(--blur-header))`,
+          minWidth: 0,
+          minHeight: 0,
+          /* iOS safe area: push header content below the notch/Dynamic Island */
+          paddingTop: 'env(safe-area-inset-top)',
+          ...style,
+        }}
       >
-        <div className={containerClass}>
-          {/* Logo section - left aligned with Linear padding */}
-          <div className='flex items-center'>
-            <LogoLink
-              logoSize={logoSize}
-              variant={logoVariant}
-              className='rounded-md'
-            />
-          </div>
-
-          {isHomepagePresentation ? navLinksMarkup : null}
-
-          {/* Spacer pushes nav + auth to the right */}
-          <div className='flex-1' aria-hidden='true' />
-
-          {/* Nav links - desktop only, right-aligned */}
-          {isHomepagePresentation ? null : navLinksMarkup}
-
-          {/* Divider between nav and auth - desktop only */}
-          {hasDesktopNavLinks &&
-          presentation !== 'homepage-embedded' &&
-          !isMarketingGlass ? (
-            <div
-              className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
-              aria-hidden='true'
-            />
-          ) : null}
-
-          {/* Auth actions */}
-          <div
-            className={cn(
-              isMarketingGlass && hasMobileNavLinks
-                ? 'hidden items-center gap-1 lg:flex'
-                : 'flex items-center gap-1',
-              isHomepagePresentation && 'homepage-header-auth'
-            )}
-          >
-            {authMode === 'public-static' && isMarketingGlass ? (
-              <GlassAuthActions
-                publicCta={publicCta}
-                showContactLink={showContactLink}
-              />
-            ) : authMode === 'public-static' ? (
-              <PublicAuthActions
-                minimal={minimalAuth}
-                minimalVariant={minimalAuthVariant}
-                minimalLabel={minimalAuthLabel}
-                publicCta={publicCta}
-              />
-            ) : (
-              <AuthActions />
-            )}
-          </div>
-
-          {/* Mobile hamburger menu - shown on small screens only */}
-          {hasMobileNavLinks && (
-            <div className='flex lg:hidden items-center'>
-              <MobileNav
-                navLinks={mobileLinks}
-                includePublicLogin={includePublicLoginInMobileNav}
-                publicCtaHref={publicCta?.href}
-                publicCtaLabel={publicCta?.label}
-                authenticatedUserSlot={<UserButton />}
+        {/* Linear-style full-width content container */}
+        <nav
+          className={cn(
+            'mx-auto w-full px-5 sm:px-6',
+            getNavContainerVariantClass({
+              containerSize: _containerSize,
+              isMarketingGlass,
+            })
+          )}
+          aria-label='Primary Navigation'
+        >
+          <div className={containerClass}>
+            {/* Logo section - left aligned with Linear padding */}
+            <div className='flex items-center'>
+              <LogoLink
+                logoSize={logoSize}
+                variant={logoVariant}
+                reveal={logoReveal && logoVariant === 'icon'}
+                className='rounded-md'
               />
             </div>
-          )}
-        </div>
-      </nav>
-    </header>
+
+            {isHomepagePresentation ? navLinksMarkup : null}
+
+            {/* Spacer pushes nav + auth to the right */}
+            <div className='flex-1' aria-hidden='true' />
+
+            {/* Nav links - desktop only, right-aligned */}
+            {isHomepagePresentation ? null : navLinksMarkup}
+
+            {/* Divider between nav and auth - desktop only */}
+            {hasDesktopNavLinks &&
+            presentation !== 'homepage-embedded' &&
+            !isMarketingGlass ? (
+              <div
+                className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
+                aria-hidden='true'
+              />
+            ) : null}
+
+            {/* Auth actions */}
+            <div
+              className={cn(
+                isMarketingGlass && hasMobileNavLinks
+                  ? 'hidden items-center gap-1 lg:flex'
+                  : 'flex items-center gap-1',
+                isHomepagePresentation && 'homepage-header-auth'
+              )}
+            >
+              {authMode === 'public-static' && isMarketingGlass ? (
+                <GlassAuthActions
+                  publicCta={publicCta}
+                  showContactLink={showContactLink}
+                />
+              ) : authMode === 'public-static' ? (
+                <PublicAuthActions
+                  minimal={minimalAuth}
+                  minimalVariant={minimalAuthVariant}
+                  minimalLabel={minimalAuthLabel}
+                  publicCta={publicCta}
+                />
+              ) : (
+                <AuthActions />
+              )}
+            </div>
+
+            {/* Mobile hamburger menu - shown on small screens only */}
+            {hasMobileNavLinks && (
+              <div className='flex lg:hidden items-center'>
+                <MobileNav
+                  navLinks={mobileLinks}
+                  includePublicLogin={includePublicLoginInMobileNav}
+                  publicCtaHref={publicCta?.href}
+                  publicCtaLabel={publicCta?.label}
+                  authenticatedUserSlot={
+                    <UserButton
+                      showUserInfo
+                      settingsHref={APP_ROUTES.SETTINGS}
+                    />
+                  }
+                />
+              </div>
+            )}
+          </div>
+        </nav>
+      </header>
+    </>
   );
 }

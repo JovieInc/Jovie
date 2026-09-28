@@ -10,10 +10,13 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  CUSTOMER_CHANGELOG_CATEGORIES,
   CUSTOMER_CHANGELOG_CATEGORY_LABELS,
+  type CustomerChangelogCategory,
   type CustomerChangelogEntry,
   type CustomerChangelogMonthGroup,
   formatCustomerChangelogDate,
@@ -21,6 +24,13 @@ import {
 } from '@/lib/customer-changelog';
 
 const INITIAL_MONTH_COUNT = 1;
+
+type CategoryFilter = 'all' | CustomerChangelogCategory;
+
+const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
+  all: 'All',
+  ...CUSTOMER_CHANGELOG_CATEGORY_LABELS,
+};
 
 /**
  * Compact source-backed fallback artwork. Customer entries do not currently
@@ -185,6 +195,41 @@ function MonthSection({
   );
 }
 
+const CATEGORY_FILTER_OPTIONS: readonly CategoryFilter[] = [
+  'all',
+  ...CUSTOMER_CHANGELOG_CATEGORIES,
+];
+
+/**
+ * Secondary category filter (pen O64tu): quiet chips below the outcome
+ * hero/lead copy, never the primary IA.
+ */
+function CategoryFilterToolbar({
+  active,
+  onChange,
+}: {
+  readonly active: CategoryFilter;
+  readonly onChange: (next: CategoryFilter) => void;
+}) {
+  return (
+    <div
+      role='toolbar'
+      aria-label='Filter Updates By Category'
+      className='changelog-filter-toolbar'
+    >
+      {CATEGORY_FILTER_OPTIONS.map(option => (
+        <FilterChip
+          key={option}
+          pressed={active === option}
+          onClick={() => onChange(option)}
+        >
+          {CATEGORY_FILTER_LABELS[option]}
+        </FilterChip>
+      ))}
+    </div>
+  );
+}
+
 function ArchiveJumpNav({
   months,
 }: {
@@ -241,6 +286,27 @@ export function CustomerChangelogArchive({
 }: CustomerChangelogArchiveProps) {
   const [visibleMonthCount, setVisibleMonthCount] =
     useState(INITIAL_MONTH_COUNT);
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
+
+  const filteredMonths = useMemo(
+    () =>
+      activeCategory === 'all'
+        ? months
+        : months
+            .map(group => ({
+              ...group,
+              entries: group.entries.filter(
+                entry => entry.category === activeCategory
+              ),
+            }))
+            .filter(group => group.entries.length > 0),
+    [months, activeCategory]
+  );
+
+  function handleCategoryChange(next: CategoryFilter) {
+    setActiveCategory(next);
+    setVisibleMonthCount(INITIAL_MONTH_COUNT);
+  }
 
   if (months.length === 0) {
     return (
@@ -250,9 +316,9 @@ export function CustomerChangelogArchive({
     );
   }
 
-  const visibleCount = Math.min(visibleMonthCount, months.length);
-  const visibleMonths = months.slice(0, visibleCount);
-  const remainingCount = months.length - visibleCount;
+  const visibleCount = Math.min(visibleMonthCount, filteredMonths.length);
+  const visibleMonths = filteredMonths.slice(0, visibleCount);
+  const remainingCount = filteredMonths.length - visibleCount;
 
   const monthToneOffsets = visibleMonths.map((_, index) =>
     visibleMonths
@@ -262,16 +328,29 @@ export function CustomerChangelogArchive({
 
   return (
     <div data-reduced-motion='static'>
-      <ArchiveJumpNav months={visibleMonths} />
-      <div id='changelog-outcome-list'>
-        {visibleMonths.map((group, index) => (
-          <MonthSection
-            key={group.monthKey}
-            group={group}
-            toneOffset={monthToneOffsets[index] ?? 0}
-          />
-        ))}
-      </div>
+      <CategoryFilterToolbar
+        active={activeCategory}
+        onChange={handleCategoryChange}
+      />
+
+      {filteredMonths.length === 0 ? (
+        <p className='text-secondary-token'>
+          {`No ${CATEGORY_FILTER_LABELS[activeCategory].toLowerCase()} updates yet.`}
+        </p>
+      ) : (
+        <>
+          <ArchiveJumpNav months={visibleMonths} />
+          <div id='changelog-outcome-list'>
+            {visibleMonths.map((group, index) => (
+              <MonthSection
+                key={group.monthKey}
+                group={group}
+                toneOffset={monthToneOffsets[index] ?? 0}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {remainingCount > 0 ? (
         <div className='changelog-load-earlier'>
@@ -282,7 +361,7 @@ export function CustomerChangelogArchive({
             aria-controls='changelog-outcome-list'
             onClick={() =>
               setVisibleMonthCount(current =>
-                Math.min(current + 1, months.length)
+                Math.min(current + 1, filteredMonths.length)
               )
             }
           >

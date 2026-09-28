@@ -17,6 +17,7 @@ import {
   M2_ACTIVATION_MARKERS,
   M2_CLAIM_FIRST_COPY,
   M2_CLAIM_PRICE_DISPLAY,
+  M2_CLAIM_PRO_ACCESS_COPY,
   M2_PRO_MONTHLY_AMOUNT_CENTS,
   M2_PRO_MONTHLY_USD,
   M2_REVENUE_PATH_CANARY,
@@ -31,7 +32,7 @@ import {
 const PRICING_HTML = `
   <html><body>
     ${'x'.repeat(500)}
-    <p>${M2_CLAIM_FIRST_COPY}. Choose Pro when you want the release system turned on.</p>
+    <p>${M2_CLAIM_FIRST_COPY}. ${M2_CLAIM_PRO_ACCESS_COPY} when you want the release system turned on.</p>
     <span>${M2_CLAIM_PRICE_DISPLAY}</span>
   </body></html>
 `;
@@ -63,6 +64,10 @@ function htmlResponse(status: number, body: string, url?: string): Response {
     headers: { 'Content-Type': 'text/html' },
     url,
   } as ResponseInit);
+}
+
+function headerValue(headers: Headers | null, name: string): string | null {
+  return headers?.get(name) ?? null;
 }
 
 describe('M2 revenue-path canary contract', () => {
@@ -158,6 +163,7 @@ describe('evaluateClaimSurface', () => {
       ok: true,
       evidence: expect.arrayContaining([
         M2_CLAIM_FIRST_COPY,
+        M2_CLAIM_PRO_ACCESS_COPY,
         M2_CLAIM_PRICE_DISPLAY,
         'signup?plan=pro',
       ]),
@@ -297,6 +303,7 @@ describe('runM2RevenuePathCanary', () => {
       new Date('2026-09-18T06:37:00.080Z'),
       new Date('2026-09-18T06:37:01.000Z'),
     ];
+    let capturedHeaders: Headers | null = null;
     const receipt = await runM2RevenuePathCanary({
       baseUrl: 'https://jov.ie/',
       now: () => {
@@ -306,6 +313,9 @@ describe('runM2RevenuePathCanary', () => {
       },
       fetchImpl: async (input, init) => {
         const url = String(input);
+        if (!capturedHeaders) {
+          capturedHeaders = new Headers(init?.headers);
+        }
         if (url.endsWith('/') || url.endsWith('jov.ie')) {
           return htmlResponse(200, HOME_HTML, 'https://jov.ie/');
         }
@@ -347,6 +357,10 @@ describe('runM2RevenuePathCanary', () => {
       },
     });
 
+    const accept = headerValue(capturedHeaders, 'accept');
+    const userAgent = headerValue(capturedHeaders, 'user-agent');
+    expect(accept).toContain('text/html');
+    expect(userAgent).toBeTruthy();
     expect(receipt.pass).toBe(true);
     expect(receipt.issue).toBe('JOV-6439');
     expect(receipt.distinctFrom).toBe('generic-uptime');

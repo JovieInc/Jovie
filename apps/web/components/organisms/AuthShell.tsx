@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/organisms/AuthShell.flag.test.tsx
+
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -7,15 +9,19 @@ import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
 import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { env } from '@/lib/env-client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { OperatorMobileNavigation } from './OperatorMobileNavigation';
 import { PersistentAudioBar } from './PersistentAudioBar';
+import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
 export interface AuthShellProps {
   readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
@@ -35,6 +41,19 @@ export interface AuthShellProps {
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
+}
+
+/** Mac app everywhere; on the web only the operator shell (dogfood). */
+export function isWhatsNewBannerEnabled({
+  section,
+  isElectron,
+  isAutomatedTest,
+}: {
+  readonly section: AppShellSection;
+  readonly isElectron: boolean;
+  readonly isAutomatedTest: boolean;
+}): boolean {
+  return !isAutomatedTest && (isElectron || section === 'ov');
 }
 
 function getContentClassName(showMobileTabs: boolean, isTableRoute: boolean) {
@@ -59,6 +78,12 @@ function AuthShellInner({
   const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
+  const isElectron = useIsElectronRuntime();
+  const showWhatsNew = isWhatsNewBannerEnabled({
+    section,
+    isElectron,
+    isAutomatedTest: env.IS_TEST || env.IS_E2E,
+  });
   const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
     <SidebarCollapseButton />
   ) : null;
@@ -95,35 +120,38 @@ function AuthShellInner({
   const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 
   return (
-    <AppShellFrame
-      sidebar={sidebar}
-      header={
-        hideTopHeader ? null : (
-          <DashboardHeader
-            breadcrumbs={breadcrumbs}
-            sidebarTrigger={sidebarTrigger}
-            railToggle={railToggle}
-            breadcrumbSuffix={headerBadge}
-            action={headerAction}
-            commandPaletteHeader={commandPaletteHeader}
-            mobileProfileSlot={
-              section === 'ov' || section === 'admin' ? null : (
-                <MobileProfileDrawer onOpen={previewPanelState.toggle} />
-              )
-            }
-            showDivider={isTableRoute}
-            transparent={isChatRoute}
-          />
-        )
-      }
-      chatAmbientGradient={isChatRoute}
-      main={children}
-      rightPanel={rightPanel}
-      audioPlayer={audioPlayer}
-      mobileBottomNav={mobileBottomNav}
-      contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
-      composerFocusActive={isComposerFocused && !isMobile}
-    />
+    <RuntimeUpdateProvider>
+      <AppShellFrame
+        sidebar={sidebar}
+        header={
+          hideTopHeader ? null : (
+            <DashboardHeader
+              breadcrumbs={breadcrumbs}
+              sidebarTrigger={sidebarTrigger}
+              railToggle={railToggle}
+              breadcrumbSuffix={headerBadge}
+              action={headerAction}
+              commandPaletteHeader={commandPaletteHeader}
+              mobileProfileSlot={
+                section === 'ov' || section === 'admin' ? null : (
+                  <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+                )
+              }
+              showDivider={isTableRoute}
+              transparent={isChatRoute}
+            />
+          )
+        }
+        chatAmbientGradient={isChatRoute}
+        main={children}
+        rightPanel={rightPanel}
+        audioPlayer={audioPlayer}
+        mobileBottomNav={mobileBottomNav}
+        contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
+        composerFocusActive={isComposerFocused && !isMobile}
+      />
+      <WhatsNewBanner enabled={showWhatsNew} />
+    </RuntimeUpdateProvider>
   );
 }
 

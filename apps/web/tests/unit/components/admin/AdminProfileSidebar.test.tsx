@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AdminProfileSidebar } from '@/features/admin/admin-creator-profiles/AdminProfileSidebar';
+import { AdminProfileSidebar } from '@/components/features/admin/admin-creator-profiles/AdminProfileSidebar';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { AlgorithmHealthReport } from '@/lib/spotify/scoring';
 import type { Contact } from '@/types';

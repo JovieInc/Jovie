@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AuthInput, FormError, OtpInput } from '@/features/auth/atoms';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import {
   AUTH_EMAIL_CHANGE_LABEL,
   AUTH_EMAIL_EMPTY_ERROR,
@@ -90,7 +91,7 @@ function readErrorCode(error: unknown): string | undefined {
   if (typeof candidate.message === 'string') {
     // Better Auth errors sometimes carry the code in `message` as
     // `"code: ..."` — fall through to that.
-    const match = candidate.message.match(/^([a-z_]+):/i);
+    const match = /^([a-z_]+):/i.exec(candidate.message);
     if (match) return match[1].toLowerCase();
   }
   return undefined;
@@ -133,6 +134,14 @@ export function EmailCodeAuthForm({
   const [emailAddress, setEmailAddress] = useState(initialEmailAddress ?? '');
   const [code, setCode] = useState('');
   const [isPending, setIsPending] = useState(false);
+  // Until React hydrates, the server-rendered form has no submit handler, so a
+  // click would fall back to a native GET that reloads the page with the
+  // email address in the URL (and server/analytics logs). Keep submit
+  // disabled until the handler is attached.
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -188,6 +197,14 @@ export function EmailCodeAuthForm({
 
     setIsPending(true);
     setErrorMessage(null);
+    const isSignupFunnel = mode === 'sign-up';
+    if (isSignupFunnel) {
+      trackFunnelStep({
+        funnel: 'artist_signup',
+        step: 'auth_start',
+        surface: 'signup',
+      });
+    }
 
     try {
       // `emailOtp.sendVerificationOtp({ email })` triggers the server-side
@@ -210,6 +227,15 @@ export function EmailCodeAuthForm({
       startResendCooldown();
     } catch (error) {
       setErrorMessage(getSendErrorMessage(error));
+      if (isSignupFunnel) {
+        trackFunnelStep({
+          funnel: 'artist_signup',
+          step: 'auth_start',
+          outcome: 'error',
+          surface: 'signup',
+          reason: 'otp_send_failed',
+        });
+      }
       logger.warn(
         'Email OTP send failed',
         {
@@ -324,7 +350,7 @@ export function EmailCodeAuthForm({
         </p>
         <Button
           type='button'
-          className={AUTH_CLASSES.authEntryCta}
+          className={AUTH_CLASSES.authCta}
           static
           onClick={handleRequestNewCode}
         >
@@ -358,7 +384,7 @@ export function EmailCodeAuthForm({
         <FormError id='auth-email-code-error' message={errorMessage} />
         <Button
           type='submit'
-          className={AUTH_CLASSES.authEntryCta}
+          className={AUTH_CLASSES.authCta}
           static
           disabled={isPending || code.length < 6}
         >
@@ -429,9 +455,9 @@ export function EmailCodeAuthForm({
       </div>
       <Button
         type='submit'
-        className={AUTH_CLASSES.authEntryCta}
+        className={AUTH_CLASSES.authCta}
         static
-        disabled={isPending}
+        disabled={isPending || !isHydrated}
         aria-busy={isPending || undefined}
       >
         {isPending ? AUTH_EMAIL_SENDING_LABEL : AUTH_EMAIL_SEND_LABEL}

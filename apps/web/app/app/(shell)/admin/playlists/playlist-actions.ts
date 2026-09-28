@@ -14,7 +14,7 @@ import { uploadPlaylistCoverImage } from '@/lib/playlists/upload-cover-image';
 import { getJovieSpotifyUserId } from '@/lib/spotify/jovie-account';
 
 async function requireAdminAction(): Promise<void> {
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId || !(await checkAdminRole(userId))) {
     throw new Error('Unauthorized');
   }

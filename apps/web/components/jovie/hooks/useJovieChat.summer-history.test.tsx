@@ -26,8 +26,10 @@ const h = vi.hoisted(() => ({
   messages: [],
   store: vi.fn(),
   session: vi.fn(),
+  admin: vi.fn(),
 }));
 vi.mock('@/lib/auth/session', () => ({ getSessionContext: h.session }));
+vi.mock('@/lib/chat/ov-mode', () => ({ canUseOvChatMode: h.admin }));
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
   getOvieOperatingStore: h.store,
 }));
@@ -61,7 +63,7 @@ function Transcript({
   readonly conversationId?: string;
 }) {
   const chat = useJovieChat({
-    profileId: 'founder-profile',
+    profileId: chatMode === 'ov' ? undefined : 'founder-profile',
     chatMode,
     conversationId,
   });
@@ -92,6 +94,7 @@ describe('Summer history restoration', () => {
     store = new MemoryOperatingStore();
     h.store.mockReturnValue(store);
     h.session.mockResolvedValue({ user: { id: 'founder' } });
+    h.admin.mockResolvedValue(true);
     await appendSummerTurn(store, {
       clientTurnId: 'original-turn',
       userText: 'Remember the shipping decision',
@@ -181,6 +184,17 @@ describe('Summer history restoration', () => {
     expect(h.send).not.toHaveBeenCalled();
   });
 
+  it('hides previously loaded history when the founder admin role is revoked', async () => {
+    const { client } = mount('ov');
+    await screen.findByText('Keep the existing owner.');
+    h.admin.mockResolvedValue(false);
+    await act(() => client.invalidateQueries({ queryKey: ['summer-history'] }));
+    await screen.findByRole('alert');
+    expect(screen.queryByText('Keep the existing owner.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
   it('shows recorded failed turns and restores a long conversation after remount', async () => {
     for (let i = 2; i <= 12; i++) {
       await appendSummerTurn(store, {
@@ -196,8 +210,10 @@ describe('Summer history restoration', () => {
       });
     }
     const view = mount('ov');
-    await screen.findByText(/Summer turn status: failed/);
-    expect(screen.getByText('Question 12')).toBeTruthy();
+    // The empty failed turn collapses into one summary row instead of a
+    // permanent "do not resend" bubble.
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
+    expect(screen.queryByText('Question 12')).toBeNull();
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(
       Array.from(
@@ -214,7 +230,7 @@ describe('Summer history restoration', () => {
     view.unmount();
     resetChatTimelineStateCacheForTests();
     mount('ov');
-    await screen.findByText(/Summer turn status: failed/);
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(h.send).not.toHaveBeenCalled();
   });

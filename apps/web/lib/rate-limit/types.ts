@@ -68,7 +68,7 @@ export type RateLimitConfig = RateLimitConfigBase &
       }
     | {
         trafficClass: 'authenticated' | 'internal';
-        analytics: boolean;
+        analytics: false;
         algorithm: 'fixed-window' | 'sliding-window';
         anonymousCostException?: never;
       }

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/AuthShell.test.tsx
 'use client';
 
 import Link from 'next/link';
@@ -7,6 +8,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
 import { track } from '@/lib/analytics';
+import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 import {
   AUTH_OFFER_SHELL_CONTEXT,
   AUTH_OFFER_SHELL_EVENTS,
@@ -295,6 +297,13 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
 
       setPendingProvider(provider);
       setOauthError(null);
+      if (mode === 'sign-up') {
+        trackFunnelStep({
+          funnel: 'artist_signup',
+          step: 'auth_start',
+          surface: 'signup',
+        });
+      }
 
       try {
         // Better Auth `signIn.social({ provider, callbackURL, errorCallbackURL,
@@ -325,6 +334,15 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
 
         setOauthError(getAuthStartErrorMessage(mode));
         setPendingProvider(null);
+        if (mode === 'sign-up') {
+          trackFunnelStep({
+            funnel: 'artist_signup',
+            step: 'auth_start',
+            outcome: 'error',
+            surface: 'signup',
+            reason: 'oauth_start_failed',
+          });
+        }
         logger.warn(
           'OAuth start failed',
           {
@@ -535,7 +553,7 @@ function AuthOAuthStartSurface({
       {hasProviders ? (
         <fieldset
           data-auth-provider-slots
-          className='grid grid-cols-1 gap-3'
+          className='grid grid-cols-1 gap-1.5'
           aria-busy={providersBusy ? 'true' : undefined}
         >
           <legend className='sr-only'>Social sign-in options</legend>

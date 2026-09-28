@@ -14,6 +14,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -97,6 +98,8 @@ function normalizeTrailingSlash(pathname: string): string {
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
+  const runtimeUpdate = useRuntimeUpdate();
+  const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -423,7 +426,14 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 href={APP_ROUTES.DASHBOARD}
                 onClick={event => handleCommandClick(event, inboxNavItem)}
                 prefetch={!isDemo}
-                aria-label='Inbox'
+                aria-label={
+                  hasRuntimeUpdate ? 'Inbox — App Update Available' : 'Inbox'
+                }
+                data-inbox-attention={
+                  hasRuntimeUpdate
+                    ? 'available'
+                    : (inboxNavigation?.state ?? 'unknown')
+                }
                 aria-current={
                   normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
                     ? 'page'
@@ -440,10 +450,16 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                   <span
                     role='status'
                     aria-label={`${inboxNavigation.pendingCount} pending items`}
-                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-background'
+                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
                   >
                     {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
                   </span>
+                ) : hasRuntimeUpdate ? (
+                  <span
+                    aria-hidden='true'
+                    data-inbox-runtime-update
+                    className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
+                  />
                 ) : null}
               </Link>
               <Link
@@ -461,7 +477,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 <Plus className='size-3.5' aria-hidden='true' />
               </Link>
             </div>
-            <SidebarGroupContent className='pb-2 pt-4'>
+            <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (
                 <div key={section.key} data-nav-section={section.key}>
                   {renderSection(section.items)}
@@ -472,7 +488,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
         )}
 
         {threadsVisible ? (
-          <div className='pt-4'>
+          <div className='pt-5'>
             <SidebarThreadsSection
               threads={sidebarThreads}
               activeThreadId={activeThreadId}

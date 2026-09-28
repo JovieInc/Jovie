@@ -1,24 +1,17 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieShippingStateCard.test.tsx
-import { useQuery } from '@tanstack/react-query';
 import { Ship } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import {
-  applyShippingStateRead,
-  createEmptyShippingStateView,
-  createShippingMachine,
-  expireShippingStateIfNeeded,
-  SHIPPING_STATE_CACHE_GC_MS,
-  SHIPPING_STATE_POLL_INTERVAL_MS,
-  type ShippingMachineState,
-  type ShippingMeaningView,
-  type ShippingStateView,
-  shippingStateReadFromHttp,
+import { computeRatePercent } from '@/lib/analytics/metrics';
+import type { CountMeasurement } from '@/lib/ovie/shipping-state';
+import type {
+  ShippingMeaningView,
+  ShippingStateView,
 } from '@/lib/ovie/shipping-state-client';
-import { REALTIME_CACHE } from '@/lib/queries/cache-strategies';
+import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
 const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
   fresh: 'Fresh',
@@ -32,13 +25,63 @@ const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
   recovery: 'Recovery',
 };
 
-function formatCount(count: ShippingStateView['queued']): string {
-  return count.value === null ? '\u2014' : count.value.toLocaleString('en-US');
+const NOT_MEASURED = 'n/a';
+
+type Delivery = ShippingStateView['delivery'];
+
+function formatCount(count: CountMeasurement): string {
+  return count.value === null
+    ? NOT_MEASURED
+    : count.value.toLocaleString('en-US');
 }
 
 function formatMeaning(meaning: ShippingMeaningView): string {
-  if (meaning.value === null) return '\u2014';
+  if (meaning.value === null) return NOT_MEASURED;
   return meaning.value ? 'Yes' : 'No';
+}
+
+function formatLanes(lanes: Delivery['lanes']): string {
+  if (lanes.running.value === null || lanes.slots.value === null) {
+    return NOT_MEASURED;
+  }
+  const value = `${lanes.running.value}/${lanes.slots.value}`;
+  return lanes.stale ? `${value} stale` : value;
+}
+
+function formatWeek(merges: Delivery['merges']): string {
+  const last = merges.last7Days.value;
+  const prior = merges.prior7Days.value;
+  if (last === null) return NOT_MEASURED;
+  const total = last.toLocaleString('en-US');
+  if (prior === null || prior === 0) return total;
+  const change = computeRatePercent(last - prior, prior, 0);
+  return `${total} (${change >= 0 ? '+' : ''}${change}% WoW)`;
+}
+
+function formatProduction(production: Delivery['production']): string {
+  if (!production.sha) return NOT_MEASURED;
+  const sha = production.sha.slice(0, 7);
+  return production.version ? `${production.version} ${sha}` : sha;
+}
+
+const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
+
+function formatAge(seconds: number | null): string | null {
+  if (seconds === null) return null;
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+
+function lanesLine(lanes: Delivery['lanes']): string {
+  const landing = formatAge(lanes.lastLandingAgeSeconds.value);
+  return [
+    ...lanes.lanes.map(lane => `${lane.name} ${lane.running}/${lane.slots}`),
+    lanes.pool.value === null ? null : `pool ${lanes.pool.value}`,
+    landing ? `last landing ${landing}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function truthLabel(view: ShippingStateView): string {
@@ -54,69 +97,7 @@ function compactMetaValue(value: string | null): string | null {
 }
 
 function useOvieShippingStateQuery(kioskToken: string | null) {
-  const machineRef = useRef<ShippingMachineState>(createShippingMachine());
-  const tokenRef = useRef<string | null>(kioskToken);
-  if (tokenRef.current !== kioskToken) {
-    tokenRef.current = kioskToken;
-    machineRef.current = createShippingMachine();
-  }
-  const query = useQuery({
-    queryKey: ['hud', 'ovie-shipping-state', kioskToken],
-    queryFn: async ({ signal }) => {
-      const requestToken = kioskToken;
-      const url = new URL(
-        '/api/hud/shipping-state',
-        globalThis.location.origin
-      );
-      if (kioskToken) url.searchParams.set('kiosk', kioskToken);
-      let response: Response;
-      try {
-        response = await fetch(url, { signal, cache: 'no-store' });
-      } catch {
-        if (signal.aborted || tokenRef.current !== requestToken) {
-          throw new DOMException('Aborted', 'AbortError');
-        }
-        const now = Date.now();
-        machineRef.current = expireShippingStateIfNeeded(
-          applyShippingStateRead(
-            machineRef.current,
-            { kind: 'disconnected' },
-            now
-          ),
-          now
-        );
-        return machineRef.current.view;
-      }
-      let payload: unknown = null;
-      try {
-        payload = await response.json();
-      } catch {
-        payload = null;
-      }
-      if (signal.aborted || tokenRef.current !== requestToken) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
-      const now = Date.now();
-      machineRef.current = expireShippingStateIfNeeded(
-        applyShippingStateRead(
-          machineRef.current,
-          shippingStateReadFromHttp(response.status, payload),
-          now
-        ),
-        now
-      );
-      return machineRef.current.view;
-    },
-    ...REALTIME_CACHE,
-    staleTime: 0,
-    gcTime: SHIPPING_STATE_CACHE_GC_MS,
-    refetchInterval: SHIPPING_STATE_POLL_INTERVAL_MS,
-    refetchIntervalInBackground: false,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: false,
-  });
+  const query = useHudShippingStateQuery(kioskToken);
   const refetch = query.refetch;
   useEffect(() => {
     function onResume(event: Event) {
@@ -138,8 +119,8 @@ function useOvieShippingStateQuery(kioskToken: string | null) {
     };
   }, [refetch]);
   return {
-    view: query.data ?? createEmptyShippingStateView(),
-    isPending: query.isPending && !query.data,
+    view: query.view,
+    isPending: query.isPending,
   };
 }
 
@@ -162,22 +143,51 @@ function ShippingStateBody({
   ]
     .filter(Boolean)
     .join(' / ');
+  const { delivery } = view;
+  const byRepo = delivery.merges.byRepo;
   const rows = [
-    ['Queued', formatCount(view.queued)],
-    ['In Flight', formatCount(view.inFlight)],
-    ['Merged', formatMeaning(view.merged)],
+    ['Lanes Running', formatLanes(delivery.lanes)],
+    ['Merge Queue', formatCount(delivery.mergeQueueDepth)],
+    ['Merged Today', formatCount(delivery.merges.today)],
+    ['In Flight', formatCount(delivery.inFlight)],
+    [
+      'Jovie / LYB / Summer',
+      [byRepo.Jovie, byRepo.LogYourBody, byRepo['summer-config']]
+        .map(formatCount)
+        .join(' / '),
+    ],
+    ['Merged 7d', formatWeek(delivery.merges)],
+    ['Production', formatProduction(delivery.production)],
+    ['Behind Main', formatCount(delivery.production.behindMain)],
     ['CI Green', formatMeaning(view.ciGreen)],
-    ['Production Verified', formatMeaning(view.productionVerified)],
-    ['Exact Live Build', formatMeaning(view.exactLiveBuild)],
+    [
+      'Summer',
+      delivery.summer.availability
+        ? SUMMER_LABEL[delivery.summer.availability]
+        : NOT_MEASURED,
+    ],
   ] as const;
+  const lanesDetail = lanesLine(delivery.lanes);
 
   return (
     <>
-      <div className='grid min-h-28 gap-2 sm:grid-cols-2'>
+      <div
+        className='grid gap-2 sm:grid-cols-2'
+        data-testid='hud-delivery-metrics'
+      >
         {rows.map(([label, value]) => (
           <ContentMetricRow key={label} label={label} value={value} />
         ))}
       </div>
+      <p
+        className='min-h-4 truncate text-2xs leading-4 text-secondary-token'
+        title={lanesDetail || undefined}
+      >
+        {lanesDetail || 'Lanes feed not measured'}
+      </p>
+      <p className='min-h-4 truncate text-2xs leading-4 text-secondary-token'>
+        {delivery.lanes.alerts.join(' · ')}
+      </p>
       <p
         className='min-h-4 break-words text-2xs leading-4 text-tertiary-token'
         title={fullSourceLine || undefined}
@@ -201,7 +211,6 @@ export function OvieShippingStateCard({
   return (
     <ContentSurfaceCard
       surface='details'
-      className='min-h-40 space-y-3 p-3'
       data-testid='hud-shipper-status-panel'
       data-ovie-shipping-state='true'
       data-truth={view.truth}
@@ -215,18 +224,23 @@ export function OvieShippingStateCard({
       aria-live='polite'
       aria-label='Ubuntu Shipping State'
     >
-      <div className='flex min-h-5 items-center justify-between gap-3'>
-        <div className='flex items-center gap-2'>
-          <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
-          <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
-            Delivery
-          </p>
+      <div
+        className='min-h-40 space-y-3 p-3'
+        data-testid='hud-shipper-status-geometry'
+      >
+        <div className='flex min-h-5 items-center justify-between gap-3'>
+          <div className='flex items-center gap-2'>
+            <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
+            <p className='text-2xs font-semibold tracking-normal text-tertiary-token'>
+              Delivery
+            </p>
+          </div>
+          <span className='text-2xs font-medium text-secondary-token'>
+            {isPending ? 'Unknown' : truthLabel(view)}
+          </span>
         </div>
-        <span className='text-2xs font-medium text-secondary-token'>
-          {isPending ? 'Unknown' : truthLabel(view)}
-        </span>
+        <ShippingStateBody view={view} />
       </div>
-      <ShippingStateBody view={view} />
     </ContentSurfaceCard>
   );
 }

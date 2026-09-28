@@ -499,3 +499,9 @@ pnpm version:check
 ```
 
 Version bumps are stamped on the main/release path (`pnpm version:stamp`). Implementation PRs must not add or edit `CHANGELOG.md`; a user-visible change earns exactly one What's New bullet after land/runtime proof. Linear remains the source of record.
+
+## Repository documentation
+
+See [source parity](docs/DOCUMENTATION.md) and the generated
+[source map](docs/REPOSITORY_SOURCES.md). Shared policy is pinned; local
+manifest, build, test and release instructions remain owned by this repository.

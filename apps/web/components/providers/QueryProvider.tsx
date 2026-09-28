@@ -18,6 +18,10 @@ import {
   copyShareableQueryData,
   subscribeCacheFence,
 } from '@/lib/queries/cache-isolation';
+import {
+  classifiedQueryRetry,
+  classifiedRetryDelay,
+} from '@/lib/queries/retry-policy';
 
 declare global {
   interface Window {
@@ -35,8 +39,17 @@ const ReactQueryDevtools = dynamic(
 );
 
 function DevToolsLoader() {
+  // Runtime chrome flags are available only in the browser. Keep the server
+  // and first hydration render identical before consulting those flags.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Only render devtools in development to avoid any production overhead
-  if (process.env.NODE_ENV !== 'development' || isDevChromeDisabledClient()) {
+  if (
+    !mounted ||
+    process.env.NODE_ENV !== 'development' ||
+    isDevChromeDisabledClient()
+  ) {
     return null;
   }
   return (
@@ -68,11 +81,13 @@ const createQueryClientConfig = (): QueryClientConfig => ({
       // Allows instant back-navigation without refetching
       gcTime: 30 * 60 * 1000,
 
-      // Retry failed requests up to 3 times with exponential backoff
-      // Handles transient network issues gracefully.
-      // JOV-6185 owns classified-retry rewrite — do not change this default here.
-      retry: 3,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+      // Classified retry policy (JOV-6185): transient network/deadline/5xx/429
+      // failures retry with bounded backoff, jitter, and Retry-After handling;
+      // cancellation, ordinary 4xx, and decode/schema failures never retry.
+      // One logical operation has one retry owner — per-query overrides must
+      // reuse classifiedQueryRetry/createClassifiedRetry, not raw counts.
+      retry: classifiedQueryRetry,
+      retryDelay: classifiedRetryDelay,
 
       // Refetch on window focus in production only
       // Keeps data fresh when users switch tabs back to the app

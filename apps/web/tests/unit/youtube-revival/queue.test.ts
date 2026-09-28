@@ -179,9 +179,10 @@ describe('scoreOpportunity', () => {
 describe('buildChallengerSets', () => {
   it('returns face + title_hook challengers when CTR is below median', () => {
     const challengers = buildChallengerSets(['ctr_below_median']);
-    const elements = challengers.map(c => c.packagingElement);
-    expect(elements).toContain('face');
-    expect(elements).toContain('title_hook');
+    expect(challengers.map(c => c.packagingElement)).toEqual([
+      'face',
+      'title_hook',
+    ]);
   });
 
   it('returns color challenger for evergreen_declining_reach', () => {

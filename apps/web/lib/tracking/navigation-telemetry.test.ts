@@ -201,6 +201,11 @@ describe('navigation telemetry client', () => {
     );
   });
 
+  it('ignores destination ready when nothing is in flight', () => {
+    expect(markNavigationDestinationReady('library', 50)).toBeNull();
+    expect(mockPostJsonBeacon).not.toHaveBeenCalled();
+  });
+
   it('does not start telemetry for an already-active destination', () => {
     expect(
       startNavigationTelemetry({

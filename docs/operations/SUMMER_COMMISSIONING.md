@@ -1,5 +1,7 @@
 # Summer commissioning
 
+> Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
+
 Issue: JOV-5853
 Registry: `scripts/summer-commissioning/registry.json`
 Acceptance harness: `scripts/summer-commissioning/commissioning.mjs`
@@ -29,7 +31,7 @@ Coverage is partial or unenumerated, with an unknown total, never company-wide
 completeness. Empty deployment/infra inventory does not mean no infrastructure.
 
 **Compose:** keep existing registries, Linear work lifecycle, Gem repository
-policy (`scripts/symphony/config/gem-repo-registry.json` and its Python loader),
+policy (`symphony-control/config/gem-repo-registry.json` and its Python loader),
 and JOV-5930 `jovie.certification/v1` authority. Legacy Gem policy entries do not
 establish current official Symphony admission. No new catalog, discovery job,
 controller, persistence layer or permission grant is introduced.

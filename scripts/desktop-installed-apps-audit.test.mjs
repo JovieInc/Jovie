@@ -8,10 +8,42 @@ import {
   commandRunsJovieDesktopShell,
   evaluateDesktopInstalledAppsAudit,
   evaluateDesktopUpdateFreshness,
+  fetchShippedDesktopVersions,
   KNOWN_DESKTOP_BUNDLE_IDS,
+  listRunningJovieProcesses,
   readCodesignMetadata,
   readDesktopBuildIdentity,
 } from './desktop-installed-apps-audit.mjs';
+
+test('rolling staging freshness uses the current release update time', async () => {
+  /** @type {typeof fetch} */
+  const fetchImpl = async input =>
+    Response.json(
+      String(input).endsWith('/latest')
+        ? {
+            name: '26.9.15',
+            published_at: '2026-09-22T10:00:00Z',
+            updated_at: '2026-09-23T10:00:00Z',
+          }
+        : {
+            name: '26.9.16-staging.35887697816.1',
+            published_at: '2026-09-09T04:08:01Z',
+            updated_at: '2026-09-23T16:29:20Z',
+          }
+    );
+  const shipped = await fetchShippedDesktopVersions(fetchImpl);
+  assert.equal(shipped.production.publishedAt, '2026-09-22T10:00:00Z');
+  assert.equal(shipped.staging.version, '26.9.16-staging.35887697816.1');
+  assert.equal(shipped.staging.publishedAt, '2026-09-23T16:29:20Z');
+  const freshness = evaluateDesktopUpdateFreshness({
+    channel: 'staging',
+    installedVersion: '26.8.3-staging.34309234992.1',
+    latestVersion: shipped.staging.version,
+    latestPublishedAt: shipped.staging.publishedAt,
+    now: new Date('2026-09-23T17:00:00Z'),
+  });
+  assert.equal(freshness.status, 'updating');
+});
 
 const SOURCE_REVISION = 'a'.repeat(40);
 
@@ -43,6 +75,16 @@ test('commandRunsJovieDesktopShell counts app shells but excludes helpers and re
       '/opt/homebrew/bin/node /Users/timwhite/Jovie/apps/web/server.js'
     ),
     false
+  );
+});
+
+test('process inventory failure cannot be reported as no running apps', () => {
+  assert.throws(
+    () =>
+      listRunningJovieProcesses(() => {
+        throw new Error('ps denied');
+      }),
+    /Running process inventory unavailable/
   );
 });
 
@@ -282,6 +324,51 @@ test('KNOWN_DESKTOP_BUNDLE_IDS marks only production as canonical', () => {
   assert.equal(KNOWN_DESKTOP_BUNDLE_IDS['app.jov.ie'].canonical, true);
   assert.equal(KNOWN_DESKTOP_BUNDLE_IDS['app.jov.ie.staging'].canonical, false);
   assert.equal(KNOWN_DESKTOP_BUNDLE_IDS['app.jov.ie.local'].canonical, false);
+});
+
+test('readDesktopBuildIdentity accepts exact staging prerelease provenance', () => {
+  const temp = mkdtempSync(path.join(tmpdir(), 'jovie-staging-identity-'));
+  try {
+    const resources = path.join(temp, 'Contents', 'Resources');
+    mkdirSync(resources, { recursive: true });
+    const identity = buildIdentity({
+      channel: 'staging',
+      version: '26.8.3-staging.34309234992.1',
+    });
+    writeFileSync(
+      path.join(resources, 'build-identity.json'),
+      JSON.stringify(identity)
+    );
+    assert.deepEqual(readDesktopBuildIdentity(temp), {
+      buildIdentity: identity,
+      buildIdentityError: null,
+    });
+    const audit = evaluateDesktopInstalledAppsAudit({
+      bundles: [
+        {
+          name: 'Jovie.app',
+          path: '/Applications/Jovie.app',
+          identifier: 'app.jov.ie',
+          version: '26.6.61',
+          buildIdentity: buildIdentity(),
+          buildIdentityError: null,
+        },
+        {
+          name: 'Jovie Staging.app',
+          path: temp,
+          identifier: 'app.jov.ie.staging',
+          version: identity.version,
+          buildIdentity: identity,
+          buildIdentityError: null,
+        },
+      ],
+      processes: [],
+    });
+    assert.equal(audit.ok, true);
+    assert.deepEqual(audit.findings, []);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
 });
 
 test('evaluateDesktopUpdateFreshness is red when installed is behind >24h', () => {

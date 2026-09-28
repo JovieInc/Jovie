@@ -1,0 +1,107 @@
+---
+id: connect-music-accounts
+title: Connect your music accounts
+description: Review detected music identities in Presence, add only the right artist, and import supported music in Library.
+documentType: guide
+category: jovie-essentials
+productBacked: true
+featureId: auto-dsp-detection-linking
+additionalFeatureIds:
+  - auto-sync-from-spotify
+productRoute: /app/profiles
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - connect spotify
+  - connect apple music
+  - connect youtube
+  - import catalog
+redirectAliases:
+  - /docs/self-serve-guide/connect-dsps
+visualProofRefs:
+  - proof/connect-music-accounts.png
+  - proof/connect-spotify-artist.png
+uiLabels:
+  - Presence
+  - Suggested
+  - Add
+  - Not me
+  - Pick the exact Spotify artist
+  - Library
+  - Sync from Spotify
+  - Import YouTube
+productSourceRefs:
+  - apps/web/app/app/(shell)/profiles/ProfilesWorkspace.tsx
+  - apps/web/app/app/(shell)/library/LibraryPageClient.tsx
+  - apps/web/app/app/(shell)/library/LibrarySurface.tsx
+  - apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx
+  - apps/web/components/features/dashboard/dashboard-nav/config.ts
+launchPath: true
+---
+
+<HelpArticle id="connect-music-accounts">
+
+# Connect your music accounts
+
+<HelpOutcome>Confirm the correct Spotify, Apple Music, or YouTube Music public identity, then import from the providers Jovie currently supports in Library.</HelpOutcome>
+
+<HelpPrerequisites>
+
+- A claimed artist profile. Music identity review is in **Presence**; imports are in **Library**. **Settings → Connections** authorizes Google services, not music providers.
+
+</HelpPrerequisites>
+
+<HelpSteps>
+
+<HelpStep title="Open Presence">
+From your artist navigation, open [Presence](https://jov.ie/app/profiles), then choose **Suggested**. Jovie groups detected public identities for review.
+
+<HelpScreenshot src="/proof/connect-music-accounts.png" alt="Presence workspace on the Suggested tab with Add and Not me actions for detected music identities" caption="Review detected identities before adding them." />
+</HelpStep>
+
+<HelpStep title="Confirm the exact artist identity">
+Compare the provider, artist name, destination URL, and catalog. Choose **Add** only for your artist; choose **Not me** for a same-name or unrelated result.
+</HelpStep>
+
+<HelpStep title="Connect the matching Spotify artist">
+Spotify is connected during profile claim or initial setup. At **Pick the exact Spotify artist**, choose the identity that owns the claimed profile; if your claimed profile has no Spotify identity, contact support instead of choosing a nearby result.
+
+<HelpScreenshot src="/proof/connect-spotify-artist.png" alt="Pick the exact Spotify artist showing candidate names, follower counts, and Use actions" caption="The selected Spotify identity controls which catalog is imported." />
+</HelpStep>
+
+<HelpStep title="Start a supported import">
+Open [Library](https://jov.ie/app/library). Use **Sync from Spotify** when it is available for the connected profile, or **Import YouTube** to authorize and import from your YouTube channel. Spotify, Apple Music, and YouTube Music can appear as detected public identities; Apple Music has no standalone authorization control in the current workspace.
+</HelpStep>
+
+<HelpStep title="Let processing finish">
+Keep the selected identity unchanged while Jovie shows its import or processing state. Review Library when processing completes; Jovie does not promise a fixed completion time.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Accepted identities appear in Presence, and supported imported items appear in Library after processing.
+
+<HelpTroubleshooting>
+
+### The suggested artist is wrong
+
+Choose **Not me**. If a wrong identity is already attached, follow [Fix the wrong artist or catalog](/docs/manage-jovie/troubleshooting/fix-wrong-artist-or-catalog); do not add another same-name result to compensate.
+
+### YouTube asks for permission again
+
+Choose **Import YouTube** and complete authorization with the channel owner account. If Jovie shows **Reconnect YouTube to refresh access**, reconnect before retrying the import.
+
+### An import stays in progress or fails
+
+Do not switch to another artist identity. Retry the visible provider action once; if it still fails, contact support with the profile URL, provider, and screenshot. No fixed processing-time promise applies.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="connect-music-accounts" ids={['claim-your-profile', 'fix-wrong-artist-or-catalog']} />
+
+<HelpFeedback articleId="connect-music-accounts" />
+
+</HelpArticle>

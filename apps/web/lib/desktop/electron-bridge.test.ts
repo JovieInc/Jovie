@@ -146,11 +146,11 @@ describe('electron-bridge — defensive guards', () => {
     expect(captureWarningMock).not.toHaveBeenCalled();
   });
 
-  it('safeInstallUpdateAndRestart falls back to opening releases URL when method is missing', () => {
+  it('safeInstallUpdateAndRestart reports failure when the bridge method is missing', async () => {
     setElectronAPI({
       versions: { app: '0.1.0' },
     });
-    __testing.safeInstallUpdateAndRestart();
+    await expect(__testing.safeInstallUpdateAndRestart()).resolves.toBe(false);
     expect(windowOpenSpy).toHaveBeenCalledWith(
       __testing.RELEASE_DOWNLOAD_URL,
       '_blank',
@@ -158,14 +158,14 @@ describe('electron-bridge — defensive guards', () => {
     );
   });
 
-  it('safeInstallUpdateAndRestart falls back to download URL when bridge throws', () => {
+  it('safeInstallUpdateAndRestart reports failure when the bridge throws', async () => {
     const installUpdateAndRestart = vi.fn(() => {
       throw new Error('IPC channel closed');
     });
     setElectronAPI({
       installUpdateAndRestart,
     });
-    __testing.safeInstallUpdateAndRestart();
+    await expect(__testing.safeInstallUpdateAndRestart()).resolves.toBe(false);
     expect(installUpdateAndRestart).toHaveBeenCalled();
     expect(windowOpenSpy).toHaveBeenCalledWith(
       __testing.RELEASE_DOWNLOAD_URL,
@@ -183,8 +183,7 @@ describe('electron-bridge — defensive guards', () => {
     setElectronAPI({
       installUpdateAndRestart,
     });
-    __testing.safeInstallUpdateAndRestart();
-    await Promise.resolve();
+    await expect(__testing.safeInstallUpdateAndRestart()).resolves.toBe(false);
     expect(installUpdateAndRestart).toHaveBeenCalledTimes(1);
     expect(windowOpenSpy).toHaveBeenCalledWith(
       __testing.RELEASE_DOWNLOAD_URL,
@@ -194,14 +193,29 @@ describe('electron-bridge — defensive guards', () => {
     expect(captureWarningMock).toHaveBeenCalled();
   });
 
-  it('safeInstallUpdateAndRestart triggers bridge cleanly when method exists', () => {
+  it('safeInstallUpdateAndRestart reports success when the bridge starts installation', async () => {
     const installUpdateAndRestart = vi.fn();
     setElectronAPI({
       installUpdateAndRestart,
     });
-    __testing.safeInstallUpdateAndRestart();
+    await expect(__testing.safeInstallUpdateAndRestart()).resolves.toBe(true);
     expect(installUpdateAndRestart).toHaveBeenCalledTimes(1);
     expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('safeInstallUpdateAndRestart reports failure when the IPC promise rejects', async () => {
+    setElectronAPI({
+      installUpdateAndRestart: vi.fn(async () => {
+        throw new Error('IPC channel closed');
+      }),
+    });
+    await expect(__testing.safeInstallUpdateAndRestart()).resolves.toBe(false);
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      __testing.RELEASE_DOWNLOAD_URL,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(captureWarningMock).toHaveBeenCalled();
   });
 
   it('openDesktopAuthUrl uses the explicit bridge method when available', async () => {
@@ -269,6 +283,39 @@ describe('electron-bridge — defensive guards', () => {
     });
     expect(copyDesktopAuthUrl).toHaveBeenCalledWith(authUrl);
     expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('redeems return codes only through the explicit bridge method', async () => {
+    const redeemDesktopAuthReturnCode = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({
+        ok: false,
+        reason: 'invalid-code',
+      })
+    );
+    setElectronAPI({ redeemDesktopAuthReturnCode });
+
+    expect(__testing.supportsDesktopAuthReturnCode()).toBe(true);
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({ ok: false, reason: 'invalid-code' });
+    expect(redeemDesktopAuthReturnCode).toHaveBeenCalledWith('BCDF-GHJK');
+
+    redeemDesktopAuthReturnCode.mockResolvedValueOnce({ ok: true });
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it('reports return codes unsupported on a stale bridge', async () => {
+    setElectronAPI({ versions: { app: '0.1.0' } });
+
+    expect(__testing.supportsDesktopAuthReturnCode()).toBe(false);
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-auth-return-code-bridge-unavailable',
+    });
   });
 
   it('copyDesktopAuthUrl fails closed for a stale bridge', async () => {

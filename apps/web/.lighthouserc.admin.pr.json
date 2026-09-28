@@ -17,7 +17,7 @@
     "assert": {
       "assertMatrix": [
         {
-          "matchingUrlPattern": "\\/app\\/admin\\/(growth|creators|users|releases)$",
+          "matchingUrlPattern": "\\/app\\/ov\\/(?:growth|people\\?view=(?:creators|users|releases))$",
           "assertions": {
             "categories:performance": [
               "error",

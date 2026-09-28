@@ -19,7 +19,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, 'pen-save-receipt.mjs');
 const CANONICAL = join(
   homedir(),
-  'Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen'
+  'Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen'
 );
 const DAILY = join(
   homedir(),

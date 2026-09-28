@@ -6,11 +6,23 @@ Legacy snapshots remain valid. The product-owned validator in
 `summer-product-paths.ts` validates the wire contract only; Summer owns ranking,
 claims, execution authority, and the decision loop in its private repository.
 
-The bridge reuses `OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN` through
-`getEveShadowOrigin`, including the existing exact-deployment allowlist. Missing
-or invalid configuration fails before signing or obtaining OIDC credentials.
-The request includes both the bearer token and
-`x-vercel-trusted-oidc-idp-token`, disallows redirects, and makes one attempt.
+The bridge calls `https://summer.jov.ie`. `getEveShadowOrigin` returns that
+domain. The deprecated origin env accepts that domain and still does not
+select the caller. `resolveSummerEveCallerOrigin` reads `GET /runtime/v1/identity` and
+admits the call only when the responder is source-bound production Summer
+(project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`, environment `production`) before
+signing or obtaining OIDC credentials. A deployment id in that document is
+observed identity, not a pin. An unreadable identity, a transport error, or
+any other responder fails closed before signing or OIDC. The request includes
+both the bearer token and
+`x-vercel-trusted-oidc-idp-token`. When
+`OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET` is set, that value is also sent
+as `x-vercel-protection-bypass` to the same alias. The secret
+belongs to the eve-shadow Vercel project (the production Summer project,
+prj_LaVQva346cjp5XfrbAIIQUln7tPH), not Jovie's
+`VERCEL_AUTOMATION_BYPASS_SECRET`. The bridge does not set
+`x-vercel-set-bypass-cookie` and does not place the secret in the URL. It
+disallows redirects and makes one attempt.
 An uncertain network result does not establish delivery and is never retried
 inside this bridge.
 

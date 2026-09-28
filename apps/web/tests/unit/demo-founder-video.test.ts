@@ -36,6 +36,9 @@ describe('founder demo video timeline', () => {
     expect(getFounderDemoSceneAt(50).id).toBe('approval-execution');
     expect(getFounderDemoSceneAt(70).id).toBe('fan-facing-layer');
     expect(getFounderDemoSceneAt(90).id).toBe('monitoring-loop');
+    expect(getFounderDemoSceneAt(FOUNDER_DEMO_DURATION_SECONDS).id).toBe(
+      'monitoring-loop'
+    );
   });
 
   it('keeps public demo copy free of accelerator and prototype wording', () => {
