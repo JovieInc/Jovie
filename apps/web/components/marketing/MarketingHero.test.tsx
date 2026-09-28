@@ -116,6 +116,16 @@ describe('MarketingHero source-backed default story', () => {
     });
   });
 
+  it('excludes the MARKETING_HERO_* fixture exports from the story index', () => {
+    const exclude = marketingHeroMeta.excludeStories;
+    expect(exclude).toEqual(/^MARKETING_HERO_/);
+    const pattern = exclude as RegExp;
+    expect(pattern.test('MARKETING_HERO_DEFAULT_PROPS')).toBe(true);
+    expect(pattern.test('MARKETING_HERO_SOURCE_SHA')).toBe(true);
+    expect(pattern.test('SourceBackedDefault')).toBe(false);
+    expect(pattern.test('LandingActions')).toBe(false);
+  });
+
   it('honors the shared root test id in landing mode', () => {
     render(
       <MarketingHero

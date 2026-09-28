@@ -64,6 +64,7 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/lib/badge-geometry-contract.ts',
   'packages/ui/lib/overlay-focus.ts',
   'packages/ui/atoms/founder-pen-atoms.ts',
+  'packages/ui/atoms/status-glyph.tsx',
 ];
 const EXCLUDED_NON_PRODUCTION_SOURCES = [
   'packages/ui/index.test.ts',
