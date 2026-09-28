@@ -79,11 +79,32 @@ jq -e '
   exit 2
 }
 
+# Forward-only, like the release rechecks (#18809): a generation whose subject
+# main has since moved past is still admissible; a diverged or unreadable
+# lineage fails closed. An exact-only match starved every generation while
+# merges kept landing during the production-mutation lock wait (JOV-6993).
+subject_is_ancestor_of_main() {
+  local main_sha="$1" status
+  if [[ -n "${FLEET_GATE_COMPARE_STATUS:-}" ]]; then
+    status="$FLEET_GATE_COMPARE_STATUS" # test fixture, like FLEET_GATE_EVALUATE_JSON
+  elif [[ -n "${GEM_PRIORITY_GATE_REPO:-}" ]]; then
+    status="$(gh api "repos/$GEM_PRIORITY_GATE_REPO/compare/$EXPECTED_SHA...$main_sha" --jq .status 2>/dev/null)" || return 1
+  else
+    return 1
+  fi
+  [[ "$status" == "ahead" ]]
+}
+
 if [[ -n "${EXPECTED_SHA:-}" ]]; then
-  jq -e --arg expected "$EXPECTED_SHA" '.signals.main.sha == $expected' "$receipt" >/dev/null || {
-    echo '::error::Fleet gate main.sha is not the exact expected subject.' >&2
-    exit 2
-  }
+  main_sha="$(jq -r '.signals.main.sha' "$receipt")"
+  if [[ "$main_sha" != "$EXPECTED_SHA" ]]; then
+    if subject_is_ancestor_of_main "$main_sha"; then
+      echo "::notice::Fleet gate subject $EXPECTED_SHA is an ancestor of main $main_sha; admitting forward-only." >&2
+    else
+      echo '::error::Fleet gate main.sha is not the expected subject or a descendant of it.' >&2
+      exit 2
+    fi
+  fi
 fi
 
 if [[ "$consumer" == "deployment" ]]; then

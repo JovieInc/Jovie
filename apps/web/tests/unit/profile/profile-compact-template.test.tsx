@@ -225,7 +225,7 @@ const mockArtist: Artist = {
 const mockContacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,
@@ -368,11 +368,23 @@ describe('ProfileCompactTemplate', () => {
       },
     }));
     window.history.replaceState(null, '', '/test-artist');
+    // AnonCookieBootstrap fetches the per-user variant on mount; resolve it
+    // deterministically so tests exercise the post-resolution state.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'button' }),
+      })
+    );
   });
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
+    vi.unstubAllGlobals();
     vi.useRealTimers();
+    document.cookie =
+      'jv_country=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   });
 
   it('keeps the signed-in escape hatch on a live tablet profile that uses embedded presentation', async () => {
@@ -592,14 +604,17 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveTextContent(`jov.ie/${mockArtist.handle}`);
     // Location lives in About, not in the identity header.
     expect(within(identity).queryByText('Los Angeles')).toBeNull();
-    const listen = within(identity).getByTestId('profile-identity-listen');
-    expect(listen).toHaveClass('h-11');
-    expect(listen).toHaveAttribute('href', `/${mockArtist.handle}/listen`);
-    expect(listen.firstElementChild).toHaveClass(
-      'profile-glass-pill',
-      'profile-glass-pill--flat',
-      'h-7'
-    );
+    // Get Updates is the only identity action; songs carry their own Listen.
+    expect(
+      within(identity).queryByTestId('profile-identity-listen')
+    ).toBeNull();
+    const getUpdates = within(identity).getByRole('button', {
+      name: 'Get Updates',
+    });
+    expect(getUpdates.parentElement).toHaveClass('h-11');
+    expect(
+      getUpdates.parentElement?.querySelector('.profile-glass-pill')
+    ).toHaveClass('profile-glass-pill', 'profile-glass-pill--flat', 'h-7');
     expect(
       within(screen.getByTestId('profile-identity-social-row')).getByRole(
         'link'
@@ -607,7 +622,14 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveClass('h-11', 'w-11');
   });
 
-  it('opens Music from the identity Listen action without a page load', async () => {
+  it('opens the existing subscribe flow from the identity Get Updates action', async () => {
+    const revealNotifications = vi.fn();
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: { readonly onRegisterReveal?: (reveal: () => void) => void }) => {
+        props.onRegisterReveal?.(revealNotifications);
+        return null;
+      }
+    );
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -617,18 +639,33 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('profile-identity-listen'));
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await waitFor(() => {
+      expect(mockProfileInlineNotificationsCTA).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Get Updates' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'listen'
-      );
+      expect(revealNotifications).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByTestId('profile-identity-listen')).toHaveAttribute(
-      'aria-current',
-      'page'
+  });
+
+  it('shows no Get Updates action when the profile cannot take fans', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        allowFanCapture={false}
+      />
     );
+
+    expect(
+      screen.queryByRole('button', { name: 'Get Updates' })
+    ).not.toBeInTheDocument();
   });
 
   it('scopes the mobile overflow contract to the active home surface slot', () => {
@@ -1283,6 +1320,36 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
+  it('does not push a source-less URL before the source param hydrates', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    expect(window.location.search).toBe('?source=qr');
+    for (const call of pushStateSpy.mock.calls) {
+      expect(String(call[2])).toContain('source=qr');
+    }
+
+    pushStateSpy.mockRestore();
+  });
+
   it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
@@ -1491,6 +1558,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await screen.findByTestId('mock-inline-notifications-cta');
+
     fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
 
     await waitFor(() => {
@@ -1499,6 +1570,190 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.queryByTestId('mock-primary-tab-panel')
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the fan-capture CTA unmounted until the visitor assignment resolves', async () => {
+    let resolveAssignment:
+      | ((value: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveAssignment = resolve;
+          })
+      )
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    // While the assignment fetch is in flight the interactive capture CTA
+    // must not exist — a control that would morph post-paint stays absent.
+    expect(
+      screen.queryByTestId('mock-inline-notifications-cta')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-compact-shell')).not.toHaveAttribute(
+      'data-visitor-assignment-resolved'
+    );
+    expect(mockProfileInlineNotificationsCTA).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveAssignment?.({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'toggle' }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+    });
+    // The CTA mounts exactly once, with the assigned variant — never the
+    // ISR default that would later morph.
+    expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+      'data-alert-opt-in-variant',
+      'toggle'
+    );
+    expect(mockProfileInlineNotificationsCTA).toHaveBeenCalledWith(
+      expect.objectContaining({ experimentVariant: 'toggle' })
+    );
+    expect(
+      mockProfileInlineNotificationsCTA.mock.calls.filter(
+        ([props]) =>
+          (props as { experimentVariant?: string }).experimentVariant ===
+          'button'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('keeps the ISR default variant when assignment resolution fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network down'))
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+    });
+    expect(mockProfileInlineNotificationsCTA).toHaveBeenCalledWith(
+      expect.objectContaining({ experimentVariant: 'button' })
+    );
+  });
+
+  it('routes a cold-load alerts click to the capture flow under the assigned variant', async () => {
+    let resolveAssignment:
+      | ((value: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveAssignment = resolve;
+          })
+      )
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    // Early click: the visitor lands on the subscribe tab before the
+    // assignment resolves; the panel receives the unresolved flag so its
+    // capture control stays inert.
+    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+          visitorAssignmentResolved: false,
+        })
+      );
+    });
+
+    await act(async () => {
+      resolveAssignment?.({
+        ok: true,
+        json: async () => ({ alertOptInVariant: 'toggle' }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+          visitorAssignmentResolved: true,
+          alertOptInVariant: 'toggle',
+        })
+      );
+    });
+  });
+
+  it('geo-sorts DSPs from the readable jv_country cookie after mount', async () => {
+    document.cookie = 'jv_country=DE; path=/';
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({ viewerCountryCode: 'DE' })
+      );
+    });
+  });
+
+  it('prefers an explicit viewerCountryCode prop over the jv_country cookie', async () => {
+    document.cookie = 'jv_country=DE; path=/';
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        viewerCountryCode='US'
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({ viewerCountryCode: 'US' })
+      );
+    });
   });
 
   it('hides the compact hero alerts card for returning subscribers', async () => {
@@ -1556,7 +1811,7 @@ describe('ProfileCompactTemplate', () => {
 
     const view = render(renderProfile());
 
-    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+    fireEvent.click(await screen.findByTestId('mock-inline-notifications-cta'));
 
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
@@ -1700,7 +1955,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+    fireEvent.click(await screen.findByTestId('mock-inline-notifications-cta'));
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(

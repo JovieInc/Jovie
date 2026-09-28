@@ -114,6 +114,34 @@ describe('toWhatwgReadableStream', () => {
  * a function`.
  */
 describe('wrapStreamTextResult stream contract (JOV-3694 / JOV-3693)', () => {
+  it('observes a rejected text promise without reading the SDK getter twice', async () => {
+    let rejectText: (error: Error) => void = () => undefined;
+    const sourceText = new Promise<string>((_resolve, reject) => {
+      rejectText = reject;
+    });
+    let textReads = 0;
+    const emptyStream = new ReadableStream<never>({
+      start(controller) {
+        controller.close();
+      },
+    });
+    const result = {
+      get text() {
+        textReads += 1;
+        return sourceText.then(text => text);
+      },
+      textStream: emptyStream,
+      fullStream: emptyStream,
+      toUIMessageStream: () => emptyStream,
+    };
+
+    wrapStreamTextResult(result, { source: 'streamText' });
+    rejectText(new Error('AI_NoOutputGeneratedError'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(textReads).toBe(1);
+  });
+
   it('keeps toUIMessageStream() output a genuine WHATWG ReadableStream', () => {
     const wrapped = wrapStreamTextResult(streamResultFor('Onward.'), {
       source: 'streamText',

@@ -292,6 +292,21 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'failed',
 ]);
 
+// Canonical customer lifecycle stages (JOV-6888). One ordered funnel shared by
+// leads, waitlist entries, creator profiles, and users.
+export const contactLifecycleStageEnum = pgEnum('contact_lifecycle_stage', [
+  'suggested',
+  'approved',
+  'outreach',
+  'profile_created',
+  'certified',
+  'signed_up',
+  'claimed',
+  'activated',
+  'paying',
+  'churned',
+]);
+
 // User status lifecycle enum - single source of truth for user state
 export const userStatusLifecycleEnum = pgEnum('user_status_lifecycle', [
   'waitlist_pending',
@@ -519,6 +534,20 @@ export const metadataSubmissionIssueStatusEnum = pgEnum(
 export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'user',
   'assistant',
+]);
+
+// Conversation Insights Enums (JOV-6784)
+export const conversationFunnelStageEnum = pgEnum('conversation_funnel_stage', [
+  'anonymous',
+  'claimed',
+  'paid',
+]);
+
+export const objectionStatusEnum = pgEnum('objection_status', [
+  'draft',
+  'approved',
+  'published',
+  'rejected',
 ]);
 
 export const chatTurnStatusEnum = pgEnum('chat_turn_status', [

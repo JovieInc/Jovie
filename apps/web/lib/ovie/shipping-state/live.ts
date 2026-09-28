@@ -285,7 +285,7 @@ function cachedReader(
             ...entry,
             expiresAt: Math.min(
               entry.expiresAt,
-              now + FAILED_READ_CACHE_TTL_MS
+              nowOf(io) + FAILED_READ_CACHE_TTL_MS
             ),
           };
         }

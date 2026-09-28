@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DspPresenceSidebar } from '@/features/dashboard/organisms/dsp-presence/DspPresenceSidebar';
+import { DspPresenceSidebar } from '@/components/features/dashboard/organisms/dsp-presence/DspPresenceSidebar';
 
 const { mockUseDashboardData, mockUseDspMatchActions } = vi.hoisted(() => ({
   mockUseDashboardData: vi.fn(),

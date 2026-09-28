@@ -331,6 +331,17 @@ describe('Vercel function config', () => {
       expect.arrayContaining(screenshotIncludes)
     );
     expect(includes).not.toEqual(expect.arrayContaining(screenshotIncludes));
+
+    // Certification packet files are staged into runtime-data and traced only
+    // into the certification API routes that read them.
+    const certificationIncludes = ['runtime-data/docs/certification/**/*'];
+    expect(includesByRoute['/api/ovie/certifications']).toEqual(
+      certificationIncludes
+    );
+    expect(includesByRoute['/api/ovie/certifications/**']).toEqual(
+      certificationIncludes
+    );
+    expect(includes).not.toEqual(expect.arrayContaining(certificationIncludes));
   });
 
   it('excludes non-runtime repo files from traces without dropping runtime reads', async () => {

@@ -247,6 +247,19 @@ export {
   workflowRunOutcomes,
   workflowRuns,
 } from './connectors';
+// Canonical Contacts (customer lifecycle)
+export {
+  type Contact,
+  type ContactStageTransition,
+  contactStageTransitions,
+  contacts,
+  insertContactSchema,
+  insertContactStageTransitionSchema,
+  type NewContact,
+  type NewContactStageTransition,
+  selectContactSchema,
+  selectContactStageTransitionSchema,
+} from './contacts';
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
@@ -312,6 +325,19 @@ export {
   type TrackArtist,
   trackArtists,
 } from './content';
+// Conversation Insights (JOV-6784)
+export {
+  type ConversationObjection,
+  type ConversationSignal,
+  conversationObjections,
+  conversationSignals,
+  insertConversationObjectionSchema,
+  insertConversationSignalSchema,
+  type NewConversationObjection,
+  type NewConversationSignal,
+  selectConversationObjectionSchema,
+  selectConversationSignalSchema,
+} from './conversation-insights';
 // Private creator documents and exact-revision capture handoffs (JOV-5173)
 export {
   type CreatorDocument,
@@ -417,9 +443,11 @@ export {
   connectorProviderEnum,
   connectorStatusEnum,
   contactChannelEnum,
+  contactLifecycleStageEnum,
   contactRoleEnum,
   contentSlugTypeEnum,
   contextFactKindEnum,
+  conversationFunnelStageEnum,
   creatorDistributionEventTypeEnum,
   creatorDistributionPlatformEnum,
   creatorTypeEnum,
@@ -466,6 +494,7 @@ export {
   metadataSubmissionIssueStatusEnum,
   metadataSubmissionStatusEnum,
   notificationChannelEnum,
+  objectionStatusEnum,
   outreachChannelEnum,
   outreachStatusEnum,
   photoStatusEnum,

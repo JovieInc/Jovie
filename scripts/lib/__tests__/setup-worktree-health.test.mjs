@@ -43,7 +43,7 @@ function writeExecutable(filePath, contents) {
 }
 
 function makeToolStubs({
-  nodeVersion = 'v22.23.2',
+  nodeVersion = 'v24.21.0',
   pnpmVersion = '9.15.9',
 } = {}) {
   const bin = makeTempDir('jovie-setup-health-bin-');
@@ -55,7 +55,7 @@ function makeToolStubs({
 function makeWorktree() {
   const root = makeTempDir('jovie-setup-health-repo-');
   writeFileSync(join(root, 'package.json'), '{"name":"fixture"}\n');
-  writeFileSync(join(root, '.nvmrc'), '22.23.2\n');
+  writeFileSync(join(root, '.nvmrc'), '24.21.0\n');
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
   writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages: []\n');
   const git = spawnSync('git', ['-c', 'init.defaultBranch=main', 'init'], {

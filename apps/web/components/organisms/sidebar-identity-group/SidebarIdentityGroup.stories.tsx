@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { withSignedInSession } from '@/.storybook/signed-in-session';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
 import { SidebarIdentitySplitLayoutFixture } from './fixtures/split-layout';
 import { SidebarIdentityGroup } from './SidebarIdentityGroup';
@@ -35,6 +36,7 @@ const meta: Meta<typeof SidebarIdentityGroup> = {
     },
   },
   decorators: [
+    withSignedInSession,
     Story => (
       <JovieAuthValuesProvider>
         <Story />

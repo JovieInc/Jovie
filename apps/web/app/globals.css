@@ -160,13 +160,6 @@ html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
   padding-top: var(--electron-titlebar-height);
 }
 
-/* JOV-6796: the admin step-up bar renders in-flow at the window's top edge,
-   where the OS window controls (traffic lights at ~x=20,y=17) would cover its
-   leading text. Drop it below the reserved titlebar row. */
-html[data-desktop-runtime="electron"] [data-admin-step-up-banner="true"] {
-  margin-top: var(--electron-titlebar-height);
-}
-
 html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
   > div {
@@ -953,6 +946,12 @@ body {
      image strength for specific routes (/ai, /download). */
   .marketing-hero-photo {
     z-index: 0;
+  }
+  /* The photo is positioned; static hero copy would paint underneath it
+     (the /pricing headline rendered invisible). Lift every later sibling. */
+  .marketing-hero-photo ~ * {
+    position: relative;
+    z-index: 1;
   }
   .marketing-hero-photo__img {
     object-fit: cover;
