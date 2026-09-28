@@ -9,7 +9,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[36rem] bg-surface-0'>
+      <div className='w-full max-w-3xl bg-surface-0'>
         <Story />
       </div>
     ),
