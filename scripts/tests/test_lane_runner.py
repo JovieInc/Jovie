@@ -650,13 +650,15 @@ class RunAgentTest(unittest.TestCase):
 
 class DispatchTest(unittest.TestCase):
     def test_spawns_one_worker_per_slot_of_healthy_enabled_providers_and_prunes(self):
-        saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run)
+        saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
+                 lane.disk_guard.check)
         spawned = []
         lane.load_providers = lambda: {"a": {"slots": 2}, "b": {"slots": 3}, "c": {"slots": 1, "enabled": False}, "d": {"slots": 4}}
         lane.provider_healthy = lambda spec: self.fail("host-scoped-off provider was probed") if spec["slots"] == 4 else spec["slots"] == 2
         lane.subprocess.Popen = lambda args, **kw: spawned.append(args[-1])
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
+        lane.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False}
         with tempfile.TemporaryDirectory() as tmp:
             old = Path(tmp) / "worktrees/old"
             old.mkdir(parents=True)
@@ -667,7 +669,8 @@ class DispatchTest(unittest.TestCase):
                 self.assertEqual(lane.dispatch(host), 0)
             finally:
                 os.environ.pop("LANES_SLOTS_D", None)
-                lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run = saved
+                (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
+                 lane.disk_guard.check) = saved
             self.assertFalse(old.exists())
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual((tick["unhealthy"], tick["spawned"], tick["error"]), (["b"], ["a", "a"], None))

@@ -85,6 +85,7 @@ interface ProfileUnifiedDrawerProps {
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
   readonly presentation?: ProfileSurfacePresentation;
+  readonly onOpenReleaseCredits?: () => void;
 }
 
 const PAY_AMOUNTS = [5, 10, 20];
@@ -238,6 +239,7 @@ export function ProfileUnifiedDrawer({
   hasTourDates,
   hasReleases,
   releases = [],
+  onOpenReleaseCredits,
   presentation = 'standalone',
 }: ProfileUnifiedDrawerProps) {
   const visibleReleases = useMemo(
@@ -385,6 +387,14 @@ export function ProfileUnifiedDrawer({
               hasTourDates={canOpenTourDrawer}
               hasTip={hasTip}
               hasContacts={hasContacts}
+              onOpenReleaseCredits={
+                onOpenReleaseCredits
+                  ? () => {
+                      handleOpenChange(false);
+                      onOpenReleaseCredits();
+                    }
+                  : undefined
+              }
             />
           )}
 

@@ -11,6 +11,7 @@ function release(
 ): ChangelogRelease {
   return {
     version,
+    kind: 'release',
     date: '2026-08-16',
     summary: '',
     sections: {
