@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Music } from 'lucide-react';
@@ -21,6 +23,13 @@ const moreItems: NavItem[] = [
     tier: 'experimental',
   },
 ];
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('CustomerNavMoreMenu', () => {
   it('renders nothing when there are no overflow destinations', () => {
@@ -84,5 +93,13 @@ describe('CustomerNavMoreMenu', () => {
     expect(label.className).toContain('overflow-hidden');
     expect(label.className).toContain('mask-image:linear-gradient');
     expect(label.className).not.toContain('justify-self-start');
+  });
+
+  it('imports sidebar chrome from the modular sidebar specifier', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/CustomerNavMoreMenu.tsx'
+    );
+    expect(source).toContain("@/components/organisms/sidebar'");
+    expect(source).not.toContain("@/components/organisms/Sidebar'");
   });
 });
