@@ -1,4 +1,5 @@
 import '../../styles/system-b-app.css';
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import SettingsLayout from '@/app/app/(shell)/settings/layout';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
@@ -42,7 +43,7 @@ export const HeaderAlignment: Story = {
         header={
           <DashboardHeader
             breadcrumbs={[{ label: 'New Chat' }]}
-            action={<button type='button'>Help</button>}
+            action={<Button type='button'>Help</Button>}
           />
         }
         main={<div className='p-4'>Main content</div>}
@@ -56,7 +57,7 @@ export const RouteOwnedHeader: Story = {
     <SidebarProvider>
       <AppShellFrame
         sidebar={<Sidebar collapsible='offcanvas'>Jovie</Sidebar>}
-        main={<button type='button'>Route header action</button>}
+        main={<Button type='button'>Route header action</Button>}
       />
     </SidebarProvider>
   ),
@@ -73,7 +74,7 @@ export const SettingsHeaderAlignment: Story = {
               id='account'
               title='Account'
               description='Security, theme, and notifications.'
-              headerAction={<button type='button'>Save</button>}
+              headerAction={<Button type='button'>Save</Button>}
             >
               <p>Account settings</p>
             </SettingsSection>
