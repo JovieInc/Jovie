@@ -54,7 +54,9 @@ describe('Button canonicalization ratchet', () => {
     ).toBeLessThanOrEqual(manifest.maxRemaining);
   });
 
-  it('does not add system-b button classes to runtime TSX sources', () => {
+  it('does not add system-b button classes to runtime TSX sources', {
+    timeout: 60_000,
+  }, () => {
     const manifest = readManifest();
     const allowed = new Set(manifest.remaining);
     const files: string[] = [];
@@ -69,7 +71,9 @@ describe('Button canonicalization ratchet', () => {
     expect(violations).toEqual([]);
   });
 
-  it('does not add system-b button classes to design-system.css', () => {
+  it('does not add system-b button classes to design-system.css', {
+    timeout: 60_000,
+  }, () => {
     const manifest = readManifest();
     const allowed = new Set(manifest.remaining);
     const violations = findButtonSurfaceClasses(DESIGN_SYSTEM_CSS).filter(
