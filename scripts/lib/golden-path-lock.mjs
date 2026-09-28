@@ -139,7 +139,8 @@ export function evaluateHomepageHtml(html) {
   // "Find me" — with a /start handoff still present for the onboarding route.
   const hasPlaceholder = html.includes(GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER);
   const hasAction = html.includes(GOLDEN_PATH_HERO_SEARCH_ACTION);
-  const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
+  const hasStartHandoff =
+    /(?:href|action)\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
   const hasClaimForm =
     html.includes(GOLDEN_PATH_HERO_CLAIM_DOMAIN) &&
     />\s*Claim\s*</.test(html) &&
@@ -152,7 +153,7 @@ export function evaluateHomepageHtml(html) {
     };
   }
   // Legacy name search, accepted until production carries the link claim.
-  if (hasPlaceholder && hasAction && hasStartHref) {
+  if (hasPlaceholder && hasAction && hasStartHandoff) {
     return {
       id: 'homepage-cta',
       ok: true,

@@ -2,7 +2,6 @@ import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { evaluateHomepageHtml } from '../../../../../scripts/lib/golden-path-lock.mjs';
@@ -42,7 +41,6 @@ describe('homepage golden-path lock', () => {
           search={HERO_COPY.search}
         />
         <HomepageClose />
-        <HomepageNoScriptContent />
       </>
     );
 

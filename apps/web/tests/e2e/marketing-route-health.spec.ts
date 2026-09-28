@@ -567,7 +567,7 @@ test.describe('marketing declared runtime fallback coverage', () => {
   ];
   const fallback: RuntimeFallback = {
     selector: '[data-marketing-runtime-state="no-script-fallback"]',
-    componentPath: 'apps/web/components/homepage/HomepageNoScriptContent.tsx',
+    componentPath: 'fixture-runtime-fallback-owner',
     hiddenWhen: 'scripting-enabled',
   };
   const cases = [
