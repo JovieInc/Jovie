@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import postcss from 'postcss';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminStepUpBanner } from './AdminStepUpBanner';
 
@@ -81,5 +84,30 @@ describe('AdminStepUpBanner', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
     expect(client.signInPasskey).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('drops below the Electron titlebar row so traffic lights never cover it (JOV-6796)', () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    try {
+      render(<AdminStepUpBanner />);
+      const banner = screen.getByRole('status');
+      const css = postcss.parse(
+        readFileSync(resolve(__dirname, '../../../app/globals.css'), 'utf8')
+      );
+      const margins: string[] = [];
+      css.walkRules(rule => {
+        if (
+          rule.selector.includes('[data-admin-step-up-banner=') &&
+          banner.matches(rule.selector)
+        ) {
+          rule.walkDecls('margin-top', declaration => {
+            margins.push(declaration.value);
+          });
+        }
+      });
+      expect(margins.at(-1)).toBe('var(--electron-titlebar-height)');
+    } finally {
+      document.documentElement.removeAttribute('data-desktop-runtime');
+    }
   });
 });

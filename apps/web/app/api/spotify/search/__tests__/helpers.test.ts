@@ -7,11 +7,16 @@ const { mockSelect, claimedResult } = vi.hoisted(() => {
   const _mockWhere = vi
     .fn()
     .mockImplementation(() => Promise.resolve(_claimedResult.value));
-  const _mockFrom = vi.fn().mockReturnValue({ where: _mockWhere });
+  const _mockLeftJoin = vi.fn().mockReturnValue({ where: _mockWhere });
+  const _mockFrom = vi.fn().mockReturnValue({
+    where: _mockWhere,
+    leftJoin: _mockLeftJoin,
+  });
   const _mockSelect = vi.fn().mockReturnValue({ from: _mockFrom });
   return {
     mockSelect: _mockSelect,
     mockFrom: _mockFrom,
+    mockLeftJoin: _mockLeftJoin,
     mockWhere: _mockWhere,
     claimedResult: _claimedResult,
   };
@@ -27,8 +32,16 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
+    id: 'id',
     spotifyId: 'spotifyId',
     isClaimed: 'isClaimed',
+    userId: 'userId',
+  },
+  userProfileClaims: {
+    id: 'claimId',
+    creatorProfileId: 'creatorProfileId',
+    userId: 'claimUserId',
+    role: 'claimRole',
   },
 }));
 
@@ -48,6 +61,7 @@ vi.mock('@/lib/utils/logger', () => ({
 import { getFeaturedCreatorsForSearch } from '@/lib/featured-creators';
 import {
   annotateClaimedStatus,
+  annotateClaimedStatusForCurrentUser,
   applyVipBoost,
   boostClaimedArtists,
   parseLimit,
@@ -321,6 +335,118 @@ describe('annotateClaimedStatus', () => {
     const annotated = await annotateClaimedStatus(results);
 
     expect(annotated).toEqual(results);
+  });
+});
+
+describe('annotateClaimedStatusForCurrentUser', () => {
+  it('marks canonical owner and manager claims as writable by the caller', async () => {
+    claimedResult.value = [
+      {
+        spotifyId: 'owner-id',
+        legacyUserId: null,
+        claimId: 'owner-claim',
+        claimUserId: 'user-1',
+        claimRole: 'owner',
+      },
+      {
+        spotifyId: 'manager-id',
+        legacyUserId: null,
+        claimId: 'manager-claim',
+        claimUserId: 'user-1',
+        claimRole: 'manager',
+      },
+      {
+        spotifyId: 'other-id',
+        legacyUserId: null,
+        claimId: 'other-claim',
+        claimUserId: 'user-2',
+        claimRole: 'owner',
+      },
+    ];
+
+    const results = [
+      makeResult({ id: 'owner-id', name: 'Owner' }),
+      makeResult({ id: 'manager-id', name: 'Manager' }),
+      makeResult({ id: 'other-id', name: 'Other' }),
+    ];
+
+    const annotated = await annotateClaimedStatusForCurrentUser(
+      results,
+      'user-1'
+    );
+
+    expect(annotated.map(result => result.isClaimedByCurrentUser)).toEqual([
+      true,
+      true,
+      undefined,
+    ]);
+  });
+
+  it('uses legacy ownership only when no canonical claim exists', async () => {
+    claimedResult.value = [
+      {
+        spotifyId: 'legacy-id',
+        legacyUserId: 'user-1',
+        claimId: null,
+        claimUserId: null,
+        claimRole: null,
+      },
+      {
+        spotifyId: 'viewer-id',
+        legacyUserId: 'user-1',
+        claimId: 'viewer-claim',
+        claimUserId: 'user-1',
+        claimRole: 'viewer',
+      },
+    ];
+
+    const annotated = await annotateClaimedStatusForCurrentUser(
+      [
+        makeResult({ id: 'legacy-id', name: 'Legacy' }),
+        makeResult({ id: 'viewer-id', name: 'Viewer' }),
+      ],
+      'user-1'
+    );
+
+    expect(annotated[0].isClaimedByCurrentUser).toBe(true);
+    expect(annotated[1].isClaimedByCurrentUser).toBeUndefined();
+  });
+
+  it('fails closed when canonical claims make profile access ambiguous', async () => {
+    claimedResult.value = [
+      {
+        spotifyId: 'ambiguous-id',
+        legacyUserId: 'user-1',
+        claimId: 'owner-claim',
+        claimUserId: 'user-1',
+        claimRole: 'owner',
+      },
+      {
+        spotifyId: 'ambiguous-id',
+        legacyUserId: 'user-1',
+        claimId: 'manager-claim',
+        claimUserId: 'user-1',
+        claimRole: 'manager',
+      },
+    ];
+
+    const [annotated] = await annotateClaimedStatusForCurrentUser(
+      [makeResult({ id: 'ambiguous-id', name: 'Ambiguous' })],
+      'user-1'
+    );
+
+    expect(annotated.isClaimedByCurrentUser).toBeUndefined();
+  });
+
+  it('does not report an ownership lookup failure as an unowned claim', async () => {
+    mockSelect.mockImplementationOnce(() => {
+      throw new Error('Connection refused');
+    });
+
+    const results = [makeResult({ id: 'claimed-id', name: 'Claimed' })];
+    await expect(
+      annotateClaimedStatusForCurrentUser(results, 'user-1')
+    ).rejects.toThrow('Connection refused');
   });
 });
 

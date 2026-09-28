@@ -48,6 +48,7 @@ import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { formatEventDateParts } from '@/lib/events/date';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import {
   type BottomTabKey,
   getPermittedPublicProfileActions,
@@ -109,10 +110,18 @@ interface ProfileDesktopSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  /**
+   * False while the per-user experiment assignment is still resolving.
+   * Variant-dependent fan-capture CTAs stay inert until this is true so the
+   * assigned control never morphs post-paint.
+   */
+  readonly visitorAssignmentResolved?: boolean;
   readonly allowFanCapture?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly viewerCountryCode?: string | null;
@@ -258,10 +267,12 @@ export function ProfileDesktopSurface({
   latestRelease,
   profileSettings,
   alertOptInVariant = 'button',
+  visitorAssignmentResolved = true,
   allowFanCapture = true,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   photoDownloadSizes = [],
   tourDates = [],
   viewerCountryCode,
@@ -402,14 +413,27 @@ export function ProfileDesktopSurface({
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
     primaryActionElement = canGetUpdates ? (
-      <ProfileInlineNotificationsCTA
-        artist={artist}
-        portalContainer={notificationsPortalContainer}
-        variant='hero'
-        presentation='modal'
-        experimentVariant={alertOptInVariant}
-        onManageNotifications={() => onModeSelect('subscribe')}
-      />
+      visitorAssignmentResolved ? (
+        <ProfileInlineNotificationsCTA
+          artist={artist}
+          portalContainer={notificationsPortalContainer}
+          variant='hero'
+          presentation='modal'
+          experimentVariant={alertOptInVariant}
+          onManageNotifications={() => onModeSelect('subscribe')}
+        />
+      ) : (
+        <Button
+          type='button'
+          variant='primary'
+          size='marketing'
+          disabled
+          aria-busy='true'
+          data-testid='profile-desktop-subscribe-resolving'
+        >
+          {primaryAction.label}
+        </Button>
+      )
     ) : null;
   } else {
     const primaryActionContent = (
@@ -936,6 +960,8 @@ export function ProfileDesktopSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
+          contacts={contacts}
         />
       </DesktopSurfaceCard>
     ) : (
@@ -1031,6 +1057,7 @@ export function ProfileDesktopSurface({
         </div>
 
         {canGetUpdates &&
+        visitorAssignmentResolved &&
         activeMode === 'subscribe' &&
         !isSubscribed &&
         overlaysEnabled ? (
@@ -1067,6 +1094,7 @@ export function ProfileDesktopSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
           tourDates={tourDates}
           hasReleases={hasReleases}
           releases={visibleReleases}

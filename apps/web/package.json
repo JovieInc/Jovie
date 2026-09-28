@@ -162,6 +162,7 @@
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "doppler run -- tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:ci": "tsx scripts/drizzle-migrate.ts",
+    "drizzle:migrate:online-indexes:ci": "tsx scripts/online-index-migrate.ts",
     "seed:test-data": "tsx --import ./tests/eval/promptfoo/server-only-preload.mjs tests/seed-test-data.ts",
     "drizzle:verify": "doppler run -- tsx scripts/drizzle-migrate-verify.ts",
     "drizzle:verify:ci": "tsx scripts/drizzle-migrate-verify.ts",
@@ -193,6 +194,7 @@
     "test:a11y": "vitest run --config=vitest.config.storybook.mts",
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
     "perf:auth": "tsx scripts/performance-auth.ts",
+    "perf:route-js": "node scripts/route-js-budget.mjs",
     "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
     "perf:queue": "doppler run --project jovie-web --config dev -- tsx scripts/performance-batch-queue.ts",
     "qa:routes": "tsx scripts/route-qa.ts",
@@ -224,6 +226,7 @@
     "@headlessui/react": "^2.2.10",
     "@jovie/action-contracts": "workspace:*",
     "@jovie/copy": "workspace:*",
+    "@jovie/extension-contracts": "workspace:*",
     "@jovie/agent-transport-contracts": "workspace:^",
     "@jovie/audio-contracts": "workspace:*",
     "@jovie/auth-routing": "workspace:*",
@@ -283,7 +286,7 @@
     "jose": "^6.2.12",
     "jszip": "^3.10.2",
     "langfuse": "^3.39.2",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.48.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^13.4.4",
     "next": "16.3.6",
@@ -342,9 +345,9 @@
     "@types/react-dom": "^19.2.7",
     "@typescript-eslint/parser": "^8.70.1",
     "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/browser": "5.0.1",
+    "@vitest/browser": "5.0.2",
     "@vitest/browser-playwright": "5.0.2",
-    "@vitest/coverage-v8": "5.0.1",
+    "@vitest/coverage-v8": "5.0.2",
     "autoprefixer": "^10.6.1",
     "axe-core": "^4.13.0",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
@@ -367,6 +370,6 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vite": "8.3.0",
-    "vitest": "5.0.1"
+    "vitest": "5.0.2"
   }
 }

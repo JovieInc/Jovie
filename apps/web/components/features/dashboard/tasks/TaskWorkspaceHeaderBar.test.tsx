@@ -14,4 +14,14 @@ describe('TaskWorkspaceHeaderBar', () => {
     );
     expect(source).not.toContain('--app-shell-header-height-compact');
   });
+
+  it('keeps the primary New Task action visible at every breakpoint', () => {
+    const source = readFileSync(
+      resolve(__dirname, './TaskWorkspaceHeaderBar.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("{mode === 'create' ? 'Create' : 'New Task'}");
+    expect(source).not.toContain("'hidden lg:inline-flex'");
+  });
 });

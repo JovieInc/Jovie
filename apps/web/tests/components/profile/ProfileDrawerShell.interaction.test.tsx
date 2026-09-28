@@ -233,6 +233,16 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     expect(document.documentElement.style.overflow).toBe('');
   });
 
+  it('stretches the embedded sheet to its container width (jov.ie/tim dogfood)', () => {
+    render(<MenuShell presentation='embedded' />);
+    // A native <dialog> defaults to width: fit-content; without w-full the
+    // Menu shrank to a 185px side panel in the tablet/desktop phone column.
+    const sheet = document.querySelector('dialog[open]');
+    expect(sheet).not.toBeNull();
+    expect(sheet?.className).toContain('w-full');
+    expect(sheet?.className).toContain('inset-x-0');
+  });
+
   it('keeps Escape dismissal across a breakpoint presentation change while open', () => {
     const onOpenChange = vi.fn();
     const { rerender } = renderOpenShell('standalone', onOpenChange);
