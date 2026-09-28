@@ -73,8 +73,8 @@ vi.mock('@/components/molecules/TipSelector', () => ({
   TipSelector: () => <div data-testid='tip-selector' />,
 }));
 
-vi.mock('@/components/molecules/PaySelector', () => ({
-  PaySelector: () => <div data-testid='pay-selector' />,
+vi.mock('@/features/profile/views/PayView', () => ({
+  PayView: () => <div data-testid='pay-view' />,
 }));
 
 vi.mock('@/features/share/PublicShareMenu', () => ({

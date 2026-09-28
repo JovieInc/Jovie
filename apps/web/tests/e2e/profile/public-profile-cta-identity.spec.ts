@@ -158,14 +158,15 @@ test.describe('Public profile CTA and identity evidence', () => {
           const portraitElement = element.querySelector<HTMLElement>(
             '[data-testid="profile-identity-portrait"]'
           );
-          const listenElement = element.querySelector<HTMLElement>(
-            '[data-testid="profile-identity-listen"]'
+          // Claimed profiles lead with Get Updates (the fan subscribe flow).
+          const primaryElement = element.querySelector<HTMLElement>(
+            '[data-testid="profile-identity-get-updates"]'
           );
           if (
             !nameElement ||
             !handleElement ||
             !portraitElement ||
-            !listenElement
+            !primaryElement
           ) {
             return null;
           }
@@ -173,13 +174,13 @@ test.describe('Public profile CTA and identity evidence', () => {
           const nameRect = nameElement.getBoundingClientRect();
           const handleRect = handleElement.getBoundingClientRect();
           const portraitRect = portraitElement.getBoundingClientRect();
-          const listenRect = listenElement.getBoundingClientRect();
+          const primaryRect = primaryElement.getBoundingClientRect();
           return {
             portraitSize: portraitRect.width,
             nameTargetHeight: nameRect.height,
             handleHeight: handleRect.height,
             renderedGap: handleRect.top - nameRect.bottom,
-            listenTargetHeight: listenRect.height,
+            primaryTargetHeight: primaryRect.height,
           };
         });
 
@@ -188,7 +189,7 @@ test.describe('Public profile CTA and identity evidence', () => {
         expect(metrics?.portraitSize, metricsReceipt).toBe(80);
         expect(metrics?.nameTargetHeight).toBeGreaterThanOrEqual(44);
         expect(metrics?.handleHeight).toBeLessThanOrEqual(20);
-        expect(metrics?.listenTargetHeight).toBeGreaterThanOrEqual(44);
+        expect(metrics?.primaryTargetHeight).toBeGreaterThanOrEqual(44);
         expect(metrics?.renderedGap, metricsReceipt).toBeGreaterThanOrEqual(0);
         expect(metrics?.renderedGap, metricsReceipt).toBeLessThanOrEqual(4);
         await expect(

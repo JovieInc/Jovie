@@ -31,7 +31,7 @@ function readManifest(): PackageManifest {
 }
 
 describe('public CLI publication metadata', () => {
-  it('declares a public Apache-2.0 Node 22 package with provenance', () => {
+  it('declares a public Apache-2.0 Node 24 package with provenance', () => {
     const manifest = readManifest();
 
     expect(manifest).toMatchObject({
@@ -45,7 +45,7 @@ describe('public CLI publication metadata', () => {
         registry: 'https://registry.npmjs.org',
       },
       bin: { jovie: './dist/cli.js' },
-      engines: { node: '>=22.23.2 <23' },
+      engines: { node: '>=24.21.0 <25' },
     });
     expect(manifest.files).toEqual(
       expect.arrayContaining(['dist', 'README.md', 'LICENSE'])

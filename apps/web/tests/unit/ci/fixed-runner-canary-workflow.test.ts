@@ -40,7 +40,7 @@ describe('fixed runner canary workflow', () => {
       '.github/actions/resolve-neon-database-url/action.yml'
     );
     expect(workflow).toContain('uses: ./.github/actions/setup-node-pnpm');
-    expect(workflow).toContain('Expected Node >=22.13 <23');
+    expect(workflow).toContain('Expected Node 24.x');
     expect(workflow).toContain('test "$(pnpm --version)" = "9.15.9"');
     expect(workflow).toContain('--shard=1/5');
     expect(workflow).toContain('--maxWorkers=2');

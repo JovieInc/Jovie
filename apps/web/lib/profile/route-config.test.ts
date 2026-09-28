@@ -193,7 +193,7 @@ describe('getRouteConfigForMode', () => {
     expect(config.label).toBe('Get updates');
   });
 
-  it('"tour" → mode-tour with Shows destination active', () => {
+  it('"tour" → mode-tour with Events destination active', () => {
     const config = getRouteConfigForMode('tour');
     expect(config.key).toBe('mode-tour');
     expect(config.activeTab).toBe('tour');
@@ -400,7 +400,7 @@ describe('REDIRECT_SINK_ROUTE_KEYS', () => {
 });
 
 describe('BOTTOM_TAB_KEYS', () => {
-  it('contains exactly four destination keys in Home · Music · Shows · About order', () => {
+  it('contains exactly four destination keys in Home · Music · Events · About order', () => {
     expect(BOTTOM_TAB_KEYS).toEqual(['profile', 'listen', 'tour', 'about']);
   });
 });
