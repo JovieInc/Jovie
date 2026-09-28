@@ -440,6 +440,21 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
+  /**
+   * Anonymous agent profile creation (POST /api/agents/profiles): 10 per hour
+   * per IP. Each call can hit Spotify and write a profile row.
+   */
+  agentProfileCreate: {
+    name: 'Agent Profile Create',
+    limit: 10,
+    window: '1 h',
+    prefix: 'public:agent-profile-create',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   /** Public click: 50 requests per minute per IP */
   publicClick: {
     name: 'Public Click',

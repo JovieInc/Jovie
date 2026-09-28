@@ -3,4 +3,8 @@ export default {
     title: 'Help Center',
     type: 'page',
   },
+  contact: {
+    title: 'Contact support',
+    type: 'page',
+  },
 };

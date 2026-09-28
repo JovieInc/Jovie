@@ -60,7 +60,15 @@ function validateSocialHandle(
 }
 
 export async function ingestSocialPlatformUrl(
-  inputUrl: string
+  inputUrl: string,
+  options: {
+    /**
+     * Untrusted callers (the public agent API) must never append links to a
+     * profile they don't own: an unclaimed profile holding the same handle
+     * gets a new handle instead of a merged link.
+     */
+    readonly allocateNewHandleOnCollision?: boolean;
+  } = {}
 ): Promise<NextResponse> {
   const detected = detectPlatform(inputUrl);
   const handleResult = validateSocialHandle(inputUrl, detected.platform.name);
@@ -110,7 +118,10 @@ export async function ingestSocialPlatformUrl(
       .limit(1);
 
     let finalHandle = effectiveNormalizedHandle;
-    if (existing?.isClaimed) {
+    if (
+      existing?.isClaimed ||
+      (existing && options.allocateNewHandleOnCollision)
+    ) {
       const altHandle = await findAvailableHandle(
         tx,
         effectiveNormalizedHandle

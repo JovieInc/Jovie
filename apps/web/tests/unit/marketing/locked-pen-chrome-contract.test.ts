@@ -110,11 +110,12 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     );
 
     expect(HOMEPAGE_LAUNCH_COPY.hero.search.action).toBe('Find me');
-    expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toHaveLength(2);
+    // Pen My0zu (JOV-6946): one relationships beat after the hero.
+    expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toHaveLength(1);
     expect(
       HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.id)
-    ).toEqual(['connected', 'relationships']);
-    expect(homepagePage).toContain('HomepageEditorialHero');
+    ).toEqual(['relationships']);
+    expect(homepagePage).toContain('HomepageIdentityHero');
     expect(homepagePage).toContain('HomepageCertifiedSections');
     expect(homepagePage).toContain('HomepageClose');
     expect(certified).toContain('HOMEPAGE_LAUNCH_COPY.certified');

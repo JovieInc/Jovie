@@ -1,6 +1,7 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
@@ -16,7 +17,8 @@ function toAbsolutePublicUrl(href: string): string {
  * Copy comes from the existing launch document — this is not a redesign.
  */
 export function buildHomepageMarkdown(): string {
-  const { hero, workspace, productStatement, faq } = HOMEPAGE_LAUNCH_COPY;
+  const { hero } = HOMEPAGE_IDENTITY_COPY;
+  const { workspace, productStatement, faq } = HOMEPAGE_LAUNCH_COPY;
   const callouts = workspace.callouts
     .map(item => `### ${item.title}\n\n${item.body}`)
     .join('\n\n');
@@ -28,8 +30,7 @@ export function buildHomepageMarkdown(): string {
 
 ${hero.subhead}
 
-${hero.primaryCta.label}: ${toAbsolutePublicUrl(hero.primaryCta.href)}
-${hero.secondaryCta.label}: ${toAbsolutePublicUrl(hero.secondaryCta.href)}
+${hero.search.placeholder} → ${hero.search.action}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
 
 ## ${workspace.kicker}
 
@@ -51,7 +52,7 @@ ${buildSiteLlmsGuidance()}
 - Home: ${BASE_URL}${APP_ROUTES.HOME}
 - About: ${BASE_URL}${APP_ROUTES.ABOUT}
 - Support: ${BASE_URL}${APP_ROUTES.SUPPORT}
-- Docs: ${DOCS_URL}/docs
+- Help Center: ${DOCS_URL}/docs
 - OpenAPI: ${BASE_URL}/openapi.json
 - llms.txt: ${BASE_URL}/llms.txt
 - Sitemap: ${BASE_URL}/sitemap.xml
@@ -70,7 +71,7 @@ That path does not exist on ${APP_NAME}. Recover from one of these public surfac
 - ${APP_NAME} developer resources: ${BASE_URL}/llms.txt
 - OpenAPI 3.1: ${BASE_URL}/openapi.json
 - Public artist API: ${BASE_URL}/api/v1/{username}
-- Docs: ${DOCS_URL}/docs
+- Help Center: ${DOCS_URL}/docs
 - Sitemap: ${BASE_URL}/sitemap.xml
 - Full site guide: ${BASE_URL}/llms-full.txt
 - About: ${BASE_URL}${APP_ROUTES.ABOUT}
