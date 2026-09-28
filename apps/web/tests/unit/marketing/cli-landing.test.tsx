@@ -181,4 +181,16 @@ describe('CLI landing page', () => {
     expect(nodeFaq?.answer).toContain('below Node 25');
     expect(nodeFaq?.answer).toContain('published package engines field');
   });
+
+  it('keeps every scrollable command block reachable by keyboard', () => {
+    render(<CliLandingPage />);
+    const blocks = document.querySelectorAll('article pre');
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const block of blocks) {
+      const scroller = block.closest('section');
+      expect(scroller).toHaveAttribute('tabindex', '0');
+      expect(scroller?.getAttribute('aria-label')).toMatch(/ command$/);
+      expect(scroller?.className).toContain('overflow-x-auto');
+    }
+  });
 });

@@ -614,7 +614,7 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "URL", "value": "https://jov.ie", "short": true },
-                    { "title": "Failed Tests", "value": "```\n${{ steps.test-results.outputs.failed_tests }}\n```", "short": false },
+                    { "title": "Failed Tests", "value": ${{ toJSON(format('```{0}```', steps.test-results.outputs.failed_tests)) }}, "short": false },
                     { "title": "Action", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": false }
                   ]
                 }

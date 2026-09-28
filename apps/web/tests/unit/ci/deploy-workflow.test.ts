@@ -5215,8 +5215,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
     expect(evaluator).toContain("default: '5'");
     expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('failingRunAttempt < 2');
-    expect(evaluator).toContain('repair_state_unavailable');
+    expect(evaluator).toContain('attemptEvidenceTrusted');
+    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {
