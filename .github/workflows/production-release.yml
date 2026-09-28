@@ -146,6 +146,15 @@ jobs:
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
         continue-on-error: false
+      - name: DB migrate (staging - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (post-migration schema check)
         id: verify
         env:
@@ -723,7 +732,7 @@ jobs:
       ]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
@@ -768,6 +777,15 @@ jobs:
           doppler run --project jovie-web --config prd
           --only-secrets=DATABASE_URL --no-fallback --
           env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
+      - name: DB migrate (production - online indexes)
+        timeout-minutes: 12
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:online-indexes:ci
       - name: DB verify (production schema check)
         id: verify-production-schema
         env:

@@ -43,7 +43,7 @@ export const PRO_TRIAL_TRUTH =
 export const PRO_LIMITED_ACCESS_TRUTH = 'Limited access.';
 
 export const FREE_PROFILE_TRUTH =
-  'Your artist profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
+  'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
 
 export const MAX_NO_TRIAL_TRUTH = 'Paid Max plan. No Max trial.';
 
