@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { CompactGlassCaptureDemo } from '@/components/marketing/artist-profile/CompactGlassCaptureDemo';
 import { HomeNotificationCard } from './HomeNotificationCard';
 import {
   HomeProfileShowcase,
@@ -31,6 +32,11 @@ export const MARKETING_RENDER_ROUTE_SURFACES = [
     id: 'fans',
     label: 'Fans',
     href: '/renders/surfaces/fans',
+  },
+  {
+    id: 'compact-glass',
+    label: 'Compact Glass',
+    href: '/renders/surfaces/compact-glass',
   },
 ] as const;
 
@@ -150,6 +156,14 @@ export function MarketingRenderSurface({
         <RenderShell>
           <div className='w-full max-w-96 rounded-[1.25rem] bg-white/[0.03] p-3'>
             <HomeRelationshipPanel />
+          </div>
+        </RenderShell>
+      );
+    case 'compact-glass':
+      return (
+        <RenderShell emphasize>
+          <div className='w-full max-w-96'>
+            <CompactGlassCaptureDemo />
           </div>
         </RenderShell>
       );

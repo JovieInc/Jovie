@@ -11,6 +11,7 @@ vi.mock('@/lib/changelog-source', () => ({ getChangelogSnapshot }));
 
 const RELEASE_FIXTURE = {
   version: '26.8.0',
+  kind: 'release',
   date: '2026-08-14',
   summary: 'A concise release summary.',
   sections: {

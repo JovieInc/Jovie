@@ -228,4 +228,38 @@ describe('ProfilePrimaryTabPanel', () => {
       screen.getByTestId('profile-primary-tab-subscribe')
     ).toBeInTheDocument();
   });
+
+  it('renders the capture control once the visitor assignment has resolved', () => {
+    renderPanel({ mode: 'subscribe', visitorAssignmentResolved: true });
+
+    expect(
+      screen.getByTestId('mock-artist-notifications-cta')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Loading subscription form')).toBeNull();
+  });
+
+  it('holds the subscribe CTA as a skeleton while the visitor assignment resolves', () => {
+    renderPanel({ mode: 'subscribe', visitorAssignmentResolved: false });
+
+    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-artist-notifications-cta')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-two-step-notifications-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('holds the two-step subscribe CTA too while the visitor assignment resolves', () => {
+    renderPanel({
+      mode: 'subscribe',
+      subscribeTwoStep: true,
+      visitorAssignmentResolved: false,
+    });
+
+    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-two-step-notifications-cta')
+    ).not.toBeInTheDocument();
+  });
 });

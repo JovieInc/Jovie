@@ -9,6 +9,11 @@ export interface AudioTrackSource {
   readonly audioUrl?: string;
   /** ISRC code for the track — used to fetch a fresh preview URL if the stored one expires. */
   readonly isrc?: string | null;
+  /**
+   * Parent release ID, when known. Lets catalog mutations converge the
+   * now-playing snapshot without re-identifying the track (JOV-6544).
+   */
+  readonly releaseId?: string;
   readonly releaseTitle?: string;
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
@@ -59,6 +64,9 @@ let _activeTrackIsrc: string | null = null;
 let _hasRetriedRefresh = false;
 let _queue: readonly AudioTrackSource[] = [];
 let _queueIndex = -1;
+/** Source of the currently active track — retained so catalog mutations can
+ * converge now-playing metadata even when no queue is set (JOV-6544). */
+let _activeSource: AudioTrackSource | null = null;
 /** Nested audio-focus holds (dictation / local preview). Resume is opt-in. */
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
@@ -273,6 +281,7 @@ function handlePlaybackFailure(
     audio.pause();
     audio.src = '';
   }
+  _activeSource = null;
   clearPlaybackQueue();
   setState({
     activeTrackId: null,
@@ -305,6 +314,7 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   const token = ++_playToken;
   _activeTrackIsrc = track.isrc ?? null;
   _hasRetriedRefresh = false;
+  _activeSource = track;
   audio.pause();
   audio.src = track.audioUrl;
   setState({
@@ -497,6 +507,63 @@ export function resumePlaybackAfterInterruption(
   });
 }
 
+export interface PlayingReleasePatch {
+  readonly id: string;
+  readonly title: string;
+  readonly artworkUrl?: string | null;
+  /** Release-level lyrics flag — applied only to release-level playback. */
+  readonly hasLyrics?: boolean;
+}
+
+/**
+ * Converge the now-playing snapshot (and queued sources) after a release
+ * mutation. Matches entries that ARE the release (release-preview playback,
+ * `id === release.id`) and tracks that BELONG to it (`releaseId`). Only
+ * metadata is patched — the active audio source and position are untouched.
+ */
+export function syncPlayingReleaseMetadata(release: PlayingReleasePatch): void {
+  const artworkUrl = release.artworkUrl ?? null;
+
+  const patchSource = (track: AudioTrackSource): AudioTrackSource => {
+    if (track.id === release.id) {
+      return {
+        ...track,
+        title: release.title,
+        releaseTitle: release.title,
+        artworkUrl,
+        hasLyrics: release.hasLyrics ?? track.hasLyrics,
+      };
+    }
+    if (track.releaseId === release.id) {
+      return { ...track, releaseTitle: release.title, artworkUrl };
+    }
+    return track;
+  };
+
+  if (_queue.length > 0) {
+    _queue = _queue.map(patchSource);
+  }
+  if (_activeSource) {
+    _activeSource = patchSource(_activeSource);
+  }
+
+  if (!state.activeTrackId) return;
+  const activeMatches =
+    state.activeTrackId === release.id ||
+    _activeSource?.releaseId === release.id;
+  if (!activeMatches) return;
+
+  const isReleasePlayback = state.activeTrackId === release.id;
+  setState({
+    ...(isReleasePlayback ? { trackTitle: release.title } : {}),
+    releaseTitle: release.title,
+    artworkUrl,
+    ...(isReleasePlayback && release.hasLyrics !== undefined
+      ? { hasLyrics: release.hasLyrics }
+      : {}),
+  });
+}
+
 export function useTrackAudioPlayer() {
   const [playbackState, setPlaybackState] = useState<PlaybackState>(state);
 
@@ -570,6 +637,7 @@ export function useTrackAudioPlayer() {
       audio.pause();
       audio.src = '';
     }
+    _activeSource = null;
     clearPlaybackQueue();
     setState({
       activeTrackId: null,
