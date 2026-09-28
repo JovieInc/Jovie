@@ -284,6 +284,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/logo-asset-normalization.test.mjs',
   'scripts/observability-issue-github.test.mjs',
   'scripts/observability-issue-sync.test.mjs',
+  'scripts/ops/firecrawl-crawl.test.mjs',
   'scripts/performance-artifact-retention.test.mjs',
   'scripts/postmortem-linkage-check.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
