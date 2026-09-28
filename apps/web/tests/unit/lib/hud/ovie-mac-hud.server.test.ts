@@ -43,6 +43,10 @@ vi.mock('@/lib/ovie/lyb-mrr.server', () => ({
   getLybDailyMrr: vi.fn(),
 }));
 
+vi.mock('@/lib/admin/founder-funnel', () => ({
+  getFounderFunnelData: vi.fn().mockResolvedValue(null),
+}));
+
 function stripeAvailable() {
   return {
     mrrUsd: 5200,

@@ -253,7 +253,7 @@ describe('founder Summer history readback', () => {
     const cas = vi.spyOn(store, 'putDecisionIfUnchanged');
     const response = await GET();
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toContain('could not be verified');
+    expect((await response.json()).error).toContain('couldn’t be verified');
     expect(
       await store.getDecisionForUpdate(SUMMER_SESSION_DECISION_ID)
     ).toEqual(before);

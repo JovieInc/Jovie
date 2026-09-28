@@ -130,9 +130,13 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
+    // Homepage conversion lock (JOV-5085): never Request access on /.
+    await expect(
+      header.getByRole('link', { name: 'Find yourself' })
+    ).toHaveAttribute('href', '/start');
     await expect(
       header.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
+    ).toHaveCount(0);
 
     const viewport = page.viewportSize();
     test.skip(
@@ -809,14 +813,14 @@ test.describe('Homepage', () => {
     const mobileNav = page.locator('#mobile-nav-panel');
     await expect(mobileNav).toBeVisible();
     await expect(
-      header.getByRole('link', { name: 'Find yourself', exact: true })
+      header.getByRole('link', { name: 'Request access', exact: true })
     ).toHaveCount(0);
     await expect(
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Request access', exact: true })
-    ).toHaveAttribute('href', '/signup');
+      mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
+    ).toHaveAttribute('href', '/start');
   });
 
   test('has no horizontal overflow across common viewports', async ({

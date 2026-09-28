@@ -71,8 +71,10 @@ updates:
       # same 6861 files). Ship now: stay on 56.3.2. Re-evaluate when a CLI
       # >=57 prebuilt tgz deploy of this repo reaches READY (manual preview
       # dispatch). Then drop this ignore and re-pin in deploy-workflow.test.ts.
+      # >=56.4 (not >=57): the >=57 range still let the 56.5.0 bump through
+      # (#18529), which fails the structural pin test.
       - dependency-name: 'vercel'
-        versions: ['>=57']
+        versions: ['>=56.4']
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'

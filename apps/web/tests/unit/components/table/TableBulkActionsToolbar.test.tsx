@@ -35,7 +35,7 @@ describe('TableBulkActionsToolbar', () => {
     expect(toolbar).toBeInTheDocument();
     expect(toolbar).toHaveAttribute('aria-hidden', 'true');
     expect(toolbar).toHaveAttribute('data-state', 'hidden');
-    expect(toolbar).toHaveClass('absolute', 'min-h-11', 'opacity-0');
+    expect(toolbar).toHaveClass('absolute', 'min-h-10', 'opacity-0');
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
   });
 
@@ -43,7 +43,7 @@ describe('TableBulkActionsToolbar', () => {
     expect(TABLE_TOOLBAR_OVERLAY_CLASS).toContain(
       'overflow-x-auto overflow-y-hidden'
     );
-    expect(TABLE_TOOLBAR_OVERLAY_CLASS).toContain('min-h-11');
+    expect(TABLE_TOOLBAR_OVERLAY_CLASS).toContain('min-h-10');
   });
 
   it('renders selected count and overflow actions in the visible overlay', () => {
