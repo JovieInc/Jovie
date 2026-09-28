@@ -27,8 +27,8 @@ import { cn } from '@/lib/utils';
  * they must never repeat a fact this header already states.
  *
  * JOV-6842: single owner of rail header anatomy. EntityHeaderCard,
- * DrawerHeader, AudienceMemberHeader, and ContactDetailHeader are folded
- * onto it and the retired files are deleted.
+ * DrawerHeader, AudienceMemberHeader, and ContactDetailHeader call sites are
+ * folded onto it; the retired files are removed by the follow-up deletion PR.
  * `layout='chrome'` = utility title bar; variants fail CI (JOV-6777).
  */
 
