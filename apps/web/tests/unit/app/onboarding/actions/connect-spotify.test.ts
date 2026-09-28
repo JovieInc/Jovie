@@ -14,6 +14,7 @@ const hoisted = vi.hoisted(() => {
     .fn()
     .mockResolvedValue(undefined);
   const captureErrorMock = vi.fn();
+  const eqMock = vi.fn();
   const attributeLeadSignupMock = vi.fn().mockResolvedValue(undefined);
   const getCachedAuthMock = vi.fn().mockResolvedValue({ userId: 'clerk_123' });
   const trackServerEventMock = vi.fn();
@@ -63,6 +64,7 @@ const hoisted = vi.hoisted(() => {
 
   return {
     captureErrorMock,
+    eqMock,
     attributeLeadSignupMock,
     getCachedAuthMock,
     isBlacklistedSpotifyIdMock,
@@ -103,7 +105,7 @@ vi.mock('next/headers', () => ({
 
 vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
-  eq: vi.fn(),
+  eq: hoisted.eqMock,
   ne: vi.fn(),
   sql: vi.fn(),
 }));
@@ -150,8 +152,8 @@ vi.mock('@/lib/db/errors', () => ({
 
 vi.mock('@/lib/db/schema/auth', () => ({
   users: {
-    clerkId: 'clerkId',
-    id: 'id',
+    clerkId: 'users.clerkId',
+    id: 'users.id',
   },
 }));
 
@@ -250,6 +252,9 @@ describe('connectOnboardingSpotifyArtist', () => {
   });
 
   it('waits for inline import and enrichment before succeeding', async () => {
+    hoisted.getCachedAuthMock.mockResolvedValueOnce({
+      userId: 'app-user-uuid',
+    });
     queueOwnedProfile({ existing: 'value' });
     queueNoExistingClaim();
     queueLatestSettings({ spotifyImportStatus: 'importing' });
@@ -278,6 +283,11 @@ describe('connectOnboardingSpotifyArtist', () => {
       importing: false,
       success: true,
     });
+    expect(hoisted.eqMock).toHaveBeenCalledWith('users.id', 'app-user-uuid');
+    expect(hoisted.eqMock).not.toHaveBeenCalledWith(
+      'users.clerkId',
+      expect.anything()
+    );
     expect(hoisted.syncReleasesFromSpotifyMock).toHaveBeenCalledWith(
       'profile_123',
       { includeTracks: true }
@@ -301,6 +311,34 @@ describe('connectOnboardingSpotifyArtist', () => {
         spotifyImportTotal: 3,
       }),
     });
+  });
+
+  it('rejects a profile outside the app user ownership scope', async () => {
+    hoisted.getCachedAuthMock.mockResolvedValueOnce({
+      userId: 'other-app-user-uuid',
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    await expect(
+      connectOnboardingSpotifyArtist({
+        artistName: 'Artist Name',
+        profileId: 'profile_123',
+        spotifyArtistId: 'artist_spotify_id',
+        spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+      })
+    ).rejects.toThrow('Profile not found');
+    expect(hoisted.eqMock).toHaveBeenCalledWith(
+      'users.id',
+      'other-app-user-uuid'
+    );
+    expect(hoisted.eqMock).not.toHaveBeenCalledWith(
+      'users.clerkId',
+      expect.anything()
+    );
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
   });
 
   it('fails closed when Spotify import completes without releases', async () => {
