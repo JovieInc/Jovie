@@ -173,6 +173,7 @@ ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 ios.teleprompter|ios|ios-teleprompter|apps/ios/Jovie/Features/Teleprompter/|compact
 ios.inbox|ios|ios-inbox|apps/ios/Jovie/Features/Inbox/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
+web.legacy-feature-flags|web|ovie|apps/web/app/app/(shell)/feature-flags/page.tsx|desktop,mobile|x|Redirect-only stub to /app/ov/certifications; Ovie-owned founder surface (JOV-6895)
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
 web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/mobile-auth-return/|desktop,mobile|x|Auth/security lane is out of scope
 macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope
