@@ -25,8 +25,37 @@ export const SCREEN_BROWSER_PROOF_SCHEMA = 'screen-browser-proof/v1';
 export const SCREEN_CERT_GATE = 'screen-certification-gate';
 export const SCREEN_REGISTRATION_GATE = 'screen-registration-gate';
 export const CLS_INTERACTION_BUDGET = 0.05;
+// Every entry below is a screen whose registered `sources` exactly matches
+// (or, for a directory registration, is the sole capture inside) a route in
+// `apps/web/data/marketing/routeManifest.ts` MARKETING_EXACT_PUBLIC_ROUTE_TARGETS
+// — i.e. `marketing-routes.spec.ts` already captures real exact-head evidence
+// for it every run. Wiring the binding lets the certification gate use that
+// evidence instead of blocking on "missing exact-head proof". Screens with no
+// matching manifest entry (dynamic/authenticated app-shell pages, iOS/macOS
+// screens, or marketing pages not yet in either registry) are intentionally
+// left unmapped: JOV-INV-018 has no producer for them on this workflow, and
+// mapping them to the wrong route would silently accept unrelated evidence.
 export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.homepage': '/',
+  'web.marketing-new': '/new',
+  'web.marketing-pricing': '/pricing',
+  'web.marketing-download': '/download',
+  'web.marketing-pay': '/pay',
+  'web.marketing-product': '/product',
+  'web.marketing-card': '/card',
+  'web.marketing-smart-links': '/smart-links',
+  'web.marketing-launch': '/launch',
+  'web.marketing-about': '/about',
+  'web.marketing-support': '/support',
+  'web.developers': '/developers',
+  'web.api-versioning-policy': '/api-versioning',
+  'web.cli-landing': '/cli',
+  'web.marketing-ai': '/ai',
+  'web.marketing-compare': '/compare',
+  'web.marketing-alternatives': '/alternatives',
+  'web.blog': '/blog',
+  'web.changelog': '/changelog',
+  'web.waitlist': '/waitlist',
 });
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
