@@ -27,13 +27,16 @@ import {
   trackArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  isCanonicalPublicProfileHandle,
+  normalizePublicProfileHandle,
+} from '@/lib/profile/opaque-internal-profile-handle';
 import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import {
   isPublicArtistCollaboratorRole,
   PUBLIC_ARTIST_COLLABORATOR_ROLES,
 } from '../artist-credit-policy';
-import { artistProfileHref } from '../artist-profile-routing';
 import type {
   CollaboratorInfo,
   CreditedArtistWithProfile,
@@ -264,18 +267,19 @@ function projectStructuredReleaseCollaborator(
     profileState = row.profileIsClaimed ? 'claimed' : 'unclaimed';
   }
 
+  // Collaborator mentions only link to readable `/{handle}` destinations
+  // (JOV-6612). Encoded `a_*` unclaimed handles and `/artists/:id` routes are
+  // raw registry IDs; credit-only artists without a canonical handle render
+  // as plain text. The `/artists/:id` route itself stays live for inbound
+  // links and still self-heals an eligible unclaimed profile on first visit.
+  const mentionHandle = isCanonicalPublicProfileHandle(row.profileUsername)
+    ? normalizePublicProfileHandle(row.profileUsername)
+    : null;
+
   return {
     artistId: row.artistId,
     name,
-    // A structured Spotify identity has a canonical entity route even before
-    // its claim-safe profile row is materialized. The route self-heals the
-    // eligible unclaimed profile on first visit; names without an exact
-    // provider identity remain plain text rather than reserving a handle by
-    // display name alone.
-    href:
-      hasPublicProfile || (!hasBoundProfile && row.artistSpotifyId)
-        ? artistProfileHref(row.artistId)
-        : null,
+    href: hasPublicProfile && mentionHandle ? `/${mentionHandle}` : null,
     profileState,
     reconciliationEligible: Boolean(row.artistSpotifyId),
     role: row.role,
