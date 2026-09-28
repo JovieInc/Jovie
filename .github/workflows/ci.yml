@@ -3316,7 +3316,7 @@ jobs:
   ci-product-lane-receipt:
     name: Product Lane Receipt
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
+      [ci-path-changes, ci-merge-group-admission, ci-risk-classifier, ci-fast, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3350,8 +3350,14 @@ jobs:
           RUN_MAC: ${{ needs.ci-path-changes.outputs.run_macos }}
           RUN_OPERATIONS: ${{ needs.ci-path-changes.outputs.run_operations }}
           RUN_CROSS: ${{ needs.ci-path-changes.outputs.run_cross_product }}
+          RISK_LEVEL: ${{ needs.ci-risk-classifier.outputs.risk_level }}
+          RISK_SMOKE: ${{ needs.ci-risk-classifier.outputs.requires_smoke }}
+          RISK_PREVIEW: ${{ needs.ci-risk-classifier.outputs.requires_preview }}
+          RISK_BLOCKS: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
+          RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
         run: |
           set -euo pipefail
+          RISK_LEVEL="${RISK_LEVEL:-unknown}" RISK_SMOKE="${RISK_SMOKE:-true}" RISK_PREVIEW="${RISK_PREVIEW:-true}" RISK_BLOCKS="${RISK_BLOCKS:-true}"
           lane_result() { [ "$1" = true ] && printf '%s' "$2" || printf skipped; }
           root="$RUNNER_TEMP/product-lane-receipt"
           jq -n \
@@ -3362,7 +3368,9 @@ jobs:
             --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
             --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
             --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run}' \
+            --arg riskLevel "$RISK_LEVEL" --arg rules "$RISK_RULES" \
+            --argjson requiresSmoke "$RISK_SMOKE" --argjson requiresPreview "$RISK_PREVIEW" --argjson blocksUnattended "$RISK_BLOCKS" \
+            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run, riskReceipt: {schemaVersion: 1, sha: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT, riskLevel: $riskLevel, requiresSmoke: $requiresSmoke, requiresPreview: $requiresPreview, blocksUnattended: $blocksUnattended, matchedRuleIds: ($rules | split(",") | map(select(length > 0)))}}' \
             > "$root/results.json"
           node scripts/lib/product-lane-finalize.mjs \
             "$root/receipt.json" "$root/results.json" \
