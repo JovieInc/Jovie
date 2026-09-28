@@ -430,6 +430,7 @@ export function ShippingVelocityChart({
               ) : null}
             </div>
             <figure
+              role='img'
               aria-labelledby={titleId}
               aria-describedby={summaryId}
               data-testid='shipping-velocity-figure'
