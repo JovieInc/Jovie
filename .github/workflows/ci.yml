@@ -2501,7 +2501,10 @@ jobs:
           set -euo pipefail
           test -n "$DATABASE_URL" || { echo "::error::Missing isolated DATABASE_URL"; exit 1; }
           pnpm --filter=@jovie/web run drizzle:migrate:ci
-          pnpm --filter=@jovie/web exec tsx scripts/verify-db-migrations.ts
+          # The ephemeral branch snapshots the shared parent, whose ledger may
+          # already drift from the journal; reconcile bookkeeping on the
+          # throwaway copy (drift is still reported) and re-verify it clean.
+          pnpm --filter=@jovie/web exec tsx scripts/verify-db-migrations.ts --repair-ephemeral-ledger
 
       - name: Measure Drizzle tooling frontier
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true') }}
