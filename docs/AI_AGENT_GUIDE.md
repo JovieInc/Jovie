@@ -126,6 +126,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/cron/process-pre-saves` | GET | CRON_SECRET | Process pre-save queue |
 | `/api/cron/schedule-release-notifications` | GET | CRON_SECRET | Schedule release alerts |
 | `/api/cron/send-release-notifications` | GET | CRON_SECRET | Send release alerts |
+| `/api/cron/web-ai-health` | GET | CRON_SECRET | Probe five production AI surfaces and return a redacted health receipt |
 
 ### Inbox Founder Reviews (authenticated founder surface)
 
