@@ -590,7 +590,10 @@ export async function executeChatTurn(
       },
     }),
     onFinish: async ({ steps, text, finishReason }) => {
-      if (!text.trim() && steps.every(step => step.toolCalls.length === 0)) {
+      if (
+        !(typeof text === 'string' && text.trim()) &&
+        steps.every(step => step.toolCalls.length === 0)
+      ) {
         const emptyOutputError = Object.assign(
           new Error('Model turn produced no text or tool calls'),
           { name: 'EmptyChatTurnError' }
