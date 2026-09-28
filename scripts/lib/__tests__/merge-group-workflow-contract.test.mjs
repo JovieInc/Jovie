@@ -1357,6 +1357,48 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('pins the pull_request base to the merge ref parent and admits proven no-ops', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const pullRequestStart = detectStep.indexOf(
+      'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
+    );
+    const dispatchStart = detectStep.indexOf(
+      'elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then'
+    );
+    const pullRequestBranch = detectStep.slice(
+      pullRequestStart,
+      dispatchStart
+    );
+    // A pull_request checkout merges onto the base as it was at checkout;
+    // the fetched tip can be newer, so pin origin/<base> to the merge ref's
+    // first parent like &base-fetch-await does for the ci-fast jobs.
+    const pinIdx = pullRequestBranch.indexOf(
+      "git update-ref \"refs/remotes/origin/${{ github.base_ref }}\" \"$(git rev-parse 'HEAD^1')\""
+    );
+    expect(pinIdx).toBeGreaterThanOrEqual(0);
+    expect(pullRequestBranch.slice(0, pinIdx)).toContain(
+      "git rev-parse --verify --quiet 'HEAD^2^{commit}'"
+    );
+    // Only a proven absorption (HEAD already an ancestor of the base, or the
+    // merge ref's tree equal to its pinned base parent) may emit the typed
+    // no-op; every other empty diff keeps failing closed.
+    const emptyIdx = pullRequestBranch.indexOf(
+      'refusing a false docs-only classification.'
+    );
+    const noopIdx = pullRequestBranch.indexOf(
+      'git merge-base --is-ancestor HEAD "origin/${{ github.base_ref }}"'
+    );
+    expect(noopIdx).toBeGreaterThanOrEqual(0);
+    expect(emptyIdx).toBeGreaterThan(noopIdx);
+    const noopBranch = pullRequestBranch.slice(noopIdx, emptyIdx);
+    expect(noopBranch).toContain('echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"');
+    expect(noopBranch).toContain('emit_ci_lanes none');
+    expect(noopBranch).toContain('exit 0');
+  });
+
   it('materializes an empty path artifact for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(

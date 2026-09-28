@@ -700,6 +700,17 @@ jobs:
               echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
               exit 1
             fi
+            # A pull_request checkout is a merge ref built on the base as it
+            # was at checkout; the fetch above can land a newer base. Pin
+            # origin/<base> to the merge ref's first parent — the same rule
+            # as &base-fetch-await — so commits main landed since checkout
+            # are not charged to this PR, and an empty diff can only mean the
+            # PR itself changes nothing.
+            if git rev-parse --verify --quiet 'HEAD^2^{commit}' >/dev/null \
+              && git merge-base --is-ancestor 'HEAD^1' "origin/${{ github.base_ref }}"; then
+              git update-ref "refs/remotes/origin/${{ github.base_ref }}" "$(git rev-parse 'HEAD^1')"
+              echo "Pinned origin/${{ github.base_ref }} to the checkout merge base $(git rev-parse --short 'HEAD^1')."
+            fi
             CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"
             CLASSIFICATION_HEAD_REF="HEAD"
             TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
@@ -707,6 +718,28 @@ jobs:
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
+              # The fetch and refs above are verified, so emptiness here is
+              # trustworthy only when absorption is proven: the merge ref's
+              # tree equals its own base parent (main already absorbed the
+              # PR head's content, e.g. the same fix landed via another PR),
+              # or a detached head checkout is itself an ancestor of the
+              # base. Emit the same typed no-op the merge_group resolver
+              # does; unverifiable emptiness stays fail-closed (JOV-4905).
+              if git merge-base --is-ancestor HEAD "origin/${{ github.base_ref }}" \
+                || { git rev-parse --verify --quiet 'HEAD^2^{commit}' >/dev/null \
+                  && [[ "$(git rev-parse 'HEAD^1')" == "$(git rev-parse "origin/${{ github.base_ref }}")" ]]; }; then
+                PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
+                mkdir -p "$PRODUCT_LANE_DIR"
+                : > "$PRODUCT_LANE_DIR/changed-paths.txt"
+                echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
+                for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
+                  echo "$output=false" >> "$GITHUB_OUTPUT"
+                done
+                echo "selected_lanes=none" >> "$GITHUB_OUTPUT"
+                echo "shared_contract_impact=none" >> "$GITHUB_OUTPUT"
+                emit_ci_lanes none
+                exit 0
+              fi
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
               exit 1
             fi
