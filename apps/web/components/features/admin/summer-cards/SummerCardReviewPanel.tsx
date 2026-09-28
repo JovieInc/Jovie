@@ -397,20 +397,17 @@ export function SummerCardReviewPanel() {
       </ContentSurfaceCard>
 
       {pendingComment ? (
+        // biome-ignore lint/a11y/noNoninteractiveElementInteractions: role=dialog is interactive; target===currentTarget is the documented way to detect backdrop clicks.
         <div
           className='fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center'
           role='dialog'
           aria-modal='true'
           aria-label='Summer Card Comment'
+          onMouseDown={event => {
+            if (event.target === event.currentTarget && !submittingId)
+              clearComment();
+          }}
         >
-          <button
-            type='button'
-            aria-label='Close Comment Dialog'
-            className='absolute inset-0 h-auto w-auto cursor-default rounded-none border-0 bg-transparent p-0'
-            onClick={() => {
-              if (!submittingId) clearComment();
-            }}
-          />
           <ContentSurfaceCard
             className='relative z-10 w-full max-w-lg'
             data-testid='summer-card-comment-dialog'
