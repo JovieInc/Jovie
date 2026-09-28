@@ -72,13 +72,19 @@ describe('NativeReturnPage (native auth bounce)', () => {
     const expectedDeepLink = `jovie://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`;
     const link = screen.getByRole('link', { name: 'Return to Jovie' });
     expect(link).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
     expect(
       screen.getByRole('heading', { name: 'Return to Jovie' })
     ).toBeVisible();
     expect(
       screen.getByText('Authentication is complete. Return to Jovie.')
     ).toBeVisible();
+    expect(document.body).not.toHaveTextContent(expectedDeepLink);
+    expect(document.body).not.toHaveTextContent(CODE);
     expect(screen.queryByText('Jovie Desktop')).toBeNull();
   });
 
@@ -127,7 +133,11 @@ describe('NativeReturnPage (native auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
   });
 
   it('uses the local app scheme on localhost origin', () => {
@@ -139,7 +149,11 @@ describe('NativeReturnPage (native auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
   });
 
   it('renders safely before browser location is available', () => {
@@ -177,7 +191,11 @@ describe('NativeReturnPage (native auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
     expect(screen.queryByRole('link', { name: /continue/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /dashboard/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /library/i })).toBeNull();

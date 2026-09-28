@@ -56,6 +56,21 @@ Minimum fields:
 - `costEstimateUsd`
 - `blockedReason`
 
+### Routing pattern: audit-expensive → implement-cheap
+
+For fleet-scale quality programs (tables, forms, dialogs), split the work by
+model tier instead of paying frontier prices for mechanical edits:
+
+1. **Audit on the expensive model** — one deep pass produces a strict,
+   machine-checkable eval written into the repo (what PASS looks like, ranked
+   gaps, CI-enforceable gates). Example: `docs/TABLE_QUALITY_EVAL.md`.
+2. **Cook on the cheap model** — implement against the eval in ordered slices
+   (one PR per slice); loop until every gate is green. Correctness is verified
+   by the eval's tests and ratchets, not by model tier.
+3. **Router rule** — when a task references a checked-in eval, the router must
+   dispatch the implement lane, not re-audit. The eval file is the contract;
+   new audits only run when no eval exists or the eval is stale.
+
 Gate evidence names are stable strings:
 
 - `gstack.qa.exhaustive`

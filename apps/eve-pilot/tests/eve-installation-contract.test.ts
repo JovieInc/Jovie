@@ -15,7 +15,7 @@ describe('Eve installation contract', () => {
 
     // Keep this pin in lockstep with the package.json dependency; dependabot
     // bumps edit the manifest but not this test.
-    const EVE_PIN = '0.66.1';
+    const EVE_PIN = '0.66.2';
 
     expect(packageJson.packageManager).toBe('pnpm@9.15.9');
     expect(packageJson.dependencies?.eve).toBe(EVE_PIN);

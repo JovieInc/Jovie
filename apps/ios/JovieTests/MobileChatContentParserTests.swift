@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 import UIKit
 @testable import Jovie
@@ -845,5 +846,85 @@ private final class SpyObservabilityProvider: ObservabilityProvider {
   func setTag(key: String, value: String) {}
   func startSpan(name: ObservabilityEvent, context: ObservabilityContext) -> ObservabilitySpan {
     NoopObservabilitySpan()
+  }
+}
+
+/// JOV-6000: the "Thinking" dots must exist only while authoritative
+/// timeline state says assistant work is in flight with nothing renderable,
+/// and the breathe loop may run only on an active scene without Reduce
+/// Motion. Terminal states, backgrounding, and reduced motion all resolve
+/// to the static/hidden state deterministically.
+struct MobileChatThinkingIndicatorTests {
+  @Test func showsIndicatorOnlyForInFlightEmptyAssistantTurn() {
+    #expect(
+      MobileChatThinkingIndicator.shouldDisplay(
+        role: .assistant,
+        status: .streaming,
+        hasRenderableContent: false
+      )
+    )
+  }
+
+  @Test func hidesIndicatorForEveryTerminalStatus() {
+    for status: MobileChatTimelineStatus in [.idle, .completed, .failed, .canceled] {
+      #expect(
+        !MobileChatThinkingIndicator.shouldDisplay(
+          role: .assistant,
+          status: status,
+          hasRenderableContent: false
+        ),
+        "Indicator must not render for terminal status \(status)"
+      )
+    }
+  }
+
+  @Test func showsIndicatorForAllInFlightStatuses() {
+    for status: MobileChatTimelineStatus in [.sending, .queued, .running, .retrying, .streaming] {
+      #expect(
+        MobileChatThinkingIndicator.shouldDisplay(
+          role: .assistant,
+          status: status,
+          hasRenderableContent: false
+        ),
+        "Indicator must render for in-flight status \(status)"
+      )
+    }
+  }
+
+  @Test func hidesIndicatorForUserTurnsAndRenderableContent() {
+    #expect(
+      !MobileChatThinkingIndicator.shouldDisplay(
+        role: .user,
+        status: .streaming,
+        hasRenderableContent: false
+      )
+    )
+    #expect(
+      !MobileChatThinkingIndicator.shouldDisplay(
+        role: .assistant,
+        status: .streaming,
+        hasRenderableContent: true
+      )
+    )
+  }
+
+  @Test func animationRunsOnlyOnActiveSceneWithoutReduceMotion() {
+    #expect(
+      MobileChatThinkingIndicator.shouldAnimate(reduceMotion: false, scenePhase: .active)
+    )
+    // Background and inactive must stop the loop; reconnect/foreground only
+    // resumes when this returns true again while the view is still mounted.
+    #expect(
+      !MobileChatThinkingIndicator.shouldAnimate(reduceMotion: false, scenePhase: .background)
+    )
+    #expect(
+      !MobileChatThinkingIndicator.shouldAnimate(reduceMotion: false, scenePhase: .inactive)
+    )
+    #expect(
+      !MobileChatThinkingIndicator.shouldAnimate(reduceMotion: true, scenePhase: .active)
+    )
+    #expect(
+      !MobileChatThinkingIndicator.shouldAnimate(reduceMotion: true, scenePhase: .background)
+    )
   }
 }

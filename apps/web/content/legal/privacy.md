@@ -6,7 +6,7 @@ This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
 ## Our Commitment to Privacy
 
-Jovie exists so musicians can share their story with confidence. That means keeping your information safe, using it transparently, and never selling it. We aim for clarity, control, and fast responses whenever you need help.
+Jovie exists so you can share your story with confidence. That means keeping your information safe, using it transparently, and never selling it. We aim for clarity, control, and fast responses whenever you need help.
 
 ## Information We Collect
 
@@ -118,14 +118,14 @@ When you start a new chat conversation, the first messages are sent to **Google*
 
 ### AI-Powered Insights
 
-Aggregated analytics data (profile views, click patterns, geographic distribution) may be sent to **Anthropic** (Claude) to generate personalized career insights. This data consists of anonymized summaries, not raw user activity.
+Aggregated analytics data (profile views, click patterns, geographic distribution) may be sent to **Anthropic** (Claude) to generate personalized insights. This data consists of anonymized summaries, not raw user activity.
 
 ### What We Do NOT Send to AI Providers
 
 - Your email address or authentication credentials
 - Your payment information
 - Your IP address
-- Raw click-level analytics data identifying your fans
+- Raw click-level analytics data identifying your visitors
 
 ### Your Controls
 

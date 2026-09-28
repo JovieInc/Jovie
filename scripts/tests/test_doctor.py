@@ -48,10 +48,16 @@ class JudgeTest(unittest.TestCase):
             gateTimeouts24h=5, failed24h=10, diskFreePct=4.0, githubRemaining=100, hudBeatAge=500,
             lastLandingAge=8 * 3600))
         self.assertEqual(set(alerts), {"tick-error", "provider-down:devin", "codex-all-banked", "no-landing",
-                                       "gate-timeouts", "failed-runs", "disk-low", "github-quota", "hud-stale"})
+                                       "gate-timeouts", "failed-runs", "disk-critical", "github-quota", "hud-stale"})
         self.assertIn("earliest reset in 10m", alerts["codex-all-banked"])
         self.assertIn("8h ago", alerts["no-landing"])
         self.assertIn("Boom", alerts["tick-error"])
+
+    def test_disk_tiers_page_summer_only_below_critical(self):
+        self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
+        alerts = doctor.judge(obs(diskFreePct=4.9))
+        self.assertEqual(set(alerts), {"disk-critical"})
+        self.assertIn("Summer", alerts["disk-critical"])
 
     def test_pool_empty_needs_thirty_sustained_minutes(self):
         self.assertEqual(doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0}), {})
@@ -62,6 +68,13 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(doctor.judge(obs(lastLandingAge=None, busy=0)), {})
         self.assertEqual(doctor.judge(obs(lastLandingAge=None, pool=0), {"poolEmptySince": 1_000_000.0}), {})
         self.assertIn("never in 24h", doctor.judge(obs(lastLandingAge=None))["no-landing"])
+
+    def test_spawn_exit_needs_spawned_workers_no_worktrees_and_no_recent_run(self):
+        idle = {"tick": {"at": "x", "unhealthy": [], "error": None, "spawned": ["devin", "codex"]}, "worktrees": 0}
+        self.assertEqual(doctor.judge(obs(**idle, lastWorkAge=600)), {})
+        self.assertEqual(doctor.judge(obs(**{**idle, "worktrees": 2}, lastWorkAge=None)), {})
+        self.assertIn("workers exit on claim", doctor.judge(obs(**idle, lastWorkAge=3601))["spawn-exit"])
+        self.assertIn("spawn-exit", doctor.judge(obs(**idle, lastWorkAge=None)))
 
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
@@ -128,6 +141,15 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(tracker.open("disk-low", "x"), "existing-1")
 
 
+class OrphanPrTest(unittest.TestCase):
+    def test_orphan_prs_from_a_fresh_sweep_raise_one_alert(self):
+        sweep = {"atEpoch": 1_000_000.0 - 60, "orphans": [18938, 18924], "counts": {"open": 150}}
+        alerts = doctor.judge(obs(reconcile=sweep))
+        self.assertIn("#18938 #18924", alerts["orphan-prs"])
+        self.assertNotIn("orphan-prs", doctor.judge(obs(reconcile={**sweep, "orphans": []})))
+        self.assertNotIn("orphan-prs", doctor.judge(obs(reconcile={**sweep, "atEpoch": 0})), "a stale sweep proves nothing")
+
+
 class StatusFeedTest(unittest.TestCase):
     def test_feed_counts_running_and_idle_slots_per_lane(self):
         import fcntl
@@ -146,7 +168,8 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(feed["lanes"]["devin"], {"running": 1, "slots": 2})
         self.assertEqual(feed["alerts"], {"disk-low": "x"})
         self.assertNotIn("gate", feed["lanes"])
-        self.assertEqual((feed["held_by_reason"], feed["failed_by_reason"]), ({}, {}))
+        self.assertEqual((feed["held_by_reason"], feed["failed_by_reason"], feed["prs"], feed["orphan_prs"]),
+                         ({}, {}, {}, []))
 
     def test_feed_publishes_held_and_failed_records_by_reason(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -159,7 +182,7 @@ class StatusFeedTest(unittest.TestCase):
             host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
             lane = type("Lane", (), {"Linear": staticmethod(lambda env: (_ for _ in ()).throw(OSError("x"))),
                                      "load_providers": staticmethod(lambda: {}),
-                                     "load_github_env": staticmethod(lambda: None), "HOST": "gem"})
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
@@ -198,7 +221,7 @@ class RunTest(unittest.TestCase):
                 def __init__(self, env):
                     raise OSError("no env")
             lane = type("Lane", (), {"Linear": FakeLinear, "load_providers": staticmethod(lambda: {}),
-                                     "load_github_env": staticmethod(lambda: None), "HOST": "test"})
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None), "HOST": "test"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {"count": 0, "available": [], "accounts": {}})})
             tracker = FakeTracker()
             os.environ["LANES_SELFTEST"] = "1"  # no gist from a unit test

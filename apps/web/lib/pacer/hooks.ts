@@ -12,11 +12,6 @@
 
 export { PACER_TIMING } from './hooks/timing';
 export type {
-  UseAsyncSearchOptions,
-  UseAsyncSearchReturn,
-} from './hooks/useAsyncSearch';
-export { useAsyncSearch } from './hooks/useAsyncSearch';
-export type {
   UseAsyncValidationOptions,
   UseAsyncValidationReturn,
 } from './hooks/useAsyncValidation';

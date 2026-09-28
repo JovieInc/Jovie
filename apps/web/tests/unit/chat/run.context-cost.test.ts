@@ -220,4 +220,52 @@ describe('executeChatTurn context cost', () => {
       },
     });
   });
+
+  it('logs the real model stream error even without telemetry (JOV-6533)', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      requestId: 'req-1',
+      uiMessages: [
+        { id: 'a', role: 'user', parts: [{ type: 'text', text: 'hi' }] },
+      ] as UIMessage[],
+    });
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const boom = new Error('provider rejected the request');
+    await (
+      capturedOptions(turn) as unknown as {
+        onError: (e: { error: unknown }) => Promise<void>;
+      }
+    ).onError({ error: boom });
+
+    expect(consoleError).toHaveBeenCalledWith(
+      '[chat] model stream error',
+      expect.objectContaining({
+        message: 'provider rejected the request',
+        requestId: 'req-1',
+      })
+    );
+
+    type Opts = {
+      onAbort: (e: { steps: unknown[] }) => void;
+      onFinish: (e: {
+        steps: { toolCalls: unknown[] }[];
+        text: string;
+        finishReason: string;
+      }) => Promise<void>;
+    };
+    const opts = capturedOptions(turn) as unknown as Opts;
+    opts.onAbort({ steps: [] });
+    expect(consoleError).toHaveBeenCalledWith(
+      '[chat] model stream aborted',
+      expect.objectContaining({ requestId: 'req-1', steps: 0 })
+    );
+    await opts.onFinish({ steps: [], text: '', finishReason: 'stop' });
+    expect(consoleError).toHaveBeenCalledWith(
+      '[chat] model turn produced no output',
+      expect.objectContaining({ requestId: 'req-1', finishReason: 'stop' })
+    );
+    consoleError.mockRestore();
+  });
 });

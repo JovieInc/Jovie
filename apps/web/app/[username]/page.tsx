@@ -20,6 +20,7 @@ import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { MetaPixel } from '@/features/tracking/MetaPixel';
+import { SignupFunnelBeacon } from '@/features/tracking/SignupFunnelBeacon';
 import {
   isProofProfileHandle,
   resolveProofClaimCta,
@@ -34,7 +35,6 @@ import {
   getCreditedArtistsWithProfiles,
   getStructuredReleaseCollaborators,
 } from '@/lib/discography/artist-queries';
-import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { env } from '@/lib/env-server';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
@@ -48,6 +48,7 @@ import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import {
   buildProfileAeoContent,
   buildProfileAeoFaqStructuredData,
+  buildStructuredCollaboratorParagraph,
 } from '@/lib/profile/aeo-content';
 import {
   collectEntityMentions,
@@ -63,6 +64,7 @@ import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-inter
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
+import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
 import { generateProfileStructuredData } from '@/lib/seo/structured-data';
 import { resolveSpotifyArtistIdentity } from '@/lib/spotify/artist-id';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
@@ -154,12 +156,14 @@ async function getPublicTourDates(
 }
 
 async function getPublicReleases(profileId: string): Promise<{
-  readonly releases: Awaited<ReturnType<typeof getReleasesForProfileLite>>;
+  readonly releases: Awaited<
+    ReturnType<typeof getCachedPublicReleasesForProfile>
+  >;
   readonly failed: boolean;
 }> {
   try {
     return {
-      releases: await getReleasesForProfileLite(profileId),
+      releases: await getCachedPublicReleasesForProfile(profileId),
       failed: false,
     };
   } catch (error) {
@@ -249,7 +253,6 @@ async function ArtistPageContent({
   profileResult,
 }: Readonly<ArtistPageContentProps>) {
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
-  const viewerCountryCode = null;
 
   // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
   // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
@@ -257,6 +260,9 @@ async function ArtistPageContent({
   // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
   // renders AnonCookieBootstrap which resolves the per-user variant client-side
   // via /api/profile/audience-anon-cookie and updates its own state.
+  // Viewer geo reaches the client through the readable jv_country cookie the
+  // proxy stamps on the response; ProfileCompactTemplate reads it post-mount
+  // for DSP geo-sorting, so no server-side country input is passed here.
 
   const {
     profile,
@@ -467,6 +473,9 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
+      {isPublicNoAuthSmoke || isClaimed ? null : (
+        <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
+      )}
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       {/* Browser Meta pixel (fbq) — builds the retargeting website custom
@@ -484,7 +493,6 @@ async function ArtistPageContent({
         mode={initialMode}
         artist={artist}
         socialLinks={links}
-        viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
         subtitle={subtitle}
         showBackButton={showBackButton}
@@ -527,6 +535,13 @@ async function ArtistPageContent({
           showOldReleases: profileSettings.showOldReleases === true,
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
+        creditSegments={
+          buildStructuredCollaboratorParagraph(
+            artist.name,
+            artist.handle,
+            releaseCollaborators
+          )?.segments
+        }
         releases={releases}
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}

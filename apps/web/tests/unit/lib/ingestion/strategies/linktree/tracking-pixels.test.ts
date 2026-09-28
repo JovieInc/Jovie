@@ -70,6 +70,48 @@ describe('detectTrackingPixels', () => {
       facebook: { detected: true, pixelIds: ['123'] },
     });
   });
+
+  it('deduplicates pixel IDs repeated across inline script and __NEXT_DATA__', () => {
+    const html = `
+      <script>
+        fbq('init', '123456789');
+      </script>
+      <script id="__NEXT_DATA__" type="application/json">
+        {"pixel": "fbq('init', '123456789');"}
+      </script>
+    `;
+    const result = detectTrackingPixels(html);
+    expect(result).toEqual({
+      facebook: { detected: true, pixelIds: ['123456789'] },
+    });
+  });
+
+  it('detects X/Twitter, Snapchat, and Pinterest pixels', () => {
+    const html = `
+      <script>
+        twq('init', 'oab12');
+        snaptr('init', 'a1b2c3d4-0000-1111-2222-333344445555');
+        pintrk('load', '2612345678901');
+      </script>
+    `;
+    const result = detectTrackingPixels(html);
+    expect(result).toEqual({
+      twitter: { detected: true, pixelIds: ['oab12'] },
+      snapchat: {
+        detected: true,
+        pixelIds: ['a1b2c3d4-0000-1111-2222-333344445555'],
+      },
+      pinterest: { detected: true, pixelIds: ['2612345678901'] },
+    });
+  });
+
+  it('detects the twq config variant used by newer X pixel snippets', () => {
+    const html = `<script>twq('config','oab12');</script>`;
+    const result = detectTrackingPixels(html);
+    expect(result).toEqual({
+      twitter: { detected: true, pixelIds: ['oab12'] },
+    });
+  });
 });
 
 describe('mergeDiscoveredPixels', () => {

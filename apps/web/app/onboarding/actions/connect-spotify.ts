@@ -1,18 +1,14 @@
 'use server';
 
 import { and, eq, ne } from 'drizzle-orm';
-import {
-  unstable_noStore as noStore,
-  revalidatePath,
-  revalidateTag,
-} from 'next/cache';
+import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import {
   clearPendingClaimContext,
   readPendingClaimContext,
@@ -41,7 +37,11 @@ import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
 } from '@/lib/profile/unclaimed-artist-profile';
-import { trackServerEvent } from '@/lib/server-analytics';
+import {
+  type ServerAnalyticsDelivery,
+  trackServerEvent,
+  trackServerEventTx,
+} from '@/lib/server-analytics';
 import { finalizePostOnboarding } from './post-onboarding';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -55,6 +55,22 @@ const DSP_DISCOVERY_PROVIDERS = [
 ] as const;
 
 class SpotifyProfileIdentityConflictError extends Error {}
+
+async function requireFunnelDelivery(
+  event: string,
+  delivery: ServerAnalyticsDelivery
+): Promise<void> {
+  if (delivery.ok) return;
+
+  const error = new Error(
+    `Onboarding Spotify funnel event rejected: ${event} (${delivery.error})`
+  );
+  await captureError('onboarding Spotify funnel event rejected', error, {
+    action: 'connectOnboardingSpotifyArtist',
+    event,
+  });
+  throw error;
+}
 
 export interface ConnectOnboardingSpotifyArtistParams {
   artistName: string;
@@ -331,6 +347,27 @@ export async function connectOnboardingSpotifyArtist(
             finalizeOnboarding: true,
           });
 
+          // Durable funnel events commit atomically with the claim inside
+          // this transaction; stable identities deduplicate retries.
+          await requireFunnelDelivery(
+            'claim_completed',
+            await trackServerEventTx(
+              tx,
+              'claim_completed',
+              { profileId: profile.id, source: 'direct_profile_spotify_match' },
+              { eventIdentity: `claim_completed:${profile.id}` }
+            )
+          );
+          await requireFunnelDelivery(
+            'activation_achieved',
+            await trackServerEventTx(
+              tx,
+              'activation_achieved',
+              { profileId: profile.id, source: 'onboarding_completed' },
+              { eventIdentity: `activation_achieved:${profile.id}` }
+            )
+          );
+
           await tx
             .update(creatorProfiles)
             .set({
@@ -443,8 +480,7 @@ export async function connectOnboardingSpotifyArtist(
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    invalidateReleaseCaches(userId, profile.id);
     revalidatePath(APP_ROUTES.RELEASES);
 
     if (!result.success) {

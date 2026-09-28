@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import type { Virtualizer } from '@tanstack/react-virtual';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatInput } from '@/components/jovie/components/ChatInput';
@@ -11,7 +12,15 @@ import {
   ChatComposerSurface,
   ChatEmptyStateComposerRegion,
   ChatLoadingConversationSkeleton,
+  ChatThreadMessages,
 } from './JovieChatSections';
+
+vi.mock('@/components/jovie/components', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/components/jovie/components')>()),
+  ChatMessage: ({ id }: { id: string }) => (
+    <div data-testid='thread-row'>{id}</div>
+  ),
+}));
 
 vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
   ChatUsageAlert: () => <div data-testid='usage-alert-probe'>usage-alert</div>,
@@ -115,6 +124,72 @@ describe('JovieChatSections', () => {
   });
 });
 
+function renderThreadMessages({
+  collapsedFailureCount = 0,
+  onShowCollapsedFailures,
+}: {
+  readonly collapsedFailureCount?: number;
+  readonly onShowCollapsedFailures?: () => void;
+} = {}) {
+  return render(
+    <ChatThreadMessages
+      messages={[]}
+      shouldVirtualizeMessages={false}
+      virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
+      virtualizedMessageViewportHeight={0}
+      virtualizedMinHeight={0}
+      messageViewportPaddingBottom={undefined}
+      totalSizeRef={() => undefined}
+      bottomSentinelRef={() => undefined}
+      isStreaming={false}
+      lastAssistantIndex={-1}
+      knownMessageIds={new Set()}
+      inlineChatError={null}
+      isStuckToBottom
+      onScrollToBottom={() => undefined}
+      collapsedFailureCount={collapsedFailureCount}
+      onShowCollapsedFailures={onShowCollapsedFailures}
+    />
+  );
+}
+
+describe('ChatThreadMessages collapsed summer failures', () => {
+  it('hides the control when there are no collapsed failures', () => {
+    renderThreadMessages({
+      collapsedFailureCount: 0,
+      onShowCollapsedFailures: vi.fn(),
+    });
+
+    expect(
+      screen.queryByTestId('chat-collapsed-failures')
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses singular copy for one earlier unanswered message and reveals it on click', () => {
+    const onShowCollapsedFailures = vi.fn();
+    renderThreadMessages({ collapsedFailureCount: 1, onShowCollapsedFailures });
+
+    const control = screen.getByTestId('chat-collapsed-failures');
+    expect(control).toHaveTextContent(
+      '1 earlier message went unanswered. Show it'
+    );
+
+    fireEvent.click(control);
+    expect(onShowCollapsedFailures).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses plural copy for multiple earlier unanswered messages', () => {
+    renderThreadMessages({
+      collapsedFailureCount: 3,
+      onShowCollapsedFailures: vi.fn(),
+    });
+
+    expect(screen.getByTestId('chat-collapsed-failures')).toHaveTextContent(
+      '3 earlier messages went unanswered. Show them'
+    );
+  });
+});
+
 function renderComposerSurface({
   suppressUsageAlert = false,
 }: {
@@ -186,5 +261,48 @@ describe('ChatComposerSurface one-chrome-layer wiring', () => {
     expect(
       screen.getByRole('textbox', { name: 'Chat Message Input' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('ChatThreadMessages virtualized window', () => {
+  it('renders the rows the virtualizer reports on every render, not the first window', () => {
+    const messages = Array.from({ length: 6 }, (_, index) => ({
+      id: `m${index}`,
+      role: index % 2 ? ('assistant' as const) : ('user' as const),
+      parts: [],
+    }));
+    let window = [0, 1];
+    // One stable object whose state changes between renders, like TanStack Virtual.
+    const virtualizer = {
+      getVirtualItems: () =>
+        window.map(index => ({ index, start: index * 80, key: index })),
+      measureElement: () => undefined,
+    } as unknown as Virtualizer<HTMLDivElement, Element>;
+    const props = {
+      messages,
+      shouldVirtualizeMessages: true,
+      virtualizer,
+      virtualizedMessageViewportHeight: 480,
+      virtualizedMinHeight: 0,
+      messageViewportPaddingBottom: undefined,
+      totalSizeRef: () => undefined,
+      bottomSentinelRef: () => undefined,
+      isStreaming: false,
+      lastAssistantIndex: 5,
+      knownMessageIds: new Set<string>(),
+      inlineChatError: null,
+      isStuckToBottom: true,
+      onScrollToBottom: () => undefined,
+    };
+    const view = render(<ChatThreadMessages {...props} />);
+    expect(
+      screen.getAllByTestId('thread-row').map(row => row.textContent)
+    ).toEqual(['m0', 'm1']);
+
+    window = [4, 5];
+    view.rerender(<ChatThreadMessages {...props} />);
+    expect(
+      screen.getAllByTestId('thread-row').map(row => row.textContent)
+    ).toEqual(['m4', 'm5']);
   });
 });

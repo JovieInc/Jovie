@@ -2,29 +2,29 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { InvestorBrief } from './InvestorBrief';
 
 const meta = {
-  title: 'Investor/Routes/Pitch',
+  title: 'Investor/Routes/InvestorPortalLanding',
   component: InvestorBrief,
   parameters: {
     layout: 'fullscreen',
     docs: {
       description: {
         component:
-          'Source-backed presentation for web-195-pitch. The story mounts the same InvestorBrief body as /pitch; metadata and noindex policy remain route-owned, while evidence labels and investor copy remain owned by the checked-in fundraising registry.',
+          'Exact source-backed fallback body for web-188-investor-portal. The gated server route (investor link or admin session) mounts InvestorBrief; this deterministic state keeps investorName null, matching the admin-session view and investor links without a recorded name, without fabricating private investor data.',
       },
     },
     pen: {
-      registryId: 'web-195-pitch',
-      route: '/pitch',
+      registryId: 'web-188-investor-portal',
+      route: '/investor-portal',
       source: 'apps/web/components/features/pitch/InvestorBrief.tsx',
       sourceExport: 'InvestorBrief',
-      storyExport: 'Web195Pitch',
+      storyExport: 'Web188AnonymousFallback',
       sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1',
+      fixture: 'shipped null investorName fallback',
       proofTier: 'source-backed',
     },
   },
   tags: ['autodocs'],
   args: {
-    embedded: false,
     investorName: null,
   },
 } satisfies Meta<typeof InvestorBrief>;
@@ -32,6 +32,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Web195Pitch: Story = {
-  name: 'web-195 /pitch',
+export const Web188AnonymousFallback: Story = {
+  name: 'web-188 /investor-portal — anonymous fallback',
 };

@@ -17,6 +17,11 @@ const hoisted = vi.hoisted(() => {
   const attributeLeadSignupMock = vi.fn().mockResolvedValue(undefined);
   const getCachedAuthMock = vi.fn().mockResolvedValue({ userId: 'clerk_123' });
   const trackServerEventMock = vi.fn();
+  const trackServerEventTxMock = vi.fn().mockResolvedValue({
+    ok: true,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  });
   const revalidatePathMock = vi.fn();
   const revalidateTagMock = vi.fn();
   const noStoreMock = vi.fn();
@@ -77,6 +82,7 @@ const hoisted = vi.hoisted(() => {
     selectResults,
     syncReleasesFromSpotifyMock,
     trackServerEventMock,
+    trackServerEventTxMock,
     clearPendingClaimContextMock,
     claimPrebuiltProfileForUserMock,
     invalidateProfileCacheMock,
@@ -196,6 +202,7 @@ vi.mock('@/lib/env-server', () => ({
 
 vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: hoisted.trackServerEventMock,
+  trackServerEventTx: hoisted.trackServerEventTxMock,
 }));
 
 vi.mock('@/app/onboarding/actions/post-onboarding', () => ({
@@ -203,6 +210,12 @@ vi.mock('@/app/onboarding/actions/post-onboarding', () => ({
 }));
 
 vi.mock('@/lib/cache/tags', () => ({
+  CACHE_TAGS: {
+    PUBLIC_PROFILE: 'profiles-all',
+    SITEMAP_CATALOG: 'sitemap-catalog',
+  },
+  createPublicReleasesTag: vi.fn().mockReturnValue('public-releases-tag'),
+  createReleasesTag: vi.fn().mockReturnValue('releases-tag'),
   createSmartLinkContentTag: vi.fn().mockReturnValue('smart-link-tag'),
 }));
 
@@ -434,6 +447,51 @@ describe('connectOnboardingSpotifyArtist', () => {
       'clerk_123',
       'artist'
     );
+  });
+
+  it('fails the direct claim transaction when a durable funnel event is rejected', async () => {
+    queueOwnedProfile();
+    queueNoExistingClaim();
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: 'artist_spotify_id',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    hoisted.trackServerEventTxMock.mockResolvedValueOnce({
+      ok: false,
+      error: 'invalid_properties',
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    await expect(
+      connectOnboardingSpotifyArtist({
+        artistName: 'Artist Name',
+        profileId: 'profile_123',
+        spotifyArtistId: 'artist_spotify_id',
+        spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+      })
+    ).rejects.toThrow(
+      'Onboarding Spotify funnel event rejected: claim_completed (invalid_properties)'
+    );
+
+    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
+      'onboarding Spotify funnel event rejected',
+      expect.any(Error),
+      {
+        action: 'connectOnboardingSpotifyArtist',
+        event: 'claim_completed',
+      }
+    );
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.attributeLeadSignupMock).not.toHaveBeenCalled();
+    expect(hoisted.cookiesSetMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
   });
 
   it('does not report direct claim success when activation receipt persistence fails', async () => {
