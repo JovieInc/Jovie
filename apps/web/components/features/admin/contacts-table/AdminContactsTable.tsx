@@ -350,7 +350,7 @@ export function AdminContactsTable({
             <a
               href={stageHref(null)}
               className={cn(
-                'rounded-full px-2.5 py-1 text-xs',
+                'rounded-full px-2 py-1 text-xs',
                 stage == null
                   ? 'bg-surface-3 font-medium text-primary-token'
                   : 'text-secondary-token hover:text-primary-token'
@@ -363,7 +363,7 @@ export function AdminContactsTable({
                 key={value}
                 href={stageHref(value)}
                 className={cn(
-                  'rounded-full px-2.5 py-1 text-xs',
+                  'rounded-full px-2 py-1 text-xs',
                   stage === value
                     ? 'bg-surface-3 font-medium text-primary-token'
                     : 'text-secondary-token hover:text-primary-token'
@@ -431,12 +431,22 @@ export function AdminContactsTable({
             style={{ top: stickyTopPx }}
           >
             <tr>
-              <th className='w-[28%] px-app-header py-2 font-medium'>Name</th>
-              <th className='w-[24%] px-2 py-2 font-medium'>Email</th>
-              <th className='w-[14%] px-2 py-2 font-medium'>Handle</th>
-              <th className='w-[12%] px-2 py-2 font-medium'>Stage</th>
-              <th className='w-[12%] px-2 py-2 font-medium'>Sources</th>
-              <th className='w-[10%] px-2 py-2 pr-app-header font-medium'>
+              <th className='w-1/4 whitespace-nowrap px-app-header py-2 font-medium'>
+                Name
+              </th>
+              <th className='w-1/4 whitespace-nowrap px-2 py-2 font-medium'>
+                Email
+              </th>
+              <th className='w-1/8 whitespace-nowrap px-2 py-2 font-medium'>
+                Handle
+              </th>
+              <th className='w-1/8 whitespace-nowrap px-2 py-2 font-medium'>
+                Stage
+              </th>
+              <th className='w-1/8 whitespace-nowrap px-2 py-2 font-medium'>
+                Sources
+              </th>
+              <th className='w-1/8 whitespace-nowrap px-2 py-2 pr-app-header font-medium'>
                 Last activity
               </th>
             </tr>
