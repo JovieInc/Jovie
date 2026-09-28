@@ -155,6 +155,93 @@ describe('unlockWithPasskey', () => {
     await unlockWithPasskey();
 
     expect(client.addPasskey).toHaveBeenCalledWith({ name: 'Ovie' });
+    expect(client.signInPasskey).toHaveBeenCalledOnce();
+  });
+
+  it('reports cancellation when enrollment aborts before the authenticator saves', async () => {
+    client.listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    client.addPasskey.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'ERROR_CEREMONY_ABORTED',
+        message: 'Registration cancelled',
+      },
+    });
+
+    await expect(unlockWithPasskey()).rejects.toMatchObject({
+      name: 'PasskeyStepUpError',
+      code: 'cancelled',
+      message: expect.stringContaining('no passkey was saved'),
+    });
+    expect(client.signInPasskey).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a data-less enrollment result as a saved passkey', async () => {
+    client.listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    client.addPasskey.mockResolvedValue({ data: null, error: null });
+
+    await expect(unlockWithPasskey()).rejects.toMatchObject({
+      name: 'PasskeyStepUpError',
+      code: 'cancelled',
+    });
+    expect(client.signInPasskey).not.toHaveBeenCalled();
+  });
+
+  it('recovers when a retry after cancellation enrolls successfully', async () => {
+    client.listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    client.addPasskey
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: 'AUTH_CANCELLED', message: 'Auth cancelled' },
+      })
+      .mockResolvedValueOnce({ data: {}, error: null });
+
+    await expect(unlockWithPasskey()).rejects.toMatchObject({
+      code: 'cancelled',
+    });
+    await unlockWithPasskey();
+
+    expect(client.addPasskey).toHaveBeenCalledTimes(2);
+    expect(client.signInPasskey).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed as setup-required when sign-in offers an unregistered credential', async () => {
+    client.listUserPasskeys
+      .mockResolvedValueOnce({ data: [{ id: 'pk1' }], error: null })
+      .mockResolvedValueOnce({ data: [], error: null });
+    client.signInPasskey.mockResolvedValue({
+      data: null,
+      error: { code: 'PASSKEY_NOT_FOUND', message: 'Passkey not found' },
+    });
+
+    await expect(unlockWithPasskey()).rejects.toMatchObject({
+      name: 'PasskeyStepUpError',
+      code: 'setup-required',
+      message: expect.stringContaining('not registered'),
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the server error when an unregistered credential is actually listed', async () => {
+    client.signInPasskey.mockResolvedValue({
+      data: null,
+      error: { code: 'PASSKEY_NOT_FOUND', message: 'Passkey not found' },
+    });
+
+    await expect(unlockWithPasskey()).rejects.toThrow('Passkey not found');
+  });
+
+  it('reports sign-in prompt cancellation as retryable', async () => {
+    client.signInPasskey.mockResolvedValue({
+      data: null,
+      error: { code: 'AUTH_CANCELLED', message: 'Auth cancelled' },
+    });
+
+    await expect(unlockWithPasskey()).rejects.toMatchObject({
+      name: 'PasskeyStepUpError',
+      code: 'cancelled',
+      message: expect.stringContaining('Try again'),
+    });
   });
 
   it('fails loudly when the signed-in passkey is not an admin factor', async () => {

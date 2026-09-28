@@ -32,6 +32,14 @@ describe('AboutPageContent', () => {
       'Ready to build your Jovie profile?',
     ]);
     expect(screen.getByText('— Tim White, Founder')).toBeVisible();
+    expect(
+      screen.getByRole('img', { name: 'Tim White, founder of Jovie' })
+    ).toBeVisible();
+    const originSection = screen
+      .getByRole('heading', { level: 2, name: 'Why Jovie Exists' })
+      .closest('section');
+    expect(originSection?.className).toContain('lg:flex-row');
+    expect(originSection?.className).not.toContain('grid-cols-[');
     for (const feature of [
       'Living Profile',
       'Relationships',

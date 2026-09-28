@@ -10,6 +10,10 @@ import {
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
 import {
+  captureKeyframe,
+  watchKeyframeErrors,
+} from './helpers/golden-path-keyframes';
+import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
 } from './utils/runtime-automation-bypass';
@@ -432,6 +436,8 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     browser,
   }) => {
     test.setTimeout(600_000);
+    // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
+    watchKeyframeErrors(page);
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 1: Landing page loads
@@ -448,6 +454,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     await expect(page.getByTestId('homepage-primary-cta')).toBeVisible({
       timeout: 20_000,
     });
+    await captureKeyframe(page, 'home');
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 2: Start the canonical anonymous chat journey
@@ -458,6 +465,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       page,
       uniqueHandle
     );
+    await captureKeyframe(page, 'anonymous-chat');
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Create account
@@ -569,6 +577,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     expect(currentUrl, 'Redirected to signin — auth lost').not.toContain(
       '/sign-in'
     );
+    await captureKeyframe(page, 'dashboard');
 
     // Drive the canonical product import owner. The test never writes profile
     // identity or catalog rows; the server action performs a real Spotify sync.
@@ -669,6 +678,13 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       LIMIT 1
     `;
     expect(importedRelease, 'Imported catalog proof disappeared').toBeTruthy();
+    if (process.env.GOLDEN_PATH_KEYFRAME_DIR) {
+      await page.goto(APP_ROUTES.RELEASES, {
+        waitUntil: 'domcontentloaded',
+        timeout: 90_000,
+      });
+      await captureKeyframe(page, 'releases-imported');
+    }
 
     // Verify the newly created user is visible in the admin dashboard.
     if (hasAdminCredentials()) {
@@ -727,6 +743,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       storageState: { cookies: [], origins: [] },
     });
     const fanPage = await fanContext.newPage();
+    watchKeyframeErrors(fanPage);
     await interceptTrackingCalls(fanPage);
 
     try {
@@ -789,6 +806,31 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
         timeout: 180_000,
         intervals: [5_000, 10_000, 20_000],
       });
+      if (process.env.GOLDEN_PATH_KEYFRAME_DIR) {
+        await captureKeyframe(fanPage, 'release-page');
+        await fanPage.goto(`/${uniqueHandle}`, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60_000,
+        });
+        await captureKeyframe(fanPage, 'public-profile');
+        const mobileContext = await browser.newContext({
+          storageState: { cookies: [], origins: [] },
+          viewport: { width: 390, height: 844 },
+          isMobile: true,
+          hasTouch: true,
+        });
+        try {
+          const mobilePage = await mobileContext.newPage();
+          watchKeyframeErrors(mobilePage);
+          await mobilePage.goto(`/${uniqueHandle}`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          });
+          await captureKeyframe(mobilePage, 'public-profile-mobile');
+        } finally {
+          await mobileContext.close();
+        }
+      }
     } finally {
       await fanContext.close();
     }

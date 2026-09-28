@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { MarketingRegistryEntry } from '@/data/marketing/componentRegistry';
 import {
+  CERTIFICATION_CERTIFIER_AUTHORITIES,
   CERTIFICATION_OPERATIONAL_EVIDENCE_TIERS,
   CERTIFICATION_TASTE_EVIDENCE_TIERS,
   type CertificationAdmission,
@@ -288,6 +289,9 @@ const FOUNDER_DECISIONS = new Set([
   'changes_requested',
   'rejected',
 ]);
+const CERTIFIER_AUTHORITIES = new Set<string>(
+  CERTIFICATION_CERTIFIER_AUTHORITIES
+);
 const AUDIT_EVENT_TYPES = new Set([
   'review_packet_incomplete',
   'taste_card_emitted',
@@ -846,7 +850,10 @@ export function isPersistedFounderDecision(
     !Number.isNaN(Date.parse(value.decidedAt)) &&
     typeof value.reviewer === 'string' &&
     value.reviewer.length > 0 &&
-    (value.notes === null || typeof value.notes === 'string')
+    (value.notes === null || typeof value.notes === 'string') &&
+    (value.certifierAuthority === undefined ||
+      (typeof value.certifierAuthority === 'string' &&
+        CERTIFIER_AUTHORITIES.has(value.certifierAuthority)))
   );
 }
 

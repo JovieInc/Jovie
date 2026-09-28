@@ -34,6 +34,13 @@ vi.mock('@/lib/rate-limit', () => ({
   getClientIP: () => '127.0.0.1',
   tipCheckoutLimiter: { limit: mocks.rateLimit },
   createRateLimitHeaders: () => ({}),
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhaustedMessage: string,
+    unavailableMessage: string
+  ) => (result.unavailable === true ? unavailableMessage : exhaustedMessage),
 }));
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
@@ -131,6 +138,36 @@ describe('/api/tips/create-checkout', () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  it('refuses checkout when Stripe Connect is disabled', async () => {
+    mocks.flag.mockResolvedValue(false);
+    const response = await POST(
+      request('POST', {
+        profileId,
+        handle: 'artist',
+        amountCents: 1000,
+      })
+    );
+    expect(response.status).toBe(409);
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses checkout when the creator is missing payout readiness', async () => {
+    mocks.select.mockResolvedValue([
+      { ...publicProfile, stripePayoutsEnabled: false },
+    ]);
+    const response = await POST(
+      request('POST', {
+        profileId,
+        handle: 'artist',
+        amountCents: 1000,
+      })
+    );
+    expect(response.status).toBe(409);
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it('refuses a mismatched handle before creating a session', async () => {
     const response = await POST(
       request('POST', {
@@ -157,6 +194,42 @@ describe('/api/tips/create-checkout', () => {
       })
     );
     expect(response.status).toBe(409);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses checkout while the Stripe account has pending requirements', async () => {
+    mocks.retrieve.mockResolvedValue({
+      charges_enabled: true,
+      payouts_enabled: true,
+      requirements: { currently_due: ['individual.verification.document'] },
+    });
+    const response = await POST(
+      request('POST', {
+        profileId,
+        handle: 'artist',
+        amountCents: 1000,
+      })
+    );
+    expect(response.status).toBe(409);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('rate limits before reading the request body', async () => {
+    mocks.rateLimit.mockResolvedValue({
+      success: false,
+      limit: 10,
+      remaining: 0,
+      reset: new Date(Date.now() + 60000),
+    });
+    const response = await POST(
+      request('POST', {
+        profileId,
+        handle: 'artist',
+        amountCents: 1000,
+      })
+    );
+    expect(response.status).toBe(429);
+    expect(mocks.select).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
   });
 

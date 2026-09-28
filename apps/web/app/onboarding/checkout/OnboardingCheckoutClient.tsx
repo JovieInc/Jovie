@@ -366,7 +366,7 @@ export function OnboardingCheckoutClient({
         {/* Error message */}
         {error ? (
           <ContentSurfaceCard
-            className='mb-4 border-destructive/30 bg-destructive/5 px-4 py-3 text-app text-destructive'
+            className='mb-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
             role='alert'
           >
             {error}

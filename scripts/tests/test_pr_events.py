@@ -116,6 +116,11 @@ class RelayTest(unittest.TestCase):
     def test_queue_removal_and_review_feedback_are_relayed(self):
         base = {"pull_request": {"number": 7, "head": {"sha": "h7"}}}
         self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued"}), [(7, "dequeued", "h7")])
+        for reason in ("MANUAL", "manual", "ALREADY_MERGED", "merged", "BRANCH_REMOVED"):
+            self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": reason}),
+                             [], f"{reason} removal is not a code failure")
+        self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": "CI_FAILURE"}),
+                         [(7, "dequeued", "h7")])
         review = {**base, "action": "submitted", "review": {"state": "CHANGES_REQUESTED", "user": {"type": "Bot"}}}
         self.assertEqual(events.relay_targets("pull_request_review", review), [(7, "review", None)])
         comment = {**review, "review": {"state": "commented", "body": "rename this", "user": {"login": "tim", "type": "User"}}}
@@ -581,7 +586,7 @@ class RunnerHookTest(unittest.TestCase):
         returned = []
         events.return_to_pool = lambda lane, linear, pr, why: returned.append(pr["number"])
         triaged = []
-        linear = SimpleNamespace(create_triage=lambda title, body: triaged.append(body))
+        linear = SimpleNamespace(create_triage=lambda title, body, dedupe=None: triaged.append(body))
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
@@ -603,7 +608,7 @@ class RunnerHookTest(unittest.TestCase):
         runner.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
         runner.load_providers = lambda: PROVIDERS
         events.return_to_pool = lambda *a: None
-        linear = SimpleNamespace(create_triage=lambda title, body: triaged.append(title))
+        linear = SimpleNamespace(create_triage=lambda title, body, dedupe=None: triaged.append(title))
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))

@@ -24,6 +24,9 @@ export const GOLDEN_PATH_HERO_SEARCH_ACTION = 'Find me';
 export const GOLDEN_PATH_GATED_CTA_LABEL = 'Request access';
 export const GOLDEN_PATH_GATED_CTA_HREF = '/signup';
 export const GOLDEN_PATH_START_PATH = '/start';
+// Homepage link claim (Tim 2026-09-28): claim jov.ie/you, submit to /start.
+export const GOLDEN_PATH_HERO_CLAIM_DOMAIN = 'jov.ie/';
+export const GOLDEN_PATH_HERO_CLAIM_ACTION = 'Claim';
 export const FAKE_RATE_LIMIT_COPY = 'Too many messages';
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
 export const JOVIE_GITHUB_REPO = 'https://github.com/JovieInc/Jovie';
@@ -136,8 +139,21 @@ export function evaluateHomepageHtml(html) {
   // "Find me" — with a /start handoff still present for the onboarding route.
   const hasPlaceholder = html.includes(GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER);
   const hasAction = html.includes(GOLDEN_PATH_HERO_SEARCH_ACTION);
-  const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
-  if (hasPlaceholder && hasAction && hasStartHref) {
+  const hasStartHandoff =
+    /(?:href|action)\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
+  const hasClaimForm =
+    html.includes(GOLDEN_PATH_HERO_CLAIM_DOMAIN) &&
+    />\s*Claim\s*</.test(html) &&
+    /<form[^>]*action\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
+  if (hasClaimForm) {
+    return {
+      id: 'homepage-cta',
+      ok: true,
+      reason: `found link claim "${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" submitting to ${GOLDEN_PATH_START_PATH}`,
+    };
+  }
+  // Legacy name search, accepted until production carries the link claim.
+  if (hasPlaceholder && hasAction && hasStartHandoff) {
     return {
       id: 'homepage-cta',
       ok: true,
@@ -164,7 +180,7 @@ export function evaluateHomepageHtml(html) {
   return {
     id: 'homepage-cta',
     ok: false,
-    reason: `homepage conversion must be the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
+    reason: `homepage conversion must be the link claim ("${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" → ${GOLDEN_PATH_START_PATH}), the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
   };
 }
 

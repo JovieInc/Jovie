@@ -26,7 +26,7 @@ enum AppShellTab: Equatable, Hashable, CaseIterable {
     case .library: return "Library"
     case .calendar: return "Calendar"
     case .inbox: return "Inbox"
-    case .profile: return "Profile"
+    case .profile: return "My Jovie Card"
     case .audience: return "Audience"
     }
   }

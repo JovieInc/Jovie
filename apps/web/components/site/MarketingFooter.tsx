@@ -25,7 +25,7 @@ import { MarketingFooterCta } from './MarketingFooterCta';
  *
  * Visual contract:
  * - Canvas→shell linear fill + soft floating glow on noir-ion atoms.
- * - Column nav with caps eyebrows (10px / 600 / 0.22em / `$atom-text-muted`).
+ * - Column nav with Title Case labels (12px / 500 / `--mf-text-muted`).
  * - Full: chrome mark + columns, no slogan; copyright left, legal right.
  * - Compact: chrome mark in the legal row; copyright + legal right.
  * - Keep production nav from `marketingNavigation`. Do not invent columns.
@@ -196,9 +196,7 @@ export function MarketingFooter({
             >
               {footerColumns.map(column => (
                 <section key={column.title}>
-                  <h2 className='mf-eyebrow mf-eyebrow--caps line-clamp-2'>
-                    {column.title}
-                  </h2>
+                  <h2 className='mf-eyebrow line-clamp-2'>{column.title}</h2>
                   <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>

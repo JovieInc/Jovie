@@ -109,27 +109,6 @@ export function SmartLinksLanding() {
       </section>
 
       <section
-        id='next-release'
-        aria-labelledby='smart-links-next'
-        className='bg-panel py-16 sm:py-22'
-      >
-        <MarketingContainer width='page'>
-          <p className='homepage-section-eyebrow'>THE 100× EXPERIENCE</p>
-          <h2
-            id='smart-links-next'
-            className='mt-4 max-w-2xl text-balance line-clamp-2 text-3xl font-semibold tracking-tight sm:text-4xl'
-          >
-            The Next Release Remembers.
-          </h2>
-          <p className='mt-5 max-w-2xl text-base leading-7 text-secondary-token'>
-            Choose a service in the demo, then see the next release. The choice
-            stays put. Swipe, tap, or use the keyboard to change it; reduced
-            motion skips the animated snap.
-          </p>
-        </MarketingContainer>
-      </section>
-
-      <section
         aria-labelledby='smart-links-cta'
         className='py-16 text-center sm:py-22'
       >

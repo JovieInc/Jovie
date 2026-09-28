@@ -25,6 +25,7 @@ NO_LANDING_S = 6 * 3600
 # Workers spawning but no agent run starting or ending: the 2026-09-28 spawn-exit deadlock
 # (every worker exited on claim), which looked busy to every other rule.
 NO_WORK_S = 60 * 60
+PROVIDER_IDLE_S = 5 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
@@ -61,7 +62,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     state = host.state
     tick = read_json(state / "tick.json", {})
-    receipts = []
+    all_receipts, receipts = [], []
     try:
         with open(state / "runs" / "ledger.jsonl") as handle:
             for line in handle:
@@ -69,6 +70,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
                     receipt = json.loads(line)
                 except ValueError:
                     continue
+                all_receipts.append(receipt)
                 ended = age_s(receipt.get("endedAt"), now)
                 if ended is not None and ended <= 86400:
                     receipts.append(receipt)
@@ -81,20 +83,33 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     try:
         linear = lane.Linear(host.linear_env)
-        pool = sum(len(linear.lane_issues(name)) for name, spec in lane.load_providers().items() if spec.get("enabled", True))
+        pool_by_provider = {name: len(linear.lane_issues(name)) for name, spec in lane.load_providers().items()
+                            if spec.get("enabled", True)}
+        pool = sum(pool_by_provider.values())
         linear_error = None
     except Exception as error:
-        pool, linear_error = None, f"{type(error).__name__}: {error}"[:100]
+        pool, pool_by_provider, linear_error = None, {}, f"{type(error).__name__}: {error}"[:100]
     github = None
+    merged, merged_error = [], None
     try:
         lane.load_github_env()
         budget = lane.graphql_budget()
         github = budget[0] if budget else None
-    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
-        pass
+        if not os.environ.get("LANES_SELFTEST"):
+            merged = merged_prs_24h(lane, now)
+    except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
+        merged_error = "merged-pr-attribution-unreadable"
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     disk = shutil.disk_usage("/")
+    capacity_by_provider: dict[str, dict[str, int]] = {}
+    for path in (state / "slots").glob("*.lock"):
+        if path.name.startswith("gate."):
+            continue
+        provider = path.name.split(".")[0]
+        capacity = capacity_by_provider.setdefault(provider, {"running": 0, "slots": 0})
+        capacity["slots"] += 1
+        capacity["running"] += 1 if _locked(path) else 0
     hud_beat = None
     try:
         hud_beat = now - (state / "hud.heartbeat").stat().st_mtime
@@ -108,12 +123,16 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
         "worktrees": len(list((state / "worktrees").glob("*"))),
         "busy": len([p for p in (state / "slots").glob("*.lock") if not p.name.startswith("gate.") and _locked(p)]),
-        "codex": accounts, "pool": pool, "linearError": linear_error, "githubRemaining": github,
+        "capacityByProvider": capacity_by_provider,
+        "codex": accounts, "pool": pool, "poolByProvider": pool_by_provider,
+        "linearError": linear_error, "githubRemaining": github,
+        "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_pr_numbers()),
         "reconcile": read_json(state / "reconcile.json", {}),
         "failedByReason": failed_by_reason(failures),
+        "_receipts24h": receipts, "_allReceipts": all_receipts,
     }
 
 
@@ -129,6 +148,19 @@ def open_pr_numbers() -> set[int] | None:
     if result.returncode != 0:
         return None
     return {int(line) for line in result.stdout.split() if line.isdigit()}
+
+
+def merged_prs_24h(lane, now: float) -> list[dict]:
+    since = datetime.fromtimestamp(now - 86400, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    result = subprocess.run(
+        ["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "merged", "--limit", "100",
+         "--search", f"merged:>={since}", "--json", "number,headRefName,createdAt,mergedAt"],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "merged PR read failed")[-120:])
+    rows = json.loads(result.stdout or "[]")
+    return [row for row in rows if row.get("number") and row.get("mergedAt")]
 
 
 def failed_by_reason(failures: dict) -> dict[str, int]:
@@ -149,6 +181,13 @@ def _locked(path: Path) -> bool:
             return False
     except (OSError, BlockingIOError):
         return True
+
+
+def codex_idle_with_qualified_work(obs: dict) -> bool:
+    codex = obs.get("codex") or {}
+    capacity = (obs.get("capacityByProvider") or {}).get("codex") or {}
+    pool = (obs.get("poolByProvider") or {}).get("codex")
+    return bool(pool and codex.get("available") and capacity.get("slots") and not capacity.get("running"))
 
 
 # ---------------------------------------------------------------- judgement
@@ -181,6 +220,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if pool and spawned and not obs.get("worktrees", 1) and (obs.get("lastWorkAge") or NO_WORK_S + 1) > NO_WORK_S:
         alerts["spawn-exit"] = (f"{spawned} workers spawn each tick but no agent run started or ended in "
                                 f"{NO_WORK_S // 60}m with {pool} issues waiting; workers exit on claim")
+    codex_capacity = (obs.get("capacityByProvider") or {}).get("codex") or {}
+    codex_pool = (obs.get("poolByProvider") or {}).get("codex")
+    idle_since = (previous or {}).get("codexIdleSince")
+    if (codex_idle_with_qualified_work(obs) and idle_since and obs["now"] - idle_since >= PROVIDER_IDLE_S):
+        alerts["provider-idle:codex"] = (f"codex has {len(codex['available'])} available account(s), "
+                                         f"{codex_pool} compatible issue(s), and 0/{codex_capacity['slots']} workers "
+                                         f"running for more than {PROVIDER_IDLE_S // 60}m")
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
@@ -231,12 +277,13 @@ class Tracker:
         if found:
             return found
         try:
+            priority = 1 if key.startswith("provider-idle:") else 2
             team = self.linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}', {})["teams"]["nodes"][0]
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
-                {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": 2,
+                {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
                        "title": self.title(key),
                        "description": f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "
                                       "it will move this issue to Done when the condition clears.\n\n"
@@ -318,7 +365,7 @@ def fetch_slo(host, lane) -> dict | None:
     return record.get("snapshot")
 
 
-def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
+def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict | None = None) -> dict:
     """The few numbers Summer and other agents need, in one small JSON."""
     counts = {}
     for path in (host.state / "slots").glob("*.lock"):
@@ -328,6 +375,35 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
         counts.setdefault(provider, {"running": 0, "slots": 0})
         counts[provider]["slots"] += 1
         counts[provider]["running"] += 1 if _locked(path) else 0
+    throughput = lane.provider_throughput(
+        obs.get("_receipts24h") or [],
+        counts,
+        obs.get("merged24h") or [],
+        attribution_receipts=obs.get("_allReceipts") or [],
+    )
+    idle_since = dict((previous or {}).get("idleQualifiedSince") or {})
+    next_idle_since = {}
+    for provider, metric in throughput["providers"].items():
+        capacity = counts.get(provider, {"running": 0, "slots": 0})
+        qualified = (obs.get("poolByProvider") or {}).get(provider)
+        account_available = len((obs.get("codex") or {}).get("available") or []) if provider == "codex" else None
+        metric["qualifiedWorkWaiting"] = qualified
+        metric["idleSlots"] = max(0, capacity["slots"] - capacity["running"])
+        metric["idleReason"] = (
+            "linear-unreadable" if obs.get("linearError") else
+            "provider-unhealthy" if provider in (tick.get("unhealthy") or []) else
+            "no-account-available" if provider == "codex" and account_available == 0 else
+            "no-qualified-work" if not qualified else
+            "capacity-idle-with-qualified-work" if metric["idleSlots"] else
+            "fully-utilized"
+        )
+        wasting_codex = provider == "codex" and bool(qualified) and bool(account_available) and bool(metric["idleSlots"])
+        if wasting_codex:
+            started = float(idle_since.get(provider) or obs.get("now") or time.time())
+            next_idle_since[provider] = started
+            metric["accountIdleSecondsWhileQualifiedWorkExists"] = max(0, int((obs.get("now") or time.time()) - started))
+        else:
+            metric["accountIdleSecondsWhileQualifiedWorkExists"] = None if obs.get("linearError") else 0
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(c["slots"] - c["running"] for c in counts.values()),
@@ -335,7 +411,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
             "codexAvailable": len((obs.get("codex") or {}).get("available") or []),
             "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
-            "prs": (obs.get("reconcile") or {}).get("counts") or {},
+            "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
+            "prs": (obs.get("reconcile") or {}).get("counts") or {}, "_idleQualifiedSince": next_idle_since,
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
             "slo": obs.get("slo")}
 
@@ -388,6 +465,10 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]
     else:
         previous["poolEmptySince"] = None
+    if codex_idle_with_qualified_work(obs):
+        previous["codexIdleSince"] = previous.get("codexIdleSince") or obs["now"]
+    else:
+        previous["codexIdleSince"] = None
     alerts = judge(obs, previous)
     if tracker is None and not os.environ.get("LANES_SELFTEST"):
         try:
@@ -396,14 +477,17 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"])
     result["poolEmptySince"] = previous["poolEmptySince"]
-    result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex")}
+    result["codexIdleSince"] = previous["codexIdleSince"]
+    result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
     if not os.environ.get("LANES_SELFTEST"):
         try:
             obs["slo"] = fetch_slo(host, lane)
         except Exception:
             obs["slo"] = obs.get("slo")
         try:
-            result["statusFeed"] = publish_status(host, lane, status_feed(host, lane, obs, alerts, obs.get("tick") or {}))
+            feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous)
+            result["idleQualifiedSince"] = feed.pop("_idleQualifiedSince", {})
+            result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]
     path.parent.mkdir(parents=True, exist_ok=True)
