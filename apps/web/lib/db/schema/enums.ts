@@ -773,6 +773,7 @@ export const referralCommissionStatusEnum = pgEnum(
 export const connectorProviderEnum = pgEnum('connector_provider', [
   'google_calendar',
   'gmail',
+  'spotify',
   'youtube',
 ]);
 
