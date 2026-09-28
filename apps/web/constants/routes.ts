@@ -86,6 +86,7 @@ export const APP_ROUTES = {
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
   ADMIN_OPS: '/hud',
+  ADMIN_SHIPPING: '/app/ov/shipping',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',
   ADMIN_WAITLIST: '/app/ov/waitlist',
@@ -113,6 +114,7 @@ export const APP_ROUTES = {
   ADMIN_OUTREACH_REVIEW: '/app/ov/outreach/review',
   ADMIN_INGEST: '/app/ov/ingest',
   ADMIN_SCREENSHOTS: '/app/ov/screenshots',
+  ADMIN_FEATURE_REGISTRY: '/app/ov/feature-registry',
   ADMIN_SHARE_STUDIO: '/app/ov/share-studio',
   ADMIN_RELEASES: '/app/ov/releases',
   ADMIN_USERS_BAN: '/app/ov/users/ban',
@@ -127,6 +129,9 @@ export const APP_ROUTES = {
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
   ADMIN_SYSTEM: '/app/ov/system',
   ADMIN_FEATURES: '/app/ov/features',
+  /** Jovie's own pages: index, SEO/agentic cert, copy gate, Lighthouse (JOV-6770). */
+  ADMIN_PRESENCE: '/app/ov/presence',
+  ADMIN_CERTIFICATIONS: '/app/ov/certifications',
   /** Legacy feature-flags route. Redirect-only; use ADMIN_FEATURES. */
   LEGACY_FEATURE_FLAGS: '/app/feature-flags',
 

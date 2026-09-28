@@ -278,11 +278,17 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
 def queued_prs(lane, kinds) -> list[dict]:
     """Open PRs carrying any of these queue labels: one search, never a scan."""
     search = "label:" + ",".join(PREFIX + kind for kind in kinds)
-    listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
-                      "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
-    if listed.returncode != 0:
+
+    def fetch():
+        listed = lane.sh(["gh", "pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "100",
+                          "--search", search, "--json", lane.PR_FIELDS + ",labels,updatedAt"])
+        return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
+    # Per-check rollups over 100 PRs are the costliest GraphQL read the lanes make, and every
+    # worker pass asked for them; one read per minute per host serves them all.
+    shared = getattr(lane, "shared", None)
+    prs = shared("queued-" + "-".join(sorted(kinds)), 60, fetch) if shared else fetch()
+    if prs is None:
         return []
-    prs = json.loads(listed.stdout or "[]")
     for pr in prs:
         pr["eventKinds"] = [name[len(PREFIX):] for name in label_names(pr)
                             if name.startswith(PREFIX) and name[len(PREFIX):] in kinds]
@@ -384,6 +390,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         if record.get("count", 0) >= lane.MAX_FIX_ATTEMPTS or in_flight(record, pr, now):
             continue
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
+                and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):
             continue  # the tick's no-model sync with main goes first
         if not may_take(name, pr, record, order, now) or lane.claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
@@ -563,6 +570,8 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
             if PREFIX + EXHAUSTED in labels:
                 plan["unlabel"].append((number, EXHAUSTED))
         wanted = []
+        if POISON_LABEL in labels:
+            wanted.append("dequeued")  # repeated ejections need the merge-group log and a model fix
         if dirty:
             wanted.append("conflict")
         elif red:
@@ -657,6 +666,7 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
     open_prs, linear = None, None
     for pr in prs:
         if "dequeued" in pr["eventKinds"] and str(pr["number"]) not in synced and pr.get("mergeStateStatus") != "DIRTY" \
+                and POISON_LABEL not in label_names(pr) \
                 and in_scope(pr, "red", set()):
             outcomes[pr["number"]] = sync_main(host, lane, pr, now)
             if outcomes[pr["number"]] == "synced":

@@ -327,3 +327,19 @@ describe('AlertDialog', () => {
     });
   });
 });
+
+describe('AlertDialog overlay layer contract', () => {
+  it('paints on the modal layer above sheets', () => {
+    render(
+      <AlertDialog open>
+        <AlertDialogContent>
+          <AlertDialogTitle>Delete this rule?</AlertDialogTitle>
+          <AlertDialogDescription>It stops applying.</AlertDialogDescription>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+    expect(screen.getByTestId('alert-dialog-content').className).toContain(
+      'z-modal'
+    );
+  });
+});

@@ -406,10 +406,10 @@ describe('DesktopAuthPage', () => {
 
     await waitFor(() => {
       expect(copyDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Sign-in link copied. Paste it into any browser.'
+      );
     });
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Sign-in link copied. Paste it into any browser.'
-    );
 
     copyDesktopAuthUrlMock.mockResolvedValueOnce({
       ok: false,
@@ -419,10 +419,10 @@ describe('DesktopAuthPage', () => {
 
     await waitFor(() => {
       expect(copyDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('status')).toHaveTextContent(
+        /could not be copied/i
+      );
     });
-    expect(screen.getByRole('status')).toHaveTextContent(
-      /could not be copied/i
-    );
   });
 
   it('keeps cancel available before opening and after an open failure', async () => {

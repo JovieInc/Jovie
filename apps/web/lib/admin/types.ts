@@ -24,6 +24,15 @@ export type {
   FounderFunnelTimeRange,
 } from './founder-funnel';
 
+// founder-review-registry
+export type {
+  FounderReviewItem,
+  FounderReviewMedia,
+  FounderReviewReadiness,
+  FounderReviewRegistryKind,
+  FounderReviewScopeLevel,
+} from './founder-review-registry';
+
 // funnel-metrics
 export type { AdminFunnelMetrics } from './funnel-metrics';
 
