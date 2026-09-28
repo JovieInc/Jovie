@@ -221,8 +221,16 @@ async function execute(
   }
 
   const command = findCommand(positionals);
-  const expectedLength = command?.arg ? 3 : 2;
-  if (!command || positionals.length !== expectedLength) {
+  if (!command) {
+    throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
+  }
+  const expectedLength = command.arg ? 3 : 2;
+  if (command.arg && positionals.length < expectedLength) {
+    throw new UsageError(
+      `Missing required argument <${command.arg.name}> for ${command.path.join(' ')}`
+    );
+  }
+  if (positionals.length !== expectedLength) {
     throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
   }
   if (values.full && !command.acceptsFull) {
