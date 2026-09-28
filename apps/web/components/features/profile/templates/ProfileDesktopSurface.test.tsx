@@ -83,14 +83,19 @@ vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
   ProfileUnifiedDrawer: ({
     open,
     presentation,
+    creditSegments,
   }: {
     readonly open: boolean;
     readonly presentation?: string;
+    readonly creditSegments?: readonly { readonly type: string }[];
   }) => (
     <div
       data-testid='mock-desktop-drawer'
       data-open={String(open)}
       data-presentation={presentation ?? 'standalone'}
+      data-credit-segments={(creditSegments ?? [])
+        .map(segment => segment.type)
+        .join('|')}
     />
   ),
 }));
@@ -931,5 +936,37 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('mock-static-listen-interface')
     ).not.toBeInTheDocument();
+  });
+
+  it('routes selected credits into the drawer About destination (JOV-6199)', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={true}
+        drawerView='about'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        creditSegments={[
+          { type: 'text', text: 'Credited on "' },
+          {
+            type: 'release',
+            text: 'Neon Circuit',
+            href: '/timwhite/neon-circuit',
+          },
+          { type: 'text', text: '".' },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
+      'data-credit-segments',
+      'text|release|text'
+    );
   });
 });

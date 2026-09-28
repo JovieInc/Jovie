@@ -85,4 +85,53 @@ describe('public share destinations', () => {
       expect.stringContaining('Listen to Midnight Drive by Tim White on Jovie')
     );
   });
+
+  describe('instagram_story native share', () => {
+    const fetchMock = vi.fn();
+    const shareMock = vi.fn();
+    const canShareMock = vi.fn();
+
+    beforeEach(() => {
+      fetchMock.mockReset();
+      shareMock.mockReset();
+      canShareMock.mockReset();
+      fetchMock.mockResolvedValue({
+        ok: true,
+        blob: async () => new Blob(['png'], { type: 'image/png' }),
+      });
+      canShareMock.mockReturnValue(true);
+      vi.stubGlobal('fetch', fetchMock);
+      vi.stubGlobal('navigator', {
+        share: shareMock,
+        canShare: canShareMock,
+      });
+    });
+
+    it('returns cancelled without downloading when the user dismisses the share sheet', async () => {
+      shareMock.mockRejectedValue(new DOMException('cancelled', 'AbortError'));
+
+      const result = await launchPublicShareDestination(
+        'instagram_story',
+        context
+      );
+
+      expect(result.status).toBe('cancelled');
+      expect(result.helperText).toBeUndefined();
+      // Only the File-building fetch ran; no fallback download was attempted.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the download fallback when sharing fails for another reason', async () => {
+      shareMock.mockRejectedValue(new Error('share failed'));
+
+      const result = await launchPublicShareDestination(
+        'instagram_story',
+        context
+      );
+
+      expect(result.status).toBe('fallback');
+      // Second fetch is the fallback asset download attempt.
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+  });
 });

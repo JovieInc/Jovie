@@ -14,6 +14,14 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import {
+  CI_FAST_LANES_SOURCE,
+  DESIGN_SURFACE_ROOTS,
+  HOMEPAGE_COPY_SOURCE,
+  LANDING_GRAMMAR_SOURCE,
+  NAVIGATION_SOURCE,
+  RECIPES_SOURCE,
+} from './design-surfaces.mjs';
 import { SEED_DONE_INVARIANTS } from './done-sprint-invariants.mjs';
 import {
   PUBLIC_SURFACE_ROOTS,
@@ -53,6 +61,13 @@ export const INVARIANT_SCANNED_PATHS = Object.freeze(
       SCROLL_JANK_ESLINT_CONFIG_PATH,
       // JOV-INV-033 Done-sprint source locks.
       ...SEED_DONE_INVARIANTS.flatMap(entry => entry.files),
+      // JOV-INV-038 founder design invariants (marketing/app surfaces).
+      ...DESIGN_SURFACE_ROOTS,
+      NAVIGATION_SOURCE,
+      RECIPES_SOURCE,
+      LANDING_GRAMMAR_SOURCE,
+      HOMEPAGE_COPY_SOURCE,
+      CI_FAST_LANES_SOURCE,
     ]),
   ].sort()
 );

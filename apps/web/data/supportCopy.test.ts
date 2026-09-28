@@ -17,12 +17,17 @@ describe('shared support language', () => {
     expect(setup?.answer).not.toMatch(/connect (?:Spotify|Apple Music)/i);
   });
 
-  it('preserves specialist music help under an explicitly music question', () => {
-    const music = SUPPORT_FAQ_ITEMS.find(item =>
-      item.question.includes('music smart links')
+  // Tim 2026-09-26 (supersedes JOV-6432): help and support are non-ICP
+  // surfaces, so smart-link help uses general Jovie profile language.
+  it('explains smart links without music-specific wording', () => {
+    const smartLinks = SUPPORT_FAQ_ITEMS.find(item =>
+      item.question.includes('smart links')
     );
-    expect(music?.answer).toContain('release');
-    expect(music?.answer).toContain('streaming platform');
+    expect(smartLinks?.question).toBe('How do smart links work?');
+    expect(smartLinks?.answer).toContain('Jovie profile');
+    expect(`${smartLinks?.question} ${smartLinks?.answer}`).not.toMatch(
+      /\b(music|release|fan|streaming)\b/i
+    );
   });
 
   it('uses profile and account metadata for the shared support page', () => {

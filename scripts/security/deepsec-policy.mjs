@@ -15,7 +15,7 @@ export const SECURITY_TARGETS = Object.freeze([
 ]);
 
 const POLICY_SHA256 =
-  '894c0f5f26a6328c532317157102b46b569209d5c697760354965eee1af1b323';
+  '8c017016c339884e82e7f24d5596dfba646727dbe84508cd40885d6483a59cd2';
 const EXCLUDED = new Set([
   '.git',
   '.deepsec',
@@ -85,30 +85,55 @@ function safeTarget(path, policy) {
   );
 }
 
-export function validateOfflinePolicy(policyBytes, targetsBytes) {
+const RUN_KINDS = ['pr', 'weekly', 'frontier'];
+
+function positive(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function billingHeld(billing) {
+  const caps = billing?.runCapUsd;
+  return (
+    billing?.route !== 'ai-gateway' ||
+    billing.hardCap !== true ||
+    !positive(billing.monthlyCapUsd) ||
+    !caps ||
+    !RUN_KINDS.every(
+      kind => positive(caps[kind]) && caps[kind] <= billing.monthlyCapUsd
+    ) ||
+    !positive(billing.minRunUsd) ||
+    !(billing.costSafetyFactor >= 1) ||
+    !Number.isInteger(billing.prMaxFiles) ||
+    billing.prMaxFiles < 1 ||
+    billing.onUnknownPrice !== 'skip'
+  );
+}
+
+export function validatePolicy(policyBytes, targetsBytes) {
   const policy = decodeJson(policyBytes, 'DeepSec policy');
   const execution = policy?.execution;
   if (
-    policy?.schemaVersion !== 1 ||
+    policy?.schemaVersion !== 2 ||
     policy?.projectId !== 'jovie' ||
     policy.maxTargets !== MAX_TARGETS ||
-    policy.modelAuth !== 'local' ||
-    policy.agent !== 'codex' ||
-    policy.model !== 'gpt-5.5' ||
+    policy.modelAuth !== 'gateway' ||
     policy.providerFallback !== false ||
-    policy.billing?.route !== 'prepaid-codex-subscription' ||
-    policy.billing.stopOnExhaustion !== true ||
-    execution?.status !== 'disabled' ||
-    execution.scanEnabled !== false
+    !policy.gatewayTags?.includes('security-scan') ||
+    billingHeld(policy.billing) ||
+    !['disabled', 'advisory'].includes(execution?.status) ||
+    execution.blocking !== false ||
+    execution.prSources !== 'same-repo-only' ||
+    execution.prCodeExecution !== 'none' ||
+    execution.dotenv !== false
   )
     fail(
       'policy-held',
-      'only the disabled prepaid Codex subscription policy is allowed'
+      'only the capped, advisory, fallback-free gateway policy is allowed'
     );
   if (sha256(policyBytes) !== POLICY_SHA256)
     fail(
       'policy-drift',
-      'policy bytes differ from the reviewed offline subscription contract'
+      'policy bytes differ from the reviewed gateway budget contract'
     );
 
   const manifest = decodeJson(targetsBytes, 'DeepSec target manifest');

@@ -45,6 +45,7 @@ import {
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import { PROFILE_DESKTOP_SURFACE_ENABLED } from '@/lib/profile/desktop-surface-flag';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
   buildProfileAccentCssVars,
@@ -94,6 +95,8 @@ interface ProfileCompactTemplateProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
@@ -268,6 +271,7 @@ export function ProfileCompactTemplate({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   photoDownloadSizes = [],
   tourDates = [],
   visitTrackingToken,
@@ -970,6 +974,7 @@ export function ProfileCompactTemplate({
                 genres={genres}
                 pressPhotos={pressPhotos}
                 allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
                 photoDownloadSizes={photoDownloadSizes}
                 tourDates={tourDates}
                 showSubscriptionConfirmedBanner={
@@ -1042,6 +1047,7 @@ export function ProfileCompactTemplate({
               genres={genres}
               pressPhotos={pressPhotos}
               allowPhotoDownloads={allowPhotoDownloads}
+              creditSegments={creditSegments}
               photoDownloadSizes={photoDownloadSizes}
               tourDates={tourDates}
               viewerCountryCode={resolvedViewerCountryCode}

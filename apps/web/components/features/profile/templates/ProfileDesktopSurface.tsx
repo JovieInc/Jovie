@@ -48,6 +48,7 @@ import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { formatEventDateParts } from '@/lib/events/date';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import {
   type BottomTabKey,
   getPermittedPublicProfileActions,
@@ -119,6 +120,8 @@ interface ProfileDesktopSurfaceProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly viewerCountryCode?: string | null;
@@ -269,6 +272,7 @@ export function ProfileDesktopSurface({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   photoDownloadSizes = [],
   tourDates = [],
   viewerCountryCode,
@@ -957,6 +961,8 @@ export function ProfileDesktopSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
+          contacts={contacts}
         />
       </DesktopSurfaceCard>
     ) : (
@@ -1089,6 +1095,7 @@ export function ProfileDesktopSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
           tourDates={tourDates}
           hasReleases={hasReleases}
           releases={visibleReleases}

@@ -12,6 +12,11 @@ const mockRecordAnonymousBotMetric = vi.hoisted(() => vi.fn());
 const mockShouldExcludeSelfByHandle = vi.hoisted(() => vi.fn());
 const mockIncrementProfileViews = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
+const mockRecordFunnelStep = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/analytics/signup-funnel.server', () => ({
+  recordFunnelStep: mockRecordFunnelStep,
+}));
 
 vi.mock('@/lib/rate-limit', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/rate-limit')>();
@@ -106,6 +111,7 @@ describe('POST /api/profile/view', () => {
       'profile_view'
     );
     expect(mockIncrementProfileViews).not.toHaveBeenCalled();
+    expect(mockRecordFunnelStep).not.toHaveBeenCalled();
   });
 
   it('records a view when the request is under the limit', async () => {
@@ -127,6 +133,19 @@ describe('POST /api/profile/view', () => {
     );
     expect(mockRecordAnonymousBotMetric).not.toHaveBeenCalled();
     expect(mockIncrementProfileViews).toHaveBeenCalledWith('dualipa');
+    expect(mockRecordFunnelStep).toHaveBeenCalledWith({
+      funnel: 'fan_subscribe',
+      step: 'profile_view',
+    });
     expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('does not count an owner self-view as a funnel profile view', async () => {
+    mockShouldExcludeSelfByHandle.mockResolvedValueOnce(true);
+
+    await POST(buildRequest());
+
+    expect(mockIncrementProfileViews).not.toHaveBeenCalled();
+    expect(mockRecordFunnelStep).not.toHaveBeenCalled();
   });
 });
