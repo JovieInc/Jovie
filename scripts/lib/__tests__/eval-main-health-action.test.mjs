@@ -151,7 +151,10 @@ describe('Evaluate main CI health action', () => {
   });
 
   it('does not emit a rerun when a canary or sentry gate failed', async () => {
-    const { outputs } = await runEvaluation({ attempt: 1, canaryFailure: true });
+    const { outputs } = await runEvaluation({
+      attempt: 1,
+      canaryFailure: true,
+    });
 
     expect(outputs.failed_run_id).toBe('');
     expect(outputs.should_alert).toBe('true');
