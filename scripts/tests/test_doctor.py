@@ -115,6 +115,7 @@ class JudgeTest(unittest.TestCase):
 class FakeTracker:
     def __init__(self):
         self.opened, self.reopened, self.closed, self.contradicted = [], [], [], []
+        self.fail_contradict = self.fail_reopen = self.fail_close = False
 
     def open(self, key, text):
         self.opened.append((key, text))
@@ -122,12 +123,15 @@ class FakeTracker:
 
     def reopen(self, issue_id, text):
         self.reopened.append((issue_id, text))
+        return not self.fail_reopen
 
     def close(self, issue_id):
         self.closed.append(issue_id)
+        return not self.fail_close
 
     def contradict_invariant(self, event):
         self.contradicted.append(event["idempotencyKey"])
+        return not self.fail_contradict
 
 
 class ConditionReceiptTest(unittest.TestCase):
@@ -176,6 +180,63 @@ class ConditionReceiptTest(unittest.TestCase):
         self.assertEqual(state["conditions"]["provider-idle:devin"]["generation"], 2)
         self.assertEqual(len(tracker.contradicted), 2)
 
+    def test_failed_escalation_stays_pending_and_retries_until_acknowledged(self):
+        observed = obs(now=1000.0, tickAge=3,
+                       tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"] * 4},
+                       poolByProvider={"devin": 20},
+                       capacityByProvider={"devin": {"running": 0, "slots": 4}})
+        previous = {"providerIdleSince": {"devin": 699.0}}
+        alerts = doctor.judge(observed, previous)
+        events = doctor.condition_receipts(alerts, previous, observed, "gem")
+        tracker = FakeTracker()
+        tracker.fail_contradict = True  # Linear down: reopen/comment on the owner fails
+        state = doctor.reconcile(alerts, previous, tracker, observed["now"], events)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["summerEscalation"]["outcome"], "pending")
+        self.assertEqual(len(tracker.contradicted), 1)
+
+        observed["now"] += 60
+        events = doctor.condition_receipts(alerts, state, observed, "gem")
+        state = doctor.reconcile(alerts, state, tracker, observed["now"], events)
+        self.assertEqual(len(tracker.contradicted), 2, "an unacknowledged escalation is retried")
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["summerEscalation"]["outcome"], "pending")
+
+        tracker.fail_contradict = False
+        observed["now"] += 60
+        events = doctor.condition_receipts(alerts, state, observed, "gem")
+        state = doctor.reconcile(alerts, state, tracker, observed["now"], events)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(len(tracker.contradicted), 3)
+
+        observed["now"] += 60
+        events = doctor.condition_receipts(alerts, state, observed, "gem")
+        state = doctor.reconcile(alerts, state, tracker, observed["now"], events)
+        self.assertEqual(len(tracker.contradicted), 3, "an acknowledged escalation is not resent")
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["summerEscalation"]["outcome"], "requested")
+
+    def test_failed_escalation_retries_after_resolve_and_refire(self):
+        observed = obs(now=1000.0, tickAge=3,
+                       tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"] * 4},
+                       poolByProvider={"devin": 20},
+                       capacityByProvider={"devin": {"running": 0, "slots": 4}})
+        previous = {"providerIdleSince": {"devin": 699.0}}
+        alerts = doctor.judge(observed, previous)
+        events = doctor.condition_receipts(alerts, previous, observed, "gem")
+        tracker = FakeTracker()
+        tracker.fail_contradict = True
+        state = doctor.reconcile(alerts, previous, tracker, observed["now"], events)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["summerEscalation"]["outcome"], "pending")
+        tracker.fail_contradict = False
+        observed["now"] += 60
+        cleared = doctor.condition_receipts({}, state, observed, "gem")
+        state = doctor.reconcile({}, state, tracker, observed["now"], cleared)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["summerEscalation"]["outcome"], "cleared")
+        observed["now"] += 60
+        refired = doctor.condition_receipts(alerts, state, observed, "gem")
+        state = doctor.reconcile(alerts, state, tracker, observed["now"], refired)
+        self.assertEqual(state["conditions"]["provider-idle:devin"]["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(len(tracker.contradicted), 2,
+                         "a generation whose first escalation never landed still escalates on refire")
+
 
 class ReconcileTest(unittest.TestCase):
     def test_new_alert_opens_once_clearing_closes_and_refire_reopens(self):
@@ -204,6 +265,27 @@ class ReconcileTest(unittest.TestCase):
         state = doctor.reconcile({"hud-stale": "x"}, state, tracker, 65.0)
         self.assertEqual(tracker.opened, [("hud-stale", "x")], "an alert whose issue never opened is retried")
         self.assertEqual(state["issues"]["hud-stale"]["id"], "id-hud-stale")
+
+    def test_failed_reopen_and_close_are_retried_not_recorded(self):
+        tracker = FakeTracker()
+        now = 1_000_000.0
+        state = doctor.reconcile({"disk-low": "x"}, {}, tracker, now)
+        state = doctor.reconcile({}, state, tracker, now + 60)
+        self.assertEqual(state["issues"]["disk-low"]["closedAt"], now + 60)
+        tracker.fail_reopen = True
+        state = doctor.reconcile({"disk-low": "again"}, state, tracker, now + 120)
+        self.assertEqual(state["issues"]["disk-low"]["closedAt"], now + 60,
+                         "a failed reopen does not mark the issue live")
+        tracker.fail_reopen = False
+        state = doctor.reconcile({"disk-low": "again"}, state, tracker, now + 180)
+        self.assertIsNone(state["issues"]["disk-low"]["closedAt"], "reopen is retried until it lands")
+        tracker.fail_close = True
+        state = doctor.reconcile({}, state, tracker, now + 240)
+        self.assertIsNone(state["issues"]["disk-low"]["closedAt"],
+                          "a failed close does not record a false close time")
+        tracker.fail_close = False
+        state = doctor.reconcile({}, state, tracker, now + 300)
+        self.assertEqual(state["issues"]["disk-low"]["closedAt"], now + 300)
 
     def test_tracker_titles_carry_the_host_and_reuse_an_existing_issue(self):
         class FakeLinear:

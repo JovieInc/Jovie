@@ -383,8 +383,10 @@ class Tracker:
         except Exception:
             return None
 
-    def contradict_invariant(self, event: dict) -> None:
-        """Reopen the liveness owner only when a new typed generation contradicts its proof."""
+    def contradict_invariant(self, event: dict) -> bool:
+        """Reopen the liveness owner only when a new typed generation contradicts its proof.
+        Returns True only once the contradiction comment actually landed; callers retry
+        until then, so a Linear outage can never masquerade as a delivered escalation."""
         try:
             data = self.linear.gql(
                 'query($n:Float!){issues(filter:{team:{key:{eq:"JOV"}},number:{eq:$n}})'
@@ -398,62 +400,65 @@ class Tracker:
                 f"First observed: {event['firstObservedAt']}; deadline: {event['deadlineAt']}; "
                 f"next: `{event['nextAction']}`.",
             )
+            return True
         except Exception:
-            pass
+            return False
 
-    def reopen(self, issue_id: str, text: str) -> None:
+    def reopen(self, issue_id: str, text: str) -> bool:
         try:
             self.linear.move(issue_id, "Triage")
             self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
+            return True
         except Exception:
-            pass
+            return False
 
-    def close(self, issue_id: str) -> None:
+    def close(self, issue_id: str) -> bool:
         try:
             self.linear.comment(issue_id, f"🤖 doctor: cleared on `{self.host}` at {now_iso()}.")
             self.linear.move(issue_id, "Done")
+            return True
         except Exception:
-            pass
+            return False
 
 
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
               conditions: dict[str, dict] | None = None) -> dict:
     """Carry issue ids across ticks; open/reopen/close through the tracker; return the new doctor.json."""
-    issues = dict(previous.get("issues", {}))      # key -> {"id", "closedAt"}
+    issues = dict(previous.get("issues", {}))      # key -> {"id", "closedAt", "escalatedFor"}
     for key, text in alerts.items():
         entry = issues.get(key)
         if entry and entry.get("closedAt") is None and entry.get("id"):
-            continue  # still open
-        if entry and entry.get("closedAt") is None and not entry.get("id"):
+            pass  # still open
+        elif entry and entry.get("closedAt") is None:
             issue_id = tracker.open(key, text) if tracker else None
-            issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
-            contradict = getattr(tracker, "contradict_invariant", None) if issue_id else None
-            if contradict and conditions and key in conditions:
-                contradict(conditions[key])
-            continue
-        if entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
-            if tracker:
-                tracker.reopen(entry["id"], text)
-                contradict = getattr(tracker, "contradict_invariant", None)
-                if contradict and conditions and key in conditions:
-                    contradict(conditions[key])
-            issues[key] = {"id": entry["id"], "closedAt": None}
-            continue
-        issue_id = tracker.open(key, text) if tracker else None
-        issues[key] = {"id": issue_id, "closedAt": None}
-        if tracker and issue_id and conditions and key in conditions:
-            contradict = getattr(tracker, "contradict_invariant", None)
-            if contradict:
-                contradict(conditions[key])
+            entry = {**entry, "id": issue_id}  # retry a failed open
+            issues[key] = entry
+        elif entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
+            if tracker and tracker.reopen(entry["id"], text):
+                entry = {**entry, "closedAt": None}
+                issues[key] = entry
+        else:
+            issue_id = tracker.open(key, text) if tracker else None
+            entry = {"id": issue_id, "closedAt": None}
+            issues[key] = entry
+        event = (conditions or {}).get(key)
+        idem = event.get("idempotencyKey") if event else None
+        contradict = getattr(tracker, "contradict_invariant", None) if tracker else None
+        if event and idem and entry and entry.get("id") and entry.get("escalatedFor") != idem:
+            if contradict and contradict(event):
+                entry["escalatedFor"] = idem
     for key, entry in issues.items():
         if key not in alerts and entry.get("closedAt") is None:
-            if tracker and entry.get("id"):
-                tracker.close(entry["id"])
-            entry["closedAt"] = now
+            if not entry.get("id"):
+                entry["closedAt"] = now
+            elif tracker and tracker.close(entry["id"]):
+                entry["closedAt"] = now  # a failed close stays open in state and is retried
     receipts = {}
     for key, event in (conditions or {}).items():
+        entry = issues.get(key) or {}
         escalation = ("cleared" if event.get("state") == "resolved" else
-                      "requested" if (issues.get(key) or {}).get("id") else "pending")
+                      "requested" if entry.get("id") and entry.get("escalatedFor") == event.get("idempotencyKey")
+                      else "pending")
         receipts[key] = {**event, "summerEscalation": {"transport": "linear", "outcome": escalation}}
     return {"at": epoch_iso(now), "alerts": alerts, "issues": issues, "conditions": receipts}
 
