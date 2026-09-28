@@ -131,6 +131,7 @@ describe('TrackSidebar', () => {
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
     expect(screen.getByTitle('Copy Track Link')).toBeInTheDocument();
     const header = screen.getByTestId('track-entity-header');
+    expect(header).toHaveAttribute('data-layout', 'inline');
     expect(header).toContainElement(screen.getByTitle('Copy Track Link'));
     expect(
       screen.queryByTestId('drawer-card-action-bar')

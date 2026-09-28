@@ -8,8 +8,8 @@ vi.mock('next/image', () => ({
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
-  EntityHeaderCard: ({ image }: { image: ReactNode }) => (
-    <div data-testid='entity-header-card'>{image}</div>
+  EntityHeader: ({ thumbnail }: { thumbnail: ReactNode }) => (
+    <div data-testid='entity-header-card'>{thumbnail}</div>
   ),
   DrawerMediaThumb: ({
     children,

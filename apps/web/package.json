@@ -124,6 +124,7 @@
     "e2e:visual:update": "playwright test tests/e2e/visual-regression.spec.ts tests/e2e/auth-visual.spec.ts tests/e2e/chat-visual.spec.ts --update-snapshots",
     "screenshots": "pnpm run screenshots:seed && pnpm run screenshots:capture",
     "screenshots:capture": "playwright test --config=playwright.config.screenshots.ts",
+    "docs-guide-shots": "playwright test --config=playwright.config.docs-guides.ts",
     "screenshots:seed": "tsx tests/product-screenshots/seed.ts",
     "visual-qa:capture": "playwright test tests/visual-qa/capture.spec.ts --config=playwright.config.visual-qa.ts",
     "visual-qa:coverage:capture": "playwright test tests/visual-qa/coverage.spec.ts --config=playwright.config.visual-qa.ts --project=visual-qa-coverage",

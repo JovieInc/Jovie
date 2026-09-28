@@ -180,6 +180,8 @@ export default defineConfig({
       'tests/performance/**',
       'tests/integration/**',
       'tests/**/*.nightly.test.ts',
+      // Playwright specs own this directory; they fail under Vitest's runner.
+      'tests/docs-guides/**',
       'tests/product-screenshots/**',
       'tests/visual-qa/**',
       // Temp Playwright comparison trees created by the artifact-secret guard.
