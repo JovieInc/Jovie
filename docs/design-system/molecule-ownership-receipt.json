@@ -89,7 +89,6 @@
         "apps/web/components/molecules/ContentSectionHeader.stories.tsx"
       ],
       "consumers": [
-        "apps/web/app/app/(shell)/admin/_components/AdminBraggingRightsSection.tsx",
         "apps/web/app/app/(shell)/admin/_components/AdminConversionFunnelSection.tsx",
         "apps/web/app/app/(shell)/admin/_components/AdminScoreboardSection.tsx",
         "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
