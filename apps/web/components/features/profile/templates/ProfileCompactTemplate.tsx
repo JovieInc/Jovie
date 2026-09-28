@@ -767,7 +767,14 @@ export function ProfileCompactTemplate({
       '',
       href
     );
-  }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix, initialSource]);
+  }, [
+    drawerOpen,
+    drawerView,
+    requestedMode,
+    artist.handle,
+    searchSuffix,
+    initialSource,
+  ]);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
