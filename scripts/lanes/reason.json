@@ -91,7 +91,27 @@
       "--model",
       "z-ai/glm-5.3",
       "--agent-id",
-      "cmuk33ew70r2e06adfqx6gbpy",
+      "cmtj3n2q901i407adklzzq01t",
+      "--json",
+      "--timeout",
+      "1800",
+      "-p",
+      "{prompt}"
+    ]
+  },
+  "researchEscalation": {
+    "name": "hyperagent-astra-research",
+    "model": "astra",
+    "timeoutS": 1900,
+    "health": ["hyperagent", "models", "--json"],
+    "healthy": "models",
+    "cmd": [
+      "hyperagent",
+      "execute",
+      "--model",
+      "astra",
+      "--agent-id",
+      "cmuc85zwf010j07adgiv0pvze",
       "--json",
       "--timeout",
       "1800",
