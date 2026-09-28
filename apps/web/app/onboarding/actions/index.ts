@@ -140,7 +140,15 @@ async function emitOnboardingFunnelEventsTx(
   const { pendingClaim, result } = params;
   if (!result.profileId) return;
 
-  if (pendingClaim) {
+  // Direct-profile onboarding only reserves the profile here. Spotify
+  // ownership verification and the actual claim happen later in
+  // connectOnboardingSpotifyArtist, which atomically emits claim completion
+  // and activation. Recording either event at reservation time would count
+  // abandoned or mismatched claims as successful and consume their durable
+  // identities before the verified transaction runs.
+  const completesClaim = pendingClaim?.mode !== 'direct_profile';
+
+  if (pendingClaim && completesClaim) {
     await recordFunnelDelivery(
       'claim_completed',
       await trackServerEventTx(
@@ -162,18 +170,20 @@ async function emitOnboardingFunnelEventsTx(
     )
   );
 
-  // Canonical self-serve activation: onboarding completed on the claimed
-  // profile. Durable and queryable without GA4; the client magic_moment
-  // marker remains supplemental telemetry.
-  await recordFunnelDelivery(
-    'activation_achieved',
-    await trackServerEventTx(
-      tx,
+  if (completesClaim) {
+    // Canonical self-serve activation: onboarding completed on the claimed
+    // profile. Durable and queryable without GA4; the client magic_moment
+    // marker remains supplemental telemetry.
+    await recordFunnelDelivery(
       'activation_achieved',
-      { profileId: result.profileId, source: 'onboarding_completed' },
-      { eventIdentity: `activation_achieved:${result.profileId}` }
-    )
-  );
+      await trackServerEventTx(
+        tx,
+        'activation_achieved',
+        { profileId: result.profileId, source: 'onboarding_completed' },
+        { eventIdentity: `activation_achieved:${result.profileId}` }
+      )
+    );
+  }
 }
 
 async function applyPendingClaimTx(

@@ -589,6 +589,11 @@ describe('completeOnboarding', () => {
   });
 
   it('reserves the prebuilt profile for direct pending claims', async () => {
+    mockReservePrebuiltProfileForUser.mockResolvedValueOnce({
+      username: 'artist',
+      status: 'updated',
+      profileId: 'profile-claim-456',
+    });
     mockReadPendingClaimContext.mockResolvedValueOnce({
       mode: 'direct_profile',
       creatorProfileId: 'profile-claim-456',
@@ -615,6 +620,16 @@ describe('completeOnboarding', () => {
     expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
     expect(mockMarkWaitlistSignedUpInTx).not.toHaveBeenCalled();
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+    expect(mockTrackServerEventTx).toHaveBeenCalledTimes(1);
+    expect(mockTrackServerEventTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'signup_completed',
+      {
+        profileId: 'profile-claim-456',
+        source: 'direct_profile',
+      },
+      { eventIdentity: 'signup_completed:profile-claim-456' }
+    );
     // Finalization stays gated for direct_profile claims...
     expect(mockFinalizePostOnboarding).not.toHaveBeenCalled();
     // ...but the completion cookie must still be set (JOV-2996) so the
