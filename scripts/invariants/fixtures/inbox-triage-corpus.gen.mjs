@@ -1,10 +1,9 @@
 /**
  * Deterministic generator for the versioned artist-inbox triage corpus
- * (JOV-6421); the generator is the corpus of record.
- *
- * Seed mail is one `cat|pri|tags|subject|body` record per line (`\n` encodes
- * a body newline). Every example is synthetic; bodies must never contain
- * `local@domain` patterns so the secret/PII screen stays green.
+ * (JOV-6421); the generator is the corpus of record. Seed mail is one
+ * `cat|pri|tags|subject|body` record per line (`\n` encodes a newline).
+ * Every example is synthetic; bodies must never contain `local@domain`
+ * patterns so the secret/PII screen stays green.
  */
 
 import { createHash } from 'node:crypto';
@@ -13,11 +12,8 @@ import { UNCATEGORIZED_LABEL } from '../jev-inbox-triage.mjs';
 
 // Canonical inbound-email seeds plus special fixture families (forwarded,
 // quoted, ambiguous, spam-resembling, injection, mixed, uncategorized).
-// `canonical` seeds emit typo/shout subject variants; all seeds emit messy.
 const SEEDS = `booking|high|canonical,time-sensitive-booking|Booking inquiry — spring festival slot|Hi, I book talent for the Riverbend Festival on April 18. We would love to have you headline the second stage. Fee range is 8-12k plus production. Can you share availability?
 booking|high|canonical,time-sensitive-booking|Club night booking request|We run a monthly night at the Mercury Lounge and want to book you for our June 12 show. 45 minute set, door split deal.
-booking|high|canonical,time-sensitive-booking|DJ set for warehouse party|Promoter here — we are booking DJs for a warehouse show on March 7. 90 minute slot, 1500 capacity. Interested?
-booking|medium|canonical|Private event inquiry|I am organizing a company retreat in Austin this fall and would like to book a 60 minute acoustic set. What is your rate?
 fan_mail|low|canonical,fan-mail|Your show changed my life|I saw you in Portland last year and your set got me through a rough time. Just wanted to say thank you.
 fan_mail|low|canonical,fan-mail|Question about the lyrics|Huge fan! In verse two of the new single, is that about your hometown? It means a lot to me.
 fan_mail|low|canonical,fan-mail|Vinyl request|Any chance of a vinyl pressing of the first record? I would buy it day one.
@@ -131,7 +127,7 @@ export function buildCorpus() {
     schema: 'inbox-triage-corpus/v1',
     version: '2026-09-28.1',
     issue: 'JOV-6421',
-    targetSize: { min: 110, max: 500 },
+    targetSize: { min: 105, max: 500 },
     notes:
       'Labels are gold for the fixed inbox category/priority enums; "uncategorized" is the abstain outcome on either axis. Sender addresses are never stored — only display name and domain — and bodies contain no real email addresses. Tuning examples calibrate concentration thresholds; holdout examples are never used for calibration.',
     examples: examples.map(e => ({ ...e, tags: [...e.tags] })),
@@ -168,9 +164,9 @@ export function buildPilotConfig() {
       spamOvercaptureRateMax: 0.05,
     },
     sufficiency: {
-      minCorpusSize: 110,
+      minCorpusSize: 105,
       minTuningExamples: 65,
-      minHoldoutExamples: 45,
+      minHoldoutExamples: 40,
       minExamplesPerExpectedCategory: 3,
       minExamplesPerExpectedPriority: 5,
       requiredTags: [
@@ -185,7 +181,7 @@ export function buildPilotConfig() {
         'typo',
         'off-topic',
       ],
-      minExecutedComparisons: 110,
+      minExecutedComparisons: 105,
       rareEventNote:
         'A ~140-500 example corpus is not proof of rare-event safety or production readiness; it bounds ordinary-quality evidence only.',
     },

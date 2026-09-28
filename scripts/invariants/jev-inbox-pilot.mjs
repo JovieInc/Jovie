@@ -137,7 +137,9 @@ function percentile(sorted, p) {
   ];
 }
 
+/** @param {Record<string, {support:number,tp:number,fp:number,fn:number}>} perClass */
 function finalizeClassMetrics(perClass) {
+  /** @type {Record<string, {support:number,precision:number,recall:number,f1:number}>} */
   const metrics = {};
   let f1Sum = 0;
   let f1Classes = 0;
@@ -160,6 +162,7 @@ function finalizeClassMetrics(perClass) {
   });
 }
 
+/** @param {Record<string, {support:number,tp:number,fp:number,fn:number}>} perClass */
 function bumpAxis(perClass, expected, pred) {
   for (const cls of new Set([expected, pred])) {
     perClass[cls] ??= { support: 0, tp: 0, fp: 0, fn: 0 };
@@ -174,7 +177,9 @@ function bumpAxis(perClass, expected, pred) {
 
 export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
   const byId = new Map(corpus.examples.map(e => [e.id, e]));
+  /** @type {Record<string, {support:number,tp:number,fp:number,fn:number}>} */
   const perCategory = {};
+  /** @type {Record<string, {support:number,tp:number,fp:number,fn:number}>} */
   const perPriority = {};
   const c = Object.fromEntries(
     'suggested wrongSuggest abstained review uncategorizedSupport uncategorizedCorrect highValueSupport highValueMissed spamOvercapture executed shadow inputTokens outputTokens'
@@ -290,7 +295,6 @@ export function summarizeOutcomes(corpus, outcomes, thresholds, config) {
       inputTokens: c.inputTokens,
       outputTokens: c.outputTokens,
     }),
-    billedCostUsd: null,
     estimatedCostUsd,
     estimatedCostPerDecisionUsd: total > 0 ? estimatedCostUsd / total : null,
     incumbentCallRetained: true,

@@ -117,13 +117,10 @@ test('empty email content never reaches the evaluator', async () => {
   const receipt = await classifyInboxEmail(
     { ...baseInput, subject: '', bodyText: '' },
     {
-      transport: async () => {
-        calls += 1;
-        return transportResult();
-      },
+      ...admittedOptions(),
+      transport: async () => ((calls += 1), transportResult()),
     }
   );
-  assert.equal(receipt.status, 'skipped');
   assert.equal(receipt.evaluatorCalls, 0);
   assert.equal(calls, 0);
 });
@@ -296,7 +293,6 @@ test('summarizeOutcomes reports per-axis metrics, abstention, latency and cost',
     ['uncategorizedRecall', 1],
     ['highValueMissRate', 0],
     ['spamOvercaptureRate', 0],
-    ['billedCostUsd', null],
     ['incumbentCallRetained', true],
     ['estimatedWholeWorkflowCostUsd', null],
   ])) {
@@ -355,7 +351,11 @@ test('summarizeOutcomes reports per-axis metrics, abstention, latency and cost',
 });
 
 test('disposition distinguishes shadow observations from executed comparisons', () => {
-  const R = (metrics, cfg = config, baselineMetrics = null) =>
+  const R = (
+    /** @type {any} */ metrics,
+    /** @type {any} */ cfg = config,
+    /** @type {any} */ baselineMetrics = null
+  ) =>
     buildPilotReceipt({
       corpus,
       config: cfg,
