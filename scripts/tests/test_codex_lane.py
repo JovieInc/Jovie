@@ -119,7 +119,7 @@ class ClassifyTest(unittest.TestCase):
         self.assertLess(soon - now, 86400)
 
 
-class LedgerTest(unittest.TestCase):
+class LedgerTest(Isolated):
     def test_announcements_keep_immediate_and_banked_promises_independent(self):
         cases = [("We reset your rate limits now.", (True, False)),
             ("You receive one banked reset credit per day.", (False, True)),
