@@ -632,14 +632,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'apps/web/app/(marketing)/support/page.tsx',
       'hero',
       'content-prose',
-      'faq',
       'cta'
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'source binding audit 2026-09-01',
+      source: 'source binding audit 2026-09-26',
       notes:
-        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and the canonical MarketingFooterCta in that order.',
+        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body pointing at the canonical Help Center on docs.jov.ie, and SupportCta in that order. FAQs rehomed to the canonical troubleshooting article under JOV-5897, so the seo recipe faq beat intentionally no longer applies.',
     },
     status: 'active',
     specVersion: '1.0.0',

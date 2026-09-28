@@ -144,10 +144,27 @@ export function interpretCounts(
 ): SourceObservation['counts'] {
   if (status !== 'ok' || payload == null) return emptyCounts();
   if (sourceId === 'lanes-status') {
+    let terminalFailures: CountMeasurement = NOT_MEASURED_COUNT;
+    if (isRecord(payload.failed_by_reason)) {
+      let total = 0;
+      let valid = true;
+      for (const value of Object.values(payload.failed_by_reason)) {
+        if (!Number.isSafeInteger(value) || Number(value) < 0) {
+          valid = false;
+          break;
+        }
+        total += Number(value);
+      }
+      if (valid) terminalFailures = measuredCount(total);
+    }
     return {
       ...emptyCounts(),
       running: countFromNumber(payload.running),
       capacityAvailable: countFromNumber(payload.idle),
+      // Terminal (dead-lettered) lane failures are reported per reason by the
+      // feed; they never alias blocked work, and absent evidence stays
+      // not-measured.
+      terminalFailures,
     };
   }
   if (sourceId === 'lane-pull-requests') {
