@@ -120,7 +120,9 @@ describe('Summer promotion inside the pin TTL', () => {
       })
     );
 
-    expect(await speak()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(await speak()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_deployment_unverified' },
+    ]);
     expect(postCount()).toBe(1);
     expect(fetchShadow).toHaveBeenCalledOnce();
     expect(identityFetch).toHaveBeenCalledTimes(2);
@@ -141,7 +143,9 @@ describe('Summer promotion inside the pin TTL', () => {
       })
     );
 
-    expect(await speak()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(await speak()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_deployment_unverified' },
+    ]);
     expect(postCount()).toBe(1);
     expect(fetchShadow).toHaveBeenCalledOnce();
     expect(identityFetch).toHaveBeenCalledTimes(2);
