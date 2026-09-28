@@ -69,6 +69,8 @@ jobs:
       - name: Produce and post evidence
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          # Real defects (failed evidence) upsert one fingerprinted Linear issue.
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           CHANGED: ${{ steps.changed.outputs.path }}
           ALL: ${{ inputs.all && '--all' || '' }}
           RUN_REF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -4,6 +4,7 @@ import { MARKETING_COMPONENT_REGISTRY } from '../data/marketing/componentRegistr
 import {
   affectedEntries,
   buildPacket,
+  defectReceipts,
   storyFileFor,
 } from './marketing-certification-producer';
 
@@ -128,5 +129,25 @@ describe('marketing certification producer', () => {
     for (const packet of [noTest, brokenStory, wrongStory, penFlagged]) {
       expect(evaluateCertificationAdmission({ packet }).state).toBe('working');
     }
+  });
+
+  it('files real defects once per entry and tier, never missing evidence', () => {
+    expect(defectReceipts(packetFor())).toEqual([]);
+    expect(
+      defectReceipts(packetFor({ ownTestFile: null, ownTests: null }))
+    ).toEqual([]);
+    const broken = packetFor({
+      stories: report(
+        'components/marketing/storybook/MarketingShells.stories.tsx',
+        'MarketingFooter',
+        'failed'
+      ),
+    });
+    expect(defectReceipts(broken)).toEqual([
+      expect.objectContaining({
+        fingerprint: 'marketing-cert:shell.footer:visual_proof',
+        tier: 'visual_proof',
+      }),
+    ]);
   });
 });
