@@ -33,7 +33,7 @@ import {
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
-import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
+import { EntityHeader } from '@/components/molecules/drawer/EntityHeader';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
@@ -269,7 +269,7 @@ export function TourDateSidebar({
           tourDate ? (
             <>
               <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
-                <EntityHeaderCard
+                <EntityHeader
                   title={tourDate.title?.trim() || tourDate.venueName}
                   stableLayout
                   titleLineClamp={1}
@@ -277,7 +277,7 @@ export function TourDateSidebar({
                   reserveSubtitleSlot
                   reserveMetaSlot
                   metaOverflow='scroll'
-                  image={
+                  thumbnail={
                     <DrawerMediaThumb
                       alt=''
                       fallback={

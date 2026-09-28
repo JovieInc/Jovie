@@ -150,8 +150,9 @@ export function ImageWithFallback({
           isFill ? 'absolute inset-0' : 'h-full w-full',
           fallbackClassName
         )}
-        role='img'
-        aria-label={alt}
+        {...(alt
+          ? { role: 'img' as const, 'aria-label': alt }
+          : { 'aria-hidden': true })}
       >
         <FallbackIcon className='h-1/3 w-1/3 text-tertiary-token' />
       </div>
