@@ -76,12 +76,11 @@ async function main() {
       slug: 'demo-miracle-official-music-video',
       releaseType: 'music_video',
       releaseDate: new Date('2023-04-14'),
-      artworkUrl: 'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+      artworkUrl: '/images/demo/artwork-video.jpg',
       totalTracks: 0,
       metadata: {
         youtubeVideoId: 'v7GHn2WJCM4',
-        youtubeThumbnailUrl:
-          'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+        youtubeThumbnailUrl: '/images/demo/artwork-video.jpg',
         youtubeChannelId: 'UCIjYyZxkFucP_W-tmXg_ILw',
         youtubeChannelName: 'Calvin Harris',
         duration: 219,
