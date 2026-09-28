@@ -20,6 +20,7 @@ import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { MetaPixel } from '@/features/tracking/MetaPixel';
+import { SignupFunnelBeacon } from '@/features/tracking/SignupFunnelBeacon';
 import {
   isProofProfileHandle,
   resolveProofClaimCta,
@@ -47,6 +48,7 @@ import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import {
   buildProfileAeoContent,
   buildProfileAeoFaqStructuredData,
+  buildStructuredCollaboratorParagraph,
 } from '@/lib/profile/aeo-content';
 import {
   collectEntityMentions,
@@ -469,6 +471,9 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
+      {isPublicNoAuthSmoke || isClaimed ? null : (
+        <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
+      )}
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       {/* Browser Meta pixel (fbq) — builds the retargeting website custom
@@ -529,6 +534,13 @@ async function ArtistPageContent({
           showOldReleases: profileSettings.showOldReleases === true,
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
+        creditSegments={
+          buildStructuredCollaboratorParagraph(
+            artist.name,
+            artist.handle,
+            releaseCollaborators
+          )?.segments
+        }
         releases={releases}
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}

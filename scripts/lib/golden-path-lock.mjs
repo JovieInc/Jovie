@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 /**
- * Fail-closed golden-path lock (JOV-5085): homepage name search
- * (Search your name → Find me, JOV-5864 certified homepage) → /start →
- * logged-out first message sends → waitlist write only after verified auth.
+ * Fail-closed golden-path lock (JOV-5085): the certified homepage front
+ * door → logged-out first message sends → waitlist write only after
+ * verified auth. The certified homepage has exactly two states
+ * (JOV-5864 / JOV-6794):
+ * - open (WAITLIST_ENABLED=false): name search
+ *   ("Search your name" → "Find me") with a /start handoff
+ * - waitlist-gated (WAITLIST_ENABLED=true, prelaunch): "Request access"
+ *   primary CTA → /signup. Waitlist gating is the only allowed gate.
  * Missing secrets fail closed. Merge gate never reads E2E_PROD.
  */
 
@@ -16,6 +21,8 @@ export const GOLDEN_PATH_LOCK_SCHEMA = 'jovie-golden-path-lock/v1';
 export const GOLDEN_PATH_PROD_ORIGIN = 'https://jov.ie';
 export const GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER = 'Search your name';
 export const GOLDEN_PATH_HERO_SEARCH_ACTION = 'Find me';
+export const GOLDEN_PATH_GATED_CTA_LABEL = 'Request access';
+export const GOLDEN_PATH_GATED_CTA_HREF = '/signup';
 export const GOLDEN_PATH_START_PATH = '/start';
 export const FAKE_RATE_LIMIT_COPY = 'Too many messages';
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
@@ -96,7 +103,7 @@ const FORBIDDEN_SKIP_REASONS = Object.freeze([
 /** @typedef {{ changed: string[], matched: string[], touchesGoldenPath: boolean }} GoldenPathPathClassification */
 /** @typedef {{ schema: string, mode: 'merge-gate'|'prod-probe'|'autofix', ok: boolean, skipped?: boolean, stub?: boolean, alwaysRan?: boolean, inconclusive?: boolean, origin?: string, fingerprint?: string, testFiles?: string[], classification?: GoldenPathPathClassification, checks?: GoldenPathCheck[] }} GoldenPathReceipt */
 /** @typedef {{ schema: string, mode: 'prod-probe', ok: boolean, inconclusive: boolean, skipped: boolean, origin: string, fingerprint: string, checks: GoldenPathCheck[] }} GoldenPathProdProbeReceipt */
-/** @typedef {{ action: 'fail_closed'|'dedup'|'escalate'|'launch', reason: string, fingerprint?: string, existingAgentIds?: string[], openPr?: unknown, priorAttemptCount?: number, openIssueUrl?: string|null, request?: { prompt: { text: string }, source: { repository: string, ref: string }, target: { autoCreatePr: boolean } } }} GoldenPathAutofixPlan */
+/** @typedef {{ action: 'fail_closed'|'dedup'|'escalate'|'launch', reason: string, fingerprint?: string, existingAgentIds?: string[], openPr?: unknown, openPrNumber?: number|null, priorAttemptCount?: number, openIssueUrl?: string|null, request?: { prompt: { text: string }, source: { repository: string, ref: string }, target: { autoCreatePr: boolean, branchName?: string } } }} GoldenPathAutofixPlan */
 
 /** @param {string[]} [files] @returns {GoldenPathPathClassification} */
 export function classifyChangedPaths(files = []) {
@@ -124,23 +131,40 @@ export function evaluateHomepageHtml(html) {
       reason: 'homepage HTML was empty',
     };
   }
-  // JOV-5864 certified homepage: the hero's only conversion control is the
-  // name search — placeholder "Search your name" + submit "Find me" — with a
-  // /start handoff still present for the onboarding route.
+  // JOV-5864 certified homepage, open state: the hero's only conversion
+  // control is the name search — placeholder "Search your name" + submit
+  // "Find me" — with a /start handoff still present for the onboarding route.
   const hasPlaceholder = html.includes(GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER);
   const hasAction = html.includes(GOLDEN_PATH_HERO_SEARCH_ACTION);
   const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
-  if (!hasPlaceholder || !hasAction || !hasStartHref) {
+  if (hasPlaceholder && hasAction && hasStartHref) {
     return {
       id: 'homepage-cta',
-      ok: false,
-      reason: `homepage conversion must be the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff`,
+      ok: true,
+      reason: `found name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" and ${GOLDEN_PATH_START_PATH} handoff`,
+    };
+  }
+  // Certified waitlist-gated state (prelaunch, WAITLIST_ENABLED=true): the
+  // hero's conversion control is "Request access" → /signup
+  // (PUBLIC_WAITLIST_URL). This is the only allowed gate — the search is
+  // intentionally hidden while gated (JOV-6794).
+  const gatedHrefPattern = new RegExp(
+    `href\\s*=\\s*["'][^"']*${GOLDEN_PATH_GATED_CTA_HREF.replace('/', '\\/')}(?:[?"']|\\/)`,
+    'i'
+  );
+  const hasGatedLabel = html.includes(GOLDEN_PATH_GATED_CTA_LABEL);
+  const hasGatedHref = gatedHrefPattern.test(html);
+  if (hasGatedLabel && hasGatedHref) {
+    return {
+      id: 'homepage-cta',
+      ok: true,
+      reason: `found waitlist-gated CTA "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (certified prelaunch gate)`,
     };
   }
   return {
     id: 'homepage-cta',
-    ok: true,
-    reason: `found name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" and ${GOLDEN_PATH_START_PATH} handoff`,
+    ok: false,
+    reason: `homepage conversion must be the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
   };
 }
 
@@ -542,7 +566,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     '',
     'Locked path (do not invent a new product flow):',
     '1. https://jov.ie homepage',
-    `2. Name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}", JOV-5864 certified homepage) → ${GOLDEN_PATH_START_PATH}`,
+    `2. Certified front door (JOV-5864 / JOV-6794): open state = name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") → ${GOLDEN_PATH_START_PATH}; waitlist-gated prelaunch state = "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (the only allowed gate)`,
     '3. Logged-out first message actually sends (not 401, not a fake rate-limit)',
     '4. Waitlist write only after verified auth',
     '',
@@ -564,7 +588,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
         ]
       : []),
     'Reproduce without signup secrets:',
-    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require the name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" plus a ${GOLDEN_PATH_START_PATH} handoff (JOV-5864 certified homepage; never revert to Get started or waitlist-first)`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require a certified front door: either the name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" plus a ${GOLDEN_PATH_START_PATH} handoff (open state) or "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF} (waitlist-gated prelaunch state, JOV-6794; never revert to Get started or an uncertified waitlist wall)`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with ${JSON.stringify(buildProdProbeChatPayload())} — must not 401 or say "Too many messages"; this probe supplies no Turnstile token, so TURNSTILE_REQUIRED leaves the post-challenge path untested`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,
@@ -572,6 +596,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/stripe/webhooks unsigned — must 400`,
     '',
     'Fix the product regression. Add or update a regression test. Do not skip because secrets are missing.',
+    'JOV-INV-018: a changed user-visible screen must be registered; run `pnpm screen-registration-gate` before opening the PR or CI fails it.',
     `When you open the PR, end the PR body with "${AUTOFIX_PR_MARKER}: ${fingerprint}" so later probe runs dedupe against it.`,
     'Do not merge. Do not deploy. Tell Gem she missed this after the lock was on.',
     receipt ? `Receipt: ${JSON.stringify(receipt)}` : '',
@@ -580,11 +605,12 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     .join('\n');
 }
 
-/** @param {{ cursorApiKey?: string | null, existingAgentIds?: string[], openPrs?: unknown[], recentAttemptCount?: number, priorAttemptCount?: number, maxAttempts?: number, openIssueUrl?: string, fingerprint?: string, checks?: GoldenPathCheck[], origin?: string, receipt?: GoldenPathReceipt | null }} [input] @returns {GoldenPathAutofixPlan} */
+/** @param {{ cursorApiKey?: string | null, existingAgentIds?: string[], openPrs?: unknown[], openPrNumber?: number | null, recentAttemptCount?: number, priorAttemptCount?: number, maxAttempts?: number, openIssueUrl?: string, fingerprint?: string, checks?: GoldenPathCheck[], origin?: string, receipt?: GoldenPathReceipt | null, now?: number }} [input] @returns {GoldenPathAutofixPlan} */
 export function planAutofix({
   cursorApiKey,
   existingAgentIds = [],
   openPrs = [],
+  openPrNumber = null,
   recentAttemptCount = 0,
   priorAttemptCount = 0,
   maxAttempts = GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
@@ -593,6 +619,7 @@ export function planAutofix({
   checks,
   origin,
   receipt,
+  now = Date.now(),
 } = {}) {
   const checkList = Array.isArray(checks) ? checks : [];
   const hasInconclusive = checkList.some(check => check.inconclusive === true);
@@ -628,6 +655,16 @@ export function planAutofix({
   const owned = (
     Array.isArray(existingAgentIds) ? existingAgentIds : []
   ).filter(id => typeof id === 'string' && id.length > 0);
+  if (openPrNumber) {
+    return {
+      action: 'dedup',
+      reason: 'open_pr_owns_fingerprint',
+      fingerprint,
+      existingAgentIds: owned,
+      openPrNumber,
+      openIssueUrl: openIssueUrl || null,
+    };
+  }
   if (owned.length > 0) {
     return {
       action: 'dedup',
@@ -669,6 +706,9 @@ export function planAutofix({
       },
       target: {
         autoCreatePr: true,
+        // JOV-6832: a fingerprint-derived branch is the dedupe key the agent
+        // list and open PRs both expose; the suffix avoids reusing a closed branch.
+        branchName: `${autofixBranchPrefix(fingerprint)}-${now.toString(36)}`,
       },
     },
   };
@@ -680,15 +720,39 @@ export function cursorAuthHeader(apiKey) {
   return `Basic ${token}`;
 }
 
-/** @param {unknown} agents @param {string} [fingerprint] @returns {string[]} */
+/** @param {string} [fingerprint] @returns {string} */
+export function autofixBranchPrefix(fingerprint) {
+  const slug = String(fingerprint ?? '')
+    .replace(`${GOLDEN_PATH_FINGERPRINT_PREFIX}:`, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `cursor/golden-path-${slug || 'unknown'}`;
+}
+
+const FINISHED_AGENT_STATUSES = new Set(['FINISHED', 'ERROR', 'EXPIRED']);
+
+/**
+ * Active Cursor agents already working this fingerprint. The list API does not
+ * echo the prompt, so match the fingerprint-derived branch too; finished agents
+ * are owned by their PR (see findOpenAutofixPr).
+ * @param {unknown} agents @param {string} [fingerprint] @returns {string[]}
+ */
 export function findOwnedAgents(agents, fingerprint) {
   const list = Array.isArray(agents) ? agents : [];
   const needle = String(fingerprint ?? '');
   if (!needle) return [];
+  const branch = autofixBranchPrefix(needle);
   return list
     .filter(agent => {
+      const record = /** @type {Record<string, unknown>} */ (agent ?? {});
+      if (FINISHED_AGENT_STATUSES.has(String(record.status ?? ''))) {
+        return false;
+      }
       const haystack = JSON.stringify(agent ?? {}).toLowerCase();
-      return haystack.includes(needle.toLowerCase());
+      return (
+        haystack.includes(needle.toLowerCase()) || haystack.includes(branch)
+      );
     })
     .map(agent => {
       const record = /** @type {Record<string, unknown>} */ (agent ?? {});
@@ -833,7 +897,7 @@ export async function executeAutofix({
   githubToken = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? '',
   fetchImpl = fetch,
   now = Date.now(),
-} = {}) {
+}) {
   const fingerprint = receipt?.fingerprint;
   const prompt = buildAutofixPrompt({
     fingerprint,
@@ -877,7 +941,10 @@ export async function executeAutofix({
     : [];
   const ownedAgentIds = ownedAgents
     .map(agent => agent.id)
-    .filter(id => typeof id === 'string' && id.length > 0);
+    .filter(
+      /** @param {unknown} id @returns {id is string} */
+      id => typeof id === 'string' && id.length > 0
+    );
 
   const openPrs = githubToken
     ? (
@@ -1036,4 +1103,25 @@ export async function executeAutofix({
     agentId,
     linearUrl: linear.url ?? null,
   };
+}
+
+/**
+ * An open Cursor PR already fixing this fingerprint (or any JOV-5085 lock break).
+ * @param {unknown} prs @param {string} [fingerprint] @returns {number | null}
+ */
+export function findOpenAutofixPr(prs, fingerprint) {
+  const list = Array.isArray(prs) ? prs : [];
+  const needle = String(fingerprint ?? '');
+  const branch = autofixBranchPrefix(needle);
+  const hit = list.find(pr => {
+    const head = String(pr?.headRefName ?? '');
+    if (!head.startsWith('cursor/')) return false;
+    const text = `${pr?.title ?? ''}\n${pr?.body ?? ''}`;
+    return (
+      head.startsWith(branch) ||
+      (needle !== '' && text.includes(needle)) ||
+      text.includes('JOV-5085')
+    );
+  });
+  return typeof hit?.number === 'number' ? hit.number : null;
 }

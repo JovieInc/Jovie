@@ -16,6 +16,7 @@ import {
   classifyChangedPaths,
   evaluateProdProbe,
   executeAutofix,
+  findOpenAutofixPr,
   GOLDEN_PATH_LOCK_SELF_TEST_FILES,
   GOLDEN_PATH_PROD_ORIGIN,
   MERGE_GATE_TEST_FILES,
@@ -28,6 +29,34 @@ const FORBIDDEN_ENV = Object.freeze([
   'E2E_PROD_EMAIL',
   'E2E_CLERK_USER',
 ]);
+const EXECUTION_LEDGER =
+  process.env.EXECUTION_ATTEMPT_LEDGER ??
+  `/tmp/golden-path-lock-${process.pid}/execution-attempts.jsonl`;
+
+function executionAttempt(command, input) {
+  if (command !== 'identity') {
+    input.coordination = {
+      kind: 'github-status',
+      repository: process.env.GH_REPO,
+      sha: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+      tokenEnv: 'GH_TOKEN',
+      targetUrl: `${process.env.GITHUB_SERVER_URL || 'https://github.com'}/${process.env.GH_REPO}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+    };
+  }
+  const result = spawnSync(
+    'python3',
+    [resolve('scripts/lanes/execution_attempt.py')],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({ command, ...input }),
+    }
+  );
+  const output = JSON.parse(result.stdout || '{}');
+  if (result.status !== 0 || output.error) {
+    throw new Error(output.error || `execution-attempt-${command}-failed`);
+  }
+  return output;
+}
 
 function usage() {
   return [
@@ -338,6 +367,33 @@ async function runProdProbe(args) {
   }
 }
 
+
+function gh(args) {
+  const result = spawnSync('gh', args, { encoding: 'utf8' });
+  if (result.status !== 0) {
+    fail(
+      `gh ${args[0]} ${args[1]} failed; refusing to launch a possible duplicate autofix.`,
+      result.stderr
+    );
+  }
+  return result.stdout;
+}
+
+function listOpenPrs() {
+  return JSON.parse(
+    gh([
+      'pr',
+      'list',
+      '--state',
+      'open',
+      '--limit',
+      '300',
+      '--json',
+      'number,headRefName,title,body',
+    ])
+  );
+}
+
 async function runAutofix(args) {
   if (!args.receipt) fail('autofix requires --receipt <path>');
   const receipt = JSON.parse(readFileSync(resolve(args.receipt), 'utf8'));
@@ -377,15 +433,90 @@ async function runAutofix(args) {
   }
 
   const apiKey = process.env.CURSOR_API_KEY ?? '';
-  if (!apiKey) {
-    fail(
-      'Golden-path prod break cannot autofix: CURSOR_API_KEY is missing. Detect without a ship lock is a hole.'
+  if (apiKey) {
+    // JOV-6832: an unreadable owner list is not permission to launch another
+    // agent; 28 duplicate PRs in 5 h came from launching blind.
+    const openPrNumber = findOpenAutofixPr(
+      listOpenPrs(),
+      receipt.fingerprint
     );
+    if (openPrNumber) {
+      // The open PR already carries the Linear intake; this run's log is the new evidence.
+      fail(
+        `Golden-path prod probe failed; open autofix PR #${openPrNumber} owns ${receipt.fingerprint}. No new Cursor launch.`
+      );
+    }
   }
+
+  const executionIdentity = executionAttempt('identity', {
+    domain: 'production-verification-remediation',
+    work: { origin: receipt.origin, failureFingerprint: receipt.fingerprint },
+    generation: {
+      deployment: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+    },
+  });
+  const execution = executionAttempt('claim', {
+    path: EXECUTION_LEDGER,
+    ident: executionIdentity,
+    owner: {
+      owner: process.env.GITHUB_RUN_ID || 'local',
+      runtime: 'golden-path-prod-autofix',
+      provider: 'cursor',
+      model: null,
+      tool: 'cursor-agent-api',
+      accountPool: 'cursor',
+    },
+    policy: {
+      attempts: 1,
+      concurrency: 1,
+      wallSeconds: 900,
+      spend: 1,
+      mutations: 2,
+      leaseSeconds: 900,
+      version: 'golden-path-autofix-v1',
+    },
+    trigger: {
+      triggerId: process.env.GITHUB_RUN_ID || 'local',
+      correlationId: receipt.fingerprint,
+      causationId: process.env.EXECUTION_GENERATION || process.env.GITHUB_SHA,
+    },
+  });
+  if (!execution.admitted) {
+    fail(`Golden-path autofix execution denied: ${execution.reason}.`);
+  }
+  executionAttempt('boundary', {
+    path: EXECUTION_LEDGER,
+    ident: executionIdentity,
+    fence: execution.fencingToken,
+    reservation: { spend: 1, mutations: 2 },
+  });
+  const finishExecution = (
+    result,
+    failureClass,
+    failureFingerprint,
+    dependencies,
+    detail = {}
+  ) =>
+    executionAttempt('finish', {
+      path: EXECUTION_LEDGER,
+      ident: executionIdentity,
+      fence: execution.fencingToken,
+      result,
+      detail: {
+        failureClass,
+        failureFingerprint,
+        evidenceDigest: receipt.fingerprint,
+        costs: {},
+        dependencies,
+        ...detail,
+      },
+    });
 
   // JOV-6827: dedupe on the probe fingerprint (open PR / running agent /
   // durable launch marker), cap one launch per fingerprint per 24h, and
   // escalate to Summer after repeated failed attempts instead of relaunching.
+  // JOV-5966: the intake inside executeAutofix dedupes by fingerprint
+  // (fail-closed) and files P0s straight into Todo, skipping the Triage queue.
   const result = await executeAutofix({
     receipt,
     cursorApiKey: apiKey,
@@ -393,17 +524,30 @@ async function runAutofix(args) {
 
   if (!result.ok) {
     if (result.stage === 'linear_intake') {
+      finishExecution('failed_unknown', 'intake_unknown', result.reason, [
+        'linear',
+      ]);
       fail(
         `Linear intake failed closed: ${result.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
         JSON.stringify(result.body ?? null)
       );
     }
     if (result.stage === 'cursor_launch') {
+      finishExecution('failed_unknown', 'provider_unknown', result.reason, [
+        'linear',
+        'cursor',
+      ]);
       fail(
         `Cursor-direct launch failed (${result.reason}).`,
         JSON.stringify(result.body ?? null)
       );
     }
+    finishExecution(
+      'failed_unknown',
+      'intake_unknown',
+      result.reason ?? 'unknown',
+      ['linear']
+    );
     if (result.reason === 'missing_cursor_api_key') {
       fail(
         'Golden-path prod break cannot autofix: CURSOR_API_KEY is missing. Detect without a ship lock is a hole.'
@@ -416,14 +560,27 @@ async function runAutofix(args) {
     console.error(
       `Launched Cursor-direct autofix ${result.agentId ?? ''} fingerprint=${receipt.fingerprint}`
     );
+    finishExecution('succeeded', null, null, ['linear', 'cursor'], {
+      costs: { apiCalls: 1 },
+      mutationsPerformed: ['linear_issue', 'cursor_agent'],
+      confidence: 'high',
+    });
   } else if (result.action === 'dedup') {
     console.error(
       `Deduped Cursor-direct autofix fingerprint=${receipt.fingerprint} reason=${result.reason} pr=${result.openPr?.number ?? ''} agents=${(result.existingAgentIds ?? []).join(',')}`
     );
+    finishExecution('succeeded', null, null, ['linear'], {
+      mutationsPerformed: ['linear_issue'],
+      confidence: 'high',
+    });
   } else if (result.action === 'escalate') {
     console.error(
       `Escalated golden-path autofix fingerprint=${receipt.fingerprint} priorAttempts=${result.priorAttemptCount ?? 0}`
     );
+    finishExecution('succeeded', null, null, ['linear'], {
+      mutationsPerformed: ['linear_issue'],
+      confidence: 'high',
+    });
   }
 
   fail(
