@@ -21,6 +21,7 @@ import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { track } from '@/lib/analytics';
 import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ShareContext } from '@/lib/share/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
@@ -77,6 +78,8 @@ interface ProfileUnifiedDrawerProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly tourDates?: TourDateViewModel[];
   readonly hasTourDates: boolean;
   readonly hasReleases: boolean;
@@ -230,6 +233,7 @@ export function ProfileUnifiedDrawer({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   tourDates = [],
   hasTourDates,
   hasReleases,
@@ -407,7 +411,6 @@ export function ProfileUnifiedDrawer({
                     checked={contentPrefs[pref.key]}
                     onCheckedChange={() => onTogglePref(pref.key)}
                     aria-label={pref.label}
-                    className='data-[state=checked]:bg-success data-[state=checked]:hover:bg-success/90'
                   />
                 </div>
               ))}
@@ -479,6 +482,8 @@ export function ProfileUnifiedDrawer({
                 genres={genres}
                 pressPhotos={pressPhotos}
                 allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                contacts={contacts}
               />
             </div>
           )}

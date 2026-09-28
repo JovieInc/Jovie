@@ -18,7 +18,11 @@ import {
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroPhoto,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
@@ -447,9 +451,14 @@ export default function LaunchPage() {
       <main>
         <section
           aria-labelledby='hero-heading'
-          className='system-b-launch-hero'
+          className='system-b-launch-hero marketing-hero-dock relative overflow-hidden'
         >
-          <MarketingContainer width='page'>
+          <MarketingHeroPhoto
+            src='/images/marketing-hero/launch.webp'
+            width={1600}
+            height={901}
+          />
+          <MarketingContainer width='page' className='relative z-3'>
             <div className='system-b-launch-hero-grid'>
               <div className='system-b-launch-hero-copy'>
                 <p className='system-b-launch-kicker'>Launch</p>

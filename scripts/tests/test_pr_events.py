@@ -15,6 +15,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -218,7 +219,7 @@ class ClaimTest(unittest.TestCase):
         found = events.queued_prs(fake_lane(shell), events.FIX_KINDS)
         self.assertEqual(found[0]["eventKinds"], ["red"])
         search = shell.calls[0][shell.calls[0].index("--search") + 1]
-        self.assertEqual(search, "label:lane-fix-red,lane-fix-conflict,lane-fix-dequeued,lane-fix-review")
+        self.assertEqual(search, "label:lane-fix-red,lane-fix-conflict,lane-fix-dequeued,lane-fix-review,lane-fix-stale")
         self.assertEqual(events.queued_prs(fake_lane(Shell({("gh", "pr", "list"): (1, "")})), events.FIX_KINDS), [])
 
     def test_an_event_pr_is_claimed_first_recorded_and_its_label_consumed(self):
@@ -249,6 +250,7 @@ class ClaimTest(unittest.TestCase):
 
     def test_the_second_attempt_escalates_to_the_next_lane_in_cost_order(self):
         self.attempts({"5": {"sha": "h0", "count": 1, "lane": "devin", "at": NOW - 60}})
+        (self.host.state / "synced.json").write_text(json.dumps({"5": {"from": "h0", "ok": True}}))
         dequeued = pr(kinds=["dequeued"])
         self.assertIsNone(events.claim_event_pr(self.host, fake_lane(Shell()), "devin", [dequeued], NOW))
         self.assertEqual(events.claim_event_pr(self.host, fake_lane(Shell()), "codex", [dequeued], NOW)["number"], 5)
@@ -372,6 +374,143 @@ class TickTest(unittest.TestCase):
                          ("jovie.bug-report/v1", "agent", "pull-request/5", "codex"))
 
 
+class GapTest(unittest.TestCase):
+    """The orphan-PR gaps: parked heads, dequeued heads, the reconcile sweep and its invariant."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.host = SimpleNamespace(state=Path(self.tmp.name))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_only_a_running_attempt_holds_its_head(self):
+        head = pr()
+        self.assertTrue(events.in_flight({"sha": "h1", "at": NOW - 60}, head, NOW))
+        self.assertFalse(events.in_flight({"sha": "h1", "at": NOW - 60, "endedAt": NOW}, head, NOW))
+        self.assertFalse(events.in_flight({"sha": "h1", "at": NOW - events.FIX_LEASE_S - 1}, head, NOW))
+        self.assertFalse(events.in_flight({"sha": "h1", "count": 1}, head, NOW), "legacy records get their retry")
+        self.assertFalse(events.in_flight({"sha": "h0", "at": NOW}, head, NOW))
+
+    def test_a_no_push_attempt_is_retried_on_the_same_head_by_the_next_lane(self):
+        (self.host.state / "fix-attempts.json").write_text(json.dumps(
+            {"5": {"sha": "h1", "count": 1, "lane": "devin", "at": NOW - 600, "endedAt": NOW - 60}}))
+        conflict = pr(kinds=["conflict"], merge="DIRTY")
+        self.assertEqual(events.claim_event_pr(self.host, fake_lane(Shell()), "codex", [conflict], NOW)["number"], 5)
+
+    def test_a_first_removal_waits_for_the_no_model_sync(self):
+        lane = fake_lane(Shell())
+        self.assertIsNone(events.claim_event_pr(self.host, lane, "devin", [pr(kinds=["dequeued"], merge="CLEAN")], NOW))
+        runs = [{"databaseId": 9, "headBranch": "gh-readonly-queue/main/pr-5-abc", "workflowName": "CI"},
+                {"databaseId": 8, "headBranch": "gh-readonly-queue/main/pr-50-abc", "workflowName": "CI"}]
+        shell = Shell({("gh", "run", "list"): runs,
+                       ("gh", "run", "view"): "job\tstep\tok\njob\tstep\tError: e2e smoke failed\n"})
+        (self.host.state / "synced.json").write_text(json.dumps({"5": {"from": "h0", "ok": True}}))
+        claimed = events.claim_event_pr(self.host, fake_lane(shell), "devin", [pr(kinds=["dequeued"], merge="CLEAN")], NOW)
+        self.assertIn("e2e smoke failed", claimed["queueFailure"])
+        self.assertEqual(shell.made("gh", "run", "view")[0][3], "9")
+        self.assertEqual(events.queue_failure(fake_lane(Shell({("gh", "run", "list"): []})), 5), "")
+        self.assertEqual(events.queue_failure(fake_lane(Shell({("gh", "run", "list"): (0, "not json")})), 5), "")
+
+    def test_tick_syncs_a_dequeued_head_with_main_once(self):
+        queued = [pr(merge="CLEAN", labels=["lane-fix-dequeued"]), pr(number=6, merge="DIRTY", labels=["lane-fix-dequeued"])]
+        shell = Shell({("gh", "pr", "list"): queued})
+        (self.host.state / "reconcile.json").write_text(json.dumps({"atEpoch": NOW}))
+        outcomes = events.tick(self.host, fake_lane(shell), lambda: None, NOW)
+        self.assertEqual(outcomes, {5: "synced"}, "a conflicted head cannot be synced; the model fixes it")
+        self.assertIn(["gh", "api", "-X", "PUT", f"repos/{runner.REPO_SLUG}/pulls/5/update-branch",
+                       "-f", "expected_head_sha=h1"], shell.calls)
+        self.assertEqual(json.loads((self.host.state / "synced.json").read_text())["5"]["ok"], True)
+        again = Shell({("gh", "pr", "list"): queued})
+        self.assertEqual(events.tick(self.host, fake_lane(again), lambda: None, NOW), {})
+        failing = Shell({("gh", "pr", "list"): [pr(number=7, merge="CLEAN", labels=["lane-fix-dequeued"])],
+                         ("gh", "api", "-X", "PUT"): (1, "")})
+        self.assertEqual(events.tick(self.host, fake_lane(failing), lambda: None, NOW), {7: "sync-failed"})
+        self.assertEqual(failing.made("gh", "api", "-X", "DELETE"), [], "a failed sync leaves the label for the model")
+
+    def node(self, number, **extra):
+        base = {"number": number, "isDraft": False, "headRefName": f"tim/x{number}", "headRefOid": "h", "labels": [],
+                "mergeStateStatus": "BLOCKED", "isInMergeQueue": False, "isCrossRepository": False,
+                "updatedAt": "2033-05-17T00:00:00Z", "rollup": "SUCCESS"}
+        base.update(extra)
+        return base
+
+    def test_reconcile_labels_missed_events_and_names_orphans(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        old = "2033-05-15T00:00:00Z"
+        prs = [
+            self.node(1, mergeStateStatus="DIRTY"),
+            self.node(2, rollup="FAILURE"),
+            self.node(3, isInMergeQueue=True, mergeStateStatus="CLEAN", labels=[{"name": "lane-fix-exhausted"}]),
+            self.node(4, mergeStateStatus="CLEAN"),
+            self.node(5, labels=[{"name": "hold"}]),
+            self.node(6, rollup="PENDING"),
+            self.node(7, labels=[{"name": "lane-fix-conflict"}], mergeStateStatus="DIRTY"),
+            self.node(8, labels=[{"name": "lane-fix-red"}], rollup="FAILURE"),
+            self.node(9, isDraft=True, headRefName="devin/jov-9-20260926t0100", mergeStateStatus="CLEAN"),
+            self.node(10, isDraft=True, headRefName="devin/jov-10-20260926t0100", updatedAt=old),
+            self.node(11, isDraft=True, headRefName="devin/jov-11-20260926t0100", updatedAt=old),
+            self.node(12, isDraft=True, headRefName="codex/jov-10-20260926t0500", updatedAt=old),
+            self.node(13, isDraft=True, headRefName="tim/wip", updatedAt=old),
+            self.node(14, updatedAt="2033-05-18T02:50:00Z"),
+        ]
+        plan = events.reconcile_plan(prs, {"8": {"count": 2}, "11": {"count": 2}}, set(), 2, now)
+        self.assertEqual(plan["label"], [(1, "conflict"), (2, "red"), (9, "green"), (12, "stale")])
+        self.assertEqual(plan["close"], [(10, "superseded by #12 for the same issue"),
+                                         (11, "stale for 48h after its fix attempts ran out")])
+        self.assertEqual(plan["reset"], [3, 4, 9])
+        self.assertEqual(plan["unlabel"], [(3, "exhausted")])
+        self.assertEqual(plan["orphans"], [4, 8], "CLEAN but unqueued, and a spent fix label, have no owner")
+        counts = plan["counts"]
+        self.assertEqual((counts["open"], counts["dirty"], counts["red"], counts["cleanNotQueued"], counts["inQueue"],
+                          counts["staleLaneDrafts"], counts["staleOtherDrafts"]), (14, 2, 2, 1, 1, 3, 1))
+
+    def test_reconcile_applies_the_plan_on_its_own_cadence(self):
+        page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [
+            {**self.node(1, mergeStateStatus="DIRTY"), "commits": {"nodes": [{"commit": {"statusCheckRollup": None}}]},
+             "labels": {"nodes": []}},
+            {**self.node(4, mergeStateStatus="CLEAN", isInMergeQueue=True),
+             "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]}, "labels": {"nodes": []}},
+            {**self.node(10, isDraft=True, headRefName="devin/jov-10-20260926t0100", updatedAt="2020-01-01T00:00:00Z"),
+             "commits": {"nodes": []}, "labels": {"nodes": []}},
+        ]}}}}
+        shell = Shell({("gh", "api", "graphql"): page})
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"4": {"count": 2}, "10": {"count": 2}}))
+        linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}}, move=None, comment=None)
+        record = events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW)
+        self.assertEqual(record["counts"]["dirty"], 1)
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/1/labels", "-f", "labels[]=lane-fix-conflict"],
+                      shell.calls)
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), {"10": {"count": 2}},
+                         "a PR that reached the queue starts a fresh episode")
+        self.assertEqual(record["closed"], [10])
+        self.assertIsNone(events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW + 60), "one sweep per window")
+        broken = Shell({("gh", "api", "graphql"): (1, "")})
+        self.assertIsNone(events.reconcile(self.host, fake_lane(broken), lambda: linear, NOW, force=True))
+        no_linear = Shell({("gh", "api", "graphql"): page})
+        events.reconcile(self.host, fake_lane(no_linear), lambda: (_ for _ in ()).throw(OSError("x")), NOW, force=True)
+        self.assertEqual(len(no_linear.made("gh", "pr", "close")), 1, "closing never waits on Linear")
+
+    def test_open_prs_are_read_page_by_page(self):
+        pages = iter([
+            {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"},
+                                                      "nodes": [{"number": 1, "labels": {"nodes": [{"name": "hold"}]}}]}}}},
+            {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                      "nodes": [{"number": 2}]}}}},
+        ])
+        shell = Shell({("gh", "api", "graphql"): lambda args: next(pages)})
+        prs = events.open_prs_state(fake_lane(shell))
+        self.assertEqual([(p["number"], p["labels"], p["rollup"]) for p in prs], [(1, [{"name": "hold"}], None), (2, [], None)])
+        self.assertIn("cursor=c1", shell.calls[1])
+
+    def test_fix_prompt_carries_stale_and_queue_log_and_lockfile_recipe(self):
+        prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "stale"], merge="DIRTY"), "title": "t",
+                                           "queueFailure": "### merge group: CI\nboom"}, "")
+        self.assertIn("boom", prompt)
+        self.assertIn("no activity for 48 hours", prompt)
+        self.assertIn("pnpm install --lockfile-only", prompt)
+
+
 class RunnerHookTest(unittest.TestCase):
     """The hook-in points in lane_runner.py: structured held records, exhausted orphans, the tick."""
 
@@ -401,8 +540,30 @@ class RunnerHookTest(unittest.TestCase):
         finally:
             runner.sh, runner.load_providers, events.return_to_pool = saved
         self.assertEqual(returned, [7])
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/7/labels", "-f",
+                       "labels[]=lane-fix-exhausted"], calls, "held with a reason, visible on the PR")
         self.assertIn("jovie.bug-report/v1", triaged[0])
         self.assertEqual((held["reason"], held["sha"]), ("fix-exhausted", "h1"))
+
+    def test_a_finished_fix_ends_its_attempt(self):
+        saved = (runner.sh, runner.failure_excerpt)
+        runner.failure_excerpt = lambda pr: ""
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None, stream=False):
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        runner.sh = fake
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                host = runner.Host(state=Path(tmp), repo=Path(tmp))
+                (host.state / "fix-attempts.json").write_text(json.dumps({"5": {"sha": "h1", "count": 1, "at": 1}}))
+                runner.fix_red_pr(host, "devin", {"cmd": ["true"]}, pr())
+                record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
+        finally:
+            runner.sh, runner.failure_excerpt = saved
+        self.assertEqual(record["pushed"], False)
+        self.assertGreater(record["endedAt"], 1)
 
     def test_dispatch_survives_a_broken_event_tick(self):
         saved = (runner.load_providers, runner.sh, runner.doctor.run, events.tick)

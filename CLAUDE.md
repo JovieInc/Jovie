@@ -40,21 +40,22 @@ per instruction. Context/checkpoint guidance: [agent context](docs/agent-context
 
 | Task | Read |
 |---|---|
-| Environment/tooling | [.claude/rules/environment.md](.claude/rules/environment.md) |
-| TypeScript, React, boundaries, prior art | [.claude/rules/code-style.md](.claude/rules/code-style.md) |
-| DB/migrations | [.claude/rules/db.md](.claude/rules/db.md) |
-| Auth/Better Auth | [.claude/rules/auth.md](.claude/rules/auth.md) |
-| Security, billing, entitlements | [.claude/rules/security.md](.claude/rules/security.md) |
-| UI/design | [DESIGN.md](DESIGN.md), [.claude/rules/ui.md](.claude/rules/ui.md) |
+| Environment/tooling | [environment.md](.claude/rules/environment.md) |
+| TypeScript, React, boundaries, prior art | [code-style.md](.claude/rules/code-style.md) |
+| DB/migrations | [db.md](.claude/rules/db.md) |
+| Auth/Better Auth | [auth.md](.claude/rules/auth.md) |
+| Security, billing, entitlements | [security.md](.claude/rules/security.md) |
+| UI/design | [DESIGN.md](DESIGN.md), [ui.md](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
 | Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
-| Tests/coverage | [.claude/rules/testing.md](.claude/rules/testing.md) |
-| PR, CI, merge, deploy | [docs/PR_FLOW.md](docs/PR_FLOW.md), [.claude/rules/release.md](.claude/rules/release.md) |
-| iOS / macOS | [.claude/rules/ios.md](.claude/rules/ios.md) / [.claude/rules/macos.md](.claude/rules/macos.md) |
-| Pen canvas/registry | [.claude/rules/pen.md](.claude/rules/pen.md) |
-| Skills | [.claude/rules/gstack.md](.claude/rules/gstack.md) |
+| Tests/coverage | [testing.md](.claude/rules/testing.md) |
+| PR, CI, merge, deploy | [PR_FLOW.md](docs/PR_FLOW.md), [MERGE_QUEUE.md](.github/MERGE_QUEUE.md), [BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md), [release.md](.claude/rules/release.md) |
+| iOS / macOS | [ios.md](.claude/rules/ios.md) / [macos.md](.claude/rules/macos.md) |
+| Pen canvas/registry | [pen.md](.claude/rules/pen.md) |
+| Skills | [gstack.md](.claude/rules/gstack.md) |
 
-Other scoped rules: ci-branching, infra, linear, swarm, hermes-air.
+Other scoped rules: ci-branching, infra, linear, motion, pr-stacking, swarm,
+hermes-air.
 Company domain canon: [index](canon/README.md). API/cron/webhook inventories:
 [docs/AI_AGENT_GUIDE.md](docs/AI_AGENT_GUIDE.md). Codex setup: [CODEX.md](CODEX.md).
 <!-- doc-freshness:scoped-rules-count:19 -->

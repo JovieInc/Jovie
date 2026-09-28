@@ -79,6 +79,7 @@ const imageUploads =
 const markdownUploads = [
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',

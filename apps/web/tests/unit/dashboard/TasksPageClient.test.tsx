@@ -1695,9 +1695,12 @@ describe('TasksPageClient', () => {
     ).getByRole('button', { name: 'Search Jovie' });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
-      within(screen.getByTestId('header-actions-host')).getByRole('button', {
+      within(screen.getByTestId('header-actions-host')).queryByRole('button', {
         name: 'Create Task',
       })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'New Task' })
     ).toBeInTheDocument();
   }, 10000);
 
@@ -1767,14 +1770,10 @@ describe('TasksPageClient', () => {
     );
   });
 
-  it('promotes the header into create mode when new task is triggered', () => {
+  it('promotes the toolbar into create mode when new task is triggered', () => {
     renderPage();
 
-    fireEvent.click(
-      within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create Task',
-      })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'New Task' }));
 
     expect(screen.getByLabelText('New Task Name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
@@ -1946,9 +1945,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(
-      within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Create Task',
-      })
+      screen.getByRole('button', { name: 'New Task' })
     ).toBeInTheDocument();
   });
 

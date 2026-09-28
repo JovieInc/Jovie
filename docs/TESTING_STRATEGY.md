@@ -4,7 +4,7 @@ This document outlines the testing strategy to enable safe, frequent deployments
 
 ## Testing Pyramid
 
-Following the pyramid approach defined in `AGENTS.md`:
+Following the pyramid approach defined in [`.claude/rules/testing.md`](../.claude/rules/testing.md):
 
 ```
         /\
@@ -325,3 +325,20 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 | Environment and runtime config | high | yes | yes | no |
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
+
+### Adopting intentional visual changes
+
+`Visual Snapshot Compare` is fail-closed (JOV-5459/JOV-5960): a PR that
+intentionally changes a snapshotted surface, such as the homepage, fails until
+its committed baselines match. Don't loosen thresholds. Adopt CI's own render instead:
+
+1. Let the compare fail once. The job uploads the public
+   `homepage-visual-<run>-<attempt>` artifact with Playwright's `-actual.png`
+   renders (Linux Chromium, mock keys only).
+2. Run `node scripts/visual-baseline-adopt.mjs <run-id> [--attempt <n>]` in the
+   PR worktree. It copies each render over the one committed baseline with the
+   same name, and reports unknown or ambiguous names instead of guessing.
+3. Review the image diff and commit the updated baselines in the same PR.
+
+The scheduled `visual-regression.yml` refresh remains the only
+`--update-snapshots` path for drift on main.

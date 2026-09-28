@@ -29,6 +29,8 @@ export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';
 export { MarketingContentShell } from './MarketingContentShell';
 export { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
+export type { MarketingEditorialHeroPhotoProps } from './MarketingEditorialHeroPhoto';
+export { MarketingEditorialHeroPhoto } from './MarketingEditorialHeroPhoto';
 export type { MarketingElectricSeamProps } from './MarketingElectricSeam';
 export { MarketingElectricSeam } from './MarketingElectricSeam';
 export type { MarketingFeatureGridProps } from './MarketingFeatureGrid';
@@ -37,10 +39,13 @@ export type {
   MarketingHeroContentProps,
   MarketingHeroCta,
   MarketingHeroLandingProps,
+  MarketingHeroPhotoInput,
   MarketingHeroProps,
   MarketingHeroShellProps,
 } from './MarketingHero';
 export { MarketingHero } from './MarketingHero';
+export type { MarketingHeroPhotoProps } from './MarketingHeroPhoto';
+export { MarketingHeroPhoto } from './MarketingHeroPhoto';
 export type { MarketingMetricCardProps } from './MarketingMetricCard';
 export { MarketingMetricCard } from './MarketingMetricCard';
 export type { MarketingPageShellProps } from './MarketingPageShell';

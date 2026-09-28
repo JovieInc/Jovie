@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { authorizeSummerControl } from '@/lib/ovie/control';
+import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import { applyOvieDump } from '@/lib/ovie/persist';
 
+const headers = { 'Cache-Control': 'private, no-store' } as const;
+
 export async function POST(request: Request): Promise<NextResponse> {
-  const entitlements = await getCurrentUserEntitlements();
-  const gate = authorizeSummerControl({
-    authenticated: entitlements.isAuthenticated,
-    isAdmin: entitlements.isAdmin,
-  });
+  let gate: ReturnType<typeof authorizeSummerControl>;
+  try {
+    gate = authorizeSummerControl(await resolveOviePrincipal(request));
+  } catch {
+    return NextResponse.json({ ok: false }, { status: 503, headers });
+  }
   if (!gate.ok) {
-    return NextResponse.json({ ok: false }, { status: gate.status });
+    return NextResponse.json({ ok: false }, { status: gate.status, headers });
   }
 
   const body: unknown = await request.json().catch(() => null);
@@ -28,5 +31,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   const receipts = await applyOvieDump(items, {
     store: getOvieOperatingStore(),
   });
-  return NextResponse.json({ ok: true, receipts, workerSpawned: false });
+  return NextResponse.json(
+    { ok: true, receipts, workerSpawned: false },
+    { headers }
+  );
 }
