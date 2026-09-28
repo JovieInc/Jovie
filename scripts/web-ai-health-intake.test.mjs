@@ -63,17 +63,26 @@ test('fingerprints cause and surface so distinct outages route separately', () =
 });
 
 test('files at Linear high priority in Todo and reopens recurring failures', async () => {
-  let input;
+  /** @type {Array<{ priority?: number; createStateName?: string; reopenTerminal?: boolean }>} */
+  const inputs = [];
   const result = await fileWebAiHealthLinearIssue({
     receipt: failedReceipt(),
     runUrl: 'https://example.test/run',
     upsertImpl: async value => {
-      input = value;
-      return { ok: true, action: 'created' };
+      inputs.push(value);
+      return /** @type {const} */ ({
+        ok: true,
+        action: 'created',
+        id: null,
+        identifier: null,
+        url: null,
+      });
     },
   });
 
   assert.equal(result.ok, true);
+  const input = inputs[0];
+  assert.ok(input);
   assert.equal(input.priority, 2);
   assert.equal(input.createStateName, 'Todo');
   assert.equal(input.reopenTerminal, true);

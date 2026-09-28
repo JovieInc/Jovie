@@ -1118,7 +1118,6 @@ ${fixtureCheckout}
       const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
         .split('\n')
         .filter(line => line.includes('doppler run --'));
-      expect(doppler).toHaveLength(7);
       const guarded = doppler.filter(line => line.includes(guardScriptName));
       expect(guarded).toHaveLength(6);
       expect(
@@ -1132,9 +1131,22 @@ ${fixtureCheckout}
       expect(
         guarded.filter(line => line.trim() === waitlistDopplerCommand)
       ).toHaveLength(1);
-      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual([
+      const expectedNonPlaywrightCommands = [
         expect.stringContaining('scripts/check-signup-readiness.ts'),
-      ]);
+        ...(file === 'synthetic-monitoring.yml'
+          ? [
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+            ]
+          : []),
+      ];
+      expect(doppler).toHaveLength(
+        guarded.length + expectedNonPlaywrightCommands.length
+      );
+      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual(
+        expectedNonPlaywrightCommands
+      );
     }
     const screenshots = readFileSync(
       join(workflowsRoot, 'screenshots.yml'),
