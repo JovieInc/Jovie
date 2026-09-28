@@ -2,8 +2,8 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import {
-  type AcquisitionMachineCertification,
-  machineCertifyPremadeProfile,
+  type AcquisitionPreflightResult,
+  runPremadeProfilePreflight,
 } from '@/lib/acquisition';
 import type { Lead, LeadSignalSnapshot } from '@/lib/db/schema/leads';
 import {
@@ -18,6 +18,7 @@ import {
 } from '@/lib/leads/job-qualification';
 import type { QualificationResult } from '@/lib/leads/qualify';
 import type { SpotifyLeadEnrichment } from '@/lib/leads/spotify-enrich-lead';
+import { stableSerialize } from '@/lib/stable-serialize';
 
 export const PUBLIC_REQUALIFICATION_EVENT_TYPE =
   'public_requalification' as const;
@@ -201,7 +202,7 @@ export interface PublicCandidateRun {
   jobQualification?: JobQualificationResult;
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
-  machineCertification: AcquisitionMachineCertification;
+  preflightReadiness: AcquisitionPreflightResult;
 }
 
 export interface PublicRequalificationResult {
@@ -220,7 +221,7 @@ export interface PublicRequalificationResult {
   expiresAt: string;
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
-  machineCertification: AcquisitionMachineCertification;
+  preflightReadiness: AcquisitionPreflightResult;
   state: PublicCandidateRun['state'];
   deduplicated: boolean;
   publicObservation: PublicCandidateObservation;
@@ -246,19 +247,6 @@ export class PublicRequalificationConflictError extends Error {
     this.incomingSourceRevision = input.incomingSourceRevision;
   }
 }
-function stableSerialize(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(item => stableSerialize(item)).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
-
 function sha256(value: unknown): `sha256:${string}` {
   return `sha256:${createHash('sha256').update(stableSerialize(value)).digest('hex')}`;
 }
@@ -379,7 +367,7 @@ export function buildPublicRun(input: {
     hasSoundCloudId: dspSignals.hasSoundCloudId,
     dspPlatformCount: dspSignals.dspPlatformCount,
   });
-  const evidence = machineCertifyPremadeProfile({
+  const evidence = runPremadeProfilePreflight({
     displayName: input.qualification.displayName,
     avatarUrl: input.qualification.avatarUrl,
     hasSpotifyLink: input.qualification.hasSpotifyLink,
@@ -395,11 +383,11 @@ export function buildPublicRun(input: {
     fitScoreBreakdown: stableDecisionBreakdown(
       fitResult.breakdown as unknown as Record<string, unknown>
     ),
-    machineCertification: {
+    preflightReadiness: {
       experimentId: evidence.experimentId,
       rubricId: evidence.rubricId,
       passed: evidence.passed,
-      confidence: evidence.confidence,
+      checklistCoverage: evidence.checklistCoverage,
       criteria: evidence.criteria,
       failures: evidence.failures,
     },
@@ -417,7 +405,7 @@ export function buildPublicRun(input: {
       fitInputVersion: PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
     },
   };
-  const machineCertification: AcquisitionMachineCertification = {
+  const preflightReadiness: AcquisitionPreflightResult = {
     ...evidence,
     receipts: evidence.receipts.map(receipt => ({
       ...receipt,
@@ -511,9 +499,9 @@ export function buildPublicRun(input: {
     incumbentDecisionDigest: decisionDigest,
     jobQualification,
   });
-  const combinedMachineCertification: AcquisitionMachineCertification = {
-    ...machineCertification,
-    receipts: machineCertification.receipts.map(receipt => ({
+  const combinedPreflightReadiness: AcquisitionPreflightResult = {
+    ...preflightReadiness,
+    receipts: preflightReadiness.receipts.map(receipt => ({
       ...receipt,
       digest: combinedDecisionDigest,
     })),
@@ -536,12 +524,12 @@ export function buildPublicRun(input: {
     sourceDigest,
     decisionDigest: combinedDecisionDigest,
     sourceUrls,
-    state: machineCertification.passed ? 'human_review' : 'machine_failed',
+    state: preflightReadiness.passed ? 'human_review' : 'machine_failed',
     publicObservation,
     jobQualification,
     fitScore: fitResult.score,
     fitScoreBreakdown,
-    machineCertification: combinedMachineCertification,
+    preflightReadiness: combinedPreflightReadiness,
   };
 }
 
@@ -562,7 +550,7 @@ export function resultFromRun(run: PublicCandidateRun, deduplicated: boolean) {
     expiresAt: run.expiresAt,
     fitScore: run.fitScore,
     fitScoreBreakdown: run.fitScoreBreakdown,
-    machineCertification: run.machineCertification,
+    preflightReadiness: run.preflightReadiness,
     state: run.state,
     deduplicated,
     publicObservation: run.publicObservation,
@@ -572,6 +560,10 @@ export function resultFromRun(run: PublicCandidateRun, deduplicated: boolean) {
 export function runFromMetadata(
   metadata: Record<string, unknown>
 ): PublicCandidateRun | null {
+  // Runs written before the preflight rename stored the same object under
+  // `machineCertification`; read both keys so older receipts stay usable.
+  const preflightReadiness =
+    metadata.preflightReadiness ?? metadata.machineCertification;
   if (
     metadata.contract !== PUBLIC_REQUALIFICATION_CONTRACT ||
     typeof metadata.candidateId !== 'string' ||
@@ -586,14 +578,15 @@ export function runFromMetadata(
     typeof metadata.fitScore !== 'number' ||
     !metadata.publicObservation ||
     typeof metadata.publicObservation !== 'object' ||
-    !metadata.machineCertification ||
-    typeof metadata.machineCertification !== 'object'
+    !preflightReadiness ||
+    typeof preflightReadiness !== 'object'
   ) {
     return null;
   }
   const sourceRevision = metadata.sourceRevision;
   return {
     ...metadata,
+    preflightReadiness,
     attemptEventType:
       typeof metadata.attemptEventType === 'string'
         ? metadata.attemptEventType

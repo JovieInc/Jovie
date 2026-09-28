@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { HomepageIdentityLenses } from '@/components/homepage/HomepageIdentityLenses';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
@@ -235,6 +236,9 @@ function RelationshipsSection({
         >
           <RelationshipOutcomes outcomes={section.outcomes} />
           <RelationshipVisibility peopleImage={image} />
+          <HomepageIdentityLenses
+            identity={HOMEPAGE_LAUNCH_COPY.certified.identity}
+          />
         </div>
       </div>
     </EditorialSection>
