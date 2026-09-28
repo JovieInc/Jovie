@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
@@ -164,14 +164,32 @@ describe('AboutPageContent', () => {
       return;
     }
 
-    expect(() =>
-      execFileSync('git', [
+    // Exit 0 and 1 are git's ancestry verdicts; any other exit is an execution
+    // error, not a verdict — retry it. A shallow boundary severs ancestry for
+    // an explicitly fetched commit, so a non-ancestor verdict in a shallow
+    // checkout proves nothing (same contract as component-ship-gate's
+    // storybook-story-quality-guard).
+    let ancestorStatus: number | null = null;
+    for (
+      let attempt = 0;
+      attempt < 3 && ancestorStatus !== 0 && ancestorStatus !== 1;
+      attempt += 1
+    ) {
+      ancestorStatus = spawnSync('git', [
         'merge-base',
         '--is-ancestor',
         ABOUT_STORY_RECEIPT.containingMergeSha,
         'HEAD',
-      ])
-    ).not.toThrow();
+      ]).status;
+    }
+    if (ancestorStatus !== 0) {
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
 
     const sourceAtReceipt = execFileSync(
       'git',

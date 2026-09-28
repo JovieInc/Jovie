@@ -76,7 +76,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     children: React.ReactNode;
     className?: string;
   }) => <div data-testid='surface-card'>{children}</div>,
-  EntityHeaderCard: ({
+  EntityHeader: ({
     title,
     subtitle,
     meta,
@@ -131,8 +131,8 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
 }));
 
-vi.mock('@/components/molecules/drawer/EntityHeaderCard', () => ({
-  EntityHeaderCard: ({
+vi.mock('@/components/molecules/drawer/EntityHeader', () => ({
+  EntityHeader: ({
     title,
     subtitle,
     meta,

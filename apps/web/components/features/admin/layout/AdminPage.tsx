@@ -1,3 +1,5 @@
+import { Activity } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
@@ -5,6 +7,7 @@ import {
   type WorkspaceTabOption,
   WorkspaceTabsSurface,
 } from '@/components/organisms/WorkspaceTabsSurface';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 export interface AdminPageTabsConfig<
@@ -73,6 +76,7 @@ export function AdminPage<
   className,
 }: Readonly<AdminPageProps<TPrimary, TSecondary>>) {
   const tabsHeaderless = Boolean(tabs);
+
   return (
     <PageShell frame='none' contentPadding='none'>
       <PageContent noPadding>
@@ -83,13 +87,23 @@ export function AdminPage<
           )}
           data-testid={testId}
         >
-          {actions ? (
-            <PageToolbar
-              start={null}
-              end={actions}
-              data-testid='admin-page-toolbar'
-            />
-          ) : null}
+          <PageToolbar
+            start={null}
+            end={
+              <>
+                {actions}
+                <Link
+                  href={APP_ROUTES.ADMIN_ACTIVITY}
+                  className='inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-2xs font-medium text-secondary-token transition-colors hover:text-primary-token'
+                  aria-label='Open Company Timeline'
+                >
+                  <Activity className='h-3.5 w-3.5' aria-hidden='true' />
+                  Timeline
+                </Link>
+              </>
+            }
+            data-testid='admin-page-toolbar'
+          />
 
           {hero ? <div data-testid='admin-page-hero'>{hero}</div> : null}
 

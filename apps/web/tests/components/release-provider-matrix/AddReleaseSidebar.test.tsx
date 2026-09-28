@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AddReleaseSidebar } from '@/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar';
+import { AddReleaseSidebar } from '@/components/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const { mockCreateRelease, mockToast } = vi.hoisted(() => ({
@@ -96,21 +96,21 @@ vi.mock('@/components/molecules/drawer', () => ({
       More
     </button>
   ),
-  EntityHeaderCard: ({
+  EntityHeader: ({
     title,
     subtitle,
     meta,
-    image,
+    thumbnail,
     actions,
   }: {
     title: ReactNode;
     subtitle?: ReactNode;
     meta?: ReactNode;
-    image?: ReactNode;
+    thumbnail?: ReactNode;
     actions?: ReactNode;
   }) => (
     <div data-testid='entity-header-card'>
-      {image}
+      {thumbnail}
       <div data-testid='entity-header-actions'>{actions}</div>
       <div data-testid='entity-header-title'>{title}</div>
       <div data-testid='entity-header-subtitle'>{subtitle}</div>

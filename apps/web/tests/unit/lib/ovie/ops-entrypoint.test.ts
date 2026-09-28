@@ -16,7 +16,7 @@ describe('Ovie Ops packaged-app entry contract', () => {
   it('hands M1 exactly one Ops product at /hud', () => {
     expect(OVIE_OPS_PRODUCT_NAME).toBe('Ops');
     expect(OVIE_OPS_ROUTE).toBe(APP_ROUTES.HUD);
-    expect(OVIE_OPS_COMPONENT).toBe('HudDashboardClient');
+    expect(OVIE_OPS_COMPONENT).toBe('OpsCockpitClient');
     expect(OVIE_PACKAGED_DEFAULT_ROUTE).toBe(APP_ROUTES.HUD);
     expect(OVIE_OPS_ENTRY.packagedDefaultRoute).toBe('/hud');
     expect(OVIE_PACKAGED_TALK_ROUTE).toBe(APP_ROUTES.ADMIN_CHAT);

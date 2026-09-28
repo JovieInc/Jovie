@@ -83,4 +83,12 @@ describe('HudFullscreenControl', () => {
 
     expect(replace).toHaveBeenCalledWith(APP_ROUTES.HUD);
   });
+
+  it('renders the enter control as an icon-only button', () => {
+    render(<HudFullscreenControl />);
+
+    const button = screen.getByRole('button', { name: 'Fullscreen' });
+    expect(button).toHaveAttribute('title', 'Fullscreen');
+    expect(button).toHaveTextContent('');
+  });
 });

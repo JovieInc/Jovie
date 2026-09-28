@@ -58,11 +58,12 @@ export function HudFullscreenControl({
     <Button
       type='button'
       variant='secondary'
-      size='sm'
+      size='icon'
       onClick={() => void toggleFullscreen()}
+      aria-label={label}
+      title={label}
     >
       <Icon className='h-3.5 w-3.5' aria-hidden='true' />
-      {label}
     </Button>
   );
 }
