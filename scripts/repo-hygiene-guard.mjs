@@ -839,10 +839,12 @@ function gitPaths(args) {
 
 function gitPathsRevParse(ref) {
   try {
-    return execFileSync('git', ['rev-parse', '--verify', '--quiet', ref], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim() || null;
+    return (
+      execFileSync('git', ['rev-parse', '--verify', '--quiet', ref], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim() || null
+    );
   } catch {
     return null;
   }
@@ -899,11 +901,9 @@ export function collectGitPaths(args) {
   // Diff against MERGE_HEAD instead so the guard measures this branch's
   // contribution plus the conflict resolution, matching --diff-base semantics.
   const mergeHead =
-    staged && diffBaseIndex < 0
-      ? gitPathsRevParse('MERGE_HEAD')
-      : null;
+    staged && diffBaseIndex < 0 ? gitPathsRevParse('MERGE_HEAD') : null;
   const baseRef =
-    diffBaseIndex >= 0 ? args[diffBaseIndex + 1] : mergeHead ?? 'HEAD';
+    diffBaseIndex >= 0 ? args[diffBaseIndex + 1] : (mergeHead ?? 'HEAD');
   if (!baseRef) throw new Error('--diff-base requires a Git revision');
   const base = gitPathModes(['ls-tree', '-r', '-z', baseRef], false);
   const current = staged
