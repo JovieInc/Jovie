@@ -344,8 +344,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/gateway':
-        specifier: ^4.0.94
-        version: 4.0.94(zod@4.6.5)
+        specifier: ^4.0.95
+        version: 4.0.95(zod@4.6.5)
       '@ai-sdk/react':
         specifier: ^4.0.120
         version: 4.0.120(react@19.2.8)(zod@4.6.5)
@@ -1019,12 +1019,6 @@ packages:
 
   '@ai-sdk/gateway@4.0.87':
     resolution: {integrity: sha512-6wJmX/D5OO7tvDJbtFdXdBuRt8AkCnW+FLK+W35UHe/tHgolAa4hclXtJcMSYnlTDy/t5DNRgdesVaoMXtwzow==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/gateway@4.0.94':
-    resolution: {integrity: sha512-hcp7GLnMynH6NfMnemgvW9acn7j3WsUe/dHFzX3/fhPit08xhm1aYmDGHMiIT6YwsXVBxkit9TriKb2SGAOg+Q==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -16727,13 +16721,6 @@ snapshots:
     dependencies:
       '@ai-sdk/provider': 4.0.17
       '@ai-sdk/provider-utils': 5.0.45(zod@4.6.5)
-      '@vercel/oidc': 3.2.0
-      zod: 4.6.5
-
-  '@ai-sdk/gateway@4.0.94(zod@4.6.5)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.18
-      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.5)
       '@vercel/oidc': 3.2.0
       zod: 4.6.5
 
