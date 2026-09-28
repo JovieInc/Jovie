@@ -33,6 +33,7 @@ import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
+import { applyPlaylistContext } from '@/lib/discography/playlist-context';
 import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
@@ -40,6 +41,7 @@ import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import { getListenPlaylistContext } from '@/lib/profile/featured-playlist-fallback-data';
 import {
   canonicalizeReleaseArtistCredits,
   canonicalizeReleaseCreditGroups,
@@ -163,13 +165,14 @@ export default async function ContentSmartLinkPage({
   }
 
   // Build provider data for the landing page
+  const listenPlaylistContext = getListenPlaylistContext(creator.settings);
   const providers = PRIMARY_PROVIDER_KEYS.map(key => {
     const link = content.providerLinks.find(l => l.providerId === key);
     return {
       key,
       label: PROVIDER_CONFIG[key].label,
       accent: PROVIDER_CONFIG[key].accent,
-      url: link?.url ?? null,
+      url: applyPlaylistContext(key, link?.url, listenPlaylistContext),
       confidence: link ? getProviderConfidence(link) : 'unknown',
     };
   }).filter(p => p.url);
@@ -182,7 +185,7 @@ export default async function ContentSmartLinkPage({
         key,
         label: PROVIDER_CONFIG[key].label,
         accent: PROVIDER_CONFIG[key].accent,
-        url: link?.url ?? null,
+        url: applyPlaylistContext(key, link?.url, listenPlaylistContext),
         confidence: link ? getProviderConfidence(link) : 'unknown',
       };
     })
@@ -279,7 +282,15 @@ export default async function ContentSmartLinkPage({
       {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
       {!isUnreleased && (
         <PreferredDspRedirect
-          providerLinks={content.providerLinks}
+          providerLinks={content.providerLinks.map(link => ({
+            ...link,
+            url:
+              applyPlaylistContext(
+                link.providerId,
+                link.url,
+                listenPlaylistContext
+              ) ?? link.url,
+          }))}
           artistHandle={creator.usernameNormalized}
           tracking={{
             contentType: content.type,

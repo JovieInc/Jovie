@@ -141,6 +141,7 @@ web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
 web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
+web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
 web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
 web.hud-isolated|web|ovie-ops-isolated|apps/web/app/hud/page.tsx,apps/web/app/hud/layout.tsx|desktop,mobile
 web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
@@ -161,6 +162,7 @@ ios.chat|ios|ios-chat|apps/ios/Jovie/Features/Chat/MobileChatView.swift|compact
 ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swift|compact
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 ios.teleprompter|ios|ios-teleprompter|apps/ios/Jovie/Features/Teleprompter/|compact
+ios.inbox|ios|ios-inbox|apps/ios/Jovie/Features/Inbox/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
 web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/mobile-auth-return/|desktop,mobile|x|Auth/security lane is out of scope

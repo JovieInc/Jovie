@@ -77,6 +77,8 @@ const jovie = [
   'tests/eve-channel-auth-contract.test.ts',
   'tests/jovie_capability_manifest.test.ts',
 ];
+// Eve 0.66 retired the default `ask_question` and `todo` tools; an orphan
+// disableTool stub for either fails discovery, so they are not listed here.
 export const disabledTools = [
   'agent',
   'bash',
