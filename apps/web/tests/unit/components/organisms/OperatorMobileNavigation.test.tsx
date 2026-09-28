@@ -116,15 +116,15 @@ describe('OperatorMobileNavigation', () => {
     expect(within(menu).getByRole('link', { name: 'Needs You' })).toHaveFocus();
 
     await user.tab();
+    expect(within(menu).getByRole('link', { name: 'Shipping' })).toHaveFocus();
+
+    await user.tab();
     expect(within(menu).getByRole('link', { name: 'Chat' })).toHaveFocus();
 
     await user.tab();
     expect(
       within(menu).getByRole('link', { name: 'Certifications' })
     ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Shipping' })).toHaveFocus();
 
     await user.tab();
     expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
