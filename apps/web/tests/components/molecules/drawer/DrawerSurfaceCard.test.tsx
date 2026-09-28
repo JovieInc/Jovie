@@ -56,10 +56,11 @@ describe('DrawerSurfaceCard', () => {
     expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-none');
     expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-none');
 
+    // Founder lock 2026-09-25: nested content containers stay flat — the
+    // shell panel owns the one rounded edge.
     expect(LINEAR_SURFACE.contentContainer).toContain('shadow-none');
-    expect(LINEAR_SURFACE.contentContainer).toContain(
-      'rounded-(--app-shell-radius-nested)'
-    );
+    expect(LINEAR_SURFACE.contentContainer).not.toContain('rounded-');
+    expect(LINEAR_SURFACE.contentContainer).not.toContain('border');
     expect(LINEAR_SURFACE.popover).toContain('shadow-(--shadow-popover)');
   });
 

@@ -726,40 +726,6 @@ export const LIBRARY_TABLE_COLUMNS = [
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
-function LibraryViewFilterChips({
-  assets,
-  preset,
-  onPreset,
-}: {
-  readonly assets: readonly LibraryReleaseAsset[];
-  readonly preset: LibraryPresetId;
-  readonly onPreset: (preset: LibraryPresetId) => void;
-}) {
-  return (
-    <div
-      className='flex shrink-0 flex-nowrap items-center gap-1'
-      data-testid='library-view-filter-chips'
-    >
-      {PRESETS.map(view => (
-        <PageToolbarTabButton
-          key={view.id}
-          label={
-            <>
-              {view.label}
-              <span className='system-b-library-rail-count ml-1 tabular-nums text-tertiary-token'>
-                {assets.filter(view.predicate).length}
-              </span>
-            </>
-          }
-          active={preset === view.id}
-          onClick={() => onPreset(view.id)}
-          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
-        />
-      ))}
-    </div>
-  );
-}
-
 const STAGE_TABS = ['all', ...LIBRARY_LIFECYCLE_STAGES] as const;
 
 function LibraryStageTabs({
@@ -1406,9 +1372,6 @@ function LibraryImportMenu({
 }
 
 function LibraryToolbar({
-  assets,
-  preset,
-  onPreset,
   stage,
   onStage,
   sort,
@@ -1428,14 +1391,11 @@ function LibraryToolbar({
   canSyncSpotify,
   isSyncingSpotify,
   onSyncSpotify,
-  youtubeConnected,
+  youtubeConnected = false,
   isImportingYouTube = false,
   youtubeImportDisabled = false,
   onImportYouTube,
 }: {
-  readonly assets: readonly LibraryReleaseAsset[];
-  readonly preset: LibraryPresetId;
-  readonly onPreset: (preset: LibraryPresetId) => void;
   readonly stage: (typeof STAGE_TABS)[number];
   readonly onStage: (stage: (typeof STAGE_TABS)[number]) => void;
   readonly sort: LibrarySortKey;
@@ -1479,11 +1439,6 @@ function LibraryToolbar({
               hidden={filtersOpen}
             />
           </div>
-          <LibraryViewFilterChips
-            assets={assets}
-            preset={preset}
-            onPreset={onPreset}
-          />
           <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
             {visibleCount}
             {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
@@ -1941,6 +1896,7 @@ function EmptyCatalog({
         description='Releases, merch, images, videos, and audio will appear here as they land.'
         presentation='workspace'
         testId='library-workspace-empty-state'
+        className='min-h-90'
         actionSlot={
           <LibraryFirstAction
             canSyncSpotify={canSyncSpotify}
@@ -2596,10 +2552,6 @@ export function LibrarySurface({
   merchProducts = EMPTY_MERCH_PRODUCTS,
   relationships = EMPTY_RELATIONSHIPS,
   postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
-  youtubeConnected = false,
-  isImportingYouTube = false,
-  youtubeImportDisabled = false,
-  onImportYouTube,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
@@ -2612,10 +2564,6 @@ export function LibrarySurface({
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
-  readonly youtubeConnected?: boolean;
-  readonly isImportingYouTube?: boolean;
-  readonly youtubeImportDisabled?: boolean;
-  readonly onImportYouTube?: () => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -3399,9 +3347,6 @@ export function LibrarySurface({
           activeFilterCount={activeFilterCount}
           filterPanel={filterPanel}
           isDesktop={isDesktopLayout}
-          assets={effectiveAssets}
-          preset={preset}
-          onPreset={handlePresetChange}
           suggestedFilters={suggestedFilters}
           canSyncSpotify={canSyncSpotify}
           isSyncingSpotify={isSyncingSpotify}
