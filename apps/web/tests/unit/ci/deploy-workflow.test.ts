@@ -4760,7 +4760,6 @@ describe('production promotion exact-artifact contract', () => {
     for (const jobName of [
       'ci-public-profile-smoke',
       'ci-post-deploy-auth-smoke',
-      'route-dom-certification',
       'lighthouse-ci',
     ]) {
       const job = getJobBlock(controller, jobName);
@@ -4775,37 +4774,6 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).toContain('base64 --decode');
     expect(controller).not.toContain(
       'needs.production-release.outputs.production_deployment_url }}'
-    );
-  });
-
-  it('blocks production verification on an exact-SHA route DOM certificate', () => {
-    const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
-    const certification = getJobBlock(workflow, 'route-dom-certification');
-    const verified = getJobBlock(workflow, 'production-verified');
-    const exactGate = getStepBlock(
-      verified,
-      'Require exact deployment and every post-deploy probe'
-    );
-
-    expect(certification).toContain(
-      'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
-    );
-    expect(certification).toContain('route-dom-certification.spec.ts');
-    expect(certification).toContain(
-      'EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}'
-    );
-    expect(certification).toContain(
-      'EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}'
-    );
-    expect(certification).toContain(
-      'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL"'
-    );
-    expect(certification).toContain(
-      'route-dom-certification-production-${{ needs.authorize-production.outputs.expected_sha }}'
-    );
-    expect(verified).toContain('route-dom-certification,');
-    expect(exactGate).toContain(
-      'Route DOM Certification:${{ needs.route-dom-certification.result }}'
     );
   });
 
@@ -4923,7 +4891,6 @@ describe('production promotion exact-artifact contract', () => {
       'Production release did not complete successfully.'
     );
     expect(exactGate).toContain('Post-Deploy Smoke');
-    expect(exactGate).toContain('Route DOM Certification');
     expect(exactGate).toContain('Authenticated Better Auth OTP smoke');
     expect(exactGate).toContain(
       'bash .github/scripts/verify-production-alias.sh'

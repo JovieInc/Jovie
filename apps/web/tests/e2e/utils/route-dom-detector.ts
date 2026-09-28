@@ -42,9 +42,10 @@ export interface RouteDomSnapshot {
   readonly viewport: { readonly width: number; readonly height: number };
 }
 
-interface RouteDomDetectorOptions {
-  readonly surface: 'marketing' | 'public-profile';
-}
+type DomRectParts = Record<
+  'x' | 'y' | 'width' | 'height' | 'right' | 'bottom',
+  number
+>;
 
 /**
  * Inspect the rendered browser DOM rather than source JSX. The semantic pass
@@ -53,34 +54,11 @@ interface RouteDomDetectorOptions {
  */
 export async function inspectRouteDom(
   page: Page,
-  options: RouteDomDetectorOptions
+  options: { readonly surface: 'marketing' | 'public-profile' }
 ): Promise<RouteDomSnapshot> {
   const [dom, ariaSnapshot] = await Promise.all([
     page.evaluate(({ surface }) => {
-      type Rect = {
-        readonly x: number;
-        readonly y: number;
-        readonly width: number;
-        readonly height: number;
-        readonly right: number;
-        readonly bottom: number;
-      };
-
-      type Finding = {
-        readonly kind:
-          | 'duplicate-hero'
-          | 'semantic-duplicate'
-          | 'text-dump-section'
-          | 'unintended-overlap'
-          | 'container-width-sheet'
-          | 'unreachable-content'
-          | 'raw-control';
-        readonly message: string;
-        readonly elements: readonly string[];
-        readonly measurements?: Readonly<Record<string, number>>;
-      };
-
-      const findings: Finding[] = [];
+      const findings: RouteDomFinding[] = [];
       const root =
         surface === 'public-profile'
           ? (document.querySelector(
@@ -89,7 +67,7 @@ export async function inspectRouteDom(
           : (document.querySelector('main') ?? document.body);
 
       const round = (value: number): number => Math.round(value * 100) / 100;
-      const rectOf = (element: Element): Rect => {
+      const rectOf = (element: Element): DomRectParts => {
         const rect = element.getBoundingClientRect();
         return {
           x: round(rect.x),
@@ -112,12 +90,9 @@ export async function inspectRouteDom(
         if (testId)
           return `${element.tagName.toLowerCase()}[data-testid="${testId}"]`;
         if (element.id) return `${element.tagName.toLowerCase()}#${element.id}`;
-        const parent = element.parentElement;
-        const siblings = parent
-          ? Array.from(parent.children).filter(
-              candidate => candidate.tagName === element.tagName
-            )
-          : [];
+        const siblings = Array.from(
+          element.parentElement?.children ?? []
+        ).filter(candidate => candidate.tagName === element.tagName);
         const suffix =
           siblings.length > 1
             ? `:nth-of-type(${siblings.indexOf(element) + 1})`
@@ -135,34 +110,33 @@ export async function inspectRouteDom(
           Number.parseFloat(style.opacity || '1') > 0
         );
       };
-      const isAccessibilityExposed = (element: Element): boolean => {
-        if (!isRendered(element)) return false;
-        if (element.closest('[aria-hidden="true"], [inert]')) return false;
-        return true;
-      };
+      const isAccessibilityExposed = (element: Element): boolean =>
+        isRendered(element) &&
+        !element.closest('[aria-hidden="true"], [inert]');
       const optedOut = (element: Element): boolean =>
         element.closest('[data-dom-certification="ignore"]') !== null;
 
       const topLevelSections = Array.from(
         root.querySelectorAll('section, article')
       ).filter(element => {
-        if (optedOut(element)) return false;
         const ancestor = element.parentElement?.closest('section, article');
-        return !ancestor || !root.contains(ancestor);
+        return !optedOut(element) && !(ancestor && root.contains(ancestor));
       });
+
+      const ledeOf = (element: Element): Element | null =>
+        element.querySelector('[data-lede]') ??
+        Array.from(element.querySelectorAll('p')).find(candidate => {
+          const className = candidate.getAttribute('class') ?? '';
+          return (
+            !/(?:^|[-_])(eyebrow|kicker)(?:$|[-_])/.test(className) &&
+            normalizedText(candidate.textContent).length >= 20
+          );
+        }) ??
+        element.querySelector('p');
 
       const semanticBlocks = topLevelSections.flatMap(element => {
         const heading = element.querySelector('h1, h2, h3');
-        const lede =
-          element.querySelector('[data-lede]') ??
-          Array.from(element.querySelectorAll('p')).find(candidate => {
-            const className = candidate.getAttribute('class') ?? '';
-            return (
-              !/(?:^|[-_])(eyebrow|kicker)(?:$|[-_])/.test(className) &&
-              normalizedText(candidate.textContent).length >= 20
-            );
-          }) ??
-          element.querySelector('p');
+        const lede = ledeOf(element);
         if (!heading || !lede) return [];
         const headingText = normalizedText(heading.textContent);
         const ledeText = normalizedText(lede.textContent);
@@ -187,19 +161,9 @@ export async function inspectRouteDom(
       });
 
       const semanticPairs = new Set<string>();
-      for (
-        let leftIndex = 0;
-        leftIndex < semanticBlocks.length;
-        leftIndex += 1
-      ) {
-        const left = semanticBlocks[leftIndex];
+      for (const [leftIndex, left] of semanticBlocks.entries()) {
         if (!left?.indexableDocument) continue;
-        for (
-          let rightIndex = leftIndex + 1;
-          rightIndex < semanticBlocks.length;
-          rightIndex += 1
-        ) {
-          const right = semanticBlocks[rightIndex];
+        for (const right of semanticBlocks.slice(leftIndex + 1)) {
           if (!right?.indexableDocument) continue;
           if (left.normalizedCluster !== right.normalizedCluster) continue;
           const explicitlyStateScoped =
@@ -222,16 +186,7 @@ export async function inspectRouteDom(
       const visibleTopLevelSections = topLevelSections.filter(isRendered);
       const intro = (element: Element) => {
         const heading = element.querySelector('h1, h2');
-        const lede =
-          element.querySelector('[data-lede]') ??
-          Array.from(element.querySelectorAll('p')).find(candidate => {
-            const className = candidate.getAttribute('class') ?? '';
-            return (
-              !/(?:^|[-_])(eyebrow|kicker)(?:$|[-_])/.test(className) &&
-              normalizedText(candidate.textContent).length >= 20
-            );
-          }) ??
-          element.querySelector('p');
+        const lede = ledeOf(element);
         return heading && lede
           ? {
               heading: normalizedText(heading.textContent),
@@ -245,16 +200,11 @@ export async function inspectRouteDom(
           'h1, h2, p, [data-lede]'
         );
         const substantiveContent = element.querySelector(
-          'a[href], article, button, canvas, dl, figure, form, iframe, img, input, ol, picture, pre, select, table, textarea, ul, video, [data-component], [data-testid*="card"], [data-testid*="mockup"], [class~="card"], [class*="-card"], [class*="mockup"]'
+          'a[href],article,button,canvas,dl,figure,form,iframe,img,input,ol,picture,pre,select,table,textarea,ul,video,[data-component],[data-testid*="card"],[data-testid*="mockup"],[class~="card"],[class*="-card"],[class*="mockup"]'
         );
         return semanticNodes.length === 2 && !substantiveContent;
       };
-      for (
-        let index = 0;
-        index < visibleTopLevelSections.length - 1;
-        index += 1
-      ) {
-        const first = visibleTopLevelSections[index];
+      for (const [index, first] of visibleTopLevelSections.entries()) {
         const second = visibleTopLevelSections[index + 1];
         if (!first || !second) continue;
         const firstIntro = intro(first);
@@ -276,46 +226,13 @@ export async function inspectRouteDom(
         });
       }
 
-      const heroIndex = visibleTopLevelSections.findIndex(element => {
-        return Boolean(
-          element.querySelector('h1') ||
-            element.matches('[data-testid*="hero"], [class*="hero"]')
-        );
-      });
-      const richContentSelector = [
-        'img',
-        'picture',
-        'video',
-        'audio',
-        'canvas',
-        'svg',
-        'iframe',
-        'figure',
-        'article',
-        'table',
-        'form',
-        'a[href]',
-        'button',
-        'input',
-        'select',
-        'textarea',
-        '[role="img"]',
-        '[data-component]',
-        '[class*="code"]',
-        '[class*="cta"]',
-        '[class*="feature"]',
-        '[class*="grid"]',
-        '[class*="panel"]',
-        '[class*="step"]',
-        '[class*="timeline"]',
-        '[data-testid*="card"]',
-        '[data-testid*="callout"]',
-        '[data-testid*="mockup"]',
-        '[class~="card"]',
-        '[class*="-card"]',
-        '[class*="callout"]',
-        '[class*="mockup"]',
-      ].join(',');
+      const heroIndex = visibleTopLevelSections.findIndex(
+        element =>
+          element.querySelector('h1') ??
+          element.matches('[data-testid*="hero"], [class*="hero"]')
+      );
+      const richContentSelector =
+        'img,picture,video,audio,canvas,svg,iframe,figure,article,table,form,a[href],button,input,select,textarea,[role="img"],[data-component],[class*="code"],[class*="cta"],[class*="feature"],[class*="grid"],[class*="panel"],[class*="step"],[class*="timeline"],[data-testid*="card"],[data-testid*="callout"],[data-testid*="mockup"],[class~="card"],[class*="-card"],[class*="callout"],[class*="mockup"]';
       if (heroIndex >= 0) {
         for (const element of visibleTopLevelSections.slice(heroIndex + 1)) {
           const text = normalizedText(element.textContent);
@@ -325,21 +242,9 @@ export async function inspectRouteDom(
           const leafTags = Array.from(element.querySelectorAll('*'))
             .filter(candidate => candidate.children.length === 0)
             .map(candidate => candidate.tagName.toLowerCase());
-          const textOnlyTags = new Set([
-            'a',
-            'br',
-            'em',
-            'h1',
-            'h2',
-            'h3',
-            'h4',
-            'h5',
-            'h6',
-            'li',
-            'p',
-            'span',
-            'strong',
-          ]);
+          const textOnlyTags = new Set(
+            'a br em h1 h2 h3 h4 h5 h6 li p span strong'.split(' ')
+          );
           if (leafTags.every(tag => textOnlyTags.has(tag))) {
             findings.push({
               kind: 'text-dump-section',
@@ -351,27 +256,8 @@ export async function inspectRouteDom(
         }
       }
 
-      const overlapSelector = [
-        'article',
-        'figure',
-        'table',
-        'h1',
-        'h2',
-        'h3',
-        'h4',
-        'h5',
-        'h6',
-        'p',
-        'ul',
-        'ol',
-        '[data-testid*="card"]',
-        '[data-testid*="callout"]',
-        '[data-testid*="mockup"]',
-        '[class~="card"]',
-        '[class*="-card"]',
-        '[class*="callout"]',
-        '[class*="mockup"]',
-      ].join(',');
+      const overlapSelector =
+        'article,figure,table,h1,h2,h3,h4,h5,h6,p,ul,ol,[data-testid*="card"],[data-testid*="callout"],[data-testid*="mockup"],[class~="card"],[class*="-card"],[class*="callout"],[class*="mockup"]';
       const overlapCandidates = Array.from(
         root.querySelectorAll(overlapSelector)
       ).filter(
@@ -415,7 +301,7 @@ export async function inspectRouteDom(
       }
 
       if (surface === 'public-profile') {
-        const viewportRect: Rect = {
+        const viewportRect: DomRectParts = {
           x: 0,
           y: 0,
           width: window.innerWidth,

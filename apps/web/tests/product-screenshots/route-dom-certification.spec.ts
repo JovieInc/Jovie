@@ -111,28 +111,16 @@ async function expectDeliberateRed(
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
   test('reproduces R01 sibling overlap', async ({ page }) => {
-    await page.setContent(`
-      <main>
-        <section><h1>R01</h1><p>Overlap proposal</p></section>
-        <section style="position:relative;height:200px">
-          <article style="position:absolute;inset:0 0 auto 0;height:100px">Card A</article>
-          <article style="position:absolute;inset:40px 0 auto 0;height:100px">Card B</article>
-        </section>
-      </main>
-    `);
+    await page.setContent(
+      '<main><section><h1>R01</h1><p>Overlap proposal</p></section><section style="position:relative;height:200px"><article style="position:absolute;inset:0 0 auto 0;height:100px">Card A</article><article style="position:absolute;inset:40px 0 auto 0;height:100px">Card B</article></section></main>'
+    );
     await expectDeliberateRed(page, 'marketing', 'unintended-overlap');
   });
 
   test('honors the explicit intentional-overlap opt-in', async ({ page }) => {
-    await page.setContent(`
-      <main>
-        <section><h1>Layered proof</h1><p>Intentional composition.</p></section>
-        <section style="position:relative;height:200px">
-          <article data-overlap="intentional" style="position:absolute;inset:0 0 auto 0;height:100px">Card A</article>
-          <article data-overlap="intentional" style="position:absolute;inset:40px 0 auto 0;height:100px">Card B</article>
-        </section>
-      </main>
-    `);
+    await page.setContent(
+      '<main><section><h1>Layered proof</h1><p>Intentional composition.</p></section><section style="position:relative;height:200px"><article data-overlap="intentional" style="position:absolute;inset:0 0 auto 0;height:100px">Card A</article><article data-overlap="intentional" style="position:absolute;inset:40px 0 auto 0;height:100px">Card B</article></section></main>'
+    );
     const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
     expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
       'unintended-overlap'
@@ -140,64 +128,45 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
   });
 
   test('rejects a below-hero text dump', async ({ page }) => {
-    await page.setContent(`
-      <main>
-        <section><h1>Product</h1><p>A concrete product story.</p><figure>Media</figure></section>
-        <section><h2>Wall of copy</h2><p>Only prose lives in this section.</p><ul><li>More prose</li></ul></section>
-      </main>
-    `);
+    await page.setContent(
+      '<main><section><h1>Product</h1><p>A concrete product story.</p><figure>Media</figure></section><section><h2>Wall of copy</h2><p>Only prose lives in this section.</p><ul><li>More prose</li></ul></section></main>'
+    );
     await expectDeliberateRed(page, 'marketing', 'text-dump-section');
   });
 
   test('reproduces the changelog double hero', async ({ page }) => {
-    await page.setContent(`
-      <main>
-        <section><h1>What Shipped</h1><p>The latest improvements from Jovie.</p></section>
-        <section><h2>What's New in Jovie</h2><p>Follow every product change.</p></section>
-      </main>
-    `);
+    await page.setContent(
+      `<main><section><h1>What Shipped</h1><p>The latest improvements from Jovie.</p></section><section><h2>What's New in Jovie</h2><p>Follow every product change.</p></section></main>`
+    );
     await expectDeliberateRed(page, 'marketing', 'duplicate-hero');
   });
 
   test('rejects a CSS-hidden semantic alternate', async ({ page }) => {
-    await page.setContent(`
-      <main>
-        <section><h1>Canonical headline</h1><p>One canonical supporting argument.</p></section>
-        <section style="display:none"><h2>Canonical headline</h2><p>One canonical supporting argument.</p></section>
-      </main>
-    `);
+    await page.setContent(
+      '<main><section><h1>Canonical headline</h1><p>One canonical supporting argument.</p></section><section style="display:none"><h2>Canonical headline</h2><p>One canonical supporting argument.</p></section></main>'
+    );
     await expectDeliberateRed(page, 'marketing', 'semantic-duplicate');
   });
 
   test('rejects a fit-content profile sheet', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.setContent(`
-      <main data-testid="public-profile-layout-shell">
-        <div data-testid="profile-compact-shell" style="position:relative;width:390px;height:844px">
-          <dialog open aria-modal="true" style="width:185px;height:300px">Menu</dialog>
-        </div>
-      </main>
-    `);
+    await page.setContent(
+      '<main data-testid="public-profile-layout-shell"><div data-testid="profile-compact-shell" style="position:relative;width:390px;height:844px"><dialog open aria-modal="true" style="width:185px;height:300px">Menu</dialog></div></main>'
+    );
     await expectDeliberateRed(page, 'public-profile', 'container-width-sheet');
   });
 
   test('rejects unreachable clipped profile content', async ({ page }) => {
-    await page.setContent(`
-      <main data-testid="public-profile-layout-shell">
-        <div class="h-fixed overflow-hidden" style="height:80px;overflow:hidden">
-          <p style="margin-top:120px">Content below a fixed dock</p>
-        </div>
-      </main>
-    `);
+    await page.setContent(
+      '<main data-testid="public-profile-layout-shell"><div class="h-fixed overflow-hidden" style="height:80px;overflow:hidden"><p style="margin-top:120px">Content below a fixed dock</p></div></main>'
+    );
     await expectDeliberateRed(page, 'public-profile', 'unreachable-content');
   });
 
   test('rejects raw controls in product chrome', async ({ page }) => {
-    await page.setContent(`
-      <main data-testid="public-profile-layout-shell">
-        <header><button type="button">Raw menu</button></header>
-      </main>
-    `);
+    await page.setContent(
+      '<main data-testid="public-profile-layout-shell"><header><button type="button">Raw menu</button></header></main>'
+    );
     await expectDeliberateRed(page, 'public-profile', 'raw-control');
   });
 });
@@ -220,13 +189,7 @@ test('certifies every marketing route and public-profile open state', async ({
     await primeOriginBoundVercelBypass(context, baseUrl);
   }
 
-  const receipts: Array<{
-    readonly route: string;
-    readonly viewport: string;
-    readonly state: string;
-    readonly snapshotPath: string;
-    readonly findingCount: number;
-  }> = [];
+  const receipts: Array<Record<string, string | number>> = [];
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const target of certificationScope === 'public-profile'
@@ -330,8 +293,6 @@ test('certifies every marketing route and public-profile open state', async ({
     deploymentId,
     sourceGitSha,
     routeCount: MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.length,
-    profileViewports: profileViewports.map(viewport => viewport.width),
-    profileStates: profileStates.map(state => state.id),
     receipts,
   });
 });

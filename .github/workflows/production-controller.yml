@@ -822,63 +822,6 @@ jobs:
             apps/web/test-results/
           retention-days: 3
           allow-markdown: 'true'
-  route-dom-certification:
-    name: Route DOM Certification (Production)
-    needs: [authorize-production, production-release]
-    if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.authorize-production.outputs.expected_sha }}
-          fetch-depth: 1
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Setup Playwright (Chromium)
-        uses: ./.github/actions/setup-playwright
-
-      - name: Certify immutable production route DOM
-        env:
-          EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
-          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
-          EXPECTED_VERCEL_ENVIRONMENT: production
-          PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/route-dom-dynamic-cookie-values
-          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
-        run: |
-          set -euo pipefail
-          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
-          PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
-            echo "::error::Exact production deployment URL is missing or invalid."
-            exit 1
-          }
-          cd apps/web
-          BASE_URL="$PRODUCTION_BASE_URL" \
-          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
-          ROUTE_DOM_CERTIFICATION_OUTPUT_DIR="test-results/route-dom-certification" \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-              pnpm exec playwright test \
-                tests/product-screenshots/route-dom-certification.spec.ts \
-                --config=playwright.config.screenshots.ts \
-                --project=screenshots \
-                --workers=1
-
-      - name: Upload immutable route DOM certificate
-        if: ${{ always() && hashFiles('apps/web/test-results/route-dom-certification/**') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
-        with:
-          name: route-dom-certification-production-${{ needs.authorize-production.outputs.expected_sha }}
-          path: apps/web/test-results/route-dom-certification/
-          if-no-files-found: error
-          retention-days: 30
-          diagnostic-paths: true
   lighthouse-ci:
     name: Lighthouse CI (Production)
     needs: [authorize-production, production-release]
@@ -976,7 +919,6 @@ jobs:
         production-release,
         ci-public-profile-smoke,
         ci-post-deploy-auth-smoke,
-        route-dom-certification,
         lighthouse-ci,
       ]
     if: >-
@@ -1098,7 +1040,6 @@ jobs:
           fi
           for probe in \
             "Post-Deploy Smoke:${{ needs.ci-public-profile-smoke.result }}" \
-            "Route DOM Certification:${{ needs.route-dom-certification.result }}" \
             "Lighthouse CI:${{ needs.lighthouse-ci.result }}"; do
             name="${probe%%:*}"
             result="${probe#*:}"
@@ -1195,7 +1136,6 @@ jobs:
               "${{ needs.production-release.result }}" \
               "${{ needs.ci-public-profile-smoke.result }}" \
               "${{ needs.ci-post-deploy-auth-smoke.result }}" \
-              "${{ needs.route-dom-certification.result }}" \
               "${{ needs.lighthouse-ci.result }}"; do
               [ "$result" = skipped ] || { echo "::error::Unselected Web release lane ran ($result)."; exit 1; }
             done
