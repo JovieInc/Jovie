@@ -386,9 +386,7 @@ function compareRegistry(spec, candidateRecord, baseRecord, now) {
           );
         }
       }
-      issues.push(
-        ...compareCounts(spec, left, right, gated, raises, now)
-      );
+      issues.push(...compareCounts(spec, left, right, gated, raises, now));
       return issues;
     }
     case 'set':
