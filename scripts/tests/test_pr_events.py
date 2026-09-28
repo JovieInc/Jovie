@@ -116,6 +116,11 @@ class RelayTest(unittest.TestCase):
     def test_queue_removal_and_review_feedback_are_relayed(self):
         base = {"pull_request": {"number": 7, "head": {"sha": "h7"}}}
         self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued"}), [(7, "dequeued", "h7")])
+        for reason in ("MANUAL", "manual", "ALREADY_MERGED", "merged", "BRANCH_REMOVED"):
+            self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": reason}),
+                             [], f"{reason} removal is not a code failure")
+        self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": "CI_FAILURE"}),
+                         [(7, "dequeued", "h7")])
         review = {**base, "action": "submitted", "review": {"state": "CHANGES_REQUESTED", "user": {"type": "Bot"}}}
         self.assertEqual(events.relay_targets("pull_request_review", review), [(7, "review", None)])
         comment = {**review, "review": {"state": "commented", "body": "rename this", "user": {"login": "tim", "type": "User"}}}
@@ -255,6 +260,23 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual(lane.posted, [5])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
                          [["gh", "api", "-X", "DELETE", f"repos/{runner.REPO_SLUG}/issues/5/labels/lane-fix-red"]])
+
+    def test_an_unfixable_hold_consumes_the_label_without_an_attempt(self):
+        shell = Shell()
+        runner.record_held(self.host, 5, "h1", ["diff-too-large:2000"])
+        claimed = events.claim_event_pr(self.host, fake_lane(shell), "devin",
+                                        [pr(kinds=["red"], checks=[RED_CHECK])], NOW)
+        self.assertIsNone(claimed, "a hold no push clears (diff-too-large) never reaches the fix loop")
+        self.assertEqual(self.attempts(), {})
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
+                         [["gh", "api", "-X", "DELETE", f"repos/{runner.REPO_SLUG}/issues/5/labels/lane-fix-red"]])
+
+    def test_a_fixable_hold_still_reaches_the_fix_loop(self):
+        shell = Shell()
+        lane = fake_lane(shell)
+        runner.record_held(self.host, 5, "h1", ["code-change-without-test"])
+        claimed = events.claim_event_pr(self.host, lane, "devin", [pr(kinds=["red"], checks=[RED_CHECK])], NOW)
+        self.assertEqual(claimed["number"], 5)
 
     def test_labels_whose_pr_no_longer_needs_work_are_consumed(self):
         shell = Shell()
@@ -578,6 +600,31 @@ class RunnerHookTest(unittest.TestCase):
                        "labels[]=lane-fix-exhausted"], calls, "held with a reason, visible on the PR")
         self.assertIn("jovie.bug-report/v1", triaged[0])
         self.assertEqual((held["reason"], held["sha"]), ("fix-exhausted", "h1"))
+
+    def test_an_unfixable_hold_escalates_once_without_burning_attempts(self):
+        stuck = pr(number=7, title="big diff")
+        calls, triaged = [], []
+        saved = (runner.sh, runner.load_providers, events.return_to_pool)
+        runner.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
+        runner.load_providers = lambda: PROVIDERS
+        events.return_to_pool = lambda *a: None
+        linear = SimpleNamespace(create_triage=lambda title, body: triaged.append(title))
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                host = runner.Host(state=Path(tmp))
+                runner.record_held(host, 7, "h1", ["diff-too-large:2000"])
+                runner.escalate_exhausted(host, [stuck], linear)
+                runner.escalate_exhausted(host, [stuck], linear)  # intake once, not every pass
+                held = json.loads((host.state / "held.json").read_text())["7"]
+                attempts = json.loads((host.state / "fix-attempts.json").read_text())["7"]
+        finally:
+            runner.sh, runner.load_providers, events.return_to_pool = saved
+        self.assertEqual(len(triaged), 1)
+        self.assertIn("Unfixable gate hold", triaged[0])
+        self.assertEqual((held["reason"], held["sha"]), ("diff-too-large", "h1"),
+                         "a zero-attempt hold keeps its real reason instead of fix-exhausted")
+        self.assertTrue(attempts["escalated"])
+        self.assertNotIn("count", attempts, "no fix attempt was charged")
 
     def test_a_finished_fix_ends_its_attempt(self):
         saved = (runner.sh, runner.failure_excerpt)

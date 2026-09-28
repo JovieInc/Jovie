@@ -94,10 +94,181 @@ TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^
 DOC_FILE = re.compile(r"(\.mdx?c?$|^docs/|^canon/|\.txt$)")
 SECRET_FILE = re.compile(r"(^|/)\.env(\.|$)|\.pem$|credentials|id_rsa")
 MAX_REVIEWABLE_LINES = 1500
+PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
+AUTONOMOUS_ORIGIN = "autonomous-lane"
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def read_provider_evidence(path: Path) -> list[dict]:
+    """Read the provider's append-only lease evidence without letting a bad row hide a run."""
+    rows = []
+    try:
+        for line in path.read_text().splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("schema") == PROVIDER_EVIDENCE_SCHEMA:
+                rows.append(row)
+    except OSError:
+        pass
+    return rows
+
+
+def receipt_category(receipt: dict) -> str:
+    """Stable attribution for new receipts, with conservative inference for old ledger rows."""
+    explicit = (receipt.get("attribution") or {}).get("category")
+    if explicit:
+        return explicit
+    kind = receipt.get("kind") or "issue"
+    if kind == "fix-red":
+        return "autonomous-remediation"
+    if kind == "adopt":
+        return "review-only"
+    if kind in ("ready-green", "sync-main"):
+        return "finalizer-only"
+    if receipt.get("handoffs"):
+        return "cross-provider-handoff"
+    return "autonomous-created"
+
+
+def pr_attribution(pr: dict, receipts: list[dict]) -> dict:
+    """Attribute a PR from durable lane receipts; branch names are fallback evidence only."""
+    number = int(pr["number"])
+    matched = [row for row in receipts if row.get("pr") == number]
+    created = [row for row in matched if row.get("issue") and (row.get("kind") or "issue") == "issue"]
+    creator = min(created, key=lambda row: row.get("startedAt", "")) if created else None
+    roles = []
+    for row in matched:
+        provider = row.get("provider")
+        category = receipt_category(row)
+        if provider:
+            roles.append({"provider": provider, "category": category, "runId": row.get("runId")})
+
+    if creator:
+        category = receipt_category(creator)
+        origin_category = category
+        origin_provider = creator.get("provider")
+        final_provider = creator.get("finishedBy") or origin_provider
+        origin = AUTONOMOUS_ORIGIN
+    else:
+        branch = pr.get("headRefName") or ""
+        created_at, merged_at = pr.get("createdAt"), pr.get("mergedAt")
+        old = False
+        try:
+            age = datetime.fromisoformat(merged_at.replace("Z", "+00:00")) - \
+                datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            old = age.total_seconds() >= 24 * 3600
+        except (AttributeError, TypeError, ValueError):
+            pass
+        if branch.startswith("codex/") and old:
+            category, origin, origin_provider = "old-codex-branch-landed-later", "branch-fallback", None
+        elif branch.startswith("codex/"):
+            category, origin, origin_provider = "manual-codex-app-created", "branch-fallback", "codex-app"
+        else:
+            category, origin, origin_provider = "unattributed", "unknown", None
+        origin_category = category
+        final_provider = origin_provider
+
+    pushed = [row for row in matched if row.get("kind") == "fix-red" and row.get("verdict") == "fix-pushed"]
+    if pushed:
+        last = max(pushed, key=lambda row: row.get("endedAt", ""))
+        finalizer = last.get("provider")
+        if finalizer and finalizer != final_provider:
+            category, final_provider = "cross-provider-finalizer", finalizer
+
+    return {"category": category, "originCategory": origin_category, "origin": origin, "originProvider": origin_provider,
+            "finalProvider": final_provider, "roles": roles}
+
+
+def provider_throughput(receipts: list[dict], provider_names=(), merged_prs: list[dict] | None = None,
+                        attribution_receipts: list[dict] | None = None) -> dict:
+    """Matched-work throughput. Unknown evidence stays null instead of becoming a false zero."""
+    names = set(provider_names)
+    names.update(row.get("provider") for row in receipts if row.get("provider"))
+    names.update(evidence.get("provider") for row in receipts for evidence in row.get("providerEvidence") or []
+                 if evidence.get("provider"))
+    metrics = {name: {"eligibleWorkOffered": 0, "accepted": 0, "workerStarts": 0,
+                      "productiveRuns": 0, "prsCreated": 0, "firstPassGreen": 0,
+                      "firstPassAttempts": 0, "remediationRuns": 0, "accountLeases": 0,
+                      "landedOutput": 0, "terminalFailures": 0}
+               for name in sorted(names)}
+    issue_to_pr: dict[str, list[float]] = {name: [] for name in metrics}
+    for row in receipts:
+        provider = row.get("provider")
+        if provider not in metrics:
+            continue
+        metric = metrics[provider]
+        kind = row.get("kind") or "issue"
+        if kind == "issue" and row.get("issue"):
+            metric["eligibleWorkOffered"] += 1
+            if (row.get("offer") or {}).get("accepted") or \
+                    row.get("execution", {}).get("event") == "attempt_finished" or row.get("agentExit") is not None:
+                metric["accepted"] += 1
+            if row.get("agentExit") is not None:
+                metric["workerStarts"] += 1
+            if row.get("pr"):
+                metric["prsCreated"] += 1
+                metric["firstPassAttempts"] += 1
+                if row.get("verdict") in ("landing", "verified-not-queued"):
+                    metric["firstPassGreen"] += 1
+                try:
+                    elapsed = datetime.fromisoformat(row["endedAt"].replace("Z", "+00:00")) - \
+                        datetime.fromisoformat(row["startedAt"].replace("Z", "+00:00"))
+                    issue_to_pr[provider].append(max(0.0, elapsed.total_seconds()))
+                except (KeyError, TypeError, ValueError):
+                    pass
+            if row.get("pr"):
+                metric["productiveRuns"] += 1
+        if kind == "fix-red":
+            metric["remediationRuns"] += 1
+        for evidence in row.get("providerEvidence") or []:
+            evidence_provider = evidence.get("provider")
+            if evidence_provider in metrics:
+                metrics[evidence_provider]["accountLeases"] += 1
+        if row.get("verdict") in ("failed", "provider-error", "fix-no-change"):
+            metric["terminalFailures"] += 1
+
+    landed_categories: dict[str, int] = {}
+    landed_origins: dict[str, int] = {}
+    merge_times: dict[str, list[float]] = {name: [] for name in metrics}
+    attribution_rows = attribution_receipts if attribution_receipts is not None else receipts
+    for pr in merged_prs or []:
+        attribution = pr_attribution(pr, attribution_rows)
+        category = attribution["category"]
+        landed_categories[category] = landed_categories.get(category, 0) + 1
+        origin_category = attribution["originCategory"]
+        landed_origins[origin_category] = landed_origins.get(origin_category, 0) + 1
+        provider = attribution.get("originProvider")
+        if provider in metrics and attribution.get("origin") == AUTONOMOUS_ORIGIN:
+            metrics[provider]["landedOutput"] += 1
+            creators = [row for row in attribution_rows if row.get("pr") == pr.get("number") and row.get("issue")]
+            try:
+                creator = min(creators, key=lambda row: row.get("startedAt", ""))
+                elapsed = datetime.fromisoformat(pr["mergedAt"].replace("Z", "+00:00")) - \
+                    datetime.fromisoformat(creator["startedAt"].replace("Z", "+00:00"))
+                merge_times[provider].append(max(0.0, elapsed.total_seconds()))
+            except (KeyError, TypeError, ValueError):
+                pass
+
+    for name, metric in metrics.items():
+        offered, starts = metric["eligibleWorkOffered"], metric["workerStarts"]
+        metric["workerStartRate"] = starts / offered if offered else None
+        metric["productiveRunRate"] = metric["productiveRuns"] / starts if starts else None
+        metric["prCreatedRate"] = metric["prsCreated"] / metric["accepted"] if metric["accepted"] else None
+        metric["firstPassGreenRate"] = metric["firstPassGreen"] / metric["firstPassAttempts"] \
+            if metric["firstPassAttempts"] else None
+        timings = sorted(issue_to_pr[name])
+        metric["issueToPrSecondsP50"] = timings[len(timings) // 2] if timings else None
+        landed_timings = sorted(merge_times[name])
+        metric["issueToMergeSecondsP50"] = landed_timings[len(landed_timings) // 2] \
+            if landed_timings else None
+    return {"schema": "jovie-provider-throughput/v1", "windowHours": 24,
+            "providers": metrics, "landedByAttribution": dict(sorted(landed_categories.items())),
+            "landedByOrigin": dict(sorted(landed_origins.items()))}
 
 
 def execution_coordination(sha: str) -> dict:
@@ -503,8 +674,15 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
+    branch = f"{name}/{issue.identifier.lower()}-{run_id[:15].lower()}"
+    worktree = host.state / "worktrees" / run_id
+    provider_evidence = runs / f"{run_id}.provider.jsonl"
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "model": spec.get("model"),
-               "issue": issue.identifier, "startedAt": now_iso()}
+               "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN,
+               "issue": issue.identifier, "linearIssueId": issue.id, "branch": branch,
+               "worktree": str(worktree), "offer": {"eligible": True, "accepted": False},
+               "attribution": {"category": "autonomous-created", "originProvider": name,
+                               "finalProvider": name}, "startedAt": now_iso()}
     ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
                                        {"title": issue.title, "description": issue.description})
     coordination = execution_coordination(execution_attempt.GITHUB_LEDGER_ANCHOR)
@@ -521,8 +699,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
                        reasons=[claimed["reason"]], endedAt=now_iso())
         return receipt
-    branch = f"{name}/{issue.identifier.lower()}-{run_id[:15].lower()}"
-    worktree = host.state / "worktrees" / run_id
+    receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
@@ -535,7 +712,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             started = time.time()
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                        {"spend": 1, "mutations": 1}, coordination=coordination)
-            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree)}),
+            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
+                                                       "provider_receipt": str(provider_evidence)}),
                               worktree, log, host.agent_timeout)
             # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
             # lane finishes it on the same worktree.
@@ -555,10 +733,13 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
-                                                             "cwd": str(worktree)}), worktree, log, host.agent_timeout)
+                                                             "cwd": str(worktree),
+                                                             "provider_receipt": str(provider_evidence)}),
+                                  worktree, log, host.agent_timeout)
                 current = nxt_name
             if handoffs:
                 receipt.update(handoffs=handoffs, finishedBy=current)
+                receipt["attribution"].update(category="cross-provider-handoff", finalProvider=current)
             receipt.update(agentExit=agent.returncode, agentSeconds=round(time.time() - started))
             receipt.update(verify_and_land(host, issue, branch, worktree, log, started,
                                            sensitive=issue_is_sensitive(issue)))
@@ -576,8 +757,13 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         finally:
             remove_worktree(host, worktree)
             sh(["git", "branch", "-D", branch], cwd=host.repo)
+    evidence = read_provider_evidence(provider_evidence)
+    if evidence:
+        receipt["providerEvidence"] = evidence
     receipt["endedAt"] = now_iso()
     verdict = receipt.get("verdict")
+    receipt["result"] = {"verdict": verdict, "commit": receipt.get("headSha"), "pr": receipt.get("pr"),
+                         "prUrl": receipt.get("prUrl")}
     result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout") \
         else "no_op_stale" if verdict in ("no-change", "not-shippable") else "failed_unknown"
     receipt["execution"] = execution_attempt.finish(
@@ -765,9 +951,16 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     """A lane PR that is stuck at a head we have not tried twice: checks settled red, or
     merge conflicts with main (GitHub drops auto-merge on those, so nothing else frees them)."""
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
+        # A held PR is Tim's/Summer's call: fixing it re-arms auto-merge and re-enqueues it
+        # (#17541, 2026-09-28). The event path already skips holds via pr_events.in_scope.
+        if {label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS:
+            continue
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
-        gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
+        held_entry = (held or {}).get(str(pr["number"]), {})
+        if not pr_events.fixable_hold(held_entry, pr["headRefOid"]):
+            continue  # a hold no push clears (e.g. diff-too-large): intake owns it, not attempts
+        gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
         if not conflicted and not gate_held and not reviewed:
             if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
@@ -781,14 +974,19 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     return None
 
 
-def exhausted_prs(prs: list[dict], attempts: dict) -> list[dict]:
-    """Heads the fix loop tried MAX_FIX_ATTEMPTS times and that are still stuck, not yet escalated."""
+def exhausted_prs(prs: list[dict], attempts: dict, held: dict | None = None) -> list[dict]:
+    """Stuck heads not yet escalated: fix attempts spent, or a hold no push can clear."""
     stuck = []
     for pr in prs:
         record = attempts.get(str(pr["number"]), {})
+        if record.get("escalated"):
+            continue
+        if not pr_events.fixable_hold((held or {}).get(str(pr["number"])), pr["headRefOid"]):
+            stuck.append(pr)  # deterministic hold: intake once, not MAX_FIX_ATTEMPTS model calls
+            continue
         # Spent attempts are terminal for the PR (red_pr never retries it), so a head the last
         # fix pushed that is still stuck escalates too instead of waiting silently.
-        if record.get("count", 0) >= MAX_FIX_ATTEMPTS and not record.get("escalated"):
+        if record.get("count", 0) >= MAX_FIX_ATTEMPTS:
             checks = pr.get("statusCheckRollup") or []
             if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED" \
                     or any(check.get("conclusion") in RED for check in checks):
@@ -800,21 +998,32 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
     """Bug intake, never Tim: comment on the PR, open a Linear Triage issue once, mark it escalated."""
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
-    for pr in exhausted_prs(prs, attempts):
-        body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
-                f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
-                "Filed through bug intake (Linear Triage); the lanes stop here.")
-        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+    held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    for pr in exhausted_prs(prs, attempts, held):
         record = attempts.get(str(pr["number"]), {})
+        if record.get("count", 0):
+            body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
+                    f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
+                    "Filed through bug intake (Linear Triage); the lanes stop here.")
+        else:
+            code = (held.get(str(pr["number"])) or {}).get("reason") or "unfixable"
+            body = (f"🤖 lanes: the gate held head `{pr['headRefOid'][:7]}` for a reason no code push can clear "
+                    f"(`{code}`; merge state {pr.get('mergeStateStatus')}). "
+                    "Filed through bug intake (Linear Triage); the lanes stop here.")
+        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+        title = ("Fix loop exhausted" if record.get("count", 0) else "Unfixable gate hold") \
+            + f": PR #{pr['number']} {pr.get('title', '')[:80]}"
         try:
-            linear.create_triage(f"Fix loop exhausted: PR #{pr['number']} {pr.get('title', '')[:80]}",
+            linear.create_triage(title,
                                  pr_events.bug_report(pr, f"{body}\n\nHost `{HOST}`, {now_iso()}.", HOST, record))
         except Exception:
             pass
         attempts[str(pr["number"])] = {**record, "escalated": True}
         pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)  # held with a reason, visible on the PR
+        # Spent attempts rename the hold fix-exhausted; a zero-attempt hold keeps its real reason.
+        prefix = ["fix-exhausted"] if record.get("count", 0) else []
         update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
-            pr["headRefOid"], ["fix-exhausted", *held.get(str(pr["number"]), {}).get("evidence", [])])}))
+            pr["headRefOid"], [*prefix, *held.get(str(pr["number"]), {}).get("evidence", [])])}))
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
         if found and found.group("lane") in pr_events.disabled_lanes(load_providers()):
             pr_events.return_to_pool(THIS, linear, pr, "orphaned lane PR after its fix attempts ran out")
@@ -922,8 +1131,12 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
     worktree = host.state / "worktrees" / run_id
+    provider_evidence = runs / f"{run_id}.provider.jsonl"
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "kind": "fix-red",
-               "pr": pr["number"], "headBefore": pr["headRefOid"], "startedAt": now_iso()}
+               "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN,
+               "attribution": {"category": "autonomous-remediation", "provider": name},
+               "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
+               "headBefore": pr["headRefOid"], "startedAt": now_iso()}
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
     ident = execution_attempt.identity("pr-remediation",
@@ -963,7 +1176,9 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination)
                 agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
-                                                         "cwd": str(worktree)}), worktree, log, host.agent_timeout)
+                                                         "cwd": str(worktree),
+                                                         "provider_receipt": str(provider_evidence)}),
+                                  worktree, log, host.agent_timeout)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
@@ -989,8 +1204,13 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
             # The attempt is over: a head it did not move may be tried again by the next lane.
             update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
                 endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
+    evidence = read_provider_evidence(provider_evidence)
+    if evidence:
+        receipt["providerEvidence"] = evidence
     receipt["endedAt"] = now_iso()
     pushed = receipt.get("verdict") == "fix-pushed"
+    receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headAfter"),
+                         "pr": receipt.get("pr")}
     receipt["execution"] = execution_attempt.finish(
         runs / "execution-attempts.jsonl", ident, claimed["fencingToken"], "succeeded" if pushed else "failed_known",
         {"failureClass": None if pushed else "repair_incomplete",
@@ -1033,7 +1253,9 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
     runs.mkdir(parents=True, exist_ok=True)
     worktree = host.state / "worktrees" / run_id
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "kind": "adopt",
-               "pr": pr["number"], "startedAt": now_iso()}
+               "origin": AUTONOMOUS_ORIGIN, "attribution": {"category": "review-only", "provider": name},
+               "worktree": str(worktree), "branch": pr.get("headRefName"), "pr": pr["number"],
+               "startedAt": now_iso()}
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
@@ -1051,6 +1273,8 @@ def adopt_pr(host: Host, name: str, pr: dict) -> dict:
         # Not verified: forget the claim so the next adopt pass retries this head.
         update_json(host.state / "verified.json", lambda verified: verified.pop(str(pr["number"]), None))
     receipt["endedAt"] = now_iso()
+    receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headSha"),
+                         "pr": receipt.get("pr")}
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt

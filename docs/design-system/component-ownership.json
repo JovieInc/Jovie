@@ -112,12 +112,7 @@
         "apps/web/components/site/MarketingFooter.tsx",
         "apps/web/components/site/MarketingFooter.css"
       ],
-      "internals": [
-        "mf-mark-tagline",
-        "mf-eyebrow",
-        "mf-eyebrow--caps",
-        "mf-baseband"
-      ]
+      "internals": ["mf-mark-tagline", "mf-eyebrow", "mf-baseband"]
     },
     "device-frames": {
       "owner": "apps/web/components/marketing/artist-profile/ArtistProfilePhoneFrame.tsx",

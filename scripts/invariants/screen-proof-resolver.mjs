@@ -27,6 +27,20 @@ const MAX_AGE = 24 * 60 * 60_000;
 // viewports x PNG/receipt). Keep modest headroom while rejecting zip bombs.
 const MAX_ARCHIVE_MEMBERS = 256;
 const MAX_EXTRACTED_ARTIFACT_BYTES = 512 * 1024 * 1024;
+// JOV-INV-018 incident (2026-09-28): `spawnSync`'s default-scoped 32MB
+// stdout cap silently killed `gh api .../zip` once the marketing bundle
+// (60 routes x two viewports of full-page PNGs) grew past ~33MB — observed
+// at 163MB. The kill sets `status: null`, so `run()` threw the generic
+// 'controlled transport unavailable', which every caller reported as
+// "controlled GitHub artifact resolver is unavailable" for every screen
+// routed through that artifact, masking real per-screen findings (or a
+// real pass) behind a misleading transport error. The download transport
+// must never be the tightest ceiling in this pipeline: extraction already
+// owns the authoritative zip-bomb limit via MAX_EXTRACTED_ARTIFACT_BYTES,
+// so give the raw (already PNG-compressed, so barely smaller) download the
+// same ceiling plus headroom rather than an arbitrary lower one.
+const MAX_ARTIFACT_DOWNLOAD_BYTES =
+  MAX_EXTRACTED_ARTIFACT_BYTES + 128 * 1024 * 1024;
 const validId = value => Number.isSafeInteger(value) && value > 0;
 const isObject = value =>
   value && typeof value === 'object' && !Array.isArray(value);
@@ -86,7 +100,7 @@ export function marketingArtifactName(headSha) {
 function run(command, args, binary = false) {
   const result = spawnSync(command, args, {
     encoding: binary ? undefined : 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
+    maxBuffer: binary ? MAX_ARTIFACT_DOWNLOAD_BYTES : 32 * 1024 * 1024,
   });
   if (result.status !== 0) throw new Error('controlled transport unavailable');
   return result.stdout;

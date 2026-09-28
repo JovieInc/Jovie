@@ -1,0 +1,166 @@
+// JOV-INV-038 evaluator receipt: dominant-first-hierarchy (visual-semantic).
+//
+// "One dominant thing to perceive first. Visual hierarchy should be
+// intentionally cinematic: the primary idea dominates; secondary information
+// recedes substantially rather than competing at nearly equal weight."
+//
+// Representative surface: the canonical homepage hero
+// (apps/web/components/homepage/HomepageIdentityHero.tsx), the flagship
+// marketing surface named in that component's own doc comment. This renders
+// the real component tree (not a source-text scan) and reads the actual
+// declared type-scale and ink tokens from its stylesheet, so a refactor that
+// makes the headline and support copy compete at nearly equal weight fails
+// this test, not just a taste review.
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
+
+vi.mock('@/components/homepage/homepage-analytics', () => ({
+  trackHomepageEvent: vi.fn(),
+}));
+vi.mock('@/lib/flags/marketing-static', () => ({
+  FEATURE_FLAGS: { WAITLIST_ENABLED: true },
+}));
+vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
+  useArtistSearchQuery: () => ({
+    results: [],
+    state: 'idle',
+    search: vi.fn(),
+    clear: vi.fn(),
+  }),
+}));
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => {
+    const { fill, priority, quality, ...rest } = props;
+    void fill;
+    void quality;
+    return (
+      <img alt='' data-priority={priority ? 'true' : undefined} {...rest} />
+    );
+  },
+}));
+
+const HEADLINE_SELECTOR = '.homepage-identity-hero__headline';
+const SUPPORT_SELECTOR = '.homepage-identity-hero__support';
+// A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
+// enough that "nearly equal weight" fails closed, loose enough that routine
+// type-scale tuning does not make this brittle.
+const MIN_DOMINANCE_RATIO = 1.8;
+
+function css(): string {
+  return readFileSync(
+    resolve(process.cwd(), 'components/homepage/HomepageIdentity.css'),
+    'utf8'
+  );
+}
+
+function cssBlock(source: string, selector: string): string {
+  const start = source.indexOf(`${selector} {`);
+  if (start === -1) {
+    throw new Error(`selector not found in HomepageIdentity.css: ${selector}`);
+  }
+  const end = source.indexOf('}', start);
+  if (end === -1) {
+    throw new Error(
+      `unterminated rule for ${selector} in HomepageIdentity.css`
+    );
+  }
+  return source.slice(start, end);
+}
+
+function toPx(bound: string): number {
+  const trimmed = bound.trim();
+  const rem = /^([\d.]+)rem$/.exec(trimmed);
+  if (rem) return Number.parseFloat(rem[1]) * 16;
+  const px = /^([\d.]+)px$/.exec(trimmed);
+  if (px) return Number.parseFloat(px[1]);
+  throw new Error(`unsupported clamp() bound unit: ${trimmed}`);
+}
+
+/** Reads the min/max px of a `property: clamp(min, preferred, max);` declaration. */
+function clampRangePx(
+  block: string,
+  property: string
+): { min: number; max: number } {
+  const match = new RegExp(
+    `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
+  ).exec(block);
+  if (!match) {
+    throw new Error(`no clamp() found for ${property} in: ${block}`);
+  }
+  return { min: toPx(match[1]), max: toPx(match[2]) };
+}
+
+describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () => {
+  it('renders exactly one dominant heading and a structurally secondary support line', () => {
+    render(<HomepageIdentityHero />);
+
+    const hero = screen.getByTestId('marketing-section-hero');
+    const headings = within(hero).getAllByRole('heading');
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveClass('homepage-identity-hero__headline');
+
+    const support = hero.querySelector(SUPPORT_SELECTOR);
+    expect(support).not.toBeNull();
+    // Support copy must not itself be a heading — it recedes structurally,
+    // it does not compete as a second thing to perceive first.
+    expect(support?.tagName.toLowerCase()).not.toMatch(/^h[1-6]$/);
+  });
+
+  it('sizes the headline substantially larger than the support line at every viewport', () => {
+    const source = css();
+    const headline = clampRangePx(
+      cssBlock(source, HEADLINE_SELECTOR),
+      'font-size'
+    );
+    const support = clampRangePx(
+      cssBlock(source, SUPPORT_SELECTOR),
+      'font-size'
+    );
+
+    expect(headline.min).toBeGreaterThan(support.min);
+    expect(headline.max).toBeGreaterThan(support.max);
+    expect(headline.min / support.min).toBeGreaterThanOrEqual(
+      MIN_DOMINANCE_RATIO
+    );
+    expect(headline.max / support.max).toBeGreaterThanOrEqual(
+      MIN_DOMINANCE_RATIO
+    );
+  });
+
+  it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
+    const source = css();
+    // The light-theme override is the one block that gives each ink token a
+    // literal value (the dark default aliases straight to --color-text-*);
+    // it is where "recedes" is either honored or silently dropped.
+    const lightThemeBlock = cssBlock(
+      source,
+      ':root:not(.dark) .homepage-identity-hero'
+    );
+
+    const primaryInk = /--homepage-identity-hero-ink:\s*([^;]+);/.exec(
+      lightThemeBlock
+    )?.[1];
+    const secondaryInk = /--homepage-identity-hero-ink-2:\s*([^;]+);/.exec(
+      lightThemeBlock
+    )?.[1];
+    expect(primaryInk, 'primary ink token declared').toBeTruthy();
+    expect(secondaryInk, 'secondary ink token declared').toBeTruthy();
+
+    // The dominant headline keeps full opacity — no color-mix fade.
+    expect(primaryInk).not.toContain('color-mix');
+
+    // The receding support line is mixed toward transparent at some opacity
+    // below 100% — "recedes substantially", not simultaneous full weight.
+    const secondaryOpacity = Number.parseFloat(
+      /(\d+(?:\.\d+)?)%/.exec(secondaryInk ?? '')?.[1] ?? 'NaN'
+    );
+    expect(Number.isNaN(secondaryOpacity)).toBe(false);
+    expect(secondaryOpacity).toBeLessThan(100);
+    expect(secondaryOpacity).toBeGreaterThan(0);
+  });
+});

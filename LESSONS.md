@@ -161,7 +161,7 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 ### Shell canvas and card surfaces must stay separate
 **Mistake:** A dark-shell cleanup changed tokens, but some task/preview routes still rendered bordered cards and even full table routes directly on `bg-(--linear-app-content-surface)`. That made cards blend into the canvas and left task pages looking like one flat rectangle.
 
-**Rule:** In the app shell, `bg-(--linear-app-content-surface)` is shell chrome/canvas only. Shared cards and panels use `bg-surface-1`, recessed wells use `bg-surface-0`, and table/workspace routes must wrap primary content in `DashboardWorkspacePanel` plus `LINEAR_SURFACE.contentContainer`.
+**Rule:** In the app shell, `bg-(--linear-app-content-surface)` is shell chrome/canvas only. Shared cards and panels use `bg-surface-1`, recessed wells use `bg-surface-0`, and table/workspace routes must wrap primary content in `PageShell` plus `LINEAR_SURFACE.contentContainer`.
 
 ### AI-generated UI defaults drift toward all-caps and border-heavy layouts
 **Mistake:** Agents produced generic AI-looking product UI with uppercase eyebrow labels, long explanatory copy, and bordered cards used as the main hierarchy device. The result felt cheap and off-brand instead of Linear-inspired and premium.
