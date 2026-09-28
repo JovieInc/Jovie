@@ -97,6 +97,24 @@ describe('public profile contract guard', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('renders the Tim White marketing proof as the full public profile, without preview chrome', () => {
+    // Homepage "real proof" captures come from this surface; the dashboard
+    // Preview bar would misrepresent jov.ie/tim (JOV-6946).
+    const contents = readFileSync(
+      join(
+        ROOT,
+        'components',
+        'features',
+        'demo',
+        'DemoTimWhiteProfileSurface.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(contents).toContain("presentation='full-public'");
+    expect(contents).not.toContain("presentation='compact-preview'");
+  });
+
   it('keeps shared profile shell files on semantic profile token aliases', () => {
     expect(readFileSync(PROFILE_DRAWER_SHELL, 'utf8')).toContain(
       '--profile-drawer-radius-mobile'
