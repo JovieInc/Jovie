@@ -3,7 +3,7 @@ import { fn } from 'storybook/test';
 import { SegmentedDigitBox } from './SegmentedDigitBox';
 
 const BOX_SIZE_CLASSNAME = 'h-12 w-11 sm:h-12 sm:w-12';
-const TEXT_SIZE_CLASSNAME = 'text-[1.22rem] sm:text-[1.3rem]';
+const TEXT_SIZE_CLASSNAME = 'text-lg sm:text-xl';
 
 const meta = {
   title: 'Atoms/SegmentedDigitBox',
