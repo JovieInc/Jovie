@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import { Bell, Check } from 'lucide-react';
 import Link from 'next/link';
 import type { MouseEvent } from 'react';
@@ -50,6 +51,15 @@ export interface ProfileIdentityHeaderProps {
 
 const PILL_FACE_CLASS_NAME =
   'profile-glass-pill profile-glass-pill--flat flex h-7 w-full items-center justify-center gap-1.5 text-mid font-medium leading-none group-focus-visible:ring-2 group-focus-visible:ring-focus';
+
+/**
+ * 44px hit slot for the 28px pill face. The canonical Button is a transparent
+ * overlay (layout-only classes — shadcn/no-restyle forbids visual overrides)
+ * so the row keeps raw <button> usage at zero; the pill face owns the look.
+ */
+const PILL_HIT_SLOT_CLASS_NAME =
+  'relative flex h-11 min-w-0 flex-1 touch-manipulation items-center';
+const PILL_HIT_OVERLAY_CLASS_NAME = 'absolute inset-0';
 
 const SOCIAL_ICON_CLASS_NAME =
   'inline-flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
@@ -138,14 +148,8 @@ export function ProfileIdentityHeader({
         data-testid='profile-identity-actions'
       >
         {onGetUpdatesClick ? (
-          <button
-            type='button'
-            onClick={onGetUpdatesClick}
-            className='group flex h-11 min-w-0 flex-1 touch-manipulation items-center focus-visible:outline-none'
-            data-testid='profile-identity-get-updates'
-            data-subscribed={isSubscribed ? 'true' : undefined}
-          >
-            <span className={PILL_FACE_CLASS_NAME}>
+          <div className={PILL_HIT_SLOT_CLASS_NAME}>
+            <span aria-hidden='true' className={PILL_FACE_CLASS_NAME}>
               {isSubscribed ? (
                 <Check className='h-3.5 w-3.5' aria-hidden='true' />
               ) : (
@@ -153,7 +157,16 @@ export function ProfileIdentityHeader({
               )}
               {isSubscribed ? 'Updates On' : 'Get Updates'}
             </span>
-          </button>
+            <Button
+              type='button'
+              variant='ghost'
+              aria-label={isSubscribed ? 'Updates On' : 'Get Updates'}
+              onClick={onGetUpdatesClick}
+              className={PILL_HIT_OVERLAY_CLASS_NAME}
+              data-testid='profile-identity-get-updates'
+              data-subscribed={isSubscribed ? 'true' : undefined}
+            />
+          </div>
         ) : hasListenDestination ? (
           <Link
             href={listenHref}

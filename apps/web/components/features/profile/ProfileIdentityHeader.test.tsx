@@ -96,8 +96,11 @@ describe('ProfileIdentityHeader', () => {
       renderHeader({ onGetUpdatesClick });
 
       const primary = screen.getByRole('button', { name: 'Get Updates' });
-      expect(primary).toHaveClass('h-11', 'flex-1');
-      expect(primary.firstElementChild).toHaveClass(
+      expect(primary.parentElement).toHaveClass('h-11', 'flex-1');
+      const pillFace = primary.parentElement?.querySelector(
+        '.profile-glass-pill'
+      );
+      expect(pillFace).toHaveClass(
         'profile-glass-pill',
         'profile-glass-pill--flat',
         'h-7'

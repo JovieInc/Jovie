@@ -599,12 +599,10 @@ describe('ProfileCompactTemplate', () => {
     const getUpdates = within(identity).getByRole('button', {
       name: 'Get Updates',
     });
-    expect(getUpdates).toHaveClass('h-11');
-    expect(getUpdates.firstElementChild).toHaveClass(
-      'profile-glass-pill',
-      'profile-glass-pill--flat',
-      'h-7'
-    );
+    expect(getUpdates.parentElement).toHaveClass('h-11');
+    expect(
+      getUpdates.parentElement?.querySelector('.profile-glass-pill')
+    ).toHaveClass('profile-glass-pill', 'profile-glass-pill--flat', 'h-7');
     expect(
       within(screen.getByTestId('profile-identity-social-row')).getByRole(
         'link'
