@@ -52,7 +52,7 @@ interface ParsedFeatureRow {
   readonly notes: string;
 }
 
-type Shot = readonly [src: string, alt: string];
+type Shot = readonly [string, string];
 type MediaContext = Omit<FounderReviewMedia, 'alt' | 'dedicated'>;
 
 const PS = '/product-screenshots';
@@ -205,7 +205,7 @@ function passedReceipt(
   };
 }
 
-type ReceiptSpec = readonly [suffix: string, summary: string, ref: string];
+type ReceiptSpec = readonly [string, string, string];
 
 interface PacketTiers {
   readonly canonical?: ReceiptSpec;
