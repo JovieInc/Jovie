@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_PEN_EXPORT_SCHEMA,
+  APP_SCREEN_PEN_GEOMETRY,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
   type AppScreenRegistryEntry,
@@ -67,14 +68,61 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('keeps authenticated shared components source-backed but non-referenceable until a native Pen root is proven', () => {
+  it('binds Pen roots only to masters proven by the committed readback', () => {
     for (const component of APP_SCREEN_COMPONENT_REGISTRY) {
-      expect(component.penRootId, component.id).toBeNull();
-      expect(component.penReferenceEligible, component.id).toBe(false);
-      expect(component.penIdentityReason, component.id).toMatch(
-        /native canonical-Pen .*root is source-mapped/i
-      );
+      const root: string | null = component.penRootId;
+      if (root === null) {
+        expect(component.penReferenceEligible, component.id).toBe(false);
+      } else {
+        const master = APP_SCREEN_PEN_GEOMETRY.masters[root];
+        expect(master, `${component.id} -> ${root}`).toBeDefined();
+        expect(master?.registryComponentId, component.id).toBe(component.id);
+      }
+      if (!component.penReferenceEligible) {
+        expect(component.penIdentityReason, component.id).toMatch(
+          /readback 2026-09-27/
+        );
+      }
     }
+    expect(
+      Object.fromEntries(
+        APP_SCREEN_COMPONENT_REGISTRY.map(component => [
+          component.id,
+          component.penRootId,
+        ])
+      )
+    ).toEqual({
+      'component.app-shell-frame': 'JwsdW',
+      'component.app-shell-content-panel': null,
+      'component.settings-panel': null,
+      'component.unified-table': 'A3fqK',
+      'component.entity-sidebar': 'RosMb',
+      'component.empty-state': null,
+      'component.error-fallback': null,
+    });
+  });
+
+  it('fails closed on Pen roots missing from, or contradicting, the readback', () => {
+    const bound = APP_SCREEN_COMPONENT_REGISTRY.find(
+      component => component.id === 'component.unified-table'
+    );
+    expect(bound).toBeDefined();
+    const withRoot = (root: string) =>
+      APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+        component.id === bound?.id
+          ? { ...component, penRootId: root }
+          : component
+      );
+    expect(
+      validateAppScreenSystem({ components: withRoot('minted-id') }).map(
+        issue => issue.code
+      )
+    ).toContain('component-pen-root-without-readback');
+    expect(
+      validateAppScreenSystem({ components: withRoot('ftsrB') }).map(
+        issue => issue.code
+      )
+    ).toContain('component-pen-root-readback-mismatch');
   });
 
   it('keeps every recipe behind a real error boundary', () => {
@@ -185,11 +233,9 @@ describe('authenticated app screen registry', () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: 'component.app-shell-frame',
-          penRootId: null,
+          penRootId: 'JwsdW',
           penReferenceEligible: false,
-          penIdentityReason: expect.stringMatching(
-            /native canonical-Pen app-shell root/i
-          ),
+          penIdentityReason: expect.stringMatching(/D1 is pending/),
         }),
       ])
     );
@@ -260,7 +306,7 @@ describe('authenticated app screen registry', () => {
     expect(
       validateAppScreenSystem({
         components: APP_SCREEN_COMPONENT_REGISTRY.map(component =>
-          component.id === first.id
+          component.id === second.id
             ? { ...component, penReferenceEligible: true }
             : component
         ),

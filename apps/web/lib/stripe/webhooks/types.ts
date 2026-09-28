@@ -14,6 +14,7 @@ import type Stripe from 'stripe';
  */
 export type SupportedEventType =
   | 'checkout.session.completed'
+  | 'checkout.session.expired'
   | 'customer.subscription.created'
   | 'customer.subscription.updated'
   | 'customer.subscription.deleted'
@@ -93,6 +94,7 @@ export function isSupportedEventType(
 ): eventType is SupportedEventType {
   const supportedTypes: readonly string[] = [
     'checkout.session.completed',
+    'checkout.session.expired',
     'customer.subscription.created',
     'customer.subscription.updated',
     'customer.subscription.deleted',

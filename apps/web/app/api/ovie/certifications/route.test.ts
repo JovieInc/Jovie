@@ -106,6 +106,15 @@ describe('GET /api/ovie/certifications', () => {
       universal: false,
     });
     expect(body.counts.total).toBe(MARKETING_COMPONENT_REGISTRY.length + 1);
+    expect(body.queue.contract).toBe('jovie.certification-inbox/v1');
+    expect(
+      body.queue.needsYou.map(
+        (item: { subject: { id: string } }) => item.subject.id
+      )
+    ).toEqual(['signup']);
+    expect(body.queue.blocked).toHaveLength(
+      MARKETING_COMPONENT_REGISTRY.length
+    );
     expect(body.rows[0]).toMatchObject({
       id: 'flows:signup',
       domain: 'flows',

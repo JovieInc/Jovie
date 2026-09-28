@@ -5,6 +5,8 @@
  * the only authority for state, evidence digests, and founder decisions.
  */
 
+import type { CertificationInboxQueue } from '@/lib/agent-os/certification-inbox';
+
 export const OVIE_CERTIFICATION_INVENTORY_CONTRACT =
   'jovie.ovie-certification-inventory/v1' as const;
 
@@ -163,6 +165,8 @@ export interface OvieCertificationInventory {
   readonly counts: Readonly<Record<OvieCertificationState, number>> & {
     readonly total: number;
   };
+  /** Unified founder-judgment projection across every connected domain. */
+  readonly queue: CertificationInboxQueue;
   readonly rows: readonly OvieCertificationRow[];
   readonly issues: readonly OvieCertificationInventoryIssue[];
 }

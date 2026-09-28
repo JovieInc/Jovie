@@ -15,7 +15,11 @@ import {
   isLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 import { recordLeadFunnelEvent } from './funnel-events';
-import { searchGoogleCSE } from './google-cse';
+import {
+  type SearchOutcome,
+  type SearchStatus,
+  searchGoogleCSEWithStatus,
+} from './google-cse';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
 interface DiscoveryCandidate {
@@ -176,6 +180,7 @@ export interface KeywordDiagnostic {
   newLeadsInserted: number;
   duplicatesSkipped: number;
   error: string | null;
+  providerStatus: SearchStatus | null;
   durationMs: number;
   searchOffset: number;
 }
@@ -270,7 +275,7 @@ async function shouldSkipSeenSearchResult(
 }
 
 async function deduplicateSearchResults(
-  results: Awaited<ReturnType<typeof searchGoogleCSE>>,
+  results: SearchOutcome['results'],
   query: string,
   currentOffset: number
 ): Promise<{ candidates: DiscoveryCandidate[]; duplicatesSkipped: number }> {
@@ -379,58 +384,96 @@ export async function runDiscovery(
       newLeadsInserted: 0,
       duplicatesSkipped: 0,
       error: null,
+      providerStatus: null,
       durationMs: 0,
       searchOffset: currentOffset,
     };
     const queryStart = Date.now();
+    let stopRun = false;
 
     try {
-      const results = await searchGoogleCSE(keyword.query, currentOffset);
-      diagnostic.rawResultCount = results.length;
-
-      const { candidates, duplicatesSkipped } = await deduplicateSearchResults(
-        results,
+      const outcome = await searchGoogleCSEWithStatus(
         keyword.query,
         currentOffset
       );
-      result.duplicatesSkipped += duplicatesSkipped;
-      diagnostic.linktreeUrlsFound = candidates.length;
-      result.candidatesProcessed += candidates.length;
+      const results = outcome.results;
+      diagnostic.providerStatus = outcome.status;
+      diagnostic.rawResultCount = results.length;
 
-      // Track per-keyword insert stats separately
-      const beforeNew = result.newLeadsFound;
-      const beforeDups = result.duplicatesSkipped;
-      await insertCandidates(candidates, result);
-      diagnostic.newLeadsInserted = result.newLeadsFound - beforeNew;
-      diagnostic.duplicatesSkipped = result.duplicatesSkipped - beforeDups;
+      if (outcome.status !== 'ok' && outcome.status !== 'empty') {
+        // Provider failure — this is not zero demand. Do not advance or reset
+        // pagination, do not record keyword success stats, and do not let the
+        // run look like a successful empty query.
+        diagnostic.error =
+          outcome.error ?? `provider status: ${outcome.status}`;
+        pipelineWarn('discovery', 'Keyword query provider failure', {
+          query: keyword.query,
+          searchOffset: currentOffset,
+          providerStatus: outcome.status,
+          error: diagnostic.error,
+        });
+        await captureError(
+          'Discovery query provider failure',
+          new Error(diagnostic.error),
+          {
+            route: 'leads/discovery',
+            contextData: {
+              query: keyword.query,
+              keywordId: keyword.id,
+              queryIndex,
+              searchOffset: currentOffset,
+              providerStatus: outcome.status,
+            },
+          }
+        );
+        // Quota, auth and missing-config failures will affect every remaining
+        // keyword — stop the run instead of burning attempts.
+        stopRun =
+          outcome.status === 'not_configured' ||
+          outcome.status === 'quota_exceeded' ||
+          outcome.status === 'unauthorized';
+      } else {
+        const { candidates, duplicatesSkipped } =
+          await deduplicateSearchResults(results, keyword.query, currentOffset);
+        result.duplicatesSkipped += duplicatesSkipped;
+        diagnostic.linktreeUrlsFound = candidates.length;
+        result.candidatesProcessed += candidates.length;
 
-      // Advance search offset for next run. If we got fewer than 10 results
-      // or exceeded max, reset to page 1.
-      const nextOffset = currentOffset + 10;
-      const newSearchOffset =
-        results.length < 10 || nextOffset > GOOGLE_CSE_MAX_START_INDEX
-          ? 1
-          : nextOffset;
+        // Track per-keyword insert stats separately
+        const beforeNew = result.newLeadsFound;
+        const beforeDups = result.duplicatesSkipped;
+        await insertCandidates(candidates, result);
+        diagnostic.newLeadsInserted = result.newLeadsFound - beforeNew;
+        diagnostic.duplicatesSkipped = result.duplicatesSkipped - beforeDups;
 
-      // Update keyword stats + pagination offset
-      await db
-        .update(discoveryKeywords)
-        .set({
-          lastUsedAt: new Date(),
-          resultsFoundTotal: keyword.resultsFoundTotal + results.length,
-          searchOffset: newSearchOffset,
-        })
-        .where(eq(discoveryKeywords.id, keyword.id));
+        // Advance search offset for next run. If we got fewer than 10 results
+        // or exceeded max, reset to page 1.
+        const nextOffset = currentOffset + 10;
+        const newSearchOffset =
+          results.length < 10 || nextOffset > GOOGLE_CSE_MAX_START_INDEX
+            ? 1
+            : nextOffset;
 
-      pipelineLog('discovery', 'Keyword query complete', {
-        query: keyword.query,
-        searchOffset: currentOffset,
-        nextOffset: newSearchOffset,
-        rawResults: diagnostic.rawResultCount,
-        linktreeUrls: diagnostic.linktreeUrlsFound,
-        newLeads: diagnostic.newLeadsInserted,
-        duplicates: diagnostic.duplicatesSkipped,
-      });
+        // Update keyword stats + pagination offset
+        await db
+          .update(discoveryKeywords)
+          .set({
+            lastUsedAt: new Date(),
+            resultsFoundTotal: keyword.resultsFoundTotal + results.length,
+            searchOffset: newSearchOffset,
+          })
+          .where(eq(discoveryKeywords.id, keyword.id));
+
+        pipelineLog('discovery', 'Keyword query complete', {
+          query: keyword.query,
+          searchOffset: currentOffset,
+          nextOffset: newSearchOffset,
+          rawResults: diagnostic.rawResultCount,
+          linktreeUrls: diagnostic.linktreeUrlsFound,
+          newLeads: diagnostic.newLeadsInserted,
+          duplicates: diagnostic.duplicatesSkipped,
+        });
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -455,8 +498,13 @@ export async function runDiscovery(
 
     diagnostic.durationMs = Date.now() - queryStart;
     result.diagnostics.push(diagnostic);
-    result.queriesUsed++;
+    // Only count a query against the budget when a provider request was
+    // actually executed — 'not_configured' makes no billable call.
+    if (diagnostic.providerStatus !== 'not_configured') {
+      result.queriesUsed++;
+    }
     queryIndex = (queryIndex + 1) % enabledKeywords.length;
+    if (stopRun) break;
   }
 
   result.budgetRemaining = remainingBudget - result.queriesUsed;

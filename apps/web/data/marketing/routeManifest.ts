@@ -131,7 +131,7 @@ export interface RouteManifestEntry {
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
   };
-  /** noindex flag — true if the route is noindex today (e.g. /ai, /investors, /demo/video). */
+  /** noindex flag — true if the route is noindex today (e.g. /ai, /demo/video). */
   readonly noindex?: boolean;
   /** Alias-of — when this route is an alias of another (e.g. /artist-profile → /artist-profiles). */
   readonly aliasOf?: string;
@@ -165,7 +165,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        'apps/web/components/homepage/HomepageIdentityHero.tsx',
         'hero',
         'centered-none'
       ),
@@ -632,14 +632,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'apps/web/app/(marketing)/support/page.tsx',
       'hero',
       'content-prose',
-      'faq',
       'cta'
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'source binding audit 2026-09-01',
+      source: 'source binding audit 2026-09-26',
       notes:
-        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and SupportCta in that order.',
+        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body pointing at the canonical Help Center on docs.jov.ie, and SupportCta in that order. FAQs rehomed to the canonical troubleshooting article under JOV-5897, so the seo recipe faq beat intentionally no longer applies.',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1062,25 +1061,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/demovideo',
-    noindex: true,
-  },
-  {
-    glob: '(marketing)/investors/page.tsx',
-    renderedSections: [],
-    bindingEvidence: {
-      status: 'exempt',
-      source: 'sanctioned route manifest exemption',
-    },
-    exempt: {
-      reason:
-        'noindex investor brief — hand-rolled layout; not recipe-composable',
-      linearId: 'JOV-4063',
-      approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
-    },
-    status: 'active',
-    specVersion: '1.0.0',
-    url: '/investors',
     noindex: true,
   },
   {

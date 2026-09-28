@@ -35,12 +35,13 @@ export interface AppScreenComponentRegistryEntry {
   readonly storybookTitle: string;
   /**
    * Native Pen identity is deliberately independent from the source identity.
-   * A component remains ineligible for Pen reference until a canonical-file
-   * manifest/readback proves this exact root; never mint an ID from source.
+   * Null, or a master id proven by the committed read-only readback in
+   * `pen-geometry.json` (JOV-6776); never mint an ID from source. A bound
+   * root stays non-reference-eligible while a pending parity decision applies.
    */
   readonly penRootId: string | null;
   readonly penReferenceEligible: boolean;
-  /** Required while no native, source-mapped Pen root is proven. */
+  /** Required while the component is not Pen-reference-eligible. */
   readonly penIdentityReason?: string;
 }
 
@@ -95,10 +96,10 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     source: 'apps/web/components/organisms/AppShellFrame.tsx',
     storySource: 'apps/web/components/organisms/AppShellFrame.stories.tsx',
     storybookTitle: 'Organisms/AppShellFrame',
-    penRootId: null,
+    penRootId: 'JwsdW',
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen app-shell root is source-mapped; promote only after manifest/readback proof.',
+      'Bound to Pen JwsdW (Canonical / App Shell / Runtime) by read-only readback 2026-09-27 (pen-geometry.json). Not reference-eligible while D1 is pending: the Pen sidebar slot is 256 and header slot 48, code locks 244/44.',
   },
   {
     id: 'component.app-shell-content-panel',
@@ -109,7 +110,7 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     penRootId: null,
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen app-shell content-panel root is source-mapped; promote only after manifest/readback proof.',
+      'No standalone canonical-Pen master: the closest node is Othc2 (Shell Content Column), a slot inside JwsdW, not a reusable root. Not bound (readback 2026-09-27).',
   },
   {
     id: 'component.settings-panel',
@@ -120,7 +121,7 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     penRootId: null,
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen settings-panel root is source-mapped; promote only after manifest/readback proof.',
+      'No matching canonical-Pen master. Candidates PoNUx (Settings shell) and QA9C6 (Settings navigation) are the whole settings frame and its nav, not the titled settings card section SettingsPanel renders. Not bound (readback 2026-09-27).',
   },
   {
     id: 'component.unified-table',
@@ -128,10 +129,10 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     storySource:
       'apps/web/components/organisms/table/organisms/UnifiedTable.stories.tsx',
     storybookTitle: 'Organisms/Table/UnifiedTable',
-    penRootId: null,
+    penRootId: 'A3fqK',
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen unified-table root is source-mapped; promote only after manifest/readback proof.',
+      'Bound to Pen A3fqK (Canonical / Unified Table / Runtime) by read-only readback 2026-09-27 (pen-geometry.json). Not reference-eligible while D2 is pending: the Pen master carries [2,10,8,10] padding, code tables are edge to edge.',
   },
   {
     id: 'component.entity-sidebar',
@@ -139,10 +140,10 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     storySource:
       'apps/web/components/molecules/drawer/EntitySidebarShell.stories.tsx',
     storybookTitle: 'Molecules/Drawer/EntitySidebarShell',
-    penRootId: null,
+    penRootId: 'RosMb',
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen entity-sidebar root is source-mapped; promote only after manifest/readback proof.',
+      'Bound to Pen RosMb (Canonical / Entity Sidebar Shell / Runtime) by read-only readback 2026-09-27 (pen-geometry.json); width 360 matches SIDEBAR_WIDTH. Not reference-eligible while D6 (one entity header, Pen odpZ8) is pending.',
   },
   {
     id: 'component.empty-state',
@@ -152,7 +153,7 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     penRootId: null,
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen empty-state root is source-mapped; promote only after manifest/readback proof.',
+      'No generic canonical-Pen empty-state master. Candidate aWMQW (Canonical / Library State Panel) is library-specific; binding it would make every app empty state inherit library anatomy (D7). Not bound (readback 2026-09-27).',
   },
   {
     id: 'component.error-fallback',
@@ -163,7 +164,7 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     penRootId: null,
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen error-fallback root is source-mapped; promote only after manifest/readback proof.',
+      'No canonical-Pen error-fallback master exists (D7). Not bound (readback 2026-09-27).',
   },
 ] as const satisfies readonly AppScreenComponentRegistryEntry[];
 

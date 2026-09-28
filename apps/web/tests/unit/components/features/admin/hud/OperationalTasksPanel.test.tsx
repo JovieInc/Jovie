@@ -12,7 +12,7 @@ function feed(
     canonicalSource: 'linear',
     cacheMode: 'local-reconciled',
     syncState: 'fresh',
-    sourceId: 'symphony-runtime',
+    sourceId: 'lane-pull-requests',
     observedAt: '2026-09-01T22:00:00.000Z',
     lastSyncedAt: '2026-09-01T22:00:00.000Z',
     freshnessDeadline: '2026-09-01T22:00:10.000Z',

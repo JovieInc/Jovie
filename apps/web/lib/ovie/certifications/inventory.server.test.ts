@@ -105,6 +105,13 @@ describe('readOvieCertificationInventory', () => {
       MARKETING_COMPONENT_REGISTRY.length + 2
     );
     expect(inventory.counts.review_ready).toBe(1);
+    expect(inventory.queue.contract).toBe('jovie.certification-inbox/v1');
+    expect(inventory.queue.needsYou.map(item => item.subject.id)).toEqual([
+      'signup',
+    ]);
+    expect(inventory.queue.blocked).toHaveLength(
+      MARKETING_COMPONENT_REGISTRY.length + 1
+    );
     // Review-ready work leads the table.
     expect(inventory.rows[0]).toMatchObject({
       id: 'flows:signup',

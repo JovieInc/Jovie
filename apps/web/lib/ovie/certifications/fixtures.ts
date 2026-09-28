@@ -6,6 +6,7 @@ import {
   type FounderCertificationDecision,
 } from '@/lib/agent-os/certification';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
+import { projectCertificationInbox } from '@/lib/agent-os/certification-inbox';
 import { normalizeKernelCertificationRow } from './normalize';
 import type {
   OvieCertificationDomainId,
@@ -161,33 +162,36 @@ export function fixtureRow(
 export function fixtureInventory(
   generatedAt: string = FIXTURE_NOW
 ): OvieCertificationInventory {
-  const ready = fixtureRow('signup-golden-path');
+  const readyPacket = fixturePacket('signup-golden-path');
+  const ready = fixtureRow('signup-golden-path', { packet: readyPacket });
+  const workingPacket = fixturePacket('claim-profile', {
+    visualProof: [fixtureReceipt('visual_proof', 'claim-visual', 'failed')],
+  });
   const working = fixtureRow('claim-profile', {
-    packet: fixturePacket('claim-profile', {
-      visualProof: [fixtureReceipt('visual_proof', 'claim-visual', 'failed')],
-    }),
+    packet: workingPacket,
     updatedAt: '2026-09-27T06:30:00.000Z',
   });
   const certifiedPacket = fixturePacket('public-profile', {
     subject: { id: 'public-profile', kind: 'surface', title: 'Public Profile' },
   });
+  const certifiedDecisions: FounderCertificationDecision[] = [
+    {
+      id: 'decision-fixture',
+      subjectId: 'public-profile',
+      evidenceDigest:
+        evaluateCertificationAdmission({ packet: certifiedPacket })
+          .decisionEvidenceDigest ?? '',
+      decision: 'approved',
+      decidedAt: '2026-09-27T07:00:00.000Z',
+      reviewer: 'founder@example.test',
+      notes: null,
+    },
+  ];
   const certified = fixtureRow('public-profile', {
     domain: 'public_profiles',
     surface: 'Profile Page',
     packet: certifiedPacket,
-    decisions: [
-      {
-        id: 'decision-fixture',
-        subjectId: 'public-profile',
-        evidenceDigest:
-          evaluateCertificationAdmission({ packet: certifiedPacket })
-            .decisionEvidenceDigest ?? '',
-        decision: 'approved',
-        decidedAt: '2026-09-27T07:00:00.000Z',
-        reviewer: 'founder@example.test',
-        notes: null,
-      },
-    ],
+    decisions: certifiedDecisions,
     updatedAt: '2026-09-27T07:00:00.000Z',
   });
   const rows = [ready, working, certified];
@@ -226,6 +230,29 @@ export function fixtureInventory(
       monitored: 0,
       total: 3,
     },
+    queue: projectCertificationInbox([
+      {
+        admission: evaluateCertificationAdmission({ packet: readyPacket }),
+        domain: 'flows',
+        observedAt: generatedAt,
+        packet: readyPacket,
+      },
+      {
+        admission: evaluateCertificationAdmission({ packet: workingPacket }),
+        domain: 'flows',
+        observedAt: '2026-09-27T06:30:00.000Z',
+        packet: workingPacket,
+      },
+      {
+        admission: evaluateCertificationAdmission({
+          packet: certifiedPacket,
+          decisions: certifiedDecisions,
+        }),
+        domain: 'public_profiles',
+        observedAt: '2026-09-27T07:00:00.000Z',
+        packet: certifiedPacket,
+      },
+    ]),
     rows,
     issues: [],
   };

@@ -8,6 +8,10 @@ import type {
   CertificationRecordBackend,
   MarketingCertificationStore,
 } from '@/lib/agent-os/certification-adapter';
+import {
+  type CertificationInboxDelivery,
+  projectCertificationInbox,
+} from '@/lib/agent-os/certification-inbox';
 import { getMarketingCertificationStore } from '@/lib/agent-os/certification-runtime-store';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import {
@@ -82,39 +86,62 @@ function laterTimestamp(a: string, b: string): string {
   return Date.parse(a) >= Date.parse(b) ? a : b;
 }
 
-function packetRow(
+interface CertificationDomainProjection {
+  readonly rows: OvieCertificationRow[];
+  readonly deliveries: CertificationInboxDelivery[];
+  readonly summary: OvieCertificationDomainSummary;
+  readonly issues: OvieCertificationInventoryIssue[];
+}
+
+function packetProjection(
   file: CertificationPacketFile,
   record: PacketDecisionRecord | undefined,
   evaluatedAt: string
-): OvieCertificationRow {
+): {
+  readonly row: OvieCertificationRow;
+  readonly delivery: CertificationInboxDelivery;
+} {
   const decisions = record?.decisions ?? [];
   const admission = evaluateCertificationAdmission({
     packet: file.packet,
     decisions,
     evaluatedAt,
   });
-  return normalizeKernelCertificationRow({
-    domain: file.domain,
-    surface: file.surface,
-    packet: file.packet,
-    admission,
-    decisions,
-    auditHistory: record?.auditHistory ?? [],
-    updatedAt: record
-      ? laterTimestamp(file.packetUpdatedAt, record.updatedAt)
-      : file.packetUpdatedAt,
-    links: file.links,
-  });
+  const updatedAt = record
+    ? laterTimestamp(file.packetUpdatedAt, record.updatedAt)
+    : file.packetUpdatedAt;
+  return {
+    row: normalizeKernelCertificationRow({
+      domain: file.domain,
+      surface: file.surface,
+      packet: file.packet,
+      admission,
+      decisions,
+      auditHistory: record?.auditHistory ?? [],
+      updatedAt,
+      links: file.links,
+    }),
+    delivery: {
+      admission,
+      domain: file.domain,
+      observedAt: updatedAt,
+      packet: file.packet,
+    },
+  };
+}
+
+function packetRow(
+  file: CertificationPacketFile,
+  record: PacketDecisionRecord | undefined,
+  evaluatedAt: string
+): OvieCertificationRow {
+  return packetProjection(file, record, evaluatedAt).row;
 }
 
 async function marketingDomain(
   deps: OvieCertificationInventoryDeps,
   evaluatedAt: string
-): Promise<{
-  readonly rows: OvieCertificationRow[];
-  readonly summary: OvieCertificationDomainSummary;
-  readonly issues: OvieCertificationInventoryIssue[];
-}> {
+): Promise<CertificationDomainProjection> {
   const domain = 'marketing_components' as const;
   const label = OVIE_CERTIFICATION_DOMAIN_LABELS[domain];
   try {
@@ -134,6 +161,12 @@ async function marketingDomain(
     );
     return {
       rows,
+      deliveries: projection.rows.map(row => ({
+        admission: row.admission,
+        domain: 'marketing_component',
+        observedAt: row.updatedAt,
+        packet: row.packet,
+      })),
       summary: {
         domain,
         label,
@@ -146,6 +179,7 @@ async function marketingDomain(
   } catch {
     return {
       rows: [],
+      deliveries: [],
       summary: {
         domain,
         label,
@@ -169,15 +203,12 @@ async function packetDomain(
   files: readonly CertificationPacketFile[],
   deps: OvieCertificationInventoryDeps,
   evaluatedAt: string
-): Promise<{
-  readonly rows: OvieCertificationRow[];
-  readonly summary: OvieCertificationDomainSummary;
-  readonly issues: OvieCertificationInventoryIssue[];
-}> {
+): Promise<CertificationDomainProjection> {
   const label = OVIE_CERTIFICATION_DOMAIN_LABELS[domain];
   if (files.length === 0) {
     return {
       rows: [],
+      deliveries: [],
       summary: {
         domain,
         label,
@@ -190,16 +221,21 @@ async function packetDomain(
   }
   try {
     const ledger = await readPacketDecisionLedger(deps.backend(), domain);
-    const rows = files.map(file =>
-      packetRow(file, ledger.records[file.packet.subject.id], evaluatedAt)
+    const projections = files.map(file =>
+      packetProjection(
+        file,
+        ledger.records[file.packet.subject.id],
+        evaluatedAt
+      )
     );
     return {
-      rows,
+      rows: projections.map(projection => projection.row),
+      deliveries: projections.map(projection => projection.delivery),
       summary: {
         domain,
         label,
         status: 'connected',
-        rowCount: rows.length,
+        rowCount: projections.length,
         note: null,
       },
       issues: [],
@@ -209,6 +245,7 @@ async function packetDomain(
     // domain fails closed instead of showing guessed states.
     return {
       rows: [],
+      deliveries: [],
       summary: {
         domain,
         label,
@@ -270,6 +307,9 @@ export async function readOvieCertificationInventory(
     universal: false,
     domains,
     counts: countCertificationStates(rows),
+    queue: projectCertificationInbox(
+      results.flatMap(result => result.deliveries)
+    ),
     rows,
     issues: [...packetRead.issues, ...results.flatMap(result => result.issues)],
   };
