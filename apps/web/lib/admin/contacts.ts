@@ -108,6 +108,215 @@ function sourceRow(
   return { ...partial, dedupeKey };
 }
 
+function mapEmails<T>(
+  rows: readonly T[],
+  pick: (row: T) => [string, string | null | undefined]
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    const [id, raw] = pick(row);
+    const email = raw?.trim().toLowerCase();
+    if (email) map.set(id, email);
+  }
+  return map;
+}
+
+type WaitlistRow = {
+  id: string;
+  fullName: string | null;
+  emailNormalized: string | null;
+  status: string | null;
+  socialUrl: string | null;
+  approvedAt: Date | null;
+  invitedAt: Date | null;
+  signedUpAt: Date | null;
+  waitlistedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function waitlistSourceRow(
+  entry: WaitlistRow
+): CanonicalContactSourceRow | null {
+  return sourceRow({
+    stage: deriveContactStage({
+      waitlistStatus: entry.status,
+      outreachStarted: entry.status === 'invited',
+    }),
+    displayName: entry.fullName,
+    email: entry.emailNormalized,
+    handle: entry.socialUrl,
+    avatarUrl: null,
+    source: 'waitlist',
+    sourceId: entry.id,
+    stageAt: latestDate(
+      entry.signedUpAt,
+      entry.invitedAt,
+      entry.approvedAt,
+      entry.waitlistedAt,
+      entry.createdAt
+    ),
+    activityAt: latestDate(entry.updatedAt, entry.createdAt),
+    waitlistEntryId: entry.id,
+  });
+}
+
+type LeadRow = {
+  id: string;
+  displayName: string | null;
+  contactEmail: string | null;
+  handle: string | null;
+  status: string | null;
+  outreachStatus: string | null;
+  avatarUrl: string | null;
+  creatorProfileId: string | null;
+  signupUserId: string | null;
+  approvedAt: Date | null;
+  ingestedAt: Date | null;
+  firstContactedAt: Date | null;
+  signupAt: Date | null;
+  paidAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function leadSourceRow(
+  lead: LeadRow,
+  emailByUserId: Map<string, string>
+): CanonicalContactSourceRow | null {
+  const outreachStarted =
+    lead.outreachStatus === 'sent' ||
+    lead.outreachStatus === 'dm_sent' ||
+    lead.outreachStatus === 'queued' ||
+    lead.firstContactedAt != null;
+  const stage =
+    lead.paidAt != null
+      ? 'paying'
+      : deriveContactStage({
+          leadStatus: lead.status,
+          leadSignedUp: lead.signupUserId != null || lead.signupAt != null,
+          outreachStarted,
+          profileExists: lead.creatorProfileId != null,
+        });
+  return sourceRow({
+    stage,
+    displayName: lead.displayName,
+    email:
+      lead.contactEmail ??
+      (lead.signupUserId
+        ? (emailByUserId.get(lead.signupUserId) ?? null)
+        : null),
+    handle: lead.handle,
+    avatarUrl: lead.avatarUrl,
+    source: 'lead',
+    sourceId: lead.id,
+    stageAt: latestDate(
+      lead.paidAt,
+      lead.signupAt,
+      lead.firstContactedAt,
+      lead.ingestedAt,
+      lead.approvedAt,
+      lead.createdAt
+    ),
+    activityAt: latestDate(lead.updatedAt, lead.createdAt),
+    leadId: lead.id,
+    creatorProfileId: lead.creatorProfileId,
+    userId: lead.signupUserId,
+  });
+}
+
+type UserRow = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  userStatus: string | null;
+  isPro: boolean | null;
+  plan: string | null;
+  stripeSubscriptionId: string | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function userSourceRow(user: UserRow): CanonicalContactSourceRow | null {
+  const isPaying =
+    user.isPro === true ||
+    user.plan === 'pro' ||
+    user.plan === 'max' ||
+    user.stripeSubscriptionId != null;
+  return sourceRow({
+    stage: deriveContactStage({
+      userStatus: user.userStatus,
+      userDeleted: user.deletedAt != null,
+      isPaying,
+    }),
+    displayName: user.name,
+    email: user.email,
+    handle: null,
+    avatarUrl: null,
+    source: 'user',
+    sourceId: user.id,
+    stageAt: latestDate(user.deletedAt, user.createdAt),
+    activityAt: latestDate(user.updatedAt, user.createdAt),
+    userId: user.id,
+  });
+}
+
+type ProfileRow = {
+  id: string;
+  userId: string | null;
+  waitlistEntryId: string | null;
+  usernameNormalized: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isVerified: boolean | null;
+  claimedAt: Date | null;
+  dmSentAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function profileSourceRow(
+  profile: ProfileRow,
+  emailByUserId: Map<string, string>,
+  emailByWaitlistEntryId: Map<string, string>
+): CanonicalContactSourceRow | null {
+  const profileEmail =
+    (profile.userId ? emailByUserId.get(profile.userId) : undefined) ??
+    (profile.waitlistEntryId
+      ? emailByWaitlistEntryId.get(profile.waitlistEntryId)
+      : undefined) ??
+    null;
+  return sourceRow({
+    stage: deriveContactStage({
+      profileExists: true,
+      profileClaimed: profile.claimedAt != null,
+      certified: profile.isVerified === true,
+      outreachStarted: profile.dmSentAt != null,
+    }),
+    displayName: profile.displayName ?? profile.usernameNormalized,
+    email: profileEmail,
+    handle: profile.usernameNormalized,
+    avatarUrl: profile.avatarUrl,
+    source: 'profile',
+    sourceId: profile.id,
+    stageAt: latestDate(profile.claimedAt, profile.createdAt),
+    activityAt: latestDate(profile.updatedAt, profile.createdAt),
+    creatorProfileId: profile.id,
+    userId: profile.userId,
+    waitlistEntryId: profile.waitlistEntryId,
+  });
+}
+
+function pushRows(
+  rows: CanonicalContactSourceRow[],
+  candidates: Array<CanonicalContactSourceRow | null>
+): void {
+  for (const row of candidates) {
+    if (row) rows.push(row);
+  }
+}
+
 async function collectSourceRows(): Promise<CanonicalContactSourceRow[]> {
   const [waitlistRows, leadRows, userRows, profileRows] = await Promise.all([
     db
@@ -189,140 +398,24 @@ async function collectSourceRows(): Promise<CanonicalContactSourceRow[]> {
 
   // Cross-source identity hints: a profile or lead linked to a user/waitlist
   // row should dedupe onto that person's email key instead of its own handle.
-  const emailByUserId = new Map<string, string>();
-  for (const user of userRows) {
-    const email = user.email?.trim().toLowerCase();
-    if (email) emailByUserId.set(user.id, email);
-  }
-  const emailByWaitlistEntryId = new Map<string, string>();
-  for (const entry of waitlistRows) {
-    const email = entry.emailNormalized?.trim().toLowerCase();
-    if (email) emailByWaitlistEntryId.set(entry.id, email);
-  }
+  const emailByUserId = mapEmails(userRows, u => [u.id, u.email]);
+  const emailByWaitlistEntryId = mapEmails(waitlistRows, e => [
+    e.id,
+    e.emailNormalized,
+  ]);
 
-  for (const entry of waitlistRows) {
-    const outreachStarted = entry.status === 'invited';
-    const row = sourceRow({
-      stage: deriveContactStage({
-        waitlistStatus: entry.status,
-        outreachStarted,
-      }),
-      displayName: entry.fullName,
-      email: entry.emailNormalized,
-      handle: entry.socialUrl,
-      avatarUrl: null,
-      source: 'waitlist',
-      sourceId: entry.id,
-      stageAt: latestDate(
-        entry.signedUpAt,
-        entry.invitedAt,
-        entry.approvedAt,
-        entry.waitlistedAt,
-        entry.createdAt
-      ),
-      activityAt: latestDate(entry.updatedAt, entry.createdAt),
-      waitlistEntryId: entry.id,
-    });
-    if (row) rows.push(row);
-  }
-
-  for (const lead of leadRows) {
-    const outreachStarted =
-      lead.outreachStatus === 'sent' ||
-      lead.outreachStatus === 'dm_sent' ||
-      lead.outreachStatus === 'queued' ||
-      lead.firstContactedAt != null;
-    const stage =
-      lead.paidAt != null
-        ? 'paying'
-        : deriveContactStage({
-            leadStatus: lead.status,
-            leadSignedUp: lead.signupUserId != null || lead.signupAt != null,
-            outreachStarted,
-            profileExists: lead.creatorProfileId != null,
-          });
-    const row = sourceRow({
-      stage,
-      displayName: lead.displayName,
-      email:
-        lead.contactEmail ??
-        (lead.signupUserId
-          ? (emailByUserId.get(lead.signupUserId) ?? null)
-          : null),
-      handle: lead.handle,
-      avatarUrl: lead.avatarUrl,
-      source: 'lead',
-      sourceId: lead.id,
-      stageAt: latestDate(
-        lead.paidAt,
-        lead.signupAt,
-        lead.firstContactedAt,
-        lead.ingestedAt,
-        lead.approvedAt,
-        lead.createdAt
-      ),
-      activityAt: latestDate(lead.updatedAt, lead.createdAt),
-      leadId: lead.id,
-      creatorProfileId: lead.creatorProfileId,
-      userId: lead.signupUserId,
-    });
-    if (row) rows.push(row);
-  }
-
-  for (const user of userRows) {
-    const isPaying =
-      user.isPro === true ||
-      user.plan === 'pro' ||
-      user.plan === 'max' ||
-      user.stripeSubscriptionId != null;
-    const row = sourceRow({
-      stage: deriveContactStage({
-        userStatus: user.userStatus,
-        userDeleted: user.deletedAt != null,
-        isPaying,
-      }),
-      displayName: user.name,
-      email: user.email,
-      handle: null,
-      avatarUrl: null,
-      source: 'user',
-      sourceId: user.id,
-      stageAt: latestDate(user.deletedAt, user.createdAt),
-      activityAt: latestDate(user.updatedAt, user.createdAt),
-      userId: user.id,
-    });
-    if (row) rows.push(row);
-  }
-
-  for (const profile of profileRows) {
-    const outreachStarted = profile.dmSentAt != null;
-    const profileEmail =
-      (profile.userId ? emailByUserId.get(profile.userId) : undefined) ??
-      (profile.waitlistEntryId
-        ? emailByWaitlistEntryId.get(profile.waitlistEntryId)
-        : undefined) ??
-      null;
-    const row = sourceRow({
-      stage: deriveContactStage({
-        profileExists: true,
-        profileClaimed: profile.claimedAt != null,
-        certified: profile.isVerified === true,
-        outreachStarted,
-      }),
-      displayName: profile.displayName ?? profile.usernameNormalized,
-      email: profileEmail,
-      handle: profile.usernameNormalized,
-      avatarUrl: profile.avatarUrl,
-      source: 'profile',
-      sourceId: profile.id,
-      stageAt: latestDate(profile.claimedAt, profile.createdAt),
-      activityAt: latestDate(profile.updatedAt, profile.createdAt),
-      creatorProfileId: profile.id,
-      userId: profile.userId,
-      waitlistEntryId: profile.waitlistEntryId,
-    });
-    if (row) rows.push(row);
-  }
+  pushRows(rows, waitlistRows.map(waitlistSourceRow));
+  pushRows(
+    rows,
+    leadRows.map(lead => leadSourceRow(lead, emailByUserId))
+  );
+  pushRows(rows, userRows.map(userSourceRow));
+  pushRows(
+    rows,
+    profileRows.map(profile =>
+      profileSourceRow(profile, emailByUserId, emailByWaitlistEntryId)
+    )
+  );
 
   return rows;
 }
@@ -374,7 +467,7 @@ function applyOverrides(
       certifiedAt: override.certifiedAt,
       sources: row.sources.includes('contact')
         ? row.sources
-        : [...row.sources, 'contact'].sort(),
+        : [...row.sources, 'contact'].sort((a, b) => a.localeCompare(b)),
     };
   });
 }
@@ -391,7 +484,7 @@ function matchesSearch(row: CanonicalContactListRow, search: string): boolean {
   const needle = search.trim().toLowerCase();
   if (!needle) return true;
   return [row.displayName, row.email, row.handle].some(
-    field => field != null && field.toLowerCase().includes(needle)
+    field => field?.toLowerCase().includes(needle) === true
   );
 }
 

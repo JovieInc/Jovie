@@ -96,11 +96,8 @@ export function normalizeEmail(email?: string | null): string | null {
 
 export function normalizeHandle(handle?: string | null): string | null {
   if (!handle) return null;
-  const trimmed = handle
-    .trim()
-    .toLowerCase()
-    .replace(/^@+/, '')
-    .replace(/\/+$/, '');
+  let trimmed = handle.trim().toLowerCase().replace(/^@+/, '');
+  while (trimmed.endsWith('/')) trimmed = trimmed.slice(0, -1);
   return trimmed.length > 0 ? trimmed : null;
 }
 
@@ -232,18 +229,22 @@ export function mergeCanonicalContacts(
 
   const merged: CanonicalContactRow[] = [];
   for (const [dedupeKey, bucket] of byKey) {
-    const top = bucket.reduce((best, row) =>
-      STAGE_RANK[row.stage] > STAGE_RANK[best.stage] ? row : best
+    const top = bucket.reduce(
+      (best, row) =>
+        STAGE_RANK[row.stage] > STAGE_RANK[best.stage] ? row : best,
+      bucket[0]
     );
     const firstNonNull = <T>(
       pick: (r: CanonicalContactSourceRow) => T | null
     ) => pick(top) ?? bucket.map(pick).find(v => v != null) ?? null;
 
-    const sources = [...new Set(bucket.map(r => r.source))].sort();
+    const sources = [...new Set(bucket.map(r => r.source))].sort((a, b) =>
+      a.localeCompare(b)
+    );
     const sourceIds: Record<string, string[]> = {};
     for (const row of bucket) {
-      (sourceIds[row.source] ??= []).includes(row.sourceId) ||
-        sourceIds[row.source].push(row.sourceId);
+      const ids = (sourceIds[row.source] ??= []);
+      if (!ids.includes(row.sourceId)) ids.push(row.sourceId);
     }
 
     merged.push({
