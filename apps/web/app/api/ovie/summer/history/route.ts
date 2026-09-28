@@ -48,8 +48,6 @@ const sessionSchema = z.object({
   }),
 });
 
-const SUMMER_HISTORY_FAILURE_TEXT = 'Summer didn’t answer this message.';
-
 function unavailable(error: string, status = 503) {
   return NextResponse.json({ error }, { status, headers });
 }
@@ -104,48 +102,95 @@ export async function GET() {
       409
     );
   }
-  const messages = [...session.turns]
-    .sort((a, b) => a.turnIndex - b.turnIndex)
-    .flatMap(turn => {
-      const id = `summer-history:${turn.turnIndex}`;
-      // Recorded failures stay in the transcript; the client collapses old ones.
-      const failed = turn.state !== 'completed';
-      const content = [
-        turn.assistantText,
-        turn.toolReceipt
-          ? `Recorded tool result (${turn.toolReceipt.ok ? 'succeeded' : 'failed'}): ${turn.toolReceipt.summary}`
-          : '',
-        failed ? SUMMER_HISTORY_FAILURE_TEXT : '',
-      ]
-        .filter(Boolean)
-        .join('\n\n');
-      return [
-        ...(turn.userText
-          ? [
-              {
-                id: `${id}:user`,
-                role: 'user' as const,
-                content: turn.userText,
-                clientMessageId: turn.clientTurnId
-                  ? `${turn.clientTurnId}:user`
-                  : null,
-                createdAt: turn.createdAt,
-                ...(failed ? { summerFailed: true } : {}),
-              },
-            ]
-          : []),
-        {
-          id: `${id}:assistant`,
-          role: 'assistant' as const,
-          content,
-          clientMessageId: turn.clientTurnId
-            ? `assistant:${turn.clientTurnId}`
-            : null,
-          createdAt: turn.createdAt,
-          ...(failed ? { summerFailed: true } : {}),
-        },
-      ];
-    });
+  const sorted = [...session.turns].sort((a, b) => a.turnIndex - b.turnIndex);
+  // Turns that recorded no answer and no tool receipt are dead-end noise that
+  // never reconciles itself; collapse each run into a single summary row
+  // instead of one permanent "do not resend" bubble per turn.
+  const isSilentFailure = (turn: (typeof sorted)[number]) =>
+    turn.state !== 'completed' && !turn.assistantText && !turn.toolReceipt;
+  const collapseSummary = (turns: (typeof sorted)[number][]) => {
+    const counts = new Map<string, number>();
+    for (const turn of turns) {
+      counts.set(turn.state, (counts.get(turn.state) ?? 0) + 1);
+    }
+    const breakdown = [...counts.entries()]
+      .map(([state, count]) => (count > 1 ? `${state} ×${count}` : state))
+      .join(', ');
+    const first = turns[0];
+    const last = turns[turns.length - 1];
+    return {
+      id: `summer-history:failed:${first.turnIndex}-${last.turnIndex}`,
+      role: 'assistant' as const,
+      content: `${turns.length} earlier Summer ${turns.length === 1 ? 'turn' : 'turns'} ended without a reply (${breakdown}). Nothing was recorded for ${turns.length === 1 ? 'it' : 'them'}; resend the message to retry.`,
+      clientMessageId: null,
+      createdAt: last.createdAt,
+    };
+  };
+  type HistoryMessage = {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    clientMessageId: string | null;
+    createdAt: string;
+    summerFailed?: true;
+  };
+  const messages: HistoryMessage[] = [];
+  let collapsedRun: typeof sorted = [];
+  const flushCollapsed = () => {
+    if (collapsedRun.length > 0) {
+      messages.push(collapseSummary(collapsedRun));
+      collapsedRun = [];
+    }
+  };
+  for (const turn of sorted) {
+    if (isSilentFailure(turn)) {
+      collapsedRun.push(turn);
+      continue;
+    }
+    flushCollapsed();
+    const id = `summer-history:${turn.turnIndex}`;
+    // Recorded failures stay marked in the transcript; the client collapses
+    // ones a later answer has superseded.
+    const failed = turn.state !== 'completed';
+    const content = [
+      turn.assistantText,
+      turn.toolReceipt
+        ? `Recorded tool result (${turn.toolReceipt.ok ? 'succeeded' : 'failed'}): ${turn.toolReceipt.summary}`
+        : '',
+      failed
+        ? `Summer turn status: ${turn.state}. Resend the message to retry it.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+    messages.push(
+      ...(turn.userText
+        ? [
+            {
+              id: `${id}:user`,
+              role: 'user' as const,
+              content: turn.userText,
+              clientMessageId: turn.clientTurnId
+                ? `${turn.clientTurnId}:user`
+                : null,
+              createdAt: turn.createdAt,
+              ...(failed ? { summerFailed: true as const } : {}),
+            },
+          ]
+        : []),
+      {
+        id: `${id}:assistant`,
+        role: 'assistant' as const,
+        content,
+        clientMessageId: turn.clientTurnId
+          ? `assistant:${turn.clientTurnId}`
+          : null,
+        createdAt: turn.createdAt,
+        ...(failed ? { summerFailed: true as const } : {}),
+      }
+    );
+  }
+  flushCollapsed();
   // Explicit projection: never expose provider receipts, checkpoints or raw rows.
   return NextResponse.json(
     {

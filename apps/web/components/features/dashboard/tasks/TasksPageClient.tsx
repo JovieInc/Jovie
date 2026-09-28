@@ -15,7 +15,6 @@ import {
   ChevronDown,
   FileText,
   Layers,
-  Plus,
   Sparkles,
   Trash2,
 } from 'lucide-react';
@@ -34,8 +33,6 @@ import {
 } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
-import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
 import { TaskDataTable } from '@/components/features/dashboard/tasks/TaskDataTable';
@@ -58,7 +55,6 @@ import {
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
-import { PageShell } from '@/components/organisms/PageShell';
 import {
   RichTextEditor,
   type RichTextEditorChange,
@@ -75,12 +71,10 @@ import {
   type TableNavAction,
 } from '@/components/organisms/table/utils/tableKeyMap';
 import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  useRegisterHeaderActions,
-  useRegisterHeaderSearch,
-} from '@/contexts/HeaderActionsContext';
+import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -131,7 +125,6 @@ import { TaskBoard } from './TaskBoard';
 import {
   type TaskSubviewId,
   type TaskSubviewOption,
-  TaskSubviewTabs,
   TaskWorkspaceHeaderBar,
 } from './TaskWorkspaceHeaderBar';
 import { TaskWorkspaceLoadingRows } from './TaskWorkspaceLoadingRows';
@@ -2148,25 +2141,6 @@ export function TasksPageClient() {
 
   useRegisterHeaderSearch(headerSearchAdapter);
 
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup>
-        <DashboardHeaderActionButton
-          ariaLabel='Create Task'
-          icon={<Plus className='h-3.5 w-3.5' />}
-          label='New Task'
-          onClick={() => setHeaderMode('create')}
-          pressed={headerMode === 'create'}
-          hideLabelOnMobile
-          className='lg:hidden'
-        />
-      </DashboardHeaderActionGroup>
-    ),
-    [headerMode]
-  );
-
-  useRegisterHeaderActions(headerActions);
-
   const showAssigneeInListRows = assigneeFilter === 'all';
   const hideSelectedRowDue = showTaskDocumentPane && Boolean(selectedTask);
 
@@ -2355,46 +2329,44 @@ export function TasksPageClient() {
           !(isBoardMode ? isActiveBoardLoading : isActiveListLoading)
         }
       />
-      <PageShell
+      <WorkspacePage
         frame='none'
         contentPadding='none'
         className='absolute inset-0 overflow-hidden'
         surfaceClassName='p-0'
         data-testid='tasks-workspace'
         toolbar={
-          isDesktopTaskLayout || headerMode !== 'default' ? (
-            <TaskWorkspaceHeaderBar
-              mode={headerMode}
-              draftTitle={draftTitle}
-              taskCount={
-                isBoardMode ? visibleBoardTaskCount : visibleTasks.length
-              }
-              subviews={taskSubviewOptions}
-              activeSubview={activeTaskSubview}
-              onSubviewChange={setTaskSubview}
-              onDraftTitleChange={setDraftTitle}
-              onCancelCreate={() => {
-                setDraftTitle('');
-                setHeaderMode('default');
-              }}
-              onSubmitCreate={handleCreateTask}
-              createPending={createTaskMutation.isPending}
-              filterCategories={taskFilterCategories}
-              onClearFilters={clearFilters}
-              onCreateTask={() => setHeaderMode('create')}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              showCancelledColumn={showCancelledColumn}
-              onShowCancelledColumnChange={setShowCancelledColumn}
-              showTaskNavigation={
-                !isBoardMode && isDesktopTaskLayout && Boolean(selectedTask)
-              }
-              canSelectPrevious={canSelectPrevious}
-              canSelectNext={canSelectNext}
-              onSelectPrevious={selectPreviousTask}
-              onSelectNext={selectNextTask}
-            />
-          ) : undefined
+          <TaskWorkspaceHeaderBar
+            mode={headerMode}
+            draftTitle={draftTitle}
+            taskCount={
+              isBoardMode ? visibleBoardTaskCount : visibleTasks.length
+            }
+            subviews={taskSubviewOptions}
+            activeSubview={activeTaskSubview}
+            onSubviewChange={setTaskSubview}
+            onDraftTitleChange={setDraftTitle}
+            onCancelCreate={() => {
+              setDraftTitle('');
+              setHeaderMode('default');
+            }}
+            onSubmitCreate={handleCreateTask}
+            createPending={createTaskMutation.isPending}
+            filterCategories={taskFilterCategories}
+            onClearFilters={clearFilters}
+            onCreateTask={() => setHeaderMode('create')}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            showCancelledColumn={showCancelledColumn}
+            onShowCancelledColumnChange={setShowCancelledColumn}
+            showTaskNavigation={
+              !isBoardMode && isDesktopTaskLayout && Boolean(selectedTask)
+            }
+            canSelectPrevious={canSelectPrevious}
+            canSelectNext={canSelectNext}
+            onSelectPrevious={selectPreviousTask}
+            onSelectNext={selectNextTask}
+          />
         }
       >
         <section
@@ -2442,12 +2414,6 @@ export function TasksPageClient() {
                         {mobileScopeCounts.all} total tasks
                       </p>
                     </div>
-                    <TaskSubviewTabs
-                      subviews={taskSubviewOptions}
-                      activeSubview={activeTaskSubview}
-                      onSubviewChange={setTaskSubview}
-                      className='px-4 pb-1 pt-2'
-                    />
                     <MobileTaskScopeTabs
                       scope={mobileScope}
                       counts={mobileScopeCounts}
@@ -2556,7 +2522,7 @@ export function TasksPageClient() {
             </div>
           )}
         </section>
-      </PageShell>
+      </WorkspacePage>
 
       <ConfirmDialog
         open={taskPendingDelete !== null}

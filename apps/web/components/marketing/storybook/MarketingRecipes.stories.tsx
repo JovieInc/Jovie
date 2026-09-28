@@ -124,7 +124,7 @@ export const pricing: Story = {
               href: `${APP_ROUTES.SIGNUP}?plan=free`,
             }}
             secondaryCta={{
-              label: 'Explore Artist Profiles',
+              label: 'Explore Jovie Profiles',
               href: APP_ROUTES.ARTIST_PROFILES,
             }}
             logos={false}

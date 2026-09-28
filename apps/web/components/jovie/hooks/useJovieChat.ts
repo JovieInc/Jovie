@@ -26,6 +26,7 @@ import { CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY } from '@/lib/chat/transcript-w
 import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 import {
   parseSummerFailure,
+  type SummerFailure,
   summerRetryExplanation,
 } from '@/lib/ovie/summer-failure';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
@@ -325,6 +326,9 @@ export function useJovieChat({
   const streamRevisionRef = useRef(0);
   const lastAssistantPartsSignatureRef = useRef<string | null>(null);
   const sdkMessagesRef = useRef<UIMessage[]>([]);
+  // Failure hop carried on a data part so a stream error still knows whether
+  // Retry may reuse the turn id (message metadata is not readable in onError).
+  const pendingSummerFailureRef = useRef<SummerFailure | null>(null);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
   const [input, setInput] = useState(() =>
     readComposerDraft(conversationId ?? null)
@@ -699,6 +703,11 @@ export function useJovieChat({
     // re-render the timeline on every burst; pairs with server-side
     // smoothStream word-level pacing in lib/chat/run.ts.
     experimental_throttle: 50,
+    onData: dataPart => {
+      if (dataPart.type === 'data-summer-failure') {
+        pendingSummerFailureRef.current = parseSummerFailure(dataPart.data);
+      }
+    },
     onFinish: ({ message }) => {
       const metadata = extractChatTurnMetadata(message.metadata);
       const finishedConversationId =
@@ -801,6 +810,24 @@ export function useJovieChat({
       }
 
       handleChatFailure(error, 'stream', clientTurnId);
+
+      const summerFailure =
+        chatMode === 'ov' ? pendingSummerFailureRef.current : null;
+      pendingSummerFailureRef.current = null;
+      if (summerFailure) {
+        setChatError({
+          type: 'server',
+          message: summerRetryExplanation(summerFailure.retry),
+          errorCode: summerFailure.hop,
+          failedMessage:
+            summerFailure.retry === 'none'
+              ? undefined
+              : lastAttemptedMessageRef.current,
+          ...(summerFailure.retry === 'same-turn' && clientTurnId
+            ? { retryClientTurnId: clientTurnId }
+            : {}),
+        });
+      }
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.usage(),
@@ -1160,6 +1187,7 @@ export function useJovieChat({
       setIsSubmitting(true);
       const clientTurnId = options?.clientTurnId ?? crypto.randomUUID();
       activeClientTurnIdRef.current = clientTurnId;
+      pendingSummerFailureRef.current = null;
       activeChatLatencyRef.current = {
         clientTurnId,
         startedAt: uxLatencyNowMs(),

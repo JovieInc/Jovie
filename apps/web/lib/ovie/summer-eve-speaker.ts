@@ -41,9 +41,9 @@ const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_MIGRATION_HISTORY_BYTES = 20 * 1024;
 const MAX_MIGRATION_HISTORY_ENTRIES = 200;
 const PENDING_RECOVERY_TEXT =
-  'Summer is still reconciling this turn. Your message will not be sent again; reopen this conversation to check for the exact Eve result.';
+  'Summer is still reconciling this turn. Retry this message in a moment; the same turn is recovered rather than duplicated.';
 const BLOCKING_RECOVERY_TEXT =
-  'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.';
+  'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.';
 
 async function verifiedDeploymentId(
   response: Response,

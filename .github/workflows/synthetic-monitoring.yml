@@ -222,7 +222,7 @@ jobs:
                     },
                     {
                       "title": "Failed Tests",
-                      "value": "```\n${{ steps.test-results.outputs.failed_tests }}\n```",
+                      "value": "```\n${{ steps.test-results.outputs.failed_tests_slack }}\n```",
                       "short": false
                     },
                     {

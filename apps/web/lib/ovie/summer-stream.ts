@@ -24,8 +24,10 @@ export async function createSummerAssistantStreamResponse(input: {
     execute: async ({ writer }) => {
       let metadata: Record<string, unknown> = { ...input.metadata };
       let hasVisibleContent = false;
+      let textStarted = false;
       let failureState: (SummerTurnEvent & { type: 'state' }) | undefined;
       let terminalState: string | undefined;
+      let lastNotice: { text: string; code: string } | undefined;
       writer.write({
         type: 'start',
         messageId,
@@ -34,11 +36,21 @@ export async function createSummerAssistantStreamResponse(input: {
           : {}),
       });
       writer.write({ type: 'start-step' });
-      writer.write({ type: 'text-start', id: textId });
+      const writeDelta = (delta: string) => {
+        if (!textStarted) {
+          textStarted = true;
+          writer.write({ type: 'text-start', id: textId });
+        }
+        writer.write({ type: 'text-delta', id: textId, delta });
+      };
       for await (const event of input.events) {
         if (event.type === 'text-delta' && event.text) {
           hasVisibleContent ||= event.text.trim().length > 0;
-          writer.write({ type: 'text-delta', id: textId, delta: event.text });
+          writeDelta(event.text);
+          continue;
+        }
+        if (event.type === 'notice') {
+          lastNotice = { text: event.text, code: event.code };
           continue;
         }
         if (event.type === 'binding') {
@@ -89,6 +101,9 @@ export async function createSummerAssistantStreamResponse(input: {
           });
         }
       }
+      if (textStarted) {
+        writer.write({ type: 'text-end', id: textId });
+      }
       if (failureState) {
         // Display-only status, not a Summer answer or a durable turn. Keep
         // admission, same-turn recovery and budget checkpoint semantics intact.
@@ -103,14 +118,23 @@ export async function createSummerAssistantStreamResponse(input: {
           summerFailure: { hop, retry: summerRetryMode(hop, terminalState) },
         };
         if (!hasVisibleContent) {
+          // Surface a real stream error, not a fake assistant reply: the chat
+          // client restores the composer text and offers Retry, and no
+          // dead-end bubble is rendered or recorded as an answer.
+          writer.write({ type: 'message-metadata', messageMetadata: metadata });
+          // The error chunk ends the stream without onFinish, so carry the
+          // hop + retry mode on a data part the client can read in onError.
           writer.write({
-            type: 'text-delta',
-            id: textId,
-            delta: summerFailureText(hop),
+            type: 'data-summer-failure',
+            data: { hop, retry: summerRetryMode(hop, terminalState) },
           });
+          writer.write({
+            type: 'error',
+            errorText: lastNotice?.text ?? summerFailureText(hop),
+          });
+          return;
         }
       }
-      writer.write({ type: 'text-end', id: textId });
       writer.write({ type: 'finish-step' });
       writer.write({
         type: 'finish',

@@ -115,7 +115,16 @@ async function launchInstagramStory(
         url: trackedUrl,
       });
       return { status: 'success' };
-    } catch {
+    } catch (error) {
+      // User dismissed the native share sheet: cancel must stay a no-op, not
+      // fall through to a surprise asset download or a fallback toast.
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        (error as { name?: unknown }).name === 'AbortError'
+      ) {
+        return { status: 'cancelled' };
+      }
       // Fall through to deterministic fallback.
     }
   }

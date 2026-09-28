@@ -17,7 +17,7 @@
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "f63b9f10c6a648253edb94de57708f6ae569eef6834638b2e8f9569115e26656"
+    "bodySha256": "4e1b3dc1066ae0ce224369eac942cbc97d07e4d30c518c47ec1885ff429688b0"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "a276e906765da3c307c2525e9acfea510977aaf186dc853456a6f69427768d25"
+    "bodySha256": "f872fbcf37472f2312c1cdcb72c66e1bd79084a8fedef50b15bc0a51c34e484e"
   },
   {
     "file": ".claude/rules/security.md",

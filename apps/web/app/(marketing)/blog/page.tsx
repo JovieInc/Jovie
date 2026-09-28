@@ -11,7 +11,7 @@ export const revalidate = false;
 export const metadata = {
   title: 'Blog',
   description:
-    'Signals, playbooks, and product notes for building lasting momentum as an independent artist.',
+    'Signals, playbooks, and product notes for building lasting momentum with your Jovie profile.',
   alternates: {
     canonical: `${BASE_URL}/blog`,
   },

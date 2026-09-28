@@ -16,6 +16,8 @@ export type ConsentState =
 
 const CONSENT_COOKIE_NAME = 'jv_tracking_consent';
 const CONSENT_STORAGE_KEY = 'jovie_tracking_consent';
+export const ACQUISITION_COOKIE_NAME = 'jv_acquisition_id';
+const ACQUISITION_STORAGE_KEY = 'jovie_acquisition_id';
 
 function isConsentRequiredForCurrentVisitor(): boolean {
   try {
@@ -183,7 +185,7 @@ export function getOrCreateSessionId(): string {
 
   const SESSION_KEY = 'jv_session_id';
   try {
-    let sessionId = globalThis.sessionStorage?.getItem(SESSION_KEY) ?? null;
+    let sessionId = globalThis.localStorage?.getItem(SESSION_KEY) ?? null;
 
     if (!sessionId) {
       // Generate a random session ID using crypto for better randomness
@@ -193,7 +195,7 @@ export function getOrCreateSessionId(): string {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
       sessionId = `${Date.now()}-${randomHex}`;
-      globalThis.sessionStorage?.setItem(SESSION_KEY, sessionId);
+      globalThis.localStorage?.setItem(SESSION_KEY, sessionId);
     }
 
     return sessionId;
@@ -201,6 +203,47 @@ export function getOrCreateSessionId(): string {
     // sessionStorage may be unavailable in restricted contexts
     return '';
   }
+}
+
+/**
+ * Stable, random first-party acquisition key. It is created only with
+ * analytics consent and stored in localStorage + a SameSite cookie so tabs,
+ * auth redirects, server checkout and client events share one exact identity.
+ */
+export function getOrCreateAcquisitionId(): string {
+  if (typeof window === 'undefined' || !isAnalyticsAllowed()) return '';
+
+  try {
+    let id = globalThis.localStorage?.getItem(ACQUISITION_STORAGE_KEY) ?? '';
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      id = crypto.randomUUID();
+      globalThis.localStorage?.setItem(ACQUISITION_STORAGE_KEY, id);
+    }
+    const secure = globalThis.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${ACQUISITION_COOKIE_NAME}=${id}; path=/; max-age=7776000; SameSite=Lax${secure}`;
+    return id;
+  } catch {
+    return '';
+  }
+}
+
+export function clearAcquisitionId(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const id = globalThis.localStorage?.getItem(ACQUISITION_STORAGE_KEY);
+    if (id && navigator.sendBeacon) {
+      navigator.sendBeacon(
+        '/api/acquisition',
+        new Blob([JSON.stringify({ action: 'revoke', acquisitionId: id })], {
+          type: 'application/json',
+        })
+      );
+    }
+    globalThis.localStorage?.removeItem(ACQUISITION_STORAGE_KEY);
+  } catch {
+    // Storage may be unavailable; expire the server-visible cookie regardless.
+  }
+  document.cookie = `${ACQUISITION_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
 
 /**
@@ -216,4 +259,5 @@ export function clearConsentState(): void {
     // localStorage may be unavailable
   }
   document.cookie = `${CONSENT_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  clearAcquisitionId();
 }

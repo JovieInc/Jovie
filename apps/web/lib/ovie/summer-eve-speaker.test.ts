@@ -445,7 +445,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(await collect()).toEqual([
       {
         type: 'notice',
-        text: 'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.',
+        text: 'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.',
         code: 'summer_turn_pending',
       },
       { type: 'error', state: 'unknown', hop: 'summer_busy' },
@@ -461,7 +461,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(await collect()).toEqual([
       {
         type: 'notice',
-        text: 'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.',
+        text: 'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.',
         code: 'summer_turn_pending',
       },
       { type: 'error', state: 'unknown', hop: 'summer_busy' },
@@ -480,7 +480,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(await collect()).toEqual([
       {
         type: 'notice',
-        text: 'Summer is still reconciling this turn. Your message will not be sent again; reopen this conversation to check for the exact Eve result.',
+        text: 'Summer is still reconciling this turn. Retry this message in a moment; the same turn is recovered rather than duplicated.',
         code: 'summer_turn_pending',
       },
       { type: 'error', state: 'unknown', hop: 'summer_result_pending' },

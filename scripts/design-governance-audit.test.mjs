@@ -83,6 +83,20 @@ test('binds design projections to the canonical invariant registry', () => {
   assert.match(wiring.detail, /design:shared-ui-visual-arbitrary:check/);
 });
 
+test('drift ledger is wired as a shrink-only governance check (JOV-6850)', () => {
+  const { results } = runConformanceAudit();
+  const ledger = results.find(item => item.id === 'design-drift-ledger');
+  assert.ok(ledger, 'design-drift-ledger check must run');
+  assert.notEqual(ledger.status, 'FAIL', ledger.detail);
+});
+
+test('design-drift-ledger FAILs when ledger inputs are unreadable', () => {
+  const audit = fixtureRepo(() => {});
+  const result = check(audit, 'design-drift-ledger');
+  assert.equal(result?.status, 'FAIL');
+  assert.match(result.detail, /drift ledger unreadable/);
+});
+
 test('skill-symlinks FAILs on dangling symlinks, nested included (JOV-5231)', () => {
   const audit = fixtureRepo(root => {
     const skills = path.join(root, '.claude/skills');

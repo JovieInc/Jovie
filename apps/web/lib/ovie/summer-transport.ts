@@ -114,6 +114,7 @@ export type SummerTurnEvent =
       readonly hop?: SummerFailureHop;
     }
   | { readonly type: 'text-delta'; readonly text: string }
+  | { readonly type: 'notice'; readonly text: string; readonly code: string }
   | { readonly type: 'tool'; readonly receipt: SummerToolReceipt };
 
 export type OvieDoorGeneration =
@@ -281,7 +282,16 @@ export async function* runOvieSummerTurn(input: {
   };
   yield { type: 'binding', binding };
 
-  if (replay && replay.state !== 'canceled') {
+  // Completed and tool-terminal turns replay their recorded result. Recorded
+  // failure/unavailable turns re-speak instead: the speaker derives the same
+  // Eve eventId from the clientTurnId, so a same-id retry reconciles or
+  // re-admits the original turn rather than replaying a dead end.
+  if (
+    replay &&
+    replay.state !== 'canceled' &&
+    replay.state !== 'failure' &&
+    replay.state !== 'unavailable'
+  ) {
     yield { type: 'state', state: 'recovery' };
     if (replay.assistantText) {
       yield { type: 'text-delta', text: replay.assistantText };
@@ -348,8 +358,7 @@ export async function* runOvieSummerTurn(input: {
       }
       if (event.type === 'notice') {
         // Pending/busy notices are carried by the failure hop, not answer text.
-        if (event.code !== 'summer_turn_pending')
-          yield { type: 'text-delta', text: event.text };
+        yield { type: 'notice', text: event.text, code: event.code };
         continue;
       }
       if (event.type === 'text-delta') {

@@ -222,8 +222,10 @@ describe('Summer history restoration', () => {
       });
     }
     const view = mount('ov');
-    await screen.findByText('Summer didn’t answer this message.');
-    expect(screen.getByText('Question 12')).toBeTruthy();
+    // The empty failed turn collapses into one summary row instead of a
+    // permanent "do not resend" bubble.
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
+    expect(screen.queryByText('Question 12')).toBeNull();
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(
       Array.from(
@@ -240,7 +242,7 @@ describe('Summer history restoration', () => {
     view.unmount();
     resetChatTimelineStateCacheForTests();
     mount('ov');
-    await screen.findByText('Summer didn’t answer this message.');
+    await screen.findByText(/1 earlier Summer turn ended without a reply/);
     expect(screen.getAllByText(/^Answer \d+/)).toHaveLength(10);
     expect(h.send).not.toHaveBeenCalled();
   });
@@ -301,10 +303,12 @@ describe('Summer history restoration', () => {
   });
 
   async function appendFailed(index: number) {
+    // A non-empty answer keeps the turn out of the server's silent-failure
+    // collapse so the client-side superseded-failure collapse is exercised.
     await appendSummerTurn(store, {
       clientTurnId: `failed-${index}`,
       userText: `hello ${index}`,
-      assistantText: '',
+      assistantText: `partial ${index}`,
       eveWorkId: null,
       eveAcks: [],
       correlationId: `failed-correlation-${index}`,

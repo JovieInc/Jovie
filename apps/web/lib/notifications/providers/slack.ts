@@ -147,6 +147,22 @@ export async function notifySlackUpgrade(
 }
 
 /**
+ * Send a cancellation notification to Slack.
+ *
+ * @param name - The name of the user whose subscription was cancelled
+ */
+export async function notifySlackCancellation(
+  name: string
+): Promise<SlackNotificationResult> {
+  const text = `🔻 ${name} cancelled their subscription.`;
+  const result = await sendSlackMessage({ text });
+  if (result.status === 'sent') {
+    logger.info('[slack] Cancellation notification sent', { name });
+  }
+  return result;
+}
+
+/**
  * Send a signup notification to Slack.
  *
  * @param name - The name of the user who signed up

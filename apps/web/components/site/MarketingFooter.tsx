@@ -14,6 +14,7 @@ import {
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { cn } from '@/lib/utils';
 import { MarketingFooterControls } from './MarketingFooterControls';
@@ -52,6 +53,10 @@ const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.SUPPORT,
   APP_ROUTES.CLI,
   APP_ROUTES.CARD,
+  // Renders its own MarketingFooterCta with route-specific copy — see
+  // isEditorialFooterCtaPath for the blog/changelog-release/engineering
+  // routes that own a different (email-signup) bottom-of-page CTA.
+  APP_ROUTES.CHANGELOG,
 ]);
 
 interface MarketingFooterProps {
@@ -138,7 +143,9 @@ export function MarketingFooter({
   const resolvedVariant = resolveFooterVariant(variant, pathname);
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
-    typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
+    typeof pathname === 'string' &&
+    (PAGE_OWNS_FINAL_CTA_PATHS.has(pathname) ||
+      isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
   const footerColumns = MARKETING_FOOTER_COLUMNS;
 

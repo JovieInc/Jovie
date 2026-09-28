@@ -126,7 +126,7 @@ describe('founder Summer history readback', () => {
   });
 
   it.each(['failed', 'unavailable', 'unknown', 'canceled', 'running'])(
-    'discloses recorded %s state without treating it as a new answer',
+    'collapses a recorded empty %s turn into a retryable summary row',
     async state => {
       await seed({
         identity: CURRENT_SUMMER_IDENTITY,
@@ -141,13 +141,59 @@ describe('founder Summer history readback', () => {
       });
       const body = await (await GET()).json();
       expect(body.messages).toHaveLength(1);
-      expect(body.messages[0].content).toBe(
-        'Summer didn’t answer this message.'
+      expect(body.messages[0].role).toBe('assistant');
+      expect(body.messages[0].content).toContain(
+        '1 earlier Summer turn ended without a reply'
       );
-      expect(body.messages[0].summerFailed).toBe(true);
+      expect(body.messages[0].content).toContain(state);
+      expect(body.messages[0].content).toContain('resend the message to retry');
       expect(body.messages[0].clientMessageId).toBeNull();
     }
   );
+
+  it('collapses a run of empty failed turns into one row while keeping real answers', async () => {
+    await seed({
+      identity: CURRENT_SUMMER_IDENTITY,
+      turns: [
+        turn(1),
+        { ...turn(2, 'failure'), assistantText: '', toolReceipt: null },
+        { ...turn(3, 'failure'), assistantText: '', toolReceipt: null },
+        { ...turn(4, 'unavailable'), assistantText: '', toolReceipt: null },
+        turn(5),
+      ],
+    });
+    const body = await (await GET()).json();
+    expect(body.messages.map((message: { id: string }) => message.id)).toEqual([
+      'summer-history:1:user',
+      'summer-history:1:assistant',
+      'summer-history:failed:2-4',
+      'summer-history:5:user',
+      'summer-history:5:assistant',
+    ]);
+    const summary = body.messages[2];
+    expect(summary.content).toContain(
+      '3 earlier Summer turns ended without a reply (failure ×2, unavailable)'
+    );
+    expect(summary.content).not.toContain('private-');
+    // The failed turns' user messages collapse too; no dead-end bubbles remain.
+    expect(JSON.stringify(body)).not.toContain('Question 2');
+    expect(JSON.stringify(body)).toContain('Question 5');
+  });
+
+  it('keeps a non-completed turn that recorded text or a tool receipt visible', async () => {
+    await seed({
+      identity: CURRENT_SUMMER_IDENTITY,
+      turns: [{ ...turn(1, 'failure'), assistantText: 'Partial reply.' }],
+    });
+    const body = await (await GET()).json();
+    const assistant = body.messages.find(
+      (message: { role: string }) => message.role === 'assistant'
+    );
+    expect(assistant.content).toContain('Partial reply.');
+    expect(assistant.content).toContain('Summer turn status: failure.');
+    expect(assistant.content).toContain('Resend the message to retry it.');
+    expect(assistant.content).not.toContain('Do not resend');
+  });
 
   it.each([true, false])(
     'shows recorded tool result ok=%s without executing tools',

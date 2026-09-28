@@ -511,6 +511,16 @@ jobs:
                   )
               ] | length
             ' <<<"$jobs_json")"
+            verified_skipped="$(jq --arg sha "$release_sha" '
+              [
+                .[].jobs[]?
+                | select(
+                    .name == "Production Verified" and
+                    .head_sha == $sha and
+                    .conclusion == "skipped"
+                  )
+              ] | length
+            ' <<<"$jobs_json")"
             if [ "$verified_count" = "1" ]; then
               production_proven=true
             fi
@@ -520,6 +530,14 @@ jobs:
             if prove_existing_production_marker "$release_sha"; then
               production_proven=true
               echo "Existing exact Production Verified marker authorized $release_sha."
+            elif [ "${verified_skipped:-0}" = "1" ]; then
+              # The controller concluded success with Production Verified
+              # skipped only when it deliberately yielded the release lease
+              # to a newer main generation. That generation will trigger its
+              # own desktop reconciliation, so this observer has nothing to
+              # publish and must not fail main.
+              echo "::notice::Production Verified was skipped for $release_sha because the controller yielded the release lease; no desktop release is due."
+              exit 0
             else
               echo "::error::Current main lacks exact successful Production Verified evidence."
               exit 1

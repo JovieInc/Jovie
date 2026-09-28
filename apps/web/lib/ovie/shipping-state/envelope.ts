@@ -78,12 +78,6 @@ function sourceSchema(
   const expected = SHIPPING_SOURCE_SCHEMAS[sourceId];
   if (candidate === expected) return candidate;
   if (
-    sourceId === 'symphony-runtime' &&
-    candidate === 'symphony-runtime-state/v1'
-  ) {
-    return candidate;
-  }
-  if (
     sourceId === 'production-controller' &&
     candidate === 'github-actions-run/v1'
   ) {

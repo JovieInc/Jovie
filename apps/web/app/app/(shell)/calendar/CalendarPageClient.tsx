@@ -27,13 +27,14 @@ import {
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { PageContent } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
   PageToolbarTabButton,
   TableContextMenu,
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import { getEventLocalDateKey } from '@/lib/events/date';
 import { queryKeys } from '@/lib/queries';
@@ -431,7 +432,7 @@ export function CalendarPageClient() {
   const isLoading = isLoadingReleases || isLoadingEvents;
 
   return (
-    <PageShell
+    <WorkspacePage
       data-testid='calendar-workspace'
       frame='none'
       contentPadding='none'
@@ -824,7 +825,7 @@ export function CalendarPageClient() {
           </div>
         </div>
       </PageContent>
-    </PageShell>
+    </WorkspacePage>
   );
 }
 

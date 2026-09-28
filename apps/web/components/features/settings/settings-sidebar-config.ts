@@ -11,7 +11,6 @@ import {
   Target,
   Trash2,
   UserRound,
-  Wrench,
 } from 'lucide-react';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -28,10 +27,7 @@ export interface SettingsSidebarItem {
   readonly icon: LucideIcon;
   /** Only rendered when the current user is an admin. */
   readonly adminOnly?: boolean;
-  /**
-   * Optional native tooltip. Used for discovery rows that leave Settings
-   * (e.g. Ops controls) so admins know why the item exists.
-   */
+  /** Optional native tooltip for rows whose purpose is not obvious. */
   readonly title?: string;
 }
 
@@ -106,18 +102,6 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
         href: APP_ROUTES.SETTINGS_RETARGETING_ADS,
         icon: Target,
       },
-      {
-        id: 'admin',
-        // Live operational toggles (waitlist gate, growth defaults, dev
-        // toolbar) live on Ops — this row is a discovery pointer only.
-        // `/app/settings/admin` redirects to ADMIN_OPS (JOV-2103).
-        label: 'Ops Controls',
-        href: APP_ROUTES.SETTINGS_ADMIN,
-        icon: Wrench,
-        adminOnly: true,
-        title:
-          'Live operational toggles live on the Ops control panel — waitlist, growth defaults, and environment helpers.',
-      },
     ],
   },
   {
@@ -146,18 +130,21 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
   },
 ];
 
-export interface FilterSettingsGroupsOptions {
-  readonly isAdmin?: boolean;
-}
-
 /**
  * Filter the settings groups for the sidebar's search input.
+ *
+ * Customer settings carry no admin rows: operator controls live in Ovie
+ * (JOV-6771), so admins and creators see the same settings IA.
  *
  * - Admin-only items are dropped unless `isAdmin` is true.
  * - A query matches an item when it appears in the item label or the group
  *   label (case-insensitive substring).
  * - Groups with no visible items are dropped entirely.
  */
+export interface FilterSettingsGroupsOptions {
+  readonly isAdmin?: boolean;
+}
+
 export function filterSettingsGroups(
   groups: readonly SettingsSidebarGroup[],
   query: string,
