@@ -115,6 +115,30 @@ export type OperationalTaskPriority =
   | 'low'
   | 'none';
 
+/** Rollup of the head-commit check suite for a lane pull request. */
+export type OperationalTaskChecks = {
+  readonly rollup: 'success' | 'failure' | 'pending' | 'unknown';
+  /** Sanitized names of failing check runs / status contexts (bounded). */
+  readonly failing: readonly string[];
+};
+
+/**
+ * GitHub pull-request detail for a lane task. Null when the task came from a
+ * source without PR evidence, or when an older publisher produced the feed.
+ */
+export type OperationalTaskPullRequest = {
+  readonly number: number;
+  readonly url: string | null;
+  readonly branch: string | null;
+  /** Owning agent lane derived from the branch prefix. */
+  readonly agent: 'devin' | 'codex' | null;
+  readonly isDraft: boolean;
+  readonly checks: OperationalTaskChecks;
+  readonly queuePosition: number | null;
+  readonly queueState: string | null;
+  readonly createdAt: string | null;
+};
+
 export type OperationalTask = {
   /** Stable cross-presentation identity. Linear remains the canonical owner. */
   readonly id: `linear:${string}`;
@@ -127,6 +151,7 @@ export type OperationalTask = {
   readonly retryAt: string | null;
   readonly sourceRevision: string | null;
   readonly updatedAt: string | null;
+  readonly pullRequest?: OperationalTaskPullRequest | null;
 };
 
 export type OperationalTaskDelta = {

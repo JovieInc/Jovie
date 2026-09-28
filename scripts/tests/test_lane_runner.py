@@ -828,6 +828,13 @@ class FixRedTest(unittest.TestCase):
         self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
 
+    def test_red_pr_never_takes_a_held_pr(self):
+        held = {**self.pr(), "labels": [{"name": "Hold"}]}
+        self.assertIsNone(lane.red_pr([held], {}), "fixing a held PR re-arms auto-merge and re-enqueues it")
+        self.assertEqual(lane.red_pr([held, self.pr(number=6)], {})["number"], 6)
+        poison = {**self.pr(), "labels": [{"name": "queue-poison"}]}
+        self.assertEqual(lane.red_pr([poison], {})["number"], 5, "queue-poison alone still goes to remediation")
+
     def test_gate_held_prs_go_to_the_fix_loop_with_the_gate_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
@@ -843,6 +850,25 @@ class FixRedTest(unittest.TestCase):
             self.assertIn("component-ship-gate", lane.render_fix_prompt(claimed, ""))
             moved = {**green, "headRefOid": "h2", "headRefName": "devin/jov-1-20260925204809"}
             self.assertIsNone(lane.red_pr([moved], {}, json.loads((host.state / "held.json").read_text())))
+
+    def test_an_unfixable_gate_hold_never_reaches_the_fix_loop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.record_held(host, 5, "h1", ["diff-too-large:2000"])
+            held = json.loads((host.state / "held.json").read_text())
+            self.assertIsNone(lane.red_pr([self.pr()], {}, held),
+                              "diff-too-large needs a human split, not MAX_FIX_ATTEMPTS model calls")
+            self.assertEqual(lane.exhausted_prs([self.pr()], {}, held)[0]["number"], 5,
+                             "the hold escalates to intake on the first pass")
+            self.assertEqual(lane.exhausted_prs([self.pr()], {"5": {"escalated": True}}, held), [])
+
+    def test_a_fixable_gate_hold_still_reaches_the_fix_loop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            lane.record_held(host, 5, "h1", ["code-change-without-test"])
+            held = json.loads((host.state / "held.json").read_text())
+            self.assertEqual(lane.red_pr([self.pr(checks=[])], {}, held)["number"], 5)
+            self.assertEqual(lane.exhausted_prs([self.pr()], {}, held), [])
 
     def test_merge_conflicts_count_as_stuck_even_with_green_checks(self):
         dirty = {**self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}]),
