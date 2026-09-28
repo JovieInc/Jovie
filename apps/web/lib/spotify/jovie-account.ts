@@ -2,14 +2,15 @@
  * Jovie Spotify Account Manager
  *
  * Manages the Jovie-owned Spotify account for playlist creation.
- * Uses Clerk OAuth to retrieve access tokens for the system account.
+ * Uses the canonical connector primitive (`connector_accounts` + shared
+ * token vault) to retrieve access tokens for the configured publisher user.
  *
  * Token flow:
- *   Clerk Backend API → getUserOauthAccessToken('oauth_spotify')
+ *   connector_accounts (provider 'spotify') → token vault decrypt/refresh
  *   → Returns short-lived Spotify access token
- *   → Clerk handles refresh automatically
+ *   → Refresh handled by the connector refresh-lock path
  *
- * Required Clerk OAuth scopes (configured in Clerk Dashboard):
+ * Required Spotify scopes (requested by the connector OAuth flow):
  *   - playlist-modify-public
  *   - playlist-read-private
  *   - ugc-image-upload
@@ -17,7 +18,11 @@
 
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
-import { getPlaylistSpotifyClerkUserId } from '@/lib/admin/platform-connections';
+import {
+  getPlaylistSpotifyClerkUserId,
+  getSpotifyConnectorAccount,
+} from '@/lib/admin/platform-connections';
+import { loadFreshSpotifyAccessToken } from '@/lib/connectors/spotify/access-token';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { SPOTIFY_API_BASE, SPOTIFY_DEFAULT_TIMEOUT_MS } from './env';
@@ -66,11 +71,23 @@ export class SpotifyApiError extends Error {
 export async function getSpotifyTokenForClerkUser(
   clerkUserId: string
 ): Promise<string> {
-  const token = env.JOVIE_SPOTIFY_ACCESS_TOKEN?.trim();
-  if (token) return token;
+  const envToken = env.JOVIE_SPOTIFY_ACCESS_TOKEN?.trim();
+  if (envToken) return envToken;
+
+  try {
+    const account = await getSpotifyConnectorAccount(clerkUserId);
+    if (account && account.status !== 'disabled') {
+      const accessToken = await loadFreshSpotifyAccessToken(account.id);
+      if (accessToken) return accessToken;
+    }
+  } catch (error) {
+    captureError('[Jovie Spotify] Connector token lookup failed', error, {
+      userId: clerkUserId,
+    });
+  }
 
   const error = new SpotifyAuthError(
-    'Spotify OAuth token is unavailable after Better Auth cutover. Reconnect Spotify with the new provider path.'
+    'Spotify is not connected for this user. Connect Spotify via the connector OAuth flow.'
   );
   captureError('[Jovie Spotify] Token retrieval failed', error, {
     userId: clerkUserId,

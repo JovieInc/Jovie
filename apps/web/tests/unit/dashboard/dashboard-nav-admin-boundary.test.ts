@@ -72,7 +72,7 @@ describe('exclusive customer vs OV navigation', () => {
     ).toEqual([]);
   });
 
-  it('keeps five founder workspaces while preserving current utilities', () => {
+  it('organizes the founder cockpit around the five company decisions', () => {
     expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual([
       'overview',
       'growth',
