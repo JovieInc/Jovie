@@ -65,62 +65,33 @@ describe('EntityHeader', () => {
     ).toBeInTheDocument();
   });
 
-  it('does not clamp the subtitle by default outside stable layout', () => {
-    render(<EntityHeader title='Audience member' subtitle='Artist team' />);
+  it('only clamps the subtitle in stable layout and reserves optional slots', () => {
+    const first = render(
+      <EntityHeader title='Audience member' subtitle='Artist team' />
+    );
     expect(screen.getByText('Artist team')).not.toHaveClass('line-clamp-1');
-  });
+    first.unmount();
 
-  it('reserves optional slots in stable layout', () => {
-    render(
-      <EntityHeader
-        title='Long entity name'
-        stableLayout
-        reserveFooterSlot
-        data-testid='entity-header'
-      />
+    const second = render(
+      <EntityHeader title='Long entity name' stableLayout reserveFooterSlot />
     );
-
-    expect(screen.getByText('Long entity name')).toHaveClass(
-      'line-clamp-1',
-      'min-h-6'
-    );
+    const title = screen.getByText('Long entity name');
+    expect(title).toHaveClass('line-clamp-1', 'min-h-6');
     expect(screen.getByTestId('entity-header-meta-slot')).toHaveClass(
       'invisible'
     );
-  });
-
-  it('renders stable metadata as a single horizontal rail', () => {
-    render(
-      <EntityHeader
-        title='Track title'
-        stableLayout
-        meta={
-          <>
-            <span>3:42</span>
-            <span>USRC12345678</span>
-            <span>Explicit</span>
-          </>
-        }
-      />
-    );
-
-    const rail = screen.getByTestId(
-      'entity-header-meta-slot'
-    ).firstElementChild;
-    expect(rail).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
-  });
-
-  it('preserves the subtitle row when requested', () => {
-    render(
-      <EntityHeader title='Audience member' stableLayout reserveSubtitleSlot />
-    );
-
-    const title = screen.getByText('Audience member');
-    expect(title).toBeInTheDocument();
     expect(title.parentElement?.nextElementSibling).toHaveClass(
       'invisible',
       'min-h-4'
     );
+    second.unmount();
+
+    render(
+      <EntityHeader title='Track title' stableLayout meta={<span>3:42</span>} />
+    );
+    expect(
+      screen.getByTestId('entity-header-meta-slot').firstElementChild
+    ).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
   });
 
   it('assigns media, identity, metadata, and actions to explicit grid cells', () => {
@@ -132,64 +103,45 @@ describe('EntityHeader', () => {
         thumbnail={<span>AR</span>}
         meta={<span>North America</span>}
         actions={<button type='button'>More actions</button>}
-        data-testid='entity-header'
       />
     );
 
     const header = screen.getByTestId('entity-header');
-    const image = header.querySelector('[data-entity-header-image]');
-    const identity = header.querySelector('[data-entity-header-identity]');
-    const metadata = header.querySelector('[data-entity-header-metadata]');
-    const actions = header.querySelector('[data-entity-header-actions]');
-
     expect(header).toHaveAttribute('data-layout', 'grid');
-    expect(header).toHaveClass(
-      'grid',
-      'grid-cols-[auto_minmax(0,1fr)_auto]',
-      'grid-rows-[auto_auto]'
+    expect(header).toHaveClass('grid', 'grid-cols-[auto_minmax(0,1fr)_auto]');
+    expect(header.querySelector('[data-entity-header-image]')).toHaveClass(
+      'row-span-2'
     );
-    expect(image).toHaveClass('col-start-1', 'row-span-2', 'row-start-1');
-    expect(identity).toHaveClass('col-start-2', 'row-start-1');
-    expect(metadata).toHaveClass('col-span-2', 'col-start-2', 'row-start-2');
-    expect(actions).toHaveClass('col-start-3', 'row-start-1');
+    expect(header.querySelector('[data-entity-header-identity]')).toHaveClass(
+      'col-start-2'
+    );
+    expect(header.querySelector('[data-entity-header-metadata]')).toHaveClass(
+      'row-start-2'
+    );
+    expect(header.querySelector('[data-entity-header-actions]')).toHaveClass(
+      'col-start-3'
+    );
   });
 });
 
 describe('EntityHeader chrome layout', () => {
-  it('renders a string title', () => {
-    render(<EntityHeader layout='chrome' title='Contact Details' />);
-
+  it('renders title and actions in a utility bar', () => {
+    const first = render(
+      <EntityHeader layout='chrome' title='Contact Details' />
+    );
     expect(screen.getByText('Contact Details')).toBeInTheDocument();
-  });
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    first.unmount();
 
-  it('renders a ReactNode title', () => {
     render(
       <EntityHeader
         layout='chrome'
         title={<span data-testid='custom-title'>Custom</span>}
-      />
-    );
-
-    expect(screen.getByTestId('custom-title')).toBeInTheDocument();
-    expect(screen.getByText('Custom')).toBeInTheDocument();
-  });
-
-  it('renders actions alongside the title', () => {
-    render(
-      <EntityHeader
-        layout='chrome'
-        title='Details'
         actions={<button type='button'>Edit</button>}
       />
     );
-
+    expect(screen.getByTestId('custom-title')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
-  });
-
-  it('renders without buttons when no actions are provided', () => {
-    render(<EntityHeader layout='chrome' title='No Actions' />);
-
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
 

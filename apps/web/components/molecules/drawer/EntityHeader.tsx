@@ -26,12 +26,10 @@ import { cn } from '@/lib/utils';
  * actions slot. Detail rows below this header are the compressed tail —
  * they must never repeat a fact this header already states.
  *
- * Consolidated 2026-09-27 (JOV-6842 / Pen odpZ8, drift decision D6): this
- * component is the single owner of the rail header anatomy. The legacy
- * variants — EntityHeaderCard, DrawerHeader, AudienceMemberHeader and
- * ContactDetailHeader — were folded onto it and deleted. `layout='chrome'`
- * covers the utility title bar; new rail-header variants fail CI via the
- * component-family ratchet (JOV-6777).
+ * JOV-6842 (Pen odpZ8, D6): single owner of rail header anatomy —
+ * EntityHeaderCard, DrawerHeader, AudienceMemberHeader and
+ * ContactDetailHeader were folded onto it. `layout='chrome'` covers the
+ * utility title bar; new variants fail CI via the header ratchet (JOV-6777).
  */
 
 export const ENTITY_HEADER_THUMBNAIL_SIZE_PX = 56;
@@ -40,9 +38,8 @@ const ENTITY_HEADER_THUMBNAIL_SIZE_CLASSNAME = 'size-14';
 export type EntityHeaderThumbnailVariant = 'artwork' | 'person' | 'connection';
 
 export interface EntityHeaderThumbnailProps {
-  /** `artwork` = release/song art (rounded square, never cropped). `person` =
-   * contact/fan avatar (circle). `connection` = DSP/provider glyph on a
-   * subtle tint (circle). */
+  /** `artwork` = release/song art (rounded square, never cropped); `person` =
+   * contact/fan avatar (circle); `connection` = provider glyph (circle). */
   readonly variant: EntityHeaderThumbnailVariant;
   readonly src?: string | null;
   readonly alt?: string;
@@ -56,11 +53,7 @@ export interface EntityHeaderThumbnailProps {
   readonly 'data-testid'?: string;
 }
 
-/**
- * Canonical 56px identity thumbnail. Shape and crop behavior follow the
- * entity kind, not the call site — release art is never cropped
- * (`object-contain`, rounded square); people are circles.
- */
+/** Canonical 56px identity thumbnail — release art never crops; people are circles. */
 export function EntityHeaderThumbnail({
   variant,
   src,
@@ -156,9 +149,8 @@ const STATUS_GLYPH_TONE_CLASSNAME: Record<EntityHeaderStatusTone, string> = {
 };
 
 /**
- * Icon-only entity status indicator. The state name is never printed as a
- * visible word — it is exposed through the hover tooltip and `aria-label`
- * only. Non-color cue: each state must use a distinct icon, not just a tint.
+ * Icon-only status indicator — the state name lives in tooltip + aria-label,
+ * never visible text. Each state needs a distinct icon, not just a tint.
  */
 export function EntityHeaderStatusGlyph({
   icon: StatusIcon,
@@ -187,9 +179,8 @@ export function EntityHeaderStatusGlyph({
 export type EntityHeaderMetaOverflow = 'wrap' | 'scroll';
 
 /**
- * `inline` is the compact legacy flow; `grid` assigns media, identity,
- * metadata, and actions to explicit cells; `chrome` is the utility-only
- * rail title bar (title left, actions right — no entity anatomy).
+ * `inline` = compact flow; `grid` = explicit media/identity/metadata/actions
+ * cells; `chrome` = utility title bar (title left, actions right).
  */
 export type EntityHeaderLayout = 'inline' | 'grid' | 'chrome';
 
@@ -213,103 +204,25 @@ export interface EntityHeaderProps {
   /** Optional footer rendered below the meta block */
   readonly footer?: ReactNode;
   readonly layout?: EntityHeaderLayout;
-  /** Enables reserved header slots so entity selection changes do not resize the header. */
+  /** Reserve slots so entity selection changes do not resize the header. */
   readonly stableLayout?: boolean;
-  /** Max title lines before truncation. Stable layouts reserve this line count. */
+  /** Max title/subtitle lines; stable layouts reserve this line count. */
   readonly titleLineClamp?: StableHeaderLineCount;
-  /** Max subtitle lines before truncation. Stable layouts reserve this line count. */
   readonly subtitleLineClamp?: StableHeaderLineCount;
-  /** Reserve the eyebrow row even when no eyebrow is available. */
-  readonly reserveEyebrowSlot?: boolean;
-  /** Reserve the subtitle row even when no subtitle is available. */
+  /** Reserve the subtitle/meta/footer row even when empty. */
   readonly reserveSubtitleSlot?: boolean;
-  /** Reserve the metadata row even when no metadata is available. */
   readonly reserveMetaSlot?: boolean;
-  /** Reserve the footer row even when no footer is available. */
   readonly reserveFooterSlot?: boolean;
   /** Metadata can either wrap or stay in a one-line horizontal rail. */
   readonly metaOverflow?: EntityHeaderMetaOverflow;
   readonly className?: string;
   readonly bodyClassName?: string;
   readonly titleClassName?: string;
-  readonly subtitleClassName?: string;
-  readonly metaClassName?: string;
   readonly footerClassName?: string;
   readonly 'data-testid'?: string;
 }
 
-function EntityHeaderMetaSlot({
-  meta,
-  shouldReserveMeta,
-  resolvedMetaOverflow,
-  metaClassName,
-}: Readonly<{
-  meta?: ReactNode;
-  shouldReserveMeta: boolean;
-  resolvedMetaOverflow: EntityHeaderMetaOverflow;
-  metaClassName?: string;
-}>) {
-  if (!meta && !shouldReserveMeta) {
-    return null;
-  }
-
-  if (resolvedMetaOverflow === 'scroll') {
-    return (
-      <StableHeaderChipRail
-        reserve={shouldReserveMeta}
-        className={cn('pt-0.5', metaClassName)}
-        testId='entity-header-meta-slot'
-      >
-        {meta}
-      </StableHeaderChipRail>
-    );
-  }
-
-  return (
-    <div
-      aria-hidden={meta ? undefined : true}
-      className={cn(
-        'flex min-h-6 flex-wrap items-center gap-1 pt-0.5',
-        !meta && 'invisible',
-        metaClassName
-      )}
-      data-testid='entity-header-meta-slot'
-    >
-      {meta ?? ' '}
-    </div>
-  );
-}
-
-function EntityHeaderFooterSlot({
-  footer,
-  shouldReserveFooter,
-  footerClassName,
-}: Readonly<{
-  footer?: ReactNode;
-  shouldReserveFooter: boolean;
-  footerClassName?: string;
-}>) {
-  if (!footer && !shouldReserveFooter) {
-    return null;
-  }
-
-  return (
-    <div
-      aria-hidden={footer ? undefined : true}
-      className={cn('min-h-7 pt-1', !footer && 'invisible', footerClassName)}
-    >
-      {footer ?? ' '}
-    </div>
-  );
-}
-
-/**
- * The shared right-rail Entity Header. Every inspector (release, contact,
- * audience member, event, DSP connection) opens with this — see the module
- * doc comment for the founder-locked contract. Composition only: this
- * component owns layout, not surface chrome (the rail's elevated surface,
- * hairline border, and shadow belong to the shell that mounts it).
- */
+/** The shared right-rail header — see module doc for the founder contract. */
 export function EntityHeader({
   thumbnail,
   eyebrow,
@@ -324,7 +237,6 @@ export function EntityHeader({
   stableLayout = false,
   titleLineClamp,
   subtitleLineClamp,
-  reserveEyebrowSlot,
   reserveSubtitleSlot,
   reserveMetaSlot,
   reserveFooterSlot,
@@ -332,8 +244,6 @@ export function EntityHeader({
   className,
   bodyClassName,
   titleClassName,
-  subtitleClassName,
-  metaClassName,
   footerClassName,
   'data-testid': testId = 'entity-header',
 }: EntityHeaderProps) {
@@ -341,8 +251,7 @@ export function EntityHeader({
     return (
       <div
         className={cn(
-          'min-h-10 shrink-0 bg-transparent px-3 py-1.5',
-          'flex items-center justify-between gap-3',
+          'flex min-h-10 shrink-0 items-center justify-between gap-3 px-3 py-1.5',
           className
         )}
         data-layout='chrome'
@@ -364,7 +273,6 @@ export function EntityHeader({
 
   const resolvedTitleLineClamp =
     titleLineClamp ?? (stableLayout ? 1 : undefined);
-  const shouldReserveEyebrow = reserveEyebrowSlot ?? false;
   const shouldReserveSubtitle = reserveSubtitleSlot ?? stableLayout;
   const shouldReserveMeta = reserveMetaSlot ?? stableLayout;
   const shouldReserveFooter = reserveFooterSlot ?? false;
@@ -375,9 +283,8 @@ export function EntityHeader({
 
   const identityContent = (
     <>
-      {eyebrow || shouldReserveEyebrow ? (
+      {eyebrow ? (
         <StableHeaderTextSlot
-          reserve={shouldReserveEyebrow}
           lineCount={1}
           size='xs'
           className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
@@ -409,22 +316,12 @@ export function EntityHeader({
           reserve={shouldReserveSubtitle}
           lineCount={resolvedSubtitleLineClamp}
           size='xs'
-          className={cn(
-            'text-xs leading-4 tracking-[-0.005em] text-secondary-token',
-            subtitleClassName
-          )}
+          className='text-xs leading-4 tracking-[-0.005em] text-secondary-token'
           testId='entity-header-details-row'
         >
           {statusGlyph ? (
             <span className='flex min-w-0 items-center gap-1.5'>
-              {subtitle ? (
-                <span
-                  className='min-w-0 truncate'
-                  data-testid='entity-header-details'
-                >
-                  {subtitle}
-                </span>
-              ) : null}
+              {subtitle && <span className='min-w-0 truncate'>{subtitle}</span>}
               {statusGlyph}
             </span>
           ) : (
@@ -437,17 +334,40 @@ export function EntityHeader({
 
   const metadataContent = (
     <>
-      <EntityHeaderMetaSlot
-        meta={meta}
-        shouldReserveMeta={shouldReserveMeta}
-        resolvedMetaOverflow={resolvedMetaOverflow}
-        metaClassName={metaClassName}
-      />
-      <EntityHeaderFooterSlot
-        footer={footer}
-        shouldReserveFooter={shouldReserveFooter}
-        footerClassName={footerClassName}
-      />
+      {meta || shouldReserveMeta ? (
+        resolvedMetaOverflow === 'scroll' ? (
+          <StableHeaderChipRail
+            reserve={shouldReserveMeta}
+            className='pt-0.5'
+            testId='entity-header-meta-slot'
+          >
+            {meta}
+          </StableHeaderChipRail>
+        ) : (
+          <div
+            aria-hidden={meta ? undefined : true}
+            className={cn(
+              'flex min-h-6 flex-wrap items-center gap-1 pt-0.5',
+              !meta && 'invisible'
+            )}
+            data-testid='entity-header-meta-slot'
+          >
+            {meta ?? ' '}
+          </div>
+        )
+      ) : null}
+      {footer || shouldReserveFooter ? (
+        <div
+          aria-hidden={footer ? undefined : true}
+          className={cn(
+            'min-h-7 pt-1',
+            !footer && 'invisible',
+            footerClassName
+          )}
+        >
+          {footer ?? ' '}
+        </div>
+      ) : null}
     </>
   );
 

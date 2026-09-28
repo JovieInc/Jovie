@@ -10,14 +10,7 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { Check, Copy, Trash2 } from 'lucide-react';
-import {
-  memo,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerChoiceChipGroup,
@@ -62,22 +55,6 @@ const CONTACT_TERRITORY_OPTIONS = CONTACT_TERRITORY_PRESETS.map(territory => ({
   label: territory,
 }));
 
-interface UseContactDetailHeaderProps {
-  readonly role: ContactRole;
-  readonly customLabel?: string | null;
-  readonly email?: string | null;
-  readonly onDelete: () => void;
-  readonly onClose?: () => void;
-  readonly menuItems?: readonly CommonDropdownItem[];
-}
-
-interface UseContactDetailHeaderResult {
-  readonly title: string;
-  readonly actions: ReactNode | undefined;
-  readonly primaryActions: DrawerHeaderAction[];
-  readonly overflowActions: DrawerHeaderAction[];
-}
-
 function useContactDetailHeaderParts({
   role,
   customLabel,
@@ -85,16 +62,24 @@ function useContactDetailHeaderParts({
   onDelete,
   onClose,
   menuItems,
-}: UseContactDetailHeaderProps): UseContactDetailHeaderResult {
+}: Readonly<{
+  role: ContactRole;
+  customLabel?: string | null;
+  email?: string | null;
+  onDelete: () => void;
+  onClose?: () => void;
+  menuItems?: readonly CommonDropdownItem[];
+}>) {
   const notifications = useNotifications();
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    };
-  }, []);
+    },
+    []
+  );
 
   const handleCopyEmail = useCallback(() => {
     if (!email) return;
@@ -105,10 +90,7 @@ function useContactDetailHeaderParts({
     copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
   }, [email, notifications]);
 
-  const roleLabel = getContactRoleLabel(role, customLabel);
-
   const primaryActions: DrawerHeaderAction[] = [];
-
   if (email) {
     // eslint-disable-next-line react-hooks/refs -- ref value read is intentional for action state
     primaryActions.push({
@@ -120,22 +102,14 @@ function useContactDetailHeaderParts({
       onClick: handleCopyEmail,
     });
   }
-
   const overflowActions: DrawerHeaderAction[] = [
-    {
-      id: 'delete',
-      label: 'Delete Contact',
-      icon: Trash2,
-      onClick: onDelete,
-    },
+    { id: 'delete', label: 'Delete Contact', icon: Trash2, onClick: onDelete },
   ];
 
-  const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
-
   return {
-    title: roleLabel,
+    title: getContactRoleLabel(role, customLabel),
     actions:
-      hasActions || onClose ? (
+      primaryActions.length > 0 || overflowActions.length > 0 || onClose ? (
         <DrawerHeaderActions
           primaryActions={primaryActions}
           overflowActions={overflowActions}
