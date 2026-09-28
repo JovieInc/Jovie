@@ -39,7 +39,7 @@ export function HomepageIdentityHero({
 
   return (
     <div
-      className='homepage-identity-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'
+      className='homepage-claim-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'
       data-homepage-testid='homepage-hero-shell'
       data-marketing-owner='apps/web/components/homepage/HomepageIdentityHero.tsx'
     >
@@ -80,7 +80,7 @@ export function HomepageIdentityHero({
           <div className='hidden items-center gap-4 sm:flex'>
             <Image
               alt={preview.portraitAlt}
-              className='size-14 shrink-0 rounded-full object-cover object-[74%_32%]'
+              className='homepage-claim-hero__portrait size-14 shrink-0 rounded-full object-cover'
               height={112}
               priority
               src={PREVIEW_PORTRAIT}
