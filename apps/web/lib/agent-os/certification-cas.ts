@@ -17,6 +17,19 @@ export interface CertificationRecordBackend {
 export const CERTIFICATION_PERSISTENCE_TTL_SECONDS = 315_576_000;
 export const CERTIFICATION_CAS_ATTEMPTS = 5;
 
+/**
+ * The ledger is stored as one JSON string in a jsonb column, but the driver
+ * decodes that jsonb string and Drizzle's jsonb mapper parses it again, so a
+ * read can hand back the object. The stored string was itself produced by
+ * JSON.stringify, so re-serializing yields the identical compare-and-set
+ * value (verified on production, 2026-09-28: every ingest was rejected).
+ */
+export function certificationRecordJson(raw: unknown): string | null {
+  if (typeof raw === 'string') return raw;
+  if (raw !== null && typeof raw === 'object') return JSON.stringify(raw);
+  return null;
+}
+
 /** Updates must be pure: a lost CAS reruns them against the latest persisted state. */
 export async function mutateCertificationRecord<State, Result>(input: {
   backend: CertificationRecordBackend;
@@ -33,12 +46,13 @@ export async function mutateCertificationRecord<State, Result>(input: {
       await input.initialize();
       continue;
     }
-    if (typeof raw !== 'string') {
+    const json = certificationRecordJson(raw);
+    if (json === null) {
       throw input.error(
         'Certification ledger must be stored as one compare-and-set JSON string.'
       );
     }
-    const current = input.parse(raw);
+    const current = input.parse(json);
     input.validate(current);
     const next = input.update(current);
     if (next.ledger === current) return next.result;
@@ -47,7 +61,7 @@ export async function mutateCertificationRecord<State, Result>(input: {
     if (
       await input.backend.compareAndSet(
         input.key,
-        raw,
+        json,
         serialized,
         CERTIFICATION_PERSISTENCE_TTL_SECONDS
       )

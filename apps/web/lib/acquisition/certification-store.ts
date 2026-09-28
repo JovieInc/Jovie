@@ -11,6 +11,7 @@ import {
 import {
   CERTIFICATION_PERSISTENCE_TTL_SECONDS,
   type CertificationRecordBackend,
+  certificationRecordJson,
   mutateCertificationRecord,
 } from '@/lib/agent-os/certification-cas';
 
@@ -212,8 +213,9 @@ function projectCandidate(
   };
 }
 
-function parseRecord(raw: unknown): AcquisitionCertificationRecord {
-  if (typeof raw !== 'string')
+function parseRecord(stored: unknown): AcquisitionCertificationRecord {
+  const raw = certificationRecordJson(stored);
+  if (raw === null)
     throw new Error('Invalid acquisition certification record.');
   const value: AcquisitionCertificationRecord = JSON.parse(raw);
   if (

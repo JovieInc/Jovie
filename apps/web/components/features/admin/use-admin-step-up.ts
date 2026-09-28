@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { authClient } from '@/lib/auth/client';
+import { unlockWithPasskey } from '@/lib/workspace-lock/unlock-with-passkey';
 
 export type AdminStepUpStatus = 'idle' | 'working' | 'error';
 
@@ -18,14 +18,7 @@ export function useAdminStepUp() {
     setStatus('working');
     setMessage(null);
     try {
-      const listed = await authClient.passkey.listUserPasskeys();
-      if (listed.error) throw new Error(listed.error.message);
-      if ((listed.data ?? []).length === 0) {
-        const added = await authClient.passkey.addPasskey({ name: 'Ovie' });
-        if (added?.error) throw new Error(added.error.message);
-      }
-      const signedIn = await authClient.signIn.passkey();
-      if (signedIn?.error) throw new Error(signedIn.error.message);
+      await unlockWithPasskey();
       window.location.reload();
     } catch (error) {
       setStatus('error');
