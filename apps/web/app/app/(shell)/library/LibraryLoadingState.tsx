@@ -1,9 +1,9 @@
 'use client';
 
-import { PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import { UnifiedTableSkeleton } from '@/components/organisms/table/organisms/UnifiedTableSkeleton';
 import { alignment } from '@/components/organisms/table/table.styles';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import type { LibraryReleaseAsset, LibraryView } from './library-data';
@@ -115,11 +115,12 @@ export const LIBRARY_TABLE_SKELETON_COLUMNS = [
 
 export function LibraryLoadingState() {
   return (
-    <PageShell
+    <WorkspacePage
       aria-busy='true'
       aria-label='Loading Library'
       frame='content-container'
       contentPadding='none'
+      surfaceMode='table'
       data-testid='library-surface-loading'
       toolbar={
         <PageToolbar
@@ -149,6 +150,6 @@ export function LibraryLoadingState() {
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
         containerClassName='h-full'
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }

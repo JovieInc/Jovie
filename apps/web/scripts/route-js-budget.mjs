@@ -23,6 +23,7 @@ import { gzipSync } from 'node:zlib';
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const MANIFEST_NAME = 'page_client-reference-manifest.js';
 
+/** @param {string} key */
 export function routeFromManifestKey(key) {
   const route = key
     .replace(/\/page$/, '')
@@ -52,6 +53,12 @@ function readClientManifest(path) {
   return entries[0];
 }
 
+/** @typedef {{ route: string, gzipKb: number, chunks: number }} RouteJsMeasurement */
+
+/**
+ * @param {string} nextDir
+ * @returns {RouteJsMeasurement[]}
+ */
 export function measureRouteJs(nextDir) {
   const buildManifest = JSON.parse(
     readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
@@ -88,6 +95,10 @@ export function measureRouteJs(nextDir) {
     .sort((a, b) => b.gzipKb - a.gzipKb);
 }
 
+/**
+ * @param {RouteJsMeasurement[]} measurements
+ * @param {{ defaultMaxGzipKb: number, routes?: Record<string, number> }} budgets
+ */
 export function checkBudgets(measurements, budgets) {
   const violations = [];
   const rows = measurements.map(row => {

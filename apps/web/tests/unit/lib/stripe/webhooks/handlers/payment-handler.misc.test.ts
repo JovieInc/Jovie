@@ -52,6 +52,7 @@ vi.mock('@/lib/stripe/config', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
+  captureWarning: vi.fn(),
   logFallback: mockLogFallback,
 }));
 

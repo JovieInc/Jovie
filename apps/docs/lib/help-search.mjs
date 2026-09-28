@@ -124,9 +124,9 @@ export function resultUrl(url, query) {
   return relative;
 }
 
-export function supportUrl(query) {
+export function supportUrl(query, source = 'help-search-zero-results') {
   const url = new URL('https://jov.ie/support');
   url.searchParams.set('query', query);
-  url.searchParams.set('source', 'help-search-zero-results');
+  url.searchParams.set('source', source);
   return url.toString();
 }

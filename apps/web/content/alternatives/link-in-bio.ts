@@ -11,7 +11,7 @@ export const linkInBioAlternative: AlternativeData = {
     'Most link-in-bio tools are a static list. Jovie is a profile that adapts to what you share, captures contacts, and notifies your audience automatically.',
   heroImage: {
     src: '/images/hero/alternatives-link-in-bio.webp',
-    alt: 'A dark, glowing web of interconnected threads in blue and pink.',
+    alt: 'A vertical column of purple light through dark smoke.',
   },
   whySwitch: [
     'A static link page treats every update the same, so nothing leads.',
