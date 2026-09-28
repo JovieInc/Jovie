@@ -5984,7 +5984,36 @@ jobs:
 
           cd "$GITHUB_WORKSPACE"
           BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter @jovie/web run test:e2e:golden-path:ci
+
+          # JOV-5489: recorded visual review of the golden-path keyframes. A
+          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
+          # The gateway key is mapped in for the reviewer only, never the server.
+          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
+          # The review runs as its own guarded producer scoped to the keyframes
+          # only, so the staged evidence includes verdict.json and only these
+          # journey keyframes are declared public (failure captures never are).
+          review() {
+            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
+              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
+          }
+          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
+          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
+            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
+            # ponytail: independent second review of the same keyframes, not a
+            # journey replay: the journey claims a protected fixture once per DB.
+            # Ceiling: a capture-timing flake is judged twice on one frame.
+            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
+          fi
         env:
+          # JOV-5489: deterministic keyframes (PNG evidence; video is refused by
+          # the artifact secret guard) and a reviewer-only gateway key.
+          GOLDEN_PATH_KEYFRAME_DIR: ${{ github.workspace }}/apps/web/test-results/golden-path-keyframes/first
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}
+          VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}
           E2E_TEST_MODE: '1'
@@ -6011,6 +6040,17 @@ jobs:
           path: |
             apps/web/test-results/
           retention-days: 3
+
+      - name: Upload golden-path visual review evidence
+        if: ${{ always() && hashFiles('apps/web/test-results/golden-path-keyframes/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: golden-path-visual-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/test-results/golden-path-keyframes/
+          allow-images: 'true'
+          public-images: 'true'
+          retention-days: 30
 
       - name: Cleanup ephemeral Neon branch
         if: always() && needs.neon-db.result != 'success' && steps.neon-branch.outputs.branch_id != ''
