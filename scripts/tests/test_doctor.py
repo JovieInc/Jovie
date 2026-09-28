@@ -195,6 +195,39 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(feed["failed_by_reason"], {"agent-timeout": 1, "legacy": 2})
 
 
+class SloFeedTest(unittest.TestCase):
+    def test_feed_passes_the_slo_block_through(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "slots").mkdir()
+            host = type("Host", (), {"state": state})()
+            lane = type("Lane", (), {"HOST": "gem"})
+            slo = {"at": "2026-09-28T00:00:00Z", "throughput": {"mergesPerDay": 25}}
+            feed = doctor.status_feed(host, lane, obs(slo=slo), {}, {})
+            self.assertEqual(feed["slo"], slo)
+            self.assertIsNone(doctor.status_feed(host, lane, obs(), {}, {})["slo"])
+
+    def test_fetch_slo_caches_and_survives_failures(self):
+        import unittest.mock as mock
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            host = type("Host", (), {"state": state})()
+            lane = type("Lane", (), {"load_github_env": staticmethod(lambda: None)})
+            snapshot = {"at": "x", "throughput": {"mergesPerDay": 21}}
+            ok = type("R", (), {"returncode": 0, "stdout": json.dumps(snapshot)})
+            with mock.patch.object(doctor.subprocess, "run", return_value=ok()):
+                self.assertEqual(doctor.fetch_slo(host, lane), snapshot)
+            # A fresh-enough cache means no second subprocess call.
+            with mock.patch.object(doctor.subprocess, "run", side_effect=AssertionError("cache missed")):
+                self.assertEqual(doctor.fetch_slo(host, lane), snapshot)
+            # A failed refresh falls back to the stale cache instead of raising.
+            (state / "slo.json").write_text(json.dumps(
+                {"fetchedAt": "2020-01-01T00:00:00Z", "snapshot": snapshot}))
+            bad = type("R", (), {"returncode": 1, "stdout": ""})
+            with mock.patch.object(doctor.subprocess, "run", return_value=bad()):
+                self.assertEqual(doctor.fetch_slo(host, lane), snapshot)
+
+
 class PublishTest(unittest.TestCase):
     def test_only_the_primary_host_publishes(self):
         saved = doctor.PRIMARY_FLAG
