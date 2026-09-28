@@ -726,6 +726,17 @@ export function ProfileCompactTemplate({
       return;
     }
 
+    // Skip until initialSource has hydrated if the URL carries a source param.
+    // Without this guard the effect fires on the first render cycle with
+    // searchSuffix = '' and pushes a source-less URL before the initialSource
+    // useEffect (which reads location.search post-mount) has a chance to run.
+    if (
+      initialSource === null &&
+      new URLSearchParams(globalThis.location.search).has('source')
+    ) {
+      return;
+    }
+
     const activeMode = resolveHistoryMode({
       drawerOpen,
       drawerView,
@@ -756,7 +767,7 @@ export function ProfileCompactTemplate({
       '',
       href
     );
-  }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
+  }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix, initialSource]);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
