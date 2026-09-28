@@ -767,7 +767,10 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         checks = pr.get("statusCheckRollup") or []
         conflicted = pr.get("mergeStateStatus") == "DIRTY"
-        gate_held = (held or {}).get(str(pr["number"]), {}).get("sha") == pr["headRefOid"]
+        held_entry = (held or {}).get(str(pr["number"]), {})
+        if not pr_events.fixable_hold(held_entry, pr["headRefOid"]):
+            continue  # a hold no push clears (e.g. diff-too-large): intake owns it, not attempts
+        gate_held = held_entry.get("sha") == pr["headRefOid"]
         reviewed = pr.get("reviewDecision") == "CHANGES_REQUESTED"
         if not conflicted and not gate_held and not reviewed:
             if any(check.get("status") in ("IN_PROGRESS", "QUEUED", "PENDING") for check in checks):
@@ -781,14 +784,19 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     return None
 
 
-def exhausted_prs(prs: list[dict], attempts: dict) -> list[dict]:
-    """Heads the fix loop tried MAX_FIX_ATTEMPTS times and that are still stuck, not yet escalated."""
+def exhausted_prs(prs: list[dict], attempts: dict, held: dict | None = None) -> list[dict]:
+    """Stuck heads not yet escalated: fix attempts spent, or a hold no push can clear."""
     stuck = []
     for pr in prs:
         record = attempts.get(str(pr["number"]), {})
+        if record.get("escalated"):
+            continue
+        if not pr_events.fixable_hold((held or {}).get(str(pr["number"])), pr["headRefOid"]):
+            stuck.append(pr)  # deterministic hold: intake once, not MAX_FIX_ATTEMPTS model calls
+            continue
         # Spent attempts are terminal for the PR (red_pr never retries it), so a head the last
         # fix pushed that is still stuck escalates too instead of waiting silently.
-        if record.get("count", 0) >= MAX_FIX_ATTEMPTS and not record.get("escalated"):
+        if record.get("count", 0) >= MAX_FIX_ATTEMPTS:
             checks = pr.get("statusCheckRollup") or []
             if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED" \
                     or any(check.get("conclusion") in RED for check in checks):
@@ -800,21 +808,32 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
     """Bug intake, never Tim: comment on the PR, open a Linear Triage issue once, mark it escalated."""
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
-    for pr in exhausted_prs(prs, attempts):
-        body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
-                f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
-                "Filed through bug intake (Linear Triage); the lanes stop here.")
-        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+    held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
+    for pr in exhausted_prs(prs, attempts, held):
         record = attempts.get(str(pr["number"]), {})
+        if record.get("count", 0):
+            body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
+                    f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
+                    "Filed through bug intake (Linear Triage); the lanes stop here.")
+        else:
+            code = (held.get(str(pr["number"])) or {}).get("reason") or "unfixable"
+            body = (f"🤖 lanes: the gate held head `{pr['headRefOid'][:7]}` for a reason no code push can clear "
+                    f"(`{code}`; merge state {pr.get('mergeStateStatus')}). "
+                    "Filed through bug intake (Linear Triage); the lanes stop here.")
+        sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
+        title = ("Fix loop exhausted" if record.get("count", 0) else "Unfixable gate hold") \
+            + f": PR #{pr['number']} {pr.get('title', '')[:80]}"
         try:
-            linear.create_triage(f"Fix loop exhausted: PR #{pr['number']} {pr.get('title', '')[:80]}",
+            linear.create_triage(title,
                                  pr_events.bug_report(pr, f"{body}\n\nHost `{HOST}`, {now_iso()}.", HOST, record))
         except Exception:
             pass
         attempts[str(pr["number"])] = {**record, "escalated": True}
         pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)  # held with a reason, visible on the PR
+        # Spent attempts rename the hold fix-exhausted; a zero-attempt hold keeps its real reason.
+        prefix = ["fix-exhausted"] if record.get("count", 0) else []
         update_json(held_path(host), lambda held: held.update({str(pr["number"]): pr_events.held_record(
-            pr["headRefOid"], ["fix-exhausted", *held.get(str(pr["number"]), {}).get("evidence", [])])}))
+            pr["headRefOid"], [*prefix, *held.get(str(pr["number"]), {}).get("evidence", [])])}))
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
         if found and found.group("lane") in pr_events.disabled_lanes(load_providers()):
             pr_events.return_to_pool(THIS, linear, pr, "orphaned lane PR after its fix attempts ran out")
