@@ -71,7 +71,7 @@ test.describe('Homepage', () => {
     await expect(
       hero.getByRole('heading', {
         level: 1,
-        name: 'A living identity for the internet.',
+        name: 'Your living identity on the internet.',
       })
     ).toBeVisible();
     await expect(
@@ -100,11 +100,11 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(specimen.getByRole('img')).toHaveJSProperty('complete', true);
 
-    // The hero texture bleeds under the docked header to y=0.
+    // The hero light bleeds under the docked header to y=0.
     const heroBox = await hero.boundingBox();
     expect(heroBox?.y ?? 1).toBeLessThanOrEqual(0);
     await expect(
-      hero.getByTestId('homepage-identity-hero-texture')
+      hero.getByTestId('homepage-identity-hero-light')
     ).toHaveAttribute('aria-hidden', 'true');
   });
 
@@ -343,7 +343,7 @@ test.describe('Homepage', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await gotoHomepage(page);
     const animation = await page
-      .getByTestId('homepage-identity-hero-texture')
+      .getByTestId('homepage-identity-hero-light')
       .evaluate(node => getComputedStyle(node).animationName);
     expect(animation).toBe('none');
   });
@@ -719,7 +719,7 @@ test.describe('Homepage', () => {
     await gotoHomepage(page);
 
     const heading = page.getByRole('heading', {
-      name: 'A living identity for the internet.',
+      name: 'Your living identity on the internet.',
     });
     await expect(heading).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -891,7 +891,7 @@ test.describe('Homepage', () => {
       expect(horizontalOverflow).toBeLessThanOrEqual(1);
 
       const heading = page.getByRole('heading', {
-        name: 'A living identity for the internet.',
+        name: 'Your living identity on the internet.',
       });
       const headingLines = await heading.evaluate(element => {
         const style = getComputedStyle(element);
@@ -1078,7 +1078,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 900, height: 800 });
     await page.evaluate(() => document.fonts.ready);
     const heading = page.getByRole('heading', {
-      name: 'A living identity for the internet.',
+      name: 'Your living identity on the internet.',
     });
     const headingLines = await heading.evaluate(element => {
       const style = getComputedStyle(element);

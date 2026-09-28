@@ -14,7 +14,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    title: 'A living identity for the internet.',
+    title: 'Your living identity on the internet.',
     description:
       'Your work, your links, your next chapter. Together in your Jovie profile.',
   },
@@ -22,7 +22,7 @@ export const Default: Story = {
 
 export const TextHidden: Story = {
   args: {
-    title: 'A living identity for the internet.',
+    title: 'Your living identity on the internet.',
     description:
       'Your work, your links, your next chapter. Together in your Jovie profile.',
     showText: false,
