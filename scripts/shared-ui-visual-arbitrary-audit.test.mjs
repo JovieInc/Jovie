@@ -62,6 +62,7 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/theme/motion-policy.ts',
   'packages/ui/theme/tokens.ts',
   'packages/ui/lib/badge-geometry-contract.ts',
+  'packages/ui/lib/overlay-focus.ts',
   'packages/ui/atoms/founder-pen-atoms.ts',
 ];
 const EXCLUDED_NON_PRODUCTION_SOURCES = [
@@ -149,7 +150,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 60);
+  assert.equal(result.scannedFiles.length, 61);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.equal(
       result.scannedFiles.includes(relativePath),
