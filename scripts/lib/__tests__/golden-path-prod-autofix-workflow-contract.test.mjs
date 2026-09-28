@@ -121,6 +121,15 @@ describe('Golden Path prod autofix workflow contract', () => {
     );
   });
 
+  it('passes a GitHub token so autofix can dedupe on fingerprint-marked PRs (JOV-6827)', () => {
+    expect(WORKFLOW).toContain('GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+    expect(WORKFLOW).toContain('pull-requests: read');
+    expect(WORKFLOW).toContain('issues: write');
+    expect(LOCK_HELPER).toContain('AUTOFIX_PR_MARKER');
+    expect(LOCK_HELPER).toContain('AUTOFIX_LAUNCH_MARKER');
+    expect(LOCK_HELPER).toContain("'escalate'");
+  });
+
   it('does not live inside the read-only post-deploy probe workflow', () => {
     const postdeploy = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/postdeploy-probes.yml'),
@@ -292,11 +301,19 @@ describe('Golden Path prod autofix dedupe contract (JOV-6832)', () => {
     expect(WORKFLOW).not.toMatch(/pull-requests:\s*write/);
     expect(WORKFLOW).toContain('GH_TOKEN: ${{ github.token }}');
     const dedupe = SCRIPT.indexOf('findOpenAutofixPr(listOpenPrs()');
-    const intake = SCRIPT.indexOf('await createGoldenPathLinearIssue(');
+    const delegate = SCRIPT.indexOf('await executeAutofix(');
     const launch = SCRIPT.indexOf('Launched Cursor-direct autofix');
+    // JOV-6827: intake + deeper dedupe + launch live in lib executeAutofix;
+    // the CLI still dedupes open fix PRs before delegating.
+    const intake = LOCK_HELPER.indexOf('await createGoldenPathLinearIssue(');
+    const cursorLaunch = LOCK_HELPER.indexOf(
+      'body: JSON.stringify(plan.request)'
+    );
     expect(dedupe).toBeGreaterThan(-1);
-    expect(intake).toBeGreaterThan(dedupe);
+    expect(delegate).toBeGreaterThan(dedupe);
     expect(launch).toBeGreaterThan(dedupe);
+    expect(intake).toBeGreaterThan(-1);
+    expect(cursorLaunch).toBeGreaterThan(intake);
     expect(SCRIPT).toContain('refusing to launch a possible duplicate');
   });
 });
