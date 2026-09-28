@@ -730,13 +730,24 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 
-  it('shows the desktop update entry and opens the update modal from the menu', async () => {
+  it('shows the desktop update entry only when actionable and opens the modal from the menu', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
       isLoading: false,
       error: null,
     } as any);
     const openModal = vi.fn();
+    mockUseDesktopUpdateContext.mockReturnValue({
+      state: { state: 'idle' },
+      openModal,
+    });
+
+    const user = userEvent.setup();
+    const { unmount } = render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+    expect(screen.queryByText(/^Update to /)).not.toBeInTheDocument();
+    unmount();
+
     mockUseDesktopUpdateContext.mockReturnValue({
       state: {
         state: 'available',
@@ -746,31 +757,10 @@ describe('UserButton billing actions', () => {
       },
       openModal,
     });
-
-    const user = userEvent.setup();
     render(<UserButton showUserInfo />);
     await user.click(screen.getByText('Adele Adkins'));
-
     await user.click(await screen.findByText('Update to 26.9.16'));
     expect(openModal).toHaveBeenCalledTimes(1);
-  });
-
-  it('omits the desktop update entry when no update is actionable', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
-    mockUseDesktopUpdateContext.mockReturnValue({
-      state: { state: 'idle' },
-      openModal: vi.fn(),
-    });
-
-    const user = userEvent.setup();
-    render(<UserButton showUserInfo />);
-    await user.click(screen.getByText('Adele Adkins'));
-
-    expect(screen.queryByText(/^Update to /)).not.toBeInTheDocument();
   });
 
   it('gives identity and help enough width while preserving menu focus order', async () => {

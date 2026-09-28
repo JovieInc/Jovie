@@ -2,8 +2,6 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { buildDesktopUpdateMenuItem } from './UserButton';
 
-const NOTES_URL = 'https://jov.ie/changelog';
-
 function MenuItemPreview({
   state,
 }: {
@@ -50,7 +48,7 @@ export const Available: Story = {
       state: 'available',
       version: '26.9.16',
       releaseDate: null,
-      notesUrl: NOTES_URL,
+      notesUrl: 'https://jov.ie/changelog',
     },
   },
 };
@@ -75,9 +73,7 @@ export const ErrorState: Story = {
   args: { state: { state: 'error', message: 'offline', retryable: true } },
 };
 
-export const HiddenWhenIdle: Story = {
-  args: { state: { state: 'idle' } },
-};
+export const HiddenWhenIdle: Story = { args: { state: { state: 'idle' } } };
 
 export const AvailableLight: Story = {
   ...Available,

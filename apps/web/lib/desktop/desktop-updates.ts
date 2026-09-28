@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from 'react';
 
-// ---------------------------------------------------------------------------
-// window.jovieDesktop.updates contract — mirrors what
-// apps/desktop/src/preload.ts exposes. Binaries that predate the bridge leave
-// `window.jovieDesktop` undefined; the hook then reports 'unsupported' and
-// every update surface renders nothing.
-// ---------------------------------------------------------------------------
+// window.jovieDesktop.updates contract — mirrors apps/desktop/src/preload.ts.
+// Binaries that predate the bridge leave `window.jovieDesktop` undefined; the
+// hook then reports 'unsupported' and every update surface renders nothing.
 
 export type DesktopUpdatePhase =
   | { readonly state: 'idle' }
@@ -76,23 +73,24 @@ interface JovieDesktopWindow {
   };
 }
 
+const BRIDGE_METHODS = [
+  'getState',
+  'check',
+  'download',
+  'install',
+  'onState',
+] as const;
+
 export function getDesktopUpdatesBridge():
   | JovieDesktopUpdatesBridge
   | undefined {
   if (globalThis.window === undefined) return undefined;
   const updates = (globalThis.window as JovieDesktopWindow).jovieDesktop
     ?.updates;
-  if (
-    updates &&
-    typeof updates.getState === 'function' &&
-    typeof updates.check === 'function' &&
-    typeof updates.download === 'function' &&
-    typeof updates.install === 'function' &&
-    typeof updates.onState === 'function'
-  ) {
-    return updates as JovieDesktopUpdatesBridge;
-  }
-  return undefined;
+  return updates &&
+    BRIDGE_METHODS.every(method => typeof updates[method] === 'function')
+    ? (updates as JovieDesktopUpdatesBridge)
+    : undefined;
 }
 
 export interface DesktopUpdateSnapshot {

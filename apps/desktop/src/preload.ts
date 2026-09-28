@@ -233,21 +233,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>,
 });
 
-/**
- * Typed updater surface (JOV-6683). Separate namespace so a stale binary simply
- * leaves `window.jovieDesktop` undefined and the renderer renders nothing.
- */
+// Typed updater surface (JOV-6683). Separate namespace so a stale binary
+// leaves `window.jovieDesktop` undefined and the renderer renders nothing.
 contextBridge.exposeInMainWorld('jovieDesktop', {
   updates: {
-    /** Ask the main process for the current typed updater phase. */
     getState: () => ipcRenderer.invoke(DESKTOP_UPDATE_GET_STATE_CHANNEL),
-    /** Trigger a silent update check; result arrives via onState. */
     check: () => ipcRenderer.invoke(DESKTOP_UPDATE_CHECK_CHANNEL),
-    /** Start downloading an available update. */
     download: () => ipcRenderer.invoke(DESKTOP_UPDATE_DOWNLOAD_CHANNEL),
-    /** Quit and install a downloaded update. */
     install: () => ipcRenderer.invoke(DESKTOP_UPDATE_INSTALL_CHANNEL),
-    /** Subscribe to typed updater phase changes; returns unsubscribe. */
     onState: (cb: (phase: unknown) => void): (() => void) => {
       if (typeof cb !== 'function') return () => undefined;
       const listener = (_: unknown, phase: unknown) => cb(phase);

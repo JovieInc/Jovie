@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * JOV-6683: the update modal renders each updater state (available,
  * downloading, ready, error) and routes its actions to the right callback.
  */
@@ -8,20 +7,17 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { DesktopUpdatePhase } from '@/lib/desktop/desktop-updates';
+import {
+  availableUpdate,
+  downloadingUpdate,
+} from '@/lib/desktop/desktop-updates.test-utils';
 import {
   DesktopUpdateModal,
   DesktopUpdateModalView,
 } from './DesktopUpdateModal';
 
 const NOTES_URL = 'https://jov.ie/changelog';
-
-const available: DesktopUpdatePhase = {
-  state: 'available',
-  version: '26.9.16',
-  releaseDate: '2026-09-27T00:00:00.000Z',
-  notesUrl: NOTES_URL,
-};
+const available = availableUpdate('26.9.16');
 
 function renderView(
   state: Parameters<typeof DesktopUpdateModalView>[0]['state'],
@@ -31,7 +27,7 @@ function renderView(
     open: true,
     state,
     notes: null,
-    notesLoading: false,
+    loading: false,
     onDownload: vi.fn(),
     onInstall: vi.fn(),
     onRetry: vi.fn(),
@@ -54,21 +50,18 @@ describe('DesktopUpdateModalView', () => {
     expect(props.onDownload).toHaveBeenCalledTimes(1);
   });
 
-  it('links to release notes when none were fetched', () => {
-    renderView(available);
+  it('links to release notes when none were fetched and dismisses via Later', async () => {
+    const props = renderView(available);
     expect(
       screen.getByRole('link', { name: 'Read the release notes' })
     ).toHaveAttribute('href', NOTES_URL);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }));
+    expect(props.onLater).toHaveBeenCalledTimes(1);
   });
 
   it('renders download progress', () => {
-    renderView({
-      state: 'downloading',
-      percent: 42,
-      transferredBytes: 42_000_000,
-      totalBytes: 100_000_000,
-      bytesPerSecond: 1_000_000,
-    });
+    renderView(downloadingUpdate(42));
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
     expect(screen.getByText('Downloading update')).toBeInTheDocument();
   });
@@ -87,12 +80,6 @@ describe('DesktopUpdateModalView', () => {
     });
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(error.onRetry).toHaveBeenCalledTimes(1);
-  });
-
-  it('dismisses via Later', async () => {
-    const props = renderView(available);
-    await userEvent.click(screen.getByRole('button', { name: 'Later' }));
-    expect(props.onLater).toHaveBeenCalledTimes(1);
   });
 });
 

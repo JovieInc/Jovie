@@ -47,9 +47,8 @@ function writeDismissedVersion(version: string): void {
 }
 
 /**
- * Owns the desktop update modal and its once-per-version auto-open. Mounts
- * inside RuntimeUpdateProvider; renders nothing when the updates bridge is
- * unsupported (web builds, stale binaries).
+ * Owns the desktop update modal and its once-per-version auto-open; renders
+ * nothing when the updates bridge is unsupported (web builds, stale binaries).
  */
 export function DesktopUpdateProvider({
   children,

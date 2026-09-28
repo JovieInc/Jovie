@@ -17,14 +17,16 @@ export interface DesktopUpdateReleaseNotes {
   readonly items: readonly string[];
 }
 
+type ActionableState = Extract<
+  DesktopUpdatePhase,
+  { state: 'available' | 'downloading' | 'ready' | 'error' }
+>;
+
 export interface DesktopUpdateModalViewProps {
   readonly open: boolean;
-  readonly state: Extract<
-    DesktopUpdatePhase,
-    { state: 'available' | 'downloading' | 'ready' | 'error' }
-  >;
+  readonly state: ActionableState;
   readonly notes: DesktopUpdateReleaseNotes | null;
-  readonly notesLoading: boolean;
+  readonly loading: boolean;
   readonly onDownload: () => void;
   readonly onInstall: () => void;
   readonly onRetry: () => void;
@@ -34,31 +36,24 @@ export interface DesktopUpdateModalViewProps {
 
 const COPY = DESKTOP_UPDATE_COPY.modal;
 
-function modalTitle(state: DesktopUpdateModalViewProps['state']): string {
-  switch (state.state) {
-    case 'available':
-      return COPY.title(state.version);
-    case 'downloading':
-      return COPY.downloadingTitle;
-    case 'ready':
-      return COPY.readyTitle;
-    case 'error':
-      return COPY.errorTitle;
-  }
-}
+const TITLES = {
+  downloading: COPY.downloadingTitle,
+  ready: COPY.readyTitle,
+  error: COPY.errorTitle,
+} as const;
 
 export function DesktopUpdateModalView({
   open,
   state,
   notes,
-  notesLoading,
+  loading,
   onDownload,
   onInstall,
   onRetry,
   onLater,
 }: DesktopUpdateModalViewProps) {
-  // Exactly one primary action per state (one-primary-action-per-screen-v1).
-  const primaryAction =
+  // One primary action per screen: each state contributes at most one.
+  const primary =
     state.state === 'available'
       ? { label: COPY.downloadAction, onClick: onDownload }
       : state.state === 'ready'
@@ -66,16 +61,20 @@ export function DesktopUpdateModalView({
         : state.state === 'error'
           ? { label: COPY.retryAction, onClick: onRetry }
           : null;
+
   return (
     <Dialog open={open} onClose={onLater} size='md'>
-      <DialogTitle>{modalTitle(state)}</DialogTitle>
+      <DialogTitle>
+        {state.state === 'available'
+          ? COPY.title(state.version)
+          : TITLES[state.state]}
+      </DialogTitle>
       {state.state === 'available' && state.releaseDate ? (
         <DialogDescription>{state.releaseDate.slice(0, 10)}</DialogDescription>
       ) : null}
       <DialogBody>
         {state.state === 'available' ? (
-          notesLoading ? null : notes &&
-            (notes.summary || notes.items.length) ? (
+          loading ? null : notes && (notes.summary || notes.items.length) ? (
             <div className='space-y-2'>
               <h3 className='text-sm font-medium text-primary-token'>
                 {COPY.notesHeading}
@@ -109,14 +108,11 @@ export function DesktopUpdateModalView({
             showValue
           />
         ) : null}
-        {state.state === 'ready' ? (
+        {state.state === 'ready' || state.state === 'error' ? (
           <p className='text-sm text-secondary-token'>
-            {COPY.readyDescription}
-          </p>
-        ) : null}
-        {state.state === 'error' ? (
-          <p className='text-sm text-secondary-token'>
-            {COPY.errorDescription}
+            {state.state === 'ready'
+              ? COPY.readyDescription
+              : COPY.errorDescription}
           </p>
         ) : null}
       </DialogBody>
@@ -124,19 +120,14 @@ export function DesktopUpdateModalView({
         <Button variant='secondary' onClick={onLater}>
           {COPY.laterAction}
         </Button>
-        {primaryAction ? (
-          <Button variant='primary' onClick={primaryAction.onClick}>
-            {primaryAction.label}
+        {primary ? (
+          <Button variant='primary' onClick={primary.onClick}>
+            {primary.label}
           </Button>
         ) : null}
       </DialogActions>
     </Dialog>
   );
-}
-
-interface ReleaseNotesResponse {
-  readonly summary?: string;
-  readonly items?: readonly string[];
 }
 
 function useReleaseNotes(version: string | null, enabled: boolean) {
@@ -152,16 +143,13 @@ function useReleaseNotes(version: string | null, enabled: boolean) {
       `/api/desktop-updates/release-notes?version=${encodeURIComponent(version)}`
     )
       .then(res => (res.ok ? res.json() : null))
-      .then((body: ReleaseNotesResponse | null) => {
+      .then((body: { summary?: string; items?: readonly string[] } | null) => {
         if (cancelled) return;
         setResult({
           version,
           notes:
             body && (body.summary || (body.items?.length ?? 0) > 0)
-              ? {
-                  summary: body.summary ?? '',
-                  items: body.items ?? [],
-                }
+              ? { summary: body.summary ?? '', items: body.items ?? [] }
               : null,
         });
       })
@@ -179,15 +167,6 @@ function useReleaseNotes(version: string | null, enabled: boolean) {
   };
 }
 
-export interface DesktopUpdateModalProps {
-  readonly open: boolean;
-  readonly state: DesktopUpdatePhase;
-  readonly onDownload: () => void;
-  readonly onInstall: () => void;
-  readonly onRetry: () => void;
-  readonly onLater: () => void;
-}
-
 export function DesktopUpdateModal({
   open,
   state,
@@ -195,23 +174,32 @@ export function DesktopUpdateModal({
   onInstall,
   onRetry,
   onLater,
-}: DesktopUpdateModalProps) {
-  const actionable =
-    state.state === 'available' ||
-    state.state === 'downloading' ||
-    state.state === 'ready' ||
-    state.state === 'error';
+}: {
+  readonly open: boolean;
+  readonly state: DesktopUpdatePhase;
+  readonly onDownload: () => void;
+  readonly onInstall: () => void;
+  readonly onRetry: () => void;
+  readonly onLater: () => void;
+}) {
   const version = state.state === 'available' ? state.version : null;
   const { notes, loading } = useReleaseNotes(version, open);
 
-  if (!actionable) return null;
+  if (
+    state.state !== 'available' &&
+    state.state !== 'downloading' &&
+    state.state !== 'ready' &&
+    state.state !== 'error'
+  ) {
+    return null;
+  }
 
   return (
     <DesktopUpdateModalView
       open={open}
       state={state}
       notes={notes}
-      notesLoading={loading}
+      loading={loading}
       onDownload={onDownload}
       onInstall={onInstall}
       onRetry={onRetry}

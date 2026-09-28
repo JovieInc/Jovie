@@ -1,53 +1,20 @@
 /**
  * @vitest-environment jsdom
- *
- * JOV-6683: the typed desktop updater bridge. Without `window.jovieDesktop`
- * (web builds, stale binaries) the hook reports 'unsupported' and callers
- * render nothing.
+ * JOV-6683: the typed desktop updater bridge; no bridge → 'unsupported'.
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { useDesktopUpdate } from './desktop-updates';
 import {
-  type DesktopUpdatePhase,
-  type JovieDesktopUpdatesBridge,
-  useDesktopUpdate,
-} from './desktop-updates';
+  availableUpdate,
+  downloadingUpdate,
+  installDesktopUpdateBridge as installBridge,
+  uninstallDesktopUpdateBridge,
+} from './desktop-updates.test-utils';
 
-type StateListener = (phase: unknown) => void;
-
-function installBridge(initial: DesktopUpdatePhase | null = null) {
-  const listeners = new Set<StateListener>();
-  const bridge: JovieDesktopUpdatesBridge = {
-    getState: vi.fn(async () => initial),
-    check: vi.fn(async () => ({ ok: true })),
-    download: vi.fn(async () => ({ ok: true })),
-    install: vi.fn(async () => ({ ok: true })),
-    onState: vi.fn((cb: StateListener) => {
-      listeners.add(cb);
-      return () => listeners.delete(cb);
-    }),
-  };
-  Object.defineProperty(window, 'jovieDesktop', {
-    configurable: true,
-    writable: true,
-    value: { updates: bridge },
-  });
-  return {
-    bridge,
-    emit(phase: DesktopUpdatePhase) {
-      for (const cb of listeners) cb(phase);
-    },
-  };
-}
-
-beforeEach(() => {
-  Reflect.deleteProperty(window, 'jovieDesktop');
-});
-
-afterEach(() => {
-  Reflect.deleteProperty(window, 'jovieDesktop');
-});
+beforeEach(uninstallDesktopUpdateBridge);
+afterEach(uninstallDesktopUpdateBridge);
 
 describe('useDesktopUpdate', () => {
   it('returns unsupported when the bridge is missing', () => {
@@ -66,25 +33,12 @@ describe('useDesktopUpdate', () => {
   });
 
   it('loads the current phase and subscribes to changes', async () => {
-    const { emit } = installBridge({
-      state: 'available',
-      version: '26.9.16',
-      releaseDate: null,
-      notesUrl: 'https://jov.ie/changelog',
-    });
+    const { emit } = installBridge(availableUpdate('26.9.16'));
     const { result } = renderHook(() => useDesktopUpdate());
 
     await waitFor(() => expect(result.current.state.state).toBe('available'));
 
-    act(() =>
-      emit({
-        state: 'downloading',
-        percent: 42,
-        transferredBytes: 1,
-        totalBytes: 2,
-        bytesPerSecond: 1,
-      })
-    );
+    act(() => emit(downloadingUpdate(42)));
     expect(result.current.state).toMatchObject({
       state: 'downloading',
       percent: 42,
@@ -103,26 +57,11 @@ describe('useDesktopUpdate', () => {
     expect(bridge.check).toHaveBeenCalledTimes(1);
 
     act(() => emit({ state: 'checking' }));
-    act(() =>
-      emit({
-        state: 'available',
-        version: '26.9.16',
-        releaseDate: null,
-        notesUrl: 'https://jov.ie/changelog',
-      })
-    );
+    act(() => emit(availableUpdate('26.9.16')));
     act(() => result.current.download());
     expect(bridge.download).toHaveBeenCalledTimes(1);
 
-    act(() =>
-      emit({
-        state: 'downloading',
-        percent: 10,
-        transferredBytes: 1,
-        totalBytes: 10,
-        bytesPerSecond: 1,
-      })
-    );
+    act(() => emit(downloadingUpdate(10)));
     expect(result.current.state).toMatchObject({ state: 'downloading' });
   });
 });

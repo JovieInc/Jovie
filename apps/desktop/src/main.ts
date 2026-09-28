@@ -59,6 +59,7 @@ import {
   buildDesktopUpdateMenuItem,
   buildManualUpdateCheckFeedback,
   DESKTOP_UPDATE_INITIAL_STATE,
+  type DesktopUpdateEvent,
   type DesktopUpdatePhase,
   hasNightlyUpdateFlag,
   NIGHTLY_UPDATE_TIMEOUT_MS,
@@ -2701,15 +2702,23 @@ function emitDesktopUpdatePhase(phase: DesktopUpdatePhase): void {
   sendToAppWindows(DESKTOP_UPDATE_STATE_CHANNEL, phase);
 }
 
+function pushUpdateEvent(event: DesktopUpdateEvent): void {
+  emitDesktopUpdatePhase(
+    reduceDesktopUpdateState(event, DESKTOP_UPDATE_NOTES_URL)
+  );
+}
+
+function updateErrorEvent(error: unknown): DesktopUpdateEvent {
+  return {
+    type: 'error',
+    message: error instanceof Error ? error.message : String(error),
+  };
+}
+
 // Wire auto-updater events to renderer IPC so the web UI can show the update
 // pill (legacy boolean channels) and the typed update surfaces (JOV-6683).
 autoUpdater.on('checking-for-update', () => {
-  emitDesktopUpdatePhase(
-    reduceDesktopUpdateState(
-      { type: 'checking-for-update' },
-      DESKTOP_UPDATE_NOTES_URL
-    )
-  );
+  pushUpdateEvent({ type: 'checking-for-update' });
 });
 
 autoUpdater.on('update-available', info => {
@@ -2717,31 +2726,21 @@ autoUpdater.on('update-available', info => {
   pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_AVAILABLE_CHANNEL);
-  emitDesktopUpdatePhase(
-    reduceDesktopUpdateState(
-      {
-        type: 'update-available',
-        version: info.version,
-        releaseDate: info.releaseDate ?? null,
-      },
-      DESKTOP_UPDATE_NOTES_URL
-    )
-  );
+  pushUpdateEvent({
+    type: 'update-available',
+    version: info.version,
+    releaseDate: info.releaseDate ?? null,
+  });
 });
 
 autoUpdater.on('download-progress', progress => {
-  emitDesktopUpdatePhase(
-    reduceDesktopUpdateState(
-      {
-        type: 'download-progress',
-        percent: progress.percent,
-        transferredBytes: progress.transferred,
-        totalBytes: progress.total,
-        bytesPerSecond: progress.bytesPerSecond,
-      },
-      DESKTOP_UPDATE_NOTES_URL
-    )
-  );
+  pushUpdateEvent({
+    type: 'download-progress',
+    percent: progress.percent,
+    transferredBytes: progress.transferred,
+    totalBytes: progress.total,
+    bytesPerSecond: progress.bytesPerSecond,
+  });
 });
 
 autoUpdater.on('update-downloaded', info => {
@@ -2749,12 +2748,7 @@ autoUpdater.on('update-downloaded', info => {
   pendingManualUpdateCheck = false;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
-  emitDesktopUpdatePhase(
-    reduceDesktopUpdateState(
-      { type: 'update-downloaded', version: info.version },
-      DESKTOP_UPDATE_NOTES_URL
-    )
-  );
+  pushUpdateEvent({ type: 'update-downloaded', version: info.version });
 
   const hasVisibleWindow = BrowserWindow.getAllWindows().some(
     win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
@@ -2772,12 +2766,7 @@ autoUpdater.on('update-downloaded', info => {
 });
 
 autoUpdater.on('update-not-available', () => {
-  emitDesktopUpdatePhase(
-    reduceDesktopUpdateState(
-      { type: 'update-not-available' },
-      DESKTOP_UPDATE_NOTES_URL
-    )
-  );
+  pushUpdateEvent({ type: 'update-not-available' });
   showManualUpdateCheckFeedback('not-available');
   if (nightlyUpdateLaunch) {
     app.quit();
@@ -2785,15 +2774,7 @@ autoUpdater.on('update-not-available', () => {
 });
 
 autoUpdater.on('error', error => {
-  emitDesktopUpdatePhase(
-    reduceDesktopUpdateState(
-      {
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-      },
-      DESKTOP_UPDATE_NOTES_URL
-    )
-  );
+  pushUpdateEvent(updateErrorEvent(error));
   showManualUpdateCheckFeedback('error');
   if (nightlyUpdateLaunch) {
     app.quit();
@@ -2830,20 +2811,21 @@ ipcMain.handle(
 );
 
 // Typed update surface (JOV-6683): the renderer's jovieDesktop.updates bridge.
-ipcMain.handle(DESKTOP_UPDATE_GET_STATE_CHANNEL, event => {
-  if (!isTrustedIpcSender(event)) return null;
-  return desktopUpdatePhase;
-});
+const INVALID_IPC = { ok: false, reason: 'invalid-request' } as const;
+
+ipcMain.handle(DESKTOP_UPDATE_GET_STATE_CHANNEL, event =>
+  isTrustedIpcSender(event) ? desktopUpdatePhase : null
+);
 
 ipcMain.handle(DESKTOP_UPDATE_CHECK_CHANNEL, event => {
-  if (!isTrustedIpcSender(event)) return { ok: false, reason: 'invalid-request' };
+  if (!isTrustedIpcSender(event)) return INVALID_IPC;
   if (!desktopUpdatesSupported()) return { ok: false, reason: 'unsupported' };
   runDesktopUpdateCheck('silent');
   return { ok: true };
 });
 
 ipcMain.handle(DESKTOP_UPDATE_DOWNLOAD_CHANNEL, event => {
-  if (!isTrustedIpcSender(event)) return { ok: false, reason: 'invalid-request' };
+  if (!isTrustedIpcSender(event)) return INVALID_IPC;
   // autoDownload normally starts the download as soon as an update is found;
   // treat an in-flight or completed download as success and only kick a
   // manual download when the update is still waiting.
@@ -2856,22 +2838,14 @@ ipcMain.handle(DESKTOP_UPDATE_DOWNLOAD_CHANNEL, event => {
   if (desktopUpdatePhase.state !== 'available') {
     return { ok: false, reason: 'no-update-available' };
   }
-  void autoUpdater.downloadUpdate().catch(error => {
-    emitDesktopUpdatePhase(
-      reduceDesktopUpdateState(
-        {
-          type: 'error',
-          message: error instanceof Error ? error.message : String(error),
-        },
-        DESKTOP_UPDATE_NOTES_URL
-      )
-    );
-  });
+  void autoUpdater
+    .downloadUpdate()
+    .catch(error => pushUpdateEvent(updateErrorEvent(error)));
   return { ok: true };
 });
 
 ipcMain.handle(DESKTOP_UPDATE_INSTALL_CHANNEL, event => {
-  if (!isTrustedIpcSender(event)) return { ok: false, reason: 'invalid-request' };
+  if (!isTrustedIpcSender(event)) return INVALID_IPC;
   if (!updateReadyToInstall) {
     return { ok: false, reason: 'update-not-downloaded' };
   }

@@ -17,12 +17,10 @@ export const DESKTOP_UPDATE_COPY = {
     errorTitle: 'Update failed',
     notesHeading: 'What is new',
     notesFallbackLabel: 'Read the release notes',
-    notesUnavailable: 'Release notes are not available for this version yet.',
     downloadAction: 'Download',
     restartAction: 'Restart to update',
     retryAction: 'Retry',
     laterAction: 'Later',
-    closeLabel: 'Close',
     progressLabel: 'Download progress',
     errorDescription:
       'The update could not be downloaded. Check your connection and try again.',

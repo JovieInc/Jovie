@@ -92,77 +92,43 @@ const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
 
 /**
  * First-row Update entry for the compact user menu (JOV-6683). Renders only
- * while the desktop updater has something to act on; clicking opens the
- * update modal owned by DesktopUpdateProvider.
+ * while the updater has something to act on; opens the provider's modal.
  */
 export function buildDesktopUpdateMenuItem(
   state: DesktopUpdateViewState,
   openModal: () => void
 ): CommonDropdownItem[] {
-  switch (state.state) {
-    case 'available':
-      return [
-        {
-          type: 'action',
-          id: 'desktop-update',
+  const entry =
+    state.state === 'available'
+      ? {
           label: UPDATE_MENU_COPY.updateToLabel(state.version),
           icon: ArrowDownToLine,
-          onClick: openModal,
-        },
-        {
-          type: 'separator',
-          id: 'sep-update',
-          className: USER_MENU_GROUP_SPACER_CLASS,
-        },
-      ];
-    case 'downloading':
-      return [
-        {
-          type: 'action',
-          id: 'desktop-update',
-          label: UPDATE_MENU_COPY.downloadingLabel(state.percent),
-          icon: ArrowDownToLine,
-          onClick: openModal,
-        },
-        {
-          type: 'separator',
-          id: 'sep-update',
-          className: USER_MENU_GROUP_SPACER_CLASS,
-        },
-      ];
-    case 'ready':
-      return [
-        {
-          type: 'action',
-          id: 'desktop-update',
-          label: UPDATE_MENU_COPY.readyLabel,
-          icon: RotateCcw,
-          onClick: openModal,
-        },
-        {
-          type: 'separator',
-          id: 'sep-update',
-          className: USER_MENU_GROUP_SPACER_CLASS,
-        },
-      ];
-    case 'error':
-      return [
-        {
-          type: 'action',
-          id: 'desktop-update',
-          label: UPDATE_MENU_COPY.errorLabel,
-          icon: CircleAlert,
-          onClick: openModal,
-        },
-        {
-          type: 'separator',
-          id: 'sep-update',
-          className: USER_MENU_GROUP_SPACER_CLASS,
-        },
-      ];
-    default:
-      return [];
-  }
+        }
+      : state.state === 'downloading'
+        ? {
+            label: UPDATE_MENU_COPY.downloadingLabel(state.percent),
+            icon: ArrowDownToLine,
+          }
+        : state.state === 'ready'
+          ? { label: UPDATE_MENU_COPY.readyLabel, icon: RotateCcw }
+          : state.state === 'error'
+            ? { label: UPDATE_MENU_COPY.errorLabel, icon: CircleAlert }
+            : null;
+  if (!entry) return [];
+  return [
+    {
+      type: 'action',
+      id: 'desktop-update',
+      label: entry.label,
+      icon: entry.icon,
+      onClick: openModal,
+    },
+    {
+      type: 'separator',
+      id: 'sep-update',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
+  ];
 }
 
 function sanitizeInstallUrl(value: unknown): string | null {

@@ -16,15 +16,10 @@ type Story = StoryObj<typeof meta>;
 export const Unsupported: Story = {
   render: () => (
     <DesktopUpdateProvider>
-      <div className='space-y-2 p-4'>
-        <p className='text-sm font-semibold text-primary-token'>
-          Shell content stays mounted inside the provider.
-        </p>
-        <p className='text-sm text-secondary-token'>
-          The update modal only appears when the desktop updater bridge reports
-          an actionable state.
-        </p>
-      </div>
+      <p className='p-4 text-sm text-secondary-token'>
+        Shell content stays mounted; the modal only appears when the updater
+        bridge reports an actionable state.
+      </p>
     </DesktopUpdateProvider>
   ),
 };

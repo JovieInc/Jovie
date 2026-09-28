@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * JOV-6683: the update modal opens once per version when an update becomes
  * available, "Later" snoozes that version, and web builds render nothing.
  */
@@ -8,51 +7,16 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  DesktopUpdatePhase,
-  JovieDesktopUpdatesBridge,
-} from '@/lib/desktop/desktop-updates';
+import {
+  availableUpdate as available,
+  downloadingUpdate,
+  installDesktopUpdateBridge as installBridge,
+  uninstallDesktopUpdateBridge,
+} from '@/lib/desktop/desktop-updates.test-utils';
 import {
   DesktopUpdateProvider,
   useDesktopUpdateContext,
 } from './DesktopUpdateProvider';
-
-type StateListener = (phase: unknown) => void;
-const NOTES_URL = 'https://jov.ie/changelog';
-
-function installBridge(initial: DesktopUpdatePhase | null = null) {
-  const listeners = new Set<StateListener>();
-  const bridge: JovieDesktopUpdatesBridge = {
-    getState: vi.fn(async () => initial),
-    check: vi.fn(async () => ({ ok: true })),
-    download: vi.fn(async () => ({ ok: true })),
-    install: vi.fn(async () => ({ ok: true })),
-    onState: vi.fn((cb: StateListener) => {
-      listeners.add(cb);
-      return () => listeners.delete(cb);
-    }),
-  };
-  Object.defineProperty(window, 'jovieDesktop', {
-    configurable: true,
-    writable: true,
-    value: { updates: bridge },
-  });
-  return {
-    bridge,
-    emit(phase: DesktopUpdatePhase) {
-      for (const cb of listeners) cb(phase);
-    },
-  };
-}
-
-function available(version: string): DesktopUpdatePhase {
-  return {
-    state: 'available',
-    version,
-    releaseDate: '2026-09-27T00:00:00.000Z',
-    notesUrl: NOTES_URL,
-  };
-}
 
 function ContextProbe() {
   const ctx = useDesktopUpdateContext();
@@ -67,7 +31,7 @@ function ContextProbe() {
 }
 
 beforeEach(() => {
-  Reflect.deleteProperty(window, 'jovieDesktop');
+  uninstallDesktopUpdateBridge();
   window.sessionStorage.clear();
   vi.stubGlobal(
     'fetch',
@@ -82,7 +46,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  Reflect.deleteProperty(window, 'jovieDesktop');
+  uninstallDesktopUpdateBridge();
   vi.unstubAllGlobals();
 });
 
@@ -142,15 +106,7 @@ describe('DesktopUpdateProvider', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(bridge.check).toHaveBeenCalledTimes(1);
 
-    act(() =>
-      emit({
-        state: 'downloading',
-        percent: 42,
-        transferredBytes: 1,
-        totalBytes: 2,
-        bytesPerSecond: 1,
-      })
-    );
+    act(() => emit(downloadingUpdate(42)));
     expect(await screen.findByRole('progressbar')).toBeInTheDocument();
   });
 });
