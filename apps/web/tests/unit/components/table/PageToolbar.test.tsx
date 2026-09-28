@@ -14,6 +14,7 @@ import {
   PageToolbarActionButton,
   PageToolbarBackLink,
   PageToolbarTabButton,
+  TABLE_TOOLBAR_SHELL_CLASS,
 } from '@/components/organisms/table/molecules/PageToolbar';
 import { findPageToolbarPrimaryCtaViolations } from '../../app/app-ia-static-guard';
 
@@ -98,6 +99,13 @@ describe('PageToolbar buttons', () => {
 
     expect(toolbar).toHaveClass('bg-transparent');
     expect(toolbar).not.toHaveClass('border-b');
+  });
+
+  it('locks the shared table toolbar shell to the 40px page toolbar height', () => {
+    expect(TABLE_TOOLBAR_SHELL_CLASS).toContain('h-10');
+    expect(TABLE_TOOLBAR_SHELL_CLASS).toContain('min-h-10');
+    expect(TABLE_TOOLBAR_SHELL_CLASS).not.toContain('h-11');
+    expect(TABLE_TOOLBAR_SHELL_CLASS).not.toContain('min-h-11');
   });
 
   it('forwards data-testid onto the toolbar shell', () => {

@@ -2538,16 +2538,16 @@
   /* 14px — body step (was 15px; consolidated 2026-09-27) */
   --text-base: 1rem;
   /* 16px */
-  --text-lg: 1.125rem;
-  /* 18px */
+  --text-lg: 1rem;
+  /* 16px (display ladder, was 18px) */
   --text-xl: 1.25rem;
   /* 20px */
   --text-2xl: 1.5rem;
   /* 24px */
-  --text-3xl: 1.875rem;
-  /* 30px */
-  --text-4xl: 2.25rem;
-  /* 36px */
+  --text-3xl: 2rem;
+  /* 32px (was 30px) */
+  --text-4xl: 2.5rem;
+  /* 40px (was 36px) */
   --text-5xl: 3rem;
   /* 48px */
 

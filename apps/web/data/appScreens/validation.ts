@@ -19,6 +19,7 @@ import {
   type AppScreenPenGeometryExport,
   type PenPendingDecision,
   type PenReferenceHold,
+  penRootEligibilityScope,
 } from './penParity';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
@@ -198,14 +199,14 @@ export function validateAppScreenSystem({
         );
       }
       const penRootId = component.penRootId;
+      const scope = penRootEligibilityScope(penRootId);
       const pendingForRoot = [
         ...penPendingDecisions.filter(decision =>
           APP_SCREEN_PEN_PARITY_CHECKS.some(
-            check =>
-              check.id === decision.checkId && check.masterId === penRootId
+            check => check.id === decision.checkId && scope.has(check.masterId)
           )
         ),
-        ...penReferenceHolds.filter(hold => hold.masterId === penRootId),
+        ...penReferenceHolds.filter(hold => scope.has(hold.masterId)),
       ];
       if (component.penReferenceEligible && pendingForRoot.length > 0) {
         add(
