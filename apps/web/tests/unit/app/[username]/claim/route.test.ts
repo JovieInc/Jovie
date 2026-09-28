@@ -8,6 +8,8 @@ const {
   mockClearPendingClaimContext,
   mockWritePendingClaimContext,
   mockIsClaimTokenValid,
+  mockEq,
+  mockUserLimit,
 } = vi.hoisted(() => ({
   mockGetOptionalAuth: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
@@ -15,10 +17,12 @@ const {
   mockClearPendingClaimContext: vi.fn(),
   mockWritePendingClaimContext: vi.fn(),
   mockIsClaimTokenValid: vi.fn(),
+  mockEq: vi.fn((column: unknown, value: unknown) => ({ column, value })),
+  mockUserLimit: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
+  eq: mockEq,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -36,7 +40,7 @@ vi.mock('@/lib/db', () => ({
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
-          limit: vi.fn().mockResolvedValue([]),
+          limit: mockUserLimit,
         })),
       })),
     })),
@@ -59,6 +63,8 @@ vi.mock('@/lib/services/profile', () => ({
   isClaimTokenValid: mockIsClaimTokenValid,
 }));
 
+import { APP_ROUTES } from '@/constants/routes';
+import { users } from '@/lib/db/schema/auth';
 import { GET } from '../../../../../app/[username]/claim/route';
 
 describe('Claim route', () => {
@@ -66,6 +72,7 @@ describe('Claim route', () => {
     vi.clearAllMocks();
     mockGetOptionalAuth.mockResolvedValue({ userId: null });
     mockReadPendingClaimContext.mockResolvedValue(null);
+    mockUserLimit.mockResolvedValue([]);
     mockGetProfileByUsername.mockResolvedValue({
       id: 'profile_1',
       username: 'claimableartist',
@@ -229,5 +236,21 @@ describe('Claim route', () => {
       })
     );
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+  });
+  it('sends a signed-in owner with an active profile to the dashboard, keyed on users.id (JOV-5401)', async () => {
+    mockGetOptionalAuth.mockResolvedValue({ userId: 'app-user-uuid' });
+    mockUserLimit.mockResolvedValue([{ activeProfileId: 'profile_owned' }]);
+
+    const response = await GET(
+      new NextRequest('https://jov.ie/claimableartist/claim?next=auth'),
+      { params: Promise.resolve({ username: 'claimableartist' }) }
+    );
+
+    expect(mockEq).toHaveBeenCalledWith(users.id, 'app-user-uuid');
+    expect(mockEq).not.toHaveBeenCalledWith(users.clerkId, expect.anything());
+    expect(new URL(response.headers.get('location') ?? '').pathname).toBe(
+      APP_ROUTES.DASHBOARD
+    );
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 });
