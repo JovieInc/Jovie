@@ -30,7 +30,12 @@ const dspMatchSuggestion: ProfileSuggestion = {
 const meta = {
   title: 'Jovie/Components/SuggestedProfilesCarousel',
   component: SuggestedProfilesCarousel,
-  parameters: { layout: 'centered' },
+  parameters: {
+    layout: 'centered',
+    // isActioning (exercised by ActioningInFlight below) drives Tailwind
+    // `disabled:` states on the action buttons; there is no `disabled` prop.
+    jovie: { uncoveredProps: ['disabled'] },
+  },
   args: {
     isLoading: false,
     currentIndex: 0,
@@ -59,6 +64,16 @@ export const ProfileReady: Story = {
 
 export const DspMatch: Story = {
   args: { suggestions: [dspMatchSuggestion] },
+};
+
+export const ActioningInFlight: Story = {
+  args: { suggestions: [profileReadySuggestion], isActioning: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('button', { name: 'Dismiss' })
+    ).toBeDisabled();
+  },
 };
 
 export const Empty: Story = { args: { suggestions: [], total: 0 } };
