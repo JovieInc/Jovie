@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDogfoodReceipt,
   DOGFOOD_RECEIPT_NO_RETENTION,
+  type DogfoodDriver,
   type DogfoodMissionContext,
   type DogfoodReceipt,
   dogfoodReceiptFromCommandRun,
@@ -178,7 +179,7 @@ describe('dogfoodReceiptFromIosReport', () => {
 describe('evaluateDogfoodReliability', () => {
   const binding = { commitSha: COMMIT_SHA, deploymentId: DEPLOYMENT_ID };
 
-  function passingRuns(count: number, driver = 'playwright' as const) {
+  function passingRuns(count: number, driver: DogfoodDriver = 'playwright') {
     return Array.from({ length: count }, (_, index) =>
       receipt({
         completedAt: `2026-09-27T10:0${index}:00.000Z`,
