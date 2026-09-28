@@ -242,6 +242,16 @@ describe('UnifiedSidebar library route', () => {
     expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
       collapsed: false,
     });
+    const row = screen
+      .getByRole('link', { name: /Inbox —/ })
+      .closest('[data-sidebar-brand-row]');
+    expect(row).toContainElement(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    );
+    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+      'href',
+      '/app'
+    );
   });
 
   it('keeps pending Inbox work reachable without a sidebar notifications region', () => {
