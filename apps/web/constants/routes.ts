@@ -86,6 +86,7 @@ export const APP_ROUTES = {
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
   ADMIN_OPS: '/hud',
+  ADMIN_SHIPPING: '/app/ov/shipping',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',
   ADMIN_WAITLIST: '/app/ov/waitlist',
@@ -127,6 +128,7 @@ export const APP_ROUTES = {
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
   ADMIN_SYSTEM: '/app/ov/system',
   ADMIN_FEATURES: '/app/ov/features',
+  ADMIN_CERTIFICATIONS: '/app/ov/certifications',
   /** Legacy feature-flags route. Redirect-only; use ADMIN_FEATURES. */
   LEGACY_FEATURE_FLAGS: '/app/feature-flags',
 

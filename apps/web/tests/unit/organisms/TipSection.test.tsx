@@ -1,10 +1,8 @@
-import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaySection } from '@/components/organisms/PaySection';
 
-// Mock Sonner toast with vi.hoisted for proper setup
 const mockToast = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
@@ -26,7 +24,6 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
 
-// Mock the ToastProvider from providers
 vi.mock('@/components/providers/ToastProvider', () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -39,26 +36,27 @@ describe('TipSection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    globalThis.localStorage.removeItem('jovie:pay:method');
   });
 
-  it('shows success toast when Stripe payment succeeds', async () => {
+  it('starts Stripe checkout only after Pay and does not claim payment completed', async () => {
     mockOnStripePayment.mockResolvedValueOnce(undefined);
 
     render(
       <PaySection handle='artist123' onStripePayment={mockOnStripePayment} />
     );
 
-    // Find and click the $5 button
-    const payButton = screen.getByText('$5');
-    fireEvent.click(payButton);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Select $5 payment amount' })
+    );
+    expect(mockOnStripePayment).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Pay $5 with Apple Pay / Card' })
+    );
 
-    // Wait for the payment to complete and toast to be called
     await waitFor(() => {
       expect(mockOnStripePayment).toHaveBeenCalledWith(5);
-      expect(mockToast.success).toHaveBeenCalledWith(
-        'Thanks for the $5!',
-        expect.objectContaining({ duration: 5000 })
-      );
+      expect(mockToast.success).not.toHaveBeenCalled();
     });
   });
 
@@ -69,11 +67,13 @@ describe('TipSection', () => {
       <PaySection handle='artist123' onStripePayment={mockOnStripePayment} />
     );
 
-    // Find and click the $5 button
-    const payButton = screen.getByText('$5');
-    fireEvent.click(payButton);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Select $5 payment amount' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Pay $5 with Apple Pay / Card' })
+    );
 
-    // Wait for the payment to fail and error toast to be called
     await waitFor(() => {
       expect(mockOnStripePayment).toHaveBeenCalledWith(5);
       expect(mockToast.error).toHaveBeenCalledWith(
@@ -83,7 +83,7 @@ describe('TipSection', () => {
     });
   });
 
-  it('renders payment method selection when both Stripe and Venmo are available', () => {
+  it('renders the shared dial when both Stripe and Venmo are available', () => {
     render(
       <PaySection
         handle='artist123'
@@ -93,16 +93,18 @@ describe('TipSection', () => {
       />
     );
 
-    expect(screen.getByText('Choose Payment Method')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Pay With Apple Pay Or Card' })
+      screen.getByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Pay With Venmo' })
+      screen.getByRole('button', { name: 'Pay $10 with Apple Pay / Card' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Select Venmo' })
     ).toBeInTheDocument();
   });
 
-  it('keeps the Venmo payment method action neutral with provider color only on the logo', () => {
+  it('keeps the payment action neutral with provider color only on the logo', async () => {
     render(
       <PaySection
         handle='artist123'
@@ -112,7 +114,10 @@ describe('TipSection', () => {
       />
     );
 
-    const venmoButton = screen.getByRole('button', { name: 'Pay With Venmo' });
+    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    const venmoButton = await screen.findByRole('button', {
+      name: 'Continue with Venmo',
+    });
     const venmoLogoClass = venmoButton
       .querySelector('svg')
       ?.getAttribute('class');
@@ -122,18 +127,7 @@ describe('TipSection', () => {
     expect(venmoLogoClass).toContain('text-brand-venmo');
   });
 
-  it('keeps provider colors out of the payment method selector source', () => {
-    const source = readFileSync('components/organisms/PaySection.tsx', 'utf8');
-
-    expect(source).not.toContain('bg-[#008CFF]');
-    expect(source).not.toContain('transition-opacity hover:opacity-90');
-    expect(source).toContain('PAY_METHOD_BUTTON_CLASSES');
-    expect(source).toContain(
-      "VenmoLogo className='h-5 w-auto text-brand-venmo'"
-    );
-  });
-
-  it('calls onVenmoPayment with a properly constructed URL when Venmo is used', () => {
+  it('calls onVenmoPayment only after Pay is pressed with the chosen amount', async () => {
     const handle = 'artist123';
     const venmoBaseLink = 'https://venmo.com/user';
 
@@ -146,40 +140,37 @@ describe('TipSection', () => {
       />
     );
 
-    // First, select the Venmo payment method
     const venmoMethodButton = screen.getByRole('button', {
-      name: 'Pay With Venmo',
+      name: 'Select Venmo',
     });
     fireEvent.click(venmoMethodButton);
+    expect(mockOnVenmoPayment).not.toHaveBeenCalled();
 
-    // Select the $5 amount in the PaySelector
     const amountButton = screen.getByRole('button', {
-      name: 'Select $5 tip amount',
+      name: 'Select $5 payment amount',
     });
     fireEvent.click(amountButton);
 
-    // Click the continue button to trigger payment
-    const continueButton = screen.getByRole('button', {
-      name: /Pay \$5 with Venmo/i,
+    const continueButton = await screen.findByRole('button', {
+      name: 'Continue with Venmo',
     });
     fireEvent.click(continueButton);
 
     expect(mockOnVenmoPayment).toHaveBeenCalledTimes(1);
     const urlArg = mockOnVenmoPayment.mock.calls[0][0];
 
-    // Basic checks on URL construction: base link and amount
     expect(urlArg).toContain(venmoBaseLink);
     expect(urlArg).toContain('utm_amount=5');
   });
 
-  it('renders QR code fallback when no Stripe or Venmo payment methods are available', () => {
+  it('does not promise a payment method when none is available', () => {
     render(<PaySection handle='artist123' />);
-
-    // QRCodeCard renders with the 'Scan to pay via Apple Pay' title
-    expect(screen.getByText('Scan to pay via Apple Pay')).toBeInTheDocument();
+    expect(
+      screen.getByText('Payments are not available for this artist yet.')
+    ).toBeInTheDocument();
   });
 
-  it('returns to payment method selection when back button is clicked after choosing a payment method', () => {
+  it('can switch back to Stripe without leaving the amount and method view', async () => {
     render(
       <PaySection
         handle='artist123'
@@ -189,27 +180,35 @@ describe('TipSection', () => {
       />
     );
 
-    // Enter a specific payment method flow (Stripe)
-    const stripeMethodButton = screen.getByRole('button', {
-      name: 'Pay With Apple Pay Or Card',
-    });
-    fireEvent.click(stripeMethodButton);
-
-    // After selecting a method, the generic payment method selection screen should no longer be visible
-    expect(screen.queryByText('Choose Payment Method')).not.toBeInTheDocument();
-
-    // Click the back button to return to the payment method selection screen
-    const backButton = screen.getByRole('button', { name: /back/i });
-    fireEvent.click(backButton);
-
-    // Verify that the payment method selection screen is shown again
-    expect(screen.getByText('Choose Payment Method')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    await screen.findByRole('button', { name: 'Continue with Venmo' });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Select Apple Pay / Card' })
+    );
     expect(
-      screen.getByRole('button', { name: 'Pay With Apple Pay Or Card' })
+      await screen.findByRole('button', {
+        name: 'Pay $10 with Apple Pay / Card',
+      })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Pay With Venmo' })
-    ).toBeInTheDocument();
+    expect(mockOnStripePayment).not.toHaveBeenCalled();
+  });
+
+  it('remembers the chosen method on this device without starting a payment', async () => {
+    render(
+      <PaySection
+        handle='artist123'
+        onStripePayment={mockOnStripePayment}
+        venmoLink='https://venmo.com/user'
+        onVenmoPayment={mockOnVenmoPayment}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    await screen.findByRole('button', { name: 'Continue with Venmo' });
+    await waitFor(() =>
+      expect(globalThis.localStorage.getItem('jovie:pay:method')).toBe('venmo')
+    );
+    expect(mockOnVenmoPayment).not.toHaveBeenCalled();
+    expect(mockOnStripePayment).not.toHaveBeenCalled();
   });
 
   it('renders Venmo payment flow directly when only Venmo is available', () => {
@@ -221,12 +220,32 @@ describe('TipSection', () => {
       />
     );
 
-    // When Stripe is not available, the payment method selection should not be shown
-    expect(screen.queryByText('Choose Payment Method')).toBeNull();
-
-    // Venmo payment flow should be available directly via the PaySelector continue button
     expect(
-      screen.getByRole('button', { name: /Pay \$10 with Venmo/i })
+      screen.getByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Continue with Venmo' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps custom amounts in the live dial without paying on edit', () => {
+    render(
+      <PaySection
+        handle='artist123'
+        venmoLink='https://venmo.com/user'
+        onVenmoPayment={mockOnVenmoPayment}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Custom Amount' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Custom Amount' }), {
+      target: { value: '12.50' },
+    });
+    expect(mockOnVenmoPayment).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue with Venmo' })
+    );
+    expect(mockOnVenmoPayment).toHaveBeenCalledWith(
+      expect.stringContaining('utm_amount=12.5')
+    );
   });
 });

@@ -752,7 +752,9 @@ function assuranceProfilesBySubject(
   return result;
 }
 
-function isCertificationReviewPacket(value: unknown): boolean {
+export function isCertificationReviewPacket(
+  value: unknown
+): value is CertificationReviewPacket {
   if (
     !isRecord(value) ||
     typeof value.contract !== 'string' ||
@@ -827,7 +829,7 @@ function isCertificationReviewPacket(value: unknown): boolean {
   });
 }
 
-function isPersistedFounderDecision(
+export function isPersistedFounderDecision(
   value: unknown,
   subjectId: string
 ): value is FounderCertificationDecision {
@@ -848,7 +850,7 @@ function isPersistedFounderDecision(
   );
 }
 
-function isPersistedAuditEvent(
+export function isPersistedAuditEvent(
   value: unknown,
   subjectId: string
 ): value is CertificationAuditEvent {

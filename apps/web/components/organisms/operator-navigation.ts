@@ -1,5 +1,6 @@
 import {
   Activity,
+  BadgeCheck,
   Banknote,
   Briefcase,
   Cable,
@@ -13,6 +14,7 @@ import {
   MessageSquare,
   Share2,
   TrendingUp,
+  Truck,
   Users,
 } from 'lucide-react';
 import {
@@ -26,7 +28,9 @@ import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 const OPERATOR_ICON_BY_ID = {
   overview: LayoutDashboard,
   chat: MessageSquare,
+  certifications: BadgeCheck,
   ops: Gauge,
+  shipping: Truck,
   people: Users,
   growth: FolderKanban,
   platform_connections: Cable,
