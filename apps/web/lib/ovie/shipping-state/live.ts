@@ -59,7 +59,7 @@ const DAY_MS = 24 * 60 * 60_000;
 const MERGE_QUEUE_QUERY =
   'query ShippingStateMergeQueue($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:1){totalCount}mergeQueue(branch:"main"){entries(first:20){totalCount pageInfo{hasNextPage}nodes{id position state pullRequest{number headRefOid}}}}}}';
 const LANE_PR_FIELDS =
-  'issueCount nodes{... on PullRequest{number title headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position}}}';
+  'issueCount nodes{... on PullRequest{number title url createdAt headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position state} author{login} commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){nodes{__typename ... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}';
 const LANE_PULL_REQUESTS_QUERY = `query ShippingStateLanePullRequests($query:String!){search(type:ISSUE,first:100,query:$query){${LANE_PR_FIELDS}}}`;
 const MERGES_QUERY =
   'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:1){issueCount}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
@@ -936,6 +936,69 @@ function unreachable(sourceId: ShippingSourceId, error: unknown) {
   );
 }
 
+const CHECK_RUN_FAILURE_CONCLUSIONS = new Set([
+  'FAILURE',
+  'TIMED_OUT',
+  'CANCELLED',
+  'ACTION_REQUIRED',
+  'STARTUP_FAILURE',
+  'STALE',
+]);
+const STATUS_CONTEXT_FAILURE_STATES = new Set(['FAILURE', 'ERROR']);
+const MAX_FAILING_CHECK_NAMES = 20;
+
+function boundedCheckName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/\s+/g, ' ').trim().slice(0, 120);
+  return normalized.length > 0 ? normalized : null;
+}
+
+/**
+ * Per-PR check rollup: GitHub's `StatusCheckRollup.state` plus the names of
+ * the failing runs so the shipping matrix can say *what* is red without a
+ * second fetch. Missing or partial data reads as `unknown`, never success.
+ */
+function laneChecksSummary(node: Record<string, unknown>): {
+  rollup: 'success' | 'failure' | 'pending' | 'unknown';
+  failing: string[];
+} {
+  const commits = isRecord(node.commits) ? node.commits.nodes : null;
+  const first = Array.isArray(commits) ? commits.find(isRecord) : null;
+  const commit = first && isRecord(first.commit) ? first.commit : null;
+  const rollup =
+    commit && isRecord(commit.statusCheckRollup)
+      ? commit.statusCheckRollup
+      : null;
+  const state =
+    typeof rollup?.state === 'string' ? rollup.state.toUpperCase() : null;
+  const summary =
+    state === 'SUCCESS'
+      ? 'success'
+      : state === 'FAILURE' || state === 'ERROR'
+        ? 'failure'
+        : state === 'PENDING' || state === 'EXPECTED'
+          ? 'pending'
+          : 'unknown';
+  const failing: string[] = [];
+  const contexts =
+    rollup && isRecord(rollup.contexts) ? rollup.contexts.nodes : null;
+  for (const ctx of Array.isArray(contexts) ? contexts : []) {
+    if (!isRecord(ctx)) continue;
+    const failed =
+      ctx.__typename === 'CheckRun'
+        ? CHECK_RUN_FAILURE_CONCLUSIONS.has(String(ctx.conclusion ?? ''))
+        : ctx.__typename === 'StatusContext'
+          ? STATUS_CONTEXT_FAILURE_STATES.has(String(ctx.state ?? ''))
+          : false;
+    if (!failed) continue;
+    const name = boundedCheckName(
+      ctx.__typename === 'CheckRun' ? ctx.name : ctx.context
+    );
+    if (name && failing.length < MAX_FAILING_CHECK_NAMES) failing.push(name);
+  }
+  return { rollup: summary, failing };
+}
+
 /**
  * Open lane PRs (`devin/`, `codex/` heads) via one search request per poll.
  * Dependabot and human branches are excluded by construction.
@@ -997,6 +1060,8 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
         pullRequests.push({
           number: node.number,
           title: node.title,
+          url: typeof node.url === 'string' ? node.url : null,
+          createdAt: node.createdAt,
           headRefName: node.headRefName,
           headRefOid: node.headRefOid,
           isDraft: node.isDraft === true,
@@ -1006,6 +1071,13 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
           mergeQueuePosition: Number.isInteger(queueEntry?.position)
             ? queueEntry?.position
             : null,
+          mergeQueueState:
+            typeof queueEntry?.state === 'string' ? queueEntry.state : null,
+          authorLogin:
+            isRecord(node.author) && typeof node.author.login === 'string'
+              ? node.author.login
+              : null,
+          checks: laneChecksSummary(node),
         });
       }
     }
