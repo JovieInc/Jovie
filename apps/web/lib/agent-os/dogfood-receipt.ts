@@ -130,12 +130,48 @@ export interface DogfoodReceiptInput {
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 
+const DOGFOOD_PRIVACY_KEYS = [
+  'conversationContentRetained',
+  'credentialsRetained',
+  'accountIdentityRetained',
+  'unrelatedPersonalDataRetained',
+] as const;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function nonEmpty(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function checkEnum(
+  value: unknown,
+  allowed: readonly string[],
+  field: string,
+  errors: string[]
+): void {
+  if (!nonEmpty(value) || !allowed.includes(value)) {
+    errors.push(`${field} must be one of ${allowed.join(', ')}`);
+  }
+}
+
+function checkTimestamp(value: unknown, field: string, errors: string[]): void {
+  if (!nonEmpty(value) || Number.isNaN(Date.parse(value))) {
+    errors.push(`${field} must be an ISO timestamp`);
+  }
+}
+
+function checkPrivacy(value: unknown, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push('privacy block is required');
+    return;
+  }
+  for (const key of DOGFOOD_PRIVACY_KEYS) {
+    if (typeof value[key] !== 'boolean') {
+      errors.push(`privacy.${key} must be a boolean`);
+    }
+  }
 }
 
 /**
@@ -153,24 +189,9 @@ export function validateDogfoodReceipt(value: unknown): string[] {
     errors.push(`schema must be ${JOVIE_DOGFOOD_RECEIPT_SCHEMA}`);
   }
   if (!nonEmpty(value.subjectId)) errors.push('subjectId is required');
-  if (
-    !nonEmpty(value.product) ||
-    !DOGFOOD_PRODUCTS.includes(value.product as DogfoodProduct)
-  ) {
-    errors.push(`product must be one of ${DOGFOOD_PRODUCTS.join(', ')}`);
-  }
-  if (
-    !nonEmpty(value.kind) ||
-    !DOGFOOD_KINDS.includes(value.kind as DogfoodKind)
-  ) {
-    errors.push(`kind must be one of ${DOGFOOD_KINDS.join(', ')}`);
-  }
-  if (
-    !nonEmpty(value.driver) ||
-    !DOGFOOD_DRIVERS.includes(value.driver as DogfoodDriver)
-  ) {
-    errors.push(`driver must be one of ${DOGFOOD_DRIVERS.join(', ')}`);
-  }
+  checkEnum(value.product, DOGFOOD_PRODUCTS, 'product', errors);
+  checkEnum(value.kind, DOGFOOD_KINDS, 'kind', errors);
+  checkEnum(value.driver, DOGFOOD_DRIVERS, 'driver', errors);
   if (!nonEmpty(value.missionId)) errors.push('missionId is required');
   if (!nonEmpty(value.actor)) errors.push('actor is required');
   if (!nonEmpty(value.environment)) errors.push('environment is required');
@@ -181,21 +202,9 @@ export function validateDogfoodReceipt(value: unknown): string[] {
     errors.push('commitSha must be a full 40-hex commit SHA');
   }
   if (!nonEmpty(value.flagCohort)) errors.push('flagCohort is required');
-  if (!nonEmpty(value.startedAt) || Number.isNaN(Date.parse(value.startedAt))) {
-    errors.push('startedAt must be an ISO timestamp');
-  }
-  if (
-    !nonEmpty(value.completedAt) ||
-    Number.isNaN(Date.parse(value.completedAt))
-  ) {
-    errors.push('completedAt must be an ISO timestamp');
-  }
-  if (
-    !nonEmpty(value.outcome) ||
-    !DOGFOOD_OUTCOMES.includes(value.outcome as DogfoodOutcome)
-  ) {
-    errors.push(`outcome must be one of ${DOGFOOD_OUTCOMES.join(', ')}`);
-  }
+  checkTimestamp(value.startedAt, 'startedAt', errors);
+  checkTimestamp(value.completedAt, 'completedAt', errors);
+  checkEnum(value.outcome, DOGFOOD_OUTCOMES, 'outcome', errors);
   if (value.blocker !== null && !nonEmpty(value.blocker)) {
     errors.push('blocker must be a non-empty string or null');
   }
@@ -205,21 +214,7 @@ export function validateDogfoodReceipt(value: unknown): string[] {
   ) {
     errors.push('evidenceRefs must be an array of non-empty strings');
   }
-  const privacy = value.privacy;
-  if (!isRecord(privacy)) {
-    errors.push('privacy block is required');
-  } else {
-    for (const key of [
-      'conversationContentRetained',
-      'credentialsRetained',
-      'accountIdentityRetained',
-      'unrelatedPersonalDataRetained',
-    ] as const) {
-      if (typeof privacy[key] !== 'boolean') {
-        errors.push(`privacy.${key} must be a boolean`);
-      }
-    }
-  }
+  checkPrivacy(value.privacy, errors);
   return errors;
 }
 
@@ -537,7 +532,7 @@ export function evaluateDogfoodReliability(
         );
       })
       .map(([key]) => key)
-      .sort();
+      .sort((left, right) => left.localeCompare(right));
 
     return {
       missionId: spec.id,
