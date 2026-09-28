@@ -46,9 +46,9 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Cross-Product Integration (combined)',
   'Promptfoo Evals (deterministic)',
   'Golden Eval Set (deterministic)',
-  'Database Certification (isolated Neon)',
   'Lighthouse (dashboard gate)',
   'Lighthouse (onboarding gate)',
+  'Database Certification (isolated Neon)',
 ];
 
 describe('ci-harness manifest', () => {
