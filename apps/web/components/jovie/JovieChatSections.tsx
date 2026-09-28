@@ -152,6 +152,7 @@ interface ChatInlineErrorProps {
   readonly onRetry: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+  readonly chatMode?: 'ov';
 }
 
 export function ChatInlineError({
@@ -159,6 +160,7 @@ export function ChatInlineError({
   onRetry,
   isLoading,
   isSubmitting,
+  chatMode,
 }: ChatInlineErrorProps) {
   return (
     <div
@@ -170,6 +172,7 @@ export function ChatInlineError({
         onRetry={onRetry}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
+        presentation={chatMode === 'ov' ? 'operator' : 'default'}
       />
     </div>
   );
