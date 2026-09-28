@@ -4,6 +4,16 @@ import { RENDER_FIXTURE_X_ROBOTS_TAG } from '@/lib/render-fixture-policy';
 
 const originalVercelEnv = process.env.VERCEL_ENV;
 
+const INVESTOR_PRIVATE_SOURCES: readonly string[] = [
+  '/investor-portal',
+  '/investor-portal/:path*',
+  '/pitch',
+  '/pitch/:path*',
+  '/investors',
+  '/investors/:path*',
+  '/Jovie-Pitch-Deck.pdf',
+];
+
 /** The subset of Next's `headers()` rule shape these assertions read. */
 interface HeaderRule {
   readonly source: string;
@@ -67,11 +77,29 @@ describe('staging preview privacy headers', () => {
       expect(values).toEqual([RENDER_FIXTURE_X_ROBOTS_TAG]);
     }
 
+    // Private investor surfaces (and their retired public URLs) are never
+    // indexable in any environment, and never shared-cacheable.
+    const investorRules = rules.filter(rule =>
+      INVESTOR_PRIVATE_SOURCES.includes(rule.source)
+    );
+    expect(investorRules.map(rule => rule.source).sort()).toEqual(
+      [...INVESTOR_PRIVATE_SOURCES].sort()
+    );
+    for (const rule of investorRules) {
+      expect(matchingHeaderValues([rule], 'X-Robots-Tag')).toEqual([
+        'noindex, nofollow, noarchive, nosnippet',
+      ]);
+      expect(matchingHeaderValues([rule], 'Cache-Control')).toEqual([
+        'private, no-cache, no-store, must-revalidate',
+      ]);
+    }
+
     // Every other production rule stays free of the preview-only header.
     const otherRules = rules.filter(
       rule =>
         rule.source !== '/renders/:path*' &&
-        rule.source !== '/:username/profile-mode-render/:path*'
+        rule.source !== '/:username/profile-mode-render/:path*' &&
+        !INVESTOR_PRIVATE_SOURCES.includes(rule.source)
     );
     expect(matchingHeaderValues(otherRules, 'X-Robots-Tag')).toEqual([]);
   });

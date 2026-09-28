@@ -1,3 +1,4 @@
+import { getSessionCookie } from 'better-auth/cookies';
 import type { NextFetchEvent, NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
@@ -6,19 +7,81 @@ import {
   releaseInvestorViewDedup,
   shouldRecordInvestorView,
 } from '@/lib/auth/investor-view-dedup';
+import {
+  isTestAuthBypassEnabled,
+  resolveTestBypassUserId,
+} from '@/lib/auth/test-mode';
 import { captureError } from '@/lib/error-tracking';
 import { apiLimiter } from '@/lib/rate-limit';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 
 const INVESTOR_TOKEN_COOKIE = '__investor_token';
 const INVESTOR_TOKEN_PARAM = 't';
+const INVESTOR_PORTAL_PATH = '/investor-portal';
+
+/**
+ * Former public investor surfaces. The brief, deck and memos now live only
+ * under /investor-portal; these answer a neutral, non-indexable 404 for
+ * everyone (they also stay reserved so no profile handle can take them).
+ */
+const RETIRED_INVESTOR_PATHS = ['/investors', '/pitch'] as const;
+const RETIRED_INVESTOR_FILES = new Set(['/Jovie-Pitch-Deck.pdf']);
+
+const PRIVATE_HEADERS = {
+  'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet',
+  'Cache-Control': 'private, no-store',
+} as const;
+
+function matchesPathPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+export function isRetiredInvestorPath(pathname: string): boolean {
+  return (
+    RETIRED_INVESTOR_FILES.has(pathname) ||
+    RETIRED_INVESTOR_PATHS.some(prefix => matchesPathPrefix(pathname, prefix))
+  );
+}
+
+function withPrivateHeaders<T extends NextResponse>(res: T): T {
+  for (const [key, value] of Object.entries(PRIVATE_HEADERS)) {
+    res.headers.set(key, value);
+  }
+  return res;
+}
+
+/** Neutral 404: identical for unknown, unauthorized and retired paths. */
+function investorNotFound(): NextResponse {
+  return withPrivateHeaders(new NextResponse(null, { status: 404 }));
+}
+
+function hasSignedInSession(req: NextRequest): boolean {
+  if (
+    isTestAuthBypassEnabled() &&
+    resolveTestBypassUserId(req.headers, req.cookies)
+  ) {
+    return true;
+  }
+  try {
+    return Boolean(getSessionCookie(req));
+  } catch {
+    // getSessionCookie can throw on malformed cookies; treat as signed-out.
+    return false;
+  }
+}
 
 /**
  * Handle investor portal requests.
  *
  * 1. Legacy subdomain (investors.jov.ie) → 301 redirect to /investor-portal
- * 2. /investor-portal?t=TOKEN → validate, set cookie, strip param
- * 3. /investor-portal with cookie → validate, record view, continue
+ * 2. Retired public /investors, /pitch and deck URLs → neutral 404
+ * 3. /investor-portal?t=TOKEN → validate, set cookie, strip param
+ * 4. /investor-portal with cookie → validate, record view, continue
+ * 5. /investor-portal with only a session → continue; the portal's server
+ *    gate admits admins and 404s everyone else
+ * 6. anything else under /investor-portal → neutral 404
+ *
+ * Every response on these paths is noindex and private, no-store.
  *
  * Extracted to dedicated helper so auth routing no longer shares a file
  * with token-gated investor access.
@@ -56,11 +119,12 @@ export async function handleInvestorRequest(
     return NextResponse.redirect(redirectUrl, 301);
   }
 
+  if (isRetiredInvestorPath(pathname)) {
+    return investorNotFound();
+  }
+
   // --- Path-based investor portal ---
-  if (
-    !pathname.startsWith('/investor-portal') ||
-    pathname.startsWith('/_next')
-  ) {
+  if (!matchesPathPrefix(pathname, INVESTOR_PORTAL_PATH)) {
     return null;
   }
 
@@ -72,13 +136,7 @@ export async function handleInvestorRequest(
     // Stripping ?t= here turns valid email links into 404s, and falling
     // through to Clerk would make token-only links depend on session state.
     if (isResponseActionPath) {
-      const res = NextResponse.next();
-      res.headers.set(
-        'X-Robots-Tag',
-        'noindex, nofollow, noarchive, nosnippet'
-      );
-      res.headers.set('Cache-Control', 'private, no-store');
-      return res;
+      return withPrivateHeaders(NextResponse.next());
     }
 
     // Rate limit token validation to prevent brute-force enumeration.
@@ -92,6 +150,7 @@ export async function handleInvestorRequest(
       return new NextResponse(null, {
         status: 429,
         headers: {
+          ...PRIVATE_HEADERS,
           'Retry-After': String(
             Math.max(
               1,
@@ -104,20 +163,20 @@ export async function handleInvestorRequest(
 
     const isValid = await validateInvestorToken(tokenParam);
     if (!isValid) {
-      return new NextResponse(null, { status: 404 });
+      return investorNotFound();
     }
 
     // Valid token: set cookie and redirect to strip ?t= from URL
     const cleanUrl = req.nextUrl.clone();
     cleanUrl.searchParams.delete(INVESTOR_TOKEN_PARAM);
 
-    const res = NextResponse.redirect(cleanUrl);
+    const res = withPrivateHeaders(NextResponse.redirect(cleanUrl));
     res.cookies.set(INVESTOR_TOKEN_COOKIE, tokenParam, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/investor-portal',
+      path: INVESTOR_PORTAL_PATH,
     });
 
     return res;
@@ -125,25 +184,23 @@ export async function handleInvestorRequest(
 
   // Check for token in cookie (return visits)
   const tokenCookie = req.cookies.get(INVESTOR_TOKEN_COOKIE)?.value;
+  const isValid = tokenCookie
+    ? await validateInvestorToken(tokenCookie)
+    : false;
 
-  if (!tokenCookie) {
-    return new NextResponse(null, { status: 404 });
-  }
-
-  // Validate cookie token against DB
-  const isValid = await validateInvestorToken(tokenCookie);
-
-  if (!isValid) {
-    const res = new NextResponse(null, { status: 404 });
-    res.cookies.delete(INVESTOR_TOKEN_COOKIE);
+  if (!tokenCookie || !isValid) {
+    // A signed-in visitor may be an admin. The proxy hot path is cookie-only,
+    // so the role check belongs to the portal's server gate, which renders
+    // the same neutral 404 for non-admins.
+    const res = hasSignedInSession(req)
+      ? withPrivateHeaders(NextResponse.next())
+      : investorNotFound();
+    if (tokenCookie) res.cookies.delete(INVESTOR_TOKEN_COOKIE);
     return res;
   }
 
-  const res = NextResponse.next();
-
   // Anti-scraping headers
-  res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
-  res.headers.set('Cache-Control', 'private, no-store');
+  const res = withPrivateHeaders(NextResponse.next());
 
   // Record view — use waitUntil for edge runtime reliability
   if (event) {

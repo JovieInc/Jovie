@@ -7,8 +7,9 @@ import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions/d
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { CACHE_TTL } from '@/lib/cache/tags';
+import { CACHE_TTL, createReleasesTag } from '@/lib/cache/tags';
 import { getWeeklyReleaseClickCounts } from '@/lib/db/queries/analytics';
+import type { ReleaseWithProviders } from '@/lib/discography/queries';
 import {
   getReleaseForProfileById,
   getReleasesForProfile as getReleasesFromDb,
@@ -47,12 +48,36 @@ async function requireProfile(profileId?: string): Promise<{
   };
 }
 
+/**
+ * Release matrix/entity server-cache key family (JOV-6272).
+ *
+ * Keyed by (userId, profileId, scope) only. The profile handle NEVER
+ * participates in the key: the same logical data must share one cache entry
+ * across handle renames, and mutations invalidate the family by
+ * (userId, profileId) regardless of handle changes.
+ */
+function releaseCacheKeys(userId: string, profileId: string) {
+  return {
+    matrix: ['releases-matrix', userId, profileId],
+    matrixArchived: ['releases-matrix-archived', userId, profileId],
+    entity: (releaseId: string) => [
+      'release-entity',
+      userId,
+      profileId,
+      releaseId,
+    ],
+  };
+}
+
+interface CachedReleaseMatrix {
+  readonly releases: ReleaseWithProviders[];
+  readonly weeklyClickCounts: Array<[string, number]>;
+}
+
 async function fetchReleaseMatrixCore(
   profileId: string,
-  profileHandle: string,
   lifecycle: 'active' | 'archived' = 'active'
-): Promise<ReleaseViewModel[]> {
-  const providerLabels = buildProviderLabels();
+): Promise<CachedReleaseMatrix> {
   const [releases, weeklyClickCounts] = await Promise.all([
     getReleasesFromDb(profileId, { includeDrafts: true, lifecycle }),
     // Weekly metric degrades gracefully: a failed aggregate never blocks the
@@ -62,7 +87,21 @@ async function fetchReleaseMatrixCore(
     ),
   ]);
 
-  return releases.map(release => {
+  return {
+    releases,
+    weeklyClickCounts: Array.from(weeklyClickCounts.entries()),
+  };
+}
+
+function mapReleaseMatrix(
+  cached: CachedReleaseMatrix,
+  profileId: string,
+  profileHandle: string
+): ReleaseViewModel[] {
+  const providerLabels = buildProviderLabels();
+  const weeklyClickCounts = new Map(cached.weeklyClickCounts);
+
+  return cached.releases.map(release => {
     const viewModel = mapReleaseToViewModel(
       release,
       providerLabels,
@@ -76,17 +115,11 @@ async function fetchReleaseMatrixCore(
 
 async function fetchReleaseEntityCore(
   profileId: string,
-  profileHandle: string,
   releaseId: string
-): Promise<ReleaseViewModel | null> {
-  const providerLabels = buildProviderLabels();
-  const release = await getReleaseForProfileById(profileId, releaseId, {
+): Promise<ReleaseWithProviders | null> {
+  return getReleaseForProfileById(profileId, releaseId, {
     includeDrafts: true,
   });
-
-  return release
-    ? mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
-    : null;
 }
 
 async function resolveReleaseMatrix(
@@ -100,14 +133,16 @@ async function resolveReleaseMatrix(
 
   const profile = await requireProfile(profileId);
 
-  return unstable_cache(
-    () => fetchReleaseMatrixCore(profile.id, profile.handle),
-    ['releases-matrix', userId, profile.id],
+  const cached = await unstable_cache(
+    () => fetchReleaseMatrixCore(profile.id),
+    releaseCacheKeys(userId, profile.id).matrix,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
+      tags: [createReleasesTag(userId, profile.id)],
     }
   )();
+
+  return mapReleaseMatrix(cached, profile.id, profile.handle);
 }
 
 const loadReleaseMatrixCached = cache(resolveReleaseMatrix);
@@ -130,14 +165,23 @@ async function resolveReleaseEntity(params: {
 
   const profile = await requireProfile(params.profileId);
 
-  return unstable_cache(
-    () => fetchReleaseEntityCore(profile.id, profile.handle, params.releaseId),
-    ['release-entity', userId, profile.id, params.releaseId],
+  const release = await unstable_cache(
+    () => fetchReleaseEntityCore(profile.id, params.releaseId),
+    releaseCacheKeys(userId, profile.id).entity(params.releaseId),
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${userId}:${profile.id}`],
+      tags: [createReleasesTag(userId, profile.id)],
     }
   )();
+
+  return release
+    ? mapReleaseToViewModel(
+        release,
+        buildProviderLabels(),
+        profile.id,
+        profile.handle
+      )
+    : null;
 }
 
 const loadReleaseEntityCached = cache(resolveReleaseEntity);
@@ -154,14 +198,16 @@ export async function loadReleaseMatrixForProfile(
 ): Promise<ReleaseViewModel[]> {
   const owned = await requireOwnedReleaseProfile(profile.profileId);
 
-  return unstable_cache(
-    () => fetchReleaseMatrixCore(owned.profileId, profile.profileHandle),
-    ['releases-matrix', owned.userId, owned.profileId, profile.profileHandle],
+  const cached = await unstable_cache(
+    () => fetchReleaseMatrixCore(owned.profileId),
+    releaseCacheKeys(owned.userId, owned.profileId).matrix,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${owned.userId}:${owned.profileId}`],
+      tags: [createReleasesTag(owned.userId, owned.profileId)],
     }
   )();
+
+  return mapReleaseMatrix(cached, owned.profileId, owned.profileHandle);
 }
 
 export async function loadArchivedReleaseMatrixForProfile(
@@ -169,22 +215,14 @@ export async function loadArchivedReleaseMatrixForProfile(
 ): Promise<ReleaseViewModel[]> {
   const owned = await requireOwnedReleaseProfile(profile.profileId);
 
-  return unstable_cache(
-    () =>
-      fetchReleaseMatrixCore(
-        owned.profileId,
-        profile.profileHandle,
-        'archived'
-      ),
-    [
-      'releases-matrix-archived',
-      owned.userId,
-      owned.profileId,
-      profile.profileHandle,
-    ],
+  const cached = await unstable_cache(
+    () => fetchReleaseMatrixCore(owned.profileId, 'archived'),
+    releaseCacheKeys(owned.userId, owned.profileId).matrixArchived,
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [`releases:${owned.userId}:${owned.profileId}`],
+      tags: [createReleasesTag(owned.userId, owned.profileId)],
     }
   )();
+
+  return mapReleaseMatrix(cached, owned.profileId, owned.profileHandle);
 }

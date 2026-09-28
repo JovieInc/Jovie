@@ -45,6 +45,47 @@ enum TeleprompterPromptFeedback: String, Equatable, Sendable {
   case queuedOffline
 }
 
+/// One slot in the bottom control sheet's thumb cluster (JOV-5343). Every
+/// case maps to a control the overlay already exposes — the sheet only
+/// repositions them within one-hand reach; it adds no new capture behavior.
+enum TeleprompterSheetControl: String, Equatable, Sendable, CaseIterable {
+  case editScript
+  case presentation
+  case speedOverride
+  case peek
+  case grid
+  case close
+  case usefulFeedback
+  case passFeedback
+  case scriptMode
+}
+
+/// BMC-style bottom sheet layout contract (JOV-5343): a fixed 2×3 thumb
+/// cluster beside the record control. Kept as pure data so the one-hand
+/// layout stays unit-testable without a simulator.
+enum TeleprompterControlSheet {
+  static let clusterRowCount = 2
+  static let clusterColumnCount = 3
+
+  /// Row 1 sits nearest the record control (primary thumb zone).
+  static func cluster(
+    for contentMode: TeleprompterContentMode
+  ) -> [[TeleprompterSheetControl]] {
+    switch contentMode {
+    case .script:
+      [
+        [.editScript, .presentation, .speedOverride],
+        [.peek, .grid, .close],
+      ]
+    case .prompt:
+      [
+        [.usefulFeedback, .passFeedback, .scriptMode],
+        [.peek, .grid, .close],
+      ]
+    }
+  }
+}
+
 /// Pure speed-override math (unit-testable without audio/camera hardware):
 /// advances the prompt at a fixed reading speed from the word where auto
 /// mode was engaged.
