@@ -15,6 +15,19 @@ const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
 const includeMobileMatrix =
   process.env.E2E_MOBILE_MATRIX === '1' || isFullMatrix;
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
+const usesManagedWebServer =
+  !shouldSkipManagedWebServer && !(isCI && process.env.BASE_URL);
+// The managed web server always runs with theme switching on (see webServer.env
+// below), but Playwright only forwards that env to the spawned server, not to
+// this config process or the workers it forks. Test files that import
+// isThemeRoute() need to see the same value the server was built with, or the
+// light-mode axe pass silently skips every route (Seer 17142845/0).
+const themeSwitchingForTests = usesManagedWebServer
+  ? '1'
+  : process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING;
+if (themeSwitchingForTests) {
+  process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = themeSwitchingForTests;
+}
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
@@ -173,7 +186,7 @@ export default defineConfig({
   ],
 
   // Only start web server if not in CI (when BASE_URL is not set)
-  ...(shouldSkipManagedWebServer || (isCI && process.env.BASE_URL)
+  ...(!usesManagedWebServer
     ? {}
     : {
         webServer: {
@@ -184,8 +197,10 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',
-            // Light mode stays under test while production forces dark.
-            NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1',
+            // Light mode stays under test while production forces dark. Kept
+            // in sync with themeSwitchingForTests above so isThemeRoute()
+            // agrees in both the server and the test process.
+            NEXT_PUBLIC_FEATURE_THEME_SWITCHING: themeSwitchingForTests ?? '1',
             E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_FAST_ONBOARDING: '1',

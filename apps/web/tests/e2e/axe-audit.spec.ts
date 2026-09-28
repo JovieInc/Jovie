@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { isThemeRoute } from '@/lib/theme/route-policy';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
 import { AUTHED_AXE_SURFACES } from './utils/authed-axe-surface-manifest';
@@ -195,6 +196,15 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
         // render in light theme, then scan color-contrast specifically.
         // Public surfaces default to dark (className='dark' in app/layout.tsx),
         // so this is the only place they're exercised in light mode.
+        //
+        // Only routes in THEME_ROUTE_POLICY can ever render light: theme-init.js
+        // and CoreProviders (forcedTheme='dark') pin every other route — public
+        // profiles, playlists, releases — to dark, fail-closed. Stripping
+        // `.dark` there scans a state no visitor can reach, so skip it; the
+        // dark-theme scan above still gates those surfaces.
+        if (!isThemeRoute(new URL(page.url()).pathname)) {
+          return;
+        }
         await page.evaluate(() => {
           document.documentElement.classList.remove('dark');
         });
