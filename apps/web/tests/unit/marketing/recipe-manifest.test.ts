@@ -1563,7 +1563,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     // Source inventory must not clear incomplete root/variant registration.
     expect(entry.bindingEvidence.status).toBe('unverified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
-      'centered-none',
+      'split-claim-card',
       ...rows.map(() => 'editorial'),
       'editorial-search',
     ]);
