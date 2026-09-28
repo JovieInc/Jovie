@@ -46,11 +46,6 @@
   opacity: 1;
 }
 
-/* Keyboard focus follows the pill's own geometry (JOV-6946). */
-.input-aura-frame--editorial:has(:focus-visible) {
-  box-shadow: 0 0 0 var(--space-0-5, 2px) var(--color-focus);
-}
-
 .input-aura-frame--editorial > .homepage-name-search__field {
   z-index: 1;
 }
