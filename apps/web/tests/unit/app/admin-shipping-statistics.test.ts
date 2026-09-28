@@ -37,7 +37,7 @@ function projectionWithCounts() {
       lastError: null,
     })
   );
-  const runtime = projection.sources['symphony-runtime'];
+  const runtime = projection.sources['lanes-status'];
   Object.assign(runtime, {
     state: 'fresh',
     freshnessDeadline: FRESH_UNTIL,
@@ -46,6 +46,16 @@ function projectionWithCounts() {
       ...runtime.counts,
       running: { state: 'measured-nonzero', value: 3 },
       retrying: { state: 'measured-zero', value: 0 },
+    },
+  });
+
+  const lanePullRequests = projection.sources['lane-pull-requests'];
+  Object.assign(lanePullRequests, {
+    state: 'fresh',
+    freshnessDeadline: FRESH_UNTIL,
+    sourceTimestamp: OBSERVED_AT,
+    counts: {
+      ...lanePullRequests.counts,
       blocked: { state: 'measured-nonzero', value: 2 },
     },
   });

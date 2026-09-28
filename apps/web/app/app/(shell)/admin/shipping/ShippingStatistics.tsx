@@ -14,9 +14,9 @@ export function pipelineRows(
   now: number
 ) {
   const definitions = [
-    ['Running', 'symphony-runtime', 'running'],
-    ['Retrying', 'symphony-runtime', 'retrying'],
-    ['Blocked', 'symphony-runtime', 'blocked'],
+    ['Running', 'lanes-status', 'running'],
+    ['Retrying', 'lanes-status', 'retrying'],
+    ['Blocked', 'lane-pull-requests', 'blocked'],
     ['Open Pull Requests', 'github-native-merge-queue', 'openPullRequests'],
     ['Native merge queue', 'github-native-merge-queue', 'queued'],
   ] as const;
