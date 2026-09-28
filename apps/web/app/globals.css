@@ -2227,6 +2227,25 @@ body {
   }
 }
 
+/* Ask Jovie mark: one restrained 360° turn on hover/focus (JOV-6569). */
+@keyframes ask-jovie-mark-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ask-jovie-mark:hover .ask-jovie-mark-icon,
+.ask-jovie-mark:focus-visible .ask-jovie-mark-icon {
+  animation: ask-jovie-mark-spin 480ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-jovie-mark:hover .ask-jovie-mark-icon,
+  .ask-jovie-mark:focus-visible .ask-jovie-mark-icon {
+    animation: none;
+  }
+}
+
 /* Keyframes */
 
 @keyframes mobile-nav-item-in {
