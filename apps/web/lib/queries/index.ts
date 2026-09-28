@@ -93,6 +93,7 @@ export {
   createQueryFn,
   FetchError,
   fetchWithTimeout,
+  isForbiddenError,
 } from './fetch';
 // Client-side hydration boundary
 export { HydrateClient } from './HydrateClient';
