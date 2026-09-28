@@ -35,10 +35,6 @@
     "apps/web/lib/eval/calibration.ts": {
       "readFileSync": 1
     },
-    "apps/web/lib/hud/ovie-mac-hud.server.ts": {
-      "existsSync": 1,
-      "readFileSync": 1
-    },
     "apps/web/lib/hud/shipper-state.ts": {
       "existsSync": 5,
       "readFileSync": 3

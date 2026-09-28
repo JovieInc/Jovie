@@ -27,6 +27,15 @@ vi.mock('@/lib/chat/knowledge/router', () => ({
     text.includes('royalties') ? 'ROYALTY-KNOWLEDGE' : '',
 }));
 
+const loggerError = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/utils/logger', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/utils/logger')>(
+      '@/lib/utils/logger'
+    );
+  return { ...actual, logger: { ...actual.logger, error: loggerError } };
+});
+
 vi.mock('@ai-sdk/gateway', () => ({
   createGateway: vi.fn(() =>
     vi.fn((modelId: string) => ({ __model: modelId }))
@@ -219,5 +228,26 @@ describe('executeChatTurn context cost', () => {
         ]),
       },
     });
+  });
+
+  it('logs the real model stream error even without telemetry (JOV-6533)', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      requestId: 'req-1',
+      uiMessages: [
+        { id: 'a', role: 'user', parts: [{ type: 'text', text: 'hi' }] },
+      ] as UIMessage[],
+    });
+    const boom = new Error('provider rejected the request');
+    await (
+      capturedOptions(turn) as unknown as {
+        onError: (e: { error: unknown }) => Promise<void>;
+      }
+    ).onError({ error: boom });
+
+    expect(loggerError).toHaveBeenCalledWith(
+      '[chat] model stream error',
+      expect.objectContaining({ error: boom, requestId: 'req-1' })
+    );
   });
 });

@@ -121,7 +121,7 @@ describe('self-hosted runner setup action', () => {
       // Stale-tree guard: the key binds OS, arch, Node pin, lockfile,
       // workspace, patches and .npmrc, and no prefix match may restore.
       expect(restoreStep).toContain(
-        "key: pnpm-node-modules-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}"
+        "key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}"
       );
       expect(restoreStep).not.toContain('restore-keys');
     });
@@ -134,9 +134,11 @@ describe('self-hosted runner setup action', () => {
       expect(stepBlock('Warm pnpm store')).toContain(
         "if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'"
       );
-      // The frozen install still runs on a hit and re-verifies the tree.
+      // Only validated merge-group consumers skip the redundant frozen install.
       const installStep = stepBlock('Install dependencies');
-      expect(installStep).not.toContain('if:');
+      expect(installStep).toContain(
+        "inputs.reuse_merge_group_workspace != 'true'"
+      );
       expect(installStep).toContain('pnpm install --frozen-lockfile');
     });
 
@@ -158,11 +160,10 @@ describe('self-hosted runner setup action', () => {
       expect(saveStep).toContain(
         "(github.event_name == 'pull_request' &&\n        github.event.pull_request.head.repo.full_name == github.repository))"
       );
-      for (const untrusted of [
-        'pull_request_target',
-        'workflow_run',
-        'merge_group',
-      ]) {
+      expect(saveStep).toContain(
+        "github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true'"
+      );
+      for (const untrusted of ['pull_request_target', 'workflow_run']) {
         expect(saveStep).not.toContain(`== '${untrusted}'`);
       }
       expect(saveStep).toContain(cachedPaths);

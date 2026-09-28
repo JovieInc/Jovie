@@ -820,6 +820,7 @@ jobs:
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/invariants/scanned-paths.mjs
+            scripts/invariants/design-surfaces.mjs
             scripts/invariants/done-sprint-invariants.mjs
             scripts/invariants/ios-web-no-scroll-jank.mjs
             scripts/invariants/latency-sensitive-execution-paths.mjs
