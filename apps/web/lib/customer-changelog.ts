@@ -15,6 +15,8 @@ import {
   type ChangelogRelease,
   type ChangelogSection,
   changelogInlineText,
+  changelogVersionLabel,
+  isDailyChangelogKey,
 } from './changelog-parser';
 
 export const CUSTOMER_CHANGELOG_CATEGORIES = [
@@ -191,7 +193,10 @@ function slugify(title: string, version: string, index: number): string {
       .replaceAll(/[^a-z0-9]+/g, '-')
       .replaceAll(/^-+|-+$/g, '')
       .slice(0, 48) || 'update';
-  return `${base}-v${version.replaceAll('.', '-')}-${index}`;
+  const versionSlug = isDailyChangelogKey(version)
+    ? version
+    : `v${version.replaceAll('.', '-')}`;
+  return `${base}-${versionSlug}-${index}`;
 }
 
 function inferCapabilities(text: string): string[] {
@@ -240,7 +245,9 @@ export function formatCustomerChangelogTertiary(
   version: string
 ): string {
   const formattedDate = formatCustomerChangelogDate(date);
-  const versionLabel = `v${version}`;
+  // A daily digest is already dated by its key; no version suffix.
+  if (isDailyChangelogKey(version)) return formattedDate || version;
+  const versionLabel = changelogVersionLabel(version);
   return formattedDate ? `${formattedDate} · ${versionLabel}` : versionLabel;
 }
 

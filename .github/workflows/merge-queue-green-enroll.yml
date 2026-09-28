@@ -61,7 +61,9 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge']);
+            // queue-poison: ejected twice in 24 h (scripts/lanes/pr_events.py, JOV-6904);
+            // the lanes remove it with their fix.
+            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
             const { owner, repo } = context.repo;
             // Page through every open PR: a single first:100 window ordered
             // UPDATED_AT ASC hid every recently fixed PR once >100 were open.

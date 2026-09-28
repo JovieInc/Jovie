@@ -46,6 +46,31 @@ function memoryBackend(
   };
 }
 
+/**
+ * Production shape: the jsonb column stores the ledger string, but Drizzle
+ * parses it again on read, so get() returns an object (2026-09-28).
+ */
+function jsonbBackend(
+  records = new Map<string, string>()
+): CertificationRecordBackend {
+  return {
+    async compareAndSet(key, expected, next) {
+      if (records.get(key) !== expected) return false;
+      records.set(key, next);
+      return true;
+    },
+    async get(key) {
+      const stored = records.get(key);
+      return stored === undefined ? null : JSON.parse(stored);
+    },
+    async setIfAbsent(key, value) {
+      if (records.has(key)) return false;
+      records.set(key, value as string);
+      return true;
+    },
+  };
+}
+
 function proof(
   tier: CertificationEvidenceReceipt['tier'],
   id: string,
@@ -339,6 +364,30 @@ describe('MarketingCertificationStore', () => {
         existingEntryId: null,
       })
     ).resolves.toMatchObject({ eligibleSubjectIds: [], selected: null });
+  });
+
+  it('persists through a jsonb backend that returns the parsed ledger', async () => {
+    const records = new Map<string, string>();
+    const store = new MarketingCertificationStore(
+      jsonbBackend(records),
+      REGISTRY
+    );
+
+    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:02:00.000Z');
+    await store.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:02:01.000Z');
+
+    const stored = [...records.values()][0];
+    expect(typeof stored).toBe('string');
+    const ledger = JSON.parse(stored ?? '{}');
+    expect(ledger.records[REGISTRY[0].id].packetUpdatedAt).toBe(
+      '2026-09-04T20:02:00.000Z'
+    );
+    expect(ledger.records[REGISTRY[1].id].packetUpdatedAt).toBe(
+      '2026-09-04T20:02:01.000Z'
+    );
+    await expect(store.inspectLedger()).resolves.toMatchObject({
+      contract: expect.any(String),
+    });
   });
 
   it('selects deterministically at most one and preserves occupied Badge', async () => {
