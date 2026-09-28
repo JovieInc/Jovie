@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Share2,
   TrendingUp,
+  Truck,
   Users,
 } from 'lucide-react';
 import {
@@ -29,6 +30,7 @@ const OPERATOR_ICON_BY_ID = {
   chat: MessageSquare,
   certifications: BadgeCheck,
   ops: Gauge,
+  shipping: Truck,
   people: Users,
   growth: FolderKanban,
   platform_connections: Cable,
