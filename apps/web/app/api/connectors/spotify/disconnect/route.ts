@@ -12,11 +12,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/connectors/spotify/disconnect
- *
- * Marks the signed-in user's Spotify connector accounts as disabled and clears
- * stored tokens. Does NOT revoke the grant at Spotify (the user can do that
- * from their Spotify account settings).
+ * POST /api/connectors/spotify/disconnect — marks the signed-in user's Spotify
+ * connector accounts disabled and clears stored tokens. Does NOT revoke the
+ * grant at Spotify.
  */
 export async function POST() {
   try {

@@ -11,10 +11,7 @@ export interface SpotifyAccountProfile {
   readonly label: string;
 }
 
-/**
- * Fetches the connected Spotify account's profile (`GET /me`). Used to label
- * connector accounts and as the canonical health check for the connection.
- */
+/** Fetches the connected Spotify account's profile (`GET /me`); also the connection health check. */
 export async function getSpotifyAccountProfile(input: {
   readonly accessToken: string;
   readonly fetcher?: typeof serverFetch;

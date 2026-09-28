@@ -17,10 +17,21 @@ vi.mock('@/lib/connectors/token-vault', () => ({
   storeTokens: mockStoreTokens,
   withRefreshLock: mockWithRefreshLock,
 }));
-
 vi.mock('@/lib/http/server-fetch', () => ({
   serverFetch: mockServerFetch,
 }));
+
+const EXPIRED = {
+  accessToken: 'stale-token',
+  refreshToken: 'refresh-1',
+  expiresAt: new Date(Date.now() - 1000),
+};
+
+const loadModule = () => import('@/lib/connectors/spotify/access-token');
+async function load(id = 'conn_1') {
+  const { loadFreshSpotifyAccessToken } = await loadModule();
+  return loadFreshSpotifyAccessToken(id);
+}
 
 describe('spotify connector access token', () => {
   beforeEach(() => {
@@ -37,27 +48,16 @@ describe('spotify connector access token', () => {
 
   it('returns the stored token when it is still fresh', async () => {
     mockLoadDecryptedToken.mockResolvedValue({
+      ...EXPIRED,
       accessToken: 'stored-token',
-      refreshToken: 'refresh',
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     });
-
-    const { loadFreshSpotifyAccessToken } = await import(
-      '@/lib/connectors/spotify/access-token'
-    );
-
-    await expect(loadFreshSpotifyAccessToken('conn_1')).resolves.toBe(
-      'stored-token'
-    );
+    await expect(load()).resolves.toBe('stored-token');
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
   it('refreshes an expired token and persists a rotated refresh token', async () => {
-    mockLoadDecryptedToken.mockResolvedValue({
-      accessToken: 'stale-token',
-      refreshToken: 'refresh-1',
-      expiresAt: new Date(Date.now() - 1000),
-    });
+    mockLoadDecryptedToken.mockResolvedValue(EXPIRED);
     mockServerFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -66,14 +66,7 @@ describe('spotify connector access token', () => {
         expires_in: 3600,
       }),
     });
-
-    const { loadFreshSpotifyAccessToken } = await import(
-      '@/lib/connectors/spotify/access-token'
-    );
-
-    await expect(loadFreshSpotifyAccessToken('conn_1')).resolves.toBe(
-      'fresh-token'
-    );
+    await expect(load()).resolves.toBe('fresh-token');
     expect(mockStoreTokens).toHaveBeenCalledWith(
       expect.objectContaining({
         connectorAccountId: 'conn_1',
@@ -86,34 +79,19 @@ describe('spotify connector access token', () => {
     expect(request.body).toContain('grant_type=refresh_token');
   });
 
-  it('returns null when the account has no refresh token', async () => {
-    mockLoadDecryptedToken.mockResolvedValue({
-      accessToken: 'stale-token',
-      refreshToken: null,
-      expiresAt: new Date(Date.now() - 1000),
-    });
-
-    const { loadFreshSpotifyAccessToken } = await import(
-      '@/lib/connectors/spotify/access-token'
-    );
-
-    await expect(loadFreshSpotifyAccessToken('conn_1')).resolves.toBeNull();
-    expect(mockServerFetch).not.toHaveBeenCalled();
-  });
-
-  it('returns null when the provider rejects the refresh', async () => {
-    mockLoadDecryptedToken.mockResolvedValue({
-      accessToken: 'stale-token',
-      refreshToken: 'refresh-1',
-      expiresAt: new Date(Date.now() - 1000),
-    });
-    mockServerFetch.mockResolvedValue({ ok: false, status: 400 });
-
-    const { loadFreshSpotifyAccessToken } = await import(
-      '@/lib/connectors/spotify/access-token'
-    );
-
-    await expect(loadFreshSpotifyAccessToken('conn_1')).resolves.toBeNull();
-    expect(mockStoreTokens).not.toHaveBeenCalled();
+  it.each([
+    ['account has no refresh token', { ...EXPIRED, refreshToken: null }, false],
+    ['provider rejects the refresh', EXPIRED, true],
+  ])('returns null when the %s', async (_name, stored, providerRejects) => {
+    mockLoadDecryptedToken.mockResolvedValue(stored);
+    if (providerRejects) {
+      mockServerFetch.mockResolvedValue({ ok: false, status: 400 });
+    }
+    await expect(load()).resolves.toBeNull();
+    if (providerRejects) {
+      expect(mockStoreTokens).not.toHaveBeenCalled();
+    } else {
+      expect(mockServerFetch).not.toHaveBeenCalled();
+    }
   });
 });

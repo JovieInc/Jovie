@@ -24,10 +24,8 @@ function redirectError(origin: string, returnTo: string, error: string) {
 }
 
 /**
- * Spotify OAuth flow for the canonical connector primitive. The same route
- * serves artist accounts on Jovie and company accounts on Ovie — the connected
- * account is keyed to the signed-in user, not to a product surface.
- *
+ * Spotify OAuth for the canonical connector primitive — one route serves artist
+ * accounts on Jovie and company accounts on Ovie.
  * GET /api/connectors/spotify/authorize?returnTo=/app/admin/platform-connections
  */
 export async function GET(request: Request) {

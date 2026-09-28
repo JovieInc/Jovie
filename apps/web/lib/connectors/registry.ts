@@ -85,7 +85,7 @@ export const CONNECTOR_REGISTRY = {
     id: CONNECTOR_PROVIDERS.spotify,
     label: 'Spotify',
     description:
-      'Connect a Spotify account so agent workflows can publish playlists and read catalog data.',
+      'Connect Spotify so agent workflows can publish playlists and read catalog data.',
     iconKey: 'spotify',
     oauthBundle: 'spotify',
     oauthScopes: [...SPOTIFY_OAUTH_SCOPES],

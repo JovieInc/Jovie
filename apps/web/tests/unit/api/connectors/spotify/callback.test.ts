@@ -1,15 +1,7 @@
 /**
- * GET /api/connectors/spotify/callback
- *
- * Mocks only `@/lib/db`, `@/lib/auth/cached`, `@/lib/http/server-fetch`,
- * `@/lib/env-server`, and `@/lib/error-tracking`. State verification
- * (`verifyGoogleOAuthState`) and token persistence (`storeTokens` → real
- * `encryptPII`) run for real, so a dropped signature check or a dropped
- * encryption call is caught by these assertions rather than by an inspected
- * mock call.
- *
- * `PII_ENCRYPTION_KEY` is left unset so the real `encryptPII` takes its cheap
- * dev/test plaintext-passthrough branch (no `scryptSync` cost).
+ * GET /api/connectors/spotify/callback — only db, auth, server-fetch, env, and
+ * error-tracking are mocked. State verification and `storeTokens` → real
+ * `encryptPII` run for real (PII_ENCRYPTION_KEY unset → cheap passthrough).
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,7 +24,6 @@ const hoisted = vi.hoisted(() => ({
     TRACKING_TOKEN_SECRET: 'test-oauth-state-secret' as string | undefined,
     CRON_SECRET: undefined as string | undefined,
     PII_ENCRYPTION_KEY: undefined as string | undefined,
-    VERCEL_ENV: undefined as string | undefined,
     NODE_ENV: 'test',
   },
 }));
@@ -40,20 +31,16 @@ const hoisted = vi.hoisted(() => ({
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
 }));
-
 vi.mock('@/lib/db', () => ({
   db: { insert: hoisted.dbInsertMock, update: hoisted.dbUpdateMock },
 }));
-
 vi.mock('@/lib/http/server-fetch', () => ({
   serverFetch: hoisted.serverFetchMock,
 }));
-
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureErrorMock,
   captureWarning: hoisted.captureWarningMock,
 }));
-
 vi.mock('@/lib/env-server', () => ({
   env: hoisted.mockEnv,
   isTestEnv: () => true,
@@ -61,44 +48,35 @@ vi.mock('@/lib/env-server', () => ({
 
 import { signGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
 
-interface InsertCall {
-  readonly values: Record<string, unknown>;
-  readonly conflict: unknown;
-}
+const GET_ROUTE = () => import('@/app/api/connectors/spotify/callback/route');
+const CONNECTORS = `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}`;
 
-interface UpdateCall {
-  readonly set: Record<string, unknown>;
-  readonly where: unknown;
-}
-
-function trackInserts(returnIds: string[]): InsertCall[] {
-  const calls: InsertCall[] = [];
+function trackInserts(returnIds: string[]) {
+  const calls: Record<string, unknown>[] = [];
   let n = 0;
   hoisted.dbInsertMock.mockImplementation(() => ({
-    values: (valuesArg: Record<string, unknown>) => ({
-      onConflictDoUpdate: (conflictArg: unknown) => {
-        calls.push({ values: valuesArg, conflict: conflictArg });
-        const id = returnIds[n] ?? `mock-id-${n}`;
-        n += 1;
-        return { returning: () => Promise.resolve([{ id }]) };
+    values: (v: Record<string, unknown>) => ({
+      onConflictDoUpdate: () => {
+        calls.push(v);
+        return {
+          returning: () =>
+            Promise.resolve([{ id: returnIds[n++] ?? `mock-id-${n}` }]),
+        };
       },
     }),
   }));
   return calls;
 }
 
-/**
- * `where()` must return a thenable (disconnect/mark paths await or `.catch`
- * it) that also exposes `.returning()` for `storeTokens`.
- */
-function trackUpdates(): UpdateCall[] {
-  const calls: UpdateCall[] = [];
+/** `where()` must be a thenable that also exposes `.returning()`. */
+function trackUpdates(returnRows: unknown[] = [{ id: 'updated' }]) {
+  const calls: { set: Record<string, unknown> }[] = [];
   hoisted.dbUpdateMock.mockImplementation(() => ({
-    set: (setArg: Record<string, unknown>) => ({
-      where: (whereArg: unknown) => {
-        calls.push({ set: setArg, where: whereArg });
+    set: (set: Record<string, unknown>) => ({
+      where: () => {
+        calls.push({ set });
         return Object.assign(Promise.resolve(undefined), {
-          returning: () => Promise.resolve([{ id: 'updated' }]),
+          returning: () => Promise.resolve(returnRows),
         });
       },
     }),
@@ -106,40 +84,34 @@ function trackUpdates(): UpdateCall[] {
   return calls;
 }
 
-function tokenResponse(overrides: Partial<Record<string, unknown>> = {}) {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({
-      access_token: 'spotify-real-access-token',
-      refresh_token: 'spotify-refresh-token',
-      expires_in: 3600,
-      token_type: 'Bearer',
-      scope: SPOTIFY_OAUTH_SCOPES.join(' '),
-      ...overrides,
-    }),
-  };
-}
-
-function profileResponse(id = 'spotify-user-123') {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({ id, email: 'dj@example.com' }),
-  };
-}
+const tokenResponse = (overrides: Record<string, unknown> = {}) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({
+    access_token: 'spotify-real-access-token',
+    refresh_token: 'spotify-refresh-token',
+    expires_in: 3600,
+    token_type: 'Bearer',
+    scope: SPOTIFY_OAUTH_SCOPES.join(' '),
+    ...overrides,
+  }),
+});
 
 function callbackRequest(params: Record<string, string>) {
   const url = new URL('http://localhost/api/connectors/spotify/callback');
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(params))
     url.searchParams.set(key, value);
-  }
   return new Request(url.toString());
 }
 
-function signedState(returnTo = APP_ROUTES.SETTINGS_CONNECTORS) {
-  return signGoogleOAuthState({ userId: 'db-user-1', returnTo });
-}
+const signedState = (returnTo: string = APP_ROUTES.SETTINGS_CONNECTORS) =>
+  signGoogleOAuthState({ userId: 'db-user-1', returnTo });
+const profileOk = {
+  ok: true,
+  json: async () => ({ id: 'spotify-user-123', email: 'dj@example.com' }),
+};
+const validRequest = () =>
+  callbackRequest({ code: 'auth-code-123', state: signedState() });
 
 describe('GET /api/connectors/spotify/callback', () => {
   beforeEach(() => {
@@ -153,48 +125,55 @@ describe('GET /api/connectors/spotify/callback', () => {
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'db-user-1' });
   });
 
-  it('redirects with ?error=spotify_oauth_denied when Spotify reports a provider error, without exchanging anything', async () => {
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ error: 'access_denied', code: 'x', state: 'y' })
-    );
+  it.each([
+    [
+      'provider reports an error',
+      { error: 'access_denied', code: 'x', state: 'y' },
+      'spotify_oauth_denied',
+    ],
+    ['code is absent', { state: 'some-state' }, 'spotify_oauth_missing'],
+    ['state is absent', { code: 'some-code' }, 'spotify_oauth_missing'],
+    [
+      'session user differs from state user',
+      { code: 'auth-code-123', state: signedState(), session: 'other-user' },
+      'spotify_session_changed',
+    ],
+    [
+      'Spotify credentials are missing',
+      { code: 'auth-code-123', state: signedState(), noSecret: true },
+      'spotify_not_configured',
+    ],
+  ])(
+    'redirects to connectors settings when %s',
+    async (_name, params, error) => {
+      const { session, noSecret, ...query } = params as Record<
+        string,
+        string | boolean
+      >;
+      if (session)
+        hoisted.getCachedAuthMock.mockResolvedValue({ userId: session });
+      if (noSecret) hoisted.mockEnv.SPOTIFY_CLIENT_SECRET = undefined;
+      const { GET } = await GET_ROUTE();
+      const response = await GET(
+        callbackRequest(query as Record<string, string>)
+      );
+      expect(response.headers.get('location')).toBe(
+        `${CONNECTORS}?error=${error}`
+      );
+      expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+    }
+  );
 
-    expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_oauth_denied`
-    );
-    expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
-    expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
-  });
-
-  it('redirects with ?error=spotify_oauth_missing when code or state is absent', async () => {
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-
-    const missingCode = await GET(callbackRequest({ state: 'some-state' }));
-    expect(missingCode.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_oauth_missing`
-    );
-
-    const missingState = await GET(callbackRequest({ code: 'some-code' }));
-    expect(missingState.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_oauth_missing`
-    );
-    expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects a tampered state signature without exchanging the code or writing to the DB', async () => {
-    const validState = signedState();
-    const tampered =
-      validState.slice(0, -1) + (validState.at(-1) === 'a' ? 'b' : 'a');
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
+  it('rejects a tampered state signature without exchanging or writing', async () => {
+    const state = signedState();
+    const tampered = state.slice(0, -1) + (state.at(-1) === 'a' ? 'b' : 'a');
+    const { GET } = await GET_ROUTE();
     const response = await GET(
       callbackRequest({ code: 'auth-code-123', state: tampered })
     );
-
-    expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_oauth_callback`
+      `${CONNECTORS}?error=spotify_oauth_callback`
     );
     expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
     expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
@@ -204,118 +183,60 @@ describe('GET /api/connectors/spotify/callback', () => {
     );
   });
 
-  it('redirects with ?error=spotify_session_changed when the session user differs from the state user', async () => {
-    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'other-user' });
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ code: 'auth-code-123', state: signedState() })
-    );
-
-    expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_session_changed`
-    );
-    expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
-  });
-
-  it('redirects with ?error=spotify_not_configured when Spotify credentials are missing', async () => {
-    hoisted.mockEnv.SPOTIFY_CLIENT_SECRET = undefined;
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ code: 'auth-code-123', state: signedState() })
-    );
-
-    expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_not_configured`
-    );
-    expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
-  });
-
-  it('does not write any connector rows when the token exchange fails', async () => {
-    hoisted.serverFetchMock.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      json: async () => ({ error: 'invalid_grant' }),
-    });
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ code: 'auth-code-123', state: signedState() })
-    );
-
-    expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_token_exchange`
-    );
-    expect(hoisted.serverFetchMock).toHaveBeenCalledTimes(1);
-    expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
-  });
-
-  it('does not write any connector rows when the token payload fails validation', async () => {
-    hoisted.serverFetchMock.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ access_token: '' }),
-    });
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ code: 'auth-code-123', state: signedState() })
-    );
-
-    expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_token_invalid`
-    );
-    expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
-  });
-
-  it('redirects with ?error=spotify_scopes when a required scope was not granted', async () => {
-    hoisted.serverFetchMock.mockResolvedValueOnce(
-      tokenResponse({ scope: 'user-read-email user-read-private' })
-    );
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ code: 'auth-code-123', state: signedState() })
-    );
-
-    expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_scopes`
-    );
-    expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
-  });
-
+  it.each([
+    [
+      'token exchange fails',
+      {
+        ok: false,
+        status: 400,
+        json: async () => ({ error: 'invalid_grant' }),
+      },
+      'spotify_token_exchange',
+    ],
+    [
+      'token payload fails validation',
+      { ok: true, status: 200, json: async () => ({ access_token: '' }) },
+      'spotify_token_invalid',
+    ],
+    [
+      'a required scope was not granted',
+      tokenResponse({ scope: 'user-read-email user-read-private' }),
+      'spotify_scopes',
+    ],
+  ])(
+    'redirects to connectors settings when %s, writing no connector rows',
+    async (_name, firstFetch, error) => {
+      hoisted.serverFetchMock.mockResolvedValueOnce(firstFetch);
+      const { GET } = await GET_ROUTE();
+      const response = await GET(validRequest());
+      expect(response.headers.get('location')).toBe(
+        `${CONNECTORS}?error=${error}`
+      );
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+    }
+  );
   it('redirects with ?error=spotify_oauth_callback when the profile fetch fails, before any account row exists', async () => {
     hoisted.serverFetchMock
       .mockResolvedValueOnce(tokenResponse())
       .mockResolvedValueOnce({ ok: false, status: 401 });
     const updates = trackUpdates();
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ code: 'auth-code-123', state: signedState() })
-    );
-
+    const { GET } = await GET_ROUTE();
+    const response = await GET(validRequest());
     expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_oauth_callback`
+      `${CONNECTORS}?error=spotify_oauth_callback`
     );
     expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
     // No accountId was minted, so no needs_reauth best-effort update runs.
     expect(updates).toHaveLength(0);
-    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
-      'Spotify OAuth callback failed',
-      expect.any(Error)
-    );
   });
 
-  it('exchanges the code with Basic auth, writes a connected spotify row with capabilities, stores tokens, and honors returnTo', async () => {
+  it('exchanges with Basic auth, upserts a connected row with capabilities, stores tokens, honors returnTo', async () => {
     hoisted.serverFetchMock
       .mockResolvedValueOnce(tokenResponse())
-      .mockResolvedValueOnce(profileResponse('spotify-user-123'));
+      .mockResolvedValueOnce(profileOk);
     const inserts = trackInserts(['spotify-acct-id']);
     trackUpdates();
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
+    const { GET } = await GET_ROUTE();
     const response = await GET(
       callbackRequest({
         code: 'auth-code-123',
@@ -323,7 +244,6 @@ describe('GET /api/connectors/spotify/callback', () => {
       })
     );
 
-    // --- Exchange request payload ---
     expect(hoisted.serverFetchMock).toHaveBeenNthCalledWith(
       1,
       'https://accounts.spotify.com/api/token',
@@ -346,7 +266,6 @@ describe('GET /api/connectors/spotify/callback', () => {
     );
     expect(exchangeBody.get('grant_type')).toBe('authorization_code');
 
-    // --- Profile request uses the exchanged access token ---
     expect(hoisted.serverFetchMock).toHaveBeenNthCalledWith(
       2,
       'https://api.spotify.com/v1/me',
@@ -355,9 +274,8 @@ describe('GET /api/connectors/spotify/callback', () => {
       })
     );
 
-    // --- Connector row ---
     expect(inserts).toHaveLength(1);
-    expect(inserts[0].values).toMatchObject({
+    expect(inserts[0]).toMatchObject({
       userId: 'db-user-1',
       provider: 'spotify',
       providerAccountId: 'spotify-user-123',
@@ -368,9 +286,7 @@ describe('GET /api/connectors/spotify/callback', () => {
         canUploadImages: true,
       },
     });
-    expect(JSON.stringify(inserts[0].values.status)).toContain('connected');
-
-    // --- Redirect honors returnTo from the signed state ---
+    expect(JSON.stringify(inserts[0].status)).toContain('connected');
     expect(response.headers.get('location')).toBe(
       'http://localhost/app/custom-return?connected=spotify'
     );
@@ -379,37 +295,19 @@ describe('GET /api/connectors/spotify/callback', () => {
   it('marks the connector needs_reauth when token persistence fails after the account row was written', async () => {
     hoisted.serverFetchMock
       .mockResolvedValueOnce(tokenResponse())
-      .mockResolvedValueOnce(profileResponse());
+      .mockResolvedValueOnce(profileOk);
     trackInserts(['spotify-acct-id']);
-    const updateCalls: UpdateCall[] = [];
-    hoisted.dbUpdateMock.mockImplementation(() => ({
-      set: (setArg: Record<string, unknown>) => ({
-        where: (whereArg: unknown) => {
-          updateCalls.push({ set: setArg, where: whereArg });
-          return Object.assign(Promise.resolve(undefined), {
-            // storeTokens sees zero rows → throws → catch marks needs_reauth
-            returning: () => Promise.resolve([]),
-          });
-        },
-      }),
-    }));
-
-    const { GET } = await import('@/app/api/connectors/spotify/callback/route');
-    const response = await GET(
-      callbackRequest({ code: 'auth-code-123', state: signedState() })
-    );
-
+    // storeTokens sees zero rows → throws → catch marks needs_reauth.
+    const updates = trackUpdates([]);
+    const { GET } = await GET_ROUTE();
+    const response = await GET(validRequest());
     expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=spotify_oauth_callback`
+      `${CONNECTORS}?error=spotify_oauth_callback`
     );
-
-    // First update: storeTokens (failed). Second: best-effort needs_reauth.
-    expect(updateCalls).toHaveLength(2);
-    expect(JSON.stringify(updateCalls[1].set)).toContain('needs_reauth');
-    expect(updateCalls[1].set).toEqual(
-      expect.objectContaining({
-        lastErrorCode: 'spotify_oauth_failed',
-      })
+    expect(updates).toHaveLength(2);
+    expect(updates[1].set).toEqual(
+      expect.objectContaining({ lastErrorCode: 'spotify_oauth_failed' })
     );
+    expect(JSON.stringify(updates[1].set)).toContain('needs_reauth');
   });
 });

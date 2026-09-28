@@ -376,7 +376,6 @@ export const ServerEnvSchema = z.object({
   GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Base URL for the YouTube OAuth redirect URI, e.g. https://jov.ie/api/connectors/youtube */
   YOUTUBE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
-  /** Base URL for the Spotify OAuth redirect URI, e.g. https://jov.ie/api/connectors/spotify */
   SPOTIFY_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
   GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
