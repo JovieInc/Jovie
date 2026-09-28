@@ -91,7 +91,7 @@ describe('public-profile consumer attachment', () => {
     );
   });
 
-  it('keeps marketing renders on the dark public-profile token scope without locking the host document', () => {
+  it('keeps marketing renders on the dark public-profile token scope without locking the host page', () => {
     const source = readFileSync(
       join(
         WEB_ROOT,
