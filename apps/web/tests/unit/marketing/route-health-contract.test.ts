@@ -126,6 +126,27 @@ describe('marketing route health contract', () => {
     ).toEqual([]);
   });
 
+  it('serves a page for every active manifest route with a concrete URL', () => {
+    // JOV-6859: an active route must never silently 404 — its resolved health
+    // target cannot be declared not-found. Wildcard routes keep their explicit
+    // fixture probes (e.g. the unpublished engineering article check).
+    for (const entry of MARKETING_ROUTE_MANIFEST) {
+      const target = getMarketingRouteHealthTarget(entry);
+      if (entry.status === 'active' && !entry.url.includes('*')) {
+        expect(
+          target.expected,
+          `${entry.glob} is active but declares ${target.expected}`
+        ).toBe('page');
+      }
+      if (target.expected === 'not-found') {
+        expect(
+          entry.url,
+          `${entry.glob} declares a not-found probe on a concrete route`
+        ).toContain('*');
+      }
+    }
+  });
+
   it('generates exact capture targets only for active public pages', () => {
     const expectedGlobs = MARKETING_ROUTE_MANIFEST.filter(
       entry =>

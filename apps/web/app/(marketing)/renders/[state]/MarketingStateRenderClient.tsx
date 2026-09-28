@@ -84,6 +84,7 @@ export function MarketingStateRenderClient({
 
   return (
     <div
+      className='profile-viewport profile-viewport--embedded'
       style={{
         width: `${width}px`,
         maxWidth: '100%',

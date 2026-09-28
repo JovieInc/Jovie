@@ -198,6 +198,7 @@
 | `/api/cron/purge-pixel-ips` | GET | `cron` | Purge stored pixel IP addresses |
 | `/api/cron/schedule-release-notifications` | GET | `cron` | Schedule upcoming release notifications |
 | `/api/cron/send-release-notifications` | GET | `cron` | Send queued release notifications |
+| `/api/cron/web-ai-health` | GET | `cron` | Probe five production AI surfaces and return a redacted health receipt |
 
 ### Dashboard
 
@@ -536,6 +537,6 @@
 | `admin` | ~38 |
 | `auth` | ~66 |
 | `public` | ~35 |
-| `cron` | ~16 |
+| `cron` | ~17 |
 | `webhook` | ~9 |
-| **Total** | **~163** |
+| **Total** | **~164** |

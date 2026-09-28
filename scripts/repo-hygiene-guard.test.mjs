@@ -20,6 +20,7 @@ import test from 'node:test';
 import {
   classifyRolloutFindings,
   evaluateRepoHygiene,
+  filterMergeParentIdenticalPaths,
   HYGIENE_EXCEPTION_MAX_DAYS,
   HYGIENE_LIMITS,
   REPO_HEALTH_BASELINE,
@@ -61,6 +62,28 @@ function promotedRollout(mode) {
 const rolloutErrors = rollout => validateRepoHealthRollout(rollout).join('\n');
 const baselineChangeErrors = current =>
   validateRepoHealthBaselineChange(REPO_HEALTH_BASELINE, current).join('\n');
+
+test('staged merge hygiene keeps resolutions and ignores unchanged incoming paths', () => {
+  const incomingOid = 'a'.repeat(40);
+  const resolvedOid = 'b'.repeat(40);
+  const mergeHeadOids = new Map([
+    ['incoming.ts', incomingOid],
+    ['resolved.ts', incomingOid],
+  ]);
+  const stagedOids = new Map([
+    ['incoming.ts', incomingOid],
+    ['resolved.ts', resolvedOid],
+  ]);
+
+  assert.deepEqual(
+    filterMergeParentIdenticalPaths(
+      ['incoming.ts', 'resolved.ts'],
+      stagedOids,
+      mergeHeadOids
+    ),
+    ['resolved.ts']
+  );
+});
 
 function fixtureFile(root, path, bytes = 1) {
   const absolute = join(root, path);

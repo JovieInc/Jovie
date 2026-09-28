@@ -133,10 +133,6 @@ export function VoicePageContent() {
                   <Link href={APP_ROUTES.SUPPORT}>Talk to the team</Link>
                 </Button>
               </div>
-              <p className='mt-4 text-xs text-tertiary-token'>
-                Voice infrastructure shipped in PR 9882 (YouTube to ElevenLabs)
-                + webhook/cron layer PR 9881.
-              </p>
             </div>
           </div>
         </MarketingContainer>

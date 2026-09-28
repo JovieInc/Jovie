@@ -1,15 +1,7 @@
 import type { ReactNode } from 'react';
 
-import {
-  STABLE_HEADER_LINE_CLAMP_CLASSNAME,
-  STABLE_HEADER_TITLE_HEIGHT_CLASSNAME,
-  StableHeaderChipRail,
-  type StableHeaderLineCount,
-  StableHeaderTextSlot,
-} from '@/components/atoms/StableHeaderSlots';
-import { cn } from '@/lib/utils';
-
-type EntityHeaderMetaOverflow = 'wrap' | 'scroll';
+import type { StableHeaderLineCount } from '@/components/atoms/StableHeaderSlots';
+import { EntityHeader, type EntityHeaderMetaOverflow } from './EntityHeader';
 
 export interface EntityHeaderCardProps {
   /** Image slot — Avatar, AvatarUploadable, artwork, etc. */
@@ -58,77 +50,11 @@ export interface EntityHeaderCardProps {
   readonly 'data-testid'?: string;
 }
 
-function EntityHeaderMetaSlot({
-  meta,
-  shouldReserveMeta,
-  resolvedMetaOverflow,
-  metaClassName,
-}: Readonly<{
-  meta?: ReactNode;
-  shouldReserveMeta: boolean;
-  resolvedMetaOverflow: EntityHeaderMetaOverflow;
-  metaClassName?: string;
-}>) {
-  if (!meta && !shouldReserveMeta) {
-    return null;
-  }
-
-  if (resolvedMetaOverflow === 'scroll') {
-    return (
-      <StableHeaderChipRail
-        reserve={shouldReserveMeta}
-        className={cn('pt-0.5', metaClassName)}
-        testId='entity-header-meta-slot'
-      >
-        {meta}
-      </StableHeaderChipRail>
-    );
-  }
-
-  return (
-    <div
-      aria-hidden={meta ? undefined : true}
-      className={cn(
-        'flex min-h-6 flex-wrap items-center gap-1 pt-0.5',
-        !meta && 'invisible',
-        metaClassName
-      )}
-      data-testid='entity-header-meta-slot'
-    >
-      {meta ?? '\u00a0'}
-    </div>
-  );
-}
-
-function EntityHeaderFooterSlot({
-  footer,
-  shouldReserveFooter,
-  footerClassName,
-}: Readonly<{
-  footer?: ReactNode;
-  shouldReserveFooter: boolean;
-  footerClassName?: string;
-}>) {
-  if (!footer && !shouldReserveFooter) {
-    return null;
-  }
-
-  return (
-    <div
-      aria-hidden={footer ? undefined : true}
-      className={cn('min-h-7 pt-1', !footer && 'invisible', footerClassName)}
-    >
-      {footer ?? '\u00a0'}
-    </div>
-  );
-}
-
 /**
- * Shared entity header card used across right-drawer sidebars.
+ * Compatibility adapter for the retired entity-header API.
  *
- * Provides the standard layout for entity identification sections
- * (contact avatar, release artwork, profile header) so all entity
- * sidebars look consistent.
+ * New call sites use EntityHeader directly. Keeping the adapter thin preserves
+ * stale imports without restoring a second owner of right-rail header anatomy.
  */
 export function EntityHeaderCard({
   image,
@@ -156,137 +82,32 @@ export function EntityHeaderCard({
   footerClassName,
   'data-testid': testId,
 }: EntityHeaderCardProps) {
-  const resolvedTitleLineClamp =
-    titleLineClamp ?? (stableLayout ? 1 : undefined);
-  const shouldReserveEyebrow = reserveEyebrowSlot ?? false;
-  const shouldReserveSubtitle = reserveSubtitleSlot ?? stableLayout;
-  const shouldReserveMeta = reserveMetaSlot ?? stableLayout;
-  const shouldReserveFooter = reserveFooterSlot ?? false;
-  const resolvedSubtitleLineClamp =
-    subtitleLineClamp ?? (shouldReserveSubtitle ? 1 : undefined);
-  const resolvedMetaOverflow: EntityHeaderMetaOverflow =
-    metaOverflow ?? (stableLayout ? 'scroll' : 'wrap');
-
-  const identityContent = (
-    <>
-      {eyebrow || shouldReserveEyebrow ? (
-        <StableHeaderTextSlot
-          reserve={shouldReserveEyebrow}
-          lineCount={1}
-          size='xs'
-          className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
-        >
-          {eyebrow}
-        </StableHeaderTextSlot>
-      ) : null}
-      <div className='flex items-start gap-1'>
-        <span
-          className={cn(
-            'min-w-0 flex-1 text-sm font-semibold leading-[18px] tracking-[-0.015em] text-primary-token',
-            resolvedTitleLineClamp
-              ? STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp]
-              : 'truncate',
-            stableLayout &&
-              resolvedTitleLineClamp &&
-              STABLE_HEADER_TITLE_HEIGHT_CLASSNAME[resolvedTitleLineClamp],
-            titleClassName
-          )}
-        >
-          {title}
-        </span>
-        {badge}
-      </div>
-      {subtitle || shouldReserveSubtitle ? (
-        <StableHeaderTextSlot
-          reserve={shouldReserveSubtitle}
-          lineCount={resolvedSubtitleLineClamp}
-          size='xs'
-          className={cn(
-            'text-xs leading-4 tracking-[-0.005em] text-secondary-token',
-            subtitleClassName
-          )}
-        >
-          {subtitle}
-        </StableHeaderTextSlot>
-      ) : null}
-    </>
-  );
-
-  const metadataContent = (
-    <>
-      <EntityHeaderMetaSlot
-        meta={meta}
-        shouldReserveMeta={shouldReserveMeta}
-        resolvedMetaOverflow={resolvedMetaOverflow}
-        metaClassName={metaClassName}
-      />
-      <EntityHeaderFooterSlot
-        footer={footer}
-        shouldReserveFooter={shouldReserveFooter}
-        footerClassName={footerClassName}
-      />
-    </>
-  );
-
-  if (layout === 'grid') {
-    return (
-      <div
-        className={cn(
-          'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-1.5',
-          className
-        )}
-        data-layout='grid'
-        data-testid={testId}
-      >
-        {image ? (
-          <div
-            className='col-start-1 row-span-2 row-start-1'
-            data-entity-header-image
-          >
-            {image}
-          </div>
-        ) : null}
-        <div
-          className={cn(
-            'col-start-2 row-start-1 min-w-0 space-y-1',
-            bodyClassName
-          )}
-          data-entity-header-identity
-        >
-          {identityContent}
-        </div>
-        {actions ? (
-          <div
-            className='col-start-3 row-start-1 justify-self-end'
-            data-entity-header-actions
-          >
-            {actions}
-          </div>
-        ) : null}
-        {meta || shouldReserveMeta || footer || shouldReserveFooter ? (
-          <div
-            className='col-span-2 col-start-2 row-start-2 min-w-0'
-            data-entity-header-metadata
-          >
-            {metadataContent}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
   return (
-    <div
-      className={cn('relative flex items-start gap-3', className)}
-      data-layout='inline'
+    <EntityHeader
+      thumbnail={image}
+      eyebrow={eyebrow}
+      title={title}
+      subtitle={subtitle}
+      meta={meta}
+      badge={badge}
+      actions={actions}
+      layout={layout}
+      footer={footer}
+      stableLayout={stableLayout}
+      titleLineClamp={titleLineClamp}
+      subtitleLineClamp={subtitleLineClamp}
+      reserveEyebrowSlot={reserveEyebrowSlot}
+      reserveSubtitleSlot={reserveSubtitleSlot}
+      reserveMetaSlot={reserveMetaSlot}
+      reserveFooterSlot={reserveFooterSlot}
+      metaOverflow={metaOverflow}
+      className={className}
+      bodyClassName={bodyClassName}
+      titleClassName={titleClassName}
+      subtitleClassName={subtitleClassName}
+      metaClassName={metaClassName}
+      footerClassName={footerClassName}
       data-testid={testId}
-    >
-      {actions ? <div className='absolute right-0 top-0'>{actions}</div> : null}
-      {image ?? null}
-      <div className={cn('min-w-0 flex-1 space-y-1', bodyClassName)}>
-        {identityContent}
-        {metadataContent}
-      </div>
-    </div>
+    />
   );
 }

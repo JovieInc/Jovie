@@ -12,7 +12,7 @@ export const PAGE_TOOLBAR_CONTAINER_CLASS =
   'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-3 py-1.5';
 
 export const PAGE_TOOLBAR_START_CLASS =
-  'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-0.5 -m-0.5 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 export const PAGE_TOOLBAR_END_CLASS =
   'ml-auto flex shrink-0 items-center justify-end gap-1';
@@ -161,34 +161,50 @@ export function PageToolbarBackLink({
 }
 
 interface PageToolbarTabButtonProps {
+  readonly id?: string;
   readonly label: ReactNode;
   readonly icon?: ReactNode;
   readonly active?: boolean;
   readonly onClick?: () => void;
+  readonly onKeyDown?: ComponentProps<typeof Button>['onKeyDown'];
   readonly className?: string;
   readonly ariaPressed?: boolean;
+  readonly ariaControls?: string;
+  readonly role?: ComponentProps<typeof Button>['role'];
+  readonly tabIndex?: number;
 }
 
 export function PageToolbarTabButton({
+  id,
   label,
   icon,
   active = false,
   onClick,
+  onKeyDown,
   className,
   ariaPressed,
+  ariaControls,
+  role,
+  tabIndex,
 }: PageToolbarTabButtonProps) {
   return (
     <Button
+      id={id}
       type='button'
       variant='ghost'
       size='sm'
+      role={role}
+      tabIndex={tabIndex}
       onClick={onClick}
+      onKeyDown={onKeyDown}
       className={cn(
         PAGE_TOOLBAR_TAB_BUTTON_CLASS,
         active && PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
         className
       )}
-      aria-pressed={ariaPressed ?? active}
+      aria-controls={ariaControls}
+      aria-pressed={role === 'tab' ? undefined : (ariaPressed ?? active)}
+      aria-selected={role === 'tab' ? active : undefined}
     >
       {icon}
       <span>{label}</span>

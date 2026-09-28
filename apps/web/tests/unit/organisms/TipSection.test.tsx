@@ -39,6 +39,21 @@ describe('TipSection', () => {
     globalThis.localStorage.removeItem('jovie:pay:method');
   });
 
+  it('leaves naming the recipient to its host instead of repeating it', () => {
+    render(
+      <PaySection
+        handle='timwhite'
+        venmoLink='https://venmo.com/timwhite'
+        onVenmoPayment={mockOnVenmoPayment}
+      />
+    );
+
+    expect(screen.queryByText('Pay timwhite')).toBeNull();
+    expect(
+      screen.getByText('Choose an amount and a payment method')
+    ).toBeDefined();
+  });
+
   it('starts Stripe checkout only after Pay and does not claim payment completed', async () => {
     mockOnStripePayment.mockResolvedValueOnce(undefined);
 
