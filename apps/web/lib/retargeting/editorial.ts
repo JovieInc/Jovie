@@ -32,8 +32,41 @@ export type EditorialRetargetingState =
  * private objections. Their presence suppresses retargeting entirely so a
  * shared link with sensitive context never enters an ad audience.
  */
-const SENSITIVE_QUERY_PARAM =
-  /^(?:token|access[_-]?token|auth|code|session|email|e|name|investor|objection|ref|referrer|utm_[a-z]+|gclid|fbclid|ttclid|dclid|msclkid|twclid|li_fat_id|sig|signature|key|preview|draft)$/iu;
+const SENSITIVE_QUERY_PARAM_NAMES = new Set([
+  'token',
+  'access_token',
+  'access-token',
+  'accesstoken',
+  'auth',
+  'code',
+  'session',
+  'email',
+  'e',
+  'name',
+  'investor',
+  'objection',
+  'ref',
+  'referrer',
+  'gclid',
+  'fbclid',
+  'ttclid',
+  'dclid',
+  'msclkid',
+  'twclid',
+  'li_fat_id',
+  'sig',
+  'signature',
+  'key',
+  'preview',
+  'draft',
+]);
+
+function isSensitiveQueryParam(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return (
+    normalized.startsWith('utm_') || SENSITIVE_QUERY_PARAM_NAMES.has(normalized)
+  );
+}
 
 /**
  * The only fields an editorial retargeting event may carry. Investor names,
@@ -110,7 +143,7 @@ export function hasSensitiveQueryParams(search: string | null): boolean {
   if (!search || search === '?') return false;
   const params = new URLSearchParams(search);
   for (const key of params.keys()) {
-    if (SENSITIVE_QUERY_PARAM.test(key)) return true;
+    if (isSensitiveQueryParam(key)) return true;
   }
   return false;
 }
