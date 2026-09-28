@@ -78,7 +78,7 @@ function isClerkHandshakeRedirect(url: string): boolean {
 async function openInterceptedAuthModal(
   page: import('@playwright/test').Page,
   mode: 'signin' | 'signup'
-) {
+): Promise<boolean> {
   await page.goto('/', {
     waitUntil: 'domcontentloaded',
     timeout: NAV_TIMEOUT,
@@ -87,12 +87,21 @@ async function openInterceptedAuthModal(
   if (mode === 'signin') {
     await page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`).first().click();
   } else {
-    await page.locator('[data-cta-sign-up="true"]').first().click();
+    const signUpCta = page.locator('[data-cta-sign-up="true"]').first();
+    const signUpEntryExists = await signUpCta
+      .waitFor({ state: 'attached', timeout: SNAPSHOT_TIMEOUT })
+      .then(() => true)
+      .catch(() => false);
+    if (!signUpEntryExists) {
+      return false;
+    }
+    await signUpCta.click();
   }
 
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {
     // Clerk can leave background requests open; the dialog probe below is the gate.
   });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +144,14 @@ test.describe('Auth modal visual regression', () => {
         await blockAnalytics(page);
         await page.setViewportSize({ width: bp.width, height: bp.height });
 
-        await openInterceptedAuthModal(page, 'signup');
+        const opened = await openInterceptedAuthModal(page, 'signup');
+        if (!opened) {
+          test.skip(
+            true,
+            'No [data-cta-sign-up] entry point on the locked waitlist homepage composition (JOV-5085): the header CTA routes to /start and the hero converts through the name search'
+          );
+          return;
+        }
 
         if (isClerkHandshakeRedirect(page.url())) {
           test.skip(true, 'Clerk handshake redirect — modal not available');
