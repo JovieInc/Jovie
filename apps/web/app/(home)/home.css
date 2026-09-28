@@ -2120,7 +2120,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: hidden;
   gap: var(--space-2);
   padding: var(--homepage-name-search-inset) var(--homepage-name-search-inset)
-    var(--homepage-name-search-inset) var(--space-5);
+    var(--homepage-name-search-inset) var(--space-4);
   border: var(--space-px) solid transparent;
   border-radius: var(--radius-pill);
   background: var(--homepage-editorial-field);
@@ -3068,28 +3068,31 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-align: center;
 }
 
+/* One accent per card, centered on its exact token and glowing from one
+   corner over the page ground (Pen My0zu, JOV-6914). Visual order rotates
+   blue, purple, pink. */
+.homepage-editorial-card__media--blue,
+.homepage-editorial-card__media--purple,
+.homepage-editorial-card__media--pink {
+  background:
+    radial-gradient(
+      ellipse 75% 70% at 88% 8%,
+      color-mix(in oklab, var(--homepage-editorial-accent) 62%, transparent),
+      transparent 72%
+    ),
+    var(--system-b-bg-page);
+}
+
 .homepage-editorial-card__media--blue {
-  background: linear-gradient(
-    35deg,
-    color-mix(in oklab, var(--color-accent-blue) 20%, var(--system-b-bg-page)),
-    color-mix(in oklab, var(--color-accent-blue) 66%, var(--system-b-bg-page))
-  );
+  --homepage-editorial-accent: var(--color-accent-blue);
+}
+
+.homepage-editorial-card__media--purple {
+  --homepage-editorial-accent: var(--color-accent-purple);
 }
 
 .homepage-editorial-card__media--pink {
-  background: linear-gradient(
-    35deg,
-    color-mix(in oklab, var(--color-accent-pink) 20%, var(--system-b-bg-page)),
-    color-mix(in oklab, var(--color-accent-pink) 66%, var(--system-b-bg-page))
-  );
-}
-
-.homepage-editorial-card__media--green {
-  background: linear-gradient(
-    35deg,
-    color-mix(in oklab, var(--color-accent-green) 20%, var(--system-b-bg-page)),
-    color-mix(in oklab, var(--color-accent-green) 66%, var(--system-b-bg-page))
-  );
+  --homepage-editorial-accent: var(--color-accent-pink);
 }
 
 .homepage-editorial-card__theme-title {
@@ -3154,6 +3157,46 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-close__copy {
     transition: none;
   }
+}
+
+/* Pen My0zu (JOV-6946): two real jov.ie/tim next steps side by side on the
+   page ground. No light panel: the phones are the only surface. */
+.homepage-next-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(var(--space-12), 8vw, var(--space-24));
+  margin-top: clamp(var(--space-12), 5vw, var(--space-16));
+}
+
+.homepage-next-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  width: min(100%, 18rem);
+  margin: 0;
+}
+
+/* Both captures render at one device width so the pair reads as a set. */
+.homepage-next-step .homepage-certified-section__device {
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  /* The next steps are a full-width row under the copy (Pen My0zu), not a
+     side column. */
+  .homepage-next-steps {
+    grid-column: 1 / -1;
+  }
+}
+
+.homepage-next-step__caption {
+  max-width: 18rem;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* HOMEPAGE CERTIFIED SECTIONS END */

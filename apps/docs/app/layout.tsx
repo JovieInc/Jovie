@@ -6,6 +6,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { ArticleFeedback } from '@/components/ArticleFeedback';
+import { ContactSupportLink } from '@/components/ContactSupportLink';
 import { HelpCenterAnalytics } from '@/components/HelpCenterAnalytics';
 import { HelpCenterSearch } from '@/components/HelpCenterSearch';
 import {
@@ -66,13 +67,17 @@ export default async function RootLayout({
               }
             >
               <HelpCenterSearch variant='mobile-only' />
+              <a href='/contact'>Contact support</a>
             </Navbar>
           }
           pageMap={pageMap}
           docsRepositoryBase='https://github.com/JovieInc/Jovie/tree/main/apps/docs'
           editLink='Edit this page on GitHub'
           footer={
-            <Footer>Copyright {new Date().getFullYear()} Jovie Inc.</Footer>
+            <Footer>
+              Copyright {new Date().getFullYear()} Jovie Inc.{' '}
+              <ContactSupportLink />
+            </Footer>
           }
           search={<HelpCenterSearch variant='desktop-only' />}
         >

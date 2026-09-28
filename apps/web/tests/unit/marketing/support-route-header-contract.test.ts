@@ -35,6 +35,11 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
+    // Homepage conversion lock (JOV-5085): / shows Find yourself -> /start
+    // even while waitlisting; other routes keep the front-door CTA.
+    expect(headerSource).toContain(
+      "[APP_ROUTES.HOME]: { label: 'Find yourself', href: APP_ROUTES.START }"
+    );
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
     // Canonical Pen header: the Customers flyout is the only glass flyout.
