@@ -12,6 +12,7 @@ import {
   clickEvents,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
+import { profileInquiries } from '@/lib/db/schema/profile-inquiries';
 import { captureError } from '@/lib/error-tracking';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
@@ -158,7 +159,7 @@ export async function GET(request: NextRequest) {
 
       const perSourceLimit = Math.min(20, Math.max(5, limit * 2));
 
-      const [actionRows, clickRows, visitRows, subscribeRows] =
+      const [actionRows, clickRows, visitRows, subscribeRows, inquiryRows] =
         await Promise.all([
           db
             .select({
@@ -253,6 +254,27 @@ export async function GET(request: NextRequest) {
               )
             )
             .orderBy(desc(notificationSubscriptions.createdAt))
+            .limit(perSourceLimit),
+
+          db
+            .select({
+              id: profileInquiries.id,
+              kind: profileInquiries.kind,
+              category: profileInquiries.category,
+              message: profileInquiries.message,
+              visitorName: profileInquiries.visitorName,
+              visitorEmail: profileInquiries.visitorEmail,
+              visitorCity: profileInquiries.visitorCity,
+              createdAt: profileInquiries.createdAt,
+            })
+            .from(profileInquiries)
+            .where(
+              and(
+                eq(profileInquiries.creatorProfileId, profile.id),
+                gte(profileInquiries.createdAt, since)
+              )
+            )
+            .orderBy(desc(profileInquiries.createdAt))
             .limit(perSourceLimit),
         ]);
 
@@ -376,11 +398,38 @@ export async function GET(request: NextRequest) {
           };
         });
 
+      const inquiryActivities: ActivityRow[] = inquiryRows.map(row => {
+        const who = row.visitorName?.trim()
+          ? row.visitorName.trim()
+          : 'Someone';
+        const snippet =
+          row.message.length > 80
+            ? `${row.message.slice(0, 80)}…`
+            : row.message;
+        const description =
+          row.kind === 'intent'
+            ? `${who} asked for ${row.category.replaceAll('_', ' ')}${
+                row.visitorCity ? ` in ${row.visitorCity}` : ''
+              } via Ask Jovie.`
+            : row.kind === 'question'
+              ? `${who} asked Jovie: "${snippet}".`
+              : `${who} sent a ${row.category.replaceAll('_', ' ')} message via Ask Jovie: "${snippet}".`;
+        return {
+          id: `inquiry:${row.id}`,
+          type: 'unknown' as const,
+          description,
+          icon: 'email' as const,
+          timestamp: toISOStringSafe(row.createdAt),
+          href: APP_ROUTES.AUDIENCE,
+        };
+      });
+
       const merged = [
         ...structuredActivities,
         ...subscribeActivities,
         ...visitActivities,
         ...clickActivities,
+        ...inquiryActivities,
       ]
         .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
         .slice(0, limit);

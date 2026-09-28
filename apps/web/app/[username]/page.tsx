@@ -7,6 +7,7 @@ import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
 // API (cookies(), headers()) in this RSC tree.
 
+import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
@@ -564,6 +565,9 @@ async function ArtistPageContent({
       ) : null}
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
+      )}
+      {isPublicNoAuthSmoke ? null : (
+        <AskJovieWidget username={artist.handle} artistName={artist.name} />
       )}
     </>
   );

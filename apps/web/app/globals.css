@@ -2734,3 +2734,19 @@ body {
     animation: none !important;
   }
 }
+
+/* Ask Jovie public-profile affordance: icon does one 360° spin on hover. */
+@keyframes ask-jovie-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .group:hover .ask-jovie-spin-once {
+    animation: ask-jovie-spin 0.6s ease-out 1;
+  }
+}
