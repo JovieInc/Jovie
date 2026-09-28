@@ -1144,6 +1144,30 @@ describe('automation-verify affected scope', () => {
     expect(plan.selectedTests).toHaveLength(6);
   });
 
+  it('always runs the virtualizer compiler invariant for virtualized web sources', () => {
+    const virtualized = 'apps/web/components/features/people/PeopleTable.tsx';
+    const plan = buildAffectedTestPlan(
+      [virtualized, 'apps/web/components/jovie/ErrorDisplayCopy.ts'],
+      {
+        isFileAvailable: () => true,
+        readFile: file =>
+          file === virtualized ? 'const v = useVirtualizer({ count });' : '',
+      }
+    );
+
+    expect(plan.mandatoryTests).toContain(
+      'apps/web/tests/unit/virtualization/virtualizer-compiler-optout.test.ts'
+    );
+    expect(
+      buildAffectedTestPlan(['apps/web/components/jovie/ErrorDisplayCopy.ts'], {
+        isFileAvailable: () => true,
+        readFile: () => '',
+      }).mandatoryTests
+    ).not.toContain(
+      'apps/web/tests/unit/virtualization/virtualizer-compiler-optout.test.ts'
+    );
+  });
+
   it('maps the seed confirmation boundary diff to focused behavior tests', () => {
     const plan = buildAffectedTestPlan([
       'apps/web/lib/events/confirmation-status.test.ts',

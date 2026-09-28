@@ -3,8 +3,28 @@
     "button": 37,
     "palette": 4,
     "emptyState": 6,
-    "shell": 21
+    "shell": 21,
+    "status": 9,
+    "entityHeader": 5
   },
+  "exceptions": [
+    {
+      "key": "status",
+      "owner": "@jovie-design",
+      "reason": "Seeds the status family ceiling so new StatusPill/StatusBadge/StatusDot/Glyph forks fail CI while design decision D5 names the canonical atom (Pen jAcP1 status pill).",
+      "issue": "JOV-6777",
+      "removalCondition": "D5 names the status-pill owner and the family converges; the ceiling then only shrinks.",
+      "evidence": "docs/design-system/drift-audit-2026-09-27.md — parallel status components inventoried 2026-09-27."
+    },
+    {
+      "key": "entityHeader",
+      "owner": "@jovie-design",
+      "reason": "Seeds the entityHeader family ceiling so new Entity/Drawer/Member/Detail Header(Card) forks fail CI while design decision D6 names the canonical owner (Pen odpZ8 entity header).",
+      "issue": "JOV-6777",
+      "removalCondition": "D6 names the entity-header owner and the family converges; the ceiling then only shrinks.",
+      "evidence": "docs/design-system/drift-audit-2026-09-27.md — five entity-header variants inventoried 2026-09-27."
+    }
+  ],
   "allowedEmptyStatePaths": [
     "components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx",
     "components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx",
@@ -13,5 +33,5 @@
     "components/molecules/EmptyState.tsx",
     "components/organisms/table/atoms/TableEmptyState.tsx"
   ],
-  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule. button current floor 37 recorded 2026-08-13 after SortableHeaderButton canonicalization."
+  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule. button current floor 37 recorded 2026-08-13 after SortableHeaderButton canonicalization. status 9 and entityHeader 5 seeded 2026-09-27 (JOV-6777, docs/design-system/drift-audit-2026-09-27.md): forks of Pen jAcP1 status pill and odpZ8 entity header stay frozen until design decisions D5/D6 name the owners."
 }
