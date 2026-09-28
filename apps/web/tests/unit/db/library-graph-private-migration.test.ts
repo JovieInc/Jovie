@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -14,10 +14,7 @@ const thumbnailPolicyMigration = join(
   process.cwd(),
   'drizzle/migrations/0099_youtube_thumbnail_versions_uuid_policy.sql'
 );
-const snapshot = join(
-  process.cwd(),
-  'drizzle/migrations/meta/0097_snapshot.json'
-);
+const metaDir = join(process.cwd(), 'drizzle/migrations/meta');
 const schemaModule = join(
   process.cwd(),
   'lib/db/schema/library-content-graph.ts'
@@ -26,7 +23,12 @@ const schemaModule = join(
 describe('library graph private migrations', () => {
   it('defines typed Drizzle schema for every private graph table', async () => {
     const schema = await readFile(schemaModule, 'utf8');
-    const snapshotJson = JSON.parse(await readFile(snapshot, 'utf8'));
+    const snapshots = (await readdir(metaDir))
+      .filter(file => file.endsWith('_snapshot.json'))
+      .sort();
+    const snapshotJson = JSON.parse(
+      await readFile(join(metaDir, snapshots.at(-1) as string), 'utf8')
+    );
     for (const [tableName, exportName] of [
       ['artist_rule_events', 'artistRuleEvents'],
       ['artist_rules', 'artistRules'],
@@ -64,7 +66,12 @@ describe('library graph private migrations', () => {
 
   it('keeps creator offers linked to audience source links', async () => {
     const sql = await readFile(graphMigration, 'utf8');
-    const snapshotJson = JSON.parse(await readFile(snapshot, 'utf8'));
+    const snapshots = (await readdir(metaDir))
+      .filter(file => file.endsWith('_snapshot.json'))
+      .sort();
+    const snapshotJson = JSON.parse(
+      await readFile(join(metaDir, snapshots.at(-1) as string), 'utf8')
+    );
     const offerForeignKeys =
       snapshotJson.tables['public.creator_offers'].foreignKeys;
     expect(sql).toContain(

@@ -124,7 +124,7 @@ function buildContent(): ProfileAeoContentModel {
       {
         artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
         name: 'Guest Vocalist',
-        href: '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
+        href: '/guestvocalist',
         profileState: 'unclaimed',
         role: 'featured_artist',
         releaseId: 'release-1',
@@ -887,7 +887,7 @@ describe('Profile AEO content', () => {
     expect(html).toContain('Source: Official merch card');
     expect(
       screen.getByRole('link', { name: 'Guest Vocalist' })
-    ).toHaveAttribute('href', '/artists/f5441adb-6789-449a-9553-ab7460c9c61c');
+    ).toHaveAttribute('href', '/guestvocalist');
   });
 
   it('links entity mentions in the description while keeping plain-text paragraphs', () => {
@@ -1042,7 +1042,7 @@ describe('Profile AEO content', () => {
         {
           artistId: '57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
           name: 'Alex Lee',
-          href: '/artists/57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
+          href: '/alexlee',
           profileState: 'claimed',
           role: 'featured_artist',
           releaseId: 'release-alex-one',
@@ -1054,7 +1054,7 @@ describe('Profile AEO content', () => {
         {
           artistId: 'e061a679-466c-465a-a545-64a7e39aa3c6',
           name: 'Alex Lee',
-          href: '/artists/e061a679-466c-465a-a545-64a7e39aa3c6',
+          href: '/alex-lee',
           profileState: 'unclaimed',
           role: 'main_artist',
           releaseId: 'release-alex-two',
@@ -1074,24 +1074,27 @@ describe('Profile AEO content', () => {
       {
         type: 'artist',
         text: 'Alex Lee',
-        href: '/artists/57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
+        href: '/alexlee',
       },
       {
         type: 'artist',
         text: 'Alex Lee',
-        href: '/artists/e061a679-466c-465a-a545-64a7e39aa3c6',
+        href: '/alex-lee',
       },
     ]);
   });
 
-  it('links unavailable exact collaborator identities through the stable route', () => {
+  it.each([
+    '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
+    '/a_15ivccsfpjhtappd1vh15i8jj',
+  ])('never links a collaborator name to a raw-ID destination: %s', href => {
     const content = buildProfileAeoContent({
       artist: baseArtist,
       releaseCollaborators: [
         {
           artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
-          name: 'Private Artist',
-          href: '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
+          name: 'Credit Only Artist',
+          href,
           profileState: 'unavailable',
           reconciliationEligible: true,
           role: 'featured_artist',
@@ -1107,11 +1110,11 @@ describe('Profile AEO content', () => {
 
     render(<ProfileAeoContent content={content} />);
     expect(screen.getByTestId('profile-aeo-content')).toHaveTextContent(
-      'Private Artist'
+      'Credit Only Artist'
     );
     expect(
-      screen.getByRole('link', { name: 'Private Artist' })
-    ).toHaveAttribute('href', '/artists/f5441adb-6789-449a-9553-ab7460c9c61c');
+      screen.queryByRole('link', { name: 'Credit Only Artist' })
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Quiet Signal' })).toHaveAttribute(
       'href',
       '/dj-test/quiet-signal'
