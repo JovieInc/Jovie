@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/PreviewPanel.test.tsx
+
 import { Button, type CommonDropdownItem } from '@jovie/ui';
 import {
   Check,

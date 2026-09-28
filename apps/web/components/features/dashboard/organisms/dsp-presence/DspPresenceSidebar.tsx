@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/DspPresenceSidebar.test.tsx
+
 import { Button, ConfirmDialog } from '@jovie/ui';
 
 import Image from 'next/image';

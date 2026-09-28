@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/admin/AdminUserDetailDrawer.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Badge, Button, UserAvatar } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
