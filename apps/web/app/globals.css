@@ -940,6 +940,12 @@ body {
   .marketing-hero-photo {
     z-index: 0;
   }
+  /* The photo is positioned; static hero copy would paint underneath it
+     (the /pricing headline rendered invisible). Lift every later sibling. */
+  .marketing-hero-photo ~ * {
+    position: relative;
+    z-index: 1;
+  }
   .marketing-hero-photo__img {
     object-fit: cover;
     object-position: right center;
