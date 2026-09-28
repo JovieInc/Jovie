@@ -47,7 +47,9 @@ const FAMILIES = {
   emptyState: /EmptyState\.tsx$/,
   shell: /Shell\.tsx$/,
   // Status pills/badges/dots/glyphs: Pen has one status-pill owner (jAcP1);
-  // code converges once design decision D5 names the atom (JOV-6777).
+  // `@jovie/ui` StatusGlyph is the canonical owner in code (D5, JOV-6841) and
+  // the legacy forks migrate onto it in follow-ups — a NEW file here means
+  // a new fork.
   status: /(?:Status(?:Pill|Badge|Dot)|Glyph)\.tsx$/,
   // Entity rail headers: Pen has one entity header (odpZ8); code converges
   // once design decision D6 names the owner (JOV-6777).
