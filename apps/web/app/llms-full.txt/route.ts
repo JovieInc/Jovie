@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { DOCS_URL } from '@/constants/domains';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 import {
@@ -113,7 +114,8 @@ AI that knows your actual career data:
 - **About**: ${BASE_URL}/about
 - **Pricing**: ${BASE_URL}/pricing
 - **Blog**: ${BASE_URL}/blog
-- **Support**: ${BASE_URL}/support
+- **Support**: ${BASE_URL}/support — Help and contact
+- **Help Center**: ${DOCS_URL}/docs — Guides and troubleshooting
 - **Changelog**: ${BASE_URL}/changelog
 - **Artist profiles**: ${BASE_URL}/{username}
 - **Release links**: ${BASE_URL}/{username}/{release-slug}
@@ -147,6 +149,7 @@ Tim White is the founder of ${APP_NAME}. Background:
 ## Contact
 
 - Website: ${BASE_URL}
+- Help Center: ${DOCS_URL}/docs
 - Support: ${BASE_URL}/support
 `;
 

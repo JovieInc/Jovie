@@ -4,6 +4,8 @@ export type DesktopSecurityEvent =
   | 'auth-deep-link-pkce-expired'
   | 'auth-deep-link-flow-mismatch'
   | 'auth-deep-link-replay-rejected'
+  | 'auth-return-code-rejected'
+  | 'auth-protocol-handler-repaired'
   | 'csp-header-missing'
   | 'csp-header-weakened'
   | 'remote-debugging-blocked'

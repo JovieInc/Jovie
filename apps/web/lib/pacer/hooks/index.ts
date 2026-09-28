@@ -9,12 +9,6 @@
 
 // Timing constants
 export { PACER_TIMING } from './timing';
-// Search hook
-export type {
-  UseAsyncSearchOptions,
-  UseAsyncSearchReturn,
-} from './useAsyncSearch';
-export { useAsyncSearch } from './useAsyncSearch';
 // Validation hook
 export type {
   UseAsyncValidationOptions,

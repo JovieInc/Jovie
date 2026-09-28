@@ -236,6 +236,13 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         stripeEventId,
         stripeEventTimestamp,
         eventType: 'payment_succeeded',
+        paymentFacts: {
+          logicalOrderId: invoice.id,
+          invoiceId: invoice.id,
+          grossAmountCents: invoice.amount_paid,
+          currency: invoice.currency,
+          attemptCount: invoice.attempt_count ?? 0,
+        },
       });
 
       if (!result.appUserId) {
