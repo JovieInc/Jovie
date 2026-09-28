@@ -348,8 +348,11 @@ describe('server analytics contract', () => {
     );
   });
 
-  it('applies a database-enforced timeout inside caller transactions', async () => {
-    const execute = vi.fn().mockResolvedValue(undefined);
+  it('restores the caller timeout after a transaction-scoped insert', async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ statementTimeout: '45s' }] })
+      .mockResolvedValue(undefined);
 
     const result = await trackServerEventTx(
       {
@@ -366,9 +369,19 @@ describe('server analytics contract', () => {
       eventId: 'event-1',
       deduplicated: false,
     });
-    expect(execute).toHaveBeenCalledOnce();
+    expect(execute).toHaveBeenCalledTimes(3);
     expect(JSON.stringify(execute.mock.calls[0])).toContain(
+      "current_setting('statement_timeout')"
+    );
+    expect(JSON.stringify(execute.mock.calls[1])).toContain(
       String(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS)
+    );
+    expect(JSON.stringify(execute.mock.calls[2])).toContain('45s');
+    expect(execute.mock.invocationCallOrder[1]).toBeLessThan(
+      mocks.insert.mock.invocationCallOrder[0]
+    );
+    expect(mocks.insert.mock.invocationCallOrder[0]).toBeLessThan(
+      execute.mock.invocationCallOrder[2]
     );
   });
 

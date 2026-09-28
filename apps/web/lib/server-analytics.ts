@@ -744,11 +744,24 @@ export async function trackServerEventTx(
 
   // Bound lock waits and execution in the database itself. A JavaScript race
   // cannot cancel an in-flight statement and could let the surrounding
-  // transaction remain pinned after the caller has already timed out.
+  // transaction remain pinned after the caller has already timed out. Restore
+  // the caller's timeout after a successful insert so later business queries
+  // in the same transaction do not inherit this analytics-specific budget.
+  const previousTimeoutResult = await tx.execute<{
+    statementTimeout: string;
+  }>(
+    drizzleSql`SELECT current_setting('statement_timeout') AS "statementTimeout"`
+  );
+  const previousTimeout =
+    previousTimeoutResult.rows[0]?.statementTimeout ?? '0';
   await tx.execute(
     drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS)}, true)`
   );
-  return insertServerAnalyticsRow(tx, prepared);
+  const delivery = await insertServerAnalyticsRow(tx, prepared);
+  await tx.execute(
+    drizzleSql`SELECT set_config('statement_timeout', ${previousTimeout}, true)`
+  );
+  return delivery;
 }
 
 export async function identifyServerUser(
