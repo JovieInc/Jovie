@@ -1476,6 +1476,7 @@ function runProfileAdmission() {
  * PR's own changed unit tests. The full Unit Tests shards run only in merge
  * groups, so without this a PR that trips a guard or breaks its own test is
  * green on PR CI and fails every merge group behind it (JOV-5301, JOV-6904).
+ * @param {{execute?: (command: string) => ExecResult | Promise<ExecResult>, changed?: readonly string[], exists?: (file: string) => boolean}} [opts]
  */
 export function runMergeGroupGuards({
   execute = shell,
