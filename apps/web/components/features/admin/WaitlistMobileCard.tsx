@@ -8,10 +8,10 @@ import {
   ExternalLink,
   Mail,
   MessageSquare,
+  Music,
   Target,
 } from 'lucide-react';
 import React, { useState } from 'react';
-import { SpotifyAccountIdentity } from '@/components/features/admin/SpotifyAccountIdentity';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import {
@@ -168,10 +168,26 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
 
           {/* Spotify */}
           {entry.spotifyUrlNormalized && (
-            <SpotifyAccountIdentity
-              displayName={entry.spotifyArtistName}
-              href={entry.spotifyUrlNormalized}
-            />
+            <div className='flex items-start gap-3'>
+              <div className='flex w-20 flex-shrink-0 items-center gap-1 text-xs font-medium text-tertiary-token'>
+                <Music className='h-3 w-3' aria-hidden />
+                Spotify
+              </div>
+              <a
+                href={entry.spotifyUrlNormalized}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='flex min-w-0 items-center gap-1.5 text-sm text-(--linear-accent) hover:underline'
+              >
+                <span className='truncate'>
+                  {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
+                </span>
+                <ExternalLink
+                  className='h-3.5 w-3.5 flex-shrink-0'
+                  aria-hidden
+                />
+              </a>
+            </div>
           )}
 
           {/* Follower Count */}

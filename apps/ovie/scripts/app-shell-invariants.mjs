@@ -182,10 +182,6 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
   }
 
   const identitySurfaces = [
-    'apps/web/components/features/admin/waitlist-table/utils/column-renderers.tsx',
-    'apps/web/components/features/admin/waitlist-table/WaitlistKanbanCard.tsx',
-    'apps/web/components/features/admin/WaitlistMobileCard.tsx',
-    'apps/web/components/features/admin/waitlist-table/WaitlistTableColumns.tsx',
     'apps/web/app/app/(shell)/admin/ingest/AdminIngestPageClient.tsx',
     'apps/web/app/app/(shell)/admin/platform-connections/PlatformConnectionsClient.tsx',
   ];

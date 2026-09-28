@@ -115,15 +115,12 @@ export function AdminTableShell({
 
   return (
     <div
-      className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col contain-layout',
-        className
-      )}
+      className={cn('flex h-full min-h-0 flex-col contain-layout', className)}
       data-testid={testId}
     >
       <div
         ref={tableContainerRef}
-        className='min-h-0 w-full min-w-0 flex-1 overflow-auto flex flex-col focus-visible:outline-none'
+        className='min-h-0 flex-1 overflow-auto flex flex-col focus-visible:outline-none'
         {...scrollContainerProps}
       >
         {toolbar ? (
