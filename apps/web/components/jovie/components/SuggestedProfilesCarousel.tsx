@@ -1,5 +1,6 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import {
   Camera,
   Check,
@@ -202,15 +203,17 @@ function ProfileReadyCard({
       />
       <div className='relative p-4'>
         {/* Dismiss button */}
-        <button
+        <IconButton
           type='button'
+          variant='ghost'
+          size='xs'
           onClick={onDismiss}
           disabled={isActioning}
-          className='absolute right-3 top-3 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token disabled:opacity-30 disabled:cursor-not-allowed'
+          className='absolute right-3 top-3'
           aria-label='Dismiss'
         >
           <X className='h-3.5 w-3.5' />
-        </button>
+        </IconButton>
 
         {/* Header */}
         <div className='mb-4 flex items-center gap-2'>

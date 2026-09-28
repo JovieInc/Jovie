@@ -1,5 +1,6 @@
 'use client';
 
+import { Button, IconButton } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useEffect, useState } from 'react';
@@ -117,37 +118,39 @@ export function ChatStarterActionsRail({
             >
               {boundedIndex + 1} of {cards.length}
             </span>
-            <button
+            <Button
               type='button'
+              variant='ghost'
               aria-label='Show More Starter Actions'
               onClick={() =>
                 setActiveIndex(current =>
                   current >= lastIndex ? 0 : current + 1
                 )
               }
-              className='inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-secondary-token transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0 motion-reduce:transition-none'
             >
               More
               <ChevronRight className='size-4' aria-hidden='true' />
-            </button>
+            </Button>
           </div>
           <fieldset className='mt-2 hidden min-h-5 items-center justify-center border-0 p-0 sm:flex'>
             <legend className='sr-only'>Choose Starter Action</legend>
             {visiblePaginationIndexes.map(index => (
-              <button
+              <IconButton
                 key={cards[index]?.id ?? index}
                 type='button'
+                variant='ghost'
+                size='md'
                 aria-label={`Show Starter Action ${index + 1} Of ${cards.length}: ${cards[index]?.title ?? ''}`}
                 aria-current={index === boundedIndex ? 'true' : undefined}
                 onClick={() => setActiveIndex(index)}
                 onKeyDown={handlePaginationKeyDown}
-                className='group relative grid size-8 place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0'
+                className='group'
               >
                 <span
                   className='size-1 rounded-full bg-quaternary-token/65 transition-[transform,background-color] duration-subtle group-hover:bg-tertiary-token group-aria-[current=true]:scale-125 group-aria-[current=true]:bg-secondary-token motion-reduce:transition-none'
                   aria-hidden='true'
                 />
-              </button>
+              </IconButton>
             ))}
             <span className='sr-only' aria-live='polite'>
               Starter Action {boundedIndex + 1} Of {cards.length}
