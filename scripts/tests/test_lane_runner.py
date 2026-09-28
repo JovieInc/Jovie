@@ -1009,6 +1009,22 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
             self.assertAlmostEqual(record["at"], time.time(), delta=60)
 
+    def test_a_head_claimed_elsewhere_is_skipped_not_a_stop(self):
+        first, second = {**self.pr(number=4), "headRefName": "devin/jov-4-20260925204809"}, \
+            {**self.pr(), "headRefName": "devin/jov-1-20260925204809"}
+        saved = (lane.claimed_elsewhere, lane.post_claim)
+        lane.claimed_elsewhere = lambda number, sha, kind: number == 4
+        lane.post_claim = lambda *a, **k: None
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            try:
+                self.assertEqual(lane.claim_red_pr(host, "devin", [first, second])["number"], 5)
+                drafts = [{**pr, "isDraft": True} for pr in (first, second)]
+                self.assertEqual(lane.claim_adoptable_pr(host, "devin", drafts)["number"], 5)
+            finally:
+                lane.claimed_elsewhere, lane.post_claim = saved
+            self.assertNotIn("4", json.loads((host.state / "fix-attempts.json").read_text()))
+
     def test_unverified_drafts_are_adopted_once_per_head(self):
         draft = {**self.pr(), "isDraft": True, "headRefName": "hyperagent/jov-6438-20260925t213221"}
         ready = {**self.pr(number=9), "isDraft": False}
