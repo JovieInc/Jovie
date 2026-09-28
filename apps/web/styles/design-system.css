@@ -828,6 +828,23 @@
   flex: 0 0 auto;
 }
 
+/* From md up the compact surface is a fixed-height phone card with overflow
+   hidden. Natural-height content ran past the card, under the tab bar, and
+   could never be scrolled into view (jov.ie/tim dogfood 2026-09-27). Bound the
+   column so the content region scrolls inside the card; its bottom padding
+   keeps the last row reachable above the dock. */
+@media (min-width: 768px) {
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-content-column,
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      .profile-home-content-scroll
+  ) {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+}
+
 /* Mobile home: the identity header and the rail share one scroll region.
    Keep the rail at the top of its remaining region so the featured card
    follows the identity header without an ownerless spacer. */
@@ -2509,16 +2526,16 @@
      KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
   --text-3xs: 0.625rem;
   /* 10px — micro labels, legal */
-  --text-2xs: 0.6875rem;
-  /* 11px — tiny labels, badges */
+  --text-2xs: 0.75rem;
+  /* 12px — small step (was 11px; consolidated 2026-09-27) */
   --text-xs: 0.75rem;
   /* 12px */
-  --text-app: 0.8125rem;
-  /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
+  --text-app: 0.75rem;
+  /* 12px — app default UI size (was 13px; consolidated 2026-09-27) */
   --text-sm: 0.875rem;
   /* 14px */
-  --text-mid: 0.9375rem;
-  /* 15px — between sm and base; intentional tight fit */
+  --text-mid: 0.875rem;
+  /* 14px — body step (was 15px; consolidated 2026-09-27) */
   --text-base: 1rem;
   /* 16px */
   --text-lg: 1.125rem;

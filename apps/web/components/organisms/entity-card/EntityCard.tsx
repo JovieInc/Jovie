@@ -455,7 +455,7 @@ export function EntityCard({
           {size.showMeta && metaText ? (
             <span
               className={cn(
-                'block min-w-0 truncate text-[11.5px] text-tertiary-token',
+                'block min-w-0 truncate text-xs text-tertiary-token',
                 isUnified && 'entity-card-meta',
                 isProfileLandscape && 'text-secondary-token'
               )}
@@ -467,7 +467,7 @@ export function EntityCard({
           {size.showMeta && model.secondaryMeta ? (
             <span
               className={cn(
-                'block min-w-0 truncate text-[11.5px] text-tertiary-token',
+                'block min-w-0 truncate text-xs text-tertiary-token',
                 isUnified && 'entity-card-meta'
               )}
             >

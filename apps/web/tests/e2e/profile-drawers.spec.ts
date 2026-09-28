@@ -313,3 +313,54 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await assertProfileRestored(page);
   });
 });
+
+// The public profile ships its compact phone column at tablet and desktop
+// widths (desktop surface flagged off). Sheets there use the embedded
+// presentation, which once shrank to fit-content (a native <dialog>
+// default) and rendered as a narrow side panel over the release card.
+const CENTERED_COLUMN_VIEWPORTS = [
+  { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop', width: 1440, height: 900 },
+] as const;
+
+test.describe('Profile Drawers - centered phone column', () => {
+  for (const viewport of CENTERED_COLUMN_VIEWPORTS) {
+    test(`menu sheet spans the phone column at ${viewport.name}`, async ({
+      page,
+    }) => {
+      await interceptAnalytics(page);
+      await page.setViewportSize(viewport);
+      await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
+      await waitForHydration(page);
+
+      const shell = page.getByTestId('profile-compact-shell');
+      await expect(shell).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+      // No raw, unstyled control may sit directly in the shell chrome.
+      const rawShellButtons = await shell.evaluate(
+        node =>
+          Array.from(node.children).filter(
+            child => child.tagName === 'BUTTON' && !child.className
+          ).length
+      );
+      expect(rawShellButtons, 'unstyled button in the profile shell').toBe(0);
+
+      await page.getByRole('button', { name: 'Menu', exact: true }).click();
+      const sheet = page.getByTestId('profile-menu-drawer');
+      await expect(sheet).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+      const shellBox = await shell.boundingBox();
+      const sheetBox = await sheet.boundingBox();
+      expect(shellBox && sheetBox).toBeTruthy();
+      if (!shellBox || !sheetBox) return;
+      expect(Math.abs(sheetBox.width - shellBox.width)).toBeLessThanOrEqual(2);
+      expect(Math.abs(sheetBox.x - shellBox.x)).toBeLessThanOrEqual(2);
+      expect(
+        Math.abs(sheetBox.y + sheetBox.height - (shellBox.y + shellBox.height))
+      ).toBeLessThanOrEqual(2);
+
+      await page.keyboard.press('Escape');
+      await expect(sheet).toBeHidden({ timeout: 5_000 });
+    });
+  }
+});

@@ -89,7 +89,6 @@ import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
-import { PageShell } from '@/components/organisms/PageShell';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -102,7 +101,6 @@ import {
   type ToolbarFilterSuggestion,
   ToolbarFilterSuggestions,
   UnifiedTable,
-  UnifiedTableSkeleton,
   ViewModeSlider,
   type ViewModeSliderOption,
 } from '@/components/organisms/table';
@@ -113,6 +111,7 @@ import {
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
 import { alignment } from '@/components/organisms/table/table.styles';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
@@ -157,6 +156,11 @@ import {
   restoreRelease,
 } from '../dashboard/releases/actions';
 import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
+import {
+  LIBRARY_TABLE_MIN_WIDTH,
+  LIBRARY_TABLE_ROW_HEIGHT,
+  LIBRARY_TABLE_SKELETON_CONFIG,
+} from './LibraryLoadingState';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   attachLibraryProductGraph,
@@ -200,8 +204,6 @@ import {
   YouTubeOptimizationPanel,
 } from './YouTubeAssetDrawerPanels';
 
-const LIBRARY_TABLE_ROW_HEIGHT = 56;
-const LIBRARY_TABLE_MIN_WIDTH = '0';
 const EMPTY_RELATIONSHIPS: readonly LibraryRelationshipView[] = [];
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)';
@@ -215,23 +217,6 @@ const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
   'w-8 min-w-8'
 );
-const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
-  readonly width?: string;
-  readonly variant?:
-    | 'text'
-    | 'avatar'
-    | 'badge'
-    | 'button'
-    | 'release'
-    | 'meta';
-}> = [
-  { variant: 'release', width: '100%' },
-  { variant: 'badge', width: '108px' },
-  { variant: 'badge', width: '92px' },
-  { variant: 'text', width: '88px' },
-  { variant: 'meta', width: '72px' },
-  { variant: 'text', width: '96px' },
-];
 
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
@@ -288,7 +273,7 @@ const SORT_LABELS: Record<LibrarySortKey, string> = {
   providers: 'Providers',
 };
 
-const PRESETS: readonly {
+export const PRESETS: readonly {
   readonly id: LibraryPresetId;
   readonly label: string;
   readonly description: string;
@@ -675,7 +660,7 @@ const LIBRARY_CATALOG_COLUMNS = [
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
-const LIBRARY_TABLE_COLUMNS = [
+export const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.accessor('title', {
     id: 'release',
     header: 'Item',
@@ -736,48 +721,6 @@ const LIBRARY_TABLE_COLUMNS = [
   }),
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
-
-const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
-
-export function LibraryLoadingState() {
-  return (
-    <PageShell
-      aria-busy='true'
-      aria-label='Loading Library'
-      frame='content-container'
-      contentPadding='none'
-      data-testid='library-surface-loading'
-      toolbar={
-        <PageToolbar
-          start={
-            <div
-              className='flex min-w-0 flex-wrap items-center gap-1'
-              data-testid='library-view-filter-chips'
-            >
-              {LIBRARY_VIEW_FILTER_CHIP_KEYS.map(key => (
-                <span
-                  key={key}
-                  className='inline-block h-8 w-16 rounded-full skeleton motion-reduce:animate-none'
-                  aria-hidden='true'
-                />
-              ))}
-            </div>
-          }
-        />
-      }
-    >
-      <UnifiedTableSkeleton<LibraryReleaseAsset>
-        columns={LIBRARY_TABLE_COLUMNS}
-        hideHeader
-        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
-        minWidth={LIBRARY_TABLE_MIN_WIDTH}
-        skeletonRows={SKELETON_ROW_COUNT.TABLE}
-        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-        containerClassName='h-full'
-      />
-    </PageShell>
-  );
-}
 
 function LibraryViewFilterChips({
   assets,
@@ -1355,6 +1298,9 @@ function LibraryToolbar({
   filterPanel,
   isDesktop,
   suggestedFilters,
+  canSyncSpotify,
+  isSyncingSpotify,
+  onSyncSpotify,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly preset: LibraryPresetId;
@@ -1373,6 +1319,9 @@ function LibraryToolbar({
   readonly filterPanel: ReactNode;
   readonly isDesktop: boolean;
   readonly suggestedFilters: readonly ToolbarFilterSuggestion[];
+  readonly canSyncSpotify: boolean;
+  readonly isSyncingSpotify: boolean;
+  readonly onSyncSpotify: () => void;
 }) {
   return (
     <PageToolbar
@@ -1413,6 +1362,11 @@ function LibraryToolbar({
             />
           ) : null}
           <ViewToggle view={view} onView={onView} />
+          <LibraryFirstAction
+            canSyncSpotify={canSyncSpotify}
+            isSyncing={isSyncingSpotify}
+            onSyncSpotify={onSyncSpotify}
+          />
         </>
       }
     />
@@ -1747,6 +1701,45 @@ function LibraryReleaseTable({
   );
 }
 
+function LibraryFirstAction({
+  canSyncSpotify,
+  isSyncing,
+  onSyncSpotify,
+  testId,
+}: {
+  readonly canSyncSpotify: boolean;
+  readonly isSyncing: boolean;
+  readonly onSyncSpotify: () => void;
+  readonly testId?: string;
+}) {
+  if (!canSyncSpotify) {
+    return (
+      <Button asChild size='sm'>
+        <Link href={APP_ROUTES.RELEASES}>Open Releases</Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      type='button'
+      size='sm'
+      disabled={isSyncing}
+      onClick={onSyncSpotify}
+      data-testid={testId}
+    >
+      <RefreshCw
+        className={cn(
+          'h-4 w-4',
+          isSyncing && 'animate-spin motion-reduce:animate-none'
+        )}
+        aria-hidden='true'
+      />
+      {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+    </Button>
+  );
+}
+
 function EmptyCatalog({
   canSyncSpotify,
   isSyncing,
@@ -1757,12 +1750,25 @@ function EmptyCatalog({
   readonly onSyncSpotify: () => void;
 }) {
   return (
-    <PageShell
+    <WorkspacePage
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'
       data-testid='library-surface'
+      toolbar={
+        <PageToolbar
+          start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
+          end={
+            <LibraryFirstAction
+              canSyncSpotify={canSyncSpotify}
+              isSyncing={isSyncing}
+              onSyncSpotify={onSyncSpotify}
+              testId='library-sync-spotify-toolbar'
+            />
+          }
+        />
+      }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
@@ -1773,37 +1779,15 @@ function EmptyCatalog({
         testId='library-workspace-empty-state'
         className='min-h-90'
         actionSlot={
-          canSyncSpotify ? (
-            <Button
-              type='button'
-              size='sm'
-              disabled={isSyncing}
-              onClick={onSyncSpotify}
-              data-testid='library-sync-spotify-empty-state'
-            >
-              <RefreshCw
-                className={cn(
-                  'h-4 w-4',
-                  isSyncing && 'animate-spin motion-reduce:animate-none'
-                )}
-                aria-hidden='true'
-              />
-              {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-            </Button>
-          ) : (
-            <Link
-              href={APP_ROUTES.RELEASES}
-              className={cn(
-                'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
-                LIBRARY_BUTTON_FOCUS_CLASS
-              )}
-            >
-              Open Releases
-            </Link>
-          )
+          <LibraryFirstAction
+            canSyncSpotify={canSyncSpotify}
+            isSyncing={isSyncing}
+            onSyncSpotify={onSyncSpotify}
+            testId='library-sync-spotify-empty-state'
+          />
         }
       />
-    </PageShell>
+    </WorkspacePage>
   );
 }
 
@@ -3183,7 +3167,7 @@ export function LibrarySurface({
   }
 
   return (
-    <PageShell
+    <WorkspacePage
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
@@ -3208,6 +3192,9 @@ export function LibrarySurface({
           filterPanel={filterPanel}
           isDesktop={isDesktopLayout}
           suggestedFilters={suggestedFilters}
+          canSyncSpotify={canSyncSpotify}
+          isSyncingSpotify={isSyncingSpotify}
+          onSyncSpotify={handleSyncSpotify}
         />
       }
     >
@@ -3261,6 +3248,6 @@ export function LibrarySurface({
           />
         </div>
       </div>
-    </PageShell>
+    </WorkspacePage>
   );
 }

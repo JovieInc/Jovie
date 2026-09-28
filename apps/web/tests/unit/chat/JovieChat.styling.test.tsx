@@ -263,6 +263,11 @@ describe('JovieChat styling regressions', () => {
     expect(jovieChatSource).toContain('CHAT_TRANSCRIPT_WINDOW');
     expect(jovieChatSource).toContain('virtualizeAfterMessageCount');
     expect(jovieChatSource).toContain('overscanRowCount');
+    // The virtualizer owner stays out of React Compiler memoization, or the
+    // window freezes on its first rows and the thread renders blank (JOV-6702).
+    expect(jovieChatSource).toMatch(
+      /export function JovieChat\([\s\S]*?\}: JovieChatProps\) \{[\s\S]{0,400}?'use no memo';/
+    );
   });
 
   it('marks an empty conversation-load shell as busy for assistive technology', () => {

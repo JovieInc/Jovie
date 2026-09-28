@@ -6,6 +6,25 @@ import {
   type TrackSidebarData,
 } from '@/components/organisms/release-sidebar/TrackSidebar';
 
+const { toggleTrack } = vi.hoisted(() => ({
+  toggleTrack: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
+  useTrackAudioPlayer: () => ({
+    playbackState: {
+      activeTrackId: null,
+      isPlaying: false,
+      playbackStatus: 'idle',
+      currentTime: 0,
+      duration: 0,
+    },
+    toggleTrack,
+    seek: vi.fn(),
+    onError: vi.fn().mockReturnValue(() => {}),
+  }),
+}));
+
 function buildTrack(
   overrides: Partial<TrackSidebarData> = {}
 ): TrackSidebarData {
@@ -187,5 +206,31 @@ describe('TrackSidebar', () => {
     await user.click(screen.getByTestId('drawer-tab-links'));
 
     expect(screen.getByText(/Unverified DSPs/i)).toBeInTheDocument();
+  });
+
+  it('forwards the release id when toggling preview playback', async () => {
+    const user = userEvent.setup();
+    toggleTrack.mockClear();
+
+    render(
+      <TrackSidebar
+        track={buildTrack({
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+        })}
+        isOpen={true}
+        onClose={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByTestId('drawer-tab-assets'));
+    await user.click(screen.getByRole('button', { name: 'Play preview' }));
+
+    expect(toggleTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'track-1',
+        releaseId: 'release-1',
+        audioUrl: 'https://cdn.example.com/preview.mp3',
+      })
+    );
   });
 });
