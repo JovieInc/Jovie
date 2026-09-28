@@ -2227,6 +2227,48 @@ body {
   }
 }
 
+/* Ask Jovie mark: one restrained 360° turn on hover/focus (JOV-6569). */
+@keyframes ask-jovie-mark-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ask-jovie-mark:hover .ask-jovie-mark-icon,
+.ask-jovie-mark:focus-visible .ask-jovie-mark-icon {
+  animation: ask-jovie-mark-spin 480ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-jovie-mark:hover .ask-jovie-mark-icon,
+  .ask-jovie-mark:focus-visible .ask-jovie-mark-icon {
+    animation: none;
+  }
+}
+
+.ask-jovie-mark .ask-jovie-wordmark {
+  display: grid;
+  grid-template-columns: 0fr;
+  font-weight: var(--font-weight-nav);
+  transition: grid-template-columns var(--duration-subtle)
+    var(--ease-interactive);
+}
+
+.ask-jovie-mark:hover .ask-jovie-wordmark,
+.ask-jovie-mark:focus-visible .ask-jovie-wordmark {
+  grid-template-columns: 1fr;
+}
+
+.ask-jovie-panel {
+  max-inline-size: calc(100vw - 2rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-jovie-mark .ask-jovie-wordmark {
+    transition: none;
+  }
+}
+
 /* Keyframes */
 
 @keyframes mobile-nav-item-in {
