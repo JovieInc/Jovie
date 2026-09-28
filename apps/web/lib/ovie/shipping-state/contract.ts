@@ -278,6 +278,11 @@ export type SourceObservation = IdentityFields & {
     readonly running: CountMeasurement;
     readonly retrying: CountMeasurement;
     readonly blocked: CountMeasurement;
+    /**
+     * Terminal (dead-lettered) failures. Distinct from `blocked`: blocked work
+     * is still live and may recover; terminal failures ended without success.
+     * Never aliases another list — absent evidence stays `not-measured`.
+     */
     readonly terminalFailures: CountMeasurement;
     readonly queued: CountMeasurement;
     readonly openPullRequests: CountMeasurement;

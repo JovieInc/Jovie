@@ -726,14 +726,22 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    // No raw credits control in the shell; the entry lives in the menu.
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).toBeNull();
+    const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toBeTypeOf('function');
+    act(() => drawerProps.onOpenReleaseCredits?.());
 
     const drawer = await screen.findByRole('dialog', { name: 'Credits' });
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
   });
 
-  it('hides the release credits trigger when every credit group is empty', () => {
+  it('hides the release credits menu entry when every credit group is empty', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -744,9 +752,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.queryByRole('button', { name: 'Release credits' })
-    ).toBeNull();
+    const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
+      onOpenReleaseCredits?: () => void;
+    };
+    expect(drawerProps.onOpenReleaseCredits).toBeUndefined();
   });
 
   it('keeps the identity header without a portrait image when a profile has no real photo', () => {
