@@ -93,7 +93,6 @@
         "apps/web/app/app/(shell)/admin/_components/AdminConversionFunnelSection.tsx",
         "apps/web/app/app/(shell)/admin/_components/AdminScoreboardSection.tsx",
         "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
-        "apps/web/app/app/(shell)/admin/ingest/AdminIngestPageClient.tsx",
         "apps/web/app/app/(shell)/admin/investors/settings/InvestorSettingsForm.tsx",
         "apps/web/app/app/(shell)/dashboard/release-plan/page.tsx",
         "apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/page.tsx",
