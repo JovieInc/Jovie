@@ -12,17 +12,20 @@
 # stuck ones get a single diagnostic comment plus one aggregate tracking issue.
 #
 # MECHANISM:
-# 1. `enable` job — fires on opened/reopened/ready_for_review and runs
+# 1. `enable` job — fires on opened/reopened and runs
 #    `gh pr merge --auto --squash` with GITHUB_TOKEN (GraphQL
 #    enablePullRequestAutoMerge; GITHUB_TOKEN is sufficient — the PAT workflow-
 #    scope gap that blocks pushing workflow-file changes does NOT apply to
-#    enabling auto-merge). Drafts are skipped here and caught by the
-#    ready_for_review event.
-# 2. `triage` job — hourly sweep + manual dispatch. PRs with auto-merge enabled
-#    but unmerged after STUCK_THRESHOLD_HOURS get ONE upserted diagnostic
-#    comment naming the blocker (failing checks w/ links, pending checks,
-#    conflicts, behind-base) and are aggregated into ONE tracking issue.
-#    Never closes PRs.
+#    enabling auto-merge). Drafts are skipped here; `ready_for_review` is
+#    contractually reserved for merge-queue-autoenroll.yml (trigger-hygiene
+#    rule 3 / JOV-INV-029), so undrafted PRs are caught by the triage sweep.
+# 2. `triage` job — hourly sweep + manual dispatch. First enables auto-merge
+#    on any open, non-draft, same-repo PR that lacks it (covers drafts that
+#    went ready and any missed enable events). Then PRs with auto-merge
+#    enabled but unmerged after STUCK_THRESHOLD_HOURS get ONE upserted
+#    diagnostic comment naming the blocker (failing checks w/ links, pending
+#    checks, conflicts, behind-base) and are aggregated into ONE tracking
+#    issue. Never closes PRs.
 # 3. `self-test` job — workflow_dispatch only. Creates a throwaway draft PR,
 #    marks it ready, exercises the same enable path, asserts autoMergeRequest
 #    via GraphQL, then runs triage with threshold 0 and asserts exactly one
@@ -38,7 +41,7 @@ name: Auto-Merge Default
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened]
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
@@ -97,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       issues: write
       pull-requests: write
     steps:
@@ -117,7 +120,7 @@ jobs:
           THRESHOLD_HOURS: ${{ inputs.threshold_hours || '6' }}
         run: |
           set -euo pipefail
-          ARGS=(--repo "$GH_REPO" --threshold-hours "$THRESHOLD_HOURS")
+          ARGS=(--repo "$GH_REPO" --threshold-hours "$THRESHOLD_HOURS" --enable-missing)
           if [[ "${DRY_RUN,,}" == "true" ]]; then
             ARGS+=(--dry-run)
           fi

@@ -7,6 +7,7 @@ const {
   buildIssueBody,
   diagnoseStuckPr,
   findMarkerComment,
+  needsAutoMergeEnable,
 } = require('./auto-merge-stuck-triage');
 
 const basePr = {
@@ -86,6 +87,22 @@ test('findMarkerComment finds only marker comments', () => {
     },
   };
   assert.equal(findMarkerComment(pr)?.databaseId, 2);
+});
+
+test('needsAutoMergeEnable: only same-repo non-draft PRs without auto-merge', () => {
+  const eligible = {
+    ...basePr,
+    autoMergeRequest: null,
+    isDraft: false,
+    isCrossRepository: false,
+  };
+  assert.equal(needsAutoMergeEnable(eligible), true);
+  assert.equal(needsAutoMergeEnable({ ...eligible, isDraft: true }), false);
+  assert.equal(
+    needsAutoMergeEnable({ ...eligible, isCrossRepository: true }),
+    false
+  );
+  assert.equal(needsAutoMergeEnable(basePr), false);
 });
 
 test('issue body aggregates stuck PRs; empty state is explicit', () => {

@@ -11,7 +11,13 @@
 //
 // Usage (requires `gh` CLI + GH_TOKEN):
 //   node .github/scripts/auto-merge-stuck-triage.js \
-//     --repo owner/name [--threshold-hours 6] [--pr 123] [--dry-run]
+//     --repo owner/name [--threshold-hours 6] [--pr 123] [--dry-run] \
+//     [--enable-missing]
+//
+// `--enable-missing` first enables auto-merge (squash) on every open,
+// non-draft, same-repo PR that lacks it — this covers drafts that went
+// ready (ready_for_review is reserved for merge-queue-autoenroll.yml per
+// trigger-hygiene rule 3) and any missed enable events.
 
 const { execFileSync } = require('node:child_process');
 
@@ -42,6 +48,7 @@ function parseArgs(argv) {
   const opts = {
     thresholdHours: 6,
     dryRun: false,
+    enableMissing: false,
     pr: null,
     repo: process.env.GH_REPO,
   };
@@ -50,6 +57,7 @@ function parseArgs(argv) {
     if (arg === '--dry-run') opts.dryRun = true;
     else if (arg === '--threshold-hours')
       opts.thresholdHours = Number(argv[++i]);
+    else if (arg === '--enable-missing') opts.enableMissing = true;
     else if (arg === '--pr') opts.pr = Number(argv[++i]);
     else if (arg === '--repo') opts.repo = argv[++i];
     else throw new Error(`Unknown argument: ${arg}`);
@@ -71,6 +79,7 @@ query($owner: String!, $name: String!, $cursor: String) {
         createdAt
         mergeable
         mergeStateStatus
+        isCrossRepository
         headRefOid
         autoMergeRequest { enabledAt mergeMethod }
         comments(last: 100) {
@@ -277,11 +286,46 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
   console.log(`Updated tracking issue #${issue.number}.`);
 }
 
+// Pure: a PR needs the enable pass when it is open, not a draft, lives in
+// this repo (fork tokens are read-only), and has no autoMergeRequest yet.
+function needsAutoMergeEnable(pr) {
+  return !pr.isDraft && !pr.isCrossRepository && !pr.autoMergeRequest;
+}
+
+function enableMissingAutoMerge(repo, prs, dryRun) {
+  for (const pr of prs) {
+    if (!needsAutoMergeEnable(pr)) continue;
+    if (dryRun) {
+      console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
+      continue;
+    }
+    gh([
+      'pr',
+      'merge',
+      String(pr.number),
+      '--repo',
+      repo,
+      '--auto',
+      '--squash',
+    ]);
+    console.log(`PR #${pr.number}: enabled auto-merge (squash).`);
+  }
+}
+
 function main() {
   const opts = parseArgs(process.argv);
   const cutoffMs = Date.now() - opts.thresholdHours * 3600 * 1000;
 
-  let prs = listOpenPrs(opts.repo).filter(
+  const openPrs = listOpenPrs(opts.repo);
+  if (opts.enableMissing) {
+    enableMissingAutoMerge(
+      opts.repo,
+      opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
+      opts.dryRun
+    );
+  }
+
+  let prs = openPrs.filter(
     pr => !pr.isDraft && pr.autoMergeRequest && pr.autoMergeRequest.enabledAt
   );
   if (opts.pr) prs = prs.filter(pr => pr.number === opts.pr);
@@ -340,4 +384,5 @@ module.exports = {
   buildCommentBody,
   buildIssueBody,
   findMarkerComment,
+  needsAutoMergeEnable,
 };
