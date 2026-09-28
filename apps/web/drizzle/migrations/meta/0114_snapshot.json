@@ -1,5 +1,5 @@
 {
-  "id": "a84d178a-842a-4c8a-ac2d-8d3619eb2602",
+  "id": "d40ccb04-fdc8-4b9f-8f13-c5f4b0a9307a",
   "prevId": "c4638cf0-0c9b-4bd7-bd82-8a8a351b63b6",
   "version": "7",
   "dialect": "postgresql",
@@ -8101,6 +8101,315 @@
             "id"
           ],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.conversation_objections": {
+      "name": "conversation_objections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "objection_key": {
+          "name": "objection_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objection": {
+          "name": "objection",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frequency": {
+          "name": "frequency",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "stage": {
+          "name": "stage",
+          "type": "conversation_funnel_stage",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'chat'"
+        },
+        "drafted_answer": {
+          "name": "drafted_answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "objection_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "evidence": {
+          "name": "evidence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "resolution_ref": {
+          "name": "resolution_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_conversation_objections_key_unique": {
+          "name": "idx_conversation_objections_key_unique",
+          "columns": [
+            {
+              "expression": "objection_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_conversation_objections_status": {
+          "name": "idx_conversation_objections_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_conversation_objections_stage": {
+          "name": "idx_conversation_objections_stage",
+          "columns": [
+            {
+              "expression": "stage",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.conversation_signals": {
+      "name": "conversation_signals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "conversation_id": {
+          "name": "conversation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "week_start": {
+          "name": "week_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stage": {
+          "name": "stage",
+          "type": "conversation_funnel_stage",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "intent": {
+          "name": "intent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objection_key": {
+          "name": "objection_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confusion_or_bug": {
+          "name": "confusion_or_bug",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "feature_ask": {
+          "name": "feature_ask",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "drop_off_point": {
+          "name": "drop_off_point",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redacted_quote": {
+          "name": "redacted_quote",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_conversation_signals_conversation_unique": {
+          "name": "idx_conversation_signals_conversation_unique",
+          "columns": [
+            {
+              "expression": "conversation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_conversation_signals_week_stage": {
+          "name": "idx_conversation_signals_week_stage",
+          "columns": [
+            {
+              "expression": "week_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stage",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_conversation_signals_objection": {
+          "name": "idx_conversation_signals_objection",
+          "columns": [
+            {
+              "expression": "objection_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "conversation_signals_conversation_id_chat_conversations_id_fk": {
+          "name": "conversation_signals_conversation_id_chat_conversations_id_fk",
+          "tableFrom": "conversation_signals",
+          "tableTo": "chat_conversations",
+          "columnsFrom": [
+            "conversation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -33453,12 +33762,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "conversation_id": {
-          "name": "conversation_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "parent_task_id": {
           "name": "parent_task_id",
           "type": "uuid",
@@ -33491,12 +33794,6 @@
         },
         "completed_at": {
           "name": "completed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "archived_at": {
-          "name": "archived_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
@@ -33641,22 +33938,6 @@
           "method": "btree",
           "with": {}
         },
-        "tasks_conversation_id_unique": {
-          "name": "tasks_conversation_id_unique",
-          "columns": [
-            {
-              "expression": "conversation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"tasks\".\"conversation_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "tasks_creator_agent_status_idx": {
           "name": "tasks_creator_agent_status_idx",
           "columns": [
@@ -33705,19 +33986,6 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "tasks_conversation_id_chat_conversations_id_fk": {
-          "name": "tasks_conversation_id_chat_conversations_id_fk",
-          "tableFrom": "tasks",
-          "tableTo": "chat_conversations",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "tasks_parent_task_id_tasks_id_fk": {
@@ -37619,6 +37887,15 @@
         "studio_location"
       ]
     },
+    "public.conversation_funnel_stage": {
+      "name": "conversation_funnel_stage",
+      "schema": "public",
+      "values": [
+        "anonymous",
+        "claimed",
+        "paid"
+      ]
+    },
     "public.creator_claim_evidence_state": {
       "name": "creator_claim_evidence_state",
       "schema": "public",
@@ -38328,6 +38605,16 @@
         "email",
         "sms",
         "push"
+      ]
+    },
+    "public.objection_status": {
+      "name": "objection_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "approved",
+        "published",
+        "rejected"
       ]
     },
     "public.optimization_experiment_status": {

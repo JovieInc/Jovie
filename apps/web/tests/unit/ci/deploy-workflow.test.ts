@@ -1608,7 +1608,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       /\n {6}vercel:\n {8}specifier: 56\.3\.2\n {8}version: 56\.3\.2[(\n]/
     );
     expect(dependabot).toMatch(
-      /- dependency-name: 'vercel'\n\s+versions: \['>=57'\]/
+      /- dependency-name: 'vercel'\n\s+versions: \['>=56\.4'\]/
     );
   });
 
@@ -5215,8 +5215,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
     expect(evaluator).toContain("default: '5'");
     expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('failingRunAttempt < 2');
-    expect(evaluator).toContain('repair_state_unavailable');
+    expect(evaluator).toContain('attemptEvidenceTrusted');
+    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {

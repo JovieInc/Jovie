@@ -143,4 +143,21 @@ test.describe('Pricing Page', () => {
     const bodyText = await page.locator('body').textContent();
     expect(bodyText && bodyText.length > 500).toBe(true);
   });
+
+  test('renders every logo-bar image without broken assets (JOV-6849)', async ({
+    page,
+  }) => {
+    const logoBar = page.locator(
+      '.marketing-hero-logos [data-testid="homepage-trust"]'
+    );
+    await expect(logoBar).toBeVisible();
+    const brokenImages = await logoBar
+      .locator('img')
+      .evaluateAll(imgs =>
+        imgs
+          .filter(img => !(img.complete && img.naturalWidth > 0))
+          .map(img => img.getAttribute('src') ?? img.alt)
+      );
+    expect(brokenImages).toEqual([]);
+  });
 });

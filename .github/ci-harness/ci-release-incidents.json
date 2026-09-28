@@ -670,10 +670,9 @@
     {
       "id": "ci-release/gbrain-readiness-diagnosis",
       "failureMode": "GBrain readiness returns a misleading pool-saturation message for wedged or DNS-broken DB sessions.",
-      "regression": {
-        "kind": "test",
-        "command": "pytest scripts/tests/test_lane_runner.py -q -k reports_missing_gbrain_instead_of_inventing_context",
-        "path": "scripts/tests/test_lane_runner.py"
+      "lifecycle": {
+        "state": "superseded",
+        "supersededBy": "JovieInc/symphony-control"
       },
       "ciStageOwner": {
         "stage": "scheduled-control-plane",
@@ -892,10 +891,9 @@
     {
       "id": "ci-release/gbrain-admin-secret-log-redaction",
       "failureMode": "GBrain administrative credentials enter persistent service logs instead of redacted diagnostics.",
-      "regression": {
-        "kind": "test",
-        "command": "pytest scripts/tests/test_lane_runner.py -q -k \"secrets_lockfile_and_size_guards or missing_key_is_a_clear_error\"",
-        "path": "scripts/tests/test_lane_runner.py"
+      "lifecycle": {
+        "state": "superseded",
+        "supersededBy": "JovieInc/symphony-control"
       },
       "ciStageOwner": {
         "stage": "operator-bootstrap",
