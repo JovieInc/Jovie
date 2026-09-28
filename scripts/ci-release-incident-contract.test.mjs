@@ -22,6 +22,7 @@ function fixture() {
       command: 'node regression.mjs',
       path: 'regression.mjs',
     },
+    lifecycle: { state: 'active' },
     ciStageOwner: { stage: 'source-pr', owner: 'CI' },
     documentation: { operator: 'operator.md', postmortem: 'postmortem.md' },
     templatePropagation: {
