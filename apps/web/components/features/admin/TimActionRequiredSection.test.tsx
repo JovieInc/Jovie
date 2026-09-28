@@ -24,7 +24,7 @@ describe('TimActionRequiredSection', () => {
     render(<TimActionRequiredSection />);
 
     expect(await screen.findByText('Needs You')).toBeInTheDocument();
-    expect(screen.getByText('Nothing needs Tim.')).toBeInTheDocument();
+    expect(screen.getByText('Nothing needs you.')).toBeInTheDocument();
     expect(screen.queryByText('Needs Tim')).not.toBeInTheDocument();
   });
 });

@@ -321,7 +321,7 @@ function timActionsMessage(
     return data?.errorMessage ?? 'Linear actions are unavailable.';
   }
   if (observation === 'empty') {
-    return 'Nothing needs Tim.';
+    return 'Nothing needs you.';
   }
   return '';
 }
