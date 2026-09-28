@@ -908,7 +908,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(classifierJob).toContain(
       'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
     );
-    expect(classifierJob).toContain("node-version: '22'");
+    expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
     // JOV-4446: merge_group uses exact base/head SHA vars; push alone binds event.before.
     expect([classifierJob.includes('fetch-depth: 0'), classifierJob.includes('filter: blob:none'), classifierJob.includes('git cat-file -e "${DIFF_BASE}^{commit}"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "$HEAD_SHA"'), classifierJob.includes('DIFF_BASE="${{ github.event.before }}"'), classifierJob.includes('|| git show')]).toEqual([true, true, true, true, true, false]);
@@ -1608,7 +1608,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       /\n {6}vercel:\n {8}specifier: 56\.3\.2\n {8}version: 56\.3\.2[(\n]/
     );
     expect(dependabot).toMatch(
-      /- dependency-name: 'vercel'\n\s+versions: \['>=57'\]/
+      /- dependency-name: 'vercel'\n\s+versions: \['>=56\.4'\]/
     );
   });
 
@@ -5215,8 +5215,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
     expect(evaluator).toContain("default: '5'");
     expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('failingRunAttempt < 2');
-    expect(evaluator).toContain('repair_state_unavailable');
+    expect(evaluator).toContain('attemptEvidenceTrusted');
+    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {

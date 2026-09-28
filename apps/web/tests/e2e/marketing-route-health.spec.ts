@@ -383,6 +383,12 @@ async function checkTarget(page: Page, target: MarketingRouteHealthTarget) {
   const responseStatus = response?.status() ?? 0;
   if (target.expected === 'not-found') {
     expect(responseStatus, `${target.glob} must remain unpublished`).toBe(404);
+  } else if (target.expected === 'page') {
+    // An active manifest route must serve a real document; a 3xx landing or a
+    // silent 404 both fail here so manifest and deploy can never drift apart.
+    expect(responseStatus, `${target.glob} must serve a 200 document`).toBe(
+      200
+    );
   } else {
     expect(
       responseStatus,

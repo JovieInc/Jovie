@@ -650,13 +650,15 @@ class RunAgentTest(unittest.TestCase):
 
 class DispatchTest(unittest.TestCase):
     def test_spawns_one_worker_per_slot_of_healthy_enabled_providers_and_prunes(self):
-        saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run)
+        saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
+                 lane.disk_guard.check)
         spawned = []
         lane.load_providers = lambda: {"a": {"slots": 2}, "b": {"slots": 3}, "c": {"slots": 1, "enabled": False}, "d": {"slots": 4}}
         lane.provider_healthy = lambda spec: self.fail("host-scoped-off provider was probed") if spec["slots"] == 4 else spec["slots"] == 2
         lane.subprocess.Popen = lambda args, **kw: spawned.append(args[-1])
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
+        lane.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False}
         with tempfile.TemporaryDirectory() as tmp:
             old = Path(tmp) / "worktrees/old"
             old.mkdir(parents=True)
@@ -667,7 +669,8 @@ class DispatchTest(unittest.TestCase):
                 self.assertEqual(lane.dispatch(host), 0)
             finally:
                 os.environ.pop("LANES_SLOTS_D", None)
-                lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run = saved
+                (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
+                 lane.disk_guard.check) = saved
             self.assertFalse(old.exists())
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual((tick["unhealthy"], tick["spawned"], tick["error"]), (["b"], ["a", "a"], None))
@@ -1008,6 +1011,22 @@ class FixRedTest(unittest.TestCase):
             record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
             self.assertEqual((record["sha"], record["count"], record["lane"]), ("h1", 1, "devin"))
             self.assertAlmostEqual(record["at"], time.time(), delta=60)
+
+    def test_shared_cache_serves_every_worker_one_read_per_ttl(self):
+        calls = []
+        fetch = lambda: calls.append(1) or (None if len(calls) == 1 else ["pr"])
+        saved = lane.SHARED_CACHE_DIR, os.environ.pop("LANES_EXECUTION_BACKEND")
+        with tempfile.TemporaryDirectory() as tmp:
+            lane.SHARED_CACHE_DIR = Path(tmp)
+            try:
+                self.assertIsNone(lane.shared("k", 60, fetch), "a failed read is returned")
+                self.assertEqual(lane.shared("k", 60, fetch), ["pr"], "and never cached")
+                self.assertEqual(lane.shared("k", 60, fetch), ["pr"])
+                self.assertEqual(len(calls), 2, "fresh value served from the file")
+                self.assertEqual(lane.shared("k", 0, fetch), ["pr"])
+                self.assertEqual(len(calls), 3, "expired value is re-read")
+            finally:
+                lane.SHARED_CACHE_DIR, os.environ["LANES_EXECUTION_BACKEND"] = saved
 
     def test_a_head_claimed_elsewhere_is_skipped_not_a_stop(self):
         first, second = {**self.pr(number=4), "headRefName": "devin/jov-4-20260925204809"}, \

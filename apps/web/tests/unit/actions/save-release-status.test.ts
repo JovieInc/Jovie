@@ -189,6 +189,10 @@ function ownedRelease() {
   };
 }
 
+const { saveReleaseStatus } = await import(
+  '@/app/app/(shell)/dashboard/releases/actions'
+);
+
 describe('saveReleaseStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -207,10 +211,6 @@ describe('saveReleaseStatus', () => {
     });
     mockDbUpdate.mockReturnValue({ set });
 
-    const { saveReleaseStatus } = await import(
-      '@/app/app/(shell)/dashboard/releases/actions'
-    );
-
     for (const status of ['draft', 'scheduled', 'released'] as const) {
       const result = await saveReleaseStatus({
         profileId: PROFILE.id,
@@ -228,10 +228,6 @@ describe('saveReleaseStatus', () => {
   });
 
   it('rejects a status outside the editable set before touching the row', async () => {
-    const { saveReleaseStatus } = await import(
-      '@/app/app/(shell)/dashboard/releases/actions'
-    );
-
     await expect(
       saveReleaseStatus({
         profileId: PROFILE.id,

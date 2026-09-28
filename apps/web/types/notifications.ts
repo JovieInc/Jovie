@@ -135,6 +135,7 @@ export type NotificationErrorCode =
   | 'validation_error'
   | 'not_found'
   | 'missing_identifier'
+  | 'forbidden'
   | 'rate_limited'
   | 'server_error';
 

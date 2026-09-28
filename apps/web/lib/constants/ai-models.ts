@@ -18,6 +18,9 @@ export const GATEWAY_ALLOWED_MODELS: readonly string[] = [
   'zai/glm-5.3-flash',
 ];
 
+/** Stable operator-facing name for the founder-owned Gateway model policy. */
+export const GATEWAY_ALLOWLIST_NAME = 'founder-strict-2026-09-17';
+
 /** Primary chat model used for the Jovie AI assistant (complex tasks) */
 export const CHAT_MODEL = 'zai/glm-5.3';
 

@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { changelogAnchorId } from '@/lib/changelog-parser';
 import { getChangelogSnapshot } from '@/lib/changelog-source';
 import {
   formatCustomerChangelogTertiary,
@@ -9,7 +10,7 @@ import {
 export const revalidate = false;
 
 export function atomEntryId(version: string): string {
-  return `${BASE_URL}/changelog#v${version}`;
+  return `${BASE_URL}/changelog#${changelogAnchorId(version)}`;
 }
 
 function versionPageUrl(version: string): string {

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { env } from '@/lib/env-server';
@@ -205,12 +206,14 @@ export async function getOvieMacHudSnapshot(
     inFlightPullRequests,
     lybMrr,
     shipping,
+    funnel,
   ] = await Promise.all([
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
     getOvieMacHudInFlightPullRequests(),
     getLybDailyMrr(new Date(nowMs)),
     getOvieMacHudShipping(),
+    getFounderFunnelData('30d').catch(() => null),
   ]);
   const financialAvailable =
     stripeMetrics.isAvailable &&
@@ -249,6 +252,7 @@ export async function getOvieMacHudSnapshot(
     },
     shipping,
     inFlightPullRequests,
+    decisionExtras: { funnel },
     lybMrr,
     generatedAtIso,
   });

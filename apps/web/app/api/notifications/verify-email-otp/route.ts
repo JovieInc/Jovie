@@ -4,6 +4,10 @@ import {
   buildInvalidRequestResponse,
   verifyEmailOtpDomain,
 } from '@/lib/notifications/domain';
+import {
+  SUBSCRIPTION_MANAGEMENT_COOKIE,
+  SUBSCRIPTION_MANAGEMENT_TTL_SECONDS,
+} from '@/lib/notifications/management-token';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import {
   createRateLimiter,
@@ -79,11 +83,27 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await verifyEmailOtpDomain(body);
-    return createNotificationJsonResponse(
+    const response = createNotificationJsonResponse(
       result.body,
       result.status,
       limitResult
     );
+
+    // On success, persist the subscription management token as an HttpOnly
+    // cookie so subsequent preference updates can prove mailbox control.
+    const managementToken =
+      'managementToken' in result.body ? result.body.managementToken : null;
+    if (result.status === 200 && managementToken) {
+      response.cookies.set(SUBSCRIPTION_MANAGEMENT_COOKIE, managementToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: true,
+        maxAge: SUBSCRIPTION_MANAGEMENT_TTL_SECONDS,
+        path: '/',
+      });
+    }
+
+    return response;
   } catch (error) {
     logger.error('[Notifications Verify OTP] Error:', error);
     await captureError('Notification verify email OTP failed', error, {

@@ -16,7 +16,7 @@ import {
   ProfileNotificationsContext,
   useProfileShell,
 } from '@/components/organisms/profile-shell';
-import { BASE_URL } from '@/constants/app';
+import { BASE_URL, COUNTRY_CODE_COOKIE } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import type {
   ProfileMode,
@@ -171,6 +171,26 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
 
 const DRAWER_CLOSE_RESET_DELAY_MS = 200;
 
+/**
+ * Reads a non-httpOnly cookie on the client. Server-safe: returns null when
+ * `document` is unavailable so callers can share the code path across SSR
+ * and hydration without branching.
+ */
+function readClientCookieValue(name: string): string | null {
+  if (globalThis.document === undefined) return null;
+  for (const entry of globalThis.document.cookie.split(';')) {
+    const [key, ...rest] = entry.trim().split('=');
+    if (key === name && rest.length > 0) {
+      try {
+        return decodeURIComponent(rest.join('='));
+      } catch {
+        return rest.join('=');
+      }
+    }
+  }
+  return null;
+}
+
 function getInitialModeFromLocation(
   fallbackMode: ProfileMode,
   readWindowLocation = false
@@ -294,6 +314,31 @@ export function ProfileCompactTemplate({
     useState<ProfileAlertOptInVariant>(alertOptInVariant);
   const [resolvedProfilePacAssignment, setResolvedProfilePacAssignment] =
     useState<ProfilePacAssignment>(profilePacAssignment);
+  // The ISR render cannot read the httpOnly jv_aid cookie, so per-user
+  // experiment assignments land via AnonCookieBootstrap after hydration.
+  // Until that resolution settles, variant-dependent fan-capture CTAs stay
+  // unmounted — the assigned control must never morph under a visitor's
+  // cursor (a click mid-flight would hit the wrong variant).
+  const [visitorAssignmentResolved, setVisitorAssignmentResolved] =
+    useState(false);
+  const markVisitorAssignmentResolved = useCallback(() => {
+    setVisitorAssignmentResolved(true);
+  }, []);
+
+  // The proxy stamps the edge-geo country into the readable jv_country
+  // cookie so ISR pages can geo-sort DSPs without a server headers() read.
+  // Read it post-mount (same pattern as `initialSource` below) so the first
+  // client render stays identical to the server render.
+  const [resolvedViewerCountryCode, setResolvedViewerCountryCode] = useState<
+    string | null
+  >(viewerCountryCode ?? null);
+  useEffect(() => {
+    if (viewerCountryCode != null) return;
+    const cookieValue = readClientCookieValue(COUNTRY_CODE_COOKIE);
+    if (cookieValue) {
+      setResolvedViewerCountryCode(cookieValue);
+    }
+  }, [viewerCountryCode]);
   const [drawerOpen, setDrawerOpen] = useState(initialDrawerView !== null);
   const [drawerView, setDrawerView] = useState<DrawerView>(
     initialDrawerView ?? 'menu'
@@ -405,9 +450,9 @@ export function ProfileCompactTemplate({
     () =>
       sortDSPsByGeoPopularity(
         getCanonicalProfileDSPs(artist, socialLinks),
-        viewerCountryCode
+        resolvedViewerCountryCode
       ),
-    [artist, socialLinks, viewerCountryCode]
+    [artist, socialLinks, resolvedViewerCountryCode]
   );
 
   const heroImageUrl = useMemo(() => {
@@ -457,7 +502,7 @@ export function ProfileCompactTemplate({
     useProfileShell({
       artist,
       socialLinks,
-      viewerCountryCode,
+      viewerCountryCode: resolvedViewerCountryCode,
       contacts,
       visitTrackingToken,
       modeOverride: requestedMode,
@@ -681,6 +726,17 @@ export function ProfileCompactTemplate({
       return;
     }
 
+    // Skip until initialSource has hydrated if the URL carries a source param.
+    // Without this guard the effect fires on the first render cycle with
+    // searchSuffix = '' and pushes a source-less URL before the initialSource
+    // useEffect (which reads location.search post-mount) has a chance to run.
+    if (
+      initialSource === null &&
+      new URLSearchParams(globalThis.location.search).has('source')
+    ) {
+      return;
+    }
+
     const activeMode = resolveHistoryMode({
       drawerOpen,
       drawerView,
@@ -711,7 +767,14 @@ export function ProfileCompactTemplate({
       '',
       href
     );
-  }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
+  }, [
+    drawerOpen,
+    drawerView,
+    requestedMode,
+    artist.handle,
+    searchSuffix,
+    initialSource,
+  ]);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
@@ -865,6 +928,7 @@ export function ProfileCompactTemplate({
       <AnonCookieBootstrap
         onVariantResolved={setResolvedAlertOptInVariant}
         onProfilePacResolved={setResolvedProfilePacAssignment}
+        onResolved={markVisitorAssignmentResolved}
       />
       <ReleaseCreditsDrawer
         open={creditsOpen}
@@ -891,13 +955,12 @@ export function ProfileCompactTemplate({
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
             data-interactive-ready={isHydrated ? 'true' : undefined}
+            data-alert-opt-in-variant={resolvedAlertOptInVariant}
+            data-visitor-assignment-resolved={
+              visitorAssignmentResolved ? 'true' : undefined
+            }
             data-public-profile-nav={publicProfileNavIds}
           >
-            {visibleReleaseCredits.length > 0 ? (
-              <button type='button' onClick={() => setCreditsOpen(true)}>
-                Release credits
-              </button>
-            ) : null}
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
@@ -910,6 +973,11 @@ export function ProfileCompactTemplate({
               <ProfileCompactSurface
                 renderMode='interactive'
                 presentation={drawerPresentation}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
                 artist={artist}
                 socialLinks={socialLinks}
                 contacts={contacts}
@@ -930,7 +998,8 @@ export function ProfileCompactTemplate({
                 showSubscriptionConfirmedBanner={
                   showSubscriptionConfirmedBanner
                 }
-                viewerCountryCode={viewerCountryCode}
+                viewerCountryCode={resolvedViewerCountryCode}
+                visitorAssignmentResolved={visitorAssignmentResolved}
                 merchCards={merchCards}
                 hideJovieBranding={hideJovieBranding}
                 hideMoreMenu={hideMoreMenu}
@@ -999,7 +1068,8 @@ export function ProfileCompactTemplate({
               creditSegments={creditSegments}
               photoDownloadSizes={photoDownloadSizes}
               tourDates={tourDates}
-              viewerCountryCode={viewerCountryCode}
+              viewerCountryCode={resolvedViewerCountryCode}
+              visitorAssignmentResolved={visitorAssignmentResolved}
               releases={releases}
               catalogLoadFailed={catalogLoadFailed}
               drawerOpen={drawerOpen}

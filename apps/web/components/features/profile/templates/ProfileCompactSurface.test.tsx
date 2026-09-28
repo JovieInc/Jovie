@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -82,6 +84,7 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
   ProfilePrimaryTabPanel: ({
     mode,
     catalogLoadFailed,
+    visitorAssignmentResolved,
     creditSegments,
     contacts,
     modeCardAccents,
@@ -89,6 +92,7 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
   }: {
     readonly mode: string;
     readonly catalogLoadFailed?: boolean;
+    readonly visitorAssignmentResolved?: boolean;
     readonly creditSegments?: readonly { readonly type: string }[];
     readonly contacts?: readonly { readonly id: string }[];
     readonly modeCardAccents?: Record<string, { accent: string }>;
@@ -97,6 +101,9 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
     <div
       data-testid={`mock-primary-tab-panel-${mode}`}
       data-catalog-load-failed={catalogLoadFailed ? 'true' : 'false'}
+      data-visitor-assignment-resolved={
+        visitorAssignmentResolved === false ? 'false' : 'true'
+      }
       data-credit-segments={(creditSegments ?? [])
         .map(segment => segment.type)
         .join('|')}
@@ -259,6 +266,27 @@ describe('ProfileCompactSurface', () => {
     );
   });
 
+  // JOV-6453: the subscribe CTA must stay a skeleton until the per-user
+  // experiment assignment resolves, so the flag is forwarded verbatim.
+  it('forwards an unresolved visitor assignment into the subscribe panel', () => {
+    renderSurface({
+      activeMode: 'subscribe',
+      visitorAssignmentResolved: false,
+    });
+
+    expect(
+      screen.getByTestId('mock-primary-tab-panel-subscribe')
+    ).toHaveAttribute('data-visitor-assignment-resolved', 'false');
+  });
+
+  it('defaults to a resolved visitor assignment for surfaces without bootstrap', () => {
+    renderSurface({ activeMode: 'subscribe' });
+
+    expect(
+      screen.getByTestId('mock-primary-tab-panel-subscribe')
+    ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
+  });
+
   it('routes selected credits into the About panel (JOV-6199)', () => {
     renderSurface({
       activeMode: 'about',
@@ -305,6 +333,33 @@ describe('ProfileCompactSurface', () => {
     renderSurface({ allowFanCapture: true });
 
     expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
+  });
+
+  it('leads the identity header with Get Updates and opens the subscribe flow', () => {
+    const onModeSelect = vi.fn();
+    renderSurface({
+      allowFanCapture: true,
+      renderMode: 'interactive',
+      onModeSelect,
+    });
+
+    const identity = screen.getByTestId('profile-identity-header');
+    expect(
+      within(identity).queryByTestId('profile-identity-listen')
+    ).toBeNull();
+    fireEvent.click(
+      within(identity).getByRole('button', { name: 'Get Updates' })
+    );
+    expect(onModeSelect).toHaveBeenCalledWith('subscribe');
+  });
+
+  it('reads Updates On for a subscribed viewer', () => {
+    renderSurface({ allowFanCapture: true, isSubscribed: true });
+
+    expect(screen.getByRole('button', { name: 'Updates On' })).toHaveAttribute(
+      'data-subscribed',
+      'true'
+    );
   });
 
   it('marks only the active public home surface for mobile overflow scoping', () => {
@@ -412,5 +467,13 @@ describe('ProfileCompactSurface', () => {
       'data-payments-link',
       ''
     );
+  });
+
+  it('forwards the release credits opener to the overflow menu drawer', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ProfileCompactSurface.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('onOpenReleaseCredits={onOpenReleaseCredits}');
   });
 });

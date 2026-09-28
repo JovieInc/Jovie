@@ -26,8 +26,9 @@ import { cn } from '@/lib/utils';
  * actions slot. Detail rows below this header are the compressed tail —
  * they must never repeat a fact this header already states.
  *
- * JOV-6842: single owner of rail header anatomy — EntityHeaderCard,
- * DrawerHeader, AudienceMemberHeader, ContactDetailHeader folded onto it.
+ * JOV-6842: single owner of rail header anatomy. EntityHeaderCard,
+ * DrawerHeader, AudienceMemberHeader, and ContactDetailHeader are folded
+ * onto it and the retired files are deleted.
  * `layout='chrome'` = utility title bar; variants fail CI (JOV-6777).
  */
 
@@ -209,6 +210,7 @@ export interface EntityHeaderProps {
   readonly titleLineClamp?: StableHeaderLineCount;
   readonly subtitleLineClamp?: StableHeaderLineCount;
   /** Reserve the subtitle/meta/footer row even when empty. */
+  readonly reserveEyebrowSlot?: boolean;
   readonly reserveSubtitleSlot?: boolean;
   readonly reserveMetaSlot?: boolean;
   readonly reserveFooterSlot?: boolean;
@@ -217,6 +219,8 @@ export interface EntityHeaderProps {
   readonly className?: string;
   readonly bodyClassName?: string;
   readonly titleClassName?: string;
+  readonly subtitleClassName?: string;
+  readonly metaClassName?: string;
   readonly footerClassName?: string;
   readonly 'data-testid'?: string;
 }
@@ -236,6 +240,7 @@ export function EntityHeader({
   stableLayout = false,
   titleLineClamp,
   subtitleLineClamp,
+  reserveEyebrowSlot,
   reserveSubtitleSlot,
   reserveMetaSlot,
   reserveFooterSlot,
@@ -243,6 +248,8 @@ export function EntityHeader({
   className,
   bodyClassName,
   titleClassName,
+  subtitleClassName,
+  metaClassName,
   footerClassName,
   'data-testid': testId = 'entity-header',
 }: EntityHeaderProps) {
@@ -272,6 +279,7 @@ export function EntityHeader({
 
   const resolvedTitleLineClamp =
     titleLineClamp ?? (stableLayout ? 1 : undefined);
+  const shouldReserveEyebrow = reserveEyebrowSlot ?? false;
   const shouldReserveSubtitle = reserveSubtitleSlot ?? stableLayout;
   const shouldReserveMeta = reserveMetaSlot ?? stableLayout;
   const shouldReserveFooter = reserveFooterSlot ?? false;
@@ -282,8 +290,9 @@ export function EntityHeader({
 
   const identityContent = (
     <>
-      {eyebrow ? (
+      {eyebrow || shouldReserveEyebrow ? (
         <StableHeaderTextSlot
+          reserve={shouldReserveEyebrow}
           lineCount={1}
           size='xs'
           className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
@@ -315,7 +324,10 @@ export function EntityHeader({
           reserve={shouldReserveSubtitle}
           lineCount={resolvedSubtitleLineClamp}
           size='xs'
-          className='text-xs leading-4 tracking-[-0.005em] text-secondary-token'
+          className={cn(
+            'text-xs leading-4 tracking-[-0.005em] text-secondary-token',
+            subtitleClassName
+          )}
           testId='entity-header-details-row'
         >
           {statusGlyph ? (
@@ -337,7 +349,7 @@ export function EntityHeader({
         resolvedMetaOverflow === 'scroll' ? (
           <StableHeaderChipRail
             reserve={shouldReserveMeta}
-            className='pt-0.5'
+            className={cn('pt-0.5', metaClassName)}
             testId='entity-header-meta-slot'
           >
             {meta}
@@ -347,7 +359,8 @@ export function EntityHeader({
             aria-hidden={meta ? undefined : true}
             className={cn(
               'flex min-h-6 flex-wrap items-center gap-1 pt-0.5',
-              !meta && 'invisible'
+              !meta && 'invisible',
+              metaClassName
             )}
             data-testid='entity-header-meta-slot'
           >

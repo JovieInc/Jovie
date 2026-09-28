@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
-import { certifyArtistProfile } from './certify-artist-profile';
+import {
+  certifyArtistProfile,
+  isDeclaredRedirect,
+} from './certify-artist-profile';
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -31,6 +34,8 @@ describe('artist proof collector', () => {
     expect(result.failed).toBe(true);
     expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
       'https://jov.ie/tim',
+      // No Sentry baggage in the HTML: bind the release via build-info.
+      'https://jov.ie/api/health/build-info',
       'https://jov.ie/broken',
       'https://jov.ie/tim',
     ]);
@@ -111,5 +116,97 @@ describe('artist proof collector', () => {
     await expect(
       certifyArtistProfile(['--output', '--baseline'], fetcher)
     ).rejects.toThrow('requires a value');
+  });
+
+  it('follows only declared redirects, one same-origin hop, and requires a 200', async () => {
+    const artist = '/artists/f5441adb-6789-449a-9553-ab7460c9c61c';
+    const redirectHtml = `<section data-testid="profile-aeo-content"><a href="${artist}">Austin Leeds</a><a href="/tim/listen">Listen</a><a href="/moved">Moved</a><a href="/artists/3836027a-8351-4c0b-8922-c3259387bbf8">Off site</a></section>`;
+    const routes: Record<string, Response | (() => Response)> = {
+      'https://jov.ie/tim': () => new Response(redirectHtml, { status: 200 }),
+      'https://jov.ie/api/health/build-info': () =>
+        Response.json({
+          commitSha: '0f42058e6e24a9882a538a6b5d94fa84b2f7c15f',
+        }),
+      [`https://jov.ie${artist}`]: () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: '/a_eiqd46x3irj64dlgo8a3glau4' },
+        }),
+      'https://jov.ie/a_eiqd46x3irj64dlgo8a3glau4': () =>
+        new Response('', { status: 200 }),
+      'https://jov.ie/tim/listen': () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: '/tim?mode=listen' },
+        }),
+      'https://jov.ie/tim?mode=listen': () => new Response('', { status: 404 }),
+      'https://jov.ie/moved': () =>
+        new Response(null, { status: 307, headers: { location: '/tim' } }),
+      'https://jov.ie/artists/3836027a-8351-4c0b-8922-c3259387bbf8': () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: 'https://example.com/x' },
+        }),
+    };
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => {
+      const route = routes[String(url)];
+      if (!route) throw new Error(`unexpected fetch ${String(url)}`);
+      return typeof route === 'function' ? route() : route;
+    });
+    const result = await certifyArtistProfile(
+      ['--output', await output()],
+      fetcher
+    );
+    const report = JSON.parse(await readFile(result.reportPath, 'utf8'));
+    const byUrl = Object.fromEntries(
+      report.linkChecks.map((check: { url: string }) => [check.url, check])
+    );
+    expect(byUrl[`https://jov.ie${artist}`]).toMatchObject({
+      status: 307,
+      redirectedTo: 'https://jov.ie/a_eiqd46x3irj64dlgo8a3glau4',
+      finalStatus: 200,
+    });
+    expect(byUrl['https://jov.ie/tim/listen']).toMatchObject({
+      status: 307,
+      finalStatus: 404,
+    });
+    expect(byUrl['https://jov.ie/moved']).toEqual(
+      expect.not.objectContaining({ finalStatus: expect.anything() })
+    );
+    expect(
+      byUrl['https://jov.ie/artists/3836027a-8351-4c0b-8922-c3259387bbf8']
+    ).toMatchObject({
+      redirectedTo: 'https://example.com/x',
+      finalStatus: null,
+    });
+    expect(fetcher).not.toHaveBeenCalledWith(
+      'https://example.com/x',
+      expect.anything()
+    );
+    expect(report.snapshot.releaseSha).toBe(
+      '0f42058e6e24a9882a538a6b5d94fa84b2f7c15f'
+    );
+    expect(result.failed).toBe(true);
+  });
+
+  it('declares only the stable artist route and route-config redirect sinks', () => {
+    expect(
+      isDeclaredRedirect(
+        new URL('https://jov.ie/artists/f5441adb-6789-449a-9553-ab7460c9c61c'),
+        'tim'
+      )
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/tim/listen'), 'tim')
+    ).toBe(true);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/someone-else/listen'), 'tim')
+    ).toBe(false);
+    expect(
+      isDeclaredRedirect(new URL('https://jov.ie/artists/not-a-uuid'), 'tim')
+    ).toBe(false);
+    expect(isDeclaredRedirect(new URL('https://jov.ie/moved'), 'tim')).toBe(
+      false
+    );
   });
 });
