@@ -1,6 +1,7 @@
 'use client';
 
 import { Activity } from 'lucide-react';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { SummerOpsCard } from '@/lib/ovie/ops-card';
 import { cn } from '@/lib/utils';
 import { ChatToolSurface } from './ChatToolSurface';
@@ -128,7 +129,7 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
                     <span
                       className='block h-full rounded-full bg-primary-token/60'
                       style={{
-                        width: `${Math.max(2, (point.value / max) * 100)}%`,
+                        width: `${Math.max(2, computeRatePercent(point.value, max))}%`,
                       }}
                     />
                   </span>
