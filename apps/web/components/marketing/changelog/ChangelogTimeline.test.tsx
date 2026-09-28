@@ -9,6 +9,7 @@ import { ChangelogTimeline } from './ChangelogTimeline';
 const RELEASES: readonly ChangelogRelease[] = [
   {
     version: '26.8.0',
+    kind: 'release',
     date: '2026-08-09',
     summary: 'A **deterministic release with `/pitch`** and `inline code`.',
     sections: {
