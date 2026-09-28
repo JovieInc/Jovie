@@ -6,6 +6,7 @@ const SNAPSHOT: ChangelogParseResult = {
   releases: [
     {
       version: '26.8.2',
+      kind: 'release',
       date: '2026-08-31',
       summary: '',
       sections: {
@@ -20,6 +21,7 @@ const SNAPSHOT: ChangelogParseResult = {
   sourceReleases: [
     {
       version: '26.9.0',
+      kind: 'release',
       date: '2026-09-19',
       summary: '',
       sections: {
@@ -34,6 +36,7 @@ const SNAPSHOT: ChangelogParseResult = {
   unpublishedReleases: [
     {
       version: '26.9.0',
+      kind: 'release',
       date: '2026-09-19',
       summary: '',
       sections: {

@@ -177,6 +177,45 @@ def add_label(number: int, kind: str, sh=run) -> bool:
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
 
 
+POISON_LABEL = "queue-poison"
+POISON_WINDOW_S = 24 * 3600
+# Only a failed merge group says something about the PR's code (not manual, merged, conflict).
+FAILED_DEQUEUE = "failed_checks"
+
+
+def queue_ejections(number: int, now: float, sh=run) -> int | None:
+    """Failure removals from the merge queue in the last 24 h (the current one included)."""
+    owner, name = REPO.split("/")
+    listed = sh(["gh", "api", "graphql", "-f", f"query={{repository(owner:\"{owner}\",name:\"{name}\"){{"
+                 f"pullRequest(number:{number}){{timelineItems(last:20,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){{"
+                 "nodes{... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}",
+                 "--jq", ".data.repository.pullRequest.timelineItems.nodes"])
+    if listed.returncode != 0:
+        return None
+    count = 0
+    for item in json.loads(listed.stdout or "[]"):
+        at = iso_ts(item.get("createdAt"))
+        if at and now - at <= POISON_WINDOW_S and str(item.get("reason") or "").lower() == FAILED_DEQUEUE:
+            count += 1
+    return count
+
+
+def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
+    """JOV-6904: a PR the queue ejected twice in 24 h is poison. Every re-entry (usually a sync
+    with main, same defect) fails the group it joins and every group behind it. Label it so
+    the enroll workflow skips it; the lanes still fix it and drop the label with their fix."""
+    if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh) or 0) < 2:
+        return False
+    if sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={POISON_LABEL}"]).returncode:
+        return False
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body",
+        f"🤖 `{POISON_LABEL}`: the merge queue ejected this PR twice in 24 h, so it stays out of the queue "
+        "until a fix lands (each re-entry fails every merge group behind it). The lanes are fixing it from "
+        "the merge-group failure and remove this label when their fix pushes; remove it by hand once the "
+        "failing merge-group check passes locally."])
+    return True
+
+
 def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -> list[tuple[int, str]]:
     disabled = disabled_lanes() if disabled is None else disabled
     added = []
@@ -188,6 +227,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         pr = json.loads(viewed.stdout or "{}")
         if sha and pr.get("headRefOid") != sha:
             continue  # a newer head is already running CI; its own events speak for it
+        if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
+            added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):
             continue
         if in_scope(pr, kind, disabled) and add_label(number, kind, sh):
