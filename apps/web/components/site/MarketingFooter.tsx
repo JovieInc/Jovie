@@ -25,7 +25,7 @@ import { MarketingFooterCta } from './MarketingFooterCta';
  *
  * Visual contract:
  * - Canvas→shell linear fill + soft floating glow on noir-ion atoms.
- * - Column nav with caps eyebrows (10px / 600 / 0.22em / `$atom-text-muted`).
+ * - Column nav with Title Case labels (12px / 500 / `--mf-text-muted`).
  * - Full: chrome mark + columns, no slogan; copyright left, legal right.
  * - Compact: chrome mark in the legal row; copyright + legal right.
  * - Keep production nav from `marketingNavigation`. Do not invent columns.
