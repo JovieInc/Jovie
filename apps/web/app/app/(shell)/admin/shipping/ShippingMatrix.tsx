@@ -477,13 +477,16 @@ export function ShippingMatrix() {
                       setSelectedId(prev => (prev === row.id ? null : row.id))
                     }
                   >
-                    <th scope='row' className='max-w-0 p-2'>
-                      <button
+                    <th scope='row' className='relative max-w-0 p-2'>
+                      <Button
                         type='button'
+                        variant='link'
+                        size='sm'
                         aria-expanded={selectedId === row.id}
                         aria-label={`Inspect ${row.identifier}: ${row.title}`}
-                        className='block w-full min-w-0 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
-                      >
+                        className='absolute inset-0'
+                      />
+                      <div aria-hidden='true' className='min-w-0'>
                         <div className='truncate font-medium text-primary-token'>
                           {row.title}
                         </div>
@@ -494,7 +497,7 @@ export function ShippingMatrix() {
                             ? ` · ${ATTENTION_LABELS[row.attention]}`
                             : ''}
                         </div>
-                      </button>
+                      </div>
                     </th>
                     <td className='p-2 whitespace-nowrap'>
                       <HudStatusPill
