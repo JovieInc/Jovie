@@ -1,11 +1,11 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
+
 import { Switch } from '@jovie/ui';
 import { BellOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
-import { toast } from '@/components/feedback';
-import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -40,6 +40,7 @@ import {
 import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
 import { MenuView } from './views/MenuView';
+import { PayView } from './views/PayView';
 import { ReleasesView } from './views/ReleasesView';
 import { PROFILE_VIEW_REGISTRY } from './views/registry';
 
@@ -336,28 +337,6 @@ export function ProfileUnifiedDrawer({
   const hasValidVenmoLink = venmoLink !== null && isAllowedVenmoUrl(venmoLink);
   const venmoUsername = extractVenmoUsername(venmoLink);
 
-  const handleTipAmountSelected = useMemo(() => {
-    return (amount: number) => {
-      if (!venmoLink || !hasValidVenmoLink) {
-        toast.error('Unable to open Venmo. The payment link is not valid.');
-        return;
-      }
-      const sep = venmoLink.includes('?') ? '&' : '?';
-      const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(venmoUsername ?? '')}`;
-      // @ts-expect-error joviePixel is injected by JoviePixel
-      globalThis.joviePixel?.track?.('tip_intent', {
-        tipAmount: amount,
-        tipMethod: 'venmo',
-      });
-      const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        toast.error(
-          'Venmo could not be opened. Please allow pop-ups and try again.'
-        );
-      }
-    };
-  }, [hasValidVenmoLink, venmoLink, venmoUsername]);
-
   const isSubView = renderedView !== 'menu';
 
   return (
@@ -525,17 +504,15 @@ export function ProfileUnifiedDrawer({
                       Pay {artist.name}
                     </p>
                     <p className='mt-1 text-xs text-tertiary-token'>
-                      @{artist.handle} via Venmo
+                      @{artist.handle}
                     </p>
                   </div>
-                  <PaySelector
+                  <PayView
+                    profileId={artist.id}
+                    artistHandle={artist.handle}
+                    venmoLink={venmoLink ?? ''}
+                    venmoUsername={venmoUsername}
                     amounts={PAY_AMOUNTS}
-                    onContinue={handleTipAmountSelected}
-                    presentation='drawer'
-                    primaryLabel='Continue with Venmo'
-                    paymentLabel='Venmo'
-                    screenReaderDescription={`Choose an amount to pay ${artist.name}, @${artist.handle}, with Venmo.`}
-                    showOtherPaymentOptions={false}
                   />
                 </>
               ) : (
