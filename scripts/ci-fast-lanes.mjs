@@ -88,6 +88,42 @@ export const COPY_GATE_PATHS = Object.freeze([
 export const COPY_GATE_COMMAND =
   'pnpm copy:check --diff-base origin/main $(git diff --name-only origin/main...HEAD)';
 
+export const NODE_RUNTIME_CONTRACT_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
+export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
+  '.nvmrc',
+  '.node-version',
+  'config/node-runtime-policy.json',
+  'scripts/node-runtime-policy.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'pnpm-lock.yaml',
+  'package.json',
+  'apps/console/package.json',
+  'apps/ovie/package.json',
+  'apps/web/package.json',
+  'apps/docs/package.json',
+  'apps/should-i-make/package.json',
+  'apps/eve-pilot/package.json',
+  'packages/jovie-cli/package.json',
+  'packages/ui/package.json',
+  'patches/**',
+  '.github/actions/setup-node-pnpm/**',
+  '.github/actions/setup-playwright/**',
+  '.github/runner-image/**',
+  '.github/workflows/agent-pipeline.yml',
+  '.github/workflows/ci.yml',
+  '.github/workflows/e2e-full-matrix.yml',
+  '.github/workflows/fleet-gate-refresh.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  '.github/workflows/node-runtime-compatibility.yml',
+  '.github/workflows/node-runtime-freshness.yml',
+  '.github/workflows/pr-conflict-handler.yml',
+  '.github/workflows/rolling-ci-dispatch.yml',
+  'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
+  'apps/web/tests/unit/ci/node-runtime-contract.test.ts',
+  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+]);
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -274,6 +310,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
+  'scripts/evals/summer-ops-card-copy.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
@@ -284,6 +321,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
+  'scripts/lib/__tests__/canonical-json.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
   'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
   'scripts/lib/observability-fingerprint.test.mjs',
@@ -293,6 +331,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ops/firecrawl-crawl.test.mjs',
   'scripts/performance-artifact-retention.test.mjs',
   'scripts/postmortem-linkage-check.test.mjs',
+  'scripts/quality-gap-finder.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
@@ -480,6 +519,12 @@ const LANES = [
     run: runCopyGate,
   },
   {
+    id: 'node-runtime-contracts',
+    name: 'Node runtime contracts',
+    nextLocalCommand: NODE_RUNTIME_CONTRACT_COMMAND,
+    run: runNodeRuntimeContracts,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -519,6 +564,7 @@ export const LANE_GROUPS = Object.freeze({
     'ios-fast',
     'billing-coverage',
     'copy-gate',
+    'node-runtime-contracts',
     'structural',
   ]),
   // ci-fast (structural web) runs these in the background while its structural
@@ -725,6 +771,38 @@ export function runBillingCoverage() {
     if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
+}
+
+export function selectNodeRuntimeContractCommands({ event, runtimeFiles }) {
+  if (
+    event === 'workflow_dispatch' ||
+    !Array.isArray(runtimeFiles) ||
+    runtimeFiles.length > 0
+  ) {
+    return [NODE_RUNTIME_CONTRACT_COMMAND];
+  }
+  return [];
+}
+
+function runNodeRuntimeContracts() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const runtimeFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(NODE_RUNTIME_CONTRACT_PATHS);
+  const commands = selectNodeRuntimeContractCommands({ event, runtimeFiles });
+
+  if (commands.length === 0) {
+    return {
+      code: 0,
+      output:
+        'Node runtime contracts skipped (no runtime contract files changed)\n',
+      skipped: true,
+    };
+  }
+
+  const result = shell(commands[0]);
+  return { code: result.code, output: result.output };
 }
 
 /**
@@ -1495,9 +1573,13 @@ function runMergeGroupGuards() {
         !file.startsWith('apps/web/tests/e2e/') &&
         existsSync(resolve(REPO_ROOT, file))
     )
-    .map(file => file.replace(/^apps\/web\//, ''))
-    .map(file => JSON.stringify(file));
+    .map(file => shellQuote(file.replace(/^apps\/web\//, '')));
   return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
+}
+
+/** Quote a path for /bin/sh (route groups like `app/(profile-admission)/`). */
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
 /** Async twin of shell() so structural commands can overlap. */
