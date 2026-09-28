@@ -27,7 +27,7 @@ const DOCK_TRACK = {
 
 function PlayerRow({ isPlaying }: { readonly isPlaying: boolean }) {
   return (
-    <div className='grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] items-center gap-3 px-4 py-1.5'>
+    <div className='flex items-center gap-3 px-4 py-1.5'>
       <SidebarNowPlaying
         track={{
           trackTitle: DOCK_TRACK.title,
@@ -37,7 +37,7 @@ function PlayerRow({ isPlaying }: { readonly isPlaying: boolean }) {
         isPlaying={isPlaying}
         onPlay={() => undefined}
         playOverlayVisible={false}
-        className='max-w-56 border-0 bg-transparent px-1 py-1 shadow-none'
+        className='w-56 shrink-0 border-0 bg-transparent px-1 py-1 shadow-none'
       />
       <AudioBar
         isPlaying={isPlaying}
@@ -49,7 +49,7 @@ function PlayerRow({ isPlaying }: { readonly isPlaying: boolean }) {
         waveformOn={false}
         onToggleWaveform={() => undefined}
         track={DOCK_TRACK}
-        className='min-w-0 px-0 py-0'
+        className='min-w-0 flex-1 px-0 py-0'
       />
     </div>
   );
@@ -85,7 +85,7 @@ function DockScene({ chromeState, theme, rightRail }: DockSceneProps) {
   const isPlaying = chromeState === 'playing';
 
   return (
-    <div className='flex h-[420px] w-[720px] gap-2 bg-base p-2'>
+    <div className='flex gap-2 bg-base p-2' style={{ height: 420, width: 720 }}>
       {/* Main column: rounded panel + dock below, matching AppShellFrame. */}
       <div className='flex min-w-0 flex-1 flex-col'>
         <div className='flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--app-shell-radius) bg-(--app-shell-content-surface) shadow-(--app-shell-shadow)'>

@@ -141,22 +141,26 @@ export const SidebarBottomNowPlaying = React.memo(
           </div>
         </div>
         {onExpand ? (
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='sm'
             onClick={onExpand}
             aria-label='Show Player'
-            className='min-w-0 flex-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+            className='min-w-0 flex-1 justify-start'
           >
-            <div
-              className='truncate text-xs font-caption text-primary-token leading-tight'
-              style={{ letterSpacing: '-0.005em' }}
-            >
-              {trackTitle}
+            <div className='min-w-0 flex-1'>
+              <div
+                className='truncate text-xs font-caption text-primary-token leading-tight'
+                style={{ letterSpacing: '-0.005em' }}
+              >
+                {trackTitle}
+              </div>
+              <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
+                {artistName}
+              </div>
             </div>
-            <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
-              {artistName}
-            </div>
-          </button>
+          </Button>
         ) : (
           <div className='min-w-0 flex-1'>
             <div
