@@ -1,7 +1,7 @@
 'use client';
 
 import { Fingerprint } from 'lucide-react';
-import { AdminStepUpButton } from './AdminStepUpButton';
+import { AdminStepUp } from './AdminStepUp';
 
 interface AdminVerificationRequiredProps {
   readonly message?: string;
@@ -22,7 +22,7 @@ export function AdminVerificationRequired({
     >
       <Fingerprint className='h-4 w-4 shrink-0' aria-hidden='true' />
       <span className='min-w-0 flex-1'>{message}</span>
-      <AdminStepUpButton />
+      <AdminStepUp />
     </div>
   );
 }

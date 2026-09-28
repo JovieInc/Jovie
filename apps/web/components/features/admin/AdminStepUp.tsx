@@ -3,17 +3,14 @@
 import { Button } from '@jovie/ui';
 import { type AdminStepUpStatus, useAdminStepUp } from './use-admin-step-up';
 
-interface AdminStepUpButtonProps {
+interface AdminStepUpProps {
   /** Provide when the parent already runs useAdminStepUp. */
   readonly status?: AdminStepUpStatus;
   readonly onUnlock?: () => void;
 }
 
 /** Unlock button that runs the admin passkey step-up, then reloads. */
-export function AdminStepUpButton({
-  status,
-  onUnlock,
-}: AdminStepUpButtonProps) {
+export function AdminStepUp({ status, onUnlock }: AdminStepUpProps) {
   const internal = useAdminStepUp();
   const resolvedStatus = status ?? internal.status;
   const resolvedUnlock = onUnlock ?? internal.unlock;

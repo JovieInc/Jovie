@@ -22,7 +22,7 @@ import {
   TableEmptyState,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { AdminStepUpButton } from '@/features/admin/AdminStepUpButton';
+import { AdminStepUp } from '@/features/admin/AdminStepUp';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
@@ -435,7 +435,7 @@ export function LeadTable({
                 heading='Admin verification required'
                 description='Unlock admin access to view leads.'
                 icon={<Fingerprint className='h-4 w-4' />}
-                actionSlot={<AdminStepUpButton />}
+                actionSlot={<AdminStepUp />}
               />
             ) : (
               <TableEmptyState

@@ -1,7 +1,7 @@
 'use client';
 
 import { Fingerprint } from 'lucide-react';
-import { AdminStepUpButton } from './AdminStepUpButton';
+import { AdminStepUp } from './AdminStepUp';
 import { useAdminStepUp } from './use-admin-step-up';
 
 /**
@@ -23,7 +23,7 @@ export function AdminStepUpBanner() {
         {message ??
           'Admin data is locked on this session. Unlock with Touch ID for 12 hours.'}
       </span>
-      <AdminStepUpButton status={status} onUnlock={unlock} />
+      <AdminStepUp status={status} onUnlock={unlock} />
     </div>
   );
 }

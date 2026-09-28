@@ -348,7 +348,7 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(leadTable).toContain('isForbiddenError');
-    expect(leadTable).toContain('AdminStepUpButton');
+    expect(leadTable).toContain('AdminStepUp');
     expect(leadTable).toContain('Admin verification required');
   });
 

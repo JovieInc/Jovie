@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { AdminStepUpButton } from './AdminStepUpButton';
+import { AdminStepUp } from './AdminStepUp';
 
 const meta = {
-  title: 'Features/Admin/AdminStepUpButton',
-  component: AdminStepUpButton,
+  title: 'Features/Admin/AdminStepUp',
+  component: AdminStepUp,
   parameters: {
     layout: 'centered',
   },
   args: {
     onUnlock: () => {},
   },
-} satisfies Meta<typeof AdminStepUpButton>;
+} satisfies Meta<typeof AdminStepUp>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
