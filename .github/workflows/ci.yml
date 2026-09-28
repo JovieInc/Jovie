@@ -1411,14 +1411,23 @@ jobs:
           # Still reads the restored cache but skips persisting it (13-55s of
           # cache write + compaction per run); this job never saves it.
           TURBO_ENGINE_READ_ONLY: '1'
-          DATABASE_URL: postgresql://localhost/noop
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
-          CLERK_SECRET_KEY: sk_test_mock
-          NEXT_DISABLE_TOOLBAR: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          # NEXT_* lines match next-build-cache-warm.yml "Build web for cache"
+          # (same turbo task hash, same inlined NEXT_PUBLIC_* values) and it
+          # sets no DATABASE_URL or VERCEL_ENV pass-through. The homepage
+          # renders none of these values. NEXT_DISABLE_TOOLBAR is extra: turbo
+          # does not hash it and the root layout reads it at prerender to keep
+          # the cookie banner and dev chrome out of the baselines.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
           NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
-          VERCEL_ENV: development
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          NEXT_DISABLE_TOOLBAR: '1'
+          CLERK_SECRET_KEY: sk_test_mock
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
@@ -1443,11 +1452,12 @@ jobs:
           fi
 
           export HOSTNAME=localhost
-          PORT=3100 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/homepage-visual-server.log" 2>&1 &
+          # Serve where the build's NEXT_PUBLIC_APP_URL/BETTER_AUTH_URL point.
+          PORT=3230 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/homepage-visual-server.log" 2>&1 &
           SERVER_PID=$!
           SERVER_READY=false
           for _attempt in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+            if curl -sf http://localhost:3230 > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
@@ -1462,11 +1472,13 @@ jobs:
             pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line --grep homepage
         env:
-          BASE_URL: http://localhost:3100
+          BASE_URL: http://localhost:3230
           CI: 'true'
           E2E_SKIP_WEB_SERVER: '1'
           DATABASE_URL: postgresql://localhost/noop
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
           CLERK_SECRET_KEY: sk_test_mock
           NEXT_DISABLE_TOOLBAR: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
@@ -1910,6 +1922,9 @@ jobs:
       - name: Run structural ci-fast lane
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: &structural-run-env
+          # Lets the story-quality guard repair a checkout a concurrent
+          # depth-limited fetch re-shallowed mid-lane (JOV-6623).
+          GH_TOKEN: ${{ github.token }}
           CI_FAST_LANE_GROUP: remaining
           CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
@@ -5981,7 +5996,36 @@ jobs:
 
           cd "$GITHUB_WORKSPACE"
           BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter @jovie/web run test:e2e:golden-path:ci
+
+          # JOV-5489: recorded visual review of the golden-path keyframes. A
+          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
+          # The gateway key is mapped in for the reviewer only, never the server.
+          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
+          # The review runs as its own guarded producer scoped to the keyframes
+          # only, so the staged evidence includes verdict.json and only these
+          # journey keyframes are declared public (failure captures never are).
+          review() {
+            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
+              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
+          }
+          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
+          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
+            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
+            # ponytail: independent second review of the same keyframes, not a
+            # journey replay: the journey claims a protected fixture once per DB.
+            # Ceiling: a capture-timing flake is judged twice on one frame.
+            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
+          fi
         env:
+          # JOV-5489: deterministic keyframes (PNG evidence; video is refused by
+          # the artifact secret guard) and a reviewer-only gateway key.
+          GOLDEN_PATH_KEYFRAME_DIR: ${{ github.workspace }}/apps/web/test-results/golden-path-keyframes/first
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}
+          VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}
           E2E_TEST_MODE: '1'
@@ -6008,6 +6052,17 @@ jobs:
           path: |
             apps/web/test-results/
           retention-days: 3
+
+      - name: Upload golden-path visual review evidence
+        if: ${{ always() && hashFiles('apps/web/test-results/golden-path-keyframes/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: golden-path-visual-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/test-results/golden-path-keyframes/
+          allow-images: 'true'
+          public-images: 'true'
+          retention-days: 30
 
       - name: Cleanup ephemeral Neon branch
         if: always() && needs.neon-db.result != 'success' && steps.neon-branch.outputs.branch_id != ''

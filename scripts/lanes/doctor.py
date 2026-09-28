@@ -288,6 +288,36 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
 
 # ---------------------------------------------------------------- status feed
 
+SLO_CACHE_S = 3600
+
+
+def fetch_slo(host, lane) -> dict | None:
+    """Latest committed shipping-SLO snapshot (docs/metrics/shipping-slo-latest.json,
+    written daily by .github/workflows/shipping-slo.yml), cached for an hour so
+    ticks stay cheap. Best-effort: a failed fetch keeps the last cached copy."""
+    cache = host.state / "slo.json"
+    record = read_json(cache, {})
+    try:
+        fetched_at = datetime.fromisoformat(record["fetchedAt"].replace("Z", "+00:00")).timestamp()
+    except (KeyError, ValueError, AttributeError):
+        fetched_at = None
+    if fetched_at is not None and time.time() - fetched_at < SLO_CACHE_S and record.get("snapshot"):
+        return record["snapshot"]
+    try:
+        lane.load_github_env()
+        raw = subprocess.run(
+            ["gh", "api", "repos/JovieInc/Jovie/contents/docs/metrics/shipping-slo-latest.json",
+             "-H", "Accept: application/vnd.github.raw"],
+            capture_output=True, text=True, timeout=20)
+        if raw.returncode == 0 and raw.stdout.strip():
+            snapshot = json.loads(raw.stdout)
+            cache.write_text(json.dumps({"fetchedAt": now_iso(), "snapshot": snapshot}))
+            return snapshot
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return record.get("snapshot")
+
+
 def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
     """The few numbers Summer and other agents need, in one small JSON."""
     counts = {}
@@ -306,7 +336,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict) -> dict:
             "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "prs": (obs.get("reconcile") or {}).get("counts") or {},
-            "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or []}
+            "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
+            "slo": obs.get("slo")}
 
 
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
@@ -367,6 +398,10 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex")}
     if not os.environ.get("LANES_SELFTEST"):
+        try:
+            obs["slo"] = fetch_slo(host, lane)
+        except Exception:
+            obs["slo"] = obs.get("slo")
         try:
             result["statusFeed"] = publish_status(host, lane, status_feed(host, lane, obs, alerts, obs.get("tick") or {}))
         except Exception as error:  # a broken feed never blocks the doctor

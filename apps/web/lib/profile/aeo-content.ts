@@ -12,6 +12,7 @@ import {
   type EntityMentionSegment,
   linkEntityMentions,
 } from '@/lib/profile/entity-mentions';
+import { isPublicArtistMentionHref } from '@/lib/profile/opaque-internal-profile-handle';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
   isPaymentSupportPlatform,
@@ -757,7 +758,11 @@ export function buildStructuredCollaboratorParagraph(
 
     const existing = grouped.get(collaborator.artistId) ?? {
       name,
-      href: collaborator.href,
+      // Raw-ID destinations (`/artists/<id>`, `/a_*`) never render as links
+      // (JOV-6612); credit-only collaborators stay plain text.
+      href: isPublicArtistMentionHref(collaborator.href)
+        ? collaborator.href
+        : null,
       releases: [],
     };
     if (

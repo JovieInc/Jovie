@@ -338,6 +338,16 @@ class ExecuteTest(unittest.TestCase):
         self.assertTrue(out["retry"])
         self.assertEqual(out["record"]["confidence"], "failed")
 
+    def test_research_escalates_to_astra_only_when_glm_fails(self):
+        job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "decisionType": "research"}))
+        run = Runner(hyperagent=[done("", 2, "glm down"), done(json.dumps({"ok": True, "text": "Astra memo"}))])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(job, CONFIG, "ctx", Path(tmp), run=run)
+        agents = [call[call.index("--agent-id") + 1] for call in run.made("hyperagent")]
+        self.assertEqual(agents, ["cmtj3n2q901i407adklzzq01t", "cmuc85zwf010j07adgiv0pvze"])
+        self.assertIn("Astra memo", out["comment"])
+        self.assertFalse(out["retry"])
+
     def test_research_goes_to_the_research_backend(self):
         job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "decisionType": "research"}))
         run = Runner(hyperagent=done(json.dumps({"ok": True, "text": "Answer: yes. Sources: ..."})))
@@ -348,7 +358,12 @@ class ExecuteTest(unittest.TestCase):
             gone = reason.execute(job, CONFIG, "ctx", Path(tmp), run=Runner(hyperagent=OSError("x")))
         self.assertEqual(out["record"]["confidence"], "research")
         self.assertIn("Answer: yes", out["comment"])
-        self.assertIn("fable-5.1", run.made("hyperagent")[0][3])
+        first = run.made("hyperagent")[0]
+        self.assertIn("z-ai/glm-5.3", first)
+        # The agent id picks the model; the --model string is only a label (Fable agent retired).
+        self.assertIn("cmtj3n2q901i407adklzzq01t", first)
+        self.assertNotIn("cmuk33ew70r2e06adfqx6gbpy", first)
+        self.assertEqual(len(run.made("hyperagent")), 1, "a GLM answer never escalates")
         self.assertTrue(failed["retry"])
         self.assertEqual(raw["record"]["confidence"], "research")
         self.assertTrue(gone["retry"])
