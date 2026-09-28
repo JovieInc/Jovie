@@ -72,7 +72,7 @@ File count, checkout/history size, dependency/build complexity, and organization
 | --- | ---: |
 | Single changed file / binary | 10 MiB / 10 MiB |
 | Changed payload / binaries | 60 MiB / 120 files and 60 MiB |
-| Tracked regular / binary payload | 180 MiB / 96 MiB |
+| Tracked regular / binary payload | 198 MiB / 96 MiB |
 | Canonical visual baselines | 100 files / 12 MiB |
 | Forbidden tracked outputs | Zero new violations |
 
@@ -118,6 +118,21 @@ Exceptions in `scripts/repo-hygiene-exceptions.json` require one exact branch, s
 Keep it unless one extraction candidate satisfies every split rule below for two consecutive 30-day receipts. File count alone is never a split signal. Prefer a typed in-repo package boundary first.
 
 ### Raise a budget
+
+Approved raise (JOV-6635, measured 2026-09-27): `maxTrackedBytes` 180 → 198 MiB
+(+10%, the per-raise cap). Exact `origin/main` measured 178.14 MiB of tracked
+regular files — 99.0% of the prior budget, over the ≥90% qualifying threshold —
+leaving ~1.9 MiB of headroom that blocked any PR adding tracked bytes. Fresh
+measurements (`git ls-tree -r -l` blob sums on `origin/main`): tree payload
+158,180,819 B 90 days ago → 187,760,331 B 30 days ago → 184,001,777 B now
+(+25.8 MB / 90d; the 30-day figure exceeds today because a recent binary purge
+shrunk the tree); tracked regular files 8,627 → 10,988 → 13,299; 11 distinct
+contributors over 90 days. `pnpm knip` reports only three small unused
+dependency entries (no tracked-byte savings); the prior hash audit's 15.52 MiB
+of duplicates are intentional export/catalog pairs, logos, and fonts; the
+largest blobs (9.06 MiB pitch PDF, 4.04 MiB demo video, catalog PNGs, ~32 MiB
+migration metadata) have live consumers. No safe removal approaches the scale
+of the shortfall, so the budget, test, and this rationale change together.
 
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 

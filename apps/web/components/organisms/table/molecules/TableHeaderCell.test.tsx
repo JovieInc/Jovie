@@ -74,6 +74,37 @@ describe('TableHeaderCell (molecule)', () => {
     expect(onToggleSort).toHaveBeenCalled();
   });
 
+  it('announces not-sorted state in the sort button accessible name', () => {
+    renderCell({ sortDirection: false });
+    expect(
+      screen.getByRole('button', {
+        name: /Title: not sorted, activate to sort/i,
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('announces the sort direction in the sort button accessible name', () => {
+    renderCell({ sortDirection: 'asc' });
+    expect(
+      screen.getByRole('button', { name: /Title: sorted ascending/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('columnheader')).toHaveAttribute(
+      'aria-sort',
+      'ascending'
+    );
+  });
+
+  it('updates the announced direction when sort toggles to descending', () => {
+    renderCell({ sortDirection: 'desc' });
+    expect(
+      screen.getByRole('button', { name: /Title: sorted descending/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('columnheader')).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
+  });
+
   it('applies column meta alignment to sortable header chrome', () => {
     renderCell({ header: mockHeader('Total', { align: 'right' }) });
 

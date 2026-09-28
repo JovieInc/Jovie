@@ -217,7 +217,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Vanity URLs',
         'Auto DSP detection & linking',
         'Manual release creation',
-        'Public artist profile page',
+        'Public Jovie profile page',
         'Artist bio & social links',
         'Subscribe / follow page',
         'Contact page',
@@ -415,10 +415,10 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
     ],
   },
   {
-    category: 'Artist Profile',
+    category: 'Jovie Profile',
     features: [
       {
-        name: 'Public artist profile page',
+        name: 'Public Jovie profile page',
         free: true,
         pro: true,
         max: true,

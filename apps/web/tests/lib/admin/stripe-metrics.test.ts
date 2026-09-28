@@ -127,6 +127,56 @@ describe('getAdminStripeOverviewMetrics', () => {
     expect(metrics.errorMessage).toBeUndefined();
   });
 
+  it('builds a 7-day baseline net of churn for week-over-week', async () => {
+    const monthly = (cents: number) =>
+      ({
+        data: [
+          {
+            price: {
+              currency: 'usd',
+              unit_amount: cents,
+              recurring: { interval: 'month', interval_count: 1 },
+            },
+            quantity: 1,
+          },
+        ],
+      }) as Stripe.ApiList<Stripe.SubscriptionItem>;
+    const day = 24 * 60 * 60;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
+    listMock.mockResolvedValue({
+      data: [
+        makeSubscription({
+          id: 'steady',
+          status: 'active',
+          created: nowSeconds - 40 * day,
+          items: monthly(1000),
+        }),
+        makeSubscription({
+          id: 'new-this-week',
+          status: 'active',
+          created: nowSeconds - 3 * day,
+          items: monthly(2000),
+        }),
+        makeSubscription({
+          id: 'churned-this-week',
+          status: 'canceled',
+          created: nowSeconds - 40 * day,
+          ended_at: nowSeconds - 2 * day,
+          items: monthly(500),
+        }),
+      ],
+      has_more: false,
+    });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(30);
+    expect(metrics.mrrUsd7dAgo).toBe(15);
+    expect(metrics.activeSubscribers).toBe(2);
+    expect(metrics.activeSubscribers7dAgo).toBe(2);
+  });
+
   it('subtracts percentage coupon discount from MRR (JOV-1089)', async () => {
     const items = {
       data: [
@@ -268,6 +318,8 @@ describe('getAdminStripeOverviewMetrics', () => {
     expect(metrics.mrrUsd).toBe(199);
     expect(metrics.excludedInternalSubscribers).toBe(1);
     expect(metrics.excludedInternalMrrUsd).toBe(199);
+    expect(metrics.activeSubscribers7dAgo).toBe(1);
+    expect(metrics.mrrUsd7dAgo).toBe(199);
   });
 
   it('returns isAvailable false when Stripe API fails', async () => {

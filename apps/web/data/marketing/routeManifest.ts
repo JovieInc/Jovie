@@ -165,7 +165,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        'apps/web/components/homepage/HomepageIdentityHero.tsx',
         'hero',
         'centered-none'
       ),
@@ -639,7 +639,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'verified',
       source: 'source binding audit 2026-09-01',
       notes:
-        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and SupportCta in that order.',
+        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and the canonical MarketingFooterCta in that order.',
     },
     status: 'active',
     specVersion: '1.0.0',
