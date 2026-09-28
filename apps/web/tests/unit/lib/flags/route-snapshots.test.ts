@@ -34,6 +34,9 @@ describe('route flag snapshots', () => {
   });
 
   it('adds route-specific flags only where client consumers need them', () => {
+    expect(resolveAppShellRouteFlagNames(APP_ROUTES.DASHBOARD)).toEqual(
+      expect.arrayContaining(['CHAT_JANK_MONITOR', 'APPLE_WALLET_PROFILE_PASS'])
+    );
     expect(resolveAppShellRouteFlagNames(APP_ROUTES.CHAT)).toEqual(
       expect.arrayContaining(['CHAT_JANK_MONITOR', 'APPLE_WALLET_PROFILE_PASS'])
     );

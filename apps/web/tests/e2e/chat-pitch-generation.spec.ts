@@ -57,7 +57,7 @@ test.describe
       await setTestUserPlan(page, 'pro');
 
       // Reload to bust React Query + billing cache
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
       await waitForHydration(page);
 
       // Navigate to a fresh chat thread
@@ -81,7 +81,7 @@ test.describe
 
       // Ensure we're on pro plan
       await setTestUserPlan(page, 'pro');
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
 
       // Navigate to chat
       await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, { timeout: 60_000 });
@@ -119,7 +119,7 @@ test.describe
 
       // Downgrade back to free
       await ensureTestUserFree(page);
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
 
       // Verify billing status API returns free
       const response = await page.request.get('/api/billing/status');

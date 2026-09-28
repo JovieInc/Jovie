@@ -63,6 +63,8 @@ describe('weightedPick', () => {
     expect(weightedPick(models, undefined, () => 0).key).toBe('a');
     expect(weightedPick(models, undefined, () => 0.5).key).toBe('b');
     expect(weightedPick(models, undefined, () => 0.99).key).toBe('c');
+    // A roll past the total weight falls through to the last model.
+    expect(weightedPick(models, undefined, () => 1.01).key).toBe('c');
   });
 
   it('biases toward the higher-weighted model', () => {
@@ -111,10 +113,10 @@ describe('generatePrintGraphic', () => {
     const callArg = generateImage.mock.calls[0][0] as {
       model: { __model: string };
       prompt: string;
-      providerOptions?: { openai?: { background?: string } };
+      providerOptions?: Record<string, Record<string, string>>;
     };
     expect(callArg.model.__model).toBe(native.id);
-    expect(callArg.providerOptions?.openai?.background).toBe('transparent');
+    expect(callArg.providerOptions).toEqual(alphaProviderOptions(native));
     expect(callArg.prompt).toContain('transparent');
     expect(out.modelKey).toBe(native.key);
     expect(out.mediaType).toBe('image/png');

@@ -144,7 +144,7 @@ async function fetchRecentlyMergedPulls(
 
   const payload: unknown = await response.json();
   if (!Array.isArray(payload)) {
-    throw new Error('Unexpected GitHub API response for merged pulls');
+    throw new TypeError('Unexpected GitHub API response for merged pulls');
   }
 
   const cutoff = Date.now() - MERGED_WINDOW_MS;

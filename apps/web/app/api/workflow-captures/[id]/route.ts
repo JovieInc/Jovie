@@ -31,8 +31,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
       },
       { headers: NO_STORE_HEADERS }
     );
-  } catch (caught) {
-    return workflowCaptureErrorResponse(caught, '/api/workflow-captures/[id]');
+  } catch (error_) {
+    return workflowCaptureErrorResponse(error_, '/api/workflow-captures/[id]');
   }
 }
 
@@ -59,7 +59,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       { ok: true, receipt },
       { headers: NO_STORE_HEADERS }
     );
-  } catch (caught) {
-    return workflowCaptureErrorResponse(caught, '/api/workflow-captures/[id]');
+  } catch (error_) {
+    return workflowCaptureErrorResponse(error_, '/api/workflow-captures/[id]');
   }
 }

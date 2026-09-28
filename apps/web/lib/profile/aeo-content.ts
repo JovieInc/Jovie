@@ -522,8 +522,6 @@ function buildFacts(
   }
   if (based && based !== hometown) {
     facts.push({ label: 'Based In', value: based });
-  } else if (!hometown && based) {
-    facts.push({ label: 'Based In', value: based });
   }
 
   return facts;
@@ -727,12 +725,17 @@ function buildDescription(params: {
   return description;
 }
 
-interface StructuredCollaboratorParagraph {
+export interface StructuredCollaboratorParagraph {
   readonly text: string;
   readonly segments: readonly EntityMentionSegment[];
 }
 
-function buildStructuredCollaboratorParagraph(
+/**
+ * Selected-credits paragraph built from exact release-credit edges. Exported
+ * so the About destination (JOV-6199) renders the same verified prose as the
+ * AEO description instead of a second implementation.
+ */
+export function buildStructuredCollaboratorParagraph(
   artistName: string,
   artistHandle: string,
   collaborators: readonly StructuredReleaseCollaborator[]
@@ -822,7 +825,7 @@ function buildStructuredCollaboratorParagraph(
   };
 }
 
-function buildOriginFaq(artist: Artist): ProfileAeoFaqItem {
+function buildOriginFaq(artist: Artist): ProfileAeoFaqItem | null {
   const origin = getOrigin(artist);
   const location = cleanText(artist.location);
   const hometown = cleanText(artist.hometown);
@@ -833,7 +836,8 @@ function buildOriginFaq(artist: Artist): ProfileAeoFaqItem {
   } else if (origin) {
     answer = `${artist.name} is from ${origin}.`;
   } else {
-    answer = `${artist.name}'s public Jovie profile does not list a hometown or origin yet; the canonical profile handle is @${artist.handle}.`;
+    // Sparse honesty (JOV-6199): an "unknown" answer is filler — omit the FAQ.
+    return null;
   }
 
   return {
@@ -848,17 +852,19 @@ function buildLatestReleaseFaq(params: {
   readonly latestRelease?: AeoReleaseFact | null;
   readonly releases: readonly PublicRelease[];
   readonly socialLinks: readonly LegacySocialLink[];
-}): ProfileAeoFaqItem {
+}): ProfileAeoFaqItem | null {
   const { artist, latestRelease, releases, socialLinks } = params;
-  const releaseDate = formatDate(latestRelease?.releaseDate);
-  const releaseType = formatReleaseType(latestRelease?.releaseType);
+  if (!latestRelease?.title) {
+    // Sparse honesty (JOV-6199): no release fact means no release answer —
+    // omit the FAQ instead of publishing "does not list a release yet".
+    return null;
+  }
+  const releaseDate = formatDate(latestRelease.releaseDate);
+  const releaseType = formatReleaseType(latestRelease.releaseType);
   const source = getReleaseSource(artist, latestRelease, socialLinks);
-  const listedReleaseCount = latestRelease?.title
-    ? Math.max(releases.length, 1)
-    : releases.length;
-  const answer = latestRelease?.title
-    ? `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releaseDate ? ` released on ${releaseDate}` : ''}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`
-    : `${artist.name}'s public Jovie profile does not list a release yet. Use the profile's listening links for current music updates.`;
+  const listedReleaseCount = Math.max(releases.length, 1);
+  const releasedOn = releaseDate ? ` released on ${releaseDate}` : '';
+  const answer = `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releasedOn}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`;
 
   return {
     question: `What is ${artist.name}'s latest release?`,
@@ -887,9 +893,10 @@ function buildTouringFaq(params: {
   }
 
   const date = formatDate(nextTourDate.startDate);
+  const dateLabel = date ? ` ${date}` : '';
   return {
     question: `Is ${artist.name} touring?`,
-    answer: `Yes. ${artist.name} has ${pluralize(upcomingTourDates.length, 'upcoming show')} listed on Jovie; the next listed date is${date ? ` ${date}` : ''} at ${formatTourLocation(nextTourDate)}.`,
+    answer: `Yes. ${artist.name} has ${pluralize(upcomingTourDates.length, 'upcoming show')} listed on Jovie; the next listed date is${dateLabel} at ${formatTourLocation(nextTourDate)}.`,
     source: nextTourDate.ticketUrl
       ? { label: 'Ticket listing', href: nextTourDate.ticketUrl }
       : {
@@ -912,9 +919,10 @@ function buildMerchFaq(params: {
   }
 
   const price = formatPrice(primaryCard.retailPriceCents);
+  const priceLabel = price ? ` priced at ${price}` : '';
   return {
     question: `Where can I buy ${artist.name} merch?`,
-    answer: `Official ${artist.name} merch is available on Jovie. The current featured item is "${primaryCard.title}", a ${primaryCard.productType}${price ? ` priced at ${price}` : ''}.`,
+    answer: `Official ${artist.name} merch is available on Jovie. The current featured item is "${primaryCard.title}", a ${primaryCard.productType}${priceLabel}.`,
     source: {
       label: 'Official merch card',
       href: profilePath(
@@ -1030,7 +1038,7 @@ export function buildProfileAeoFaqStructuredData(
 }
 
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 function containsArtistIdentity(value: string, artistName: string): boolean {
@@ -1039,7 +1047,7 @@ function containsArtistIdentity(value: string, artistName: string): boolean {
   if (!normalizedValue || !normalizedName) return false;
 
   const identityPattern = new RegExp(
-    `(^|[^\\p{L}\\p{N}])${escapeRegExp(normalizedName)}(?=$|[^\\p{L}\\p{N}])`,
+    String.raw`(^|[^\p{L}\p{N}])${escapeRegExp(normalizedName)}(?=$|[^\p{L}\p{N}])`,
     'iu'
   );
   return identityPattern.test(normalizedValue);

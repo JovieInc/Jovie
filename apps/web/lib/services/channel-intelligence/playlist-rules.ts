@@ -66,12 +66,12 @@ function parseActivityAt(
 
 function copiedName(row: FetchedPlaylistRow): string | undefined {
   const name = row.name?.trim();
-  return name ? name : undefined;
+  return name || undefined;
 }
 
 function copiedUrl(row: FetchedPlaylistRow): string | undefined {
   const url = row.url?.trim();
-  return url ? url : undefined;
+  return url || undefined;
 }
 
 function copiedFollowerCount(row: FetchedPlaylistRow): number | undefined {
@@ -270,11 +270,11 @@ function evaluateDormantDropped(): ChannelPlaylistRuleCaseResult {
     ],
     nowIso: RULE_CASE_NOW,
   });
-  const ids = gated.recommendations.map(row => row.id);
+  const ids = new Set(gated.recommendations.map(row => row.id));
   const passed =
-    !ids.includes('pl_dormant') &&
-    ids.includes('pl_fresh') &&
-    ids.includes('pl_year') &&
+    !ids.has('pl_dormant') &&
+    ids.has('pl_fresh') &&
+    ids.has('pl_year') &&
     gated.recommendations[0]?.id === 'pl_fresh';
   return {
     id: 'dormant-dropped',

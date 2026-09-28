@@ -114,7 +114,7 @@ const ciAuditSchema = z.union([
 const existingRepairSchema = z
   .object({
     mode: z.literal('isolated-cli'),
-    identifier: z.string().regex(/^JOV-[1-9][0-9]*$/u),
+    identifier: z.string().regex(/^JOV-[1-9]\d*$/u),
     issueId: z.uuid(),
     ownerId: z.uuid(),
     issueRevision: timestamp,

@@ -14,8 +14,7 @@ export interface CalendarObjectPayload {
   readonly endsAt?: string;
 }
 
-const BOOKING_SUBJECT_RE =
-  /(?:—|-)\s*([^,]+?)(?:\s*,|\s+\w+\s+\d{1,2}\s+\d{4})/;
+const BOOKING_SUBJECT_RE = /[-—]\s*([^,]+?)(?:\s*,|\s+\w+\s+\d{1,2}\s+\d{4})/;
 const VENUE_IN_SNIPPET_RE =
   /(?:at|@)\s+([A-Z][A-Za-z0-9'&\-\s]{2,60}?)(?:\s+on\b|,|\.|\s+\d)/;
 const PERSON_FROM_RE = /^([^<@]+?)(?:\s*<|$)/;

@@ -12,7 +12,6 @@
  */
 
 import {
-  buildReport,
   type CanaryCheckResult,
   type CanaryReport,
   checkHttpGet,
@@ -20,12 +19,9 @@ import {
   hasServerError,
 } from './public-profile';
 
-export {
-  buildReport,
-  type CanaryCheckResult,
-  type CanaryReport,
-  formatReportSummary,
-};
+export { buildReport } from './public-profile';
+
+export { type CanaryCheckResult, type CanaryReport, formatReportSummary };
 
 export const AUTH_SIGNUP_ONBOARDING_CANARY_REDIS_KEY =
   'canary:auth_signup_onboarding:last_run';

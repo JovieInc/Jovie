@@ -10,14 +10,11 @@ import {
 
 const webRoot = join(process.cwd());
 
-const SPLASH_B_SOURCES = [
-  'components/features/auth/AuthLayout.tsx',
-  'app/desktop-auth/DesktopAuthClient.tsx',
-  'app/(auth)/DesktopAuthRouteHandoff.tsx',
-] as const;
+const SPLASH_B_SOURCES = ['components/features/auth/AuthLayout.tsx'] as const;
 
 const BRAND_LOGO_PRODUCTION_SOURCES = [
   ...SPLASH_B_SOURCES,
+  'app/desktop-auth/MacCinematicSurface.tsx',
   'components/atoms/BrandLogo.tsx',
   'components/atoms/Logo.tsx',
   'components/atoms/LogoIcon.tsx',

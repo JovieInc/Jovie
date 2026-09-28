@@ -106,7 +106,7 @@ describe('Summer workflow promotion (JOV-5217)', () => {
     const receipt = executePromotedDumpAck({
       workId: 'work_dump_1',
       items: [
-        'file JOV-5217 with token sk-live-supersecret and user ada@jov.ie',
+        'file JOV-5217 with token sk-live-supersecret token_abcdefgh and TOKEN_ABCDEFGH and user ada@jov.ie',
         'Jovie signup returns 500 on /start',
       ],
     });
@@ -121,6 +121,9 @@ describe('Summer workflow promotion (JOV-5217)', () => {
     expect(receipt.eveInvokedSymphony).toBe(false);
     expect(receipt.eveSelectedWorker).toBe(false);
     expect(receipt.items.some(item => item.text.includes('sk-live'))).toBe(
+      false
+    );
+    expect(receipt.items.some(item => /token_abcdefgh/i.test(item.text))).toBe(
       false
     );
     expect(receipt.items.some(item => item.text.includes('ada@jov.ie'))).toBe(

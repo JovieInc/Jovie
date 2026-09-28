@@ -22,6 +22,8 @@ export const JOVIE_WORK_SOURCES = [
 
 export type JovieWorkSource = (typeof JOVIE_WORK_SOURCES)[number];
 
+type WorkFeedInstant = Date | string | null;
+
 export const JOVIE_WORK_ICONS = [
   'workflow',
   'agent',
@@ -304,9 +306,9 @@ export function mapAgentRunToJovieWorkItem(input: {
   id: string;
   agentSlug: string;
   status: string;
-  completedAt: Date | string | null;
-  startedAt: Date | string | null;
-  createdAt?: Date | string | null;
+  completedAt: WorkFeedInstant;
+  startedAt: WorkFeedInstant;
+  createdAt?: WorkFeedInstant;
 }): JovieWorkItem {
   const phase = mapAgentRunStatusToPhase(input.status);
   const timestampSource =
@@ -336,8 +338,8 @@ export function mapSuggestedActionToJovieWorkItem(input: {
   payload: unknown;
   rationale: string | null;
   createdAt: Date | string;
-  approvedAt: Date | string | null;
-  executedAt: Date | string | null;
+  approvedAt: WorkFeedInstant;
+  executedAt: WorkFeedInstant;
 }): JovieWorkItem {
   const phase = mapSuggestedActionStatusToPhase(input.status);
   const actionTitle = readSuggestedActionTitle(input.payload);
@@ -374,8 +376,8 @@ export function mapRetouchJobToJovieWorkItem(input: {
   id: string;
   status: string;
   style: string;
-  completedAt: Date | string | null;
-  startedAt: Date | string | null;
+  completedAt: WorkFeedInstant;
+  startedAt: WorkFeedInstant;
   createdAt: Date | string;
 }): JovieWorkItem {
   const phase = mapRetouchJobStatusToPhase(input.status);
@@ -402,7 +404,7 @@ export function mapRetouchJobToJovieWorkItem(input: {
 export function mapMerchFulfillmentJobToJovieWorkItem(input: {
   id: string;
   status: string;
-  completedAt: Date | string | null;
+  completedAt: WorkFeedInstant;
   updatedAt: Date | string;
   createdAt: Date | string;
 }): JovieWorkItem {
@@ -432,7 +434,7 @@ export function mapMetadataSubmissionToJovieWorkItem(input: {
   status: string;
   providerId: string;
   releaseTitle: string | null;
-  sentAt: Date | string | null;
+  sentAt: WorkFeedInstant;
   updatedAt: Date | string;
   createdAt: Date | string;
 }): JovieWorkItem {
@@ -463,7 +465,7 @@ export function mapFanNotificationToJovieWorkItem(input: {
   status: string;
   notificationType: string;
   releaseTitle: string | null;
-  sentAt: Date | string | null;
+  sentAt: WorkFeedInstant;
   scheduledFor: Date | string;
   createdAt: Date | string;
 }): JovieWorkItem {

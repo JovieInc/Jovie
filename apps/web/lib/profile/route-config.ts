@@ -279,7 +279,7 @@ export function validatePublicProfileNavigation(
   if (
     destinations.some(destination => {
       const label: string = destination.label;
-      return label === 'Shows' || label === 'Alerts';
+      return label === 'Shows' || label === 'Tour' || label === 'Alerts';
     })
   ) {
     issues.push('legacy-nav-label');

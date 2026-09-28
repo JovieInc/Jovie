@@ -198,18 +198,16 @@ export function getHudShipperStatus(): HudShipperStatusPayload {
         'scanned',
       ].includes(event.event ?? '')
     );
-    lastResult =
-      meaningful?.event === 'empty_queue'
-        ? 'Empty queue'
-        : meaningful?.event === 'capacity_throttled'
-          ? 'Throttled'
-          : meaningful?.event === 'dry_run_planned'
-            ? 'Dry run planned'
-            : meaningful?.event === 'singleton_active_skip'
-              ? 'Singleton skip'
-              : meaningful?.event === 'scanned'
-                ? 'Scanned'
-                : 'Finished';
+    let lastResultLabel = 'Finished';
+    if (meaningful?.event === 'empty_queue') lastResultLabel = 'Empty queue';
+    else if (meaningful?.event === 'capacity_throttled') {
+      lastResultLabel = 'Throttled';
+    } else if (meaningful?.event === 'dry_run_planned') {
+      lastResultLabel = 'Dry run planned';
+    } else if (meaningful?.event === 'singleton_active_skip') {
+      lastResultLabel = 'Singleton skip';
+    } else if (meaningful?.event === 'scanned') lastResultLabel = 'Scanned';
+    lastResult = lastResultLabel;
   }
 
   return {
@@ -232,34 +230,27 @@ export function getHudShipperStatus(): HudShipperStatusPayload {
   };
 }
 
+function shippedNumber(primary: unknown, fallback: unknown): number | null {
+  if (typeof primary === 'number') return primary;
+  if (typeof fallback === 'number') return fallback;
+  return null;
+}
+
 function normalizeWhatShippedEntry(value: unknown): HudWhatShippedEntry | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
   const title = typeof record.title === 'string' ? record.title : null;
-  const mergedAt =
-    typeof record.mergedAt === 'string'
-      ? record.mergedAt
-      : typeof record.shippedAt === 'string'
-        ? record.shippedAt
-        : null;
+  let mergedAt: string | null = null;
+  if (typeof record.mergedAt === 'string') mergedAt = record.mergedAt;
+  else if (typeof record.shippedAt === 'string') mergedAt = record.shippedAt;
   if (!title || !mergedAt) return null;
 
   return {
-    prNumber:
-      typeof record.prNumber === 'number'
-        ? record.prNumber
-        : typeof record.pr === 'number'
-          ? record.pr
-          : null,
+    prNumber: shippedNumber(record.prNumber, record.pr),
     title,
     mergedAt,
     url: typeof record.url === 'string' ? record.url : null,
-    issueNumber:
-      typeof record.issueNumber === 'number'
-        ? record.issueNumber
-        : typeof record.issue === 'number'
-          ? record.issue
-          : null,
+    issueNumber: shippedNumber(record.issueNumber, record.issue),
   };
 }
 
@@ -276,11 +267,11 @@ export function getHudWhatShipped(): HudWhatShippedPayload {
 
   try {
     const parsed = JSON.parse(readFileSync(WHAT_SHIPPED_PATH, 'utf8'));
-    const rawEntries = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray((parsed as { entries?: unknown }).entries)
-        ? (parsed as { entries: unknown[] }).entries
-        : [];
+    let rawEntries: unknown[] = [];
+    if (Array.isArray(parsed)) rawEntries = parsed;
+    else if (Array.isArray((parsed as { entries?: unknown }).entries)) {
+      rawEntries = (parsed as { entries: unknown[] }).entries;
+    }
 
     const entries = rawEntries
       .map(normalizeWhatShippedEntry)

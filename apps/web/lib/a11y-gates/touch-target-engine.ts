@@ -48,8 +48,7 @@ export interface RipgrepResult {
 export type RipgrepRunner = (scanRoot: string) => RipgrepResult;
 
 // Tailwind heights below 44px (h-11 = 2.75rem = 44px is the floor).
-const SUB_44_SCALE =
-  '(?:0|0\\.5|1|1\\.5|2|2\\.5|3|3\\.5|4|4\\.5|5|5\\.5|6|6\\.5|7|7\\.5|8|8\\.5|9|9\\.5|10|10\\.5)';
+const SUB_44_SCALE = String.raw`(?:0|0\.5|1|1\.5|2|2\.5|3|3\.5|4|4\.5|5|5\.5|6|6\.5|7|7\.5|8|8\.5|9|9\.5|10|10\.5)`;
 const SUB_44_UTILITY = new RegExp(
   `(?:^|[\\s"'\`])(?:h|size)-${SUB_44_SCALE}(?:$|[\\s"'\`])`
 );

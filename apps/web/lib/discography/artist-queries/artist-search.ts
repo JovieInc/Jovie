@@ -27,6 +27,7 @@ import {
   trackArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import {
   isPublicArtistCollaboratorRole,
@@ -46,6 +47,7 @@ export interface StructuredReleaseCollaboratorRow {
   readonly artistProfileId: string | null;
   readonly profileIsPublic: boolean | null;
   readonly profileIsClaimed: boolean | null;
+  readonly profileUsername: string | null;
   readonly creditName: string | null;
   readonly role: ArtistRole;
   readonly position: number;
@@ -106,6 +108,7 @@ export async function getCreditedArtistsWithProfiles(
       .selectDistinct({
         name: drizzleSql<string>`coalesce(${releaseArtists.creditName}, ${artists.name})`,
         handle: creatorProfiles.usernameNormalized,
+        profileDisplayName: creatorProfiles.displayName,
       })
       .from(releaseArtists)
       .innerJoin(
@@ -128,6 +131,7 @@ export async function getCreditedArtistsWithProfiles(
       .selectDistinct({
         name: drizzleSql<string>`coalesce(${trackArtists.creditName}, ${artists.name})`,
         handle: creatorProfiles.usernameNormalized,
+        profileDisplayName: creatorProfiles.displayName,
       })
       .from(trackArtists)
       .innerJoin(discogTracks, eq(trackArtists.trackId, discogTracks.id))
@@ -151,6 +155,10 @@ export async function getCreditedArtistsWithProfiles(
     const name = row.name?.trim();
     const handle = row.handle?.trim();
     if (!name || !handle) continue;
+    // Shared discovery-eligibility predicate (JOV-6260): public-but-ineligible
+    // identities (QA machine handles, reserved fixtures, test display names)
+    // never become linked artist mentions.
+    if (!isPublicProfileIndexable(handle, row.profileDisplayName)) continue;
     const key = name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -179,6 +187,7 @@ export async function getStructuredReleaseCollaborators(
       artistProfileId: artists.creatorProfileId,
       profileIsPublic: creatorProfiles.isPublic,
       profileIsClaimed: creatorProfiles.isClaimed,
+      profileUsername: creatorProfiles.usernameNormalized,
       creditName: releaseArtists.creditName,
       role: releaseArtists.role,
       position: releaseArtists.position,
@@ -241,10 +250,14 @@ function projectStructuredReleaseCollaborator(
   const name = (row.creditName ?? row.artistName).trim();
   if (!name) return null;
 
+  // Shared discovery-eligibility predicate (JOV-6260): a bound profile that is
+  // public but ineligible (QA machine handle, reserved fixture) is treated as
+  // unavailable so it is never linked or labeled as a public identity.
+  const hasBoundProfile = Boolean(row.artistProfileId);
   const hasPublicProfile =
-    Boolean(row.artistProfileId) && row.profileIsPublic === true;
-  const hasPrivateProfileBinding =
-    Boolean(row.artistProfileId) && row.profileIsPublic !== true;
+    hasBoundProfile &&
+    row.profileIsPublic === true &&
+    isPublicProfileIndexable(row.profileUsername ?? '');
   let profileState: StructuredReleaseCollaborator['profileState'] =
     'unavailable';
   if (hasPublicProfile) {
@@ -260,7 +273,7 @@ function projectStructuredReleaseCollaborator(
     // provider identity remain plain text rather than reserving a handle by
     // display name alone.
     href:
-      hasPublicProfile || (!hasPrivateProfileBinding && row.artistSpotifyId)
+      hasPublicProfile || (!hasBoundProfile && row.artistSpotifyId)
         ? artistProfileHref(row.artistId)
         : null,
     profileState,

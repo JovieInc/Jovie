@@ -35,6 +35,7 @@ async function runTool(args: { url: string }) {
     toolCallId: 'test',
     messages: [],
     abortSignal: new AbortController().signal,
+    context: {},
   });
 }
 

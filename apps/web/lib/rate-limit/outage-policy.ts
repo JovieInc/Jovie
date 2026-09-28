@@ -1,6 +1,10 @@
 /** Redis outage inventory. Tests pin completeness and requireRedis. */
 
-import { RATE_LIMITERS, type RateLimiterName } from './config';
+import type { RateLimiterName } from './config';
+import type { RateLimitConfig } from './types';
+
+/** Any limiter map keyed like RATE_LIMITERS (tests pass mutated copies). */
+type RateLimiterConfigMap = Readonly<Record<RateLimiterName, RateLimitConfig>>;
 
 export type RedisOutageClass = 'mandatory' | 'advisory' | 'optional' | 'local';
 export type RedisCallerUnavailableAction = 'deny' | 'allow' | 'drop';
@@ -79,6 +83,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   deployPromote: mandatoryDeny,
   accountDelete: mandatoryDeny,
   publicArtistApi: mandatoryDenyFixed,
+  agentProfileCreate: mandatoryDenyFixed,
   general: mandatoryDenyFixed,
   changelogSubscribe: mandatoryDenyFixed,
   musicBrainzLookup: mandatoryDeny,
@@ -184,10 +189,8 @@ export const REDIS_DATA_CONSUMERS = {
   },
 } as const satisfies Record<string, RedisDataConsumerPolicy>;
 
-function limiterRequiresRedis(
-  config: (typeof RATE_LIMITERS)[RateLimiterName]
-): boolean {
-  return 'requireRedis' in config && config.requireRedis === true;
+function limiterRequiresRedis(config: RateLimitConfig): boolean {
+  return config.requireRedis === true;
 }
 
 export function unpinnedLimiterPolicies(
@@ -200,7 +203,7 @@ export function unpinnedLimiterPolicies(
 }
 
 export function mandatoryLimitersMissingRequireRedis(
-  configs: typeof RATE_LIMITERS,
+  configs: RateLimiterConfigMap,
   policies: typeof RATE_LIMIT_OUTAGE_POLICY = RATE_LIMIT_OUTAGE_POLICY
 ): string[] {
   return (Object.keys(policies) as RateLimiterName[])
@@ -211,7 +214,7 @@ export function mandatoryLimitersMissingRequireRedis(
 }
 
 export function wrongPolicyLimiters(
-  configs: typeof RATE_LIMITERS,
+  configs: RateLimiterConfigMap,
   policies: typeof RATE_LIMIT_OUTAGE_POLICY = RATE_LIMIT_OUTAGE_POLICY
 ): string[] {
   return (Object.keys(policies) as RateLimiterName[])

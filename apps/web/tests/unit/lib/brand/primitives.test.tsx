@@ -61,6 +61,16 @@ describe('Wordmark', () => {
     const { container } = render(<Wordmark height={64} color='#08090a' />);
     const paths = container.querySelectorAll('svg > path');
     expect(paths.length).toBe(LETTER_SEQUENCE.length);
+    expect([...paths].map(path => path.getAttribute('transform'))).toEqual([
+      'translate(0 0)',
+      'translate(78 0)',
+      'translate(190 0)',
+      'translate(274 0)',
+      'translate(310 0)',
+    ]);
+    expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe(
+      '0 0 374 100'
+    );
   });
 
   it('substitutes the mark glyph for the O when markAsO is true', () => {

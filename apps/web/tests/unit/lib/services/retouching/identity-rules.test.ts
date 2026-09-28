@@ -15,8 +15,13 @@ describe('retouch identity safe-refusal gate', () => {
     for (const result of evaluateAllRetouchRuleCases()) {
       expect(result.passed, result.reason).toBe(true);
     }
-    expect(evaluateRetouchRuleCase('ambiguous-identity-refused').passed).toBe(
-      true
+    expect(evaluateRetouchRuleCase('ambiguous-identity-refused')).toMatchObject(
+      {
+        id: 'ambiguous-identity-refused',
+        passed: true,
+        reason:
+          'Low-quality or ambiguous identity is refused; confident identity may proceed',
+      }
     );
   });
 

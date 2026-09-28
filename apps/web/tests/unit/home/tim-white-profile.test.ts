@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildDemoProfile } from '@/features/demo/mock-dashboard-data';
 import { HOME_PAGE_ARTIST } from '@/features/home/home-page-content';
-import { HOMEPAGE_PROFILE_PREVIEW_ARTIST } from '@/features/home/homepage-profile-preview-fixture';
+import {
+  HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+  HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST,
+} from '@/features/home/homepage-profile-preview-fixture';
 import { MOCK_ARTIST } from '@/features/home/phone-mode-content';
 import {
   FOUNDER_DEMO_PERSONA,
@@ -42,6 +45,10 @@ describe('Tim White canonical mock identity', () => {
     expect(HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id).toBe(
       TIM_WHITE_PROFILE.spotifyArtistId
     );
+    expect(HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.settings).toMatchObject({
+      ...HOMEPAGE_PROFILE_PREVIEW_ARTIST.settings,
+      heroRoleLabel: 'DJ / Producer',
+    });
   });
 
   it('keeps the internal demo profile aligned with the canonical internal persona', () => {

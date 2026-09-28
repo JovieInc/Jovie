@@ -1,0 +1,42 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: Daily Actions Cache GC keeps two main generations; superseded GB-scale main caches must go within hours or LRU evicts the live ones.
+# removal-trigger: Remove when each cache writer deletes its predecessor after saving.
+name: Actions Cache Supersede
+# clock-class: temporal-resource
+on:
+  schedule:
+    - cron: '11,41 * * * *'
+  # GitHub throttles scheduled runs (hours-long gaps observed), so also run
+  # after each main push. Push runs stay dry-run until a logged pass is reviewed.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Delete (false = dry-run)'
+        type: boolean
+        default: false
+
+permissions:
+  actions: write
+
+concurrency:
+  group: actions-cache-supersede-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  prune:
+    if: github.repository == 'JovieInc/Jovie' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/lib
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: node scripts/lib/actions-cache-supersede.mjs

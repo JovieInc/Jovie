@@ -40,6 +40,12 @@
 - `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
 - `logo-visible-bounds-normalization` — Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.
 - `do-not-fuck-with-art` — Never crop album art. Use object-fit: contain, not cover. No gradient, overlay, play button, or chrome on album art, merch, or a face except optional mostly-transparent glass play/pause.
+- `hero-art-one-shot` — A hero image is composed for its final layout: it reserves the headline, subcopy, header controls and product zones, and depth falls off optically from that focal plane like a wide-aperture 85mm portrait, never as a blur mask or a linear sharp-to-blur gradient.
+- `background-never-focal` — Backgrounds are abstract light, atmosphere, restrained geometry, light leaks or low-detail texture. No literal spheres, glass balls, rings, props, stage lights, particle fields, visualizers, genre tropes, or texture that reads as a recognizable material. If the eye reaches the background before the copy or product, it fails.
+- `text-aware-contrast` — Every text and control over imagery, including header Log in and the primary CTA, passes contrast in the rendered composition; the art direction reserves that contrast instead of a post-hoc overlay.
+- `product-page-shows-product` — Every product page demonstrates the real product UI, callouts never overlap unintentionally, and no section below the hero ships as unstyled text.
+- `one-hero-per-story` — A page has one hero; adjacent sections never restate the same introduction.
+- `virtual-model-passport` — A virtual model ID is a defined person, not a prompt. Its passport fixes height, proportions, body type, hair, eyes, facial geometry and identifying traits; styling and shoot layers vary but identity never drifts; comp cards show headshot, three-quarter, full-body front and profile before campaign renders; models never name or resemble real people.
 
 ## Canonical Tailwind Utilities
 
@@ -52,7 +58,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (266 contract tokens; 503 total in CSS)
+## Design Tokens (273 contract tokens; 533 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -86,7 +92,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 ### Semantic Colors
 
 - `--color-accent`: #11afff
-- `--color-bg-active`: var(--noir-ion-elevated)
+- `--color-bg-active`: rgba(0, 0, 0, 0.06)
 - `--color-bg-base`: var(--noir-ion-canvas)
 - `--color-bg-button`: var(--noir-ion-elevated)
 - `--color-bg-elevated`: var(--noir-ion-elevated)
@@ -218,26 +224,30 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-footer-row-height`: calc(var(--space-6) + var(--space-1-5))
 - `--app-shell-frame-seam`: rgba(0, 0, 0, 0.045)
 - `--app-shell-gap`: 8px
-- `--app-shell-header-height`: 40px
-- `--app-shell-header-height-compact`: 36px
+- `--app-shell-header-height`: 44px
 - `--app-shell-header-padding-x`: 12px
 - `--app-shell-radius`: 12px
 - `--app-shell-radius-item`: 8px
 - `--app-shell-radius-menu`: 8px
-- `--app-shell-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045)
+- `--app-shell-shadow`: 0 14px 30px rgba(0, 0, 0, 0.045)
 - `--app-shell-sidebar-accent-active-rgb`: 236 238 241
 - `--app-shell-sidebar-accent-rgb`: 242 243 245
 - `--app-shell-sidebar-background`: rgb(247 248 248)
 - `--app-shell-sidebar-background-rgb`: 247 248 248
+- `--app-shell-sidebar-badge-font-size`: 0.5rem
 - `--app-shell-sidebar-border-rgb`: 0 0 0 / 0.06
 - `--app-shell-sidebar-floating-radius`: 14px
 - `--app-shell-sidebar-foreground-rgb`: 18 18 20
+- `--app-shell-sidebar-history-font-size`: 0.78125rem
+- `--app-shell-sidebar-history-grid`: minmax(0, 1fr) auto
+- `--app-shell-sidebar-icon-size`: 1rem
 - `--app-shell-sidebar-item-foreground-rgb`: 88 90 96
 - `--app-shell-sidebar-item-icon-rgb`: 122 125 132
 - `--app-shell-sidebar-muted-rgb`: 112 116 124
+- `--app-shell-sidebar-nav-grid`: var(--app-shell-sidebar-icon-size) minmax(0, 1fr)
 - `--app-shell-sidebar-seam`: rgba(0, 0, 0, 0.05)
 - `--app-shell-sidebar-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035)
-- `--app-shell-sidebar-width`: 280px
+- `--app-shell-sidebar-width`: 244px
 - `--app-shell-toolbar-gap`: 4px
 
 ### Public Shell
@@ -313,12 +323,15 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--space-24`: 6rem
 - `--space-28`: 7rem
 - `--space-3`: 0.75rem
+- `--space-3-5`: 0.875rem
 - `--space-32`: 8rem
 - `--space-4`: 1rem
 - `--space-40`: 10rem
 - `--space-5`: 1.25rem
 - `--space-6`: 1.5rem
+- `--space-7`: 1.75rem
 - `--space-8`: 2rem
+- `--space-9`: 2.25rem
 - `--space-px`: 1px
 
 ### Shadows

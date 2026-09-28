@@ -153,24 +153,25 @@ describe('profile mode alias content candidate', () => {
     await expect(result).resolves.toBe(false);
   });
 
-  it.each([
-    0, 1, 2,
-  ])('delegates to the canonical resolver when candidate lookup %i finds a row', async candidateIndex => {
-    mockCandidateQueries(
-      [0, 1, 2].map(index =>
-        Promise.resolve(index === candidateIndex ? [{ id: 'candidate' }] : [])
-      ),
-      'music'
-    );
+  it.each([0, 1, 2])(
+    'delegates to the canonical resolver when candidate lookup %i finds a row',
+    async candidateIndex => {
+      mockCandidateQueries(
+        [0, 1, 2].map(index =>
+          Promise.resolve(index === candidateIndex ? [{ id: 'candidate' }] : [])
+        ),
+        'music'
+      );
 
-    const { hasProfileModeAliasContentCandidate } = await import(
-      '@/app/[username]/[...slug]/_lib/content-candidate'
-    );
+      const { hasProfileModeAliasContentCandidate } = await import(
+        '@/app/[username]/[...slug]/_lib/content-candidate'
+      );
 
-    await expect(
-      hasProfileModeAliasContentCandidate('profile-1', 'music')
-    ).resolves.toBe(true);
-  });
+      await expect(
+        hasProfileModeAliasContentCandidate('profile-1', 'music')
+      ).resolves.toBe(true);
+    }
+  );
 
   it('delegates when a candidate hit has a parallel lookup failure', async () => {
     mockCandidateQueries(

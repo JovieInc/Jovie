@@ -58,7 +58,7 @@ const createSurfaceFixture = (
   const identity = document.createElement('div');
   const cover = document.createElement('div');
 
-  identity.dataset.testid = 'profile-hero-identity-block';
+  identity.dataset.testid = 'profile-identity-header';
   cover.dataset.testid = 'profile-cover';
   identity.getBoundingClientRect = () =>
     createRect(dimensions.identityWidth, dimensions.identityHeight);
@@ -414,7 +414,10 @@ describe('useProfileMobileOverflow', () => {
 
   it('keeps embedded previews and missing surfaces outside the overflow contract', () => {
     const fixture = createSurfaceFixture();
-    const { result, rerender } = renderHook(
+    const { result, rerender } = renderHook<
+      boolean,
+      { isPreviewEmbedded: boolean; surface: HTMLDivElement | null }
+    >(
       ({ isPreviewEmbedded, surface }) =>
         useProfileMobileOverflow({
           isHomeMode: true,

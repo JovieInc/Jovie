@@ -171,8 +171,9 @@ export function addYouTubeImportReason(
   count: number
 ): YouTubeImportReason[] {
   if (count <= 0) return [...reasons];
-  const existing = reasons.find(reason => reason.code === code);
-  if (!existing) return [...reasons, { code, count }];
+  if (!reasons.some(reason => reason.code === code)) {
+    return [...reasons, { code, count }];
+  }
   return reasons.map(reason =>
     reason.code === code ? { code, count: reason.count + count } : reason
   );

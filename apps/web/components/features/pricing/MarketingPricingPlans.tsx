@@ -9,6 +9,7 @@ import {
   isMarketingPlanActive,
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
+import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import { cn } from '@/lib/utils';
 
 type MarketingPricingMode = 'compact' | 'expanded';
@@ -105,6 +106,7 @@ export function MarketingPricingPlans({
 
   return (
     <div
+      data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}
       data-marketing-section='pricing'
       data-marketing-variant={variant}

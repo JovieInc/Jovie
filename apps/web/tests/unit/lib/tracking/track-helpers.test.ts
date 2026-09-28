@@ -118,19 +118,19 @@ describe('deriveAttributionSource', () => {
   it('returns null when utm_medium is not retargeting', () => {
     expect(
       deriveAttributionSource({ utm_source: 'meta', utm_medium: 'cpc' })
-    ).toBe(null);
+    ).toBeNull();
   });
 
   it('returns null when utm_source is missing', () => {
-    expect(deriveAttributionSource({ utm_medium: 'retargeting' })).toBe(null);
+    expect(deriveAttributionSource({ utm_medium: 'retargeting' })).toBeNull();
   });
 
   it('returns null for null input', () => {
-    expect(deriveAttributionSource(null)).toBe(null);
+    expect(deriveAttributionSource(null)).toBeNull();
   });
 
   it('returns null for undefined input', () => {
-    expect(deriveAttributionSource(undefined)).toBe(null);
+    expect(deriveAttributionSource(undefined)).toBeNull();
   });
 
   it('returns null for unknown source', () => {
@@ -139,7 +139,7 @@ describe('deriveAttributionSource', () => {
         utm_source: 'pinterest',
         utm_medium: 'retargeting',
       })
-    ).toBe(null);
+    ).toBeNull();
   });
 
   it('is case-insensitive for utm_source', () => {

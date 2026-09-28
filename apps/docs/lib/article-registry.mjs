@@ -10,6 +10,7 @@ import {
   parseProductRoutes,
   validateArticleMetadata,
 } from './article-metadata.mjs';
+import { validateArticleStructure } from './article-structure.mjs';
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(moduleDirectory, '../../..');
@@ -50,11 +51,14 @@ export function loadArticleRegistry({
 
   for (const path of findMdxFiles(articleDirectory)) {
     const sourcePath = relative(repositoryRoot, path).split(sep).join('/');
-    const { metadata } = parseFrontmatter(
+    const { metadata, body } = parseFrontmatter(
       readFileSync(path, 'utf8'),
       sourcePath
     );
     validateArticleMetadata(metadata, { features, routes, sourcePath });
+    if (metadata.documentType === 'guide') {
+      validateArticleStructure(body, metadata, { sourcePath });
+    }
     const route = routeFromArticlePath(path, articleDirectory);
     const errors = [];
     if (seenIds.has(metadata.id)) {
@@ -95,6 +99,9 @@ export function filterNavigationPageMap(pageMap, primaryRoutes) {
       const children = item.children.map(visit).filter(Boolean);
       if (children.length === 0 && !allowedRoutes.has(item.route)) return null;
       return { ...item, children };
+    }
+    if (typeof item.href === 'string') {
+      return allowedRoutes.has(item.href) ? item : null;
     }
     if ('route' in item && !allowedRoutes.has(item.route)) return null;
     return item;

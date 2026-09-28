@@ -115,6 +115,23 @@ describe('shared deterministic scorers', () => {
     expect(
       scored.rubric.find(item => item.criterion === 'rubric-voice')
     ).toMatchObject({ verdict: 'absent', flagged: false });
+    const boundaries = runAllScorers({
+      ...baseInput,
+      rubricScores: {
+        'rubric-helpfulness': 4,
+        'rubric-accuracy': 3,
+        'rubric-voice': 2,
+      },
+    });
+    expect(
+      boundaries.rubric.find(item => item.criterion === 'rubric-helpfulness')
+    ).toMatchObject({ verdict: 'pass', score: 4, flagged: false });
+    expect(
+      boundaries.rubric.find(item => item.criterion === 'rubric-accuracy')
+    ).toMatchObject({ verdict: 'soft-fail', score: 3, flagged: true });
+    expect(
+      boundaries.rubric.find(item => item.criterion === 'rubric-voice')
+    ).toMatchObject({ verdict: 'fail', score: 2, flagged: true });
     expect(
       scored.rubric.find(item => item.criterion === 'rubric-safety')?.reason
     ).toContain('judge:absent');

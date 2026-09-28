@@ -130,6 +130,24 @@ describe('HeroSpotifySearch', () => {
       ).toHaveAccessibleName('Search your name');
     });
 
+    it('leads the editorial pill with a glyph and lets the pill own focus (JOV-6946)', () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+
+      expect(
+        document.querySelector('.homepage-name-search__icon')
+      ).toHaveAttribute('aria-hidden', 'true');
+      // No square ring inside pill geometry: the frame draws the focus ring.
+      const input = screen.getByPlaceholderText('Search your name');
+      expect(input.className).not.toMatch(/focus-visible:ring-2/);
+      expect(input.className).toContain('focus-visible:outline-none');
+    });
+
     it('uses the shared editorial aura treatment for homepage pills', () => {
       render(
         <HeroSpotifySearch
@@ -779,6 +797,40 @@ describe('HeroSpotifySearch', () => {
       expect(input).toHaveAttribute('aria-expanded', 'false');
       await user.type(input, 'Taylor');
       expect(input).toHaveAttribute('aria-expanded', 'true');
+    });
+  });
+
+  // JOV-6553: claimed ≠ membership. The badge must never claim the artist
+  // is "On Jovie" — expected copy authored from the approved contract.
+  describe('truthful artist status (JOV-6553)', () => {
+    it('claimed artists show a truthful listing badge, never "On Jovie"', async () => {
+      mockHookReturn.results = ARTISTS.map(artist => ({
+        ...artist,
+        isClaimed: artist.id === 'artist-1',
+      }));
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Taylor');
+
+      const badge = screen.getByTestId('listing-badge');
+      expect(badge).toHaveTextContent('Jovie listing');
+      expect(badge.textContent).not.toContain('On Jovie');
+    });
+
+    it('unclaimed artists show no listing badge', async () => {
+      mockHookReturn.results = ARTISTS.map(artist => ({
+        ...artist,
+        isClaimed: artist.id === 'artist-1',
+      }));
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Phoebe');
+
+      const row = screen.getByText('Phoebe Bridgers').closest('button');
+      expect(row).not.toBeNull();
+      expect(
+        row?.querySelector('[data-testid="listing-badge"]')
+      ).not.toBeInTheDocument();
     });
   });
 });

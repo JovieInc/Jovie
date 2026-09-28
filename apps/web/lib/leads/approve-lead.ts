@@ -6,7 +6,6 @@ import { type Lead, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from './funnel-events';
 import { ingestLeadAsCreator } from './ingest-lead';
-import { pushLeadToInstantly } from './instantly';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { routeLead } from './route-lead';
 import { spotifyEnrichLead } from './spotify-enrich-lead';
@@ -15,8 +14,6 @@ export interface ApproveLeadResult {
   ingestion: { success: boolean; profileId?: string; error?: string } | null;
   routing: {
     route?: string;
-    instantlyLeadId?: string;
-    outreachStatus?: string;
     error?: string;
   } | null;
 }
@@ -45,93 +42,20 @@ async function trySpotifyEnrichment(leadId: string): Promise<void> {
   }
 }
 
-async function pushToInstantlyIfEligible(
-  leadId: string,
-  routeResult: { route: string; claimUrl?: string }
-): Promise<Partial<ApproveLeadResult['routing']>> {
-  const [routedLead] = await db
-    .select()
-    .from(leads)
-    .where(eq(leads.id, leadId))
-    .limit(1);
-
-  if (routedLead?.instantlyLeadId) {
-    pipelineLog('approve', 'Already pushed to Instantly — skipping', {
-      leadId,
-      instantlyLeadId: routedLead.instantlyLeadId,
-    });
-    return {};
-  }
-
-  const isEmailEligible =
-    routedLead?.contactEmail &&
-    !routedLead.emailInvalid &&
-    (routeResult.route === 'email' || routeResult.route === 'both');
-
-  if (!isEmailEligible || !routedLead?.contactEmail || !routeResult.claimUrl)
-    return {};
-
-  try {
-    const instantlyLeadId = await pushLeadToInstantly({
-      email: routedLead.contactEmail,
-      firstName: routedLead.displayName ?? routedLead.linktreeHandle,
-      claimLink: routeResult.claimUrl,
-      artistName: routedLead.displayName ?? routedLead.linktreeHandle,
-      priorityScore: routedLead.priorityScore ?? 0,
-    });
-
-    const queuedNow = new Date();
-    await db
-      .update(leads)
-      .set({
-        instantlyLeadId,
-        outreachStatus: 'queued',
-        outreachQueuedAt: queuedNow,
-        firstContactedAt: routedLead.firstContactedAt ?? queuedNow,
-        lastContactedAt: queuedNow,
-        updatedAt: queuedNow,
-      })
-      .where(eq(leads.id, leadId));
-
-    await recordLeadFunnelEvent(
-      {
-        leadId,
-        eventType: 'email_queued',
-        channel: 'email',
-        provider: 'instantly',
-        campaignKey: 'claim_invite',
-        metadata: {
-          instantlyLeadId,
-          claimLink: routeResult.claimUrl,
-        },
-      },
-      { idempotent: true }
-    );
-
-    return { instantlyLeadId, outreachStatus: 'queued' };
-  } catch (instantlyError) {
-    await captureError('Instantly push failed', instantlyError, {
-      route: 'leads/approve-lead',
-      contextData: { leadId },
-    });
-    return {
-      error:
-        instantlyError instanceof Error
-          ? instantlyError.message
-          : 'Instantly push failed',
-    };
-  }
-}
-
 /**
  * Shared approval pipeline used by both manual admin approval and auto-approve cron.
  *
  * Steps:
  * 1. Update status to approved
- * 2. Ingest as creator profile
+ * 2. Ingest as creator profile (failed construction holds the lead for
+ *    review — it must not advance to outreach-ready or export)
  * 3. Spotify enrichment (non-blocking — routing proceeds even if this fails)
  * 4. Route lead (email/DM/both/manual_review/skipped)
- * 5. Push to Instantly if email-eligible (with idempotency guard)
+ *
+ * External enrollment/send is intentionally NOT performed here. Routing marks
+ * the lead `outreachStatus: 'pending'`; the guarded `processOutreachBatch`
+ * boundary is the only path that applies suppression, capacity caps, dedupe,
+ * locking, and the kill switch before pushing to the provider.
  */
 export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
   const leadId = lead.id;
@@ -197,22 +121,36 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
     }
   }
 
+  // Failed or incomplete profile construction must not advance to
+  // outreach-ready. Hold the lead for review instead of routing it.
+  const ingestionFailed =
+    Boolean(lead.linktreeUrl) &&
+    (!ingestion || ingestion.success !== true || !ingestion.profileId);
+
+  if (ingestionFailed) {
+    pipelineWarn(
+      'approve',
+      'Ingestion failed — holding lead for review, skipping routing',
+      { leadId, error: ingestion?.error ?? 'No profile constructed' }
+    );
+    await db
+      .update(leads)
+      .set({ outreachRoute: 'manual_review', updatedAt: new Date() })
+      .where(eq(leads.id, leadId));
+    return { ingestion, routing: null };
+  }
+
   // 3. Spotify enrichment — non-blocking so routing still proceeds
   await trySpotifyEnrichment(leadId);
 
-  // 4. Route lead + 5. Push to Instantly if email-eligible
+  // 4. Route lead. External enrollment/send happens only inside
+  // processOutreachBatch, the single guarded outbound boundary.
   let routing: ApproveLeadResult['routing'] = null;
   try {
     pipelineLog('approve', 'Starting lead routing', { leadId });
     const routeResult = await routeLead(leadId);
     routing = { route: routeResult.route };
     pipelineLog('approve', 'Lead routed', { leadId, route: routeResult.route });
-
-    const instantlyResult = await pushToInstantlyIfEligible(
-      leadId,
-      routeResult
-    );
-    routing = { ...routing, ...instantlyResult };
   } catch (routingError) {
     await captureError('Lead routing failed', routingError, {
       route: 'leads/approve-lead',

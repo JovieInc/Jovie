@@ -103,19 +103,18 @@ describe('commercial recommendation boundary', () => {
       'active_experiment_requires_review_before_replacement'
     );
   });
-  it('lets stronger LYB paid value beat Jovie without a product preference', () => {
+  it('keeps current-bottleneck LYB work ahead of non-objective work', () => {
     const input = snapshot();
     input.candidates.push({
       ...input.candidates[0],
-      id: 'lyb',
-      product: 'logyourbody',
-      lybCanaryPassed: true,
-      paidValueCompletions: m(3),
-      collectedCashCents: m(90000),
+      id: 'profiles',
+      product: 'jovie-profiles',
+      paidValueCompletions: m(30),
+      collectedCashCents: m(900000),
     });
-    expect(project(input).selectedCandidateId).toBe('lyb');
+    expect(project(input).selectedCandidateId).toBe('lyb-sales');
     input.candidates.reverse();
-    expect(project(input).selectedCandidateId).toBe('lyb');
+    expect(project(input).selectedCandidateId).toBe('lyb-sales');
   });
   it.each([
     'held',
@@ -130,12 +129,12 @@ describe('commercial recommendation boundary', () => {
   });
   it('retains the LYB canary gate', () => {
     const input = snapshot();
-    input.candidates[0].product = 'logyourbody';
+    input.candidates[0].lybCanaryPassed = false;
     expect(project(input).verdict).toBe('hold');
   });
   it('keeps salary sustainability and cash headroom UNKNOWN without blocking safe learning', () => {
     const result = project();
-    expect(result.selectedCandidateId).toBe('thumbnails');
+    expect(result.selectedCandidateId).toBe('lyb-sales');
     expect(result.salary.sustainability).toBe('UNKNOWN');
     expect(result.salary.annualPersonalSalaryGoalsDollars).toEqual([
       32000, 50000, 70000, 100000, 150000, 200000,
@@ -211,26 +210,26 @@ describe('commercial recommendation boundary', () => {
     expect(project(input).evidenceBackedInfrastructureIds).toEqual([
       'shipping',
     ]);
-    expect(project(input).selectedCandidateId).toBe('thumbnails');
+    expect(project(input).selectedCandidateId).toBe('lyb-sales');
     input.candidates[1].repeatedUsefulJobs = m(1);
     expect(project(input).evidenceBackedInfrastructureIds).toEqual([]);
     input.candidates[1].repeatedUsefulJobs = null;
     expect(project(input).evidenceBackedInfrastructureIds).toEqual([]);
   });
-  it.each([
-    'hypothesis',
-    'stale',
-    'future',
-    'missing',
-  ])('excludes %s source records without coercing unknowns to zero', kind => {
-    const input = snapshot();
-    if (kind === 'hypothesis') input.sources[0].basis = 'hypothesis';
-    if (kind === 'stale') input.sources[0].observedAt = '2026-09-01T00:00:00Z';
-    if (kind === 'future') input.sources[0].observedAt = '2099-01-01T00:00:00Z';
-    if (kind === 'missing') input.sources = [];
-    expect(project(input).verdict).toBe('hold');
-    expect(project(input).financials.collectedCashCents).toBe('UNKNOWN');
-  });
+  it.each(['hypothesis', 'stale', 'future', 'missing'])(
+    'excludes %s source records without coercing unknowns to zero',
+    kind => {
+      const input = snapshot();
+      if (kind === 'hypothesis') input.sources[0].basis = 'hypothesis';
+      if (kind === 'stale')
+        input.sources[0].observedAt = '2026-09-01T00:00:00Z';
+      if (kind === 'future')
+        input.sources[0].observedAt = '2099-01-01T00:00:00Z';
+      if (kind === 'missing') input.sources = [];
+      expect(project(input).verdict).toBe('hold');
+      expect(project(input).financials.collectedCashCents).toBe('UNKNOWN');
+    }
+  );
   it('rejects duplicate identities and unsafe numeric claims', () => {
     const input = snapshot();
     input.sources.push(input.sources[0]);
@@ -251,5 +250,57 @@ describe('commercial recommendation boundary', () => {
     expect(after.evidenceDigest).not.toBe(before.evidenceDigest);
     expect(after.verdict).toBe('hold');
     expect(after.financials.collectedCashCents).toBe(500000);
+  });
+  it('re-ranks when fresh bottleneck evidence changes', () => {
+    const input = snapshot();
+    input.candidates.push({
+      ...input.candidates[0],
+      id: 'lyb-activation',
+      causalPath: 'Activation moves a conversation to first value.',
+      targetFunnelStage: 'activated',
+    });
+    expect(project(input).selectedCandidateId).toBe('lyb-sales');
+    input.bottleneck.stage = 'activated';
+    expect(project(input).selectedCandidateId).toBe('lyb-activation');
+  });
+  it('uses compounding work only when current-bottleneck objective work is unavailable', () => {
+    const input = snapshot();
+    input.candidates.push({
+      ...input.candidates[0],
+      id: 'automation',
+      product: 'shared',
+      objectiveClass: 'compounding',
+      causalPath: 'Automation increases future qualified outreach throughput.',
+      targetFunnelStage: null,
+    });
+    expect(project(input).selectedCandidateId).toBe('lyb-sales');
+    input.candidates[0].held = true;
+    expect(project(input).selectedCandidateId).toBe('automation');
+  });
+  it('holds work that exceeds observed constrained capacity', () => {
+    const input = snapshot();
+    input.candidates[0].agentMinutes = m(481);
+    expect(project(input).verdict).toBe('hold');
+    input.candidates[0].agentMinutes = m(480);
+    input.candidates[0].ciMinutes = m(241);
+    expect(project(input).verdict).toBe('hold');
+    input.candidates[0].ciMinutes = m(0);
+    input.candidates[0].incrementalSpendCents = m(1);
+    expect(project(input).verdict).toBe('hold');
+  });
+  it('rejects unclassified work and unbounded invariant claims', () => {
+    const input = snapshot() as unknown as Record<string, unknown>;
+    const candidates = input.candidates as Array<Record<string, unknown>>;
+    delete candidates[0].objectiveClass;
+    expect(summerCommercialSnapshotSchema.safeParse(input).success).toBe(false);
+    const risk = snapshot();
+    risk.candidates[0].objectiveClass = 'risk-invariant';
+    risk.candidates[0].boundedInvariant = null;
+    expect(summerCommercialSnapshotSchema.safeParse(risk).success).toBe(false);
+  });
+  it('invalidates the pre-objective snapshot contract', () => {
+    const input = snapshot() as unknown as Record<string, unknown>;
+    input.schema = 'jovie.summer-commercial.snapshot/v1';
+    expect(summerCommercialSnapshotSchema.safeParse(input).success).toBe(false);
   });
 });

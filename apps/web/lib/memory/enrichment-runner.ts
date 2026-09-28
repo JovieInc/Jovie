@@ -99,7 +99,7 @@ export class MemoryEnrichmentRunner {
           description: response.description,
           birthDate: response.birthDate,
           releaseDate: response.releaseDate,
-          ...(response.metadata ?? {}),
+          ...response.metadata,
         });
         const currentEnrichment = asRecord(currentMetadata.enrichment);
         const enrichmentMetadata = {

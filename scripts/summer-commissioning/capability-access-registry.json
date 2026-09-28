@@ -8,8 +8,8 @@
   "principal": {
     "id": "summer",
     "channel": "ovie",
-    "safeToolManifestDigest": "19ae65968cb4a1f068098c605d21b93cc8c2ad70200deeadd41180e6df5ce89f",
-    "policyDigest": "671cf970b10417139c6c996d14e207417caccf2870933879c2e0777deedf5fe2"
+    "safeToolManifestDigest": "deea9c531e0f933e3b917b669829ef96fa934683af94697185502d39044c7166",
+    "policyDigest": "541ddf90454c097112607d833800b4f9ea19b9a036a7029087d3faf62527aba8"
   },
   "capabilities": [
     {
@@ -240,7 +240,7 @@
         "authenticated": true,
         "authorized": true,
         "liveProbed": false,
-        "autonomousSafe": true
+        "autonomousSafe": false
       },
       "evidence": [
         {
@@ -250,7 +250,7 @@
           "countsForSummer": true
         },
         {
-          "tier": "test",
+          "tier": "source",
           "ref": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
           "summary": "Deterministic create/update/deny/readback coverage for Summer Linear coordination.",
           "countsForSummer": true
@@ -389,66 +389,6 @@
         "requiresAttestedReceipt": true
       },
       "blocker": "The source and policy path exist, but exact Summer authentication and a persisted live escalation receipt are missing."
-    },
-    {
-      "id": "summer-access-linear-coordination-write",
-      "capability": "Bounded Linear create/update with readback",
-      "accessMode": "explicit founder-intent create/update + mandatory readback",
-      "dataBoundary": "Jovie Linear team issues created/updated for coordination only; never execution or delivery acceptance",
-      "hostEvidenceCountsAsSummer": false,
-      "state": {
-        "configured": true,
-        "authenticated": true,
-        "authorized": true,
-        "liveProbed": false,
-        "autonomousSafe": true
-      },
-      "evidence": [
-        {
-          "tier": "source",
-          "ref": "apps/web/lib/ovie/linear-coordination.ts",
-          "summary": "coordinateLinearWork requires founderIntentRef, provenance, and readback identity match; executionCompleted and deliveryAccepted remain false.",
-          "countsForSummer": true
-        },
-        {
-          "tier": "source",
-          "ref": "apps/web/lib/ovie/mcp/tools.ts",
-          "summary": "coordinate_linear_work MCP tool requires linear-coordination-write.",
-          "countsForSummer": true
-        },
-        {
-          "tier": "test",
-          "ref": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
-          "summary": "Unit tests cover create/update readback and denial paths.",
-          "countsForSummer": true
-        }
-      ],
-      "leastPrivilegePacket": {
-        "status": "local-implemented",
-        "owner": "Summer durable intake",
-        "grants": [
-          "Linear issue create",
-          "Linear issue update",
-          "Linear issue readback"
-        ],
-        "explicitDenials": [
-          "claiming executionCompleted",
-          "claiming deliveryAccepted",
-          "privilege expansion",
-          "Symphony heal"
-        ],
-        "reEvaluateWhen": "live Linear create/update readback receipt is observed under Summer principal"
-      },
-      "deterministicProbe": {
-        "id": "summer.access.linear-coordination-write",
-        "version": "1.0.0",
-        "fixture": "linear-explicit-update-reversible-fixture/v1",
-        "expectedState": "configured_authenticated_authorized_autonomous_safe",
-        "requiresSummerPrincipal": true,
-        "forbidsHostSubstitution": true,
-        "requiresAttestedReceipt": false
-      },
-      "blocker": "Live provider probe outstanding; local unit path is green."
     }
   ]
 }

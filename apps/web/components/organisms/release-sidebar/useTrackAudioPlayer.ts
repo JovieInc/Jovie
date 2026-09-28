@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { writeAudioBarDismissed } from '@/components/shell/audio-bar-dismissal';
 
 export interface AudioTrackSource {
   readonly id: string;
@@ -10,10 +9,19 @@ export interface AudioTrackSource {
   readonly audioUrl?: string;
   /** ISRC code for the track — used to fetch a fresh preview URL if the stored one expires. */
   readonly isrc?: string | null;
+  /**
+   * Parent release ID, when known. Lets catalog mutations converge the
+   * now-playing snapshot without re-identifying the track (JOV-6544).
+   */
+  readonly releaseId?: string;
   readonly releaseTitle?: string;
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
   readonly hasLyrics?: boolean;
+  /** Analyzed tempo, when known. Never fabricated — omit rather than guess. */
+  readonly bpm?: number | null;
+  /** Musical/Camelot key, when known. Never fabricated — omit rather than guess. */
+  readonly musicalKey?: string | null;
 }
 
 export interface ToggleTrackOptions {
@@ -37,6 +45,10 @@ interface PlaybackState {
   readonly artistName: string | null;
   readonly artworkUrl: string | null;
   readonly hasLyrics: boolean;
+  /** Analyzed tempo for the active track, when known. Null when absent — never fabricated. */
+  readonly bpm: number | null;
+  /** Musical/Camelot key for the active track, when known. Null when absent — never fabricated. */
+  readonly musicalKey: string | null;
   readonly queueLength: number;
   readonly queueIndex: number;
   readonly hasNext: boolean;
@@ -52,6 +64,9 @@ let _activeTrackIsrc: string | null = null;
 let _hasRetriedRefresh = false;
 let _queue: readonly AudioTrackSource[] = [];
 let _queueIndex = -1;
+/** Source of the currently active track — retained so catalog mutations can
+ * converge now-playing metadata even when no queue is set (JOV-6544). */
+let _activeSource: AudioTrackSource | null = null;
 /** Nested audio-focus holds (dictation / local preview). Resume is opt-in. */
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
@@ -122,6 +137,8 @@ let state: PlaybackState = {
   artistName: null,
   artworkUrl: null,
   hasLyrics: false,
+  bpm: null,
+  musicalKey: null,
   queueLength: 0,
   queueIndex: -1,
   hasNext: false,
@@ -264,6 +281,7 @@ function handlePlaybackFailure(
     audio.pause();
     audio.src = '';
   }
+  _activeSource = null;
   clearPlaybackQueue();
   setState({
     activeTrackId: null,
@@ -277,6 +295,8 @@ function handlePlaybackFailure(
     artistName: null,
     artworkUrl: null,
     hasLyrics: false,
+    bpm: null,
+    musicalKey: null,
     ...getQueueSnapshot(),
   });
   notifyPlaybackError(reason);
@@ -294,6 +314,7 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   const token = ++_playToken;
   _activeTrackIsrc = track.isrc ?? null;
   _hasRetriedRefresh = false;
+  _activeSource = track;
   audio.pause();
   audio.src = track.audioUrl;
   setState({
@@ -308,6 +329,8 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     artistName: track.artistName ?? null,
     artworkUrl: track.artworkUrl ?? null,
     hasLyrics: Boolean(track.hasLyrics),
+    bpm: track.bpm ?? null,
+    musicalKey: track.musicalKey ?? null,
     ...getQueueSnapshot(),
   });
 
@@ -361,7 +384,14 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   el.addEventListener('pause', () =>
     setState({
       isPlaying: false,
-      playbackStatus: state.activeTrackId ? 'paused' : 'idle',
+      // Media events are dispatched asynchronously: a pause() issued inside
+      // handlePlaybackFailure lands here after the error state is set, and
+      // must not downgrade it to 'idle' (error UI would flash and vanish).
+      playbackStatus: state.activeTrackId
+        ? 'paused'
+        : state.playbackStatus === 'error'
+          ? 'error'
+          : 'idle',
     })
   );
   el.addEventListener('ended', () => {
@@ -477,6 +507,63 @@ export function resumePlaybackAfterInterruption(
   });
 }
 
+export interface PlayingReleasePatch {
+  readonly id: string;
+  readonly title: string;
+  readonly artworkUrl?: string | null;
+  /** Release-level lyrics flag — applied only to release-level playback. */
+  readonly hasLyrics?: boolean;
+}
+
+/**
+ * Converge the now-playing snapshot (and queued sources) after a release
+ * mutation. Matches entries that ARE the release (release-preview playback,
+ * `id === release.id`) and tracks that BELONG to it (`releaseId`). Only
+ * metadata is patched — the active audio source and position are untouched.
+ */
+export function syncPlayingReleaseMetadata(release: PlayingReleasePatch): void {
+  const artworkUrl = release.artworkUrl ?? null;
+
+  const patchSource = (track: AudioTrackSource): AudioTrackSource => {
+    if (track.id === release.id) {
+      return {
+        ...track,
+        title: release.title,
+        releaseTitle: release.title,
+        artworkUrl,
+        hasLyrics: release.hasLyrics ?? track.hasLyrics,
+      };
+    }
+    if (track.releaseId === release.id) {
+      return { ...track, releaseTitle: release.title, artworkUrl };
+    }
+    return track;
+  };
+
+  if (_queue.length > 0) {
+    _queue = _queue.map(patchSource);
+  }
+  if (_activeSource) {
+    _activeSource = patchSource(_activeSource);
+  }
+
+  if (!state.activeTrackId) return;
+  const activeMatches =
+    state.activeTrackId === release.id ||
+    _activeSource?.releaseId === release.id;
+  if (!activeMatches) return;
+
+  const isReleasePlayback = state.activeTrackId === release.id;
+  setState({
+    ...(isReleasePlayback ? { trackTitle: release.title } : {}),
+    releaseTitle: release.title,
+    artworkUrl,
+    ...(isReleasePlayback && release.hasLyrics !== undefined
+      ? { hasLyrics: release.hasLyrics }
+      : {}),
+  });
+}
+
 export function useTrackAudioPlayer() {
   const [playbackState, setPlaybackState] = useState<PlaybackState>(state);
 
@@ -494,9 +581,7 @@ export function useTrackAudioPlayer() {
       const audio = getAudio();
       if (!audio) return;
 
-      // Intentional play clears dictation/local-preview holds and reopens
-      // a user-dismissed shell audio bar.
-      writeAudioBarDismissed(false);
+      // Intentional play clears any dictation/local-preview interruption hold.
       if (_interruptionDepth > 0) {
         _interruptionDepth = 0;
         _wasPlayingBeforeInterruption = false;
@@ -552,6 +637,7 @@ export function useTrackAudioPlayer() {
       audio.pause();
       audio.src = '';
     }
+    _activeSource = null;
     clearPlaybackQueue();
     setState({
       activeTrackId: null,
@@ -565,6 +651,8 @@ export function useTrackAudioPlayer() {
       artistName: null,
       artworkUrl: null,
       hasLyrics: false,
+      bpm: null,
+      musicalKey: null,
       ...getQueueSnapshot(),
     });
   }, []);

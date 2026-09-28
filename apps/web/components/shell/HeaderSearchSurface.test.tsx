@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { HeaderSearchSurface } from './HeaderSearchSurface';
 import type { SearchableRelease } from './header-search-results';
 
@@ -225,7 +226,7 @@ describe('HeaderSearchSurface', () => {
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
     expect(options[2]).toHaveClass('system-b-table-row-shell', 'min-h-10');
     const filterSuggestion = screen.getByRole('option', {
-      name: 'Midnight Artist Filter by artist',
+      name: segmentedAccessibleName('Midnight Artist', 'Filter by artist'),
     });
     expect(filterSuggestion).toHaveClass(
       'system-b-table-row-shell',
@@ -253,6 +254,39 @@ describe('HeaderSearchSurface', () => {
     ]);
   });
 
+  it('uses the banned-icon-safe Layers glyph for a release with no known provider', () => {
+    render(
+      <HeaderSearchSurface
+        adapter={createAdapter()}
+        catalog={{
+          conversations: [],
+          profiles: [],
+          releases: [
+            {
+              id: 'release-unknown-provider',
+              title: 'Unmastered Draft',
+              artistNames: ['Midnight Artist'],
+              smartLinkPath: '/midnight-artist/unmastered-draft',
+            },
+          ],
+        }}
+        isOpen
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search Jovie' }), {
+      target: { value: 'unmastered' },
+    });
+
+    const icon = screen
+      .getByRole('option', { name: /Unmastered Draft/ })
+      .querySelector('[data-header-search-result-icon] svg');
+    expect(icon).toHaveClass('lucide-layers');
+    expect(icon).not.toHaveClass('lucide-disc-3');
+  });
+
   it('keeps the active result identity stable as slower groups arrive and falls back only when it disappears', () => {
     const onClose = vi.fn();
     const props = {
@@ -276,7 +310,7 @@ describe('HeaderSearchSurface', () => {
     const input = screen.getByRole('combobox', { name: 'Search Jovie' });
     fireEvent.change(input, { target: { value: 'sober' } });
     const releaseOption = screen.getByRole('option', {
-      name: 'Sober Frank Ocean',
+      name: segmentedAccessibleName('Sober', 'Frank Ocean'),
     });
     expect(releaseOption).toHaveAttribute('aria-selected', 'true');
 
@@ -299,7 +333,7 @@ describe('HeaderSearchSurface', () => {
     );
 
     const stableReleaseOption = screen.getByRole('option', {
-      name: 'Sober Frank Ocean',
+      name: segmentedAccessibleName('Sober', 'Frank Ocean'),
     });
     expect(stableReleaseOption).toHaveAttribute('aria-selected', 'true');
     const activateRelease = vi

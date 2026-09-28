@@ -1,12 +1,16 @@
 import type { OperationalTruthState } from '@/lib/ovie/program';
 import {
+  type DeliverySummary,
+  emptyDeliverySummary,
   SHIPPING_STATE_FRESHNESS_MS,
   SHIPPING_STATE_SCHEMA,
 } from '@/lib/ovie/shipping-state';
+import { parseDeliverySummary } from '@/lib/ovie/shipping-state/client';
 
 export { SHIPPING_STATE_SCHEMA };
 export const SHIPPING_STATE_FRESHNESS_BUDGET_MS = SHIPPING_STATE_FRESHNESS_MS;
-export const SHIPPING_STATE_POLL_INTERVAL_MS = 4_000;
+/** One interval for the delivery card and operational tasks. Under the 10s freshness budget. */
+export const SHIPPING_STATE_POLL_INTERVAL_MS = 6_000;
 export const SHIPPING_STATE_CLOCK_UNCERTAINTY_MS = 1_000;
 export const SHIPPING_STATE_CACHE_GC_MS = 30_000;
 
@@ -50,6 +54,8 @@ export type ShippingStateView = {
   readonly ciGreen: ShippingMeaningView;
   readonly productionVerified: ShippingMeaningView;
   readonly exactLiveBuild: ShippingMeaningView;
+  /** Per-metric delivery truth; a failed source leaves only its metrics n/a. */
+  readonly delivery: DeliverySummary;
   readonly flags: ReadonlySet<ShippingFlag>;
 };
 export type ShippingStateRead =
@@ -200,6 +206,7 @@ export function createEmptyShippingStateView(): ShippingStateView {
     ciGreen: NONE_MEANING,
     productionVerified: NONE_MEANING,
     exactLiveBuild: NONE_MEANING,
+    delivery: emptyDeliverySummary(),
     flags: new Set(),
   };
 }
@@ -271,11 +278,12 @@ export function parseShippingStateProjection(
     lastSuccess: null,
     lastError: lastErrorMessage(payload.lastError),
     queued: nestedCount(payload.sources, 'github-native-merge-queue', 'queued'),
-    inFlight: nestedCount(payload.sources, 'symphony-runtime', 'running'),
+    inFlight: nestedCount(payload.sources, 'lane-pull-requests', 'running'),
     merged: parseMeaning(meanings.merged),
     ciGreen: parseMeaning(meanings.ciGreen),
     productionVerified: parseMeaning(meanings.productionVerified),
     exactLiveBuild: parseMeaning(meanings.exactLiveBuild),
+    delivery: parseDeliverySummary(payload.delivery),
     flags,
   };
   return { ok: true, projection: view };

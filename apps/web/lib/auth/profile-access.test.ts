@@ -155,33 +155,33 @@ function fakeAccessTransaction(rows: readonly JoinedAccessRow[]) {
 }
 
 describe('getExactProfileAccess', () => {
-  it.each([
-    'owner',
-    'manager',
-  ])('authorizes an exact %s claim through the joined query', async role => {
-    const fake = fakeAccessTransaction([
-      {
-        userId: USER_A,
-        profileId: PROFILE,
-        legacyUserId: USER_B,
-        claimUserId: USER_A,
-        claimRole: role,
-      },
-    ]);
+  it.each(['owner', 'manager'])(
+    'authorizes an exact %s claim through the joined query',
+    async role => {
+      const fake = fakeAccessTransaction([
+        {
+          userId: USER_A,
+          profileId: PROFILE,
+          legacyUserId: USER_B,
+          claimUserId: USER_A,
+          claimRole: role,
+        },
+      ]);
 
-    await expect(
-      getExactProfileAccess(fake.tx, USER_A, PROFILE)
-    ).resolves.toEqual({
-      ok: true,
-      profileId: PROFILE,
-      ownerUserId: role === 'owner' ? USER_A : null,
-    });
-    expect(fake.select).toHaveBeenCalledTimes(1);
-    expect(fake.from).toHaveBeenCalledTimes(1);
-    expect(fake.firstLeftJoin).toHaveBeenCalledTimes(1);
-    expect(fake.secondLeftJoin).toHaveBeenCalledTimes(1);
-    expect(fake.where).toHaveBeenCalledTimes(1);
-  });
+      await expect(
+        getExactProfileAccess(fake.tx, USER_A, PROFILE)
+      ).resolves.toEqual({
+        ok: true,
+        profileId: PROFILE,
+        ownerUserId: role === 'owner' ? USER_A : null,
+      });
+      expect(fake.select).toHaveBeenCalledTimes(1);
+      expect(fake.from).toHaveBeenCalledTimes(1);
+      expect(fake.firstLeftJoin).toHaveBeenCalledTimes(1);
+      expect(fake.secondLeftJoin).toHaveBeenCalledTimes(1);
+      expect(fake.where).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('normalizes repeated joined user and profile rows before resolving', async () => {
     const fake = fakeAccessTransaction([

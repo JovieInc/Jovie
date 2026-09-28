@@ -885,12 +885,35 @@ export function collectGitPaths(args) {
     );
   const baseRef = diffBaseIndex >= 0 ? args[diffBaseIndex + 1] : 'HEAD';
   if (!baseRef) throw new Error('--diff-base requires a Git revision');
-  const base = gitPathModes(['ls-tree', '-r', '-z', baseRef], false);
+  // During an in-progress merge, measure the authored delta against the
+  // incoming side (MERGE_HEAD): content identical to an already-reviewed
+  // upstream commit is not new authored change.
+  let mergeHead = null;
+  if (staged) {
+    try {
+      mergeHead = execFileSync(
+        'git',
+        ['rev-parse', '-q', '--verify', 'MERGE_HEAD'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+      ).trim();
+    } catch {
+      mergeHead = null;
+    }
+  }
+  const effectiveBase = mergeHead || baseRef;
+  const base = gitPathModes(['ls-tree', '-r', '-z', effectiveBase], false);
   const current = staged
     ? gitPathModes(['ls-files', '-s', '-z'], true)
     : gitPathModes(['ls-tree', '-r', '-z', 'HEAD'], false);
   const diffArgs = staged
-    ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']
+    ? [
+        'diff',
+        '--cached',
+        '--name-only',
+        '--diff-filter=ACMR',
+        '-z',
+        effectiveBase,
+      ]
     : ['diff', '--name-only', '--diff-filter=ACMR', '-z', `${baseRef}..HEAD`];
   return {
     baseRef,

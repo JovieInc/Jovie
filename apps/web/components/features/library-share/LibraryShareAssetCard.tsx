@@ -3,7 +3,12 @@
 // @coverage-via apps/web/tests/unit/library-share/LibraryShareAssetLayouts.test.tsx
 
 import { Button } from '@jovie/ui';
-import { ArrowDownToLine, Disc3, FileText, PlayCircle } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  AudioLines,
+  FileText,
+  PlayCircle,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -72,7 +77,7 @@ export function LibraryShareAssetCard({
           />
         ) : (
           <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
-            <Disc3 className='h-8 w-8' strokeWidth={2} />
+            <AudioLines className='h-8 w-8' strokeWidth={2} />
           </div>
         )}
       </ArtworkFrame>

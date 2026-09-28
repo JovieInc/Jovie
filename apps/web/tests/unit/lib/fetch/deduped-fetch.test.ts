@@ -452,16 +452,15 @@ describe('dedupedFetch', () => {
       const firstController = new AbortController();
       const secondController = new AbortController();
       let resolveJson: ((value: unknown) => void) | undefined;
-      mockFetch.mockImplementationOnce(
-        (_url: string, init?: RequestInit) =>
-          Promise.resolve({
-            ok: true,
-            json: () =>
-              new Promise(resolve => {
-                resolveJson = resolve;
-              }),
-            signal: init?.signal,
-          }) as Promise<Response>
+      mockFetch.mockImplementationOnce((_url: string, init?: RequestInit) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            new Promise(resolve => {
+              resolveJson = resolve;
+            }),
+          signal: init?.signal,
+        })
       );
 
       const first = dedupedFetch('/api/shared', {

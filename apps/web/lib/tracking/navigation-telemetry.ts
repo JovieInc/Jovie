@@ -186,7 +186,7 @@ function completeUxNavigationMeasurement(
   readyAt: number
 ): void {
   const navigation = pendingUxNavigation;
-  if (!navigation || destinationRoute !== navigation.destinationRoute) return;
+  if (destinationRoute !== navigation?.destinationRoute) return;
   pendingUxNavigation = null;
   clearTimeout(navigation.timeoutId);
   recordUxLatency(
@@ -297,9 +297,9 @@ export function startNavigationTelemetry(input: {
   }
 
   if (
-    lastReadyNavigation &&
-    destinationRoute === lastReadyNavigation.sourceRoute &&
-    startedAt - lastReadyNavigation.readyAt <= NAVIGATION_SHORT_RETURN_MS
+    destinationRoute === lastReadyNavigation?.sourceRoute &&
+    startedAt - (lastReadyNavigation?.readyAt ?? Number.POSITIVE_INFINITY) <=
+      NAVIGATION_SHORT_RETURN_MS
   ) {
     pendingInputs.push({
       eventId: `${navigationId}:short_return`,
@@ -309,7 +309,7 @@ export function startNavigationTelemetry(input: {
       destinationRoute,
       inputMethod: input.inputMethod,
       context: input.context,
-      latencyMs: startedAt - lastReadyNavigation.readyAt,
+      latencyMs: startedAt - (lastReadyNavigation?.readyAt ?? 0),
       success: false,
     });
   }
@@ -360,7 +360,7 @@ export function markNavigationDestinationReady(
 ): NavigationTelemetryPayload | null {
   completeUxNavigationMeasurement(destinationRoute, readyAt);
   const navigation = pendingNavigation;
-  if (!navigation || destinationRoute !== navigation.destinationRoute) {
+  if (destinationRoute !== navigation?.destinationRoute) {
     return null;
   }
 

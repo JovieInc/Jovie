@@ -9,19 +9,19 @@ import {
 
 describe('parseConsentCookie', () => {
   it('returns null for undefined cookie value', () => {
-    expect(parseConsentCookie(undefined)).toBe(null);
+    expect(parseConsentCookie(undefined)).toBeNull();
   });
 
   it('returns null for empty string', () => {
-    expect(parseConsentCookie('')).toBe(null);
+    expect(parseConsentCookie('')).toBeNull();
   });
 
   it('returns null for invalid JSON', () => {
-    expect(parseConsentCookie('not-json')).toBe(null);
+    expect(parseConsentCookie('not-json')).toBeNull();
   });
 
   it('returns null when marketing field is missing', () => {
-    expect(parseConsentCookie('{"essential":true}')).toBe(null);
+    expect(parseConsentCookie('{"essential":true}')).toBeNull();
   });
 
   it('returns null when marketing is not boolean', () => {
@@ -29,7 +29,7 @@ describe('parseConsentCookie', () => {
       parseConsentCookie(
         '{"essential":true,"analytics":true,"marketing":"yes"}'
       )
-    ).toBe(null);
+    ).toBeNull();
   });
 
   it('parses valid consent with marketing=true', () => {
@@ -55,11 +55,11 @@ describe('parseConsentCookie', () => {
   });
 
   it('returns null for number value', () => {
-    expect(parseConsentCookie('42')).toBe(null);
+    expect(parseConsentCookie('42')).toBeNull();
   });
 
   it('returns null for array', () => {
-    expect(parseConsentCookie('[1,2,3]')).toBe(null);
+    expect(parseConsentCookie('[1,2,3]')).toBeNull();
   });
 
   it('requires analytics=true for analytics consent', () => {

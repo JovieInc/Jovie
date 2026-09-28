@@ -72,32 +72,31 @@ const OPTIONS = [
 ] as const;
 
 describe('TabBar distribution', () => {
-  it.each([
-    'collapse',
-    'scroll',
-    'wrap',
-  ] as const)('adds equal-width tab classes in %s mode when distribution is fill', overflowMode => {
-    render(
-      <TabBar
-        value='overview'
-        onValueChange={() => undefined}
-        options={OPTIONS}
-        ariaLabel='Workspace tabs'
-        overflowMode={overflowMode}
-        distribution='fill'
-        actions={<button type='button'>Pinned action</button>}
-      />
-    );
+  it.each(['collapse', 'scroll', 'wrap'] as const)(
+    'adds equal-width tab classes in %s mode when distribution is fill',
+    overflowMode => {
+      render(
+        <TabBar
+          value='overview'
+          onValueChange={() => undefined}
+          options={OPTIONS}
+          ariaLabel='Workspace tabs'
+          overflowMode={overflowMode}
+          distribution='fill'
+          actions={<button type='button'>Pinned action</button>}
+        />
+      );
 
-    expect(
-      screen.getByRole('button', { name: 'Pinned action' })
-    ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Pinned action' })
+      ).toBeInTheDocument();
 
-    for (const tab of screen.getAllByRole('tab')) {
-      expect(tab.className).toContain('flex-1');
-      expect(tab.className).toContain('min-w-18');
+      for (const tab of screen.getAllByRole('tab')) {
+        expect(tab.className).toContain('flex-1');
+        expect(tab.className).toContain('min-w-18');
+      }
     }
-  });
+  );
 
   it('keeps intrinsic tabs content-sized by default', () => {
     render(

@@ -26,19 +26,19 @@ export class CreatorDocumentConflictError extends Error {
       | 'claim_ledger_frozen'
       | 'claim_source_inaccessible'
   ) {
-    super(
-      code === 'revision_conflict'
-        ? 'Document changed in another session'
-        : code === 'evidence_incomplete'
-          ? 'Every factual script claim needs supporting evidence'
-          : code === 'approval_ineligible'
-            ? 'Only the current evidence-backed script can be approved'
-            : code === 'claim_ledger_frozen'
-              ? 'Claim ledger is frozen for review'
-              : code === 'claim_source_inaccessible'
-                ? 'Evidence source is inaccessible'
-                : 'Claim does not belong to the current document revision'
-    );
+    let message = 'Claim does not belong to the current document revision';
+    if (code === 'revision_conflict') {
+      message = 'Document changed in another session';
+    } else if (code === 'evidence_incomplete') {
+      message = 'Every factual script claim needs supporting evidence';
+    } else if (code === 'approval_ineligible') {
+      message = 'Only the current evidence-backed script can be approved';
+    } else if (code === 'claim_ledger_frozen') {
+      message = 'Claim ledger is frozen for review';
+    } else if (code === 'claim_source_inaccessible') {
+      message = 'Evidence source is inaccessible';
+    }
+    super(message);
     this.name = 'CreatorDocumentConflictError';
   }
 }

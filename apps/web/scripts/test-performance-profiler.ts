@@ -9,6 +9,10 @@
 import { type SpawnSyncReturns, spawnSync } from 'child_process';
 import { readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import {
+  PHASE_TIMINGS_OUTPUT_FILE,
+  type PhaseTimings,
+} from './vitest-phase-timing-reporter';
 
 interface TestResult {
   name: string;
@@ -87,6 +91,11 @@ const PERFORMANCE_SUITE_FILES = [
   'tests/unit/onboarding-step-navigation.test.ts',
 ] as const;
 
+// Vitest 5 prints the Duration breakdown as percentages of summed phases, so
+// absolute phase timings come from this machine-readable reporter instead.
+const PHASE_TIMING_REPORTER_ARG =
+  '--reporter=./scripts/vitest-phase-timing-reporter.ts';
+
 const defaultDependencies: ProfilerDependencies = {
   runCommand: (args, timeout) =>
     spawnSync('pnpm', args, {
@@ -105,6 +114,43 @@ function parseTiming(output: string, label: string): number | undefined {
   if (!match) return undefined;
   const value = Number.parseFloat(match[1]);
   return match[2].toLowerCase() === 's' ? value * 1000 : value;
+}
+
+/**
+ * Parse the phase-timing reporter JSON. Returns undefined for missing or
+ * malformed evidence so callers fall back to legacy (Vitest <=4) absolute
+ * console timings and, failing that, fail closed.
+ */
+function parsePhaseTimings(content: string): PhaseTimings | undefined {
+  if (!content) return undefined;
+  try {
+    const parsed = JSON.parse(content) as Partial<PhaseTimings>;
+    const fields = [
+      'setup',
+      'tests',
+      'environment',
+      'transform',
+      'collect',
+      'prepare',
+    ] as const;
+    if (parsed.source !== 'vitest-phase-timing-reporter') return undefined;
+    if (
+      typeof parsed.moduleCount !== 'number' ||
+      !Number.isInteger(parsed.moduleCount) ||
+      parsed.moduleCount <= 0
+    ) {
+      return undefined;
+    }
+    for (const field of fields) {
+      const value = parsed[field];
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+        return undefined;
+      }
+    }
+    return parsed as PhaseTimings;
+  } catch {
+    return undefined;
+  }
 }
 
 function commandOutput(output: string | null | undefined): string {
@@ -175,12 +221,16 @@ class TestPerformanceProfiler {
       output: testOutput,
       durationMs,
       jsonOutput,
+      phaseTimings,
     } = this.runTestsWithTiming();
 
     // Parse the output to extract performance metrics (excluding setupTime —
     // already captured by the probe above so we don't overwrite it with the
     // misleading aggregate value).
-    this.parseTestOutput(testOutput, jsonOutput, { skipSetupTime: true });
+    this.parseTestOutput(testOutput, jsonOutput, {
+      skipSetupTime: true,
+      phaseTimings,
+    });
     if (!this.results.totalDuration) this.results.totalDuration = durationMs;
 
     this.assertCredibleResults();
@@ -208,6 +258,7 @@ class TestPerformanceProfiler {
   private measureProbeSetupTime(): void {
     const probeFile = 'tests/unit/atoms/BrandLogo.test.tsx';
     console.log(`⚡ Measuring per-file setup time via probe: ${probeFile}`);
+    this.removeStaleFile(PHASE_TIMINGS_OUTPUT_FILE);
     try {
       const result = this.dependencies.runCommand(
         [
@@ -217,11 +268,17 @@ class TestPerformanceProfiler {
           '--config=vitest.config.mts',
           probeFile,
           '--reporter=verbose',
+          PHASE_TIMING_REPORTER_ARG,
         ],
         60000
       );
       this.assertCommandSucceeded(result, 'Setup probe');
-      const setupTime = parseTiming(commandOutput(result.stdout), 'setup');
+      const phaseTimings = parsePhaseTimings(
+        this.readAndRemoveFile(PHASE_TIMINGS_OUTPUT_FILE)
+      );
+      const setupTime =
+        phaseTimings?.setup ??
+        parseTiming(commandOutput(result.stdout), 'setup');
       if (setupTime) {
         this.results.setupTime = setupTime;
         console.log(
@@ -239,13 +296,15 @@ class TestPerformanceProfiler {
     output: string;
     durationMs: number;
     jsonOutput: string;
+    phaseTimings: PhaseTimings | undefined;
   } {
     console.log(
       `⏱️  Running representative performance suite (${PERFORMANCE_SUITE_FILES.length} files, ${TEST_PERFORMANCE_TARGETS.totalDuration}ms budget, ${PERFORMANCE_SUITE_TIMEOUT_MS}ms timeout)...`
     );
     const startTime = Date.now();
     const jsonOutputFile = '.cache/vitest-performance-results.json';
-    this.removeStaleJsonOutput(jsonOutputFile);
+    this.removeStaleFile(jsonOutputFile);
+    this.removeStaleFile(PHASE_TIMINGS_OUTPUT_FILE);
     const result = this.dependencies.runCommand(
       [
         'exec',
@@ -256,6 +315,7 @@ class TestPerformanceProfiler {
         '--reporter=default',
         '--reporter=json',
         `--outputFile=${jsonOutputFile}`,
+        PHASE_TIMING_REPORTER_ARG,
       ],
       PERFORMANCE_SUITE_TIMEOUT_MS
     );
@@ -264,7 +324,10 @@ class TestPerformanceProfiler {
     return {
       output: commandOutput(result.stdout),
       durationMs: Date.now() - startTime,
-      jsonOutput: this.readVitestJsonOutput(jsonOutputFile),
+      jsonOutput: this.readAndRemoveFile(jsonOutputFile),
+      phaseTimings: parsePhaseTimings(
+        this.readAndRemoveFile(PHASE_TIMINGS_OUTPUT_FILE)
+      ),
     };
   }
 
@@ -295,7 +358,7 @@ class TestPerformanceProfiler {
     throw new TestRunError(`${label} did not complete successfully`, details);
   }
 
-  private removeStaleJsonOutput(outputFile: string): void {
+  private removeStaleFile(outputFile: string): void {
     try {
       unlinkSync(join(this.dependencies.cwd, outputFile));
     } catch (error: unknown) {
@@ -303,31 +366,63 @@ class TestPerformanceProfiler {
     }
   }
 
-  private readVitestJsonOutput(outputFile: string): string {
+  private readAndRemoveFile(outputFile: string): string {
+    let content: string;
     try {
-      const content = readFileSync(
-        join(this.dependencies.cwd, outputFile),
-        'utf8'
-      );
-      unlinkSync(join(this.dependencies.cwd, outputFile));
-      return content;
-    } catch {
-      return '';
+      content = readFileSync(join(this.dependencies.cwd, outputFile), 'utf8');
+    } catch (error: unknown) {
+      // A run that produced no file reports as empty output; anything else
+      // (permissions, I/O) is a real failure and must not look like "no data".
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+      throw error;
     }
+    // Cleanup failures must not discard output that was read successfully.
+    this.removeStaleFile(outputFile);
+    return content;
   }
 
   private parseTestOutput(
     output: string,
     jsonOutput: string,
-    options: { skipSetupTime?: boolean } = {}
+    options: { skipSetupTime?: boolean; phaseTimings?: PhaseTimings } = {}
   ): void {
-    // Extract overall timing information
+    // Wall-clock Duration is still printed as an absolute time in Vitest 5.
     this.results.totalDuration =
       parseTiming(output, 'Duration') ?? this.results.totalDuration;
 
-    // setupTime is measured separately by measureProbeSetupTime() when
-    // skipSetupTime is true, so we skip the misleading aggregate value here.
-    if (!options.skipSetupTime) {
+    // Absolute phase timings come from the phase-timing reporter; the console
+    // breakdown is only a fallback for Vitest <=4 output. setupTime is measured
+    // separately by measureProbeSetupTime() when skipSetupTime is true, so we
+    // skip the misleading aggregate value here.
+    const phases = options.phaseTimings;
+    if (phases) {
+      if (!options.skipSetupTime) this.results.setupTime = phases.setup;
+      this.results.testExecutionTime = phases.tests;
+      this.results.environmentTime = phases.environment;
+      this.results.transformTime = phases.transform;
+      this.results.collectTime = phases.collect;
+      this.results.prepareTime = phases.prepare;
+    } else {
+      this.parseLegacyPhaseTimings(output, options.skipSetupTime ?? false);
+    }
+
+    if (jsonOutput) {
+      this.parseVitestJsonOutput(jsonOutput);
+    }
+    this.parseConsoleTestResults(output);
+  }
+
+  /**
+   * Vitest <=4 printed absolute phase times in the Duration line, e.g.
+   * "Duration 2.0s (transform 100ms, setup 200ms, tests 400ms, ...)". Vitest 5
+   * prints percentages instead, which never match here, so a missing reporter
+   * file leaves these fields empty and assertCredibleResults fails closed.
+   */
+  private parseLegacyPhaseTimings(
+    output: string,
+    skipSetupTime: boolean
+  ): void {
+    if (!skipSetupTime) {
       this.results.setupTime =
         parseTiming(output, 'setup') ?? this.results.setupTime;
     }
@@ -342,11 +437,9 @@ class TestPerformanceProfiler {
       parseTiming(output, 'collect') ?? this.results.collectTime;
     this.results.prepareTime =
       parseTiming(output, 'prepare') ?? this.results.prepareTime;
+  }
 
-    if (jsonOutput) {
-      this.parseVitestJsonOutput(jsonOutput);
-    }
-
+  private parseConsoleTestResults(output: string): void {
     // Extract individual test results from console output only when JSON
     // parsing failed to produce per-test timings.
     if (this.results.testResults.length === 0) {
@@ -650,6 +743,7 @@ export {
   PERFORMANCE_SUITE_TIMEOUT_MS,
   type PerformanceMetrics,
   type ProfilerDependencies,
+  parsePhaseTimings,
   TEST_PERFORMANCE_TARGETS,
   TestPerformanceProfiler,
   TestRunError,

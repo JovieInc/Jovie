@@ -66,6 +66,18 @@ describe('buildEntitySameAs', () => {
     expect(result).toContain('https://isni.org/isni/0000000121032683');
   });
 
+  it('normalizes ISNI hyphens in externalId', () => {
+    const links: EntityIdentityLink[] = [
+      {
+        platform: 'isni',
+        url: 'https://isni.org/isni/0000000121032683',
+        externalId: '0000-0001-2103-2683',
+      },
+    ];
+    const result = buildEntitySameAs(EMPTY_PROFILE, links, NO_SOCIAL);
+    expect(result).toContain('https://isni.org/isni/0000000121032683');
+  });
+
   it('falls back to url when ISNI externalId is absent', () => {
     const links: EntityIdentityLink[] = [
       {

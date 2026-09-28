@@ -255,7 +255,7 @@ export function validateSitemapXml(content: string): SeoGuardrailResult {
         )
       );
     }
-    const lastmod = block.match(/<lastmod>([^<]*)<\/lastmod>/i)?.[1];
+    const lastmod = /<lastmod>([^<]*)<\/lastmod>/i.exec(block)?.[1];
     if (lastmod !== undefined && Number.isNaN(new Date(lastmod).getTime())) {
       errors.push(
         failure(

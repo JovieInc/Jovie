@@ -1,8 +1,9 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
-import { OnboardingV2Form } from '@/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
+import { OnboardingV2Form } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
+import type { ArtistSearchState } from '@/lib/queries/useArtistSearchQuery';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -27,7 +28,7 @@ const mockArtistSearch = {
   }>,
   search: mockSearch,
   searchImmediate: mockSearch,
-  state: 'idle' as const,
+  state: 'idle' as ArtistSearchState,
 };
 
 const DISCOVERY_SNAPSHOT = {
@@ -73,7 +74,7 @@ const DISCOVERY_SNAPSHOT = {
     username: 'perf-budget',
   },
   readiness: {
-    blockingReason: null,
+    blockingReason: null as string | null,
     canProceedToDashboard: true,
     phase: 'ready',
   },
@@ -106,11 +107,19 @@ const DISCOVERY_SNAPSHOT = {
       version: 1,
     },
   ],
-} as const;
+};
 
-function createDiscoverySnapshot(
-  overrides: Partial<typeof DISCOVERY_SNAPSHOT> = {}
-) {
+type DiscoverySnapshotFixture = typeof DISCOVERY_SNAPSHOT;
+/** Nested sections merge field-by-field; arrays replace wholesale. */
+type DiscoverySnapshotOverrides = {
+  [K in keyof DiscoverySnapshotFixture]?: DiscoverySnapshotFixture[K] extends readonly unknown[]
+    ? DiscoverySnapshotFixture[K]
+    : DiscoverySnapshotFixture[K] extends object
+      ? Partial<DiscoverySnapshotFixture[K]>
+      : DiscoverySnapshotFixture[K];
+};
+
+function createDiscoverySnapshot(overrides: DiscoverySnapshotOverrides = {}) {
   const releaseCount =
     overrides.importState?.releaseCount ??
     overrides.counts?.releaseCount ??
@@ -249,6 +258,10 @@ vi.mock('@/features/auth', () => ({
 
 vi.mock('@/app/onboarding/actions/connect-spotify', () => ({
   connectOnboardingSpotifyArtist: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
+  recordOnboardingUpgradeOfferDecision: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 vi.mock('@/app/onboarding/actions/enrich-profile', () => ({
@@ -448,6 +461,55 @@ describe('Onboarding screen performance budgets', () => {
     );
   });
 
+  // JOV-6553: claimed artists must stay selectable (the server-side identity
+  // lock owns denial) and must show a truthful listing badge — never a
+  // disabled "Unavailable" dead-end or an "On Jovie" membership claim.
+  it('spotify results show truthful status for claimed artists', async () => {
+    mockArtistSearch.results = [
+      {
+        followers: 123456,
+        id: 'artist-result',
+        imageUrl: null,
+        name: 'Search Budget Artist',
+        popularity: 81,
+        url: 'https://open.spotify.com/artist/artist-result',
+      },
+      {
+        followers: 9,
+        id: 'claimed-result',
+        imageUrl: null,
+        name: 'Claimed Listing Artist',
+        popularity: 70,
+        url: 'https://open.spotify.com/artist/claimed-result',
+      },
+    ].map(r => ({
+      ...r,
+      isClaimed: r.id === 'claimed-result',
+    }));
+    mockArtistSearch.state = 'success';
+
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='spotify'
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    const claimedRow = screen
+      .getByText('Claimed Listing Artist')
+      .closest('button')!;
+    expect(claimedRow).toBeEnabled();
+    const badge = within(claimedRow).getByTestId('listing-badge');
+    expect(badge).toHaveTextContent('Jovie listing');
+    expect(badge.textContent).not.toContain('On Jovie');
+    expect(screen.queryByText('Unavailable')).not.toBeInTheDocument();
+  });
+
   it('checkout screen renders within budget', async () => {
     const renderTime = await measureRenderTime(
       () =>
@@ -461,6 +523,7 @@ describe('Onboarding screen performance budgets', () => {
             monthlyAmount={1900}
             monthlyPriceId='price_monthly'
             plan='pro'
+            profileId={null}
             spotifyFollowers={15000}
             username='perf-budget'
           />
@@ -537,6 +600,27 @@ describe('Onboarding screen performance budgets', () => {
       name: 'Import ran into an issue',
     });
     expect(screen.getByRole('button', { name: /Try again/i })).toBeEnabled();
+  });
+
+  it('uses the banned-icon-safe AudioLines glyph for a release with no artwork', async () => {
+    mockDiscoveryResponse(createDiscoverySnapshot());
+
+    const { container } = render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='releases'
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    await screen.findByRole('heading', { name: 'Your release preview' });
+    const icon = container.querySelector('svg.lucide-audio-lines');
+    expect(icon).toBeTruthy();
+    expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
   });
 
   it('lets creators continue when Spotify import completed without releases', async () => {

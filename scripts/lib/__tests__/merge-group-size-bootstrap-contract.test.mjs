@@ -61,14 +61,17 @@ describe('merge-group size trusted bootstrap contract', () => {
     'curl example.com',
     'python leak.py',
     'gh api /user',
-  ])('fails closed when an extra token-bearing command is inserted: %s', command => {
-    expect(
-      errorsAfter(
-        '          set -euo pipefail\n          [[ "$BOOTSTRAP_HEAD"',
-        `          set -euo pipefail\n          ${command}\n          [[ "$BOOTSTRAP_HEAD"`
-      )
-    ).not.toEqual([]);
-  });
+  ])(
+    'fails closed when an extra token-bearing command is inserted: %s',
+    command => {
+      expect(
+        errorsAfter(
+          '          set -euo pipefail\n          [[ "$BOOTSTRAP_HEAD"',
+          `          set -euo pipefail\n          ${command}\n          [[ "$BOOTSTRAP_HEAD"`
+        )
+      ).not.toEqual([]);
+    }
+  );
 
   it('fails closed on missing command-scoped auth or leaked token argv', () => {
     expect(errorsAfter('GH_TOKEN: ${{ github.token }}', '')).not.toEqual([]);

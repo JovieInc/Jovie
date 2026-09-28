@@ -53,7 +53,9 @@ function quality(
     const star = range.type === '*' && range.subtype === '*';
     if (!exact && !typeWildcard && !star) continue;
 
-    const specificity = exact ? 2 : typeWildcard ? 1 : 0;
+    let specificity = 0;
+    if (exact) specificity = 2;
+    else if (typeWildcard) specificity = 1;
     if (
       specificity > bestSpecificity ||
       (specificity === bestSpecificity && range.q > best)

@@ -363,18 +363,6 @@ const MARKETING_SURFACES = [
     interactions: GLOBAL_INTERACTIONS,
   },
   {
-    id: 'marketing-investors',
-    family: 'marketing',
-    expectedState: 'ok',
-    path: APP_ROUTES.INVESTORS,
-    readySelectors: ['h1'],
-    mainSelector: 'main',
-    minMainTextLength: 120,
-    lighthouse: false,
-    perfGroups: ['marketing-public'],
-    interactions: GLOBAL_INTERACTIONS,
-  },
-  {
     id: 'marketing-artist-notifications',
     family: 'marketing',
     expectedState: 'ok',

@@ -227,7 +227,7 @@ export class EveWorkflowContractMutationError extends Error {
 }
 
 const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
-const SECRET_RE = /\b(?:sk|pk|token|bearer|key)[-_]?[A-Za-z0-9+/_=-]{8,}\b/gi;
+const SECRET_RE = /\b(?:sk|pk|token|bearer|key)[-_]?[A-Z0-9+/_=-]{8,}\b/gi;
 
 type StoredRun = {
   sequence: number;

@@ -4,9 +4,10 @@ import {
   parseVisualQaThemeToken,
   resolveVisualQaColorSchemes,
   type VisualQaColorScheme,
-  type VisualQaThemeRequest,
 } from '@/lib/visual-qa/themes';
 import { VISUAL_QA_PHASES, type VisualQaPhase } from '@/lib/visual-qa/types';
+
+export type { VisualQaThemeRequest } from '@/lib/visual-qa/themes';
 
 export type VisualQaCapturePhaseRequest = VisualQaPhase | 'both';
 
@@ -72,5 +73,3 @@ export function parseVisualQaCaptureRequest(input: {
     breakpoints: parseVisualQaBreakpointWidths(input.breakpoints),
   };
 }
-
-export type { VisualQaThemeRequest };

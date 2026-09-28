@@ -49,7 +49,7 @@ function reject(code: AudioBlobRejectionCode, rule: string): never {
 }
 
 function text(bytes: Uint8Array, offset: number, length: number): string {
-  return String.fromCharCode(...bytes.subarray(offset, offset + length));
+  return String.fromCodePoint(...bytes.subarray(offset, offset + length));
 }
 
 function u32(bytes: Uint8Array, offset: number, littleEndian = false): number {

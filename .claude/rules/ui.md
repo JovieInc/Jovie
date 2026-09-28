@@ -229,11 +229,15 @@ The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the sh
 
 ### Color & Accent Discipline
 
-`DESIGN.md` is canonical. Accent color is semantic only: status, focus,
-selection, active navigation, links, or a named data category. Do not rotate
-accent colors between sections, ornament title text, or place decorative icons
-on colored squares. CTAs remain neutral high-contrast pills. Color never
-carries status alone.
+`DESIGN.md` is canonical for tokens. Color is neutral by default; accents
+appear only on card and section backgrounds, rotating in visual order
+blue → purple → pink (then orange, then red/green last) with no two
+consecutive sections sharing one. Image cards pick the accent that
+complements the art by color theory and anchor the rotation. Each gradient
+uses one accent centered on its exact token value. Lower OKLCH chroma for
+contrast, and more strongly behind art. The focus/link accent never rotates.
+CTAs stay neutral pills. Color never carries status alone. Full rule:
+`docs/design-system/DETAILS.md` (accent rotation rule).
 
 For Jovie-owned intentionally art-directed/generated brand imagery, use
 Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The

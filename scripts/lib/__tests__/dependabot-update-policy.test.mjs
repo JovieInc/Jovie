@@ -19,6 +19,19 @@ const CONFIG = readFileSync(
   resolve(REPO_ROOT, '.github/dependabot.yml'),
   'utf8'
 );
+const VITEST_MANIFEST_PATHS = [
+  'package.json',
+  'apps/console/package.json',
+  'apps/eve-pilot/package.json',
+  'apps/ovie/package.json',
+  'apps/web/package.json',
+  'packages/action-contracts/package.json',
+  'packages/audio-contracts/package.json',
+  'packages/auth-routing/package.json',
+  'packages/copy/package.json',
+  'packages/jovie-cli/package.json',
+  'packages/ui/package.json',
+];
 
 function pullRequest(overrides = {}) {
   return {
@@ -509,5 +522,45 @@ describe('Dependabot discovery contract', () => {
         )
       );
     }
+  });
+});
+
+describe('Dependabot npm grouping (JOV-6837)', () => {
+  it('lands the vitest family and dev patches as single PRs, never majors', () => {
+    const npm = CONFIG.slice(
+      0,
+      CONFIG.indexOf("package-ecosystem: 'github-actions'")
+    );
+    expect(npm).toMatch(
+      /vitest:\n\s+patterns:\n\s+- 'vitest'\n\s+- '@vitest\/\*'\n\s+update-types:\n\s+- 'minor'\n\s+- 'patch'/
+    );
+    expect(npm).toMatch(
+      /dev-patch:\n\s+dependency-type: 'development'\n\s+update-types:\n\s+- 'patch'\n/
+    );
+  });
+
+  it('keeps exact Vitest family versions aligned across workspace manifests', () => {
+    const manifests = VITEST_MANIFEST_PATHS.map(path => [
+      path,
+      JSON.parse(readFileSync(resolve(REPO_ROOT, path), 'utf8')),
+    ]);
+    const rootManifest = manifests[0][1];
+    const expectedVersion = rootManifest.devDependencies.vitest;
+
+    for (const [path, manifest] of manifests) {
+      const dependencies = {
+        ...manifest.dependencies,
+        ...manifest.devDependencies,
+      };
+      for (const [name, version] of Object.entries(dependencies)) {
+        if (name === 'vitest' || name.startsWith('@vitest/')) {
+          expect(version, `${path}: ${name}`).toBe(expectedVersion);
+        }
+      }
+    }
+
+    expect(rootManifest.pnpm.overrides['@vitest/browser']).toBe(
+      expectedVersion
+    );
   });
 });

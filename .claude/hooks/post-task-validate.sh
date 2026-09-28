@@ -1,65 +1,71 @@
 #!/usr/bin/env bash
 # Post-task validation hook (Stop event)
-# Runs automated checks (typecheck, lint, boundaries, tests) before allowing
-# Claude to complete a task. Single pass — allows completion if all checks pass.
+# Checks only what the session changed, in the session's own checkout, before
+# allowing Claude to stop. Full-suite and affected-test runs belong to CI.
 # No changes: allows completion immediately.
 
 set -uo pipefail
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-cd "$PROJECT_DIR"
+INPUT=$(cat)
 
-# Read hook input from stdin
-cat > /dev/null
+# Validate the checkout the session is working in (a worktree session's cwd),
+# not the launch directory in CLAUDE_PROJECT_DIR.
+CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
+cd "${CWD:-${CLAUDE_PROJECT_DIR:-.}}" 2>/dev/null || exit 0
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || exit 0
 
-# Check if there are any code changes to validate
-CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || true)
-STAGED_FILES=$(git diff --cached --name-only 2>/dev/null || true)
-ALL_CHANGED="${CHANGED_FILES}${STAGED_FILES}"
-
-# If no code changes, allow stop
-if [ -z "$ALL_CHANGED" ]; then
-  echo '{"continue": true}'
+# A second Stop after a block means Claude already saw the report; let it stop.
+if [ "$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ]; then
   exit 0
 fi
+
+[ -d node_modules ] || exit 0
+
+# Changed = modified/staged/untracked, excluding deletions.
+CHANGED=$( { git diff --name-only --diff-filter=d HEAD; git ls-files --others --exclude-standard; } 2>/dev/null | sort -u)
+[ -z "$CHANGED" ] && exit 0
+
+LINTABLE=$(printf '%s\n' "$CHANGED" | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|json|jsonc|css)$' || true)
+WEB_TS=$(printf '%s\n' "$CHANGED" | grep -E '^apps/web/.*\.(ts|tsx)$' || true)
+WEB_TESTS=$(printf '%s\n' "$WEB_TS" | grep -E '\.test\.(ts|tsx)$' | sed 's|^apps/web/||' || true)
 
 errors=()
 
-# 1. TypeScript type check
-if ! pnpm --filter @jovie/web run typecheck -- --pretty false >/dev/null 2>&1; then
-  errors+=("TypeScript type check failed — run: pnpm --filter @jovie/web run typecheck -- --pretty false")
+# 1. Biome on changed files only (pre-existing drift elsewhere is not this session's).
+if [ -n "$LINTABLE" ]; then
+  # shellcheck disable=SC2086
+  if ! pnpm biome check --no-errors-on-unmatched --files-ignore-unknown=true $LINTABLE >/dev/null 2>&1; then
+    errors+=("Biome lint failed — run: pnpm biome check --write <changed files>")
+  fi
 fi
 
-# 2. Biome lint
-if ! pnpm biome check apps/web --no-errors-on-unmatched >/dev/null 2>&1; then
-  errors+=("Biome lint failed — run: pnpm biome check apps/web")
+if [ -n "$WEB_TS" ]; then
+  # 2. TypeScript (incremental, single-flight)
+  if ! pnpm --filter @jovie/web run typecheck -- --pretty false >/dev/null 2>&1; then
+    errors+=("TypeScript type check failed — run: pnpm --filter @jovie/web run typecheck -- --pretty false")
+  fi
+
+  # 3. Server/client boundary check (most common bug source)
+  if ! pnpm --filter @jovie/web lint:server-boundaries >/dev/null 2>&1; then
+    errors+=("Server/client boundary violations found — run: pnpm --filter @jovie/web lint:server-boundaries")
+  fi
+
+  # 4. Changed test files only. ponytail: `vitest --changed` walks the import
+  # graph and ran >10min after editing a shared module; CI runs affected tests.
+  if [ -n "$WEB_TESTS" ]; then
+    # shellcheck disable=SC2086
+    if ! (cd apps/web && pnpm exec vitest run $WEB_TESTS) >/dev/null 2>&1; then
+      errors+=("Changed tests failed — run: cd apps/web && pnpm exec vitest run $(echo $WEB_TESTS)")
+    fi
+  fi
 fi
 
-# 3. Server/client boundary check (most common bug source)
-if ! pnpm --filter @jovie/web lint:server-boundaries >/dev/null 2>&1; then
-  errors+=("Server/client boundary violations found — run: pnpm --filter @jovie/web lint:server-boundaries")
-fi
+[ ${#errors[@]} -eq 0 ] && exit 0
 
-# 4. Run affected tests (run from apps/web since vitest is not a root script)
-if ! (cd apps/web && pnpm exec vitest run --changed) >/dev/null 2>&1; then
-  errors+=("Affected tests failed — run: cd apps/web && pnpm exec vitest run --changed")
-fi
-
-# Build the JSON response safely using python3
-if [ ${#errors[@]} -gt 0 ]; then
-  # Validation failed — block and report
-  REASON="Post-task validation failed:\n"
-  for err in "${errors[@]}"; do
-    REASON+="- ${err}\n"
-  done
-  REASON+="\nFix these issues before completing."
-  python3 -c "
-import json, sys
-print(json.dumps({'continue': False, 'stopReason': sys.argv[1]}))
-" "$REASON"
-  exit 0
-fi
-
-# All checks passed — allow completion
-echo '{"continue": true}'
+REASON="Post-task validation failed:"$'\n'
+for err in "${errors[@]}"; do
+  REASON+="- ${err}"$'\n'
+done
+REASON+=$'\n'"Fix these issues before completing."
+jq -n --arg r "$REASON" '{decision: "block", reason: $r}'
 exit 0
