@@ -29,7 +29,7 @@ describe('TimActionRequiredSection observation states', () => {
         'empty'
       );
     });
-    expect(screen.getByText('Nothing needs Tim.')).toBeInTheDocument();
+    expect(screen.getByText('Nothing needs you.')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Retry' })
     ).not.toBeInTheDocument();

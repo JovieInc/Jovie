@@ -12,14 +12,13 @@ import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { getOvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud.server';
-import { OVIE_OPS_PRODUCT_NAME } from '@/lib/ovie/ops-entrypoint';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: OVIE_OPS_PRODUCT_NAME,
-  description: 'Scan-first company operations.',
+  title: 'Now | Ovie',
+  description: 'Company pulse, what matters, and whether you need to act.',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -89,8 +88,8 @@ export default async function HudPage({
 
   return (
     <AdminPage
-      title={OVIE_OPS_PRODUCT_NAME}
-      description='Decisions, survival, bottleneck, delivery, operating chain.'
+      title='Now'
+      description='How Jovie is doing now, what matters, and whether you need to act.'
       testId='hud-admin-page'
       actions={<HudFullscreenControl />}
     >

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/DspPresenceSidebar.test.tsx
+
 import { Button, ConfirmDialog } from '@jovie/ui';
 
 import Image from 'next/image';
@@ -9,7 +11,7 @@ import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actio
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
+import { EntityHeader } from '@/components/molecules/drawer/EntityHeader';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
@@ -68,8 +70,8 @@ function SidebarEntityHeader({
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <EntityHeaderCard
-      image={
+    <EntityHeader
+      thumbnail={
         item.externalArtistImageUrl ? (
           <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
             <Image

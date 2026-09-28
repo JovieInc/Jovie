@@ -77,11 +77,12 @@ export function HudFullscreenControl({
     <Button
       type='button'
       variant='secondary'
-      size='sm'
+      size='icon'
       onClick={() => void openFullscreen()}
+      aria-label='Fullscreen'
+      title='Fullscreen'
     >
       <Maximize2 className='h-3.5 w-3.5' aria-hidden='true' />
-      Fullscreen
     </Button>
   );
 }
