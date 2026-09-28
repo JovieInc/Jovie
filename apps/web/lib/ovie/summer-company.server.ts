@@ -7,6 +7,7 @@ import {
   sql as drizzleSql,
   eq,
   inArray,
+  isNotNull,
   isNull,
   max,
 } from 'drizzle-orm';
@@ -20,6 +21,10 @@ import { billingAuditLog } from '@/lib/db/schema/billing';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { stripe } from '@/lib/stripe/client';
+import {
+  INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN,
+  isInternalOrTestAccountEmail,
+} from '@/lib/utils/email';
 import { getLybDailyMrr } from './lyb-mrr.server';
 
 /**
@@ -38,9 +43,41 @@ const unavailable = (reason: string): Unavailable => ({
   reason,
 });
 
+/**
+ * Internal/test account predicates (JOV-6673). Company reads must only count
+ * real external customers; `internalAccount` matches team inboxes (jov.ie and
+ * the admin domain), seeded QA/E2E patterns (clerk_test tags, e2e/browse/qa/
+ * smoke/staging local parts), reserved test domains, and demo placeholders
+ * (`*-public`). `externalAccount` treats a null email as external — it is a
+ * user record we cannot classify, not an internal one.
+ */
+const internalAccount = () =>
+  drizzleSql`lower(${users.email}) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}`;
+const externalAccount = () =>
+  drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`;
+
+/** Stripe customer ids belonging to internal/test users (by user email). */
+async function getInternalStripeCustomerIds(): Promise<Set<string>> {
+  const rows = await db
+    .select({ stripeCustomerId: users.stripeCustomerId })
+    .from(users)
+    .where(and(isNotNull(users.stripeCustomerId), internalAccount()));
+  return new Set(
+    rows
+      .map(row => row.stripeCustomerId)
+      .filter((id): id is string => id !== null)
+  );
+}
+
 export async function getSummerRevenue(now = new Date()) {
+  // A failed internal-id lookup must fail the read, not silently under-exclude.
+  const internalCustomerIds = await getInternalStripeCustomerIds();
   const [stripeMetrics, lyb] = await Promise.all([
-    getAdminStripeOverviewMetrics(),
+    getAdminStripeOverviewMetrics({
+      isInternalCustomer: ({ id, email }) =>
+        (id !== null && internalCustomerIds.has(id)) ||
+        isInternalOrTestAccountEmail(email),
+    }),
     getLybDailyMrr(now).catch(() => unavailable('lyb_mrr_failed')),
   ]);
   const jovie = !stripeMetrics.isConfigured
@@ -50,6 +87,8 @@ export async function getSummerRevenue(now = new Date()) {
       : {
           mrrUsd: stripeMetrics.mrrUsd,
           activeSubscriptions: stripeMetrics.activeSubscribers,
+          excludedInternal: stripeMetrics.excludedInternalSubscribers,
+          excludedInternalMrrUsd: stripeMetrics.excludedInternalMrrUsd,
           source: 'stripe' as const,
         };
   return { observedAt: now.toISOString(), jovie, lyb };
@@ -71,7 +110,12 @@ export type SummerCohortRow = {
   readonly detail?: string;
 };
 
-type Cohort = { readonly total: number; readonly rows: SummerCohortRow[] };
+type Cohort = {
+  readonly total: number;
+  /** Internal/test accounts excluded from this cohort (JOV-6673). */
+  readonly excludedInternal: number;
+  readonly rows: SummerCohortRow[];
+};
 
 /** Reachable account: not deleted and not suppressed from outbound. */
 const reachableUser = () =>
@@ -82,12 +126,13 @@ function withEmail(email: string | null): { email?: string } {
 }
 
 async function claimedArtists(limit: number): Promise<Cohort> {
-  const where = and(
+  const baseWhere = and(
     eq(userProfileClaims.role, 'owner'),
     reachableUser(),
     drizzleSql`coalesce(${creatorProfiles.marketingOptOut}, false) = false`
   );
-  const [rows, [totals]] = await Promise.all([
+  const where = and(baseWhere, externalAccount());
+  const [rows, [totals], [excluded]] = await Promise.all([
     db
       .select({
         id: creatorProfiles.id,
@@ -114,9 +159,19 @@ async function claimedArtists(limit: number): Promise<Cohort> {
       )
       .innerJoin(users, eq(users.id, userProfileClaims.userId))
       .where(where),
+    db
+      .select({ total: count() })
+      .from(userProfileClaims)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorProfiles.id, userProfileClaims.creatorProfileId)
+      )
+      .innerJoin(users, eq(users.id, userProfileClaims.userId))
+      .where(and(baseWhere, internalAccount())),
   ]);
   return {
     total: totals?.total ?? 0,
+    excludedInternal: excluded?.total ?? 0,
     rows: rows.map(row => ({
       id: row.id,
       displayName: row.displayName || row.username,
@@ -131,13 +186,14 @@ async function claimedArtists(limit: number): Promise<Cohort> {
 
 /** Users whose subscription was deleted and who have not paid again since. */
 async function churned(limit: number): Promise<Cohort> {
-  const where = and(
+  const baseWhere = and(
     eq(billingAuditLog.eventType, 'subscription_deleted'),
     reachableUser(),
     drizzleSql`coalesce(${users.isPro}, false) = false`
   );
+  const where = and(baseWhere, externalAccount());
   const cancelledAt = max(billingAuditLog.createdAt);
-  const [rows, [totals]] = await Promise.all([
+  const [rows, [totals], [excluded]] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -156,9 +212,15 @@ async function churned(limit: number): Promise<Cohort> {
       .from(billingAuditLog)
       .innerJoin(users, eq(users.id, billingAuditLog.userId))
       .where(where),
+    db
+      .select({ total: drizzleSql<number>`count(distinct ${users.id})::int` })
+      .from(billingAuditLog)
+      .innerJoin(users, eq(users.id, billingAuditLog.userId))
+      .where(and(baseWhere, internalAccount())),
   ]);
   return {
     total: totals?.total ?? 0,
+    excludedInternal: excluded?.total ?? 0,
     rows: rows.map(row => ({
       id: row.id,
       displayName: row.name || row.email || row.id,
@@ -205,7 +267,9 @@ async function checkoutAbandoned(limit: number, now: Date): Promise<Cohort> {
     startingAfter = sessions.data.at(-1)?.id;
     if (!sessions.has_more || !startingAfter) break;
   }
-  if (latestByCustomer.size === 0) return { total: 0, rows: [] };
+  if (latestByCustomer.size === 0) {
+    return { total: 0, excludedInternal: 0, rows: [] };
+  }
 
   const matched = await db
     .select({
@@ -222,7 +286,11 @@ async function checkoutAbandoned(limit: number, now: Date): Promise<Cohort> {
         drizzleSql`coalesce(${users.isPro}, false) = false`
       )
     );
-  const rows = matched
+  const external = matched.filter(
+    row => !isInternalOrTestAccountEmail(row.email)
+  );
+  const excludedInternal = matched.length - external.length;
+  const rows = external
     .map(row => ({
       row,
       expiredAt: latestByCustomer.get(row.stripeCustomerId ?? '') ?? 0,
@@ -230,6 +298,7 @@ async function checkoutAbandoned(limit: number, now: Date): Promise<Cohort> {
     .sort((left, right) => right.expiredAt - left.expiredAt);
   return {
     total: rows.length,
+    excludedInternal,
     rows: rows.slice(0, limit).map(({ row, expiredAt }) => ({
       id: row.id,
       displayName: row.name || row.email || row.id,

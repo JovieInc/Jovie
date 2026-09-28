@@ -280,6 +280,7 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
+      caption='Releases'
       className='text-app text-primary-token'
       containerClassName={
         designV1

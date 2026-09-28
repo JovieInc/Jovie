@@ -67,6 +67,7 @@ import {
   type EveIdentityId,
 } from '@/lib/ovie/identity';
 import { OvieProgramError } from '@/lib/ovie/program';
+import { logger } from '@/lib/utils/logger';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
 
@@ -667,6 +668,15 @@ export async function executeChatTurn(
     onError: async ({ error }) => {
       if (isClientDisconnect(error, signal)) return;
 
+      // Always leave the real provider error in runtime logs: callers map it to
+      // recovery copy and telemetry is optional, so it was otherwise invisible
+      // (JOV-6533: 200 + "Message paused" with no trace anywhere).
+      logger.error('[chat] model stream error', {
+        error,
+        requestId,
+        mode,
+        selectedModel,
+      });
       langfuseTrace.endError(error);
 
       if (isGatewayBudgetExceededError(error)) {

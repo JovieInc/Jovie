@@ -48,21 +48,58 @@ const lybRecord = { schema: 'jovie.lyb-daily-mrr/v1', state: 'unavailable' };
 describe('getSummerRevenue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.dbResults.length = 0;
     hoisted.lybMrr.mockResolvedValue(lybRecord);
   });
 
   it('reports Jovie Stripe MRR and passes the LYB record through', async () => {
+    hoisted.dbResults.push([]); // internal stripe customer ids
     hoisted.stripeMetrics.mockResolvedValue({
       mrrUsd: 120,
       activeSubscribers: 3,
+      excludedInternalSubscribers: 1,
+      excludedInternalMrrUsd: 199,
       isConfigured: true,
       isAvailable: true,
     });
     await expect(getSummerRevenue(NOW)).resolves.toEqual({
       observedAt: NOW.toISOString(),
-      jovie: { mrrUsd: 120, activeSubscriptions: 3, source: 'stripe' },
+      jovie: {
+        mrrUsd: 120,
+        activeSubscriptions: 3,
+        excludedInternal: 1,
+        excludedInternalMrrUsd: 199,
+        source: 'stripe',
+      },
       lyb: lybRecord,
     });
+  });
+
+  it('passes an internal-customer classifier to the Stripe metrics read', async () => {
+    hoisted.dbResults.push([
+      { stripeCustomerId: 'cus_internal' },
+      { stripeCustomerId: null },
+    ]);
+    hoisted.stripeMetrics.mockResolvedValue({
+      mrrUsd: 0,
+      activeSubscribers: 0,
+      excludedInternalSubscribers: 1,
+      excludedInternalMrrUsd: 199,
+      isConfigured: true,
+      isAvailable: true,
+    });
+    await getSummerRevenue(NOW);
+    const { isInternalCustomer } = hoisted.stripeMetrics.mock.calls[0][0];
+    expect(isInternalCustomer({ id: 'cus_internal', email: null })).toBe(true);
+    expect(isInternalCustomer({ id: 'cus_ext', email: 'tim@jov.ie' })).toBe(
+      true
+    );
+    expect(
+      isInternalCustomer({ id: 'cus_ext2', email: 'e2e-1@example.com' })
+    ).toBe(true);
+    expect(
+      isInternalCustomer({ id: 'cus_real', email: 'artist@band.com' })
+    ).toBe(false);
   });
 
   it.each([
@@ -71,6 +108,7 @@ describe('getSummerRevenue', () => {
   ])(
     'never reports a fake zero when Stripe cannot answer',
     async (metrics, reason) => {
+      hoisted.dbResults.push([]);
       hoisted.stripeMetrics.mockResolvedValue({
         mrrUsd: 0,
         activeSubscribers: 0,
@@ -82,6 +120,7 @@ describe('getSummerRevenue', () => {
   );
 
   it('marks LYB unavailable when its read throws', async () => {
+    hoisted.dbResults.push([]);
     hoisted.stripeMetrics.mockResolvedValue({
       mrrUsd: 1,
       activeSubscribers: 1,
@@ -115,10 +154,12 @@ describe('getSummerCohort', () => {
           claimedAt: new Date('2026-09-01T00:00:00.000Z'),
         },
       ],
-      [{ total: 7 }]
+      [{ total: 7 }],
+      [{ total: 50 }]
     );
     await expect(getSummerCohort('claimed_artists', 10)).resolves.toEqual({
       total: 7,
+      excludedInternal: 50,
       rows: [
         {
           id: 'p1',
@@ -141,10 +182,12 @@ describe('getSummerCohort', () => {
           cancelledAt: new Date('2026-09-10T00:00:00.000Z'),
         },
       ],
-      [{ total: 1 }]
+      [{ total: 1 }],
+      [{ total: 2 }]
     );
     await expect(getSummerCohort('churned', 10)).resolves.toEqual({
       total: 1,
+      excludedInternal: 2,
       rows: [
         {
           id: 'u1',
@@ -190,8 +233,20 @@ describe('getSummerCohort', () => {
       {
         id: 'u1',
         name: null,
-        email: 'a@example.com',
+        email: 'a@band.com',
         stripeCustomerId: 'cus_1',
+      },
+      {
+        id: 'u2',
+        name: null,
+        email: 'e2e-checkout@jov.ie',
+        stripeCustomerId: 'cus_2',
+      },
+      {
+        id: 'u3',
+        name: null,
+        email: 'qa-fan@gmail.com',
+        stripeCustomerId: 'cus_2',
       },
     ]);
     const cohort = await getSummerCohort('checkout_abandoned', 10, NOW);
@@ -200,11 +255,12 @@ describe('getSummerCohort', () => {
     );
     expect(cohort).toEqual({
       total: 1,
+      excludedInternal: 2,
       rows: [
         {
           id: 'u1',
-          displayName: 'a@example.com',
-          email: 'a@example.com',
+          displayName: 'a@band.com',
+          email: 'a@band.com',
           detail: `checkout expired ${new Date(created * 1000).toISOString()}`,
         },
       ],
@@ -215,6 +271,6 @@ describe('getSummerCohort', () => {
     hoisted.sessionsList.mockResolvedValue({ has_more: false, data: [] });
     await expect(
       getSummerCohort('checkout_abandoned', 10, NOW)
-    ).resolves.toEqual({ total: 0, rows: [] });
+    ).resolves.toEqual({ total: 0, excludedInternal: 0, rows: [] });
   });
 });

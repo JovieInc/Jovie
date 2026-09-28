@@ -14,6 +14,7 @@ fi
 
 # Configuration
 MIGRATIONS_DIR="drizzle/migrations"
+ONLINE_INDEXES_DIR="drizzle/online-indexes"
 BASE_BRANCH=${1:-"origin/main"}
 BULK_LABEL_MARKER="schema:bulk"
 
@@ -66,9 +67,9 @@ if git rev-parse -q --verify MERGE_HEAD > /dev/null 2>&1; then
     # BASE...HEAD replays this branch's own history (including renumbered
     # migrations). Diff the base against the staged merge result instead.
     STAGED_TREE=$(git write-tree)
-    CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH" "$STAGED_TREE" -- "$MIGRATIONS_DIR" 2>/dev/null || echo "")
+    CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH" "$STAGED_TREE" -- "$MIGRATIONS_DIR" "$ONLINE_INDEXES_DIR" 2>/dev/null || echo "")
 else
-    CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH"...HEAD -- "$MIGRATIONS_DIR" 2>/dev/null || echo "")
+    CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH"...HEAD -- "$MIGRATIONS_DIR" "$ONLINE_INDEXES_DIR" 2>/dev/null || echo "")
 fi
 
 if [ -z "$CHANGED_FILES" ]; then
@@ -91,12 +92,12 @@ ADDED_FILES=()
 # Process each changed file
 while IFS=$'\t' read -r status file; do
     # Skip if not a migration file
-    if [[ ! "$file" =~ ^drizzle/migrations/.*\.(sql|ts)$ ]]; then
+    if [[ ! "$file" =~ ^drizzle/migrations/.*\.(sql|ts)$ ]] && [[ ! "$file" =~ ^drizzle/online-indexes/.*\.json$ ]]; then
         continue
     fi
     
     # Skip meta files
-    if [[ "$file" =~ meta/ ]]; then
+    if [[ "$file" =~ ^drizzle/migrations/meta/ ]]; then
         continue
     fi
     
@@ -271,7 +272,7 @@ if [ $ADDED_COUNT -gt 0 ]; then
         filename=$(basename "$file")
         
         # Validate filename format - support both Drizzle Kit format and timestamp format
-        if [[ ! "$filename" =~ ^[0-9]{4}_.+\.(sql|ts)$ ]] && [[ ! "$filename" =~ ^[0-9]{12}_.+\.(sql|ts)$ ]]; then
+        if [[ ! "$filename" =~ ^[0-9]{4}_.+\.(sql|ts)$ ]] && [[ ! "$filename" =~ ^[0-9]{12}_.+\.(sql|ts|json)$ ]]; then
             log_error "Invalid migration filename format: $filename"
             echo "   Expected formats:"
             echo "   - Drizzle Kit: 0000_description.sql"

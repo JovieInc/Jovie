@@ -32,13 +32,24 @@ type BuildCspOptions = {
  */
 const INLINE_SCRIPT_HASHES = {
   /**
-   * next-themes inline script hash (v0.4.6)
-   * This script prevents flash of unstyled content (FOUC) by applying
-   * the theme class before React hydration.
-   * Hash may need updating when next-themes version or ThemeProvider config changes.
-   * Config: attribute='class', storageKey='jovie-theme', enableSystem=true
+   * next-themes inline script hashes (v0.4.6), one per ThemeProvider config
+   * CoreProviders can emit. The script prevents FOUC by applying the theme
+   * class before hydration; its arguments are baked into the script body, so
+   * every config needs its own hash. Hashes come from the production-minified
+   * bytes (view source on a nonce-bearing route such as /waitlist), not the
+   * unminified package script.
+   * Shared: attribute='class', storageKey='jovie-theme'.
    */
-  nextThemes: "'sha256-72V5U2XTMga8oD2MGpcgPdSLXnks+/+SSDhnTJpROjA='",
+  nextThemes: [
+    // Theme enabled, defaultTheme='dark', enableSystem=true
+    "'sha256-72V5U2XTMga8oD2MGpcgPdSLXnks+/+SSDhnTJpROjA='",
+    // Theme enabled, defaultTheme='light', enableSystem=true
+    "'sha256-zm0H100NPdOWVvvnI87sdTS9zsaC0K6AbychQyhdtE0='",
+    // Theme enabled, defaultTheme='system', enableSystem=true
+    "'sha256-U8qHNAYVONMkNDz+dKowqI4OkI0neY4A/sKEI0weOO8='",
+    // Theme disabled: forcedTheme='dark', defaultTheme='dark', enableSystem=false
+    "'sha256-m28SzJyXJXbtlY+lqTklVWkSDAiE0+QMTXjTAQPO5zU='",
+  ],
 
   /**
    * @vercel/analytics inline script hash (locked at v1.6.1)
@@ -65,7 +76,10 @@ const STATIC_CSP_PARTS = {
   // for the woff2 files) were added for the retired static HTML pitch deck
   // (Manrope + JetBrains Mono — not in the self-hosted font set). The marketing app otherwise uses
   // next/font and self-hosted Geist/DM Sans/Satoshi.
-  styleSrc: "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  // Google Identity Services loads its One Tap/button stylesheet from
+  // accounts.google.com/gsi/style on /signin and /signup (JOV-4369).
+  styleSrc:
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
   fontSrc:
     "font-src 'self' data: https://fonts.gstatic.com https://vercel.live https://assets.vercel.com",
   // Pre-computed media-src from canonical media domain registry
@@ -79,7 +93,7 @@ const STATIC_CSP_PARTS = {
   scriptSrcPrefix: "script-src 'self'",
   // Pre-computed script-src suffix (after nonce, excludes dev-only 'unsafe-eval')
   scriptSrcSuffix: [
-    INLINE_SCRIPT_HASHES.nextThemes,
+    ...INLINE_SCRIPT_HASHES.nextThemes,
     INLINE_SCRIPT_HASHES.vercelAnalytics,
     'https://va.vercel-scripts.com',
     'https://vitals.vercel-insights.com',
@@ -137,6 +151,12 @@ const STATIC_CSP_PARTS = {
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)
   frameSrcBase: [
     "frame-src 'self'",
+    // Native auth bounce pages launch these registered app protocols in a
+    // hidden iframe so the visible fallback page remains available.
+    'jovie:',
+    'jovie-staging:',
+    'jovie-local:',
+    'ie.jov.jovie:',
     'https://js.stripe.com',
     'https://checkout.stripe.com',
     'https://challenges.cloudflare.com',

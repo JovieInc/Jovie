@@ -10,7 +10,7 @@ import {
   AboutPageContent,
 } from '@/components/organisms/AboutPageContent';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { buildOrganizationSchema } from '@/lib/constants/schemas';
 import {
   ARTIST_LABELED_IDENTITY_SURFACES,
@@ -83,12 +83,12 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
   });
 
   it('keeps canonical identity aligned with the approved homepage SEO copy', () => {
-    expect(COMPANY_IDENTITY.seoTitle).toBe(HOMEPAGE_LAUNCH_COPY.seo.title);
+    expect(COMPANY_IDENTITY.seoTitle).toBe(HOMEPAGE_IDENTITY_COPY.seo.title);
     expect(COMPANY_IDENTITY.seoDescription).toBe(
-      HOMEPAGE_LAUNCH_COPY.seo.description
+      HOMEPAGE_IDENTITY_COPY.seo.description
     );
     expect(COMPANY_IDENTITY.homepageHeadline).toBe(
-      HOMEPAGE_LAUNCH_COPY.hero.headline
+      HOMEPAGE_IDENTITY_COPY.hero.headline
     );
   });
 

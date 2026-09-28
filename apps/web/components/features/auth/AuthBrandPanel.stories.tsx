@@ -14,15 +14,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    headline: 'Control how the world sees you.',
-    description: 'Find what the internet knows. Turn it into relationships.',
+    headline: 'A living identity for the internet.',
+    description:
+      'Your work, your links, your next chapter. Together in your Jovie profile.',
   },
 };
 
 export const TextHidden: Story = {
   args: {
-    headline: 'Control how the world sees you.',
-    description: 'Find what the internet knows. Turn it into relationships.',
+    headline: 'A living identity for the internet.',
+    description:
+      'Your work, your links, your next chapter. Together in your Jovie profile.',
     showText: false,
   },
 };
