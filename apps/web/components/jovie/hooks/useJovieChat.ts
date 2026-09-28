@@ -32,6 +32,7 @@ import {
 } from '@/lib/ovie/summer-failure';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
+import { FetchError } from '@/lib/queries/fetch';
 import { captureException } from '@/lib/sentry/client-lite';
 import { logger } from '@/lib/utils/logger';
 
@@ -138,6 +139,12 @@ function uxLatencyNowMs(): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isRecoverableSummerHistoryFailure(error: unknown): boolean {
+  return (
+    error instanceof FetchError && (error.status === 404 || error.isRetryable())
+  );
 }
 
 function extractChatTurnMetadata(value: unknown): ChatTurnMetadata | null {
@@ -458,6 +465,10 @@ export function useJovieChat({
     chatMode,
     refetchInterval: titlePollIntervalMs,
   });
+  const blocksOvieConversation =
+    chatMode === 'ov' &&
+    isConversationQueryError &&
+    !isRecoverableSummerHistoryFailure(existingConversationError);
   // Recorded Summer failures that an answered turn has since superseded. They
   // collapse behind one control so the thread isn't a wall of failures; the
   // latest failure stays visible because Retry applies to it.
@@ -477,11 +488,7 @@ export function useJovieChat({
     );
   }, [chatMode, existingConversation]);
   const messages = useMemo(() => {
-    if (
-      timelineMode !== chatMode ||
-      (chatMode === 'ov' && isConversationQueryError)
-    )
-      return [];
+    if (timelineMode !== chatMode || blocksOvieConversation) return [];
     const rows = selectRenderableMessages(timelineState);
     if (chatMode !== 'ov') return rows;
     // Canonical turn order wins over tied timestamps; never invent event times.
@@ -503,7 +510,7 @@ export function useJovieChat({
   }, [
     timelineMode,
     chatMode,
-    isConversationQueryError,
+    blocksOvieConversation,
     timelineState,
     existingConversation,
     showSupersededSummerFailures,
@@ -1182,7 +1189,7 @@ export function useJovieChat({
     ): Promise<boolean> => {
       if (
         chatMode === 'ov' &&
-        (isLoadingConversation || isConversationQueryError)
+        (isLoadingConversation || blocksOvieConversation)
       )
         return false;
       const hasFiles = files && files.length > 0;
@@ -1294,7 +1301,7 @@ export function useJovieChat({
       tryHandleCommand,
       chatMode,
       isLoadingConversation,
-      isConversationQueryError,
+      blocksOvieConversation,
     ]
   );
 
@@ -1455,16 +1462,15 @@ export function useJovieChat({
     setInput,
     chipTray,
     messages,
-    chatError:
-      chatMode === 'ov' && isConversationQueryError
-        ? {
-            type: 'unknown' as const,
-            message:
-              existingConversationError instanceof Error
-                ? existingConversationError.message
-                : 'Summer history couldn’t load. Reload to try again.',
-          }
-        : chatError,
+    chatError: blocksOvieConversation
+      ? {
+          type: 'unknown' as const,
+          message:
+            existingConversationError instanceof Error
+              ? existingConversationError.message
+              : 'Summer history couldn’t load. Reload to try again.',
+        }
+      : chatError,
     isLoading,
     isSubmitting,
     hasMessages,

@@ -27,7 +27,15 @@ function stage(
   conversionRate: number | null,
   dropOff: number | null
 ) {
-  return { key, label, description: label, count, conversionRate, dropOff };
+  return {
+    key,
+    label,
+    description: label,
+    count,
+    conversionRate,
+    dropOff,
+    drillDownHref: `/app/ov/people?stage=${key}`,
+  };
 }
 
 function makeFunnel(
@@ -75,6 +83,11 @@ describe('FounderFunnelBand', () => {
       screen.getByTestId('founder-funnel-stage-onboarding_chats')
     ).toBeInTheDocument();
     expect(screen.getByText('Biggest drop-off · −60')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', {
+        name: '40 Accounts created; inspect underlying entities',
+      })
+    ).toHaveAttribute('href', '/app/ov/people?stage=accounts_created');
     expect(screen.queryByTestId('founder-hud-mrr')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('founder-hud-shipping-velocity')

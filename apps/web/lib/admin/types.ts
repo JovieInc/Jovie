@@ -8,6 +8,13 @@
  * runtime values — those belong in their respective server modules.
  */
 
+// assets
+export type {
+  AdminAssetRow,
+  AdminAssetSort,
+  AdminAssetType,
+} from './assets';
+
 // bragging-rights
 export type { AdminBraggingRights } from './bragging-rights';
 

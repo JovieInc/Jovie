@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { forbidden, unauthorized } from 'next/navigation';
-import { OpsCockpitClient } from '@/app/app/(shell)/admin/ops/OpsCockpitClient';
+import { HudDashboardClient } from '@/app/app/(shell)/admin/ops/HudDashboardClient';
 import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
@@ -9,16 +9,16 @@ import { OperationalControlPanel } from '@/components/features/admin/Operational
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { authorizeHud } from '@/lib/auth/hud';
+import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { getOvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud.server';
-import { OVIE_OPS_PRODUCT_NAME } from '@/lib/ovie/ops-entrypoint';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: OVIE_OPS_PRODUCT_NAME,
-  description: 'Scan-first company operations.',
+  title: 'Now | Ovie',
+  description: 'Company pulse, what matters, and whether you need to act.',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -63,11 +63,12 @@ export default async function HudPage({
       : getFounderFunnelData('30d').catch(() => null),
   ]);
   const dashboard = (
-    <OpsCockpitClient
+    <HudDashboardClient
       initialMetrics={metrics}
       density={tokenOk || fullscreen ? 'kiosk' : 'shell'}
       presentationMode={tokenOk ? 'token' : 'shell'}
       kioskToken={tokenOk ? kioskToken : null}
+      useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
       initialFunnel={funnel}
     />
   );
@@ -87,8 +88,8 @@ export default async function HudPage({
 
   return (
     <AdminPage
-      title={OVIE_OPS_PRODUCT_NAME}
-      description='Company operating state at a glance.'
+      title='Now'
+      description='How Jovie is doing now, what matters, and whether you need to act.'
       testId='hud-admin-page'
       actions={<HudFullscreenControl />}
     >

@@ -68,6 +68,11 @@ describe('CLI landing page', () => {
       expect(screen.getByText(item.request)).toBeVisible();
     }
 
+    expect(
+      CLI_DOCUMENTED_COMMANDS.find(item => item.command === 'jovie skill')
+        ?.request
+    ).toBe('Prints the Jovie SKILL.md for agents');
+
     expect(screen.queryByText(/login/i, { selector: 'h2' })).toBeNull();
     expect(screen.queryByText(/oauth/i, { selector: 'h2' })).toBeNull();
     expect(screen.queryByText('npm publish')).toBeNull();

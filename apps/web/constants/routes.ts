@@ -85,7 +85,12 @@ export const APP_ROUTES = {
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
+  /** Founder home: business and production reality in one scan. */
+  ADMIN_NOW: '/hud',
   ADMIN_OPS: '/hud',
+  ADMIN_PRODUCT: '/app/ov/product',
+  ADMIN_OPERATIONS: '/app/ov/operations',
+  ADMIN_NEEDS_YOU: '/app/ov/needs-you',
   ADMIN_SHIPPING: '/app/ov/shipping',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',
