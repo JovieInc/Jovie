@@ -2389,7 +2389,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'apps/desktop/src/renderer/App.tsx',
       'apps/ios/Jovie/Features/New/NewScreen.swift',
       'apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift',
-      'apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift',
+      'apps/ios/Jovie/Features/Camera/CameraOverlayView.swift',
     ];
     for (const path of paths) {
       assert.equal(kindOf(path), 'unregistered', path);

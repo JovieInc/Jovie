@@ -95,6 +95,11 @@ export function JovieChat({
   featureIntroCatalog,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
+  // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
+  // Compiler caches reads keyed on that object; compiled, ChatThreadMessages froze
+  // on its first window and rendered blank once scrolled (JOV-6702). Keep this
+  // owner uncompiled too so getTotalSize() and the row element stay live.
+  'use no memo';
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

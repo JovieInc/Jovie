@@ -182,6 +182,9 @@ export const APP_ROUTES = {
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
+  VOICE: '/voice',
+  /** Internal render-fixture index; the page itself 404s unless fixtures are enabled. */
+  RENDERS: '/renders',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',

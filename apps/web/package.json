@@ -285,7 +285,7 @@
     "jose": "^6.2.12",
     "jszip": "^3.10.2",
     "langfuse": "^3.39.2",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.48.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^13.4.4",
     "next": "16.3.6",
