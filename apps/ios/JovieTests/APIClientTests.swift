@@ -321,6 +321,51 @@ struct APIClientTests {
     _ = try await client.fetchActionLoopInbox(workspace: .ovie)
   }
 
+  @Test func postsSummerCardDecisionAndMapsRepeatToAlreadyDecided() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/ovie/summer-cards/sc_0123456789abcdef0123456789abcdef/decision")
+      #expect(request.httpMethod == "POST")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      let decoded = try JSONDecoder().decode(
+        [String: String].self,
+        from: requestBodyData(request)
+      )
+      #expect(decoded["decision"] == "reject")
+      #expect(decoded["comment"] == "Too expensive.")
+      return (
+        HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+        Data("{}".utf8)
+      )
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    let decided = try await client.decideSummerCard(
+      cardID: "sc_0123456789abcdef0123456789abcdef",
+      decision: .reject,
+      comment: "Too expensive."
+    )
+    #expect(decided == .decided)
+
+    MockURLProtocol.requestHandler = { request in
+      (
+        HTTPURLResponse(url: request.url!, statusCode: 409, httpVersion: nil, headerFields: nil)!,
+        Data("{}".utf8)
+      )
+    }
+    let repeatResult = try await client.decideSummerCard(
+      cardID: "sc_0123456789abcdef0123456789abcdef",
+      decision: .approve,
+      comment: nil
+    )
+    #expect(repeatResult == .alreadyDecided)
+  }
+
   @Test func fetchesActionLoopCalendarWithBearerToken() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in
