@@ -163,6 +163,8 @@ export type OvieSummerTurn = {
     readonly ok: boolean;
     readonly receiptId: string;
     readonly summary: string;
+    /** Optional structured card payload (e.g. summer.ops-card.v1). */
+    readonly data?: unknown;
   };
   readonly createdAt: string;
   readonly updatedAt: string;
