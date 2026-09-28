@@ -205,7 +205,7 @@ export function confirmedBlockers(
 
 export async function main(
   argv: readonly string[] = process.argv.slice(2),
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<NodeJS.ProcessEnv> = process.env,
   fetchImpl?: typeof fetch
 ) {
   const { values } = parseArgs({

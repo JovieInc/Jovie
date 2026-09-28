@@ -103,11 +103,11 @@ describe('golden path visual review', () => {
       verdict: 'unknown',
       reason: 'invalid JSON',
     });
-    expect(
-      parseModelVerdict(
-        '{"verdict":"pass","findings":["ok",{"n":1},"' + 'x'.repeat(400) + '"]}'
-      ).findings
-    ).toEqual(['ok', 'x'.repeat(300)]);
+    const parsed = parseModelVerdict(
+      '{"verdict":"pass","findings":["ok",{"n":1},"' + 'x'.repeat(400) + '"]}'
+    );
+    if (parsed.verdict !== 'pass') throw new Error('expected pass verdict');
+    expect(parsed.findings).toEqual(['ok', 'x'.repeat(300)]);
   });
 
   it('reviewer A reports unknown on outage, missing key or HTTP error', async () => {
