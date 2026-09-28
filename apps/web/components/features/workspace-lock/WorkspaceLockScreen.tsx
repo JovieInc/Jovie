@@ -38,7 +38,7 @@ export function WorkspaceLockScreen() {
     <div
       role='status'
       data-workspace-lock='true'
-      className='flex h-full min-h-[50vh] w-full flex-col items-center justify-center gap-4 px-6'
+      className='flex h-full min-h-1/2 w-full flex-col items-center justify-center gap-4 px-6'
     >
       <button
         type='button'
