@@ -87,7 +87,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
     XCTAssertTrue(app.buttons["shell-actions-menu"].exists)
     app.buttons["shell-actions-menu"].tap()
@@ -100,6 +100,10 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
     XCTAssertTrue(app.buttons["Open Public Profile"].exists)
     XCTAssertTrue(app.buttons["Open Public Profile"].isEnabled)
+    XCTAssertEqual(
+      app.staticTexts["apple-wallet-profile-pass-status"].label,
+      "Apple Wallet isn't available for this profile yet."
+    )
     attachScreenshot(named: "profile", app: app)
   }
 
@@ -157,7 +161,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["QR unavailable"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
     let copyButton = app.buttons["dashboard-copy-url-button"]
     let shareButton = app.buttons["dashboard-share-profile-button"]
     XCTAssertTrue(copyButton.exists)
