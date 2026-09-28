@@ -51,7 +51,7 @@ describe('CertificationDetailRail', () => {
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
       'Flow signup'
     );
-    expect(screen.getByTestId('entity-header-details')).toHaveTextContent(
+    expect(screen.getByTestId('entity-header-details-row')).toHaveTextContent(
       'Flows · Golden Path'
     );
     const evidence = screen.getByTestId('certification-evidence');

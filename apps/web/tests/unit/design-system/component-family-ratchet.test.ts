@@ -40,6 +40,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(__dirname, '..', '..', '..');
 const SCAN_DIR = join(WEB_ROOT, 'components');
 const BASELINE_PATH = join(__dirname, 'component-family.baseline.json');
+const LEGACY_ENTITY_HEADER_PATH = join(
+  SCAN_DIR,
+  'molecules',
+  'drawer',
+  'EntityHeaderCard.tsx'
+);
 
 const FAMILIES = {
   button: /Button\.tsx$/,
@@ -94,6 +100,15 @@ function countFamilies(): Record<Family, number> {
 }
 
 describe('design-system component-family ratchet', () => {
+  it('keeps the retained EntityHeaderCard API as a canonical adapter', () => {
+    const source = readFileSync(LEGACY_ENTITY_HEADER_PATH, 'utf8');
+
+    expect(source).toMatch(/from '\.\/EntityHeader'/);
+    expect(source).toContain('<EntityHeader');
+    expect(source).not.toContain('StableHeaderTextSlot');
+    expect(source).not.toContain('data-entity-header-identity');
+  });
+
   it('duplicate component families do not grow above the baseline', () => {
     const current = countFamilies();
 
