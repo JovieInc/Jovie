@@ -118,6 +118,11 @@ not expand `design-conformance:gate`, unit tests, or e2e.
 
 Exception (JOV-5447): `design-exception-registry` compares inventoried
 design-debt registries to the trusted ci-fast base and fails closed on growth.
+A `count-map` spec with `exceptionPointer` (today: `component-family-counts`)
+may seed a NEW measurement key only with a sibling `exceptions[]` entry keyed
+by that name carrying owner, reason, Linear issue, removal condition or
+expiry, and evidence — the same metadata bar as `design-authority-exceptions`;
+existing-key ceilings stay shrink-only.
 
 Exception (JOV-6280): the remaining-group `shadcn-lint-contracts` lane runs the
 shipped ESLint config against `@jovie/ui` Button/Card/Input fixtures plus an
