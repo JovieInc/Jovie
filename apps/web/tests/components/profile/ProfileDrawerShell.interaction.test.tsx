@@ -1,10 +1,16 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
+import { ProfileUnifiedDrawer } from '@/components/features/profile/ProfileUnifiedDrawer';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
-import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { MenuView } from '@/features/profile/views/MenuView';
 import type { ShareContext } from '@/lib/share/types';
 import { mockArtist } from '@/lib/test-utils/mock-data';
@@ -330,6 +336,38 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
 
 describe('ProfileUnifiedDrawer public menu interactions', () => {
   afterEach(resetScrollLock);
+
+  it('uses the shared Pay dial for the selected artist profile', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ available: false }),
+    });
+    globalThis.fetch = fetchMock;
+    render(
+      <ProfileUnifiedDrawer
+        {...drawerProps}
+        open
+        view='pay'
+        hasTip
+        socialLinks={[
+          {
+            platform: 'venmo',
+            url: 'https://venmo.com/u/test-artist',
+          } as never,
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByRole('group', { name: 'Choose a payment method' })
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/tips/create-checkout?profileId=artist-1',
+        expect.objectContaining({ cache: 'no-store' })
+      )
+    );
+  });
 
   it.each(['standalone', 'embedded', 'modal'] as const)(
     'keeps Share → Pay → Contact order and gating in %s mode',
