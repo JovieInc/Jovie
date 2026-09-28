@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
 
@@ -8,28 +9,20 @@ export type HomepageCertifiedSectionId =
   (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number]['id'];
 
 /**
- * Kept as a source-compatible input while the homepage transitions away from
- * product screenshots in the locked editorial pass. The approved composition
- * uses the conceptual identity artwork instead of a profile export.
+ * Real public-profile exports for the approved customer-zero example
+ * (jov.ie/tim): the two next steps a visitor can take, updates and payment
+ * (JOV-6946 real first-party proof).
  */
 export interface HomepageCertifiedPreviews {
-  readonly connected?: MarketingExportImage;
-  readonly relationships?: readonly MarketingExportImage[];
+  readonly subscribe: MarketingExportImage;
+  readonly pay: MarketingExportImage;
 }
 
 export interface HomepageCertifiedSectionsProps {
-  readonly previews?: HomepageCertifiedPreviews;
+  readonly previews: HomepageCertifiedPreviews;
 }
 
-const IDENTITY_ARTWORK = {
-  src: '/assets/generated/homepage-identity-optical-v1.webp',
-  width: 1902,
-  height: 827,
-  alt: 'A conceptual photographic assembly of a profile identity',
-} as const;
-
 type HomepageSection = (typeof HOMEPAGE_LAUNCH_COPY.certified.sections)[number];
-type RelationshipSection = Extract<HomepageSection, { id: 'relationships' }>;
 
 function EditorialSection({
   children,
@@ -61,81 +54,49 @@ function EditorialSection({
   );
 }
 
-function RelationshipOutcomes({
-  outcomes,
-}: Readonly<{ outcomes: RelationshipSection['outcomes'] }>) {
+function ProfileSurface({
+  image,
+  caption,
+}: Readonly<{ image: MarketingExportImage; caption: string }>) {
   return (
-    <ol className='homepage-relationship-outcomes' aria-label='Relationships'>
-      {outcomes.map((outcome, index) => (
-        <li
-          key={outcome.id}
-          className='homepage-relationship-outcome'
-          data-homepage-testid={`homepage-outcome-${outcome.id}`}
-        >
-          <span
-            className='homepage-relationship-outcome__index'
-            aria-hidden='true'
-          >
-            {String(index + 1).padStart(2, '0')}
-          </span>
-          <div className='homepage-relationship-outcome__copy'>
-            <h3>{outcome.headline}</h3>
-            <p>{outcome.body}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
+    <figure className='homepage-next-step'>
+      <ArtistProfilePhoneFrame
+        className='homepage-certified-section__device'
+        size='md'
+      >
+        <Image
+          alt={image.alt}
+          className='homepage-certified-section__screen'
+          height={image.height}
+          loading='lazy'
+          quality={85}
+          sizes='(min-width: 900px) 18rem, 70vw'
+          src={image.publicUrl}
+          width={image.width}
+        />
+      </ArtistProfilePhoneFrame>
+      <figcaption className='homepage-next-step__caption'>{caption}</figcaption>
+    </figure>
   );
 }
 
-function ConnectedSection({
-  section,
-}: Readonly<{
-  section: Extract<HomepageSection, { id: 'connected' }>;
-}>) {
+/**
+ * Pen My0zu (JOV-6946): one section, one job. The hero already shows the
+ * profile; this section proves the next steps a visitor takes from it, with
+ * real captures of jov.ie/tim. The retired connected chapter, numbered
+ * outcomes, visibility block, and lenses slider replayed the hero argument.
+ */
+export function HomepageCertifiedSections({
+  previews,
+}: HomepageCertifiedSectionsProps) {
+  const section = HOMEPAGE_LAUNCH_COPY.certified.sections[0];
+
   return (
     <EditorialSection dataMedia='true' rhythm='product' section={section}>
       <div className='homepage-certified-section__inner'>
-        <div className='homepage-connected-header'>
-          <div className='homepage-certified-section__copy'>
-            <p className='homepage-certified-section__eyebrow'>
-              {section.eyebrow}
-            </p>
-            <h2
-              id='homepage-section-connected-heading'
-              className='homepage-certified-section__headline'
-              data-homepage-section-heading
-            >
-              {section.headline}
-            </h2>
-          </div>
-          <p className='homepage-certified-section__body'>{section.body}</p>
-        </div>
-        <div className='homepage-connected-artwork'>
-          <Image
-            alt={IDENTITY_ARTWORK.alt}
-            className='homepage-connected-artwork__image'
-            height={IDENTITY_ARTWORK.height}
-            loading='lazy'
-            sizes='(min-width: 1024px) calc(100vw - 12rem), calc(100vw - 3rem)'
-            src={IDENTITY_ARTWORK.src}
-            width={IDENTITY_ARTWORK.width}
-          />
-        </div>
-      </div>
-    </EditorialSection>
-  );
-}
-
-function RelationshipsSection({
-  section,
-}: Readonly<{ section: RelationshipSection }>) {
-  return (
-    <EditorialSection dataMedia='false' rhythm='text' section={section}>
-      <div className='homepage-certified-section__inner'>
         <div className='homepage-certified-section__copy'>
           <h2
-            id='homepage-section-relationships-heading'
+            id={`homepage-section-${section.id}-heading`}
             className='homepage-certified-section__headline'
             data-homepage-section-heading
           >
@@ -143,33 +104,16 @@ function RelationshipsSection({
           </h2>
           <p className='homepage-certified-section__body'>{section.body}</p>
         </div>
-        <div className='homepage-certified-section__media'>
-          <RelationshipOutcomes outcomes={section.outcomes} />
+        <div className='homepage-next-steps' data-homepage-visual={section.id}>
+          {section.steps.map(step => (
+            <ProfileSurface
+              caption={step.caption}
+              image={previews[step.id]}
+              key={step.id}
+            />
+          ))}
         </div>
       </div>
     </EditorialSection>
-  );
-}
-
-/**
- * Founder-locked editorial body. The unsupported logo proof strip is omitted
- * until an attributable adoption or permission receipt exists. The shared
- * full footer remains mounted by PublicPageShell.
- */
-export function HomepageCertifiedSections({
-  previews,
-}: HomepageCertifiedSectionsProps) {
-  void previews;
-  const { sections } = HOMEPAGE_LAUNCH_COPY.certified;
-
-  return (
-    <>
-      {sections.map((section): ReactNode => {
-        if (section.id === 'connected') {
-          return <ConnectedSection key={section.id} section={section} />;
-        }
-        return <RelationshipsSection key={section.id} section={section} />;
-      })}
-    </>
   );
 }

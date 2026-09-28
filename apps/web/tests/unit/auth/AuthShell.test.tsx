@@ -58,6 +58,9 @@ vi.mock('@/lib/analytics', () => ({
   track: trackMock,
 }));
 
+const trackFunnelStep = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/signup-funnel-client', () => ({ trackFunnelStep }));
+
 vi.mock('@/lib/auth/oauth-providers', async () => {
   const actual = await vi.importActual<
     typeof import('@/lib/auth/oauth-providers')
@@ -214,7 +217,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
   it('keeps OAuth buttons disabled until client hydration attaches handlers', async () => {
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
     expect(serverMarkup).toContain('data-auth-shell-hydrated="false"');
-    expect(serverMarkup).toContain('grid grid-cols-1 gap-3');
     // SSR emits `disabled=""` before the provider slot attribute.
     expect(serverMarkup).toMatch(
       /disabled=""[^>]*data-auth-provider-slot="google"/
@@ -350,6 +352,40 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
         })
       );
     });
+  });
+
+  it('records signup auth_start and its failure, never for sign-in', async () => {
+    const user = userEvent.setup();
+    signInSocialMock.mockResolvedValueOnce({
+      error: { message: 'provider unavailable' },
+    });
+    const { unmount } = render(<AuthShell mode='sign-up' />);
+    const apple = await screen.findByRole('button', { name: /apple/i });
+    await waitFor(() => expect(apple).toBeEnabled());
+    await user.click(apple);
+
+    await waitFor(() => expect(trackFunnelStep).toHaveBeenCalledTimes(2));
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(1, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      surface: 'signup',
+    });
+    expect(trackFunnelStep).toHaveBeenNthCalledWith(2, {
+      funnel: 'artist_signup',
+      step: 'auth_start',
+      outcome: 'error',
+      surface: 'signup',
+      reason: 'oauth_start_failed',
+    });
+    unmount();
+    trackFunnelStep.mockClear();
+
+    render(<AuthShell mode='sign-in' />);
+    const google = await screen.findByRole('button', { name: /google/i });
+    await waitFor(() => expect(google).toBeEnabled());
+    await user.click(google);
+    await waitFor(() => expect(signInSocialMock).toHaveBeenCalled());
+    expect(trackFunnelStep).not.toHaveBeenCalled();
   });
 
   it('surfaces Better Auth social soft-errors instead of leaving the button pending', async () => {

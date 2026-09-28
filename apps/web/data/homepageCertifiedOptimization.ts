@@ -1,3 +1,5 @@
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+
 /**
  * JOV-INV-012 optimization contract for the certified root homepage.
  *
@@ -13,6 +15,8 @@ export const HOMEPAGE_CERTIFIED_EVENTS = {
   EXPOSURE: 'homepage_certified_exposed',
   SEARCH_EXPOSED: 'homepage_certified_search_exposed',
   SEARCH_SUBMITTED: 'homepage_certified_search_submitted',
+  ACCESS_EXPOSED: 'homepage_certified_access_exposed',
+  ACCESS_REQUESTED: 'homepage_certified_access_requested',
 } as const;
 
 export const HOMEPAGE_CERTIFIED_PLACEMENTS = ['hero', 'close'] as const;
@@ -24,6 +28,7 @@ export const HOMEPAGE_CERTIFIED_CONTEXT = {
   variantIdentity: HOMEPAGE_CERTIFIED_VARIANT_ID,
   platform: 'web',
   contentVariant: 'certified-section-1',
+  actionState: FEATURE_FLAGS.WAITLIST_ENABLED ? 'waitlist-on' : 'waitlist-off',
 } as const;
 
 export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
@@ -52,13 +57,13 @@ export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
     'content-variant',
   ],
   hypothesis:
-    'A person-first, name-search hero converts more inbound visitors into /start than the artist-pitch Get started poster.',
+    'The certified homepage converts through one name-search hero (Search your name → Find me) into /start. Waitlist writes happen only after verified auth.',
   primaryMetric:
     'homepage_certified_search_submitted / homepage_certified_exposed',
   guardrails: [
     'No implied customers or borrowed logos on `/`.',
-    'No competing hero CTA besides Search your name → Find me.',
-    'Person-first copy only; do not restore Drop more music or waitlist-first email on `/`.',
+    'No competing hero CTA: Search your name → Find me hands off to /start. Never replace it with Get started, Request access, or a waitlist-first link.',
+    'Broad company-level copy; do not narrow the homepage to one ICP.',
     'Do not persist search query text in analytics properties.',
   ],
   privacyAndConsent:

@@ -9,6 +9,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -24,8 +25,123 @@ import {
   transitionDeliveryReceipt,
 } from '../delivery-state-machine.mjs';
 
+const require = createRequire(import.meta.url);
 const HEAD = 'a'.repeat(40);
 const REPO = 'JovieInc/Jovie';
+
+describe('failed deployment event ingress', () => {
+  const failedDeploy = (attempt = 1) => ({
+    action: 'completed',
+    repository: { full_name: REPO },
+    workflow_run: {
+      id: 35923560063,
+      run_attempt: attempt,
+      name: `Production Controller ${HEAD} from CI 35923443093 attempt 1`,
+      path: '.github/workflows/production-controller.yml',
+      head_sha: HEAD,
+      head_branch: 'main',
+      status: 'completed',
+      conclusion: 'failure',
+      html_url: 'https://github.com/JovieInc/Jovie/actions/runs/35923560063',
+    },
+  });
+
+  it('routes a failed release by workflow path rather than its dynamic run title', () => {
+    const receipt = buildDeliveryReceipt(failedDeploy());
+    assert.equal(receipt.event.failure, 'production-controller-failed');
+    assert.equal(receipt.event.workflow, 'Production Controller');
+    assert.equal(receipt.stage, 'repair-pending');
+    assert.equal(receipt.next.owner, 'gem');
+    assert.equal(
+      receipt.next.action,
+      'investigate-failed-production-controller'
+    );
+    assert.equal(receipt.event.evidence.workflowRun.id, 35923560063);
+    assert.equal(receipt.event.evidence.workflowRun.attempt, 1);
+    assert.notEqual(
+      receipt.receiptKey,
+      buildDeliveryReceipt(failedDeploy(2)).receiptKey
+    );
+    assert.equal(
+      receipt.receiptKey,
+      buildDeliveryReceipt(failedDeploy()).receiptKey
+    );
+  });
+
+  it('rejects incomplete release identities and does not turn success into repair', () => {
+    for (const invalid of [
+      { id: 0 },
+      { run_attempt: 0 },
+      { head_sha: 'short' },
+      { head_branch: 'feature' },
+      { status: 'in_progress' },
+    ]) {
+      const event = failedDeploy();
+      Object.assign(event.workflow_run, invalid);
+      assert.throws(
+        () => buildDeliveryReceipt(event),
+        /exact completed main run attempt/
+      );
+    }
+    const success = failedDeploy();
+    success.workflow_run.conclusion = 'success';
+    assert.equal(buildDeliveryReceipt(success).stage, 'received');
+    const timeout = failedDeploy();
+    timeout.workflow_run.conclusion = 'timed_out';
+    assert.equal(
+      buildDeliveryReceipt(timeout).event.failure,
+      'production-controller-failed'
+    );
+    const cancelled = failedDeploy();
+    cancelled.workflow_run.conclusion = 'cancelled';
+    assert.equal(
+      buildDeliveryReceipt(cancelled).event.failure,
+      'dropped-controller-event'
+    );
+  });
+
+  it('persists a replay-safe repair receipt through the real event CLI', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'delivery-linked-'));
+    try {
+      const entrypoint = new URL(
+        '../delivery-state-machine.mjs',
+        import.meta.url
+      ).pathname;
+      const input = join(directory, 'event.json');
+      await writeFile(input, JSON.stringify(failedDeploy()));
+      const args = [
+        entrypoint,
+        `--event-file=${input}`,
+        `--state-dir=${directory}`,
+      ];
+      const first = spawnSync(process.execPath, args, { encoding: 'utf8' });
+      assert.equal(first.status, 0, first.stderr);
+      assert.notEqual(
+        first.stdout.trim(),
+        '',
+        'successful ingress must emit its persisted receipt'
+      );
+      const result = JSON.parse(first.stdout);
+      assert.equal(
+        result.task.action,
+        'investigate-failed-production-controller'
+      );
+      assert.equal(result.task.evidence.workflowRun.id, 35923560063);
+      const replay = spawnSync(process.execPath, args, { encoding: 'utf8' });
+      assert.equal(replay.status, 0, replay.stderr);
+      assert.equal(JSON.parse(replay.stdout).task.taskKey, result.task.taskKey);
+      assert.equal((await readdir(join(directory, 'repair-tasks'))).length, 1);
+      const bad = spawnSync(
+        process.execPath,
+        [entrypoint, '--event-file=/missing-event.json'],
+        { encoding: 'utf8' }
+      );
+      assert.equal(bad.status, 1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
 const LYB_REPO = 'JovieInc/LogYourBody';
 const CROSS_RUNTIME_LIFECYCLE_KEY =
   '5a34f15f28cdfed416aa498dd84fdf5d048f68f9f183f782c1a2b95800f28c52';
@@ -604,6 +720,139 @@ describe('delivery state machine', () => {
       assert.equal(output.lifecycleRejectedCount, 1);
       assert.equal(output.lifecycleActions[1].status, 'created');
     } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('scans persisted lifecycle receipts once per snapshot while holding the queue lock', async () => {
+    // Per-action rescans held the summer-queue lock ~60s in production and
+    // timed out Delivery Control Receipts (run 36119641162).
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-pr-lifecycle-scan-'));
+    const receiptDirectory = join(directory, 'pr-lifecycle-actions');
+    const fsPromises = require('node:fs/promises');
+    const originalReaddir = fsPromises.readdir;
+    let receiptScans = 0;
+    fsPromises.readdir = /** @type {typeof originalReaddir} */ (
+      /** @type {unknown} */ (
+        (/** @type {any} */ path, /** @type {any[]} */ ...rest) => {
+          if (`${path}` === receiptDirectory) receiptScans += 1;
+          return originalReaddir(path, ...rest);
+        }
+      )
+    );
+    syncBuiltinESMExports();
+    try {
+      const actions = [17001, 17002, 17003, 17004, 17005].map(
+        (pr, inventoryIndex) => lifecycleAction({ pr, inventoryIndex })
+      );
+      const result = await persistClosureHealthActions(
+        {
+          repository: REPO,
+          observedAt: actions[0].observedAt,
+          lifecycleActions: actions,
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(result.lifecycleActionCount, actions.length);
+      assert.deepEqual(
+        result.lifecycleActions.map(action => action.status),
+        actions.map(() => 'created')
+      );
+      assert.equal(receiptScans, 1);
+    } finally {
+      fsPromises.readdir = originalReaddir;
+      syncBuiltinESMExports();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('scans persisted red-loop records once per snapshot while holding the queue lock', async () => {
+    // Per-action loadLoopRecords rescans grow the summer-queue lock hold with
+    // the red-loop directory size, the same shape as the lifecycle receipts.
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-red-loop-scan-'));
+    const loopDirectory = join(directory, 'red-loop');
+    const fsPromises = require('node:fs/promises');
+    const originalReaddir = fsPromises.readdir;
+    let loopScans = 0;
+    fsPromises.readdir = /** @type {typeof originalReaddir} */ (
+      /** @type {unknown} */ (
+        (/** @type {any} */ path, /** @type {any[]} */ ...rest) => {
+          if (`${path}` === loopDirectory) loopScans += 1;
+          return originalReaddir(path, ...rest);
+        }
+      )
+    );
+    syncBuiltinESMExports();
+    try {
+      const stackAction = (key, rootPr) => ({
+        schema: 'jovie-stack-health-action/v1',
+        repository: REPO,
+        taskKey: key.repeat(64),
+        deliveryKey: `closure-stack:${key.repeat(64)}`,
+        action: 'split-or-retarget-draft-stack',
+        owner: 'symphony',
+        writer: 'symphony',
+        issue: 'JOV-5362',
+        rootPr,
+        rootHeadSha: key.repeat(40),
+        prNumbers: [rootPr],
+        memberHeads: [{ pr: rootPr, headSha: key.repeat(40) }],
+        maxDepth: 1,
+        promotionPath: [
+          { pr: rootPr, base: 'main', head: key, headSha: key.repeat(40) },
+        ],
+        integrator: null,
+        deadline: null,
+        violations: ['missing-stack-integrator'],
+        safety: 'receipt-only; requalify exact heads before split-or-retarget',
+      });
+      const repairActions = ['1', '2', '3', '4', '5'].map((key, index) =>
+        stackAction(key, 18001 + index)
+      );
+      const evidenceRoots = [18101, 18102, 18103];
+      const persist = observedAt => {
+        loopScans = 0;
+        return persistClosureHealthActions(
+          {
+            schema: 'jovie-closure-health/v1',
+            authority: 'Summer',
+            observedAt,
+            reasons: ['draft-stack-policy-violation'],
+            stackHealth: {
+              violations: [
+                ...repairActions.map(item => ({ rootPr: item.rootPr })),
+                ...evidenceRoots.map(rootPr => ({ rootPr })),
+              ],
+            },
+            repairActions,
+          },
+          { stateDir: directory }
+        );
+      };
+      const first = await persist('2026-09-20T10:00:00.000Z');
+      assert.equal(first.actionCount, repairActions.length);
+      assert.equal(first.evidenceCount, evidenceRoots.length);
+      const firstScans = loopScans;
+
+      // A later snapshot of the same stacks hits duplicate loop records and
+      // reactivates each one; that must not rescan red-loop per row.
+      const replay = await persist('2026-09-20T11:00:00.000Z');
+      const replayScans = loopScans;
+      assert.equal(replay.actionCount, repairActions.length);
+      assert.equal(replay.evidenceCount, evidenceRoots.length);
+      assert.equal(replay.resolution.queue.items.length, 8);
+      assert.deepEqual(
+        { firstScans, replayScans },
+        { firstScans: 1, replayScans: 1 }
+      );
+
+      // The single scan still fails closed: an unreadable record rejects the run.
+      await writeFile(join(loopDirectory, 'poison.json'), '{bad json\n');
+      await assert.rejects(persist('2026-09-20T12:00:00.000Z'), SyntaxError);
+    } finally {
+      fsPromises.readdir = originalReaddir;
+      syncBuiltinESMExports();
       await rm(directory, { recursive: true, force: true });
     }
   });

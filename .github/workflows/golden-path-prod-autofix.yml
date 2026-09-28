@@ -1,9 +1,9 @@
 name: Golden Path Prod Autofix
 
-# JOV-5085: event-driven live-path probe + Cursor-direct autofix.
-# Separate from Post-Deploy Probes, which are read-only and must not mutate.
-# Detect without a ship lock is a hole.
-#
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Trusted-main workflow_run observes deployed runtime; only this bounded job receives Linear/Cursor mutation credentials and it never deploys or merges.
+# removal-trigger: Remove when Production Controller emits the same durable attempt receipt and dispatches this bounded autofix without a downstream workflow hop.
 # Does not read signup-account secrets. Missing CURSOR_API_KEY fails closed.
 
 on:
@@ -32,10 +32,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
+      # JOV-6832: read open fix PRs so a failing probe never launches a duplicate.
+      pull-requests: read
+      statuses: write
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
       LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+      EXECUTION_GENERATION: ${{ github.event.workflow_run.head_sha || github.sha }}
+      EXECUTION_ATTEMPT_LEDGER: /tmp/golden-path-lock/execution-attempts.jsonl
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,7 +64,7 @@ jobs:
             --origin https://jov.ie \
             --receipt /tmp/golden-path-lock/receipt.json
 
-      - name: Fail closed if Cursor cannot autofix a break
+      - name: Classify the prod probe before any autofix
         if: always()
         env:
           PROBE_OUTCOME: ${{ steps.probe.outcome }}
@@ -68,8 +75,26 @@ jobs:
             exit 1
           fi
           if [[ "$PROBE_OUTCOME" == "success" ]]; then
-            echo "Live golden path passed. Cursor-direct not launched."
+            if jq -e '.ok == true and .inconclusive != true' /tmp/golden-path-lock/receipt.json >/dev/null; then
+              echo "Live golden-path probe passed; the first-message stream reached a clean finish event. Cursor-direct not launched."
+              exit 0
+            fi
+            echo "::error::Probe command succeeded without an all-pass production receipt; refusing to claim success or autofix."
+            exit 1
+          fi
+          if jq -e '.inconclusive == true and ([.checks[] | select(.ok == false and .inconclusive != true)] | length == 0)' /tmp/golden-path-lock/receipt.json >/dev/null; then
+            # Inconclusive is not a product failure: every other check passed and
+            # the anonymous probe intentionally carries no Turnstile token. Warn
+            # (visible annotation + summary) and exit 0 so the job does not go
+            # red on every Production Controller run. Any actionable failed
+            # check falls through to the autofix path below and still fails.
+            echo "::warning title=Golden path unverified::The chat request reached Turnstile, but no valid token was supplied. The post-challenge first-message path was not exercised; no autofix was attempted."
+            echo "Golden path status: inconclusive (warning, not a failure). Turnstile was reached, but the first-message path was not tested. All other checks passed. No autofix was attempted." >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          fi
+          if jq -e '.ok == true and .inconclusive != true' /tmp/golden-path-lock/receipt.json >/dev/null; then
+            echo "::error::Probe command failed despite an all-pass production receipt; refusing autofix."
+            exit 1
           fi
           if [[ -z "${CURSOR_API_KEY:-}" ]]; then
             echo "::error::CURSOR_API_KEY is missing. Detect without a ship lock is a hole."
@@ -77,3 +102,11 @@ jobs:
           fi
           node scripts/golden-path-lock.mjs autofix \
             --receipt /tmp/golden-path-lock/receipt.json
+
+      - name: Preserve execution-attempt receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: golden-path-execution-attempts-${{ github.run_id }}
+          path: /tmp/golden-path-lock/execution-attempts.jsonl
+          if-no-files-found: ignore

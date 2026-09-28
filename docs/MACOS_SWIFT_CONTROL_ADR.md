@@ -85,7 +85,7 @@ Ovie inside packaged Jovie.app is the one heads-up: `/hud?ovie=mac` (`ovieOperat
 
 ### `ops/reviewed-invariants/mac-closed-loop-merged-is-not-live-v1`
 
-Visible Mac/iOS work is done only on packaged `Jovie.app` or Jovie Local dogfood, not on merge, CI, or a Linux checkout. Allowed: isolated UI / source-bound / fast-track-ui lanes without a full suite. Forbidden: calling compile/HMR “offline”, treating #16414 as live, or blocking a UI atom PR on unrelated E2E. Measure: typed proof tiers in `docs/OVIE_PROGRAM.md`; recovery classification tests in `renderer-recovery.test.ts`; a Mac screenshot or receipt before `M1 PASSED` / HUD Done.
+Visible Mac/iOS work is done only on packaged `Jovie.app` or Jovie Local dogfood, not on merge, CI, or a Linux checkout. Allowed: isolated UI / source-bound / UI fast lanes without a full suite. Forbidden: calling compile/HMR “offline”, treating #16414 as live, or blocking a UI atom PR on unrelated E2E. Measure: typed proof tiers in `docs/OVIE_PROGRAM.md`; recovery classification tests in `renderer-recovery.test.ts`; a Mac screenshot or receipt before `M1 PASSED` / HUD Done.
 
 ---
 

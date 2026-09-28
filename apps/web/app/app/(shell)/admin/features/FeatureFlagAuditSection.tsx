@@ -52,7 +52,10 @@ function formatValue(
   effective: boolean | null,
   source: 'override' | 'default'
 ): string {
-  const value = effective === null ? '—' : effective ? 'On' : 'Off';
+  let value: string;
+  if (effective === null) value = '—';
+  else if (effective) value = 'On';
+  else value = 'Off';
   return `${value} · ${source === 'override' ? 'Override' : 'Default'}`;
 }
 

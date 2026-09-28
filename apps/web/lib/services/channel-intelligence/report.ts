@@ -94,12 +94,12 @@ export function buildChannelChangePlan(input: {
     const weakCtr = video.ctr < WEAK_CTR;
     const weakRetention = video.avgViewDurationSeconds < WEAK_AVD_SECONDS;
     if (!weakCtr && !weakRetention) continue;
-    const gate =
-      weakCtr && weakRetention
-        ? 'CTR and retention both miss the continued-distribution gate'
-        : weakCtr
-          ? 'CTR misses the continued-distribution gate'
-          : 'Retention misses the continued-distribution gate';
+    let gate = 'Retention misses the continued-distribution gate';
+    if (weakCtr && weakRetention) {
+      gate = 'CTR and retention both miss the continued-distribution gate';
+    } else if (weakCtr) {
+      gate = 'CTR misses the continued-distribution gate';
+    }
     items.push({
       priority: items.length + 1,
       action: weakCtr

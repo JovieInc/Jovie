@@ -81,6 +81,16 @@ describe('launch page System B source contract', () => {
     }
   });
 
+  it('does not publish the unsupported launch uplift statistic', () => {
+    const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
+
+    expect(source).not.toContain('371%');
+    expect(source).not.toContain('13.5%');
+    expect(source).not.toContain('10.5%');
+    expect(source).not.toContain('WordStream');
+    expect(source).not.toContain('Omnisend');
+  });
+
   it('keeps launch-visible imported demos on the same System B guardrails', () => {
     for (const sourcePath of launchVisibleSourcePaths) {
       const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');

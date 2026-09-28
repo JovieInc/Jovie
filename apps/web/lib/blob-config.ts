@@ -13,7 +13,7 @@ export function isBlobStorageConfigured(): boolean {
 
 export function getBlobReadWriteToken(): string | undefined {
   const token = env.BLOB_READ_WRITE_TOKEN?.trim();
-  return token ? token : undefined;
+  return token || undefined;
 }
 
 export function getBlobCommandOptions(): { token?: string } {

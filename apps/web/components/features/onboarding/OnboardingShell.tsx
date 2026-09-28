@@ -34,6 +34,8 @@ import { useOnboardingClaim } from './useOnboardingClaim';
  * Holds the Turnstile token until the chat client wires its first request.
  */
 interface OnboardingShellProps {
+  /** Whether the server resolved a verified account for this request. */
+  readonly isSignedIn?: boolean;
   /** First 8 chars of the session id. Debug breadcrumb only — not sensitive. */
   readonly sessionLabel: string;
   /** ID for a homepage-captured starter prompt stored in localStorage. */
@@ -43,6 +45,7 @@ interface OnboardingShellProps {
 }
 
 export function OnboardingShell({
+  isSignedIn = false,
   intentId,
   sessionLabel,
   starterHandoff,
@@ -170,17 +173,19 @@ export function OnboardingShell({
             className='relative flex min-h-0 flex-1'
             data-onboarding-session={sessionLabel}
           >
-            <div
-              className='absolute right-3 top-3 z-30 sm:right-4 sm:top-4'
-              data-testid='onboarding-sign-in-header'
-            >
-              <Link
-                className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
-                href={APP_ROUTES.SIGNIN}
+            {!isSignedIn ? (
+              <div
+                className='absolute right-3 top-3 z-30 sm:right-4 sm:top-4'
+                data-testid='onboarding-sign-in-header'
               >
-                Sign in
-              </Link>
-            </div>
+                <Link
+                  className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+                  href={APP_ROUTES.SIGNIN}
+                >
+                  Sign in
+                </Link>
+              </div>
+            ) : null}
             <OnboardingChat
               intentId={intentId}
               onConversationActivity={handleConversationActivity}
@@ -237,7 +242,9 @@ function OnboardingShellStatus({
         aria-busy='true'
         data-testid='onboarding-linking-skeleton'
       >
-        <Skeleton className='h-3.5 w-44 rounded' />
+        <div className='flex h-3.5 w-44'>
+          <Skeleton className='flex-1' rounded='md' />
+        </div>
         <span className='sr-only'>{message}</span>
       </div>
     );

@@ -1,10 +1,19 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
+
+const runtimeUpdateState = vi.hoisted(() => ({ available: false }));
+vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
+  useRuntimeUpdate: () =>
+    runtimeUpdateState.available ? { available: true } : null,
+}));
 
 vi.mock('next/link', () => ({
   default: React.forwardRef<
@@ -15,8 +24,24 @@ vi.mock('next/link', () => ({
   }),
 }));
 
+describe('Linear-scale density (founder lock 2026-09-25)', () => {
+  it('gives the nav sections and threads block the wider pt-5 top gap', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardNav.tsx'),
+      'utf8'
+    );
+    expect(source).not.toContain("SidebarGroupContent className='pb-2 pt-4'");
+    expect(source).toContain("SidebarGroupContent className='pb-2 pt-5'");
+    expect(source).not.toContain("<div className='pt-4'>");
+    expect(source).toContain("<div className='pt-5'>");
+  });
+});
+
 describe('DashboardNav route warming', () => {
-  afterEach(() => resetDashboardNavTestMocks());
+  afterEach(() => {
+    runtimeUpdateState.available = false;
+    resetDashboardNavTestMocks();
+  });
 
   it('fully prefetches every canonical dynamic customer route', () => {
     renderDashboardNav({ renderFn: render });
@@ -39,6 +64,54 @@ describe('DashboardNav route warming', () => {
     expect(
       screen.queryByRole('link', { name: 'Tasks' })
     ).not.toBeInTheDocument();
+  });
+
+  it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {
+    runtimeUpdateState.available = true;
+    const pending = renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        inboxNavigation: { state: 'available', pendingCount: 3 },
+      },
+    });
+    expect(
+      pending.getByRole('link', { name: 'Inbox — App Update Available' })
+    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    expect(
+      pending.getByRole('status', { name: '3 pending items' })
+    ).toHaveTextContent('3');
+    // text-background emits no CSS (no --color-background token); the badge
+    // count must use the base-color token on its accent fill.
+    expect(
+      pending.getByRole('status', { name: '3 pending items' })
+    ).toHaveClass('bg-accent', 'text-(--color-bg-base)');
+    pending.unmount();
+
+    const updateOnly = renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        inboxNavigation: { state: 'empty', pendingCount: 0 },
+      },
+    });
+    const updateLink = updateOnly.getByRole('link', {
+      name: 'Inbox — App Update Available',
+    });
+    expect(updateLink).toHaveAttribute('data-inbox-attention', 'available');
+    expect(
+      updateLink.querySelector('[data-inbox-runtime-update]')
+    ).not.toBeNull();
+    updateOnly.unmount();
+
+    runtimeUpdateState.available = false;
+    const caughtUp = renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        inboxNavigation: { state: 'empty', pendingCount: 0 },
+      },
+    });
+    const link = caughtUp.getByRole('link', { name: 'Inbox' });
+    expect(link).toHaveAttribute('data-inbox-attention', 'empty');
+    expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
   // JOV-6181: the rail's New Chat affordance must never carry the terminal

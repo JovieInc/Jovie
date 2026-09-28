@@ -15,7 +15,6 @@ HOT_PATH_WORKFLOWS = (
     "agent-tick.yml",
     "auto-fix-lint-agent-drafts.yml",
     "stuck-draft-autoclose.yml",
-    "merge-queue-autoenroll.yml",
 )
 
 FULL_CHECKOUT_JOBS = (
@@ -26,8 +25,6 @@ FLEET_CONTROLLER_JOBS = (
     ("auto-pr-on-push.yml", "open-pr"),
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("auto-ready-agent-drafts.yml", "green-source"),
-    ("merge-queue-autoenroll.yml", "enroll"),
-    ("merge-queue-autoenroll.yml", "rebase"),
     ("agent-tick.yml", "auto-ready"),
 )
 
@@ -371,21 +368,6 @@ def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
     assert "ci-harness/manifest.json" not in workflow
 
 
-def test_slop_gate_is_post_merge_informational() -> None:
-    """Copy smell stays off PR Ready; taste is post-ship."""
-    workflow = (WORKFLOWS / "slop-gate.yml").read_text(encoding="utf-8")
-    trigger_block = workflow.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert "schedule:" in trigger_block
-    assert "workflow_dispatch:" in trigger_block
-    assert "pull_request" not in trigger_block
-    assert "ci-harness/manifest.json" in workflow
-    assert "continue-on-error: true" in workflow
-    assert "HEAD~1" not in workflow
-    assert "--before='7 days ago'" in workflow
-
-
 def test_agent_pipeline_retires_dead_qc_wires() -> None:
     """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
     workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
@@ -415,7 +397,6 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     for workflow_name in (
         "agent-pipeline.yml",
         "pr-conflict-handler.yml",
-        "merge-queue-autoenroll.yml",
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "run: corepack enable" not in content, workflow_name
@@ -446,7 +427,6 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
         "actionlint.yml",
         "brand-scrub.yml",
         "ci.yml",
-        "slop-gate.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert install_command in workflow, workflow_name
@@ -463,7 +443,7 @@ def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
     )
 
     assert "npm install -g pnpm@" not in script
-    assert "corepack prepare pnpm@9.15.4 --activate" in script
+    assert "corepack prepare pnpm@9.15.9 --activate" in script
     assert "pnpm install --frozen-lockfile --ignore-scripts" in script
     assert "env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN" in script
     assert ".headOwner == $repo_owner" in script
@@ -705,9 +685,15 @@ def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
         assert "run: gh --version" in block, (workflow, job_name)
 
 
-def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> None:
-    """CI-completion audits may supersede each other, never operator runs."""
+def test_conflict_handler_uses_shared_non_cancelling_canary_queue() -> None:
+    """The shared canary slot queues all FX writers without cancelling work."""
     block = _job_block("pr-conflict-handler.yml", "plan")
+    workflow = (WORKFLOWS / "pr-conflict-handler.yml").read_text(
+        encoding="utf-8"
+    )
+    rolling = (WORKFLOWS / "rolling-ci-dispatch.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "runs-on: ubuntu-latest" in block
     assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
@@ -715,13 +701,20 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
     assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert (
         "group: pr-conflict-handler-${{ github.repository }}-"
-        "${{ github.event_name == 'workflow_dispatch' && "
-        "'operator' || 'audit' }}"
+        "${{ github.event_name == 'pull_request_target' && "
+        "format('pr-{0}', github.event.pull_request.number) || "
+        "(github.event_name == 'workflow_dispatch' && 'operator' || 'audit') }}"
     ) in block
-    assert (
-        "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}"
-        in block
+    shared_slot = (
+        "group: jovie-fx-shared-canary-slot-${{ github.repository }}\n"
+        "  cancel-in-progress: false\n"
+        "  queue: max"
     )
+    assert shared_slot in workflow
+    assert shared_slot in rolling
+    assert "cancel-in-progress: false" in block
+    assert "queue: max" in block
+    assert "cancel-in-progress: ${{" not in block
     assert "EVENT_NAME: ${{ github.event_name }}" in block
     assert "APPLY_INPUT: ${{ inputs.apply || 'false' }}" in block
     assert 'if [[ "$EVENT_NAME" == "workflow_dispatch"' in block
@@ -794,9 +787,8 @@ def test_conflict_cohort_batches_poll_reads_and_fails_closed_on_ledger_lookup() 
 
 
 def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
-    """Main/merge-group completions must not wake PR fleet controllers."""
+    """Filter CI events before trusted remediation consumes a runner."""
     for workflow, job_name in (
-        ("merge-queue-autoenroll.yml", "enroll"),
         ("pr-conflict-handler.yml", "plan"),
     ):
         block = _job_block(workflow, job_name)
@@ -892,15 +884,18 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
         assert exact_identity_check in workflow
     assert ".base.sha" not in workflow
     assert re.search(
-        r'push\s+"https://github\.com/\$REPOSITORY\.git"\s+'
-        r'"(?:HEAD|\$[A-Z_]*(?:HEAD|COMMIT)):refs/heads/\$HEAD_REF"',
+        r'push\s+--force-with-lease="refs/heads/\$HEAD_REF:\$SOURCE_HEAD"\s*\\?\s*'
+        r'"https://github\.com/\$REPOSITORY\.git"\s+'
+        r'"HEAD:refs/heads/\$HEAD_REF"',
         workflow,
         re.IGNORECASE,
     )
+    assert 'git merge-base --is-ancestor "$SOURCE_HEAD" "$resolved_commit"' in workflow
+    assert 'git merge-base --is-ancestor "$BASE_HEAD" "$resolved_commit"' in workflow
+    assert not re.search(r'\bpush\s+--force(?:\s|=|$)', workflow, re.IGNORECASE)
     assert "expected_base:0:12" not in workflow
     assert "BASE_HEAD:0:12" not in workflow
     for forbidden in (
-        "force-with-lease",
         "git push --force",
         "gh pr merge",
         "gh pr ready",
@@ -1327,6 +1322,20 @@ def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     assert "pnpm --filter=@jovie/web run test" in job
 
 
+def test_nightly_bypass_server_warms_auth_landing_route() -> None:
+    """The chaos sweep's first navigation must not eat a cold dev compile.
+
+    Playwright global setup skips route warmup when BASE_URL is external, so
+    the readiness step has to compile /app via the test-auth enter route or
+    auth.setup times out on page.goto (JOV-6818).
+    """
+    step = _step_block("nightly-tests.yml", "Start route QA bypass server")
+
+    assert "api/dev/test-auth/enter?persona=creator&redirect=/app" in step
+    assert "curl -fsSL" in step
+    assert "--max-time" in step
+
+
 def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     """Missing Slack credentials must not make the notification job fail."""
     job = _job_block("nightly-tests.yml", "notify")
@@ -1367,28 +1376,6 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     ):
         assert result in all_success
     assert "env.SLACK_WEBHOOK_URL != ''" in all_success
-
-
-def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
-    """Large public pitch assets must be referenced by the checked-in deck."""
-    pitch_dir = REPO_ROOT / "apps" / "web" / "public" / "pitch"
-    assets_dir = pitch_dir / "assets"
-    deck_sources = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in pitch_dir.iterdir()
-        if path.is_file() and path.suffix in {".css", ".html", ".js"}
-    )
-    referenced_assets = set(re.findall(r"assets/([^\"')\s>]+)", deck_sources))
-
-    large_unreferenced = sorted(
-        path.name
-        for path in assets_dir.iterdir()
-        if path.is_file()
-        and path.stat().st_size > 250_000
-        and path.name not in referenced_assets
-    )
-
-    assert large_unreferenced == []
 
 
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
@@ -1434,6 +1421,15 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert "hold-screenshot-mq-during-controller.mjs" in publication
     assert publication.count('gh pr edit --add-label "merge-queue"') == 0
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
+
+
+def test_product_screenshots_preserve_the_active_exact_head_capture() -> None:
+    """Frequent main pushes must not discard an in-progress capture."""
+    workflow = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split("\njobs:\n", 1)[0]
+
+    assert "group: screenshots" in concurrency
+    assert "cancel-in-progress: false" in concurrency
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
@@ -1577,7 +1573,37 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "Native autoenroll owns queue mutation" in dependabot
+    assert "scripts/native-merge-intent.mjs" in dependabot
+    assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
+    assert "workflow_run.workflow_id == 178737329" in dependabot
+    adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "run?.workflow_id !== CI_WORKFLOW_ID" in adapter
+    assert "run.head_repository?.full_name" in adapter
+    assert "ref: ${{ github.sha }}" in dependabot
+    assert "Native autoenroll owns queue mutation" not in dependabot
+
+
+def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
+    """Both wake-up paths use only base policy and the helper's local imports."""
+    step = _step_block("dependabot-auto-merge.yml", "Checkout trusted reconciliation policy")
+    materialized = _sparse_checkout_paths(step)
+    workflow = (WORKFLOWS / "dependabot-auto-merge.yml").read_text(encoding="utf-8")
+
+    assert "ref: ${{ github.sha }}" in step
+    assert "persist-credentials: false" in step
+    assert "github.event.workflow_run.workflow_id == 178737329" in workflow
+    assert "github.event.workflow_run.event == 'pull_request'" in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "actions/download-artifact" not in workflow
+    assert "      actions: read" in workflow
+    for entrypoint in (
+        "scripts/dependabot-workflow-run-adapter.mjs",
+        "scripts/native-merge-intent.mjs",
+    ):
+        assert entrypoint in materialized
+        _assert_local_runtime_closure(materialized, entrypoint)
 
 
 def test_retired_merge_queue_label_has_no_active_producers() -> None:
@@ -1587,8 +1613,6 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
-        REPO_ROOT / "scripts/release-queue-deferred.sh",
-        REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1620,7 +1644,6 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "edited" in trigger
     assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
-    assert "workflows: [CI, Production Controller, Queue-Deferred Release]" not in trigger
     assert "group: fleet-gate-event-refresh" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "github.event.workflow_run.conclusion != 'cancelled'" in block
@@ -1661,21 +1684,72 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
     assert scheduled_fixed == ["runner-heartbeat.yml"]
 
 
+ADMISSION_MUTATION_PATTERNS = (
+    re.compile(r"triage-event-assess\.mjs"),
+    re.compile(r"backlog-orchestrator\.mjs[\"'\s]+(gate-next|admit-next|approve-plan|approve-research|reconcile|remediate)(?![^\n]*--dry-run)"),
+    re.compile(r"run-backlog\.sh\s+(gate-next|admit-next)"),
+)
+
+
+def test_one_workflow_owns_automatic_issue_admission() -> None:
+    """JOV-5467: a single workflow under one concurrency group may mutate
+    Linear issue admission; Linear dispatch and capacity events share it."""
+    writers: set[str] = set()
+    dispatch_listeners: set[str] = set()
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        if any(pattern.search(text) for pattern in ADMISSION_MUTATION_PATTERNS):
+            writers.add(path.name)
+        if "linear_triage_assess" in text:
+            dispatch_listeners.add(path.name)
+
+    assert writers == {"fleet-gate-refresh.yml"}
+    assert dispatch_listeners == {"fleet-gate-refresh.yml"}
+    assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
+
+    workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+    # One file-level concurrency group serializes every admission event.
+    assert workflow.count("concurrency:") == 1
+    assert "group: fleet-gate-event-refresh" in workflow
+    assert workflow.index("concurrency:") < workflow.index("jobs:")
+
+
+def test_symphony_wake_requires_verified_admitted_receipt() -> None:
+    """The assess job writes the exact-issue receipt before any Symphony wake,
+    and the wake is conditioned on the reconciler's mutated Todo transition."""
+    block = _job_block("fleet-gate-refresh.yml", "assess")
+    assert "github.event_name == 'repository_dispatch'" in block
+    receipt_write = block.index('> "$RECEIPT_FILE"')
+    wake_gate = block.index(".wakeSymphony == true")
+    wake_call = block.index("http://127.0.0.1:4041/api/v1/refresh")
+    assert receipt_write < wake_gate < wake_call
+    assert "requiresImmediateInvestigation == true" in block
+
+
+def test_retired_admission_commands_stay_disabled() -> None:
+    """gate-next/admit-next/approve-plan fail closed at the shared CLI."""
+    cli = (REPO_ROOT / "scripts/backlog-orchestrator/backlog-orchestrator.mjs").read_text(
+        encoding="utf-8"
+    )
+    for command in ("admit-next", "gate-next", "approve-plan"):
+        assert f"'{command}'" in cli
+    assert "owns Linear pickup and dispatch" in cli
+    assert "process.exit(78)" in cli
+
+
 def test_fleet_controllers_share_one_evaluate_action() -> None:
-    """FGR, QDR, merge-queue, and production-controller must not copy-paste the gate CLI."""
+    """FGR and production-controller share the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
-    script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
+    script = REPO_ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
-        ("queue-deferred-release.yml", "fleet-policy", "policy"),
-        ("merge-queue-autoenroll.yml", "fleet-policy", "policy"),
         ("production-controller.yml", "fleet-promotion", "policy"),
     )
     for workflow, job_name, _step in callers:
         text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
         assert f"uses: ./{action}" in text, workflow
-        assert "python3 scripts/symphony/gem-priority-gate.py" not in text, workflow
+        assert "python3 scripts/fleet-gate/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production

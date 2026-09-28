@@ -61,6 +61,130 @@ count_prebuilt_files() {
   find .vercel/output -type f | wc -l | tr -d ' '
 }
 
+# Vercel CLI >= 59 applies the repo .vercelignore to prebuilt functions'
+# `.vc-config.json` filePathMap entries and drops every match from the upload
+# (PREBUILT_FILEPATHMAP_IGNORED, "excludes at least 20 files the prebuilt
+# functions need"). CLI 56.x uploaded the full traced closure. (Restoring
+# that closure did not fix the 59.x "Extracting deployment files ...
+# Unexpected error" failures; the CLI is pinned to 56.3.2 for that, see
+# .github/dependabot.yml.) The prebuilt file walk ignores everything outside .vercel/output regardless
+# of .vercelignore, so that file only shapes source uploads. For prebuilt
+# uploads it only removes files `vercel build` traced (CHANGELOG.md,
+# docs/FEATURE_REGISTRY.md, tests/quarantine.json, ...). The dropped set
+# depends on the trace and the CLI truncates it at 20, so no fixed re-include
+# list can cover it. Hide the file for the prebuilt CLI call only; source
+# deploys keep it. assert_prebuilt_upload_has_no_secrets bounds what the
+# upload set may contain.
+HIDDEN_VERCELIGNORE=""
+
+restore_vercelignore() {
+  if [ -n "$HIDDEN_VERCELIGNORE" ]; then
+    mv -f -- "$HIDDEN_VERCELIGNORE" .vercelignore
+    HIDDEN_VERCELIGNORE=""
+  fi
+}
+
+trap restore_vercelignore EXIT
+
+run_prebuilt_cli() {
+  local cli_status=0
+  if [ -f .vercelignore ]; then
+    HIDDEN_VERCELIGNORE="$(mktemp "${RUNNER_TEMP:-/tmp}/jovie-vercelignore.XXXXXX")"
+    mv -f -- .vercelignore "$HIDDEN_VERCELIGNORE"
+  fi
+  "$@" || cli_status=$?
+  restore_vercelignore
+  return "$cli_status"
+}
+
+# A prebuilt upload is .vercel/output plus every filePathMap target of its
+# .vc-config.json files. Fail closed before upload if either names a
+# credential-bearing file.
+assert_prebuilt_upload_has_no_secrets() {
+  node - <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const root = process.cwd();
+const outputDir = path.join(root, '.vercel', 'output');
+const forbidden = rel => {
+  const posix = rel.split(path.sep).join('/');
+  const base = path.posix.basename(posix);
+  return (/^\.env(\..+)?$/.test(base) && base !== '.env.example')
+    || /\.(pem|key|p12|pfx)$/i.test(base)
+    || /^\.(npmrc|netrc)$/.test(base)
+    || base === 'credentials.json'
+    || (posix.startsWith('.vercel/') && !posix.startsWith('.vercel/output/'));
+};
+const offenders = new Set();
+const walk = dir => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) { walk(abs); continue; }
+    const rel = path.relative(root, abs);
+    if (forbidden(rel)) offenders.add(rel);
+    if (entry.name !== '.vc-config.json') continue;
+    let config;
+    try { config = JSON.parse(fs.readFileSync(abs, 'utf8')); } catch { continue; }
+    for (const target of Object.values(config.filePathMap || {})) {
+      const targetRel = path.relative(root, path.join(root, String(target)));
+      if (forbidden(targetRel)) offenders.add(targetRel);
+    }
+  }
+};
+if (fs.existsSync(outputDir)) walk(outputDir);
+if (offenders.size > 0) {
+  process.stderr.write('Deploy failed: prebuilt upload would include credential-bearing files:\n');
+  for (const offender of [...offenders].sort()) process.stderr.write(`  ${offender}\n`);
+  process.exit(1);
+}
+NODE
+}
+
+# A filePathMap target that is a symlink to a file is packed into the tgz as a
+# symlink entry, and Vercel's remote build then dies at "Extracting deployment
+# files... Error: Unexpected error" on every retry. The build step's
+# materialize-vercel-static.mjs dereferences them; refuse to upload (and burn
+# three remote builds) if any remain. Directory links (pnpm's node_modules
+# layer) are traced by every build and extract fine.
+assert_prebuilt_function_traces_have_no_file_links() {
+  node - <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const root = process.cwd();
+const functionsDir = path.join(root, '.vercel', 'output', 'functions');
+const offenders = new Set();
+const walk = dir => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) { walk(abs); continue; }
+    if (entry.name !== '.vc-config.json' || !entry.isFile()) continue;
+    let config;
+    try { config = JSON.parse(fs.readFileSync(abs, 'utf8')); } catch { continue; }
+    for (const target of Object.values(config.filePathMap || {})) {
+      const traced = path.join(root, String(target));
+      let stat;
+      try { stat = fs.lstatSync(traced); } catch { continue; }
+      if (!stat.isSymbolicLink()) continue;
+      let resolved;
+      try { resolved = fs.statSync(traced); } catch { resolved = null; }
+      if (!resolved || !resolved.isDirectory()) offenders.add(path.relative(root, traced));
+    }
+  }
+};
+if (fs.existsSync(functionsDir)) walk(functionsDir);
+if (offenders.size > 0) {
+  const sorted = [...offenders].sort();
+  process.stderr.write(
+    `Deploy failed: ${sorted.length} function filePathMap target(s) are file symlinks; `
+    + 'Vercel cannot extract them from the prebuilt archive. Run '
+    + 'node .github/scripts/materialize-vercel-static.mjs after vercel build:\n');
+  for (const offender of sorted.slice(0, 20)) process.stderr.write(`  ${offender}\n`);
+  if (sorted.length > 20) process.stderr.write(`  ... ${sorted.length - 20} more\n`);
+  process.exit(1);
+}
+NODE
+}
+
 run_deploy() {
   local mode="$1"
   shift
@@ -76,17 +200,17 @@ run_deploy() {
   local deploy_cmd=(timeout --signal=TERM --kill-after="${kill_grace_seconds}s" "$timeout_seconds")
 
   if [ "$mode" = "tgz" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
+    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "split-tgz" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
+    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "plain" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" "${VERCEL_SCOPE_ARGS[@]}"
+    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
@@ -113,6 +237,114 @@ run_deploy() {
   "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" "${VERCEL_SCOPE_ARGS[@]}"
 }
 
+emit_failure_diagnostic() {
+  # Provider output may contain credentials or workflow commands. Node is
+  # already required by the Vercel CLI. Read only a bounded tail, emit
+  # allowlisted receipt fields plus a redacted, command-neutralized line tail
+  # and one ::error:: annotation; diagnostic failure must not change status.
+  node - "$1" "$2" "$3" "$4" <<'NODE'
+const fs = require('node:fs');
+const [file, mode, attempt, status] = process.argv.slice(2);
+let fd;
+try {
+  fd = fs.openSync(file, 'r');
+  const size = fs.fstatSync(fd).size;
+  const buffer = Buffer.alloc(Math.min(size, 32768));
+  const read = fs.readSync(fd, buffer, 0, buffer.length, Math.max(0, size - buffer.length));
+  const output = buffer.subarray(0, read).toString('utf8');
+  const codes = ['ENOENT', 'EACCES', 'ENOSPC', 'ENOTFOUND', 'EAI_AGAIN',
+    'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED'];
+  const signatures = [
+    ['AUTH', /token is not valid|invalid token|not authorized|\bforbidden\b|status code 40[13]\b/i],
+    ['RATE_LIMITED', /rate.?limit|too many requests|status code 429\b/i],
+    ['PAYLOAD_TOO_LARGE', /too large|size limit|status code 413\b/i],
+    ['MISSING_FILES', /missing_files|missing files/i],
+    ['PREBUILT_OUTPUT_INVALID', /filePathMap/i],
+    ['PROVIDER_5XX', /status code 5\d\d\b|internal server error|bad gateway|service unavailable/i],
+  ];
+  const errorCode = codes.find(code => new RegExp(`\\b${code}\\b`).test(output))
+    || signatures.find(([, pattern]) => pattern.test(output))?.[0] || 'UNKNOWN';
+  const urls = [...output.matchAll(/https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app(?=\/?(?:\s|$))/gi)];
+  const candidate = urls.at(-1)?.[0] || null;
+  const token = process.env.VERCEL_TOKEN;
+  const deploymentUrl = candidate && !(token && candidate.includes(token)) ? candidate : null;
+  const asset = errorCode === 'ENOENT' && output.includes('/retouching/styles/white-space.md')
+    ? 'retouch-style-prompt' : errorCode === 'ENOENT' && output.includes('/tests/quarantine.json')
+      ? 'runtime-quarantine-ledger' : null;
+  const receipt = {
+    schema: 'jovie-vercel-deploy-failure/v1',
+    mode: ['tgz', 'split-tgz', 'plain', 'source'].includes(mode) ? mode : 'unknown',
+    attempt: /^\d+$/.test(attempt) ? Number(attempt) : null,
+    exitStatus: /^\d+$/.test(status) ? Number(status) : null,
+    errorCode, asset, deploymentUrl,
+  };
+  process.stderr.write(`Deploy failure diagnostic: ${JSON.stringify(receipt)}\n`);
+  const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const redact = line => {
+    let out = token ? line.replace(new RegExp(escapeRegExp(token), 'g'), '[redacted]') : line;
+    return out
+      .replace(/(--token(?:=|\s+))\S+/gi, '$1[redacted]')
+      .replace(/(\bbearer\s+)\S+/gi, '$1[redacted]')
+      .replace(/(\b[\w-]*(?:token|secret|password|authorization|api[_-]?key)["']?\s*[:=]\s*)(?!bearer\s)\S+/gi, '$1[redacted]')
+      .replace(/:\/\/[^/\s@]+@/g, '://[redacted]@');
+  };
+  // The read may start mid-line (possibly mid-secret): drop that fragment.
+  const rawLines = output.split(/\r?\n|\r/);
+  if (size > buffer.length) rawLines.shift();
+  const tail = rawLines
+    .map(line => line.replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ''))
+    .filter(line => line.trim() !== '')
+    .slice(-40)
+    .map(line => /^\s*(?:::|##\[)/.test(line) ? '[workflow command line removed]' : redact(line).slice(0, 300));
+  process.stderr.write(`Vercel CLI output tail (last ${tail.length} lines, redacted):\n`);
+  for (const line of tail) process.stderr.write(`  | ${line}\n`);
+  const specific = [...tail].reverse().find(line => line !== '[workflow command line removed]'
+    && /\berror\b|error:|ERR_|failed/i.test(line));
+  const escapeData = value => value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const message = `Vercel ${receipt.mode} deploy attempt ${receipt.attempt ?? '?'} failed `
+    + `(exit ${receipt.exitStatus ?? '?'}, ${errorCode})${specific ? `: ${specific.trim()}` : ''}`;
+  // A timeout may still hand off an accepted deployment, so it only warns.
+  const level = receipt.exitStatus === 124 || receipt.exitStatus === 137 ? 'warning' : 'error';
+  process.stdout.write(`::${level} title=Vercel deploy failed::${escapeData(message)}\n`);
+} catch {
+  process.stderr.write('Deploy failure diagnostic unavailable\n');
+} finally {
+  if (fd !== undefined) fs.closeSync(fd);
+}
+NODE
+}
+
+# Diagnostic only: record the shape of the prebuilt upload (names, sizes,
+# modes, symlink targets; never contents or env) right before the tgz attempt
+# so an "Extracting deployment files" failure can be diffed against the last
+# success. Failure of the manifest itself never changes deploy behavior.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_MANIFEST_FILE="${VERCEL_OUTPUT_MANIFEST_FILE:-${RUNNER_TEMP:-/tmp}/jovie-vercel-output-manifest.json}"
+OUTPUT_MANIFEST_WRITTEN=false
+
+record_output_manifest() {
+  echo "Recording prebuilt upload manifest (${OUTPUT_MANIFEST_FILE})"
+  if node "$SCRIPT_DIR/vercel-output-manifest.mjs" --json "$OUTPUT_MANIFEST_FILE"; then
+    OUTPUT_MANIFEST_WRITTEN=true
+  else
+    echo "Vercel output manifest unavailable" >&2
+  fi
+}
+
+print_output_manifest_summary() {
+  if [ "$OUTPUT_MANIFEST_WRITTEN" = true ]; then
+    node "$SCRIPT_DIR/vercel-output-manifest.mjs" --summary "$OUTPUT_MANIFEST_FILE" >&2 || true
+  fi
+}
+
+report_extracted_file_count() {
+  local extracted=""
+  extracted="$(grep -Eo 'Extracted [0-9]+ deployment files' "$1" | tail -1 || true)"
+  if [ -n "$extracted" ]; then
+    echo "Vercel remote build: ${extracted}"
+  fi
+}
+
 try_mode() {
   local mode="$1"
   local attempt="$2"
@@ -120,11 +352,21 @@ try_mode() {
 
   local deploy_output_file=""
   local deploy_status=0
+  if [ "$mode" = "tgz" ]; then
+    record_output_manifest || true
+  fi
   deploy_output_file="$(mktemp "${RUNNER_TEMP:-/tmp}/jovie-vercel-deploy.XXXXXX")"
   chmod 600 "$deploy_output_file"
   run_deploy "$mode" "$@" >"$deploy_output_file" 2>&1 || deploy_status=$?
   local deployment_url=""
   deployment_url="$(parse_deployment_url_file "$deploy_output_file")"
+  report_extracted_file_count "$deploy_output_file" || true
+  if [ "$deploy_status" -ne 0 ]; then
+    emit_failure_diagnostic "$deploy_output_file" "$mode" "$attempt" "$deploy_status" || true
+    if [ "$mode" = "tgz" ]; then
+      print_output_manifest_summary
+    fi
+  fi
   rm -f "$deploy_output_file"
   if [ "$deploy_status" -eq 0 ]; then
     if [ -z "$deployment_url" ]; then
@@ -202,6 +444,10 @@ fi
 if [ "${#deploy_modes[@]}" -eq 0 ]; then
   echo "Deploy failed: no prebuilt output is available and source fallback is disabled." >&2
   exit 1
+fi
+if [ "$has_prebuilt_output" = true ] && [ "$force_source_deploy" != "true" ]; then
+  assert_prebuilt_upload_has_no_secrets
+  assert_prebuilt_function_traces_have_no_file_links
 fi
 total_attempts="${#deploy_modes[@]}"
 attempt=0

@@ -116,7 +116,7 @@ function redactLeakSpans(text: string): string {
 }
 
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 function shouldUseFallback(

@@ -499,6 +499,7 @@ function createPaidConversionStore(options?: {
     eventType: string;
     leadId: string;
     campaignKey?: string | null;
+    metadata?: Record<string, unknown>;
   }> = [];
   let eventWriteAttempts = 0;
 
@@ -532,6 +533,7 @@ function createPaidConversionStore(options?: {
         eventType: string;
         leadId: string;
         campaignKey?: string | null;
+        metadata?: Record<string, unknown>;
       }) => ({
         onConflictDoNothing: vi.fn().mockImplementation(async () => {
           eventWriteAttempts += 1;
@@ -548,6 +550,7 @@ function createPaidConversionStore(options?: {
               leadId: row.leadId,
               eventType: row.eventType,
               campaignKey: row.campaignKey,
+              metadata: row.metadata,
             });
           }
         }),
@@ -578,11 +581,11 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     expect(leadState.paidAt).toBeInstanceOf(Date);
     expect(leadState.paidSubscriptionId).toBe('sub_happy');
     expect(recordedEvents).toEqual([
-      {
+      expect.objectContaining({
         leadId: 'lead_123',
         eventType: 'paid_converted',
         campaignKey: 'premade-artist-profile',
-      },
+      }),
     ]);
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
   });
@@ -596,16 +599,16 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     await attributeLeadPaidConversionByAppUserId('user_123', 'sub_proof');
 
     expect(recordedEvents).toEqual([
-      {
+      expect.objectContaining({
         leadId: 'lead_123',
         eventType: 'paid_converted',
         campaignKey: 'premade-artist-profile',
-      },
-      {
+      }),
+      expect.objectContaining({
         leadId: 'lead_123',
         eventType: 'activation',
         campaignKey: 'proof-to-claim',
-      },
+      }),
     ]);
   });
 
@@ -637,11 +640,11 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     expect(leadState.paidAt).toBeInstanceOf(Date);
     expect(leadState.paidSubscriptionId).toBe('sub_retry');
     expect(recordedEvents).toEqual([
-      {
+      expect.objectContaining({
         leadId: 'lead_123',
         eventType: 'paid_converted',
         campaignKey: 'premade-artist-profile',
-      },
+      }),
     ]);
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
   });
@@ -695,6 +698,43 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
         }),
       })
     );
+  });
+
+  it('persists checkout correlation IDs on paid_converted and keeps them on replay', async () => {
+    const { leadState, recordedEvents } = createPaidConversionStore();
+    const { attributeLeadPaidConversionByAppUserId } = leadFunnelEventsApi;
+    const correlation = {
+      claimId: 'claim_abc',
+      runId: 'run_def',
+      candidateId: 'candidate_ghi',
+      offerVersion: 'launch-acquisition:premade-artist-profile:v1',
+      firstTouch: 'claim_invite',
+    };
+
+    await attributeLeadPaidConversionByAppUserId(
+      'user_123',
+      'sub_correlated',
+      correlation
+    );
+    await attributeLeadPaidConversionByAppUserId(
+      'user_123',
+      'sub_correlated',
+      correlation
+    );
+
+    expect(leadState.paidSubscriptionId).toBe('sub_correlated');
+    expect(recordedEvents).toEqual([
+      {
+        leadId: 'lead_123',
+        eventType: 'paid_converted',
+        campaignKey: 'premade-artist-profile',
+        metadata: expect.objectContaining({
+          stripeSubscriptionId: 'sub_correlated',
+          experimentId: 'premade-artist-profile',
+          ...correlation,
+        }),
+      },
+    ]);
   });
 
   it('preserves the legacy Clerk entry point while attributing by resolved app UUID', async () => {

@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockCaptureMessage,
   mockFixedWindow,
   mockGetRedis,
   mockRatelimitConstructor,
   mockSlidingWindow,
 } = vi.hoisted(() => ({
+  mockCaptureMessage: vi.fn(),
   mockFixedWindow: vi.fn(),
   mockGetRedis: vi.fn(),
   mockRatelimitConstructor: vi.fn(),
   mockSlidingWindow: vi.fn(),
+}));
+
+vi.mock('@sentry/nextjs', () => ({
+  captureMessage: mockCaptureMessage,
 }));
 
 vi.mock('@upstash/ratelimit', () => ({
@@ -23,22 +29,25 @@ vi.mock('@upstash/ratelimit', () => ({
   },
 }));
 
-vi.mock('@/lib/env-server', () => ({
-  env: { NODE_ENV: 'test' },
-}));
+const mockEnv = vi.hoisted(() => ({ NODE_ENV: 'test' }));
+
+vi.mock('@/lib/env-server', () => ({ env: mockEnv }));
 
 vi.mock('@/lib/redis', () => ({
   getRedis: mockGetRedis,
 }));
 
-import { createRedisRateLimiter } from './redis-limiter';
+import {
+  createRedisRateLimiter,
+  resetRedisFallbackWarningForTests,
+} from './redis-limiter';
 
 const baseConfig = {
   name: 'Public Test',
   limit: 50,
   window: '1 m',
   prefix: 'public:test',
-  analytics: false,
+  analytics: false as const,
   algorithm: 'fixed-window' as const,
   trafficClass: 'internal' as const,
 };
@@ -46,6 +55,8 @@ const baseConfig = {
 describe('createRedisRateLimiter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEnv.NODE_ENV = 'test';
+    resetRedisFallbackWarningForTests();
     mockGetRedis.mockReturnValue({});
     mockFixedWindow.mockReturnValue('fixed-window-limiter');
     mockSlidingWindow.mockReturnValue('sliding-window-limiter');
@@ -69,5 +80,30 @@ describe('createRedisRateLimiter', () => {
 
     expect(mockSlidingWindow).toHaveBeenCalledWith(50, '1 m');
     expect(mockFixedWindow).not.toHaveBeenCalled();
+  });
+
+  it('captures one name-agnostic production fallback with limiter context', () => {
+    mockEnv.NODE_ENV = 'production';
+    mockGetRedis.mockReturnValue(null);
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    createRedisRateLimiter(baseConfig);
+    createRedisRateLimiter({ ...baseConfig, name: 'Another Limiter' });
+
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'Rate limiter falling back to in-memory store — Redis unconfigured',
+      expect.objectContaining({
+        level: 'error',
+        tags: {
+          limiter: 'Public Test',
+          'rate_limit.prefix': 'public:test',
+        },
+      })
+    );
+    consoleError.mockRestore();
   });
 });

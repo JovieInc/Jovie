@@ -5,19 +5,18 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
-import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+  getPublicPriceClaim,
+  type PublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 
 const STORY_CARDS = [
   {
     label: 'Profile',
-    headline: 'Artist profiles built to convert',
-    body: 'One public fan path for streaming, tickets, support, and capture.',
-  },
-  {
-    label: 'Fan',
-    headline: 'Capture fans once. Bring them back automatically.',
-    body: 'Turn profile visits and QR scans into an audience for every drop.',
+    headline: 'Public Jovie profile and audience capture',
+    body: 'Claim profile same day.',
   },
 ] as const;
 
@@ -39,6 +38,10 @@ function PricingStoryCard({
   );
 }
 
+function formatMonthlyPrice(claim: PublicPriceClaim): string {
+  return `${claim.priceLabel}/month`;
+}
+
 interface PricingRecipeBodyProps {
   readonly requestAccessCopy: string;
   readonly plans: ReactNode;
@@ -52,104 +55,117 @@ export function PricingRecipeBody({
   comparisonChart,
   structuredData,
 }: Readonly<PricingRecipeBodyProps>) {
+  const freeClaim = getPublicPriceClaim('free');
+  const proClaim = getPublicPriceClaim('pro');
+  const enterpriseClaim = getPublicPriceClaim('enterprise');
+  const proMonthlyPrice = formatMonthlyPrice(proClaim);
+
   return (
     <MarketingPageShell className='system-b-pricing-page'>
-      {structuredData}
+      <div data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}>
+        {structuredData}
 
-      <MarketingHero
-        className='system-b-pricing-hero'
-        headingId='pricing-hero-heading'
-        headline='Pricing'
-        subtitle='Artist profiles are free forever. Pro adds the release tools when you need them.'
-        primaryCta={{
-          label: 'Claim Your Profile',
-          href: `${APP_ROUTES.SIGNUP}?plan=free`,
-        }}
-        secondaryCta={{
-          label: 'Explore Artist Profiles',
-          href: APP_ROUTES.ARTIST_PROFILES,
-        }}
-        media={
-          <div className='system-b-pricing-story-grid'>
-            {STORY_CARDS.map(card => (
-              <PricingStoryCard
-                key={card.label}
-                label={card.label}
-                headline={card.headline}
-                body={card.body}
-              />
-            ))}
-          </div>
-        }
-      />
+        <MarketingHero
+          className='system-b-pricing-hero'
+          headingId='pricing-hero-heading'
+          headline='Pricing'
+          subtitle={`Jovie profiles are free forever. Artist Visibility Pro is ${proMonthlyPrice} with limited access.`}
+          primaryCta={{
+            label: freeClaim.ctaLabel,
+            href: freeClaim.ctaHref,
+          }}
+          secondaryCta={{
+            label: 'Explore Jovie Profiles',
+            href: APP_ROUTES.ARTIST_PROFILES,
+          }}
+          photo={{
+            src: '/images/marketing-hero/pricing.webp',
+            width: 1600,
+            height: 901,
+          }}
+          media={
+            <div className='system-b-pricing-story-grid'>
+              {STORY_CARDS.map(card => (
+                <PricingStoryCard
+                  key={card.label}
+                  label={card.label}
+                  headline={card.headline}
+                  body={card.body}
+                />
+              ))}
+            </div>
+          }
+        />
 
-      <section aria-label='Plans' className='system-b-pricing-section'>
-        <MarketingContainer width='page'>
-          <div className='system-b-pricing-plans'>{plans}</div>
-        </MarketingContainer>
-      </section>
+        <section aria-label='Plans' className='system-b-pricing-section'>
+          <MarketingContainer width='page'>
+            <div className='system-b-pricing-plans'>{plans}</div>
+          </MarketingContainer>
+        </section>
 
-      <section
-        aria-labelledby='pricing-compare-heading'
-        className='system-b-pricing-section'
-      >
-        <MarketingContainer width='page'>
-          <div className='system-b-pricing-section-inner'>
-            <div className='system-b-pricing-section-copy'>
+        <section
+          aria-labelledby='pricing-compare-heading'
+          className='system-b-pricing-section'
+        >
+          <MarketingContainer width='page'>
+            <div className='system-b-pricing-section-inner'>
+              <div className='system-b-pricing-section-copy'>
+                <h2
+                  id='pricing-compare-heading'
+                  className='system-b-pricing-section-title'
+                >
+                  Compare All Features
+                </h2>
+                <p className='system-b-pricing-section-body'>
+                  Public Jovie profile and audience capture.
+                </p>
+              </div>
+              <div className='system-b-pricing-chart-wrap'>
+                {comparisonChart}
+              </div>
+            </div>
+          </MarketingContainer>
+        </section>
+
+        <section
+          aria-labelledby='pricing-get-started-heading'
+          className='system-b-pricing-final'
+        >
+          <MarketingContainer width='page'>
+            <div>
               <h2
-                id='pricing-compare-heading'
+                id='pricing-get-started-heading'
                 className='system-b-pricing-section-title'
               >
-                Compare All Features
+                Get Started
               </h2>
-              <p className='system-b-pricing-section-body'>
-                See the plan matrix for notifications, analytics, contacts,
-                smart links, and release workspace capabilities.
-              </p>
+              <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
+              <div className='system-b-pricing-actions system-b-pricing-actions--center'>
+                <Link
+                  href={freeClaim.ctaHref}
+                  prefetch={false}
+                  className='system-b-pricing-secondary-link'
+                >
+                  {freeClaim.ctaLabel}
+                </Link>
+                <Link
+                  href={proClaim.ctaHref}
+                  prefetch={false}
+                  className='system-b-pricing-secondary-link'
+                >
+                  {proClaim.ctaLabel}
+                </Link>
+                <a
+                  href={enterpriseClaim.ctaHref}
+                  className='system-b-pricing-secondary-link'
+                >
+                  {enterpriseClaim.ctaLabel}
+                </a>
+              </div>
             </div>
-            <div className='system-b-pricing-chart-wrap'>{comparisonChart}</div>
-          </div>
-        </MarketingContainer>
-      </section>
-
-      <section
-        aria-labelledby='pricing-get-started-heading'
-        className='system-b-pricing-final'
-      >
-        <MarketingContainer width='page'>
-          <div>
-            <h2
-              id='pricing-get-started-heading'
-              className='system-b-pricing-section-title'
-            >
-              Get Started
-            </h2>
-            <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
-            <div className='system-b-pricing-actions system-b-pricing-actions--center'>
-              <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=free`}
-                prefetch={false}
-                className='system-b-pricing-secondary-link'
-              >
-                Claim your profile
-              </Link>
-              <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=pro`}
-                prefetch={false}
-                className='system-b-pricing-secondary-link'
-              >
-                Start Pro trial
-              </Link>
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
-                className='system-b-pricing-secondary-link'
-              >
-                Contact sales
-              </a>
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
+          </MarketingContainer>
+        </section>
+      </div>
     </MarketingPageShell>
   );
 }

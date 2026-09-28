@@ -8,9 +8,12 @@ import { describe, expect, it } from 'vitest';
 describe('canonical primary hover CSS', () => {
   it('emits the existing semantic hover background and border from real Button classes', async () => {
     // Use the actual app theme registrations, without unrelated source scans.
-    // This catches a valid-looking class whose semantic token was never registered.
+    // Theme blocks live in styles/tailwind-foundation.css (imported by
+    // globals.css) since the JOV-2269 two-context split.
     const appCss = postcss.parse(
-      readFileSync(resolve('app/globals.css'), 'utf8')
+      ['app/globals.css', 'styles/tailwind-foundation.css']
+        .map(path => readFileSync(resolve(path), 'utf8'))
+        .join('\n')
     );
     const themes: string[] = [];
     appCss.walkAtRules('theme', rule => {

@@ -5,14 +5,19 @@ import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 
 const WEB_ROOT = join(import.meta.dirname, '..', '..', '..');
-const GLOBALS_CSS = readFileSync(join(WEB_ROOT, 'app', 'globals.css'), 'utf8');
+// The canonical @theme block lives in styles/tailwind-foundation.css, which
+// app/globals.css imports normally (JOV-2269 two-context split).
+const GLOBALS_CSS = readFileSync(
+  join(WEB_ROOT, 'styles', 'tailwind-foundation.css'),
+  'utf8'
+);
 
 function readCanonicalTheme(): string {
   const theme = GLOBALS_CSS.match(/@theme \{[\s\S]*?\n\}/)?.[0];
 
   if (!theme) {
     throw new Error(
-      'apps/web/app/globals.css is missing its canonical @theme block'
+      'apps/web/styles/tailwind-foundation.css is missing its canonical @theme block'
     );
   }
 

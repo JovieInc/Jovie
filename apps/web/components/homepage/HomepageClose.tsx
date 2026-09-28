@@ -5,7 +5,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
-/** Saved canonical K4ar1: one focus-only action returns to the hero search. */
+/** Returns focus to the hero name search. The close is not a second conversion. */
 export function HomepageClose() {
   const { close } = HOMEPAGE_LAUNCH_COPY.certified;
 

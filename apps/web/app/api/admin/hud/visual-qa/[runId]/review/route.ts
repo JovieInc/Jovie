@@ -130,7 +130,7 @@ export async function POST(
   context: { params: Promise<{ runId: string }> }
 ): Promise<Response> {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

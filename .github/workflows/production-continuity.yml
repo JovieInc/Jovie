@@ -11,6 +11,14 @@ on:
   # that remained individually paused after another project was resumed.
   schedule:
     - cron: '*/5 * * * *'
+  # Production Controller completion is the event-driven freshness signal.
+  # GitHub throttles this repository's five-minute schedule to hours
+  # (2026-09-26: six scheduled runs in 18 h), so the production-stale alarm
+  # also rides every controller generation, including failed ones.
+  workflow_run:
+    workflows: [Production Controller]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -31,20 +39,34 @@ jobs:
       affected_targets: ${{ steps.probe.outputs.affected_targets }}
       incident_classes: ${{ steps.probe.outputs.incident_classes }}
       incident_key: ${{ steps.probe.outputs.incident_key }}
+      requires_agent_ingress: ${{ steps.probe.outputs.requires_agent_ingress }}
     steps:
       - name: Checkout policy source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      - name: Start independent scheduler check-in
+        id: sentry_checkin
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: >-
+          node .github/scripts/production-continuity-checkin.mjs
+          --status=in_progress
+
       - name: Probe Jovie and Summer production
         id: probe
+        # The read-only repo token lets the freshness probe compare the live
+        # production SHA against main; it reaches GitHub only, never jov.ie.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: >-
           node .github/scripts/production-continuity.mjs
           --output "$RUNNER_TEMP/production-continuity.json"
           --github-output "$GITHUB_OUTPUT"
 
       - name: Publish exact observation receipt
+        id: observation_receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-continuity-${{ github.run_id }}-${{ github.run_attempt }}
@@ -53,6 +75,7 @@ jobs:
           retention-days: 14
 
       - name: Summarize production state
+        id: observation_summary
         env:
           STATUS: ${{ steps.probe.outputs.status }}
           AFFECTED_TARGETS: ${{ steps.probe.outputs.affected_targets }}
@@ -67,6 +90,17 @@ jobs:
             echo "| Affected targets | ${AFFECTED_TARGETS:-none} |"
             echo "| Incident classes | ${INCIDENT_CLASSES:-none} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Complete independent scheduler check-in
+        if: ${{ always() && steps.sentry_checkin.outputs.check_in_id != '' }}
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          CHECK_IN_ID: ${{ steps.sentry_checkin.outputs.check_in_id }}
+          CHECK_IN_STATUS: ${{ steps.probe.outcome == 'success' && steps.observation_receipt.outcome == 'success' && steps.observation_summary.outcome == 'success' && 'ok' || 'error' }}
+        run: >-
+          node .github/scripts/production-continuity-checkin.mjs
+          --status="$CHECK_IN_STATUS"
+          --check-in-id="$CHECK_IN_ID"
 
   founder-alert:
     name: Notify production on-call (${{ needs.observe.outputs.incident_key }})
@@ -128,7 +162,8 @@ jobs:
   agent-ingress:
     name: Admit one Summer provider-recovery task
     needs: observe
-    if: ${{ needs.observe.outputs.status == 'unhealthy' }}
+    # production-stale is a release-pipeline failure, not a provider outage.
+    if: ${{ needs.observe.outputs.status == 'unhealthy' && needs.observe.outputs.requires_agent_ingress == 'true' }}
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
     steps:

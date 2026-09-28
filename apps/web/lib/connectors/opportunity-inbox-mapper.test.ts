@@ -99,6 +99,9 @@ describe('mapSuggestedActionToInboxCard', () => {
           'direct-thumbnail-mutation-disabled-native-experiment-required',
       },
     });
+    expect(card.why).toBe(
+      'YouTube API snapshot captured 2026-09-01T12:00:00.000Z. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.'
+    );
   });
   it('maps typed workflow requests into a direct Record decision', () => {
     const card = mapSuggestedActionToInboxCard({

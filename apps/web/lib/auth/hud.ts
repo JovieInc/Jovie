@@ -10,7 +10,8 @@ export type HudAuthResult =
   | { ok: false; reason: 'unauthorized' | 'not_configured' };
 
 export async function authorizeHud(
-  kioskToken: string | null
+  kioskToken: string | null,
+  options?: { session?: 'cookie' | 'fresh' }
 ): Promise<HudAuthResult> {
   const expectedToken = env.HUD_KIOSK_TOKEN;
   if (kioskToken && kioskToken === expectedToken) {
@@ -18,7 +19,7 @@ export async function authorizeHud(
   }
 
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getCurrentUserEntitlements(options);
     if (
       entitlements.isAuthenticated &&
       entitlements.userId &&

@@ -60,14 +60,11 @@ describe('NewLandingPage', () => {
   it('renders the staged homepage v2 content with canonical public nav', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
-      'href',
-      '/artists'
-    );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/product'
     );
+    expect(screen.getByRole('button', { name: /Customers/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
@@ -75,10 +72,9 @@ describe('NewLandingPage', () => {
       '/pricing'
     );
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
 
     render(<NewLandingPage />);
 

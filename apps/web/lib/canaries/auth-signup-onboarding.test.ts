@@ -13,6 +13,7 @@ import {
   hasGoldenPathSurfaceError,
   isKnownOnboardingFallback,
 } from './auth-signup-onboarding';
+import { buildReport as canonicalBuildReport } from './public-profile';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -172,6 +173,27 @@ describe('formatAuthSignupOnboardingReportSummary', () => {
     );
     expect(formatAuthSignupOnboardingReportSummary(report)).toContain(
       '[canary/auth-signup-onboarding] PASS'
+    );
+  });
+
+  it('re-exports the canonical report builder', () => {
+    expect(buildReport).toBe(canonicalBuildReport);
+    const report = buildReport(
+      '2026-06-12T06:23:00Z',
+      [{ name: 'signup-500', ok: false, durationMs: 4 }],
+      4
+    );
+    expect(report).toEqual({
+      runAt: '2026-06-12T06:23:00Z',
+      pass: false,
+      checks: [{ name: 'signup-500', ok: false, durationMs: 4 }],
+      totalDurationMs: 4,
+    });
+    expect(formatAuthSignupOnboardingReportSummary(report)).toContain(
+      '[canary/auth-signup-onboarding] FAIL'
+    );
+    expect(formatAuthSignupOnboardingReportSummary(report)).toContain(
+      'signup-500'
     );
   });
 });

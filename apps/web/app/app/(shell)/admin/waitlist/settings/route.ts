@@ -64,7 +64,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   let entitlements;
   try {
-    entitlements = await getCurrentUserEntitlements();
+    entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
     if (!entitlements.isAuthenticated) return forbiddenResponse(401);
     if (!entitlements.isAdmin) return forbiddenResponse(403);
 

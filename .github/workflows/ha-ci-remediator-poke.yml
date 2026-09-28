@@ -24,6 +24,9 @@ name: HA CI remediator poke
 #     the SHA-256 fingerprint of the exact sent payload in the existing receipt.
 #     Missing or malformed 202 bodies remain pending/unknown; they never invent
 #     an identifier or unlock a retry. Non-202 retains the existing failure receipt.
+# FX canary overlap guard: while the existing hosted-FX single-PR canary is
+# enabled, suppress HA for that PR (including forced dispatches). Keep
+# merge_group deliveries on the existing HA lane: FX only accepts source-PR CI.
 run-name: ha-remediate/PR${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}/${{ github.event.workflow_run.head_sha || github.sha }}
 on:
   workflow_run:
@@ -71,8 +74,75 @@ jobs:
           FORCE: ${{ inputs.force || false }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
+          PRODUCER_EVENT: ${{ github.event.workflow_run.event || 'workflow_dispatch' }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch || '' }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name || '' }}
+          PR_ASSOCIATIONS: ${{ toJSON(github.event.workflow_run.pull_requests || fromJSON('[]')) }}
+          FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
+          FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
         run: |
           set -euo pipefail
+
+          if [ "${PRODUCER_EVENT:-}" != "merge_group" ] &&
+             [ "${FX_HOSTED_REMEDIATION_ENABLED:-}" = "true" ] &&
+             [[ "${FX_HOSTED_REMEDIATION_CANARY_PR:-}" =~ ^[1-9][0-9]*$ ]]; then
+            normalize_pr_number() {
+              local value="${1:-}"
+              if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+                return 1
+              fi
+              while [ "${#value}" -gt 1 ] && [ "${value:0:1}" = "0" ]; do
+                value="${value#0}"
+              done
+              printf '%s' "$value"
+            }
+
+            canary_pr="$FX_HOSTED_REMEDIATION_CANARY_PR"
+            event_pr=$(normalize_pr_number "${PR_NUMBER:-}" || true)
+            if [ "$event_pr" = "$canary_pr" ]; then
+              echo "::notice::PR #$canary_pr is owned by the active FX canary; suppressing the competing Hyperagent poke."
+              exit 0
+            fi
+
+            if [ "$PRODUCER_EVENT" = "pull_request" ] && [ -z "$event_pr" ]; then
+              if [ -z "${HEAD_REPOSITORY:-}" ]; then
+                echo "::notice::The CI event has no PR association or source repository; skipping Hyperagent because FX canary ownership cannot be resolved."
+                exit 0
+              fi
+              if [ "$HEAD_REPOSITORY" = "$REPO" ]; then
+                if ! jq -e 'type == "array" and length == 0' <<<"${PR_ASSOCIATIONS:-}" >/dev/null 2>&1; then
+                  echo "::notice::The same-repository CI event has a malformed or inconsistent PR association; skipping Hyperagent."
+                  exit 0
+                fi
+                if [ -z "${HEAD_BRANCH:-}" ] || [[ ! "${HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+                  echo "::notice::The same-repository CI event lacks a valid source branch or head SHA; skipping Hyperagent."
+                  exit 0
+                fi
+
+                repo_owner="${REPO%%/*}"
+                branch_pr_candidates=$(gh api "repos/$REPO/pulls" --method GET \
+                  -f state=open -f head="$repo_owner:$HEAD_BRANCH" -f per_page=100)
+                if ! jq -e --arg repository "$REPO" --arg branch "$HEAD_BRANCH" --arg head "$HEAD_SHA" '
+                  type == "array" and length == 1 and
+                  (.[0].number | type == "number" and . > 0) and
+                  .[0].state == "open" and
+                  .[0].head.ref == $branch and .[0].head.sha == $head and
+                  .[0].head.repo.full_name == $repository and
+                  .[0].base.repo.full_name == $repository
+                ' <<<"$branch_pr_candidates" >/dev/null 2>&1; then
+                  echo "::notice::The same-repository CI branch does not resolve to one current open exact-head PR; skipping Hyperagent."
+                  exit 0
+                fi
+
+                event_pr=$(jq -r '.[0].number' <<<"$branch_pr_candidates")
+                if [ "$event_pr" = "$canary_pr" ]; then
+                  echo "::notice::PR #$canary_pr is owned by the active FX canary; suppressing the competing Hyperagent poke."
+                  exit 0
+                fi
+                echo "::notice::Resolved the empty CI PR association to current same-repository PR #$event_pr by exact head branch and SHA."
+              fi
+            fi
+          fi
 
           if [ -n "${PR_NUMBER:-}" ]; then
             pr_json=$(gh api "repos/$REPO/pulls/$PR_NUMBER")

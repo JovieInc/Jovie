@@ -327,11 +327,7 @@ async function processLeadUrl(
  * Inserts new leads as 'discovered', then triggers qualification.
  */
 export async function POST(request: NextRequest) {
-  const entitlements = await cacheQuery(
-    'entitlements:admin-leads',
-    () => getCurrentUserEntitlements(),
-    { ttlSeconds: 300 }
-  );
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

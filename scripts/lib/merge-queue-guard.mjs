@@ -2,7 +2,6 @@ import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
 
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
-export const FAST_TRACK_UI_LABEL = 'fast-track-ui';
 export const UI_LABEL = 'ui';
 export const NEEDS_CONFLICT_RESOLUTION_LABEL = 'needs-conflict-resolution';
 
@@ -63,9 +62,10 @@ export function isPendingNativeCohortCutoverField(field) {
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
   // JOV-6107: measured peak 19 hosted jobs/group plus >=7 background jobs on
-  // Team's 60-job budget permits two groups (45), not three (64). Keep the
-  // 20-minute check budget and ALLGREEN; see docs/PR_FLOW.md for the receipt.
-  check_response_timeout_minutes: 20,
+  // Team's 60-job budget permits two groups (45), not three (64). Preserve
+  // ALLGREEN. The prior 20-minute response deadline is shorter than the
+  // 30/40-minute required CI paths; source targets 60 minutes.
+  check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
   max_entries_to_build: 2,
   max_entries_to_merge: 5,
@@ -74,6 +74,11 @@ export const NATIVE_QUEUE_POLICY = Object.freeze({
   min_entries_to_merge_wait_minutes:
     NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes,
 });
+
+/** Exact old value during the source-first timeout cutover; no broad drift. */
+export function isPendingNativeCheckTimeoutCutover(field, observed) {
+  return field === 'check_response_timeout_minutes' && observed === 20;
+}
 
 /**
  * A lower native build count is safe for source-first rollout and rollback.
@@ -530,6 +535,12 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Layout Guard',
   'CI / Build + Layout (combined)',
   'Build + Layout (combined)',
+  'CI / Ovie Build (combined)',
+  'Ovie Build (combined)',
+  'CI / Ovie Typecheck (combined)',
+  'Ovie Typecheck (combined)',
+  'CI / Storybook Surface Matrix (combined)',
+  'Storybook Surface Matrix (combined)',
   'CI / iOS Fast Unit + Coverage (combined)',
   'iOS Fast Unit + Coverage (combined)',
   'CI / iOS Build + Test (combined)',
@@ -831,8 +842,8 @@ export function uiFastTrackPolicy(pr) {
   if (!labels.has(UI_LABEL)) {
     blockers.push(`missing required label: ${UI_LABEL}`);
   }
-  if (!labels.has(FAST_TRACK_UI_LABEL)) {
-    blockers.push(`missing required label: ${FAST_TRACK_UI_LABEL}`);
+  if (!labels.has(FAST_TRACK_LABEL)) {
+    blockers.push(`missing required label: ${FAST_TRACK_LABEL}`);
   }
 
   if (changedFiles.length === 0) {
@@ -873,13 +884,12 @@ export function uiFastTrackPolicy(pr) {
   }
 
   return {
-    requested: labels.has(FAST_TRACK_UI_LABEL),
+    requested: labels.has(UI_LABEL) && labels.has(FAST_TRACK_LABEL),
     eligible: blockers.length === 0,
     blockers,
     warnings,
     labels: {
       hasUi: labels.has(UI_LABEL),
-      hasFastTrackUi: labels.has(FAST_TRACK_UI_LABEL),
       hasFast: labels.has(FAST_TRACK_LABEL),
     },
     evidence,
@@ -1001,12 +1011,6 @@ export function serializationKeysForFile(file) {
     keys.push({
       key: `subsystem:${firstDirectory(normalized, 4)}`,
       reason: 'web library subsystem',
-      file: normalized,
-    });
-  } else if (normalized.startsWith('scripts/symphony/')) {
-    keys.push({
-      key: `subsystem:${firstDirectory(normalized, 3)}`,
-      reason: 'Symphony automation subsystem',
       file: normalized,
     });
   } else if (normalized.startsWith('scripts/')) {
@@ -1431,7 +1435,14 @@ export function validateMergeQueueRepoConfig(input) {
  * @param {{
  *   backend?: 'native',
  *   liveQueueConfiguration?: Record<string, unknown> | null,
+ *   allowUnavailableBypassActors?: boolean,
  * }} [options]
+ *
+ * GitHub omits `bypass_actors` from the ruleset response unless the caller can
+ * edit the ruleset; a workflow `GITHUB_TOKEN` never can. Absent stays fail
+ * closed by default; `allowUnavailableBypassActors` is an explicit opt-in for
+ * read-only observers that reports `bypassActorsVisible: false` instead. A
+ * present-but-malformed or non-empty `bypass_actors` still fails either way.
  */
 export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
   const errors = [];
@@ -1463,7 +1474,8 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
       if (
         observed[field] !== expected &&
         !isPendingNativeCohortCutoverField(field) &&
-        !isSupportedNativeBuildConcurrency(field, observed[field])
+        !isSupportedNativeBuildConcurrency(field, observed[field]) &&
+        !isPendingNativeCheckTimeoutCutover(field, observed[field])
       )
         errors.push(`live native merge_queue ${field} must be ${expected}`);
   }
@@ -1503,8 +1515,11 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
   }
 
   const hasValidBypassActors = Array.isArray(ruleset?.bypass_actors);
+  const bypassActorsVisible = ruleset?.bypass_actors !== undefined;
   const bypassActors = hasValidBypassActors ? ruleset.bypass_actors : [];
-  if (!hasValidBypassActors) {
+  const unavailableBypassActorsAllowed =
+    options.allowUnavailableBypassActors === true && !bypassActorsVisible;
+  if (!hasValidBypassActors && !unavailableBypassActorsAllowed) {
     errors.push('live ruleset bypass_actors must be an array');
   }
   if (bypassActors.length > 0) {
@@ -1517,6 +1532,7 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
     contexts,
     checks,
     hasBypassActors: bypassActors.length > 0,
+    bypassActorsVisible,
     hasNativeMergeQueue: Boolean(mergeQueueRule),
   };
 }
@@ -1983,11 +1999,13 @@ export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
 ]);
 export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
   'Run unit tests',
+  // ci-fast structural lane (coverage thresholds, ratchets). Live #18287
+  // failed it four times on an unchanged head with a coverage shortfall.
+  'Run structural ci-fast lane',
   'Run packages/ui unit tests',
   'Build and test',
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
-export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
 export const ACTIVE_MERGE_GROUP_STATUSES = new Set([
   'queued',
   'in_progress',
@@ -2010,10 +2028,11 @@ export function parseMergeQueueFrontBranch(branch) {
  * already-failed native merge-group attempt with no new information.
  *
  * Actions:
- *  - 'allow'   no applicable failure, a new head, or the bounded recovery path
- *              for unclassified infrastructure failures.
+ *  - 'allow'   no applicable failure, a new head, or the single recovery
+ *              retry per head for one unclassified infrastructure failure.
  *  - 'block'   the unchanged head has a classified product-check failure, or
- *              repeated unclassified failures inside the bounded cooldown.
+ *              its single retry is spent ('retry-exhausted'), regardless of
+ *              main movement or elapsed time; a new source head clears it.
  *  - 'unknown' evidence is missing/invalid. Callers must treat this as
  *              non-authoritative: enrollment degrades to the pre-guard
  *              behavior and dequeue mutations must not fire.
@@ -2052,10 +2071,21 @@ export function frontItemChurnDecision({
     .map(({ run }) => run)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
+  // Without the head commit time, failures of earlier heads cannot be told
+  // apart from the current head's, and counting all of them could mark an
+  // untested head retry-exhausted. Missing evidence is non-authoritative.
   const headMs = Date.parse(headCommittedAt);
-  const failuresForCurrentHead = Number.isFinite(headMs)
-    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
-    : allFailedFrontedRuns;
+  if (!Number.isFinite(headMs)) {
+    return {
+      action: 'unknown',
+      reason:
+        'head commit time unavailable; cannot attribute merge-group failures to the current head',
+      evidence: null,
+    };
+  }
+  const failuresForCurrentHead = allFailedFrontedRuns.filter(
+    run => Date.parse(run.createdAt) >= headMs
+  );
   const latestActiveForCurrentHead = mergeGroupRuns
     .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
     .filter(
@@ -2185,61 +2215,34 @@ export function frontItemChurnDecision({
     };
   }
 
-  const failedFrontedRuns = failuresForCurrentHead.filter(({ headBranch }) => {
-    const front = parseMergeQueueFrontBranch(headBranch);
-    return front?.baseSha === currentBaseSha;
-  });
-  if (failedFrontedRuns.length === 0) {
+  // One infrastructure-recovery retry per unchanged source head, counted
+  // across every synthetic group base. Counting only failures on the exact
+  // current main base (plus a five-minute cooldown) let an unchanged head
+  // re-enter the queue indefinitely: live #18287 failed the same combined-head
+  // check four times in 40 minutes while each ejection re-enqueued it, and
+  // every rebuild charged the followers a duplicate merge-group run.
+  const lastFailed = failuresForCurrentHead[0];
+  const lastFailedFront = parseMergeQueueFrontBranch(lastFailed.headBranch);
+  const unclassifiedEvidence = {
+    failureClass: 'unclassified',
+    failedAttempts: failuresForCurrentHead.length,
+    lastFailedRunId: lastFailed.id ?? null,
+    lastFailedAt: lastFailed.createdAt ?? null,
+    failedSteps: lastFailed.failedSteps ?? [],
+    baseSha: lastFailedFront?.baseSha ?? null,
+  };
+  if (failuresForCurrentHead.length < MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
     return {
       action: 'allow',
       reason:
-        'only unclassified failures exist and none occurred on the exact current main base',
-      evidence: null,
-    };
-  }
-  const lastFailed = failedFrontedRuns[0];
-  const attemptMs = Date.parse(lastFailed.createdAt);
-
-  if (failedFrontedRuns.length < MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
-    return {
-      action: 'allow',
-      reason:
-        'one unclassified merge-group failure retains a bounded infrastructure-recovery retry',
-      evidence: {
-        failureClass: 'unclassified',
-        failedAttempts: failedFrontedRuns.length,
-        lastFailedRunId: lastFailed.id ?? null,
-        lastFailedAt: lastFailed.createdAt ?? null,
-        baseSha: currentBaseSha,
-      },
-    };
-  }
-
-  const observedMs = Date.parse(observedAt);
-  if (observedMs - attemptMs >= MERGE_GROUP_CHURN_COOLDOWN_MS) {
-    return {
-      action: 'allow',
-      reason:
-        'unclassified failures completed the five-minute cooldown; allow one bounded infrastructure-recovery retry',
-      evidence: {
-        failureClass: 'unclassified',
-        failedAttempts: failedFrontedRuns.length,
-        lastFailedRunId: lastFailed.id ?? null,
-        lastFailedAt: lastFailed.createdAt ?? null,
-        baseSha: currentBaseSha,
-      },
+        'one unclassified merge-group failure retains a single infrastructure-recovery retry for this head',
+      evidence: unclassifiedEvidence,
     };
   }
 
   return {
     action: 'block',
-    reason: `unchanged head already fronted ${failedFrontedRuns.length} recent unclassified merge-group failures on the exact current main base; suppressing until the bounded cooldown`,
-    evidence: {
-      failureClass: 'unclassified',
-      failedAttempts: failedFrontedRuns.length,
-      lastFailedRunId: lastFailed.id ?? null,
-      lastFailedAt: lastFailed.createdAt ?? null,
-      baseSha: currentBaseSha,
-    },
+    reason: `unchanged head already failed ${failuresForCurrentHead.length} merge-group attempts; its single infrastructure-recovery retry is spent, so re-enrollment waits for a new source head`,
+    evidence: { ...unclassifiedEvidence, failureClass: 'retry-exhausted' },
   };
 }

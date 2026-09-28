@@ -94,20 +94,20 @@ describe('MusicBrainz directory assessment safeguards', () => {
     expect(assessment.nextAction.externalSubmissionAllowed).toBe(false);
   });
 
-  it.each([
-    `https://musicbrainz.org/artist/${OTHER_MBID}`,
-    'not-a-url',
-  ])('quarantines a canonical surface with an invalid identity URL: %s', url => {
-    const assessment = assessMusicBrainzDirectoryObservation(
-      input({
-        surface: { ...input().surface, normalizedUrl: url },
-      })
-    );
+  it.each([`https://musicbrainz.org/artist/${OTHER_MBID}`, 'not-a-url'])(
+    'quarantines a canonical surface with an invalid identity URL: %s',
+    url => {
+      const assessment = assessMusicBrainzDirectoryObservation(
+        input({
+          surface: { ...input().surface, normalizedUrl: url },
+        })
+      );
 
-    expect(assessment.outcome).toBe('surface_identity_mismatch');
-    expect(assessment.owner).toBe('jovie');
-    expect(assessment.nextAction.kind).toBe('quarantine_identity_match');
-  });
+      expect(assessment.outcome).toBe('surface_identity_mismatch');
+      expect(assessment.owner).toBe('jovie');
+      expect(assessment.nextAction.kind).toBe('quarantine_identity_match');
+    }
+  );
 
   it('prepares evidence without submitting when the entity is missing', () => {
     const assessment = assessMusicBrainzDirectoryObservation(
@@ -127,23 +127,23 @@ describe('MusicBrainz directory assessment safeguards', () => {
   it.each([
     { qualificationStatus: 'suggested', identityConfidence: '0.70' },
     { qualificationStatus: 'qualified', identityConfidence: 'not-a-number' },
-  ])('requires identity confirmation for weak canonical evidence: %o', ({
-    qualificationStatus,
-    identityConfidence,
-  }) => {
-    const assessment = assessMusicBrainzDirectoryObservation(
-      input({
-        surface: {
-          ...input().surface,
-          qualificationStatus,
-          identityConfidence,
-        },
-      })
-    );
+  ])(
+    'requires identity confirmation for weak canonical evidence: %o',
+    ({ qualificationStatus, identityConfidence }) => {
+      const assessment = assessMusicBrainzDirectoryObservation(
+        input({
+          surface: {
+            ...input().surface,
+            qualificationStatus,
+            identityConfidence,
+          },
+        })
+      );
 
-    expect(assessment.outcome).toBe('identity_unverified');
-    expect(assessment.nextAction.kind).toBe('confirm_identity_evidence');
-  });
+      expect(assessment.outcome).toBe('identity_unverified');
+      expect(assessment.nextAction.kind).toBe('confirm_identity_evidence');
+    }
+  );
 
   it('treats malformed source URLs as invalid provenance', () => {
     const assessment = assessMusicBrainzDirectoryObservation(

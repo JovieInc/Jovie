@@ -18,7 +18,11 @@ import {
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroPhoto,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
@@ -447,9 +451,14 @@ export default function LaunchPage() {
       <main>
         <section
           aria-labelledby='hero-heading'
-          className='system-b-launch-hero'
+          className='system-b-launch-hero marketing-hero-dock relative overflow-hidden'
         >
-          <MarketingContainer width='page'>
+          <MarketingHeroPhoto
+            src='/images/marketing-hero/launch.webp'
+            width={1600}
+            height={901}
+          />
+          <MarketingContainer width='page' className='relative z-3'>
             <div className='system-b-launch-hero-grid'>
               <div className='system-b-launch-hero-copy'>
                 <p className='system-b-launch-kicker'>Launch</p>
@@ -548,15 +557,6 @@ export default function LaunchPage() {
               />
               <div>
                 <NumberedFeatureList items={PROFILE_FEATURES} />
-                <div className='system-b-launch-stat-callout'>
-                  <strong>371%</strong>
-                  <p>
-                    More clicks when a page has one CTA instead of many. Pages
-                    with a single action convert at 13.5% vs 10.5% for pages
-                    with five or more links.
-                  </p>
-                  <span>Source: WordStream, Omnisend</span>
-                </div>
               </div>
             </div>
           </MarketingContainer>

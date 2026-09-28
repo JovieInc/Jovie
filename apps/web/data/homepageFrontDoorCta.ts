@@ -51,7 +51,7 @@ export function getHomepageFrontDoorCtaContract(
   if (waitlistEnabled) {
     return {
       primary: {
-        label: 'Get started',
+        label: 'Request access',
         href: PUBLIC_WAITLIST_URL,
       },
       secondary: null,

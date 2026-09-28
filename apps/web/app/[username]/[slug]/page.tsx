@@ -17,7 +17,10 @@ import {
   type FeaturedArtist,
   ReleaseLandingPage,
 } from '@/app/r/[slug]/ReleaseLandingPage';
-import { UnpublishedEntityAlerts } from '@/components/features/alerts/UnpublishedEntityAlerts';
+import {
+  UnpublishedEntityAlerts,
+  UnpublishedEntityAlertsFallback,
+} from '@/components/features/alerts/UnpublishedEntityAlerts';
 import { BASE_URL } from '@/constants/app';
 import {
   MysteryReleasePage,
@@ -25,10 +28,7 @@ import {
   UnreleasedReleaseHero,
   VideoReleasePage,
 } from '@/features/release';
-import {
-  derivePreviewState,
-  getProviderConfidence,
-} from '@/lib/discography/audio-qa';
+import { getProviderConfidence } from '@/lib/discography/audio-qa';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
@@ -142,7 +142,7 @@ export default async function ContentSmartLinkPage({
       notFound();
     }
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<UnpublishedEntityAlertsFallback />}>
         <UnpublishedEntityAlerts
           artist={creatorToArtist(creator)}
           entityTitle={unpublished.title}
@@ -189,13 +189,6 @@ export default async function ContentSmartLinkPage({
     .filter(p => p.url);
 
   const allProviders = [...providers, ...secondaryProviders];
-  const previewState = derivePreviewState({
-    audioUrl: null,
-    previewUrl: content.previewUrl ?? null,
-    metadata: content.previewMetadata ?? null,
-    providerLinks: content.providerLinks,
-  });
-
   // Check if any video provider links exist for "Use this sound"
   const hasVideoLinks = content.providerLinks.some(
     link => Boolean(link.url) && isVideoProviderKey(link.providerId)
@@ -230,6 +223,7 @@ export default async function ContentSmartLinkPage({
       releaseType: content.releaseType,
       totalTracks: content.totalTracks,
       credits: content.credits,
+      primaryArtists: content.primaryArtists,
       durationMs: content.durationMs,
       isrc: content.isrc,
       trackNumber: content.trackNumber,
@@ -302,7 +296,6 @@ export default async function ContentSmartLinkPage({
         content={content}
         creator={creator}
         allProviders={allProviders}
-        previewState={previewState}
         soundsUrl={soundsUrl}
         downloadUrl={downloadUrl}
       />
@@ -389,7 +382,6 @@ function ContentPageBody({
   content,
   creator,
   allProviders,
-  previewState,
   soundsUrl,
   downloadUrl,
 }: Readonly<{
@@ -405,7 +397,6 @@ function ContentPageBody({
     url: string | null;
     confidence?: import('@/lib/discography/types').ProviderConfidence;
   }>;
-  previewState: ReturnType<typeof derivePreviewState>;
   soundsUrl: string | null;
   downloadUrl: string | null;
 }>) {
@@ -488,10 +479,6 @@ function ContentPageBody({
         title: content.title,
         artworkUrl: content.artworkUrl,
         releaseDate: toISOStringOrNull(content.releaseDate),
-        previewUrl: content.previewUrl ?? null,
-        isrc: content.isrc ?? null,
-        previewVerification: previewState.previewVerification,
-        previewSource: previewState.previewSource,
       }}
       artist={{
         name: ownerName,
@@ -748,10 +735,6 @@ export async function generateMetadata({
           },
         ],
       }),
-      ...(content.type === 'track' &&
-        content.previewUrl && {
-          audio: content.previewUrl,
-        }),
     },
     twitter: {
       card: ogImage ? 'summary_large_image' : 'summary',

@@ -39,13 +39,12 @@ describe('Library lifecycle policy (JOV-3374)', () => {
     });
   });
 
-  it.each([
-    'image',
-    'video',
-    'audio',
-  ] as const)('keeps %s on the parent release lifecycle until it has an independent identity', itemKind => {
-    expect(getLibraryLifecycleOwnerKind(itemKind)).toBe('release');
-  });
+  it.each(['image', 'video', 'audio'] as const)(
+    'keeps %s on the parent release lifecycle until it has an independent identity',
+    itemKind => {
+      expect(getLibraryLifecycleOwnerKind(itemKind)).toBe('release');
+    }
+  );
 
   it('does not invent a release owner for independent tracks or merch', () => {
     expect(getLibraryLifecycleOwnerKind('track')).toBe('track');

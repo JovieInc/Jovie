@@ -120,8 +120,10 @@ describe('Hermes CLI worker runner', () => {
     );
   });
 
-  it('terminates a Design Lab worker process group when artifacts grow over budget', async () => {
-    if (process.platform === 'win32') return;
+  it('terminates a Design Lab worker process group when artifacts grow over budget', async ({
+    skip,
+  }) => {
+    if (process.platform === 'win32') skip();
     const workspace = await realpath(
       await mkdtemp(path.join(os.tmpdir(), 'hermes-design-lab-monitor-'))
     );
@@ -189,8 +191,10 @@ describe('Hermes CLI worker runner', () => {
     }
   });
 
-  it('allows gradual below-budget Design Lab writes and never signals a normally closed worker', async () => {
-    if (process.platform === 'win32') return;
+  it('allows gradual below-budget Design Lab writes and never signals a normally closed worker', async ({
+    skip,
+  }) => {
+    if (process.platform === 'win32') skip();
     const workspace = await realpath(
       await mkdtemp(path.join(os.tmpdir(), 'hermes-design-lab-growth-'))
     );
@@ -243,8 +247,10 @@ describe('Hermes CLI worker runner', () => {
     }
   });
 
-  it('keeps monitoring the owned process group after its leader exits', async () => {
-    if (process.platform === 'win32') return;
+  it('keeps monitoring the owned process group after its leader exits', async ({
+    skip,
+  }) => {
+    if (process.platform === 'win32') skip();
     const workspace = await realpath(
       await mkdtemp(path.join(os.tmpdir(), 'hermes-design-lab-background-'))
     );

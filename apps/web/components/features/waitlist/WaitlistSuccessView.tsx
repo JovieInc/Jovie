@@ -27,7 +27,11 @@ export function WaitlistSuccessView({
   email,
 }: Readonly<WaitlistSuccessViewProps>) {
   useEffect(() => {
-    if (outcome !== 'save_failed' && outcome !== 'rate_limited') {
+    if (
+      outcome !== 'save_failed' &&
+      outcome !== 'rate_limited' &&
+      outcome !== 'receipt_unavailable'
+    ) {
       track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_CONFIRMATION_VIEWED, {
         surface: 'waitlist_receipt',
         outcome,

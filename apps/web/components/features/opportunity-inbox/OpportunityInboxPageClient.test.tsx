@@ -9,6 +9,18 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
+const runtimeState = vi.hoisted(() => ({
+  update: null as null | {
+    available: boolean;
+    busy: boolean;
+    title: string;
+    description: string;
+    apply: () => void;
+  },
+}));
+vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
+  useRuntimeUpdate: () => runtimeState.update,
+}));
 const mutateMock = vi.fn();
 const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
 let inboxHomeEnabled = false;
@@ -149,11 +161,29 @@ const pendingTourDate = {
 
 describe('OpportunityInboxPageClient', () => {
   afterEach(() => {
+    runtimeState.update = null;
     inboxHomeEnabled = false;
     mutateMock.mockReset();
     mutateAsyncMock.mockReset();
     mutateAsyncMock.mockResolvedValue({ ok: true });
     tourDateMutateMock.mockReset();
+  });
+
+  it('shows runtime notifications in Inbox instead of a caught-up state', () => {
+    runtimeState.update = {
+      available: true,
+      busy: false,
+      title: 'Restart Jovie To Update',
+      description: 'Install the available update.',
+      apply: vi.fn(),
+    };
+    render(
+      <OpportunityInboxPageClient inbox={{ cards: [], emptyActionCards: [] }} />
+    );
+    expect(screen.getByTestId('inbox-runtime-notification')).toBeVisible();
+    expect(
+      screen.queryByTestId('opportunity-inbox-empty-state')
+    ).not.toBeInTheDocument();
   });
 
   it('hydrates the artist-profile rail with the inbox profile data', async () => {
@@ -585,40 +615,54 @@ describe('OpportunityInboxPageClient', () => {
     expect(songs).toHaveFocus();
   });
 
-  it('returns focus to the empty-state recovery action after clearing Inbox', async () => {
-    const user = userEvent.setup();
-    inboxHomeEnabled = true;
+  it.each([false, true])(
+    'returns focus to remaining Inbox work after clearing cards (update=%s)',
+    async hasUpdate => {
+      if (hasUpdate)
+        runtimeState.update = {
+          available: true,
+          busy: false,
+          title: 'Restart Jovie To Update',
+          description: 'Install update.',
+          apply: vi.fn(),
+        };
+      const user = userEvent.setup();
+      inboxHomeEnabled = true;
 
-    render(
-      <OpportunityInboxPageClient
-        inbox={{
-          cards: [
-            {
-              id: 'card-1',
-              sourceKind: 'test.suggestion',
-              signalType: 'other' as const,
-              typeLabel: 'Suggestion',
-              createdAt: '2026-06-28T10:00:00.000Z',
-              title: 'Detroit listeners up 340%',
-              why: 'Promoter email matched your Detroit growth spike.',
-              primaryActionLabel: 'Review pitch',
-              status: 'pending' as const,
-              category: 'suggestion' as const,
-            },
-          ],
-          emptyActionCards: [],
-        }}
-      />
-    );
+      render(
+        <OpportunityInboxPageClient
+          inbox={{
+            cards: [
+              {
+                id: 'card-1',
+                sourceKind: 'test.suggestion',
+                signalType: 'other' as const,
+                typeLabel: 'Suggestion',
+                createdAt: '2026-06-28T10:00:00.000Z',
+                title: 'Detroit listeners up 340%',
+                why: 'Promoter email matched your Detroit growth spike.',
+                primaryActionLabel: 'Review pitch',
+                status: 'pending' as const,
+                category: 'suggestion' as const,
+              },
+            ],
+            emptyActionCards: [],
+          }}
+        />
+      );
 
-    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
-    await user.keyboard('{ArrowRight}');
+      screen
+        .getByRole('button', { name: 'Review Current Opportunity' })
+        .focus();
+      await user.keyboard('{ArrowRight}');
 
-    expect(
-      screen.getByTestId('opportunity-inbox-empty-state')
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
-  });
+      expect(
+        screen.getByRole('button', {
+          name: hasUpdate ? 'Restart Jovie To Update' : 'Start Session',
+        })
+      ).toHaveFocus();
+    }
+  );
 
   it('returns focus to recovery after completing the last report next step', async () => {
     const user = userEvent.setup();
@@ -721,47 +765,51 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByTestId('opportunity-inbox-filter-empty')).toBeVisible();
   });
 
-  it.each([
-    '{ArrowRight}',
-    '{ArrowLeft}',
-  ])('does not restore stack focus after a failed %s action', async key => {
-    const user = userEvent.setup();
-    inboxHomeEnabled = true;
-    mutateMock.mockImplementation((_id, options) => {
-      options?.onError?.();
-    });
-    mutateAsyncMock.mockRejectedValueOnce(new Error('decision failed'));
+  it.each(['{ArrowRight}', '{ArrowLeft}'])(
+    'does not restore stack focus after a failed %s action',
+    async key => {
+      const user = userEvent.setup();
+      inboxHomeEnabled = true;
+      mutateMock.mockImplementation((_id, options) => {
+        options?.onError?.();
+      });
+      mutateAsyncMock.mockRejectedValueOnce(new Error('decision failed'));
 
-    render(
-      <OpportunityInboxPageClient
-        inbox={{
-          cards: [
-            {
-              id: 'card-1',
-              sourceKind: 'test.suggestion',
-              signalType: 'other' as const,
-              typeLabel: 'Suggestion',
-              createdAt: '2026-06-28T10:00:00.000Z',
-              title: 'Detroit listeners up 340%',
-              why: 'Promoter email matched your Detroit growth spike.',
-              primaryActionLabel: 'Review pitch',
-              status: 'pending' as const,
-              category: 'suggestion' as const,
-            },
-          ],
-          emptyActionCards: [],
-        }}
-      />
-    );
+      render(
+        <OpportunityInboxPageClient
+          inbox={{
+            cards: [
+              {
+                id: 'card-1',
+                sourceKind: 'test.suggestion',
+                signalType: 'other' as const,
+                typeLabel: 'Suggestion',
+                createdAt: '2026-06-28T10:00:00.000Z',
+                title: 'Detroit listeners up 340%',
+                why: 'Promoter email matched your Detroit growth spike.',
+                primaryActionLabel: 'Review pitch',
+                status: 'pending' as const,
+                category: 'suggestion' as const,
+              },
+            ],
+            emptyActionCards: [],
+          }}
+        />
+      );
 
-    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
-    await user.keyboard(key);
-    const songs = screen.getByRole('button', { name: 'Songs' });
-    await user.click(songs);
+      screen
+        .getByRole('button', { name: 'Review Current Opportunity' })
+        .focus();
+      await user.keyboard(key);
+      const songs = screen.getByRole('button', { name: 'Songs' });
+      await user.click(songs);
 
-    expect(songs).toHaveFocus();
-    expect(screen.getByTestId('opportunity-inbox-filter-empty')).toBeVisible();
-  });
+      expect(songs).toHaveFocus();
+      expect(
+        screen.getByTestId('opportunity-inbox-filter-empty')
+      ).toBeVisible();
+    }
+  );
 
   it('returns focus to a queue item restored after an asynchronous failure', async () => {
     const user = userEvent.setup();

@@ -29,7 +29,7 @@ const CLI = join(HERE, 'pen-cold-readback.mjs');
 const GATE = join(HERE, 'pen-promotion-gate.mjs');
 const CANONICAL_PATH = join(
   homedir(),
-  'Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen'
+  'Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen'
 );
 
 function unavailableInput(overrides = {}) {

@@ -54,7 +54,7 @@ async function readOtpRequestEmail(request: Request): Promise<string | null> {
  * returning `false` disables limiting for that request).
  *
  * CI and local self-hosted runners collapse client IPs to 127.0.0.1, so the
- * plugin defaults (3 req / 60s per path, shared Upstash secondary storage)
+ * plugin defaults (3 req / 60s per path, shared Upstash auth rate-limit counter)
  * are exhausted by concurrent golden-path / agent OTP traffic. Deterministic
  * E2E test emails therefore bypass this limit (triple-guarded above);
  * everyone else keeps the 3/60s window.

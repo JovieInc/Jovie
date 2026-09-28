@@ -311,19 +311,26 @@ Three input variables generate the entire palette:
 
 ### App Colors — Light Mode (System B)
 
+Text secondary/tertiary/quaternary follow the **cinematic depth** ramp
+(founder-locked, Tim, 2026-09-25): one big step down from primary, then a
+compressed ordered tail. Each light value is ≥4.5:1 against white; secondary
+and tertiary are also gated at 4.5:1 against `--color-bg-base`/`surface-1` by
+`contrast-pairs.config.json` (dark values follow the same ramp via the
+Noir Ion anchors below).
+
 | Token | Value | Hex approx | Usage |
 |-------|-------|-----------|-------|
-| `--color-bg-base` | `#F8FAFD` | canvas | Page / canvas |
-| `--color-bg-surface-0` | `#F3F5F8` | shell | Sidebar / chrome |
-| `--color-bg-surface-1` | `#EAEDF1` | card | Cards / content |
-| `--color-bg-surface-2` | `#DFE3E8` | elevated | Hover / raised |
-| `--color-bg-surface-3` | `#D4D9E0` | floating | Pressed / overlays |
+| `--color-bg-base` | `#F3F4F6` | canvas | Page / canvas |
+| `--color-bg-surface-0` | `#F9FAFC` | shell | Sidebar / chrome |
+| `--color-bg-surface-1` | `#FFFFFF` | card | Cards / content |
+| `--color-bg-surface-2` | `#FFFFFF` | elevated | Hover / raised |
+| `--color-bg-surface-3` | `#FFFFFF` | floating | Pressed / overlays |
 | `--color-bg-primary` | `lch(98.94% 0.5 282)` | `#fcfcfd` | Primary content area |
 | `--color-bg-secondary` | `lch(95.94% 0.5 282)` | `#f3f3f5` | Secondary surfaces, sidebar |
 | Text primary | `lch(9.894% 0 282)` | `#0c0c0c` | Headings, primary text |
-| Text secondary | `lch(19.788% 1.25 282)` | `#2e2f31` | Body text, labels |
-| Text tertiary | `lch(39.576% 1.25 282)` | `#5a5b5d` | Descriptions, meta |
-| Text quaternary | `lch(65.3% 1.25 282)` | `#9a9b9d` | Placeholders |
+| Text secondary | `#5A606A` | `#5a606a` | Body text, labels |
+| Text tertiary | `#666C76` | `#666c76` | Descriptions, meta |
+| Text quaternary | `#6A7078` | `#6A7078` | Placeholders |
 | Border subtle | `oklch(0% 0 0 / 6%)` | — | Dividers |
 | Border default | `oklch(0% 0 0 / 10%)` | — | Borders |
 | Border strong | `oklch(0% 0 0 / 18%)` | — | Emphasis |
@@ -340,15 +347,15 @@ prior anchors without a second theme provider).
 
 | Role | Anchor | Product token(s) | Usage |
 |------|--------|------------------|-------|
-| Canvas | `#030407` | `--color-bg-base`, `--color-bg-page`, `--linear-bg-page` | App page |
-| Shell | `#06080D` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
-| Card | `#0F1420` | `--color-bg-surface-1`, `--app-shell-content-surface` | Cards / content |
-| Elevated | `#151B2A` | `--color-bg-surface-2` | Inputs, raised |
-| Floating | `#1B2436` | `--color-bg-surface-3` | Modals, tooltips |
+| Canvas | `#030406` | `--color-bg-base`, `--color-bg-page`, `--linear-bg-page` | App page |
+| Shell | `#07080A` | `--color-bg-surface-0`, sidebar rgb `7 8 10` | Sidebar / chrome |
+| Card | `#131417` | `--color-bg-surface-1`, `--app-shell-content-surface` | Cards / content |
+| Elevated | `#1A1B1E` | `--color-bg-surface-2` | Inputs, raised |
+| Floating | `#232427` | `--color-bg-surface-3` | Modals, tooltips |
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
-| Text secondary | `#D7DCE8` | `--color-text-secondary-token` | Labels |
-| Text muted | `#A8B0C3` | `--color-text-tertiary-token` | Meta |
-| Text tertiary | `#7D879D` | `--color-text-quaternary-token` | Placeholders |
+| Text secondary | `#A0A5AF` | `--color-text-secondary-token` | Labels |
+| Text muted | `#8F95A0` | `--color-text-tertiary-token` | Meta |
+| Text tertiary | `#858B96` | `--color-text-quaternary-token` | Placeholders |
 | Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
 | Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
 | Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |
@@ -360,19 +367,42 @@ prior anchors without a second theme provider).
 
 | Role | Hex | Soft | Meaning |
 |------|-----|------|---------|
-| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Focus, active nav, links, selection |
-| Ultra (violet) | `#8E56F5` | `rgba(142,86,245,.12)` | Agent intelligence or ranking state only |
-| Pulse (pink) | `#F52BB5` | `rgba(245,43,181,.12)` | Launch or creative-status state only |
+| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Focus, active nav, links, selection; rotation slot 1 on backgrounds |
+| Ultra (violet) | `#8E56F5` | `rgba(142,86,245,.12)` | Agent intelligence or ranking state; rotation slot 2 on backgrounds |
+| Pulse (pink) | `#F52BB5` | `rgba(245,43,181,.12)` | Launch or creative-status state; rotation slot 3 on backgrounds |
 | Mint (green) | `#3FFA8B` | `rgba(63,250,139,.12)` | Success. Aqua aliases this hex. |
-| Orange | `#FF7800` | `rgba(255,120,0,.12)` | Warning. Gold aliases this hex. |
+| Orange | `#FF7800` | `rgba(255,120,0,.12)` | Warning; rotation slot 4 after Ion, Ultra, Pulse. Gold aliases this hex. |
 | Red | `#F72A36` | `rgba(247,42,54,.12)` | Danger / error. Flare aliases this hex. |
 
 CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
 Every status also uses text, icon, shape, or pattern — color alone never carries meaning.
 
-Accent color is semantic only. Do not rotate accent colors for decoration, use
-accent title text as ornament, or put a decorative icon on a colored square.
+Accent color follows the founder rotation rule (Tim, 2026-09-26). It applies
+app-wide: web, mobile web, iOS, macOS, marketing, and public profiles.
+
+- **Neutral by default.** Color appears only through the rotation below. The
+  interactive focus/link accent never rotates. Red and green keep their status
+  meaning. CTAs stay neutral high-contrast pills.
+- **Background only.** A rotating accent fills a card or section background
+  (tint, gradient, shader). Text, glyphs, and CTAs stay neutral.
+- **Visual-order rotation.** Assign blue (Ion) → purple (Ultra) → pink (Pulse) in
+  reading order on each surface. Two consecutive sections or cards never share
+  an accent. Orange enters only after those three are used on that surface.
+  Red and green enter only after all four, since they read as error and success.
+- **Image anchor.** When a card carries album art, release artwork, or a photo,
+  choose the accent that best complements the image by color theory, and reject
+  accents that clash with it (skin tones included). That choice anchors the
+  rotation, and the next section cannot reuse it.
+- **One accent per gradient.** A gradient, shader, or background uses one
+  accent only, never two in the same section. Its central hue is the exact accent
+  token value, with the most weight there. Other stops are shades of that hue.
+- **Saturation is the contrast lever.** Colors are OKLCH. When the foreground
+  needs to pop, lower chroma only (keep lightness and hue), by an optically
+  equal amount across accents. Behind album art or a profile picture,
+  desaturate strongly so the art wins. Text-only cards keep more chroma.
+
+Never use accent title text as ornament or put a decorative icon on a colored square.
 
 Specimen: Storybook `Design System/Noir Ion Specimen`.
 
@@ -765,15 +795,24 @@ keep them at semibold (~590) and do not drop medium surfaces to book/400.
 | Token | Light | Dark |
 |-------|-------|------|
 | Width | 244px | 244px |
-| Background RGB | `247 248 248` | `6 8 13` |
+| Background RGB | `247 248 248` | `7 8 10` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
+| Accent active RGB | `236 238 241` | `168 176 195 / 0.1` |
 | Item foreground RGB | `88 90 96` | `214 218 226` |
 | Item icon RGB | `122 125 132` | `116 120 128` |
 | Muted RGB | `112 116 124` | `107 111 118` |
 | Nav font | 12px / weight 500 | — |
 | Item font | 13px / weight 450 | — |
+
+Linear-scale density (founder lock 2026-09-25): 28px nav/history rows, 16px
+sidebar icons, 44px app header everywhere (single token, no separate
+"compact" variant). Selected nav row uses the neutral Accent active tint
+above with primary-token text — no ion/blue background, no border.
+Today/Earlier day headers are sentence case, no letterspacing, 11px medium,
+quiet color. Account footer is a single compact 32px row: 20px avatar, name
+only, no workspace subtitle line.
 
 ### App Shell Frame
 
@@ -877,7 +916,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 
 | Property | Value | Notes |
 |----------|-------|-------|
-| Background | `#0a0a0a` | Shipped status-screen black (e.g. `apps/web/public/offline.html`); intentionally distinct from the app canvas `--color-bg-base` (`#030407`) |
+| Background | `#0a0a0a` | Shipped status-screen black (e.g. `apps/web/public/offline.html`); intentionally distinct from the app canvas `--color-bg-base` (`#030406`) |
 | Text primary | `#ffffff` | |
 | Text secondary | `#969799` | Descriptions |
 | Text quaternary | `#62666d` | Error IDs |

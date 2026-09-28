@@ -42,6 +42,12 @@ describe('onboarding sign-in placement', () => {
     );
   });
 
+  it('hides sign-in after the server resolves an authenticated session', () => {
+    render(<OnboardingShell sessionLabel='pending' isSignedIn />);
+
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+  });
+
   it('removes the centered duplicate and starter rail from the blank entry', () => {
     render(<OnboardingChatEmptyIntro mode='blank' />);
 

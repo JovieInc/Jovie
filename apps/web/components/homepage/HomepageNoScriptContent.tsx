@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 /**
@@ -13,7 +14,8 @@ import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
  * `<noscript>` content.
  */
 export function HomepageNoScriptContent() {
-  const { hero, certified } = HOMEPAGE_LAUNCH_COPY;
+  const { hero } = HOMEPAGE_IDENTITY_COPY;
+  const { certified } = HOMEPAGE_LAUNCH_COPY;
 
   return (
     <section
@@ -29,21 +31,17 @@ export function HomepageNoScriptContent() {
         <div key={section.id}>
           <h3>{section.headline}</h3>
           <p>{section.body}</p>
-          {'outcomes' in section
-            ? section.outcomes.map(outcome => (
-                <div key={outcome.id}>
-                  <h4>{outcome.headline}</h4>
-                  <p>{outcome.body}</p>
-                </div>
-              ))
-            : null}
+          {section.steps.map(step => (
+            <p key={step.id}>{step.caption}</p>
+          ))}
         </div>
       ))}
 
       <h3>{certified.close.headline}</h3>
 
       <p>
-        <a href={APP_ROUTES.START}>{certified.close.action}</a>{' '}
+        {hero.search.placeholder}{' '}
+        <a href={APP_ROUTES.START}>{hero.search.action}</a>{' '}
         <a href={APP_ROUTES.SUPPORT}>Contact support</a>
       </p>
     </section>

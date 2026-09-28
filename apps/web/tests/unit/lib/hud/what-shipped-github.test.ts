@@ -96,6 +96,27 @@ describe('readWhatShippedFromGitHub process fallback cache', () => {
     vi.useRealTimers();
   });
 
+  it('reports a non-array GitHub payload as an unavailable TypeError', async () => {
+    stubQuotaExhaustedRedis();
+    mocks.serverFetch.mockResolvedValue(
+      new Response(JSON.stringify({ message: 'not a list' }), { status: 200 })
+    );
+
+    const result = await readWhatShippedFromGitHub();
+
+    expect(result).toMatchObject({
+      available: false,
+      observation: 'unavailable',
+      items: [],
+      errorMessage: 'Unexpected GitHub API response for merged pulls',
+    });
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      'What shipped GitHub fallback failed',
+      expect.any(TypeError),
+      expect.objectContaining({ context: 'hud_what_shipped_github' })
+    );
+  });
+
   it('keeps the GitHub feed available when Redis rejects reads and writes for quota', async () => {
     const redis = stubQuotaExhaustedRedis();
     mocks.serverFetch.mockResolvedValue(

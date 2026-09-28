@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
+import { routeFromPattern } from './performance-budgets.mjs';
 import {
   AUDITOR_MODEL,
   alreadyFiled,
@@ -29,6 +30,67 @@ const overlay = source =>
   }).join('\n');
 
 describe('JOV-INV-026 performance invariant factory', () => {
+  it('binds every admin Lighthouse URL to error-level assertions and its budget route', () => {
+    const config = JSON.parse(
+      readFileSync('apps/web/.lighthouserc.admin.pr.json', 'utf8')
+    );
+    const packageJson = JSON.parse(
+      readFileSync('apps/web/package.json', 'utf8')
+    );
+    const script = packageJson.scripts['test:lighthouse:admin:pr'];
+    const urls = script
+      .match(/LIGHTHOUSE_DASHBOARD_URLS=([^ ]+)/)?.[1]
+      .split(',');
+    const [adminAssertions] = config.ci.assert.assertMatrix;
+    const matcher = new RegExp(adminAssertions.matchingUrlPattern);
+    const finalUrls = [
+      '/app/ov/growth',
+      '/app/ov/people?view=creators',
+      '/app/ov/people?view=users',
+      '/app/ov/people?view=releases',
+    ];
+
+    assert.deepEqual(urls, finalUrls);
+    for (const url of finalUrls) {
+      assert.equal(matcher.test('https://jov.ie' + url), true, url);
+    }
+    for (const redirectingUrl of [
+      '/app/ov/creators',
+      '/app/ov/users',
+      '/app/ov/releases',
+    ]) {
+      assert.equal(matcher.test('https://jov.ie' + redirectingUrl), false);
+    }
+    assert.equal(
+      routeFromPattern(adminAssertions.matchingUrlPattern),
+      '/app/ov/*'
+    );
+    assert.equal(
+      adminAssertions.assertions['categories:performance'][0],
+      'error'
+    );
+    const pack = projectPerformancePack();
+    for (const url of finalUrls) {
+      const violations = planLinearIssues({
+        pack,
+        measurements: [
+          {
+            url: `https://jov.ie${url}`,
+            source: 'lhci',
+            metrics: { performance_score: 0.1 },
+          },
+        ],
+      });
+      assert.ok(
+        violations.some(
+          item =>
+            item.fingerprint === 'perf-violation:/app/ov/*:performance_score'
+        ),
+        `missing OV proposal for ${url}`
+      );
+    }
+  });
+
   it('accepts the checked-in performance pack', () => {
     assert.deepEqual(validatePerformanceFactory(), []);
     const pack = JSON.parse(readFileSync(PERFORMANCE_PACK_PATH, 'utf8'));

@@ -290,7 +290,7 @@ hash_dependency_inputs() {
 
 # Warm SessionStart skip. Claude and Codex both call this script on every
 # session. When the worktree is already healthy (deps fingerprint matches,
-# Node 22.23.2+, pnpm 9.15.4), do not rerun Doppler/gh/Clerk/migration/lsof.
+# Node 22.23.2+, pnpm 9.15.9), do not rerun Doppler/gh/Clerk/migration/lsof.
 # Cold or stale worktrees fall through to the full body. Codex gbrain sync
 # is not part of this script and still runs after we return.
 # Force the full body with JOVIE_SETUP_FORCE=1.
@@ -323,7 +323,7 @@ fi
 # ─── 2. pnpm ────────────────────────────────────────────────────────────────
 echo ""
 echo "── pnpm ────────────────────────────────────────────────────────────────"
-REQUIRED_PNPM="9.15.4"
+REQUIRED_PNPM="9.15.9"
 if command -v pnpm &>/dev/null; then
   PNPM_VERSION=$(pnpm --version)
   if [[ "$PNPM_VERSION" == "$REQUIRED_PNPM" ]]; then

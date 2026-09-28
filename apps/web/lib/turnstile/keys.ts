@@ -133,7 +133,7 @@ export function resolveTurnstileSecretKey(
 
 /** Browser hostname helper — returns null during SSR / non-DOM runtimes. */
 export function getBrowserTurnstileHostname(): string | null {
-  if (typeof globalThis.location === 'undefined') return null;
+  if (globalThis.location === undefined) return null;
   return globalThis.location.hostname || null;
 }
 

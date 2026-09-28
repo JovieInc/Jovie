@@ -19,6 +19,9 @@ describe('MemoryRateLimiter', () => {
     limit: 3,
     window: '1 m',
     prefix: 'test',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'internal',
   };
 
   beforeEach(() => {
@@ -288,6 +291,9 @@ describe('MemoryRateLimiter', () => {
         limit: 2,
         window: '5 s',
         prefix: 'sec-test',
+        analytics: false,
+        algorithm: 'fixed-window',
+        trafficClass: 'internal',
       };
       const limiter = new MemoryRateLimiter(config);
 
@@ -307,6 +313,9 @@ describe('MemoryRateLimiter', () => {
         limit: 2,
         window: '1 h',
         prefix: 'hour-test',
+        analytics: false,
+        algorithm: 'fixed-window',
+        trafficClass: 'internal',
       };
       const limiter = new MemoryRateLimiter(config);
 
@@ -331,6 +340,9 @@ describe('MemoryRateLimiter', () => {
         limit: 1,
         window: '1 m',
         prefix: 'single',
+        analytics: false,
+        algorithm: 'fixed-window',
+        trafficClass: 'internal',
       };
       const limiter = new MemoryRateLimiter(config);
 
@@ -348,6 +360,9 @@ describe('MemoryRateLimiter', () => {
         limit: 10000,
         window: '1 h',
         prefix: 'high',
+        analytics: false,
+        algorithm: 'fixed-window',
+        trafficClass: 'internal',
       };
       const limiter = new MemoryRateLimiter(config);
 

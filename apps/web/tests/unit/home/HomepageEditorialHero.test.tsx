@@ -1,11 +1,18 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
+import { HomepagePrimaryAction } from '@/components/homepage/HomepagePrimaryAction';
 import {
   HOMEPAGE_CERTIFIED_EVENTS,
   HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT,
   HOMEPAGE_CERTIFIED_VARIANT_ID,
 } from '@/data/homepageCertifiedOptimization';
+
+const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
+vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
+beforeEach(() => {
+  gate.WAITLIST_ENABLED = false;
+});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -32,6 +39,45 @@ function renderHero() {
 }
 
 describe('HomepageEditorialHero', () => {
+  it('keeps the name search when the waitlist gate is on', () => {
+    gate.WAITLIST_ENABLED = true;
+    render(
+      <HomepagePrimaryAction
+        appearance='editorial'
+        placeholder='Search your name'
+        submitLabel='Find me'
+        submitTestId='homepage-primary-cta'
+      />
+    );
+    expect(screen.getByRole('combobox')).toHaveAttribute(
+      'placeholder',
+      'Search your name'
+    );
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+      'Find me'
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Get started' })
+    ).not.toBeInTheDocument();
+  });
+  it('does not replace the hero name search with a waitlist link', () => {
+    gate.WAITLIST_ENABLED = true;
+    renderHero();
+    expect(screen.getByRole('combobox')).toHaveAttribute(
+      'placeholder',
+      'Search your name'
+    );
+    expect(screen.getByRole('button', { name: 'Find me' })).toBeEnabled();
+    expect(
+      screen.queryByRole('link', { name: 'Request access' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Get started' })
+    ).not.toBeInTheDocument();
+  });
   it('renders one heading, one support line, and the name search as the only control', () => {
     renderHero();
 

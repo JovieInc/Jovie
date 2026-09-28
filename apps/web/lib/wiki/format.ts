@@ -1,6 +1,6 @@
 export function titleFromSlug(slug: string): string {
   const parts = slug.split('/');
-  return parts[parts.length - 1]
+  return (parts.at(-1) ?? '')
     .replace(/[-_]/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase());
 }

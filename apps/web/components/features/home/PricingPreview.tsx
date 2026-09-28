@@ -1,12 +1,13 @@
 import { Container } from '@/components/site/Container';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
-import { publicEnv } from '@/lib/env-public';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 // Extracted static style to avoid creating new object on each render
 const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
-const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
 export function PricingPreview() {
+  const freeClaim = getPublicPriceClaim('free');
+  const proClaim = getPublicPriceClaim('pro');
+
   return (
     <section className='py-20 bg-surface-1'>
       <Container size='md'>
@@ -19,28 +20,28 @@ export function PricingPreview() {
             Simple, transparent pricing
           </h2>
           <p className='mt-4 text-lg text-tertiary-token'>
-            Start free. Scale as you grow.
+            Artist profiles are free forever. {proClaim.note}
           </p>
         </div>
 
-        <div
-          className={`grid ${maxPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-8 max-w-4xl mx-auto`}
-        >
+        <div className='grid md:grid-cols-2 gap-8 max-w-4xl mx-auto'>
           {/* Free Tier */}
           <div className='text-center'>
             <h3
               className='text-sm font-medium uppercase tracking-wide text-tertiary-token mb-3'
               style={FONT_SYNTHESIS_STYLE}
             >
-              Free
+              {freeClaim.displayName}
             </h3>
             <p
               className='text-4xl sm:text-5xl font-semibold text-primary-token mb-3'
               style={FONT_SYNTHESIS_STYLE}
             >
-              $0
+              {freeClaim.priceLabel}
             </p>
-            <p className='text-sm text-secondary-token'>Branded profile</p>
+            <p className='text-sm text-secondary-token'>
+              Public artist profile and audience capture
+            </p>
           </div>
 
           {/* Pro Tier */}
@@ -49,38 +50,17 @@ export function PricingPreview() {
               className='text-sm font-medium uppercase tracking-wide text-primary-token mb-3'
               style={FONT_SYNTHESIS_STYLE}
             >
-              Pro
+              {proClaim.displayName}
             </h3>
             <p
               className='text-4xl sm:text-5xl font-semibold text-primary-token mb-3'
               style={FONT_SYNTHESIS_STYLE}
             >
-              ${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}
+              {proClaim.priceLabel}
+              {proClaim.cadence ? <span>{proClaim.cadence}</span> : null}
             </p>
-            <p className='text-sm text-secondary-token'>
-              Your identity. Your data.
-            </p>
+            <p className='text-sm text-secondary-token'>{proClaim.note}</p>
           </div>
-
-          {maxPlanEnabled && (
-            <div className='text-center'>
-              <h3
-                className='text-sm font-medium uppercase tracking-wide text-tertiary-token mb-3'
-                style={FONT_SYNTHESIS_STYLE}
-              >
-                {ENTITLEMENT_REGISTRY.max.marketing.displayName}
-              </h3>
-              <p
-                className='text-4xl sm:text-5xl font-semibold text-primary-token mb-3'
-                style={FONT_SYNTHESIS_STYLE}
-              >
-                ${ENTITLEMENT_REGISTRY.max.marketing.price?.monthly ?? 0}
-              </p>
-              <p className='text-sm text-secondary-token'>
-                {ENTITLEMENT_REGISTRY.max.marketing.tagline}
-              </p>
-            </div>
-          )}
         </div>
       </Container>
     </section>

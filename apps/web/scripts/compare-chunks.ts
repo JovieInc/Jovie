@@ -8,12 +8,18 @@
  * Usage:
  *   pnpm --filter @jovie/web compare-chunks          # Compare against baseline
  *   pnpm --filter @jovie/web compare-chunks:snapshot  # Capture new baseline
+ *
+ * JOV-6585: also enforces explicit telemetry-contribution budgets (compressed
+ * and uncompressed) for the chunks that ship browser telemetry onto public
+ * routes. Limits live in docs/performance/telemetry-budgets.json with a
+ * documented Jovie-measured baseline; a missing build manifest fails closed.
  */
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { gzipSync } from 'node:zlib';
 
 const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE_PATH = join(
@@ -27,10 +33,67 @@ const ROUTE_BUDGETS_PATH = join(
   WEB_ROOT,
   '../../docs/performance/route-budgets.json'
 );
+const TELEMETRY_BUDGETS_PATH = join(
+  WEB_ROOT,
+  '../../docs/performance/telemetry-budgets.json'
+);
 
 // Initial JS budget (bytes) — fail CI if total exceeds this
 const DEFAULT_INITIAL_JS_BUDGET_KB = 250;
 const GROWTH_THRESHOLD_PERCENT = 10;
+
+/**
+ * Telemetry chunk classification (JOV-6585). A chunk counts as telemetry
+ * contribution when any module in it resolves to one of these provenance
+ * markers — the browser analytics paths plus the vendor collectors they pull
+ * in transitively.
+ *
+ * Turbopack sanitizes source paths into chunk names by replacing `/` and `.`
+ * with `_` (e.g. `..._lib_tracking_navigation_telemetry_..._.js`), and webpack
+ * keeps path segments in split-chunk names, so each marker is normalized to
+ * its underscore-separated form for matching against chunk paths.
+ */
+export const TELEMETRY_MODULE_MARKERS = [
+  'lib/tracking/',
+  'lib/analytics',
+  'lib/monitoring/web-vitals',
+  '@vercel/analytics',
+  'web-vitals',
+  'googletagmanager',
+  'gtag',
+] as const;
+
+function normalizeChunkName(chunkPath: string): string {
+  return chunkPath.replaceAll('/', '_').replaceAll('.', '_');
+}
+
+export function isTelemetryChunk(
+  chunkPath: string,
+  markers: readonly string[] = TELEMETRY_MODULE_MARKERS
+): boolean {
+  // Match the raw path (webpack may keep `/` and `.`) and the sanitized name
+  // (Turbopack). The 'web-vitals'/'gtag' markers intentionally match either
+  // spelling; no non-telemetry module path contains these substrings.
+  const normalized = normalizeChunkName(chunkPath).replaceAll('-', '_');
+  return markers.some(marker => {
+    const markerNormalized = normalizeChunkName(marker).replaceAll('-', '_');
+    return chunkPath.includes(marker) || normalized.includes(markerNormalized);
+  });
+}
+
+interface TelemetryBudgets {
+  limits: {
+    gzip_bytes: number;
+    raw_bytes: number;
+  };
+  baseline: {
+    commit: string | null;
+    capturedAt: string;
+    measured_gzip_bytes: number;
+    measured_raw_bytes: number;
+  };
+  rationale: string;
+}
 
 interface Baseline {
   capturedAt: string | null;
@@ -58,6 +121,165 @@ function getFileSize(filePath: string): number {
     // Ignore missing files
   }
   return 0;
+}
+
+function getFileBytes(filePath: string): Buffer | null {
+  try {
+    const fullPath = join(WEB_ROOT, '.next', filePath);
+    if (existsSync(fullPath)) {
+      return readFileSync(fullPath);
+    }
+  } catch {
+    // Ignore missing files
+  }
+  return null;
+}
+
+/**
+ * JOV-6585: telemetry chunk classification lives above (isTelemetryChunk with
+ * Turbopack/webpack name normalization).
+ */
+export interface TelemetryContribution {
+  readonly chunks: Record<string, { raw: number; gzip: number }>;
+  readonly rawBytes: number;
+  readonly gzipBytes: number;
+}
+
+/**
+ * Measure the telemetry contribution of a build-manifest chunk set: raw and
+ * gzip-compressed bytes summed over every telemetry chunk (deduplicated by
+ * chunk path, so transitive telemetry dependencies shared across pages count
+ * once).
+ */
+export function measureTelemetryContribution(
+  chunkPaths: readonly string[],
+  readChunkBytes: (chunkPath: string) => Buffer | null = getFileBytes
+): TelemetryContribution {
+  const chunks: Record<string, { raw: number; gzip: number }> = {};
+  let rawBytes = 0;
+  let gzipBytes = 0;
+  const seen = new Set<string>();
+
+  for (const chunkPath of chunkPaths) {
+    if (seen.has(chunkPath)) continue;
+    seen.add(chunkPath);
+    if (!isTelemetryChunk(chunkPath)) continue;
+    const bytes = readChunkBytes(chunkPath);
+    if (!bytes) continue;
+    const gzip = gzipSync(bytes).length;
+    chunks[chunkPath] = { raw: bytes.length, gzip };
+    rawBytes += bytes.length;
+    gzipBytes += gzip;
+  }
+
+  return { chunks, gzipBytes, rawBytes };
+}
+
+export function loadTelemetryBudgets(
+  budgetsPath: string = TELEMETRY_BUDGETS_PATH
+): TelemetryBudgets {
+  if (!existsSync(budgetsPath)) {
+    throw new TypeError(
+      `Telemetry budget file is missing: ${budgetsPath}. The gate is fail-closed — commit docs/performance/telemetry-budgets.json instead of skipping the check.`
+    );
+  }
+
+  const parsed = JSON.parse(readFileSync(budgetsPath, 'utf-8')) as Partial<
+    Record<'limits' | 'baseline' | 'rationale', unknown>
+  >;
+  const limits = parsed.limits as
+    | { gzip_bytes?: unknown; raw_bytes?: unknown }
+    | undefined;
+  const baseline = parsed.baseline as
+    | {
+        commit?: unknown;
+        capturedAt?: unknown;
+        measured_gzip_bytes?: unknown;
+        measured_raw_bytes?: unknown;
+      }
+    | undefined;
+  if (
+    typeof limits?.gzip_bytes !== 'number' ||
+    typeof limits?.raw_bytes !== 'number' ||
+    limits.gzip_bytes <= 0 ||
+    limits.raw_bytes <= 0 ||
+    typeof parsed.rationale !== 'string' ||
+    parsed.rationale.trim() === '' ||
+    typeof baseline?.capturedAt !== 'string' ||
+    typeof baseline?.measured_gzip_bytes !== 'number' ||
+    typeof baseline?.measured_raw_bytes !== 'number'
+  ) {
+    throw new TypeError(
+      `Telemetry budget file is malformed: ${budgetsPath} must define limits.gzip_bytes, limits.raw_bytes, a non-empty rationale, and a baseline {commit, capturedAt, measured_gzip_bytes, measured_raw_bytes}.`
+    );
+  }
+
+  return parsed as TelemetryBudgets;
+}
+
+export interface TelemetryBudgetResult {
+  readonly gzipBytes: number;
+  readonly rawBytes: number;
+  readonly limits: { gzip_bytes: number; raw_bytes: number };
+  readonly passed: boolean;
+  readonly violations: readonly string[];
+}
+
+export function evaluateTelemetryBudgets(
+  contribution: TelemetryContribution,
+  budgets: TelemetryBudgets
+): TelemetryBudgetResult {
+  const violations: string[] = [];
+  if (contribution.gzipBytes > budgets.limits.gzip_bytes) {
+    violations.push(
+      `telemetry gzip ${contribution.gzipBytes}B > ${budgets.limits.gzip_bytes}B limit`
+    );
+  }
+  if (contribution.rawBytes > budgets.limits.raw_bytes) {
+    violations.push(
+      `telemetry uncompressed ${contribution.rawBytes}B > ${budgets.limits.raw_bytes}B limit`
+    );
+  }
+  return {
+    gzipBytes: contribution.gzipBytes,
+    limits: budgets.limits,
+    passed: violations.length === 0,
+    rawBytes: contribution.rawBytes,
+    violations,
+  };
+}
+
+/** Print the telemetry report section; returns violations for the caller. */
+export function reportTelemetryBudget(
+  contribution: TelemetryContribution,
+  budgets: TelemetryBudgets
+): TelemetryBudgetResult {
+  const result = evaluateTelemetryBudgets(contribution, budgets);
+  console.log(`\n### Telemetry contribution (JOV-6585)\n`);
+  console.log(`| Metric | Measured | Limit |`);
+  console.log(`|--------|----------|-------|`);
+  console.log(
+    `| Telemetry JS (gzip) | ${formatBytes(contribution.gzipBytes)} | ${formatBytes(budgets.limits.gzip_bytes)} |`
+  );
+  console.log(
+    `| Telemetry JS (uncompressed) | ${formatBytes(contribution.rawBytes)} | ${formatBytes(budgets.limits.raw_bytes)} |`
+  );
+  console.log(
+    `| Telemetry chunks | ${Object.keys(contribution.chunks).length} | — |`
+  );
+  for (const [chunk, sizes] of Object.entries(contribution.chunks)) {
+    console.log(
+      `- \`${chunk}\`: ${formatBytes(sizes.raw)} raw / ${formatBytes(sizes.gzip)} gzip`
+    );
+  }
+  if (!result.passed) {
+    for (const violation of result.violations) {
+      console.log(`\n❌ TELEMETRY BUDGET EXCEEDED: ${violation}`);
+    }
+  } else {
+    console.log(`\n✅ Telemetry contribution within committed limits.`);
+  }
+  return result;
 }
 
 function collectChunkSizes(manifest: BuildManifest): Record<string, number> {
@@ -275,15 +497,37 @@ function compare(): void {
     );
   }
 
+  // Telemetry contribution budgets (JOV-6585): explicit compressed and
+  // uncompressed limits over the telemetry dependency graph of the build.
+  // Fail-closed: a missing/malformed budget file is itself a failure.
+  try {
+    const telemetryBudgets = loadTelemetryBudgets();
+    const chunkPaths = Object.keys(currentChunks);
+    const contribution = measureTelemetryContribution(chunkPaths);
+    const telemetryResult = reportTelemetryBudget(
+      contribution,
+      telemetryBudgets
+    );
+    if (!telemetryResult.passed) {
+      hasFailure = true;
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.log(`\n❌ TELEMETRY BUDGET GATE UNAVAILABLE: ${reason}`);
+    hasFailure = true;
+  }
+
   if (hasFailure) {
     process.exit(1);
   }
 }
 
-// CLI
-const isSnapshot = process.argv.includes('--snapshot');
-if (isSnapshot) {
-  captureSnapshot();
-} else {
-  compare();
+// CLI. Importing the budget helpers must not exit the process.
+const invokedPath = process.argv[1];
+if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+  if (process.argv.includes('--snapshot')) {
+    captureSnapshot();
+  } else {
+    compare();
+  }
 }

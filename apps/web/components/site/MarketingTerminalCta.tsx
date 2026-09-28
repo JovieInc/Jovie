@@ -2,7 +2,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { MarketingContainer } from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';

@@ -57,8 +57,12 @@ jobs:
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     # The trusted policy has a 45s aggregate API deadline. Keep this producer
-    # terminal before merge-group admission's 90s external-check deadline.
-    timeout-minutes: 1
+    # terminal well before merge-group admission's 6-minute external-check deadline.
+    # The job clock starts at runner assignment, before image provisioning: a
+    # 1-minute budget let a 69s provisioning stall mark a fully passing run
+    # CANCELLED, which admission (correctly) treats as a terminal failure
+    # (PR #18454, run 36271793816). Match Fork PR Gate's 3-minute budget.
+    timeout-minutes: 3
     steps:
       - name: Check out trusted queue policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,14 +127,57 @@ jobs:
           # event's base SHA remains older, so repository hygiene can charge
           # main growth to this PR. Source policy must inspect the exact head.
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+          # The repository hygiene and screenshot checks compare with the PR's
+          # exact merge base, which requires the full ancestry of both tips.
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Fetch PR base
-        run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+      - name: Resolve exact PR merge base
+        id: pr-merge-base
+        env:
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # The event's pull_request base SHA is not refreshed when the PR head
+        # is pushed, so on a long-lived PR it names a days-old base. Judge the
+        # PR against the base branch tip the full-history checkout fetched.
+        run: |
+          set -euo pipefail
+          [[ "$PR_BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || exit 1
+          [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]] || exit 1
+          [[ "$(git rev-parse --is-shallow-repository)" == false ]] || exit 1
+          base_tip="$(git rev-parse --verify "refs/remotes/origin/$PR_BASE_REF^{commit}")"
+          [[ "$base_tip" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          merge_bases="$(git merge-base --all "$base_tip" "$PR_HEAD_SHA")"
+          [[ "$merge_bases" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          echo "base_tip=$base_tip" >> "$GITHUB_OUTPUT"
+          echo "sha=$merge_bases" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce projected combined-tree byte budget
+        # merge_group enforces maxTrackedBytes on base + members and ejects the
+        # whole group when it overflows. Project the same total (base tip + this
+        # PR's byte delta) here so an over-budget PR fails before admission, and
+        # warn when the projection is above 95% of the budget.
+        env:
+          PR_BASE_SHA: ${{ steps.pr-merge-base.outputs.base_tip }}
+          PR_MERGE_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # Run the budget policy from the base tip, not the PR head: a PR cut
+        # before this script landed has no copy of it (MODULE_NOT_FOUND on
+        # every older open PR), and a PR must not be able to weaken the policy
+        # that judges it. The script and its imports all live in scripts/lib.
+        run: |
+          set -euo pipefail
+          policy_dir="$RUNNER_TEMP/size-policy"
+          rm -rf "$policy_dir"
+          mkdir -p "$policy_dir"
+          git archive "$PR_BASE_SHA" scripts/lib | tar -x -C "$policy_dir"
+          node "$policy_dir/scripts/lib/projected-tree-budget.mjs"
 
       - name: Enforce repository hygiene
-        run: node scripts/repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}" --report repo-health-receipt.json
+        env:
+          PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+        run: node scripts/repo-hygiene-guard.mjs --diff-base "$PR_DIFF_BASE" --report repo-health-receipt.json
 
       - name: Upload repository health receipt
         if: always()
@@ -146,14 +193,19 @@ jobs:
 
       - name: Detect screenshot integrity changes
         id: screenshot-integrity
+        env:
+          PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
         run: |
-          if git diff --quiet "${{ github.event.pull_request.base.sha }}" HEAD -- \
+          set -euo pipefail
+          if git diff --quiet "$PR_DIFF_BASE" HEAD -- \
             apps/web/lib/screenshots/ \
             apps/web/screenshot-catalog/current/ \
             apps/web/public/product-screenshots/ \
             'apps/web/scripts/check-screenshot-catalog*.ts'; then
             echo "required=false" >> "$GITHUB_OUTPUT"
           else
+            status=$?
+            [[ "$status" -eq 1 ]] || exit "$status"
             echo "required=true" >> "$GITHUB_OUTPUT"
           fi
 

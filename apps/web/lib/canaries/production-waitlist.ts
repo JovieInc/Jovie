@@ -110,10 +110,7 @@ export const productionWaitlistIncompleteReceiptSchema = z.object({
 });
 
 function splitBaseEmail(baseEmail: string): readonly [string, string] {
-  const match = baseEmail
-    .trim()
-    .toLowerCase()
-    .match(/^([^@+]+)@([^@]+)$/);
+  const match = /^([^@+]+)@([^@]+)$/.exec(baseEmail.trim().toLowerCase());
   if (!match?.[1] || !match[2]) {
     throw new Error(
       'E2E_PROD_SIGNUP_EMAIL_BASE must be a base address without plus-tagging'

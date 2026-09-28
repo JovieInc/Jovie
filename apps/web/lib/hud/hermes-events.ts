@@ -91,7 +91,7 @@ export function mapHermesEventsToAgentRunArtifacts(
         ? event.pr
         : typeof event.pr === 'string'
           ? Number.parseInt(event.pr, 10)
-          : NaN;
+          : Number.NaN;
     const pullRequestUrl =
       Number.isFinite(pr) && pr > 0 ? `${GITHUB_PULL}${pr}` : null;
 

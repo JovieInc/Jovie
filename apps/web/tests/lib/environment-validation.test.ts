@@ -1,4 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
 import {
   validateAndLogEnvironment,
   validateEnvironment,
@@ -68,10 +77,50 @@ describe('Environment Validation', () => {
       }
     });
 
-    it('flags missing XAI_API_KEY as warning (not critical) in production', () => {
+    it('warns when album art gateway auth is missing off Vercel in production', () => {
       const originalVercelEnv = process.env.VERCEL_ENV;
+      const originalVercel = process.env.VERCEL;
+      const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
       const originalXaiKey = process.env.XAI_API_KEY;
       process.env.VERCEL_ENV = 'production';
+      delete process.env.VERCEL;
+      delete process.env.AI_GATEWAY_API_KEY;
+      process.env.XAI_API_KEY = 'direct-xai-key';
+
+      try {
+        const result = validateEnvironment('runtime');
+
+        expect(
+          result.warnings.some(message =>
+            message.includes(
+              'AI Gateway is unavailable — album art generation will be disabled until configured'
+            )
+          )
+        ).toBe(true);
+        expect(
+          result.warnings.some(message => message.includes('XAI_API_KEY'))
+        ).toBe(false);
+        expect(
+          result.critical.some(message =>
+            message.includes('album art generation will be disabled')
+          )
+        ).toBe(false);
+      } finally {
+        restoreEnv('VERCEL_ENV', originalVercelEnv);
+        restoreEnv('VERCEL', originalVercel);
+        restoreEnv('AI_GATEWAY_API_KEY', originalGatewayKey);
+        restoreEnv('XAI_API_KEY', originalXaiKey);
+      }
+    });
+
+    it('does not warn about album art when Vercel OIDC can cover the Gateway', () => {
+      const originalVercelEnv = process.env.VERCEL_ENV;
+      const originalVercel = process.env.VERCEL;
+      const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
+      const originalXaiKey = process.env.XAI_API_KEY;
+      process.env.VERCEL_ENV = 'production';
+      process.env.VERCEL = '1';
+      delete process.env.AI_GATEWAY_API_KEY;
       delete process.env.XAI_API_KEY;
 
       try {
@@ -79,78 +128,59 @@ describe('Environment Validation', () => {
 
         expect(
           result.warnings.some(message =>
-            message.includes('XAI_API_KEY is missing')
+            message.includes('album art generation will be disabled')
           )
-        ).toBe(true);
-        // Critical list must NOT include the xAI warning — app must still boot
-        expect(
-          result.critical.some(message => message.includes('XAI_API_KEY'))
         ).toBe(false);
       } finally {
-        if (originalVercelEnv) {
-          process.env.VERCEL_ENV = originalVercelEnv;
-        } else {
-          delete process.env.VERCEL_ENV;
-        }
-        if (originalXaiKey) {
-          process.env.XAI_API_KEY = originalXaiKey;
-        } else {
-          delete process.env.XAI_API_KEY;
-        }
+        restoreEnv('VERCEL_ENV', originalVercelEnv);
+        restoreEnv('VERCEL', originalVercel);
+        restoreEnv('AI_GATEWAY_API_KEY', originalGatewayKey);
+        restoreEnv('XAI_API_KEY', originalXaiKey);
       }
     });
 
-    it('flags whitespace-only XAI_API_KEY as warning in preview', () => {
+    it('flags whitespace-only AI_GATEWAY_API_KEY as an album-art warning in preview', () => {
       const originalVercelEnv = process.env.VERCEL_ENV;
-      const originalXaiKey = process.env.XAI_API_KEY;
+      const originalVercel = process.env.VERCEL;
+      const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
       process.env.VERCEL_ENV = 'preview';
-      process.env.XAI_API_KEY = '   ';
+      delete process.env.VERCEL;
+      process.env.AI_GATEWAY_API_KEY = '   ';
 
       try {
         const result = validateEnvironment('runtime');
 
         expect(
           result.warnings.some(message =>
-            message.includes('XAI_API_KEY is missing')
+            message.includes('album art generation will be disabled')
           )
         ).toBe(true);
       } finally {
-        if (originalVercelEnv) {
-          process.env.VERCEL_ENV = originalVercelEnv;
-        } else {
-          delete process.env.VERCEL_ENV;
-        }
-        if (originalXaiKey) {
-          process.env.XAI_API_KEY = originalXaiKey;
-        } else {
-          delete process.env.XAI_API_KEY;
-        }
+        restoreEnv('VERCEL_ENV', originalVercelEnv);
+        restoreEnv('VERCEL', originalVercel);
+        restoreEnv('AI_GATEWAY_API_KEY', originalGatewayKey);
       }
     });
-    it('does not warn about XAI_API_KEY in development', () => {
+
+    it('does not warn about album art gateway auth in development', () => {
       const originalVercelEnv = process.env.VERCEL_ENV;
-      const originalXaiKey = process.env.XAI_API_KEY;
+      const originalVercel = process.env.VERCEL;
+      const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
       process.env.VERCEL_ENV = 'development';
-      delete process.env.XAI_API_KEY;
+      delete process.env.VERCEL;
+      delete process.env.AI_GATEWAY_API_KEY;
 
       try {
         const result = validateEnvironment('runtime');
         expect(
           result.warnings.some(message =>
-            message.includes('XAI_API_KEY is missing')
+            message.includes('album art generation will be disabled')
           )
         ).toBe(false);
       } finally {
-        if (originalVercelEnv) {
-          process.env.VERCEL_ENV = originalVercelEnv;
-        } else {
-          delete process.env.VERCEL_ENV;
-        }
-        if (originalXaiKey) {
-          process.env.XAI_API_KEY = originalXaiKey;
-        } else {
-          delete process.env.XAI_API_KEY;
-        }
+        restoreEnv('VERCEL_ENV', originalVercelEnv);
+        restoreEnv('VERCEL', originalVercel);
+        restoreEnv('AI_GATEWAY_API_KEY', originalGatewayKey);
       }
     });
 

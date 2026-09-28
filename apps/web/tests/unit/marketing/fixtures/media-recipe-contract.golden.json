@@ -16,8 +16,8 @@
     "blurPx": 20,
     "saturatePercent": 165,
     "backdropFilter": "blur(20px) saturate(165%)",
-    "darkShellHex": "#06080D",
-    "darkCanvasHex": "#030407"
+    "darkShellHex": "#07080A",
+    "darkCanvasHex": "#030406"
   },
   "flowingAccent": {
     "viewBox": "0 0 1200 24",

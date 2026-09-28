@@ -33,9 +33,24 @@ done < <(
 
 sorted_paths=()
 while IFS= read -r path; do
-  git cat-file -e "${tree}:${path}"
   sorted_paths+=("${path}")
 done < <(printf '%s\n' "${paths[@]}" | LC_ALL=C sort -u)
+
+# Validate the complete context with one long-lived Git process. Spawning
+# one `git cat-file` process per path dominates this script when the repository
+# or host is busy, and this script is intentionally invoked repeatedly to
+# prove deterministic archive output.
+object_status=$(
+  for path in "${sorted_paths[@]}"; do
+    printf '%s:%s\n' "${tree}" "${path}"
+  done | git cat-file --batch-check='%(objecttype)'
+)
+while IFS= read -r status; do
+  if [[ "${status}" == *' missing' ]]; then
+    echo "runner build context contains a missing tree entry: ${status% missing}" >&2
+    exit 1
+  fi
+done <<< "${object_status}"
 
 if [[ "${mode}" == '--list' ]]; then
   printf '%s\n' "${sorted_paths[@]}"

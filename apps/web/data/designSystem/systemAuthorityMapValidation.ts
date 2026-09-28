@@ -172,7 +172,7 @@ export function validateDesignSystemAuthorityMap({
     if (!DESIGN_SYSTEM_AUTHORITY_STATUS_VALUES.includes(entry.status)) {
       add(issues, 'invalid-authority-status', entry.id);
     }
-    if (Object.hasOwn(entry as Record<string, unknown>, 'statusFloor')) {
+    if (Object.hasOwn(entry, 'statusFloor')) {
       add(issues, 'invalid-authority-status-floor', `${entry.id}:mutable`);
     }
     const statusFloor = STATUS_FLOORS[entry.id];

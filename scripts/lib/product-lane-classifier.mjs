@@ -21,7 +21,7 @@ const GATE_RECEIPTS = {
   },
   web: {
     tests:
-      'Web unit shards, Web build/layout, extension typecheck/test/build, and observability worker typecheck/test',
+      'Web unit shards, Ovie route/proxy coverage and independent build/typecheck, Web build/layout, extension typecheck/test/build, and observability worker typecheck/test',
     artifact: 'apps/web/.next exact combined-head build workspace',
     releaseWorkflow: '.github/workflows/production-release.yml',
   },
@@ -43,6 +43,13 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'shared-contract',
     ['web'],
     /^packages\/jev-evaluation\//,
+  ],
+  [
+    // @jovie/copy: canonical copy rules consumed by apps/web (canon/VOICE.md).
+    'shared-copy',
+    'shared-contract',
+    ['web'],
+    /^packages\/copy\//,
   ],
   [
     'shared-agent-transport',
@@ -116,7 +123,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'web-product',
     'web',
     ['web'],
-    /^(apps\/(web|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|jovie-cli|ui)\/|workers\/observability-ingest\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|jovie-cli|ui)\/|workers\/observability-ingest\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
     'operations-tooling',
@@ -136,7 +143,7 @@ const ALL_LANES = [...PRODUCT_LANES, 'operations', 'cross-product'];
 const JS_WORKSPACE_PRODUCTS = ['mac', 'web'];
 const OPERATIONS_ONLY_PACKAGE_SCRIPTS = new Set(['invariants:check']);
 const OPERATIONS_ONLY_INVARIANT_ADDITION =
-  /^python3 scripts\/symphony\/tests\/[a-z0-9-]+\.test\.py$/;
+  /^python3 scripts\/fleet-gate\/tests\/[a-z0-9-]+\.test\.py$/;
 const IOS_PACKAGE_SCRIPT = /^(?:ios:|ci:ios-|test:auth:ios$)/;
 const IOS_PACKAGE_COMMAND = /(?:apps\/ios\/|\bxcodebuild\b|\bfastlane ios\b)/;
 const PACKAGE_MANAGER_COMMAND = /\b(?:pnpm|npm|yarn)\s+([^;&|\n]+)/g;

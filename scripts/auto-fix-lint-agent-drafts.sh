@@ -195,7 +195,7 @@ while IFS= read -r pr; do
   # Setup pnpm and install
   if ! command -v pnpm >/dev/null 2>&1; then
     corepack enable >/dev/null 2>&1
-    corepack prepare pnpm@9.15.4 --activate >/dev/null 2>&1
+    corepack prepare pnpm@9.15.9 --activate >/dev/null 2>&1
   fi
 
   # Ignore lifecycle scripts and drop write tokens from the install env so

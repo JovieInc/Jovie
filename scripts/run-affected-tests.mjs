@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -21,6 +23,13 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/tests/setup.ts',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
+const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+const KNOWN_VITEST_FIXTURE_TESTS = new Map([
+  [
+    'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
+    ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
+  ],
+]);
 const INVESTOR_NOTE_INGESTION_TESTS = [
   'apps/web/tests/unit/investors/note-ingestion.test.ts',
   'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
@@ -178,6 +187,20 @@ const SUMMER_COMMISSIONING_LANE = new Set([
   ...SUMMER_COMMISSIONING_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
+  'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/capability-benchmark.mjs',
+  'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'docs/operations/CAPABILITY_BENCHMARK.md',
+]);
+const CAPABILITY_BENCHMARK_LANE = new Set([
+  ...CAPABILITY_BENCHMARK_PRIMARY_INPUTS,
+  'scripts/ci-fast-lanes.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const CAPABILITY_BENCHMARK_NODE_TESTS = [
+  'scripts/capability-benchmark/capability-benchmark.test.mjs',
+];
 const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/company-registry.test.mjs',
   'scripts/summer-commissioning/project-creation-policy.test.mjs',
@@ -228,10 +251,12 @@ const ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS = new Set([
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/fx-remediation-lane.mjs',
   'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
 ]);
 const ROLLING_CI_FX_CACHE_GC_LANE = new Set([
@@ -245,6 +270,7 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
 ];
@@ -274,18 +300,8 @@ const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
 ];
-const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = new Set([
-  '.github/workflows/fleet-gate-refresh.yml',
-  'scripts/symphony/launchd/README.md',
-  'scripts/symphony/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template',
-  'scripts/symphony/shipper-gated-entrypoint.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/lib/__tests__/hermes-launchd.test.mjs',
-]);
-const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
-  ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
-  ...AFFECTED_TEST_SELECTOR_MANIFEST,
-]);
+const OWNERLESS_RECOVERY_POLICY_TEST =
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
@@ -301,14 +317,16 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
-  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  OWNERLESS_RECOVERY_POLICY_TEST,
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+  'scripts/lib/__tests__/pr-conflict-event.test.mjs',
   'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
   'scripts/lib/__tests__/github-merge-queue.test.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/codeql-workflow-contract.test.mjs',
   'scripts/lib/__tests__/design-exception-registry.test.mjs',
@@ -328,12 +346,12 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+  'scripts/lib/__tests__/product-lane-classifier.test.mjs',
   'scripts/lib/__tests__/production-lane-range.test.mjs',
   'scripts/lib/__tests__/preview-env-contract.test.mjs',
 ];
@@ -379,6 +397,74 @@ const MERGE_GROUP_ADMISSION_WEB_TESTS = [
 // Run 32547855063 spent 3180.55s collecting V8 coverage before this static
 // ownership contract failed. Keep it in the cheap structural selector so
 // coverage-lane drift fails before an expensive changed-surface collection.
+// Control-plane node:test suites, each with its own per-module coverage gate:
+// [test file, coverage include (null = no coverage gate), thresholds].
+const CI_CONTROL_NODE_COVERAGE_TESTS = [
+  [
+    '.github/scripts/production-continuity.test.mjs',
+    '.github/scripts/production-continuity.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/production-continuity-dedupe.test.mjs',
+    '.github/scripts/production-continuity-dedupe.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/production-continuity-checkin.test.mjs',
+    '.github/scripts/production-continuity-checkin.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  ['.github/scripts/production-continuity-workflow.test.mjs', null, []],
+  [
+    '.github/scripts/materialize-vercel-static.test.mjs',
+    '.github/scripts/materialize-vercel-static.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/vercel-output-manifest.test.mjs',
+    '.github/scripts/vercel-output-manifest.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/vercel-output-validate.test.mjs',
+    '.github/scripts/vercel-output-validate.mjs',
+    [
+      '--test-coverage-lines=90',
+      '--test-coverage-branches=85',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    '.github/scripts/production-input-provenance.test.mjs',
+    '.github/scripts/production-input-provenance.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=75',
+      '--test-coverage-functions=90',
+    ],
+  ],
+];
 const CI_CONTROL_WEB_TESTS = [
   'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
 ];
@@ -395,10 +481,10 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
-  'scripts/symphony/evaluate-fleet-gate.sh',
-  'scripts/symphony/fleet_admission_receipt.py',
-  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-  'scripts/symphony/tests/test_fleet_admission_receipt.py',
+  'scripts/fleet-gate/evaluate-fleet-gate.sh',
+  'scripts/fleet-gate/fleet_admission_receipt.py',
+  'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+  'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
@@ -408,6 +494,7 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/pr-check-failures.mjs',
   'scripts/lib/upsert-pr-comment.sh',
@@ -425,68 +512,84 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
+const OWNERLESS_RECOVERY_COVERAGE_INPUTS = new Set([
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  OWNERLESS_RECOVERY_POLICY_TEST,
+  'scripts/ownerless-recovery-sweeper.mjs',
+]);
+const OWNERLESS_RECOVERY_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=lib/ownerless-recovery-policy.mjs',
+  '--coverage.include=ownerless-recovery-sweeper.mjs',
+  '--coverage.thresholds.perFile=true',
+  '--coverage.thresholds.statements=60',
+  '--coverage.thresholds.lines=65',
+  '--coverage.thresholds.branches=60',
+  '--coverage.thresholds.functions=50',
+];
 const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
-  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-  'scripts/symphony/tests/test_fleet_admission_receipt.py',
+  'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+  'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
   'scripts/tests/test_gh_retry.py',
 ];
-const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
-  ...CI_CONTROL_SCRIPT_TESTS,
-  'scripts/lib/__tests__/hermes-launchd.test.mjs',
-];
-const EVENT_DRIVEN_SHIPPER_PYTHON_TESTS = [
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-];
-const DELIVERY_LIVENESS_LANE = new Set([
-  'scripts/symphony/jobs/codex-issue-shipper.ts',
-  'scripts/symphony/jobs/delivery-liveness-watchdog.ts',
-  'scripts/symphony/launchd/README.md',
-  'scripts/symphony/launchd/co.jovie.hermes.delivery-liveness-watchdog.plist.template',
-  'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
-  'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
-  'scripts/symphony/lib/codex-issue-shipper.ts',
-  'scripts/symphony/lib/delivery-liveness.ts',
-  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+const DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS = new Set([
+  '.github/workflows/dependabot-auto-merge.yml',
+  '.github/dependabot.yml',
+  'scripts/dependabot-update-policy.mjs',
+  'scripts/dependabot-workflow-run-adapter.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
 ]);
-const DELIVERY_LIVENESS_TESTS = [
-  'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
-  'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
-  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
-  'scripts/lib/__tests__/hermes-launchd.test.mjs',
-];
-const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
-  '.husky/pre-push',
-  'scripts/automation-verify.sh',
-  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
-  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
-  'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
-  'scripts/backlog-orchestrator/admitter.mjs',
-  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
-  'scripts/backlog-orchestrator/deterministic-gates.mjs',
-  'scripts/backlog-orchestrator/gate-next-hold.mjs',
-  'scripts/symphony/codex-rotate',
-  'scripts/symphony/codex-account-probe.sh',
-  'scripts/symphony/symphony-lease-guard',
-  'scripts/symphony/tests/codex-account-probe.test.py',
-  'scripts/symphony/tests/codex-rotate.test.py',
-  'scripts/symphony/tests/symphony-lease-guard.test.py',
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/pre-push-gate.test.mjs',
-  'scripts/run-affected-tests.mjs',
+const DEPENDABOT_AUTO_MERGE_LANE = new Set([
+  ...DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/tests/test_agent_workflow_hygiene.py',
 ]);
-const SYMPHONY_THROUGHPUT_NODE_TESTS = [
-  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
-  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
-  'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
-];
-const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
+const DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
 ];
-const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
-  'scripts/symphony/tests/codex-account-probe.test.py',
-  'scripts/symphony/tests/codex-rotate.test.py',
-  'scripts/symphony/tests/symphony-lease-guard.test.py',
+const DEPENDABOT_AUTO_MERGE_NODE_TESTS = [
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+  'scripts/lib/__tests__/native-merge-intent.test.mjs',
+  'scripts/lib/__tests__/source-admission-policy.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS = [
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-include=scripts/native-merge-intent.mjs',
+  '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
+  '--test-coverage-lines=95',
+];
+const DEPENDABOT_AUTO_MERGE_PYTHON_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
+];
+const DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=dependabot-update-policy.mjs',
+  '--coverage.thresholds.lines=95',
+  '--coverage.thresholds.branches=90',
+  '--coverage.thresholds.functions=95',
+];
+const DEPENDABOT_ADAPTER_CONTROL_TEST_ARGS = [
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-lines=95',
+  DEPENDABOT_AUTO_MERGE_NODE_TESTS[0],
+];
+const DEPENDABOT_POLICY_CONTROL_TEST_ARGS = [
+  'exec',
+  'vitest',
+  '--root',
+  'scripts',
+  '--config',
+  'vitest.config.mts',
+  'run',
+  'lib/__tests__/dependabot-update-policy.test.mjs',
+  ...DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
 ];
 const BACKLOG_REMEDIATION_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/backlog-remediation.mjs',
@@ -512,266 +615,33 @@ const BACKLOG_REMEDIATION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const FLEET_PROMOTION_GATE_INPUTS = new Set([
-  'scripts/symphony/gem-priority-gate.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
+  'scripts/fleet-gate/closure_health.py',
+  'scripts/fleet-gate/evaluate-fleet-gate.sh',
+  'scripts/fleet-gate/fleet_admission_receipt.py',
+  'scripts/fleet-gate/gem-priority-gate.py',
+  'scripts/fleet-gate/gem_gate_contract.py',
+  'scripts/fleet-gate/summer_ci_audit.py',
+  'scripts/fleet-gate/symphony_proof_context.py',
+  'scripts/fleet-gate/tests/closure-health.test.py',
+  'scripts/fleet-gate/tests/gem-priority-gate.test.py',
+  'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+  'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
 ]);
 const FLEET_PROMOTION_GATE_LANE = new Set([
   ...FLEET_PROMOTION_GATE_INPUTS,
   '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
-  'scripts/symphony/evaluate-fleet-gate.sh',
-  'scripts/symphony/fleet_admission_receipt.py',
-  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-  'scripts/symphony/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ]);
 const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
-  'scripts/symphony/tests/gem-priority-gate.test.py',
+  'scripts/fleet-gate/tests/closure-health.test.py',
+  'scripts/fleet-gate/tests/gem-priority-gate.test.py',
 ];
 const FLEET_PROMOTION_GATE_PYTEST_TESTS = [
-  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-  'scripts/symphony/tests/test_fleet_admission_receipt.py',
+  'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+  'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
 ];
-const HYPERAGENT_LIFECYCLE_LANE = new Set([
-  '.github/workflows/ci.yml',
-  'scripts/ci-fast-lanes.mjs',
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-  'scripts/run-affected-tests.mjs',
-  'scripts/symphony/hyperagent/lifecycle.py',
-  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
-]);
-const HYPERAGENT_LIFECYCLE_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/hyperagent/lifecycle.py',
-  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
-]);
-const GEM_PR_REHABILITATION_LANE = new Set([
-  '.github/requirements/pytest.in',
-  '.github/requirements/pytest.txt',
-  '.github/workflows/gem-delivery-controller-activation.yml',
-  '.github/workflows/ci.yml',
-  'docs/PR_FLOW.md',
-  'scripts/symphony/config/gem-repo-registry.json',
-  'scripts/symphony/config/model-registry.json',
-  'scripts/symphony/closure_health.py',
-  'scripts/symphony/gem-disk-reclaim.py',
-  'scripts/symphony/gem-symphony-workspace-boot-simulate',
-  'scripts/symphony/gem-workspace-migrate.py',
-  'scripts/symphony/gem-pr-drain.py',
-  'scripts/symphony/gem-ops-hud.py',
-  'scripts/symphony/gem-priority-gate.py',
-  'scripts/symphony/gem-repo-drain-cycle.py',
-  'scripts/symphony/gem_gate_contract.py',
-  'scripts/symphony/gem_repo_registry.py',
-  'scripts/symphony/gem_rehabilitation_policy.py',
-  'scripts/symphony/install-gem-fleet-controller.sh',
-  'scripts/symphony/install-gem-symphony-storage.sh',
-  'scripts/symphony/install-gem-pr-rehabilitation.sh',
-  'scripts/symphony/install-symphony-ui-pilot.sh',
-  'scripts/symphony/model-router.py',
-  'scripts/symphony/jovie-symphony-workspace',
-  'scripts/symphony/jovie-symphony-workspace-create',
-  'scripts/symphony/symphony-reconciler.py',
-  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
-  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
-  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
-  'scripts/symphony/systemd/gem-disk-reclaim.service',
-  'scripts/symphony/systemd/gem-disk-reclaim.timer',
-  'scripts/symphony/systemd/gem-pr-drain.service',
-  'scripts/symphony/systemd/gem-pr-drain.timer',
-  'scripts/symphony/tests/test_gem_disk_reclaim.py',
-  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
-  'scripts/symphony/tests/test_gem_workspace_migrate.py',
-  'scripts/symphony/tests/gem-pr-drain.test.py',
-  'scripts/symphony/tests/gem-ops-hud.test.py',
-  'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
-  'scripts/symphony/tests/closure-health.test.py',
-  'scripts/symphony/tests/symphony-reconciler.test.py',
-  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
-  'scripts/symphony/tests/test-model-router.py',
-  'scripts/tests/test_symphony_ui_pilot_runtime.py',
-  'scripts/symphony/tests/symphony-github-poke.test.py',
-  'scripts/ci-fast-lanes.mjs',
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-  'scripts/run-affected-tests.mjs',
-]);
-const GEM_PR_REHABILITATION_PYTHON_TESTS = [
-  'scripts/symphony/tests/closure-health.test.py',
-  'scripts/symphony/tests/test_gem_disk_reclaim.py',
-  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
-  'scripts/symphony/tests/test_gem_workspace_migrate.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/symphony/tests/gem-pr-drain.test.py',
-  'scripts/symphony/tests/gem-ops-hud.test.py',
-  'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-  'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
-  'scripts/symphony/tests/symphony-reconciler.test.py',
-  'scripts/symphony/tests/test-model-router.py',
-];
-const GEM_PR_REHABILITATION_PYTEST_TESTS = [
-  'scripts/tests/test_symphony_ui_pilot_runtime.py',
-];
-const GEM_PR_REHABILITATION_NODE_TESTS = [
-  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
-];
-const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/WORKFLOW.md',
-  'scripts/symphony/symphony_official_runtime.py',
-  'scripts/symphony/gem-checkin-hud.py',
-  'scripts/symphony/gem-checkin-tty1.sh',
-  'scripts/symphony/systemd/symphony-elixir.service',
-  'scripts/symphony/systemd/symphony-burrito.service',
-  'scripts/symphony/systemd/symphony-burrito-update.service',
-  'scripts/symphony/systemd/symphony-burrito-update.timer',
-  'scripts/symphony/update-symphony-burrito.sh',
-  'scripts/symphony/tests/gem-checkin-hud.test.py',
-  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-]);
-const CURSOR_CLI_WORKER_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/cursor-agent-std',
-  'scripts/symphony/cursor-cli-worker.py',
-  'scripts/symphony/install-cursor-cli-worker.sh',
-  'scripts/symphony/systemd/cursor-cli-worker.service',
-  'scripts/symphony/systemd/cursor-cli-worker.timer',
-  'scripts/symphony/tests/cursor-cli-worker.test.py',
-]);
-const CURSOR_CLI_WORKER_LANE = new Set([
-  ...CURSOR_CLI_WORKER_PRIMARY_INPUTS,
-  ...AFFECTED_TEST_SELECTOR_MANIFEST,
-  'scripts/ci-fast-lanes.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-]);
-const CURSOR_CLI_WORKER_PYTHON_TESTS = [
-  'scripts/symphony/tests/cursor-cli-worker.test.py',
-];
-const GEM_CHECKIN_HUD_LANE = new Set([
-  ...GEM_CHECKIN_HUD_PRIMARY_INPUTS,
-  ...CURSOR_CLI_WORKER_PRIMARY_INPUTS,
-  ...AFFECTED_TEST_SELECTOR_MANIFEST,
-  '.github/workflows/reusable-ci-lint.yml',
-]);
-const GEM_CHECKIN_HUD_PYTHON_TESTS = [
-  'scripts/symphony/tests/gem-checkin-hud.test.py',
-  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-];
-const GEM_STORAGE_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/WORKFLOW.md',
-  'scripts/symphony/gem-symphony-workspace-boot-simulate',
-  'scripts/symphony/gem-workspace-migrate.py',
-  'scripts/symphony/install-gem-symphony-storage.sh',
-  'scripts/symphony/jovie-symphony-workspace',
-  'scripts/symphony/jovie-symphony-workspace-create',
-  'scripts/symphony/symphony_official_runtime.py',
-  'scripts/symphony/systemd/gem-disk-reclaim.service',
-]);
-const GEM_STORAGE_LANE = new Set([
-  ...GEM_STORAGE_PRIMARY_INPUTS,
-  '.github/workflows/ci.yml',
-  'scripts/ci-fast-lanes.mjs',
-  'scripts/run-affected-tests.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
-  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-  'scripts/symphony/tests/test_gem_disk_reclaim.py',
-  'scripts/symphony/tests/test_gem_workspace_migrate.py',
-  'scripts/tests/test_openai_symphony_install.py',
-  'scripts/tests/test_symphony_ui_pilot_runtime.py',
-]);
-const GEM_STORAGE_PYTHON_TESTS = [
-  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
-  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-  'scripts/symphony/tests/test_gem_disk_reclaim.py',
-  'scripts/symphony/tests/test_gem_workspace_migrate.py',
-];
-const GEM_STORAGE_PYTEST_TESTS = [
-  'scripts/tests/test_openai_symphony_install.py',
-  'scripts/tests/test_symphony_ui_pilot_runtime.py',
-];
-const SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/symphony-codex-exhausted.py',
-  'scripts/symphony/tests/symphony-additive-router.test.py',
-]);
-const SYMPHONY_NATIVE_ADMISSION_ANCHOR =
-  'scripts/symphony/tests/native-admission-consumers.test.py';
-const SYMPHONY_NATIVE_ADMISSION_GATES = [
-  'scripts/symphony/tests/run-issue-lease-gate.py',
-  'scripts/symphony/tests/run-lease-gate.py',
-  'scripts/symphony/tests/run-provider-promotion-gate.py',
-  'scripts/symphony/tests/run-runtime-proof-gate.py',
-];
-const SYMPHONY_NATIVE_ADMISSION_LANE = new Set([
-  SYMPHONY_NATIVE_ADMISSION_ANCHOR,
-  'scripts/symphony/WORKFLOW.md',
-  'scripts/symphony/symphony-agent-router',
-  'scripts/symphony/symphony-codex-exhausted.py',
-  'scripts/symphony/symphony-codex-router',
-  'scripts/symphony/symphony-lease-guard',
-  'scripts/symphony/tests/existing-pr-repair.test.py',
-  'scripts/symphony/tests/symphony-agent-router.test.py',
-  'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
-  'scripts/symphony/tests/provider-runtime-promotion.test.py',
-  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-  ...SYMPHONY_NATIVE_ADMISSION_GATES,
-  ...AFFECTED_TEST_SELECTOR_MANIFEST,
-]);
-const SYMPHONY_AGENT_ROUTER_INPUTS = new Set([
-  'scripts/symphony/symphony-agent-router',
-  'scripts/symphony/tests/symphony-agent-router.test.py',
-]);
-const SYMPHONY_AGENT_ROUTER_LANE = new Set([
-  ...SYMPHONY_AGENT_ROUTER_INPUTS,
-  ...AFFECTED_TEST_SELECTOR_MANIFEST,
-]);
-const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
-  ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
-  'scripts/symphony/config/model-registry.json',
-  'scripts/symphony/model-router.py',
-  'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
-  'scripts/symphony/tests/test-model-router.py',
-  'scripts/symphony/tests/symphony-github-poke.test.py',
-  ...AFFECTED_TEST_SELECTOR_MANIFEST,
-]);
-const SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS = [
-  'scripts/symphony/tests/symphony-additive-router.test.py',
-  'scripts/symphony/tests/test-model-router.py',
-  'scripts/symphony/tests/symphony-github-poke.test.py',
-];
-const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/config/gem-repo-registry.json',
-  'scripts/symphony/config/model-registry.json',
-  'scripts/symphony/closure_health.py',
-  'scripts/symphony/gem-disk-reclaim.py',
-  'scripts/symphony/gem-pr-drain.py',
-  'scripts/symphony/gem-ops-hud.py',
-  'scripts/symphony/gem-repo-drain-cycle.py',
-  'scripts/symphony/gem_repo_registry.py',
-  'scripts/symphony/gem_rehabilitation_policy.py',
-  'scripts/symphony/symphony-reconciler.py',
-  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
-  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
-  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
-  'scripts/symphony/install-gem-fleet-controller.sh',
-  'scripts/symphony/install-gem-pr-rehabilitation.sh',
-  'scripts/symphony/install-symphony-ui-pilot.sh',
-  'scripts/symphony/systemd/gem-disk-reclaim.service',
-  'scripts/symphony/systemd/gem-disk-reclaim.timer',
-  'scripts/symphony/model-router.py',
-  'scripts/symphony/systemd/gem-pr-drain.service',
-  'scripts/symphony/systemd/gem-pr-drain.timer',
-  'scripts/symphony/tests/test_gem_disk_reclaim.py',
-  'scripts/symphony/tests/gem-pr-drain.test.py',
-  'scripts/symphony/tests/gem-ops-hud.test.py',
-  'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-  'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
-  'scripts/symphony/tests/test-model-router.py',
-  'scripts/symphony/tests/closure-health.test.py',
-  'scripts/symphony/tests/symphony-reconciler.test.py',
-  'scripts/tests/test_symphony_ui_pilot_runtime.py',
-]);
 const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/no-unattended-red.mjs',
   'scripts/backlog-orchestrator/delivery-state-machine.mjs',
@@ -779,19 +649,19 @@ const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
 ]);
 const NO_UNATTENDED_RED_LANE = new Set([
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   ...NO_UNATTENDED_RED_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
   '.github/workflows/fleet-gate-refresh.yml',
   '.github/workflows/delivery-control-receipts.yml',
   'canon/invariants.jsonl',
-  'scripts/symphony/closure_health.py',
-  'scripts/symphony/gem-ops-hud.py',
-  'scripts/symphony/tests/closure-health.test.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/symphony/tests/gem-ops-hud.test.py',
+  'scripts/fleet-gate/closure_health.py',
+  'scripts/fleet-gate/tests/closure-health.test.py',
+  'scripts/fleet-gate/tests/gem-priority-gate.test.py',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/invariants/registry.test.mjs',
   'scripts/tests/test_agent_workflow_hygiene.py',
 ]);
@@ -801,18 +671,36 @@ const NO_UNATTENDED_RED_NODE_TESTS = [
   'scripts/invariants/registry.test.mjs',
 ];
 const NO_UNATTENDED_RED_PYTHON_TESTS = [
-  'scripts/symphony/tests/closure-health.test.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/symphony/tests/gem-ops-hud.test.py',
+  'scripts/fleet-gate/tests/closure-health.test.py',
+  'scripts/fleet-gate/tests/gem-priority-gate.test.py',
 ];
 const NO_UNATTENDED_RED_PYTEST_TESTS = [
   'scripts/tests/test_agent_workflow_hygiene.py',
 ];
 const NO_UNATTENDED_RED_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
 ];
+const RETOUCH_PROMPT_SOURCES = [
+  'components/features/admin/system-map/AdminSystemMapSkillsTab.tsx',
+  'lib/services/retouching/style.ts',
+  'lib/services/retouching/style-prompt.ts',
+];
+const RETOUCH_PROMPT_PROOFS = [
+  'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.test.tsx',
+  'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+  'apps/web/lib/services/retouching/style.test.ts',
+  'apps/web/tests/unit/app/admin-system-map.test.tsx',
+];
+const RETOUCH_PROMPT_LANE = new Set([
+  ...RETOUCH_PROMPT_SOURCES.map(file => `apps/web/${file}`),
+  ...RETOUCH_PROMPT_PROOFS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+]);
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -850,14 +738,10 @@ const PR_SIZE_GUARD_TESTS = [
 const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
 const NEON_ATTEMPT_ARTIFACT_MANIFEST = new Set([
   '.github/workflows/ci.yml',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const NEON_ATTEMPT_ARTIFACT_TESTS = [
@@ -865,7 +749,6 @@ const NEON_ATTEMPT_ARTIFACT_TESTS = [
 ];
 const NEON_ATTEMPT_ARTIFACT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
   '.github/workflows/ci.yml',
@@ -876,21 +759,15 @@ const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
 const GOLDEN_PATH_SMOKE_CONTRACT_TESTS = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
 ];
-const GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-];
+const GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS = [];
 const PERFORMANCE_PROFILER_REPAIR_ANCHORS = new Set([
   'apps/web/scripts/test-performance-guard.ts',
   'apps/web/scripts/test-performance-profiler.test.ts',
   'apps/web/scripts/test-performance-profiler.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
 const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
@@ -905,8 +782,6 @@ const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = new Set([
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
   'apps/web/tests/unit/metrics-layer-guard-logic.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
 ]);
 const SCANNER_LOAD_REPAIR_MANIFEST = new Set([
@@ -920,15 +795,12 @@ const SCANNER_LOAD_REPAIR_WEB_TESTS = [
   'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
 ];
 const SCANNER_LOAD_REPAIR_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
 ];
 const PERFORMANCE_PROFILER_REPAIR_WEB_TESTS = [
   'apps/web/scripts/test-performance-profiler.test.ts',
 ];
-const PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-];
+const PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS = [];
 const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = new Set([
   'apps/web/app/api/dev/test-auth/session/route.ts',
   'apps/web/lib/auth/dev-test-auth-identity.ts',
@@ -942,16 +814,8 @@ const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = new Set([
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/lib/auth/test-mode.test.ts',
   'apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/jobs/ci-failure-monitor.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-  'scripts/symphony/lib/ci-failure-classifier.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
 ]);
-const PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-];
+const PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS = [];
 const VISUAL_QA_DIFF_ARTIFACTS_SOURCE =
   'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts';
 const VISUAL_QA_DIFF_ARTIFACTS_TEST =
@@ -964,14 +828,11 @@ const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
   'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
 const MOBILE_OVERFLOW_NAVIGATION_RACE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const RUNNER_IO_PRESSURE_MANIFEST = new Set([
   '.github/runner-host/README.md',
@@ -981,8 +842,6 @@ const RUNNER_IO_PRESSURE_MANIFEST = new Set([
   '.github/runner-host/ci-runner-autoscaler.service.snapshot',
   '.github/runner-host/install-io-pressure-guard.sh',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
@@ -995,20 +854,16 @@ const RUNNER_IO_PRESSURE_V2_MANIFEST = new Set([
   '.github/workflows/runner-autoscaler-canary.yml',
   'apps/web/tests/unit/ci/runner-autoscaler-canary-workflow.test.ts',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
 const RUNNER_IO_PRESSURE_SCRIPT_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const RUNNER_PREREQUISITE_CONTRACT_TESTS = [
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
 ];
 const RUNNER_PREREQUISITE_CONTROL_TESTS = [
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-harness.test.mjs',
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
@@ -1030,8 +885,6 @@ const RUNNER_PREREQUISITE_CONTRACT_MANIFEST = new Set([
   '.github/runner-image/verify-prerequisites.mjs',
   '.github/workflows/ci.yml',
   ...RUNNER_PREREQUISITE_CONTRACT_TESTS,
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
@@ -1043,8 +896,6 @@ const LAYOUT_GUARD_CONTRACT_MANIFEST = new Set([
   '.github/scripts/layout-guard-manifest.mjs',
   '.github/scripts/layout-guard-manifest.test.mjs',
   '.github/workflows/ci.yml',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
@@ -1053,7 +904,6 @@ const LAYOUT_GUARD_CONTRACT_ROOT_TESTS = [
 ];
 const LAYOUT_GUARD_CONTRACT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 
 function isInvestorNoteIngestionInput(file) {
@@ -1075,13 +925,155 @@ function unique(values) {
   return [...new Set(values)];
 }
 
+function fullSuitePlan(fallbackReason) {
+  return {
+    mode: 'full',
+    fallbackReason,
+    relatedFiles: [],
+    mandatoryTests: [],
+  };
+}
+
+const VERCEL_DEPLOY_DIAGNOSTICS_PAIR = new Set([
+  '.github/scripts/vercel-prebuilt-deploy.sh',
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+]);
+const VERCEL_DEPLOY_DIAGNOSTICS_WITH_SELECTOR = new Set([
+  ...VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
+  '.github/workflows/linear-sync-on-merge.yml',
+  'scripts/lib/linear-sync-on-merge.mjs',
+  'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+]);
+const LINEAR_SYNC_ON_MERGE_LANE = new Set([
+  ...LINEAR_SYNC_ON_MERGE_PRIMARY,
+  '.claude/rules/linear.md',
+  '.github/MERGE_QUEUE.md',
+  '.github/workflows/README.md',
+  'docs/AUTOMATION_AUDIT.md',
+  'docs/PR_WORKFLOW_GUIDE.md',
+  'docs/REPOSITORY_SOURCES.md',
+  'scripts/agent-context/rule-scopes.json',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+
 export function buildAffectedTestPlan(
   changedFiles,
   { isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)) } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
-  if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
-    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
+  if (globalTestInput) {
+    return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const isLinearSyncOnMerge =
+    files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
+    files.every(file => LINEAR_SYNC_ON_MERGE_LANE.has(file));
+  if (isLinearSyncOnMerge) {
+    if (
+      !isFileAvailable('scripts/lib/__tests__/linear-sync-on-merge.test.mjs')
+    ) {
+      return fullSuitePlan('linear sync focused-test proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+      nodeTests: [],
+    };
+  }
+  // The shell wrapper's behavior is exercised by the existing Python CI
+  // suite. Admit only the complete pair, optionally with the complete local
+  // selector pair; unknown peers and unavailable proof retain full fallback.
+  const isExactDeployDiagnostics = [
+    VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+    VERCEL_DEPLOY_DIAGNOSTICS_WITH_SELECTOR,
+  ].some(
+    manifest =>
+      files.length === manifest.size && files.every(file => manifest.has(file))
+  );
+  if (isExactDeployDiagnostics) {
+    if (
+      ![
+        ...VERCEL_DEPLOY_DIAGNOSTICS_PAIR,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return fullSuitePlan(
+        'deploy diagnostics focused-test proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: VERCEL_CONGESTION_CONTROL_PYTHON_TESTS,
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (
+    files.some(file =>
+      RETOUCH_PROMPT_SOURCES.some(source => file === `apps/web/${source}`)
+    )
+  ) {
+    if (
+      !files.every(file => RETOUCH_PROMPT_LANE.has(file)) ||
+      !RETOUCH_PROMPT_PROOFS.every(isFileAvailable)
+    ) {
+      return fullSuitePlan(
+        'retouch prompt lane is mixed or its focused-test proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [
+        'scripts/summer-commissioning/company-registry.test.mjs',
+        'scripts/summer-commissioning/project-creation-policy.test.mjs',
+      ],
+      retouchPromptCoverage: true,
+    };
+  }
+  const isBoundedCapabilityBenchmarkChange =
+    files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => CAPABILITY_BENCHMARK_LANE.has(file));
+  if (isBoundedCapabilityBenchmarkChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
+    };
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
@@ -1100,7 +1092,9 @@ export function buildAffectedTestPlan(
     };
   }
   if (files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file))) {
-    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    return fullSuitePlan(
+      'Summer commissioning change exceeds its focused lane'
+    );
   }
   const isBoundedBacklogRemediationChange =
     files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
@@ -1136,22 +1130,6 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/product-lane-classifier.test.mjs',
       ]),
       nodeTests: ['scripts/typecheck-scripts.mjs'],
-    };
-  }
-  const isExactSymphonyThroughputControl =
-    files.length === SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.size &&
-    files.every(file => SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.has(file));
-  if (isExactSymphonyThroughputControl) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
-      scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
-      nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
     };
   }
   const isBoundedRollingCiFxCacheGcChange =
@@ -1202,183 +1180,23 @@ export function buildAffectedTestPlan(
       nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
     };
   }
-  const isBoundedHyperagentLifecycleChange =
-    files.some(file => HYPERAGENT_LIFECYCLE_PRIMARY_INPUTS.has(file)) &&
-    files.every(file => HYPERAGENT_LIFECYCLE_LANE.has(file));
-  if (isBoundedHyperagentLifecycleChange) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: [
-        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
-      ],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
-      nodeTests: [],
-    };
-  }
-  const isBoundedCursorCliWorkerChange =
-    files.some(file => CURSOR_CLI_WORKER_PRIMARY_INPUTS.has(file)) &&
-    files.every(file => CURSOR_CLI_WORKER_LANE.has(file));
-  if (isBoundedCursorCliWorkerChange) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: CURSOR_CLI_WORKER_PYTHON_TESTS,
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
-      nodeTests: [],
-    };
-  }
-  const isBoundedGemCheckinHudChange =
-    files.some(file => GEM_CHECKIN_HUD_PRIMARY_INPUTS.has(file)) &&
-    files.every(file => GEM_CHECKIN_HUD_LANE.has(file));
-  if (isBoundedGemCheckinHudChange) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: GEM_CHECKIN_HUD_PYTHON_TESTS,
-      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
-      nodeTests: [],
-    };
-  }
-  const isBoundedGemStorageChange =
-    files.some(file => GEM_STORAGE_PRIMARY_INPUTS.has(file)) &&
-    files.every(file => GEM_STORAGE_LANE.has(file));
-  if (isBoundedGemStorageChange) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: GEM_STORAGE_PYTEST_TESTS,
-      pythonUnittestTests: GEM_STORAGE_PYTHON_TESTS,
-      scriptVitestTests: [
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
-      nodeTests: [],
-    };
-  }
-  if (files.includes(SYMPHONY_NATIVE_ADMISSION_ANCHOR)) {
-    // Run the actual operational coverage gates, not an unrelated full web
-    // suite. This exception cannot absorb unknown peers or missing gate files.
-    if (
-      !files.every(file => SYMPHONY_NATIVE_ADMISSION_LANE.has(file)) ||
-      ![
-        SYMPHONY_NATIVE_ADMISSION_ANCHOR,
-        ...SYMPHONY_NATIVE_ADMISSION_GATES,
-        ...AFFECTED_TEST_SELECTOR_TESTS,
-      ].every(isFileAvailable)
-    ) {
-      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
-    }
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: SYMPHONY_NATIVE_ADMISSION_GATES,
-      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
-      nodeTests: [],
-    };
-  }
-  if (files.some(file => SYMPHONY_AGENT_ROUTER_INPUTS.has(file))) {
-    const gates = ['scripts/symphony/tests/run-issue-lease-gate.py'];
-    if (
-      !files.every(file => SYMPHONY_AGENT_ROUTER_LANE.has(file)) ||
-      ![
-        ...SYMPHONY_AGENT_ROUTER_INPUTS,
-        ...gates,
-        ...AFFECTED_TEST_SELECTOR_TESTS,
-      ].every(isFileAvailable)
-    ) {
-      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
-    }
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: gates,
-      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
-      nodeTests: [],
-    };
-  }
-  const hasLegacySymphonyTestChange = files.includes(
-    'scripts/symphony/tests/symphony-codex-auth-fallback.test.py'
-  );
-  const hasAdditiveSymphonyTestAnchor = files.includes(
-    'scripts/symphony/tests/symphony-additive-router.test.py'
-  );
-  if (hasLegacySymphonyTestChange && !hasAdditiveSymphonyTestAnchor) {
-    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
-  }
-  const isBoundedSymphonyAdditiveRouterChange =
-    files.some(file => SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS.has(file)) &&
-    files.every(file => SYMPHONY_ADDITIVE_ROUTER_LANE.has(file));
-  if (isBoundedSymphonyAdditiveRouterChange) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS,
-      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
-      nodeTests: [],
-    };
-  }
-  const isBoundedGemPrRehabilitationChange =
-    files.some(file => GEM_PR_REHABILITATION_PRIMARY_INPUTS.has(file)) &&
-    files.every(file => GEM_PR_REHABILITATION_LANE.has(file));
-  if (isBoundedGemPrRehabilitationChange) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: GEM_PR_REHABILITATION_PYTEST_TESTS,
-      pythonUnittestTests: GEM_PR_REHABILITATION_PYTHON_TESTS,
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
-      nodeTests: files.includes(
-        'scripts/symphony/summer-symphony-outbox-consumer.test.mjs'
-      )
-        ? ['scripts/symphony/summer-symphony-outbox-consumer.test.mjs']
-        : GEM_PR_REHABILITATION_NODE_TESTS,
-    };
-  }
   const isBoundedNoUnattendedRedChange =
     files.some(file => NO_UNATTENDED_RED_PRIMARY_INPUTS.has(file)) &&
     files.every(file => NO_UNATTENDED_RED_LANE.has(file));
   if (isBoundedNoUnattendedRedChange) {
+    if (
+      ![
+        ...NO_UNATTENDED_RED_NODE_TESTS,
+        ...NO_UNATTENDED_RED_SCRIPT_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return fullSuitePlan(
+        'No Unattended Red focused-test proof is unavailable'
+      );
+    }
     return {
       mode: 'selected',
+      deliveryControllerCoverage: true,
       relatedFiles: [],
       mandatoryTests: [],
       selectedTests: [],
@@ -1436,14 +1254,38 @@ export function buildAffectedTestPlan(
     };
   }
   if (hasMergeGroupAdmissionPrimaryInput) {
-    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    return fullSuitePlan(
+      'merge-group admission change exceeds its focused lane'
+    );
   }
-  const deliveryLivenessInputCount = files.filter(file =>
-    DELIVERY_LIVENESS_LANE.has(file)
-  ).length;
   const earlySelectorInputCount = files.filter(file =>
     AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
   ).length;
+  const dependabotAutoMergeInputCount = files.filter(file =>
+    DEPENDABOT_AUTO_MERGE_PRIMARY_INPUTS.has(file)
+  ).length;
+  const isBoundedDependabotAutoMergeChange =
+    dependabotAutoMergeInputCount > 0 &&
+    files.every(file => DEPENDABOT_AUTO_MERGE_LANE.has(file)) &&
+    (earlySelectorInputCount === 0 ||
+      earlySelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const hasIncompleteDependabotAutoMergeChange =
+    dependabotAutoMergeInputCount > 0 && !isBoundedDependabotAutoMergeChange;
+  if (isBoundedDependabotAutoMergeChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: DEPENDABOT_AUTO_MERGE_PYTHON_TESTS,
+      pythonUnittestTests: [],
+      scriptVitestTests: DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
+      nodeTests: DEPENDABOT_AUTO_MERGE_NODE_TESTS,
+      nodeTestArgs: DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS,
+    };
+  }
   const mergeQueueControllerInputCount = files.filter(file =>
     MERGE_QUEUE_CONTROLLER_INPUTS.has(file)
   ).length;
@@ -1466,49 +1308,20 @@ export function buildAffectedTestPlan(
       pythonTests: MERGE_QUEUE_CONTROLLER_PYTHON_TESTS,
       pythonUnittestTests: [],
       scriptVitestTests: MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: files.some(file =>
+        OWNERLESS_RECOVERY_COVERAGE_INPUTS.has(file)
+      )
+        ? OWNERLESS_RECOVERY_COVERAGE_ARGS
+        : [],
       nodeTests: [],
     };
   }
-  const isBoundedDeliveryLivenessChange =
-    deliveryLivenessInputCount > 0 &&
-    files.every(
-      file =>
-        DELIVERY_LIVENESS_LANE.has(file) ||
-        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
-    ) &&
-    (earlySelectorInputCount === 0 ||
-      earlySelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
-  if (isBoundedDeliveryLivenessChange) {
-    return {
-      mode: 'selected',
-      relatedFiles: [],
-      mandatoryTests: [],
-      selectedTests: [],
-      rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: [],
-      scriptVitestTests: unique([
-        ...DELIVERY_LIVENESS_TESTS,
-        ...(earlySelectorInputCount > 0 ? AFFECTED_TEST_SELECTOR_TESTS : []),
-      ]),
-      nodeTests: [],
-    };
-  }
-  const isExactEventDrivenShipperPrimary =
-    files.length === EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST.size &&
-    files.every(file => EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST.has(file));
-  const isExactEventDrivenShipperWithSelector =
-    files.length === EVENT_DRIVEN_SHIPPER_MANIFEST.size &&
-    files.every(file => EVENT_DRIVEN_SHIPPER_MANIFEST.has(file));
-  const isExactEventDrivenShipper =
-    isExactEventDrivenShipperPrimary || isExactEventDrivenShipperWithSelector;
   const isBoundedFleetPromotionGateChange =
     files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
     files.every(file => FLEET_PROMOTION_GATE_LANE.has(file));
   const hasUnboundedFleetPromotionGateChange =
     files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
-    !isBoundedFleetPromotionGateChange &&
-    !isExactEventDrivenShipper;
+    !isBoundedFleetPromotionGateChange;
   if (isBoundedFleetPromotionGateChange) {
     return {
       mode: 'selected',
@@ -1671,7 +1484,7 @@ export function buildAffectedTestPlan(
   );
   const directTests = relatedFiles.filter(
     file =>
-      /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
+      VITEST_TEST_FILE.test(file) &&
       !(
         isExactPrerequisiteTrain &&
         PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS.has(file)
@@ -1750,6 +1563,9 @@ export function buildAffectedTestPlan(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
+  for (const file of files) {
+    mandatoryTests.push(...(KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []));
+  }
   const hasHomepageSystemBGuardInput = files.some(isHomepageSystemBGuardInput);
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
@@ -1819,14 +1635,8 @@ export function buildAffectedTestPlan(
       ? VERCEL_CONGESTION_CONTROL_PYTHON_TESTS
       : []),
   ]);
-  const pythonUnittestTests = unique([
-    ...(isExactEventDrivenShipper ? EVENT_DRIVEN_SHIPPER_PYTHON_TESTS : []),
-    ...(files.some(file => file.includes('symphony-codex-account-control'))
-      ? ['scripts/symphony/tests/codex-account-probe.test.py']
-      : []),
-  ]);
+  const pythonUnittestTests = unique([]);
   const scriptVitestTests = unique([
-    ...(isExactEventDrivenShipper ? EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS : []),
     ...(isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
@@ -1867,7 +1677,9 @@ export function buildAffectedTestPlan(
     ...(isExactLayoutGuardContract ? LAYOUT_GUARD_CONTRACT_SCRIPT_TESTS : []),
   ]);
   const isCoveredSource = file => {
-    if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
+    if (VITEST_TEST_FILE.test(file)) return true;
+    const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
+    if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
     if (file.startsWith('apps/web/app/[username]/')) return true;
     if (file.startsWith('apps/web/components/')) return true;
@@ -1888,8 +1700,6 @@ export function buildAffectedTestPlan(
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
-    if (isExactEventDrivenShipper && EVENT_DRIVEN_SHIPPER_MANIFEST.has(file))
-      return true;
     if (
       isExactAuthenticatedA11yRepair &&
       AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
@@ -1938,12 +1748,7 @@ export function buildAffectedTestPlan(
         file === 'apps/web/lib/events/insert.ts')
     )
       return true;
-    if (file.startsWith('apps/web/eslint-rules/canonical-ui-label-casing'))
-      return true;
-    return (
-      file ===
-      'apps/web/tests/unit/design-system/arbitrary-values.baseline.json'
-    );
+    return file.startsWith('apps/web/eslint-rules/canonical-ui-label-casing');
   };
   const hasUnknownCiCancellationHealerPeer =
     hasCiCancellationHealerChange &&
@@ -1979,13 +1784,7 @@ export function buildAffectedTestPlan(
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
-    !isExactEventDrivenShipper &&
     !isExactPrSizeGuardWithSelector;
-  const hasIncompleteEventDrivenShipper =
-    hasManifestInputBeyondDirectTests(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST) &&
-    !isExactEventDrivenShipper &&
-    !isBoundedFleetPromotionGateChange &&
-    !isBoundedBacklogRemediationChange;
   const hasIncompletePrSizeGuard =
     hasManifestInputBeyondDirectTests(PR_SIZE_GUARD_MANIFEST) &&
     !isExactPrSizeGuard &&
@@ -2096,64 +1895,77 @@ export function buildAffectedTestPlan(
   const hasUnboundedBacklogRemediationChange =
     files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
     !isBoundedBacklogRemediationChange;
+  const uncoveredSourceFiles = relatedFiles.filter(
+    file => !isCoveredSource(file)
+  );
   const hasUncoveredSource =
-    !isExactEventDrivenShipper &&
-    (relatedFiles.some(file => !isCoveredSource(file)) ||
-      (mergeQueueControllerInputCount > 0 &&
-        !isBoundedMergeQueueControllerChange &&
-        !isExactScannerLoadRepairPrimary &&
-        !isExactScannerLoadRepairWithSelector) ||
-      hasUnboundedFleetPromotionGateChange ||
-      hasUnboundedBacklogRemediationChange ||
-      hasUnknownCiCancellationHealerPeer ||
-      hasStandaloneCiFastLanesChange ||
-      hasIncompletePrerequisiteTrain ||
-      hasStandalonePrerequisiteGlobal ||
-      hasUnknownPrerequisiteTrainPeer ||
-      hasIncompleteVercelCongestionControl ||
-      hasIncompleteAffectedTestSelector ||
-      hasIncompletePrSizeGuard ||
-      hasIncompletePerformanceProfilerRepair ||
-      hasIncompleteScannerLoadRepair ||
-      hasIncompleteMobileOverflowNavigationRace ||
-      hasIncompleteRunnerIoPressure ||
-      hasIncompleteRunnerPrerequisiteContract ||
-      hasIncompleteLayoutGuardContract ||
-      hasIncompleteEventDrivenShipper ||
-      hasIncompleteNeonAttemptArtifactRepair);
+    uncoveredSourceFiles.length > 0 ||
+    (mergeQueueControllerInputCount > 0 &&
+      !isBoundedMergeQueueControllerChange &&
+      !isExactScannerLoadRepairPrimary &&
+      !isExactScannerLoadRepairWithSelector) ||
+    hasUnboundedFleetPromotionGateChange ||
+    hasUnboundedBacklogRemediationChange ||
+    hasIncompleteDependabotAutoMergeChange ||
+    hasUnknownCiCancellationHealerPeer ||
+    hasStandaloneCiFastLanesChange ||
+    hasIncompletePrerequisiteTrain ||
+    hasStandalonePrerequisiteGlobal ||
+    hasUnknownPrerequisiteTrainPeer ||
+    hasIncompleteVercelCongestionControl ||
+    hasIncompleteAffectedTestSelector ||
+    hasIncompletePrSizeGuard ||
+    hasIncompletePerformanceProfilerRepair ||
+    hasIncompleteScannerLoadRepair ||
+    hasIncompleteMobileOverflowNavigationRace ||
+    hasIncompleteRunnerIoPressure ||
+    hasIncompleteRunnerPrerequisiteContract ||
+    hasIncompleteLayoutGuardContract ||
+    hasIncompleteNeonAttemptArtifactRepair;
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
     pythonTests.length > 0 ||
     scriptVitestTests.length > 0;
+  const hasFocusedLane =
+    hasSelectedTests &&
+    (relatedFiles.length > 0 ||
+      hasCiCancellationHealerChange ||
+      hasHomepageSystemBGuardInput ||
+      hasAppScreenCanvasGuardInput ||
+      isExactPrerequisiteTrain ||
+      isExactVercelCongestionControl ||
+      isExactAffectedTestSelector ||
+      isExactAuthenticatedA11yRepair ||
+      isExactPrSizeGuard ||
+      isExactPrSizeGuardWithSelector ||
+      isExactGoldenPathSmokeContractRepair ||
+      isExactNeonAttemptArtifactRepair ||
+      isExactPerformanceProfilerRepair ||
+      isExactPersistedAuthFixtureRepair ||
+      isExactVisualQaSelectorRepair ||
+      isExactMobileOverflowNavigationRace ||
+      isExactRunnerIoPressure ||
+      isExactRunnerPrerequisiteRepair ||
+      isExactLayoutGuardContract);
+  const mode = hasUncoveredSource
+    ? 'full'
+    : hasFocusedLane
+      ? 'selected'
+      : relatedFiles.length === 0
+        ? 'none'
+        : 'full';
+  const fallbackReason =
+    mode !== 'full'
+      ? undefined
+      : uncoveredSourceFiles.length > 0
+        ? `uncovered source path(s): ${uncoveredSourceFiles.join(', ')}`
+        : hasUncoveredSource
+          ? `incomplete or mixed focused-test lane: ${files.join(', ')}`
+          : `no focused test mapping for: ${relatedFiles.join(', ')}`;
   return {
-    mode: hasUncoveredSource
-      ? 'full'
-      : hasSelectedTests &&
-          (relatedFiles.length > 0 ||
-            hasCiCancellationHealerChange ||
-            hasHomepageSystemBGuardInput ||
-            hasAppScreenCanvasGuardInput ||
-            isExactPrerequisiteTrain ||
-            isExactVercelCongestionControl ||
-            isExactAffectedTestSelector ||
-            isExactAuthenticatedA11yRepair ||
-            isExactPrSizeGuard ||
-            isExactPrSizeGuardWithSelector ||
-            isExactGoldenPathSmokeContractRepair ||
-            isExactNeonAttemptArtifactRepair ||
-            isExactPerformanceProfilerRepair ||
-            isExactPersistedAuthFixtureRepair ||
-            isExactVisualQaSelectorRepair ||
-            isExactMobileOverflowNavigationRace ||
-            isExactRunnerIoPressure ||
-            isExactRunnerPrerequisiteRepair ||
-            isExactLayoutGuardContract ||
-            isExactEventDrivenShipper)
-        ? 'selected'
-        : relatedFiles.length === 0
-          ? 'none'
-          : 'full',
+    mode,
+    fallbackReason,
     relatedFiles,
     mandatoryTests: unique(mandatoryTests),
     selectedTests,
@@ -2180,6 +1992,14 @@ function formatCommand(command, args) {
     .join(' ');
 }
 
+export function formatAffectedTestPlanDiagnostic(plan) {
+  const fallback =
+    plan.mode === 'full'
+      ? ` fallbackReason=${JSON.stringify(plan.fallbackReason ?? 'unspecified')}`
+      : '';
+  return `[affected-tests] mode=${plan.mode} related=${plan.relatedFiles.length} mandatory=${plan.mandatoryTests.length}${fallback}`;
+}
+
 function changedFiles(base) {
   return execFileSync(
     'git',
@@ -2202,12 +2022,15 @@ export async function runCommandStatus(
     progressIntervalMs = DEFAULT_PROGRESS_INTERVAL_MS,
     label = 'command',
     logger = message => console.log(message),
+    // Concurrent callers buffer each child's output and flush it whole on
+    // exit so parallel stages never interleave their diagnostics.
+    bufferOutput = false,
   } = {}
 ) {
   const commandText = formatCommand(command, args);
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
-    stdio: 'inherit',
+    stdio: bufferOutput ? ['ignore', 'pipe', 'pipe'] : 'inherit',
     env: buildVerificationEnv(),
     detached: process.platform !== 'win32',
   });
@@ -2219,6 +2042,11 @@ export async function runCommandStatus(
     if (process.platform === 'win32') child.kill(signal);
     else if (child.pid) process.kill(-child.pid, signal);
   };
+  const outputChunks = [];
+  if (bufferOutput) {
+    child.stdout?.on('data', chunk => outputChunks.push(chunk));
+    child.stderr?.on('data', chunk => outputChunks.push(chunk));
+  }
   logger(
     `[affected-tests] start ${label} pid=${child.pid ?? 'unknown'} timeoutMs=${timeoutMs} command=${commandText}`
   );
@@ -2249,12 +2077,31 @@ export async function runCommandStatus(
     terminate('SIGKILL');
   }, timeoutMs + 5000);
   killTimer.unref?.();
+  const closed = new Promise(resolveClosed =>
+    child.once('close', resolveClosed)
+  );
   const status = await new Promise(resolveStatus => {
     child.once('exit', (code, signal) =>
       resolveStatus(timedOut ? 124 : (code ?? (signal ? 128 : 1)))
     );
     child.once('error', () => resolveStatus(1));
   });
+  if (bufferOutput) {
+    // Let piped output drain, but never hang on a leaked grandchild that
+    // still holds the pipe open after the command itself exited.
+    let drainTimer;
+    await Promise.race([
+      closed,
+      new Promise(resolveDrain => {
+        drainTimer = setTimeout(resolveDrain, 2000);
+        drainTimer.unref?.();
+      }),
+    ]);
+    clearTimeout(drainTimer);
+    if (outputChunks.length > 0) {
+      process.stdout.write(Buffer.concat(outputChunks));
+    }
+  }
   clearInterval(progressTimer);
   clearTimeout(timeoutTimer);
   clearTimeout(killTimer);
@@ -2350,8 +2197,119 @@ export function buildProjectCreationTestCommand() {
   ];
 }
 
-export function buildSelectedTestCommands(plan, maxWorkers) {
+export function controlCoverageReportsDirectory(
+  name,
+  base = process.env.RUNNER_TEMP || tmpdir()
+) {
+  return `--coverage.reportsDirectory=${resolve(base, 'jovie-control-coverage', name)}`;
+}
+
+export function buildControlCoverageCommands() {
+  const nativeCoverageArgs = [
+    'exec',
+    'vitest',
+    '--root',
+    'scripts',
+    '--config',
+    'vitest.config.mts',
+    'run',
+    ...CI_CONTROL_SCRIPT_TESTS.filter(
+      file => file !== OWNERLESS_RECOVERY_POLICY_TEST
+    ).map(file => file.replace(/^scripts\//, '')),
+    '--coverage',
+    '--coverage.include=merge-queue-backend.mjs',
+    '--coverage.include=lib/merge-group-admission.mjs',
+    '--coverage.include=lib/merge-queue-guard.mjs',
+    '--coverage.include=lib/native-queue-group-evidence.mjs',
+    '--coverage.include=lib/native-queue-policy-evidence.mjs',
+    '--coverage.include=lib/native-queue-eval.mjs',
+    '--coverage.include=native-queue-eval.mjs',
+    '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/github-open-prs-rest.mjs',
+    '--coverage.include=lib/pr-conflict-event.mjs',
+    '--coverage.include=lib/pr-conflict-handler.mjs',
+    '--coverage.thresholds.perFile=true',
+    '--coverage.thresholds.lines=85',
+    '--coverage.thresholds.branches=75',
+    '--coverage.thresholds.functions=82',
+    controlCoverageReportsDirectory('native-queue'),
+  ];
+  const ownerlessCoverageArgs = [
+    'exec',
+    'vitest',
+    '--root',
+    'scripts',
+    '--config',
+    'vitest.config.mts',
+    'run',
+    OWNERLESS_RECOVERY_POLICY_TEST.replace(/^scripts\//, ''),
+    '--maxWorkers',
+    '1',
+    ...OWNERLESS_RECOVERY_COVERAGE_ARGS,
+    controlCoverageReportsDirectory('ownerless-recovery'),
+  ];
+  return [
+    ['pnpm', nativeCoverageArgs],
+    ['pnpm', ownerlessCoverageArgs],
+  ];
+}
+
+export function buildSelectedTestCommands(
+  plan,
+  maxWorkers,
+  base = 'origin/main',
+  head
+) {
   const commands = [];
+  if (plan.deliveryControllerCoverage) {
+    commands.push(['node', [...DELIVERY_CONTROLLER_COVERAGE_ARGS]]);
+  }
+  if (plan.retouchPromptCoverage) {
+    if (
+      ![base, head].every(
+        sha => typeof sha === 'string' && /^[a-f0-9]{40}$/.test(sha)
+      )
+    ) {
+      throw new Error('prompt coverage requires exact base and head SHAs');
+    }
+    // Keep the hosted changed-source runner and real browser story intact.
+    commands.push([
+      'env',
+      [
+        `JOVIE_COVERAGE_INCLUDE=${RETOUCH_PROMPT_SOURCES.join('\n')}`,
+        'pnpm',
+        '--filter',
+        '@jovie/web',
+        'test:coverage',
+        '--changed',
+        base,
+        '--bail',
+        '1',
+      ],
+    ]);
+    commands.push([
+      'node',
+      [
+        'scripts/check-changed-test-coverage.mjs',
+        '--base',
+        base,
+        '--head',
+        head,
+      ],
+    ]);
+    commands.push([
+      'pnpm',
+      [
+        '--filter',
+        '@jovie/web',
+        'exec',
+        'vitest',
+        'run',
+        '--config=vitest.config.storybook.mts',
+        'components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+      ],
+    ]);
+  }
   if ((plan.nodeTests || []).length > 0) {
     const companyTest =
       'scripts/summer-commissioning/company-registry.test.mjs';
@@ -2365,7 +2323,10 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
       file => file !== companyTest && file !== projectTest
     );
     if (otherTests.length > 0)
-      commands.push(['node', ['--test', ...otherTests]]);
+      commands.push([
+        'node',
+        [...(plan.nodeTestArgs || []), '--test', ...otherTests],
+      ]);
   }
   if (plan.scriptVitestTests.length > 0) {
     commands.push([
@@ -2381,6 +2342,7 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
         ...plan.scriptVitestTests.map(file => file.replace(/^scripts\//, '')),
         '--maxWorkers',
         maxWorkers,
+        ...(plan.scriptVitestCoverageArgs || []),
       ],
     ]);
   }
@@ -2459,48 +2421,108 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
   ];
 }
 
+export function buildControlTestCommands() {
+  return [
+    buildCompanyRegistryTestCommand(),
+    buildProjectCreationTestCommand(),
+    ...buildControlCoverageCommands(),
+    ['node', DEPENDABOT_ADAPTER_CONTROL_TEST_ARGS],
+    [
+      'pnpm',
+      [
+        ...DEPENDABOT_POLICY_CONTROL_TEST_ARGS,
+        controlCoverageReportsDirectory('dependabot-update-policy'),
+      ],
+    ],
+    // The event test also executes the CLI entrypoint in-process. Its broad
+    // manual fleet path predates this slice, so enforce the measured CLI
+    // subset separately from the new event validator's per-file 85/75/82 gate.
+    [
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/pr-conflict-event.test.mjs',
+        '--coverage',
+        '--coverage.include=pr-conflict-handler.mjs',
+        '--coverage.thresholds.lines=55',
+        '--coverage.thresholds.branches=60',
+        '--coverage.thresholds.functions=65',
+        controlCoverageReportsDirectory('pr-conflict-cli'),
+      ],
+    ],
+    [
+      'pnpm',
+      [
+        '--filter',
+        '@jovie/web',
+        'exec',
+        'vitest',
+        'run',
+        ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
+        '--maxWorkers',
+        '1',
+      ],
+    ],
+    ...CI_CONTROL_NODE_COVERAGE_TESTS.map(([file, include, thresholds]) => [
+      'node',
+      include
+        ? [
+            '--test',
+            '--experimental-test-coverage',
+            `--test-coverage-include=${include}`,
+            ...thresholds,
+            file,
+          ]
+        : ['--test', file],
+    ]),
+    ['pnpm', ['run', 'test:rolling-ci-fx:coverage']],
+  ];
+}
+
+// The control stages are independent processes, so a bounded pool overlaps
+// the long native-queue Vitest coverage run (the critical path, ~20s) with
+// the ~25s of short, mostly single-threaded stages instead of serializing
+// ~45s of work. Three slots finish the short stages before the long run on a
+// 4-vCPU runner (two slots left them as the tail). Every Vitest coverage
+// stage owns a distinct reports directory so concurrent runs cannot clean
+// each other's coverage temp files.
+export const CONTROL_TEST_CONCURRENCY = 3;
+
+export async function runControlTestCommands(
+  execute = (command, args) =>
+    runCommandStatus(command, args, { bufferOutput: true }),
+  concurrency = CONTROL_TEST_CONCURRENCY
+) {
+  const commands = buildControlTestCommands();
+  let cursor = 0;
+  let failureStatus = 0;
+  async function worker() {
+    while (failureStatus === 0 && cursor < commands.length) {
+      const [command, args] = commands[cursor];
+      cursor += 1;
+      const status = await execute(command, args);
+      if (status !== 0 && failureStatus === 0) failureStatus = status;
+    }
+  }
+  await Promise.all(
+    Array.from(
+      { length: Math.max(1, Math.min(concurrency, commands.length)) },
+      () => worker()
+    )
+  );
+  return failureStatus;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.includes('--control')) {
-    const companyStatus = await runCommandStatus(
-      ...buildCompanyRegistryTestCommand()
-    );
-    if (companyStatus !== 0) process.exit(companyStatus);
-    const projectStatus = await runCommandStatus(
-      ...buildProjectCreationTestCommand()
-    );
-    if (projectStatus !== 0) process.exit(projectStatus);
-    await runCommand('pnpm', [
-      'exec',
-      'vitest',
-      '--root',
-      'scripts',
-      ...['--config', 'vitest.config.mts'],
-      'run',
-      ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
-      '--coverage',
-      '--coverage.include=merge-queue-backend.mjs',
-      '--coverage.include=lib/merge-group-admission.mjs',
-      '--coverage.include=lib/merge-queue-guard.mjs',
-      '--coverage.include=lib/native-queue-group-evidence.mjs',
-      '--coverage.include=lib/native-queue-policy-evidence.mjs',
-      '--coverage.include=lib/native-queue-eval.mjs',
-      '--coverage.include=**/scripts/native-queue-eval.mjs',
-      '--coverage.thresholds.perFile=true',
-      '--coverage.thresholds.lines=85',
-      '--coverage.thresholds.branches=75',
-      '--coverage.thresholds.functions=82',
-    ]);
-    await runCommand('pnpm', [
-      '--filter',
-      '@jovie/web',
-      'exec',
-      'vitest',
-      'run',
-      ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
-      '--maxWorkers',
-      '1',
-    ]);
+    process.exit(await runControlTestCommands());
   }
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
@@ -2530,9 +2552,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);
   }
-  console.log(
-    `[affected-tests] mode=${plan.mode} related=${plan.relatedFiles.length} mandatory=${plan.mandatoryTests.length}`
-  );
+  console.log(formatAffectedTestPlanDiagnostic(plan));
 
   if (plan.mode === 'none') process.exit(0);
   if (plan.mode === 'full') {
@@ -2547,9 +2567,25 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     });
   }
 
-  await runCommands(buildSelectedTestCommands(plan, maxWorkers), 1, {
-    timeoutMs: shardTimeoutMs,
-    progressIntervalMs,
-    labelPrefix: 'selected',
-  });
+  const coverageBase = plan.retouchPromptCoverage
+    ? execFileSync('git', ['rev-parse', `${base}^{commit}`], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }).trim()
+    : base;
+  const coverageHead = plan.retouchPromptCoverage
+    ? execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }).trim()
+    : undefined;
+  await runCommands(
+    buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
+    1,
+    {
+      timeoutMs: shardTimeoutMs,
+      progressIntervalMs,
+      labelPrefix: 'selected',
+    }
+  );
 }

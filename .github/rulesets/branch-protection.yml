@@ -155,7 +155,9 @@ rules:
       max_entries_to_merge: 5
       max_entries_to_build: 2
       min_entries_to_merge_wait_minutes: 10
-      check_response_timeout_minutes: 20
+      # Source-first cutover: live stays at 20 until this guard lands, then
+      # apply 60 without changing required checks or ALLGREEN.
+      check_response_timeout_minutes: 60
 
   # Dormant rules are intentionally absent from this applied payload:
   # `required_signatures` and `non_fast_forward`. Live ruleset 10512119 does

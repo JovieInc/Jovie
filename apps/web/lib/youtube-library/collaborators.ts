@@ -101,6 +101,18 @@ export function extractCreditedNames(input: {
   return found;
 }
 
+function collaboratorEvidenceSource(
+  input: {
+    readonly description?: string | null;
+    readonly creditedNames?: readonly string[];
+  },
+  excerpt: string
+): 'provider' | 'youtube_description' | 'youtube_title' {
+  if (input.creditedNames?.length) return 'provider';
+  if (input.description?.includes(excerpt)) return 'youtube_description';
+  return 'youtube_title';
+}
+
 export function resolveYouTubeCollaboratorClaims(input: {
   readonly title?: string | null;
   readonly description?: string | null;
@@ -122,11 +134,7 @@ export function resolveYouTubeCollaboratorClaims(input: {
       matchMethod: resolved?.matchMethod ?? 'unmatched',
       status: verified ? 'approved' : 'pending_review',
       evidence: {
-        source: input.creditedNames?.length
-          ? 'provider'
-          : input.description?.includes(credit.excerpt)
-            ? 'youtube_description'
-            : 'youtube_title',
+        source: collaboratorEvidenceSource(input, credit.excerpt),
         excerpt: credit.excerpt,
       },
     };

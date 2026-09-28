@@ -4,22 +4,20 @@ updates:
   - package-ecosystem: 'npm'
     directories:
       - '/'
-      - '/scripts/symphony/codex-cli'
     schedule:
       interval: 'daily'
       time: '09:00'
       timezone: 'Etc/UTC'
-    # Ship now: preserve shallow PRs while removing the observed ten-slot
-    # starvation. Re-evaluate when 20+ npm update PRs remain open across two
-    # weekday runs; then group only low-risk development patches (JOV-5465).
+    # JOV-6837: the JOV-5465 re-evaluate trigger fired (12 open npm PRs, 5
+    # DIRTY on pnpm-lock.yaml, 2026-09-27). Each lockfile bump conflicts with
+    # every other one, so move-together families and low-risk dev patches
+    # land as one PR each. Majors and runtime deps stay one PR per package.
     open-pull-requests-limit: 25
     cooldown:
       default-days: 3
       semver-major-days: 7
       semver-minor-days: 3
       semver-patch-days: 1
-    reviewers:
-      - 'itstimwhite'
     assignees:
       - 'itstimwhite'
     commit-message:
@@ -35,6 +33,18 @@ updates:
           - 'electron'
         update-types:
           - 'major'
+      # vitest and @vitest/* must share one version; split PRs broke each other.
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      dev-patch:
+        dependency-type: 'development'
+        update-types:
+          - 'patch'
     ignore:
       # Temporary workaround: these packages do not publish 10.3.2.
       # Dependabot currently attempts that version and fails the update job.
@@ -53,6 +63,16 @@ updates:
       # `pnpm --filter @jovie/web run evals:validate` against 0.123.x.
       - dependency-name: 'promptfoo'
         versions: ['>=0.122']
+      # Pinned at 56.3.2 (2026-09-25): every staging `vercel deploy
+      # --prebuilt --archive=tgz` since the 56.3.2 -> 59.16.0 bump (#18080)
+      # is created, then fails server-side at "Extracting deployment files"
+      # with "Unexpected error". Last green deploy-staging: job 106502335969
+      # (CLI 56.3.2, 6861 files); first red: job 106515900378 (CLI 59.16.0,
+      # same 6861 files). Ship now: stay on 56.3.2. Re-evaluate when a CLI
+      # >=57 prebuilt tgz deploy of this repo reaches READY (manual preview
+      # dispatch). Then drop this ignore and re-pin in deploy-workflow.test.ts.
+      - dependency-name: 'vercel'
+        versions: ['>=57']
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'
@@ -62,8 +82,6 @@ updates:
       day: 'monday'
       time: '09:00'
     open-pull-requests-limit: 5
-    reviewers:
-      - 'itstimwhite'
     assignees:
       - 'itstimwhite'
     commit-message:
@@ -77,7 +95,8 @@ updates:
       # init/analyze load one shared bundle and must move in the same PR.
       codeql-action:
         patterns:
-          - 'github/codeql-action'
+          # Sub-actions (analyze, upload-sarif, init) are distinct names.
+          - 'github/codeql-action*'
 
   # Enable version updates for Docker (if needed)
   - package-ecosystem: 'docker'
@@ -87,8 +106,6 @@ updates:
       day: 'monday'
       time: '09:00'
     open-pull-requests-limit: 5
-    reviewers:
-      - 'itstimwhite'
     assignees:
       - 'itstimwhite'
     commit-message:

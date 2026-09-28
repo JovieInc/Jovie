@@ -5,7 +5,12 @@ import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 
 const WEB_ROOT = join(import.meta.dirname, '..', '..', '..');
-const GLOBALS_CSS = readFileSync(join(WEB_ROOT, 'app', 'globals.css'), 'utf8');
+// The shared @utility blocks live in styles/tailwind-foundation.css, which
+// app/globals.css imports normally (JOV-2269 two-context split).
+const GLOBALS_CSS = readFileSync(
+  join(WEB_ROOT, 'styles', 'tailwind-foundation.css'),
+  'utf8'
+);
 
 const VIEWPORT_UTILITIES = {
   'w-overlay-viewport': 'width: calc(100vw - var(--space-8));',
@@ -41,7 +46,7 @@ function readUtilityBlock(className: string): string {
 
   if (!match) {
     throw new Error(
-      `apps/web/app/globals.css is missing @utility ${className}`
+      `apps/web/styles/tailwind-foundation.css is missing @utility ${className}`
     );
   }
 

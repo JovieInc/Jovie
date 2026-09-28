@@ -2,9 +2,8 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import { cache } from 'react';
-import { auth } from '@/lib/auth/better-auth';
+import { getRequestSession } from '@/lib/auth/request-session';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -64,11 +63,6 @@ export interface AuthGateResult {
   };
 }
 
-export interface AuthGateIdentity {
-  readonly clerkUserId: string | null;
-  readonly email: string | null;
-}
-
 function canUseE2ETestAuthFallback(): boolean {
   return (
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
@@ -125,6 +119,7 @@ interface AuthGateRecord {
   id: string;
   email: string | null;
   userStatus: string | null;
+  waitlistEntryId: string | null;
   isAdmin: boolean | null;
   isPro: boolean | null;
   deletedAt: Date | null;
@@ -141,6 +136,7 @@ interface AuthGateDbUser {
   id: string;
   email: string | null;
   userStatus: string | null;
+  waitlistEntryId: string | null;
   isAdmin: boolean | null;
   isPro: boolean | null;
   deletedAt: Date | null;
@@ -500,8 +496,8 @@ async function handleMissingDbUser(
 }
 
 /**
- * Resolve the current Better Auth identity. Reads `auth.api.getSession`
- * directly (NOT through cached.ts) so gate.ts sees the BA user id — the
+ * Resolve the current Better Auth identity. Reads the request-scoped
+ * Better Auth session (NOT through cached.ts) so gate.ts sees the BA user id — the
  * app `users` lookup then goes through `users.better_auth_user_id`.
  *
  * The `clerkUserId` field name is preserved in the return shape for
@@ -512,9 +508,10 @@ async function handleMissingDbUser(
  * short-circuit the session read. The app user's `betterAuthUserId` is
  * resolved from the DB.
  */
-async function resolveAuthIdentity(
-  knownAppUserId?: string
-): Promise<AuthGateIdentity> {
+async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
+  clerkUserId: string | null;
+  email: string | null;
+}> {
   // The secretless visual-capture runtime carries a Better Auth identity in
   // test cookies, but has no persisted app `users.id`. In that deliberately
   // synthetic mode it must win over a caller's cached app-id hint. Normal
@@ -556,8 +553,7 @@ async function resolveAuthIdentity(
   }
 
   try {
-    const headerStore = await headers();
-    const session = await auth.api.getSession({ headers: headerStore });
+    const session = await getRequestSession();
     if (!session) {
       return { clerkUserId: null, email: null };
     }
@@ -573,10 +569,6 @@ async function resolveAuthIdentity(
   }
 }
 
-export async function resolveRequestAuthIdentity(): Promise<AuthGateIdentity> {
-  return resolveAuthIdentity();
-}
-
 async function loadAuthGateRecord(
   betterAuthUserId: string,
   email: string | null
@@ -587,6 +579,7 @@ async function loadAuthGateRecord(
         id: users.id,
         email: users.email,
         userStatus: users.userStatus,
+        waitlistEntryId: users.waitlistEntryId,
         isAdmin: users.isAdmin,
         isPro: users.isPro,
         deletedAt: users.deletedAt,
@@ -632,6 +625,7 @@ function toAuthGateDbUser(
     id: dbResult.id,
     email: dbResult.email,
     userStatus: dbResult.userStatus,
+    waitlistEntryId: dbResult.waitlistEntryId,
     isAdmin: dbResult.isAdmin,
     isPro: dbResult.isPro,
     deletedAt: dbResult.deletedAt,
@@ -660,12 +654,6 @@ function toAuthGateProfile(
 export interface ResolveUserStateOptions {
   createDbUserIfMissing?: boolean;
   /**
-   * Pre-resolved Better Auth identity for callers that already performed the
-   * request session lookup. This preserves the canonical gate while avoiding a
-   * second auth-store read on the same route.
-   */
-  knownAuthIdentity?: AuthGateIdentity;
-  /**
    * Pre-resolved app `users.id` UUID. When provided, skips the Better Auth
    * session read (which calls `headers()` and must NOT be invoked inside
    * `unstable_cache` / `"use cache"` boundaries).
@@ -685,7 +673,6 @@ function serializeResolveUserStateOptions(
 ): string {
   return JSON.stringify({
     createDbUserIfMissing: options.createDbUserIfMissing ?? true,
-    knownAuthIdentity: options.knownAuthIdentity ?? null,
     knownClerkUserId: options.knownClerkUserId ?? null,
   });
 }
@@ -711,16 +698,10 @@ function serializeResolveUserStateOptions(
 async function resolveUserStateInternal(
   options: ResolveUserStateOptions = {}
 ): Promise<AuthGateResult> {
-  const {
-    createDbUserIfMissing = true,
-    knownAuthIdentity,
-    knownClerkUserId,
-  } = options;
+  const { createDbUserIfMissing = true, knownClerkUserId } = options;
 
   // 1. Resolve Better Auth identity and prefetch waitlist gate in parallel.
-  const identityPromise = knownAuthIdentity
-    ? Promise.resolve(knownAuthIdentity)
-    : resolveAuthIdentity(knownClerkUserId);
+  const identityPromise = resolveAuthIdentity(knownClerkUserId);
   const waitlistGatePromise = readWaitlistGateEnabledForAuthGate();
   const { clerkUserId, email } = await identityPromise;
 
@@ -766,6 +747,7 @@ async function resolveUserStateInternal(
   // 2b. If no DB user exists, create one if requested
   let dbUserId: string | null = dbUser?.id ?? null;
   let currentUserStatus = dbUser?.userStatus ?? null;
+  let currentWaitlistEntryId = dbUser?.waitlistEntryId ?? null;
   let currentDeletedAt = dbUser?.deletedAt ?? null;
 
   if (!dbUserId && canUseE2ETestAuthFallback()) {
@@ -799,12 +781,14 @@ async function resolveUserStateInternal(
     const [createdUser] = await db
       .select({
         userStatus: users.userStatus,
+        waitlistEntryId: users.waitlistEntryId,
         deletedAt: users.deletedAt,
       })
       .from(users)
       .where(eq(users.id, dbUserId))
       .limit(1);
     currentUserStatus = createdUser?.userStatus ?? null;
+    currentWaitlistEntryId = createdUser?.waitlistEntryId ?? null;
     currentDeletedAt = createdUser?.deletedAt ?? null;
     profile = null;
   }
@@ -813,6 +797,7 @@ async function resolveUserStateInternal(
     isAuthenticated: true,
     hasDbUser: Boolean(dbUserId),
     userStatus: currentUserStatus,
+    waitlistEntryId: currentWaitlistEntryId,
     deletedAt: currentDeletedAt,
     waitlistGateEnabled,
     profile,
@@ -836,13 +821,11 @@ const resolveUserStateCached = cache(
   async (optionsKey: string): Promise<AuthGateResult> => {
     const parsed = JSON.parse(optionsKey) as {
       createDbUserIfMissing: boolean;
-      knownAuthIdentity: AuthGateIdentity | null;
       knownClerkUserId: string | null;
     };
 
     return resolveUserStateInternal({
       createDbUserIfMissing: parsed.createDbUserIfMissing,
-      knownAuthIdentity: parsed.knownAuthIdentity ?? undefined,
       knownClerkUserId: parsed.knownClerkUserId ?? undefined,
     });
   }

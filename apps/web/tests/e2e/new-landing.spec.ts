@@ -36,11 +36,11 @@ test.describe('/new landing page', () => {
 
     await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
     await expect(
-      headerNav.getByRole('link', { name: 'Artists', exact: true })
-    ).toHaveAttribute('href', APP_ROUTES.ARTISTS);
-    await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.PRODUCT);
+    await expect(
+      headerNav.getByRole('button', { name: /Customers/ })
+    ).toHaveCount(1);
     await expect(
       headerNav.getByRole('button', { name: 'For', exact: true })
     ).toHaveCount(0);
@@ -56,10 +56,10 @@ test.describe('/new landing page', () => {
     ).toBeVisible();
 
     await expect(
-      page.getByRole('heading', { name: /your ai artist manager/i })
+      page.getByRole('heading', { name: /your ai presence manager/i })
     ).toBeVisible();
     await expect(
-      page.getByText(/plan releases, create assets, draft pitches/i)
+      page.getByText(/plan launches, create assets, draft pitches/i)
     ).toBeVisible();
 
     await expect(page.getByTestId('homepage-v2-system-overview')).toBeVisible();
@@ -128,7 +128,7 @@ test.describe('/new landing page', () => {
       'Pro'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      '$39'
+      '$199'
     );
     await expect(page.getByRole('link', { name: 'Release Pages' })).toHaveCount(
       0

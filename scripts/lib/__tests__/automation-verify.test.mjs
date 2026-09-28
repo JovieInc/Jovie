@@ -1,17 +1,266 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildAffectedTestPlan,
   buildCompanyRegistryTestCommand,
+  buildControlCoverageCommands,
+  buildControlTestCommands,
   buildFullSuiteCommands,
   buildProjectCreationTestCommand,
   buildSelectedTestCommands,
   buildVerificationEnv,
+  CONTROL_TEST_CONCURRENCY,
+  controlCoverageReportsDirectory,
+  formatAffectedTestPlanDiagnostic,
   runCommandStatus,
+  runControlTestCommands,
 } from '../../run-affected-tests.mjs';
+
+describe('affected-test selector inventory', () => {
+  it('references only existing scripts tests', () => {
+    const selector = readFileSync(
+      resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+      'utf8'
+    );
+    const referencedTests = [
+      ...selector.matchAll(
+        /['"](scripts\/[^'"]+\.test\.(?:mjs|cjs|js|ts|tsx))['"]/g
+      ),
+    ].map(match => match[1]);
+
+    expect(referencedTests.length).toBeGreaterThan(0);
+    expect(
+      [...new Set(referencedTests)].filter(
+        testFile =>
+          !existsSync(resolve(import.meta.dirname, '../../..', testFile))
+      )
+    ).toEqual([]);
+  });
+});
+
+describe('structural control stage execution', () => {
+  it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
+    const stages = buildControlTestCommands();
+    expect(stages).toHaveLength(17);
+    expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
+    expect(stages[1]).toEqual(buildProjectCreationTestCommand());
+    expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
+    expect(stages[2][1]).toContain(
+      '--coverage.include=lib/pr-conflict-event.mjs'
+    );
+    expect(stages[3][1]).toContain(
+      '--coverage.include=lib/ownerless-recovery-policy.mjs'
+    );
+    expect(stages[4]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+        '--test-coverage-lines=95',
+        'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+      ],
+    ]);
+    expect(stages[5]).toEqual([
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/dependabot-update-policy.test.mjs',
+        '--coverage.enabled',
+        '--coverage.provider=v8',
+        '--coverage.include=dependabot-update-policy.mjs',
+        '--coverage.thresholds.lines=95',
+        '--coverage.thresholds.branches=90',
+        '--coverage.thresholds.functions=95',
+        controlCoverageReportsDirectory('dependabot-update-policy'),
+      ],
+    ]);
+    expect(stages[6][1]).toContain(
+      '--coverage.include=pr-conflict-handler.mjs'
+    );
+    expect(stages[7][1]).toContain('@jovie/web');
+    expect(stages[8]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/production-continuity.mjs',
+        '--test-coverage-lines=95',
+        '--test-coverage-branches=90',
+        '--test-coverage-functions=90',
+        '.github/scripts/production-continuity.test.mjs',
+      ],
+    ]);
+    expect(stages[11]).toEqual([
+      'node',
+      ['--test', '.github/scripts/production-continuity-workflow.test.mjs'],
+    ]);
+    expect(stages[13]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/vercel-output-manifest.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=85',
+        '--test-coverage-functions=90',
+        '.github/scripts/vercel-output-manifest.test.mjs',
+      ],
+    ]);
+    expect(stages[14]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/vercel-output-validate.mjs',
+        '--test-coverage-lines=90',
+        '--test-coverage-branches=85',
+        '--test-coverage-functions=90',
+        '.github/scripts/vercel-output-validate.test.mjs',
+      ],
+    ]);
+    expect(stages[15]).toEqual([
+      'node',
+      [
+        '--test',
+        '--experimental-test-coverage',
+        '--test-coverage-include=.github/scripts/production-input-provenance.mjs',
+        '--test-coverage-lines=85',
+        '--test-coverage-branches=75',
+        '--test-coverage-functions=90',
+        '.github/scripts/production-input-provenance.test.mjs',
+      ],
+    ]);
+    expect(stages[16]).toEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
+    const visited = [];
+    expect(
+      await runControlTestCommands(async (command, args) => {
+        visited.push([command, args]);
+        return 0;
+      })
+    ).toBe(0);
+    expect(visited).toEqual(stages);
+  });
+
+  it('propagates each failed stage and starts nothing after the failure', async () => {
+    const stages = buildControlTestCommands();
+    for (const failedStage of stages.map((_, index) => index)) {
+      const visited = [];
+      const status = await runControlTestCommands(async (command, args) => {
+        const index = visited.length;
+        visited.push([command, args]);
+        await new Promise(resolveTick => setTimeout(resolveTick, 0));
+        return index === failedStage ? 7 : 0;
+      });
+      expect(status).toBe(7);
+      // Only a stage already in flight alongside the failed one may have
+      // started; nothing is dispatched once the failure is observed.
+      expect(visited.length).toBeGreaterThanOrEqual(failedStage + 1);
+      expect(visited.length).toBeLessThanOrEqual(
+        Math.min(stages.length, failedStage + CONTROL_TEST_CONCURRENCY)
+      );
+      expect(visited).toEqual(stages.slice(0, visited.length));
+    }
+  });
+
+  it('bounds concurrent control stages and overlaps independent work', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const status = await runControlTestCommands(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise(resolveTick => setTimeout(resolveTick, 1));
+      inFlight -= 1;
+      return 0;
+    });
+    expect(status).toBe(0);
+    expect(CONTROL_TEST_CONCURRENCY).toBe(3);
+    expect(peak).toBe(CONTROL_TEST_CONCURRENCY);
+    peak = 0;
+    expect(
+      await runControlTestCommands(async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise(resolveTick => setTimeout(resolveTick, 1));
+        inFlight -= 1;
+        return 0;
+      }, 1)
+    ).toBe(0);
+    expect(peak).toBe(1);
+  });
+
+  it('gives every concurrent Vitest coverage stage its own reports directory', () => {
+    const stages = /** @type {Array<[string, string[]]>} */ (
+      buildControlTestCommands()
+    );
+    const vitestCoverageStages = stages.filter(
+      ([command, args]) =>
+        command === 'pnpm' &&
+        args.includes('vitest') &&
+        args.some(argument => argument.startsWith('--coverage'))
+    );
+    expect(vitestCoverageStages).toHaveLength(4);
+    const directories = vitestCoverageStages.map(([, args]) => {
+      const flags = args.filter(argument =>
+        argument.startsWith('--coverage.reportsDirectory=')
+      );
+      expect(flags).toHaveLength(1);
+      return flags[0].slice('--coverage.reportsDirectory='.length);
+    });
+    expect(new Set(directories).size).toBe(directories.length);
+    for (const directory of directories) {
+      expect(directory).toMatch(/jovie-control-coverage/);
+    }
+    // The FX stage keeps its own dedicated directory in package.json.
+    expect(buildControlTestCommands().at(-1)).toEqual([
+      'pnpm',
+      ['run', 'test:rolling-ci-fx:coverage'],
+    ]);
+  });
+
+  it('flushes buffered stage output whole after the command exits', async () => {
+    const diagnostics = [];
+    const writes = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = chunk => {
+      writes.push(String(chunk));
+      return true;
+    };
+    let status;
+    try {
+      status = await runCommandStatus(
+        process.execPath,
+        [
+          '-e',
+          'console.log("first"); console.error("second"); process.exit(3)',
+        ],
+        {
+          bufferOutput: true,
+          logger: message => diagnostics.push(message),
+        }
+      );
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    expect(status).toBe(3);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('first');
+    expect(writes[0]).toContain('second');
+    expect(diagnostics.at(-1)).toContain('status=3');
+  });
+});
 
 const runner = readFileSync(
   resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
@@ -90,12 +339,10 @@ describe('Summer commissioning affected-test lane', () => {
         'scripts/summer-commissioning/company-registry.test.mjs',
       ],
     ]);
-    expect(runner).toMatch(
-      /const companyStatus = await runCommandStatus\(\s*\.\.\.buildCompanyRegistryTestCommand\(\)\s*\);/
+    expect(buildControlTestCommands()[0]).toEqual(
+      buildCompanyRegistryTestCommand()
     );
-    expect(runner).toContain(
-      'if (companyStatus !== 0) process.exit(companyStatus);'
-    );
+    expect(runner).toContain('process.exit(await runControlTestCommands());');
   });
 
   it('fails closed to the full suite when commissioning changes mix scopes', () => {
@@ -131,36 +378,14 @@ describe('Summer commissioning affected-test lane', () => {
       expect(commands[2][1]).not.toContain(
         'scripts/summer-commissioning/project-creation-policy.test.mjs'
       );
-      expect(runner).toMatch(
-        /const projectStatus = await runCommandStatus\(\s*\.\.\.buildProjectCreationTestCommand\(\)\s*\);/
+      expect(buildControlTestCommands()[1]).toEqual(
+        buildProjectCreationTestCommand()
       );
-      expect(runner).toContain(
-        'if (projectStatus !== 0) process.exit(projectStatus);'
-      );
+      expect(runner).toContain('process.exit(await runControlTestCommands());');
     }
   );
 });
 
-const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
-  '.husky/pre-push',
-  'scripts/automation-verify.sh',
-  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
-  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
-  'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
-  'scripts/backlog-orchestrator/admitter.mjs',
-  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
-  'scripts/backlog-orchestrator/deterministic-gates.mjs',
-  'scripts/backlog-orchestrator/gate-next-hold.mjs',
-  'scripts/symphony/codex-rotate',
-  'scripts/symphony/codex-account-probe.sh',
-  'scripts/symphony/symphony-lease-guard',
-  'scripts/symphony/tests/codex-account-probe.test.py',
-  'scripts/symphony/tests/codex-rotate.test.py',
-  'scripts/symphony/tests/symphony-lease-guard.test.py',
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/pre-push-gate.test.mjs',
-  'scripts/run-affected-tests.mjs',
-];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
   '.github/workflows/ci.yml',
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
@@ -177,65 +402,54 @@ const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
 const FLEET_PROMOTION_GATE_LANE = [
   '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
-  'scripts/symphony/evaluate-fleet-gate.sh',
-  'scripts/symphony/fleet_admission_receipt.py',
-  'scripts/symphony/gem-priority-gate.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-  'scripts/symphony/tests/test_fleet_admission_receipt.py',
+  'scripts/fleet-gate/evaluate-fleet-gate.sh',
+  'scripts/fleet-gate/fleet_admission_receipt.py',
+  'scripts/fleet-gate/gem-priority-gate.py',
+  'scripts/fleet-gate/tests/gem-priority-gate.test.py',
+  'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+  'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
-const HYPERAGENT_LIFECYCLE_LANE = [
-  '.github/workflows/ci.yml',
-  'scripts/ci-fast-lanes.mjs',
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-  'scripts/run-affected-tests.mjs',
-  'scripts/symphony/hyperagent/lifecycle.py',
-  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+const DEPENDABOT_AUTO_MERGE_NODE_TESTS = [
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+  'scripts/lib/__tests__/native-merge-intent.test.mjs',
+  'scripts/lib/__tests__/source-admission-policy.test.mjs',
 ];
-const GEM_PR_REHABILITATION_LANE = [
-  '.github/requirements/pytest.in',
-  '.github/requirements/pytest.txt',
-  '.github/workflows/gem-delivery-controller-activation.yml',
-  '.github/workflows/ci.yml',
-  'docs/PR_FLOW.md',
-  'scripts/symphony/config/gem-repo-registry.json',
-  'scripts/symphony/config/model-registry.json',
-  'scripts/symphony/closure_health.py',
-  'scripts/symphony/gem-disk-reclaim.py',
-  'scripts/symphony/gem-pr-drain.py',
-  'scripts/symphony/gem-ops-hud.py',
-  'scripts/symphony/gem-priority-gate.py',
-  'scripts/symphony/gem-repo-drain-cycle.py',
-  'scripts/symphony/gem_gate_contract.py',
-  'scripts/symphony/gem_repo_registry.py',
-  'scripts/symphony/gem_rehabilitation_policy.py',
-  'scripts/symphony/install-gem-fleet-controller.sh',
-  'scripts/symphony/install-gem-pr-rehabilitation.sh',
-  'scripts/symphony/install-symphony-ui-pilot.sh',
-  'scripts/symphony/model-router.py',
-  'scripts/symphony/symphony-reconciler.py',
-  'scripts/symphony/systemd/gem-disk-reclaim.service',
-  'scripts/symphony/systemd/gem-disk-reclaim.timer',
-  'scripts/symphony/systemd/gem-pr-drain.service',
-  'scripts/symphony/systemd/gem-pr-drain.timer',
-  'scripts/symphony/tests/test_gem_disk_reclaim.py',
-  'scripts/symphony/tests/gem-pr-drain.test.py',
-  'scripts/symphony/tests/gem-ops-hud.test.py',
-  'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
-  'scripts/symphony/tests/closure-health.test.py',
-  'scripts/symphony/tests/symphony-reconciler.test.py',
-  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
-  'scripts/symphony/tests/test-model-router.py',
-  'scripts/tests/test_symphony_ui_pilot_runtime.py',
-  'scripts/ci-fast-lanes.mjs',
+const DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS = [
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
+  '--test-coverage-include=scripts/native-merge-intent.mjs',
+  '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
+  '--test-coverage-lines=95',
+];
+const DEPENDABOT_AUTO_MERGE_PYTHON_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
+];
+const DEPENDABOT_AUTO_MERGE_INPUTS = [
+  '.github/workflows/dependabot-auto-merge.yml',
+  '.github/dependabot.yml',
+  'scripts/dependabot-update-policy.mjs',
+  'scripts/dependabot-workflow-run-adapter.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+];
+const DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS = [
+  '--coverage.enabled',
+  '--coverage.provider=v8',
+  '--coverage.include=dependabot-update-policy.mjs',
+  '--coverage.thresholds.lines=95',
+  '--coverage.thresholds.branches=90',
+  '--coverage.thresholds.functions=95',
+];
+const DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+];
+const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
+  'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+  'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
+  'scripts/tests/test_gh_retry.py',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = [
   '.github/actions/evaluate-fleet-gate/action.yml',
@@ -243,10 +457,10 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
-  'scripts/symphony/evaluate-fleet-gate.sh',
-  'scripts/symphony/fleet_admission_receipt.py',
-  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-  'scripts/symphony/tests/test_fleet_admission_receipt.py',
+  'scripts/fleet-gate/evaluate-fleet-gate.sh',
+  'scripts/fleet-gate/fleet_admission_receipt.py',
+  'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+  'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
@@ -359,21 +573,6 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
-const GEM_CHECKIN_HUD_LANE = [
-  'scripts/symphony/WORKFLOW.md',
-  'scripts/symphony/symphony_official_runtime.py',
-  'scripts/symphony/gem-checkin-hud.py',
-  'scripts/symphony/gem-checkin-tty1.sh',
-  'scripts/symphony/systemd/symphony-elixir.service',
-  'scripts/symphony/systemd/symphony-burrito.service',
-  'scripts/symphony/systemd/symphony-burrito-update.service',
-  'scripts/symphony/systemd/symphony-burrito-update.timer',
-  'scripts/symphony/update-symphony-burrito.sh',
-  'scripts/symphony/tests/gem-checkin-hud.test.py',
-  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-  '.github/workflows/reusable-ci-lint.yml',
-  ...AFFECTED_TEST_SELECTOR_MANIFEST,
-];
 const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
@@ -396,32 +595,15 @@ const ROLLING_CI_FX_CACHE_GC_LANE = [
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/fx-remediation-lane.mjs',
   'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
-];
-const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = [
-  '.github/workflows/fleet-gate-refresh.yml',
-  'scripts/symphony/launchd/README.md',
-  'scripts/symphony/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template',
-  'scripts/symphony/shipper-gated-entrypoint.py',
-  'scripts/symphony/tests/gem-priority-gate.test.py',
-  'scripts/lib/__tests__/hermes-launchd.test.mjs',
-];
-const DELIVERY_LIVENESS_LANE = [
-  'scripts/symphony/jobs/codex-issue-shipper.ts',
-  'scripts/symphony/jobs/delivery-liveness-watchdog.ts',
-  'scripts/symphony/launchd/README.md',
-  'scripts/symphony/launchd/co.jovie.hermes.delivery-liveness-watchdog.plist.template',
-  'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
-  'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
-  'scripts/symphony/lib/codex-issue-shipper.ts',
-  'scripts/symphony/lib/delivery-liveness.ts',
-  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
 ];
 const PR_SIZE_GUARD_MANIFEST = [
   '.github/workflows/pr-size-guard.yml',
@@ -437,15 +619,11 @@ const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_ANCHORS = [
   'apps/web/scripts/test-performance-guard.ts',
   'apps/web/scripts/test-performance-profiler.test.ts',
   'apps/web/scripts/test-performance-profiler.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_MANIFEST = [
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
@@ -460,8 +638,6 @@ const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = [
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
   'apps/web/tests/unit/metrics-layer-guard-logic.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
 ];
 const SCANNER_LOAD_REPAIR_MANIFEST = [
@@ -501,8 +677,6 @@ const CASE_SENSITIVE_LOWERCASE_CHAT_INPUT_PATTERNS = [
 const GOLDEN_PATH_SMOKE_CONTRACT_REPAIR_DIFF = [
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = [
@@ -518,11 +692,6 @@ const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = [
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/lib/auth/test-mode.test.ts',
   'apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/jobs/ci-failure-monitor.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-  'scripts/symphony/lib/ci-failure-classifier.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
 ];
 const PERSISTED_AUTH_FIXTURE_REPAIR_DIFF = [
   ...PERSISTED_AUTH_FIXTURE_REPAIR_CORE,
@@ -532,8 +701,6 @@ const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = [
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
   'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -545,8 +712,6 @@ const RUNNER_IO_PRESSURE_MANIFEST = [
   '.github/runner-host/ci-runner-autoscaler.service.snapshot',
   '.github/runner-host/install-io-pressure-guard.sh',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -559,8 +724,6 @@ const RUNNER_IO_PRESSURE_V2_MANIFEST = [
   '.github/workflows/runner-autoscaler-canary.yml',
   'apps/web/tests/unit/ci/runner-autoscaler-canary-workflow.test.ts',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -578,8 +741,6 @@ const RUNNER_PREREQUISITE_CONTRACT_MANIFEST = [
   '.github/runner-image/verify-prerequisites.mjs',
   '.github/workflows/ci.yml',
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -592,16 +753,12 @@ const LAYOUT_GUARD_CONTRACT_MANIFEST = [
   '.github/scripts/layout-guard-manifest.mjs',
   '.github/scripts/layout-guard-manifest.test.mjs',
   '.github/workflows/ci.yml',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
   '.github/workflows/ci.yml',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
-  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -718,7 +875,6 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });
@@ -732,7 +888,6 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });
@@ -749,156 +904,6 @@ describe('automation-verify affected scope', () => {
   it('selects related tests instead of the whole affected workspace package', () => {
     expect(script).toContain('node scripts/run-affected-tests.mjs');
     expect(script).not.toContain('turbo-local.mjs test --affected');
-  });
-
-  it('routes the exact JOV-5006 ops diff to focused infrastructure contracts', () => {
-    const plan = buildAffectedTestPlan(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST);
-
-    expect(plan).toMatchObject({
-      mode: 'selected',
-      relatedFiles: [],
-      selectedTests: [],
-      pythonUnittestTests: ['scripts/symphony/tests/gem-priority-gate.test.py'],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
-        'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
-        'scripts/lib/__tests__/native-queue-eval.test.mjs',
-        'scripts/lib/__tests__/native-queue-collector.test.mjs',
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
-        'scripts/lib/__tests__/pr-visual-review.test.mjs',
-        'scripts/lib/__tests__/ci-harness.test.mjs',
-        'scripts/lib/__tests__/changed-test-coverage.test.mjs',
-        'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
-        'scripts/lib/__tests__/ci-branching-guard.test.mjs',
-        'scripts/lib/__tests__/merge-queue-guard.test.mjs',
-        'scripts/lib/__tests__/merge-queue-backend.test.mjs',
-        'scripts/lib/__tests__/pre-land-changelog.test.mjs',
-        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-        'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
-        'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
-        'scripts/lib/__tests__/eval-main-health-action.test.mjs',
-        'scripts/lib/__tests__/pr-check-failures.test.mjs',
-        'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
-        'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
-        'scripts/lib/__tests__/github-merge-queue.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-        'scripts/lib/__tests__/codeql-workflow-contract.test.mjs',
-        'scripts/lib/__tests__/design-exception-registry.test.mjs',
-        'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
-        'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
-        'scripts/lib/__tests__/merge-group-admission.test.mjs',
-        'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
-        'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
-        'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
-        'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
-        'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
-        'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
-        'scripts/lib/__tests__/golden-path-lock.test.mjs',
-        'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
-        'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
-        'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
-        'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
-        'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
-        'scripts/lib/__tests__/actions-cache-gc.test.mjs',
-        'scripts/lib/__tests__/queue-deferred-release.test.mjs',
-        'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
-        'scripts/lib/__tests__/setup-worktree-health.test.mjs',
-        'scripts/lib/__tests__/linear-issue-intake.test.mjs',
-        'scripts/lib/__tests__/agent-qc-wires.test.mjs',
-        'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
-        'scripts/lib/__tests__/production-lane-range.test.mjs',
-        'scripts/lib/__tests__/preview-env-contract.test.mjs',
-        'scripts/lib/__tests__/hermes-launchd.test.mjs',
-      ],
-    });
-  });
-
-  it('self-selects the focused JOV-5006 contracts while changing the selector', () => {
-    expect(
-      buildAffectedTestPlan([
-        ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
-        ...AFFECTED_TEST_SELECTOR_MANIFEST,
-      ]).mode
-    ).toBe('selected');
-  });
-
-  it('fails closed when the JOV-5006 ops signature includes unknown source', () => {
-    expect(
-      buildAffectedTestPlan([
-        ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
-        'scripts/symphony/unknown-shipper-control.py',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('routes delivery-liveness changes to their complete script contracts', () => {
-    const plan = buildAffectedTestPlan(DELIVERY_LIVENESS_LANE);
-
-    expect(plan).toMatchObject({
-      mode: 'selected',
-      relatedFiles: [],
-      selectedTests: [],
-      scriptVitestTests: [
-        'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
-        'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
-        'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
-        'scripts/lib/__tests__/hermes-launchd.test.mjs',
-      ],
-    });
-  });
-
-  it('keeps a focused delivery-liveness follow-up on the same contracts', () => {
-    const plan = buildAffectedTestPlan([
-      'scripts/symphony/jobs/delivery-liveness-watchdog.ts',
-      'scripts/symphony/launchd/README.md',
-      'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
-      'scripts/symphony/lib/delivery-liveness.ts',
-    ]);
-
-    expect(plan.mode).toBe('selected');
-    expect(plan.scriptVitestTests).toEqual([
-      'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
-      'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
-      'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
-      'scripts/lib/__tests__/hermes-launchd.test.mjs',
-    ]);
-  });
-
-  it('fails closed when delivery-liveness changes include an unknown peer', () => {
-    expect(
-      buildAffectedTestPlan([
-        ...DELIVERY_LIVENESS_LANE,
-        'scripts/symphony/lib/unknown-delivery-control.ts',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('selects the complete Symphony throughput control-plane test lanes', () => {
-    const plan = buildAffectedTestPlan(SYMPHONY_THROUGHPUT_CONTROL_MANIFEST);
-    expect(plan).toMatchObject({
-      mode: 'selected',
-      nodeTests: [
-        'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
-        'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
-        'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
-      ],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/pre-push-gate.test.mjs',
-      ],
-      pythonUnittestTests: [
-        'scripts/symphony/tests/codex-account-probe.test.py',
-        'scripts/symphony/tests/codex-rotate.test.py',
-        'scripts/symphony/tests/symphony-lease-guard.test.py',
-      ],
-    });
-    expect(
-      buildAffectedTestPlan([
-        ...SYMPHONY_THROUGHPUT_CONTROL_MANIFEST,
-        'scripts/backlog-orchestrator/unknown.mjs',
-      ]).mode
-    ).toBe('full');
   });
 
   it('selects the official Symphony backlog remediation lane', () => {
@@ -946,10 +951,10 @@ describe('automation-verify affected scope', () => {
 
   it('selects the fleet promotion gate regression lane', () => {
     for (const files of [
-      ['scripts/symphony/gem-priority-gate.py'],
+      ['scripts/fleet-gate/gem-priority-gate.py'],
       [
-        'scripts/symphony/gem-priority-gate.py',
-        'scripts/symphony/tests/gem-priority-gate.test.py',
+        'scripts/fleet-gate/gem-priority-gate.py',
+        'scripts/fleet-gate/tests/gem-priority-gate.test.py',
       ],
       FLEET_PROMOTION_GATE_LANE,
     ]) {
@@ -959,240 +964,34 @@ describe('automation-verify affected scope', () => {
           'apps/web/tests/unit/api/health/deploy.critical.test.ts',
         ],
         pythonTests: [
-          'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-          'scripts/symphony/tests/test_fleet_admission_receipt.py',
+          'scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+          'scripts/fleet-gate/tests/test_fleet_admission_receipt.py',
         ],
         pythonUnittestTests: [
-          'scripts/symphony/tests/gem-priority-gate.test.py',
+          'scripts/fleet-gate/tests/closure-health.test.py',
+          'scripts/fleet-gate/tests/gem-priority-gate.test.py',
         ],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
     }
     expect(
       buildAffectedTestPlan([
-        'scripts/symphony/gem-priority-gate.py',
-        'scripts/symphony/unknown-fleet-peer.py',
+        'scripts/fleet-gate/gem-priority-gate.py',
+        'scripts/fleet-gate/unknown-fleet-peer.py',
       ]).mode
     ).toBe('full');
   });
 
-  it('selects the bounded Gem check-in HUD + burrito contracts and fails closed on unrelated files', () => {
-    expect(buildAffectedTestPlan(GEM_CHECKIN_HUD_LANE)).toMatchObject({
-      mode: 'selected',
-      selectedTests: [],
-      pythonUnittestTests: [
-        'scripts/symphony/tests/gem-checkin-hud.test.py',
-        'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-      ],
-      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
-    });
+  it('routes a closure-health source-only repair to the fleet gate Python suites', () => {
     expect(
-      buildAffectedTestPlan([
-        ...GEM_CHECKIN_HUD_LANE,
-        'apps/ios/Jovie/RootView.swift',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('selects every Gem PR rehabilitation contract without unrelated product tests', () => {
-    const plan = buildAffectedTestPlan(GEM_PR_REHABILITATION_LANE);
-    expect(plan).toMatchObject({
-      mode: 'selected',
-      selectedTests: [],
-      pythonTests: ['scripts/tests/test_symphony_ui_pilot_runtime.py'],
-      pythonUnittestTests: [
-        'scripts/symphony/tests/closure-health.test.py',
-        'scripts/symphony/tests/test_gem_disk_reclaim.py',
-        'scripts/symphony/tests/jovie-symphony-workspace.test.py',
-        'scripts/symphony/tests/test_gem_workspace_migrate.py',
-        'scripts/symphony/tests/gem-priority-gate.test.py',
-        'scripts/symphony/tests/gem-pr-drain.test.py',
-        'scripts/symphony/tests/gem-ops-hud.test.py',
-        'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-        'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
-        'scripts/symphony/tests/symphony-reconciler.test.py',
-        'scripts/symphony/tests/test-model-router.py',
-      ],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
-    });
-    expect(
-      buildAffectedTestPlan([
-        ...GEM_PR_REHABILITATION_LANE,
-        'apps/ios/Jovie/RootView.swift',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('selects the bounded Hyperagent lifecycle contract', () => {
-    expect(buildAffectedTestPlan(HYPERAGENT_LIFECYCLE_LANE)).toMatchObject({
-      mode: 'selected',
-      selectedTests: [],
-      pythonUnittestTests: [
-        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
-      ],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
-    });
-    expect(
-      buildAffectedTestPlan([
-        ...HYPERAGENT_LIFECYCLE_LANE,
-        'apps/ios/Jovie/RootView.swift',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('maps model-router-only changes to the Gem rehabilitation contracts', () => {
-    const plan = buildAffectedTestPlan([
-      'scripts/symphony/model-router.py',
-      'scripts/symphony/config/model-registry.json',
-      'scripts/symphony/tests/test-model-router.py',
-    ]);
-    expect(plan.mode).toBe('selected');
-    expect(plan.pythonUnittestTests).toContain(
-      'scripts/symphony/tests/test-model-router.py'
-    );
-    expect(plan.scriptVitestTests).toContain(
-      'scripts/lib/__tests__/automation-verify.test.mjs'
-    );
-  });
-
-  it('maps the additive Symphony router boundary to its two regression suites', () => {
-    const plan = buildAffectedTestPlan([
-      'scripts/symphony/config/model-registry.json',
-      'scripts/symphony/model-router.py',
-      'scripts/symphony/symphony-codex-exhausted.py',
-      'scripts/symphony/tests/symphony-additive-router.test.py',
-      'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
-      'scripts/symphony/tests/test-model-router.py',
-      'scripts/run-affected-tests.mjs',
-      'scripts/lib/__tests__/automation-verify.test.mjs',
-    ]);
-    expect(plan).toMatchObject({
-      mode: 'selected',
-      pythonUnittestTests: [
-        'scripts/symphony/tests/symphony-additive-router.test.py',
-        'scripts/symphony/tests/test-model-router.py',
-        'scripts/symphony/tests/symphony-github-poke.test.py',
-      ],
-      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
-    });
-  });
-
-  it('does not narrow arbitrary edits to the legacy Symphony controller suite', () => {
-    expect(
-      buildAffectedTestPlan([
-        'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('runs the operational launcher gate for sender-only changes', () => {
-    const sender = 'scripts/symphony/symphony-agent-router';
-    const test = 'scripts/symphony/tests/symphony-agent-router.test.py';
-    const gate = 'scripts/symphony/tests/run-issue-lease-gate.py';
-    const selector = 'scripts/run-affected-tests.mjs';
-    const selectorTest = 'scripts/lib/__tests__/automation-verify.test.mjs';
-    for (const changed of [
-      [sender],
-      [test],
-      [sender, test],
-      [sender, test, selector, selectorTest],
-    ]) {
-      const plan = buildAffectedTestPlan(changed);
-      expect(plan.mode).toBe('selected');
-      expect(plan.pythonUnittestTests).toEqual([gate]);
-      expect(plan.scriptVitestTests).toEqual([selectorTest]);
-      expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
-        'python3',
-        [gate],
-      ]);
-    }
-    for (const missing of [sender, test, gate, selectorTest]) {
-      expect(
-        buildAffectedTestPlan([sender], {
-          isFileAvailable: file => file !== missing,
-        }).mode
-      ).toBe('full');
-    }
-    for (const unrelated of [
-      'package.json',
-      'apps/web/app/page.tsx',
-      'scripts/symphony/symphony-codex-router',
-    ]) {
-      expect(buildAffectedTestPlan([sender, unrelated]).mode).toBe('full');
-    }
-  });
-
-  it('runs native admission coverage gates for the bounded consumer change', () => {
-    const files = [
-      'scripts/symphony/tests/native-admission-consumers.test.py',
-      'scripts/symphony/WORKFLOW.md',
-      'scripts/symphony/symphony-agent-router',
-      'scripts/symphony/symphony-codex-exhausted.py',
-      'scripts/symphony/symphony-codex-router',
-      'scripts/symphony/symphony-lease-guard',
-      'scripts/symphony/tests/existing-pr-repair.test.py',
-      'scripts/symphony/tests/run-issue-lease-gate.py',
-      'scripts/symphony/tests/symphony-agent-router.test.py',
-      'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
-      'scripts/symphony/tests/provider-runtime-promotion.test.py',
-      'scripts/symphony/tests/symphony-burrito-workflow.test.py',
-      'scripts/run-affected-tests.mjs',
-      'scripts/lib/__tests__/automation-verify.test.mjs',
-    ];
-    const gates = [
-      'scripts/symphony/tests/run-issue-lease-gate.py',
-      'scripts/symphony/tests/run-lease-gate.py',
-      'scripts/symphony/tests/run-provider-promotion-gate.py',
-      'scripts/symphony/tests/run-runtime-proof-gate.py',
-    ];
-    const plan = buildAffectedTestPlan(files);
-    expect(plan.mode).toBe('selected');
-    expect(plan.pythonUnittestTests).toEqual(gates);
-    expect(plan.scriptVitestTests).toEqual([
-      'scripts/lib/__tests__/automation-verify.test.mjs',
-    ]);
-    expect(buildSelectedTestCommands(plan, '1')).toEqual(
-      expect.arrayContaining(gates.map(gate => ['python3', [gate]]))
-    );
-    for (const peer of [
-      'package.json',
-      'apps/web/lib/auth.ts',
-      'scripts/unknown.py',
-    ]) {
-      expect(buildAffectedTestPlan([...files, peer]).mode).toBe('full');
-    }
-    for (const missing of [
-      files[0],
-      ...gates,
-      'scripts/lib/__tests__/automation-verify.test.mjs',
-    ]) {
-      expect(
-        buildAffectedTestPlan(files, {
-          isFileAvailable: file => file !== missing,
-        }).mode
-      ).toBe('full');
-    }
-    expect(buildAffectedTestPlan(files.slice(1)).mode).toBe('full');
-  });
-
-  it('routes a closure-health source-only repair to its Python regression suite', () => {
-    expect(
-      buildAffectedTestPlan(['scripts/symphony/closure_health.py'])
+      buildAffectedTestPlan(['scripts/fleet-gate/closure_health.py'])
     ).toMatchObject({
       mode: 'selected',
       pythonUnittestTests: expect.arrayContaining([
-        'scripts/symphony/tests/closure-health.test.py',
+        'scripts/fleet-gate/tests/closure-health.test.py',
+        'scripts/fleet-gate/tests/gem-priority-gate.test.py',
       ]),
-      scriptVitestTests: expect.arrayContaining([
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ]),
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });
   });
 
@@ -1205,14 +1004,11 @@ describe('automation-verify affected scope', () => {
       '.github/workflows/delivery-control-receipts.yml',
       '.github/workflows/fleet-gate-refresh.yml',
       'canon/invariants.jsonl',
-      'scripts/symphony/closure_health.py',
-      'scripts/symphony/gem-ops-hud.py',
-      'scripts/symphony/tests/closure-health.test.py',
-      'scripts/symphony/tests/gem-priority-gate.test.py',
-      'scripts/symphony/tests/gem-ops-hud.test.py',
+      'scripts/fleet-gate/closure_health.py',
+      'scripts/fleet-gate/tests/closure-health.test.py',
+      'scripts/fleet-gate/tests/gem-priority-gate.test.py',
       'scripts/lib/ownerless-recovery-policy.mjs',
       'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-      'scripts/lib/__tests__/queue-deferred-release.test.mjs',
       'scripts/invariants/registry.test.mjs',
       'scripts/tests/test_agent_workflow_hygiene.py',
       ...AFFECTED_TEST_SELECTOR_MANIFEST,
@@ -1222,14 +1018,14 @@ describe('automation-verify affected scope', () => {
       selectedTests: [],
       pythonTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
       pythonUnittestTests: [
-        'scripts/symphony/tests/closure-health.test.py',
-        'scripts/symphony/tests/gem-priority-gate.test.py',
-        'scripts/symphony/tests/gem-ops-hud.test.py',
+        'scripts/fleet-gate/tests/closure-health.test.py',
+        'scripts/fleet-gate/tests/gem-priority-gate.test.py',
       ],
       scriptVitestTests: [
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-        'scripts/lib/__tests__/queue-deferred-release.test.mjs',
       ],
       nodeTests: [
         'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
@@ -1255,6 +1051,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
         'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+        'scripts/lib/__tests__/fx-remediation-lane.test.mjs',
         'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
         'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
       ],
@@ -1307,37 +1104,6 @@ describe('automation-verify affected scope', () => {
         'apps/web/lib/unknown-safe-remediation-peer.ts',
       ]).mode
     ).toBe('full');
-  });
-
-  it('keeps reconciler-only changes inside the bounded rehabilitation lane', () => {
-    for (const changedPath of [
-      'scripts/symphony/symphony-reconciler.py',
-      'scripts/symphony/tests/symphony-reconciler.test.py',
-    ]) {
-      const plan = buildAffectedTestPlan([changedPath]);
-      expect(plan.mode).toBe('selected');
-      expect(plan.pythonUnittestTests).toContain(
-        'scripts/symphony/tests/symphony-reconciler.test.py'
-      );
-    }
-  });
-
-  it('routes fleet controller installer repairs to the Gem rehabilitation lane', () => {
-    expect(
-      buildAffectedTestPlan([
-        'scripts/symphony/install-gem-fleet-controller.sh',
-        'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-      ])
-    ).toMatchObject({
-      mode: 'selected',
-      pythonUnittestTests: expect.arrayContaining([
-        'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-      ]),
-      scriptVitestTests: expect.arrayContaining([
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ]),
-    });
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {
@@ -1543,12 +1309,123 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual([
-      'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'scripts/symphony/tests/test_fleet_admission_receipt.py',
-      'scripts/tests/test_gh_retry.py',
-    ]);
+    expect(plan.pythonTests).toEqual(MERGE_QUEUE_CONTROLLER_PYTHON_TESTS);
+    expect(plan.nodeTests).toEqual([]);
     expect(plan.selectedTests).toEqual([]);
+  });
+
+  it.each(DEPENDABOT_AUTO_MERGE_INPUTS)(
+    'routes Dependabot automation input %s to its focused policy and runtime checks',
+    input => {
+      const plan = buildAffectedTestPlan([input]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(
+        DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS
+      );
+      expect(plan.scriptVitestCoverageArgs).toEqual(
+        DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS
+      );
+      expect(plan.pythonTests).toEqual(DEPENDABOT_AUTO_MERGE_PYTHON_TESTS);
+      expect(plan.nodeTests).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TESTS);
+      expect(plan.nodeTestArgs).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS);
+    }
+  );
+
+  it('keeps the Dependabot lane bounded to its own surface and selector companions', () => {
+    const plan = buildAffectedTestPlan([
+      ...DEPENDABOT_AUTO_MERGE_INPUTS,
+      'scripts/tests/test_agent_workflow_hygiene.py',
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS);
+    expect(plan.scriptVitestCoverageArgs).toEqual(
+      DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS
+    );
+    expect(plan.pythonTests).toEqual(DEPENDABOT_AUTO_MERGE_PYTHON_TESTS);
+    expect(plan.nodeTests).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TESTS);
+    expect(plan.nodeTestArgs).toEqual(DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS);
+    const commands = buildSelectedTestCommands(plan, '2');
+    expect(commands).toContainEqual([
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/automation-verify.test.mjs',
+        'lib/__tests__/dependabot-update-policy.test.mjs',
+        '--maxWorkers',
+        '2',
+        ...DEPENDABOT_AUTO_MERGE_COVERAGE_ARGS,
+      ],
+    ]);
+    expect(
+      buildAffectedTestPlan([
+        ...DEPENDABOT_AUTO_MERGE_INPUTS,
+        'scripts/lib/unknown-dependabot-peer.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('covers ownerless recovery policy and sweep behavior in that controller suite', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/lib/ownerless-recovery-policy.mjs',
+    ]);
+    const commands = buildSelectedTestCommands(plan, '1');
+
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs'
+    );
+    expect(plan.scriptVitestCoverageArgs).toEqual([
+      '--coverage.enabled',
+      '--coverage.provider=v8',
+      '--coverage.include=lib/ownerless-recovery-policy.mjs',
+      '--coverage.include=ownerless-recovery-sweeper.mjs',
+      '--coverage.thresholds.perFile=true',
+      '--coverage.thresholds.statements=60',
+      '--coverage.thresholds.lines=65',
+      '--coverage.thresholds.branches=60',
+      '--coverage.thresholds.functions=50',
+    ]);
+    expect(commands).toHaveLength(2);
+    expect(commands[0][0]).toBe('pnpm');
+    expect(commands[0][1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=ownerless-recovery-sweeper.mjs',
+        '--coverage.include=lib/ownerless-recovery-policy.mjs',
+        '--coverage.thresholds.functions=50',
+      ])
+    );
+
+    const [nativeControl, ownerlessControl] = buildControlCoverageCommands();
+    const ownerlessTest = 'lib/__tests__/ownerless-recovery-policy.test.mjs';
+    expect(
+      [nativeControl, ownerlessControl]
+        .flatMap(([, args]) => args)
+        .filter(argument => argument === ownerlessTest)
+    ).toHaveLength(1);
+    expect(nativeControl[1]).not.toContain(ownerlessTest);
+    expect(nativeControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.branches=75',
+        '--coverage.thresholds.functions=82',
+        '--coverage.include=run-affected-tests.mjs',
+      ])
+    );
+    expect(ownerlessControl[1]).toEqual(
+      expect.arrayContaining([
+        '--coverage.include=lib/ownerless-recovery-policy.mjs',
+        '--coverage.include=ownerless-recovery-sweeper.mjs',
+        '--coverage.thresholds.statements=60',
+      ])
+    );
   });
 
   it('keeps the merge-group admission diff on its runtime and workflow contracts', () => {
@@ -1596,11 +1473,8 @@ describe('automation-verify affected scope', () => {
       expect(plan.scriptVitestTests).toEqual(
         MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS
       );
-      expect(plan.pythonTests).toEqual([
-        'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-        'scripts/symphony/tests/test_fleet_admission_receipt.py',
-        'scripts/tests/test_gh_retry.py',
-      ]);
+      expect(plan.pythonTests).toEqual(MERGE_QUEUE_CONTROLLER_PYTHON_TESTS);
+      expect(plan.nodeTests).toEqual([]);
     }
   );
 
@@ -1769,6 +1643,70 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
+  it.each([false, true])(
+    'runs the real deploy-wrapper suite for the exact pair (selector=%s)',
+    withSelector => {
+      const files = [
+        '.github/scripts/vercel-prebuilt-deploy.sh',
+        'scripts/tests/test_vercel_prebuilt_deploy.py',
+      ];
+      if (withSelector)
+        files.push(
+          'scripts/run-affected-tests.mjs',
+          'scripts/lib/__tests__/automation-verify.test.mjs'
+        );
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonTests).toEqual([
+        'scripts/tests/test_vercel_prebuilt_deploy.py',
+      ]);
+      expect(plan.scriptVitestTests).toContain(
+        'scripts/lib/__tests__/automation-verify.test.mjs'
+      );
+      expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+        'python3',
+        ['-m', 'pytest', 'scripts/tests/test_vercel_prebuilt_deploy.py', '-q'],
+      ]);
+    }
+  );
+
+  it.each([
+    '.github/scripts/unknown-vercel-control.mjs',
+    'package.json',
+    'apps/web/lib/unknown.ts',
+    'scripts/run-affected-tests.mjs',
+  ])(
+    'keeps deploy diagnostics on full fallback for extra/incomplete peer %s',
+    peer => {
+      expect(
+        buildAffectedTestPlan([
+          '.github/scripts/vercel-prebuilt-deploy.sh',
+          'scripts/tests/test_vercel_prebuilt_deploy.py',
+          peer,
+        ]).mode
+      ).toBe('full');
+    }
+  );
+
+  it.each([
+    '.github/scripts/vercel-prebuilt-deploy.sh',
+    'scripts/tests/test_vercel_prebuilt_deploy.py',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ])(
+    'keeps deploy diagnostics on full fallback when proof file %s is unavailable',
+    missing => {
+      expect(
+        buildAffectedTestPlan(
+          [
+            '.github/scripts/vercel-prebuilt-deploy.sh',
+            'scripts/tests/test_vercel_prebuilt_deploy.py',
+          ],
+          { isFileAvailable: file => file !== missing }
+        ).mode
+      ).toBe('full');
+    }
+  );
+
   it('keeps the Vercel congestion-control diff on its focused cross-runtime suites', () => {
     const plan = buildAffectedTestPlan(VERCEL_CONGESTION_CONTROL_MANIFEST);
 
@@ -1872,7 +1810,6 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
     expect(plan.selectedTests).not.toContain(
       'apps/web/tests/e2e/golden-path.spec.ts'
@@ -1995,8 +1932,6 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
   });
 
@@ -2094,7 +2029,6 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
     expect(buildSelectedTestCommands(plan, '2')).toEqual([
       [
@@ -2108,7 +2042,6 @@ describe('automation-verify affected scope', () => {
           'vitest.config.mts',
           'run',
           'lib/__tests__/automation-verify.test.mjs',
-          'symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
           '--maxWorkers',
           '2',
         ],
@@ -2147,7 +2080,6 @@ describe('automation-verify affected scope', () => {
         'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
       ]);
       expect(plan.scriptVitestTests).toEqual([
-        'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
         ...(manifest.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.length
           ? ['scripts/lib/__tests__/automation-verify.test.mjs']
           : []),
@@ -2171,7 +2103,6 @@ describe('automation-verify affected scope', () => {
         'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
       ]);
       expect(plan.scriptVitestTests).toEqual([
-        'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
         'scripts/lib/__tests__/merge-queue-backend.test.mjs',
         ...(manifest.length === SCANNER_LOAD_REPAIR_MANIFEST.length
           ? ['scripts/lib/__tests__/automation-verify.test.mjs']
@@ -2218,7 +2149,6 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
   });
 
@@ -2231,7 +2161,6 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
   });
 
@@ -2250,7 +2179,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...NEON_ATTEMPT_ARTIFACT_MANIFEST,
-        'scripts/symphony/lib/unknown-neon-artifact-helper.ts',
+        'scripts/fleet-gate/unknown-neon-artifact-helper.ts',
       ]).mode
     ).toBe('full');
   });
@@ -2283,7 +2212,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST,
-        'scripts/symphony/lib/unknown-mobile-overflow-helper.ts',
+        'scripts/fleet-gate/unknown-mobile-overflow-helper.ts',
       ]).mode
     ).toBe('full');
   });
@@ -2321,7 +2250,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
-        'scripts/symphony/lib/unknown-profiler-helper.ts',
+        'scripts/fleet-gate/unknown-profiler-helper.ts',
       ]).mode
     ).toBe('full');
   });
@@ -2334,7 +2263,6 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/ci/runner-setup-action.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/automation-verify.test.mjs',
       'scripts/lib/__tests__/ci-harness.test.mjs',
       'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
@@ -2356,7 +2284,6 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/ci-harness.test.mjs',
       'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
       'scripts/lib/__tests__/ci-branching-guard.test.mjs',
@@ -2393,9 +2320,73 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  it('maps a unit-test-only diff to its focused Vitest command', () => {
+    const testFile =
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts';
+    const plan = buildAffectedTestPlan([testFile]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([testFile]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
+  it('maps a known fixture-only diff to its focused Vitest command', () => {
+    const fixture =
+      'apps/web/tests/unit/design-system/arbitrary-values.baseline.json';
+    const testFile =
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts';
+    const plan = buildAffectedTestPlan([fixture]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual([testFile]);
+    expect(plan.selectedTests).toEqual([testFile]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+    expect(
+      buildAffectedTestPlan([fixture], {
+        isFileAvailable: file => file !== testFile,
+      }).mode
+    ).toBe('full');
+  });
+
   it('fails closed when a web source has no test lane', () => {
-    expect(buildAffectedTestPlan(['apps/web/lib/unknown.ts']).mode).toBe(
-      'full'
+    const plan = buildAffectedTestPlan(['apps/web/lib/unknown.ts']);
+
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'uncovered source path(s): apps/web/lib/unknown.ts'
+    );
+    expect(formatAffectedTestPlanDiagnostic(plan)).toBe(
+      '[affected-tests] mode=full related=1 mandatory=0 fallbackReason="uncovered source path(s): apps/web/lib/unknown.ts"'
     );
   });
 
@@ -2545,4 +2536,146 @@ describe('automation-verify affected scope', () => {
       '[affected-tests] complete shard 1/8 status=124'
     );
   }, 10000);
+});
+
+describe('deployment repair qualification regressions', () => {
+  const ops = [
+    '.github/workflows/delivery-control-receipts.yml',
+    'scripts/backlog-orchestrator/delivery-state-machine.mjs',
+    'scripts/backlog-orchestrator/no-unattended-red.mjs',
+    'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+    'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+    'scripts/ci-fast-lanes.mjs',
+  ];
+  const packaging = [
+    'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.tsx',
+    'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.test.tsx',
+    'apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.stories.tsx',
+    'apps/web/lib/services/retouching/style.ts',
+    'apps/web/lib/services/retouching/style-prompt.ts',
+  ];
+  const available = { isFileAvailable: () => true };
+
+  it('qualifies the exact failed-controller repair with operational coverage and runner contracts', () => {
+    const plan = buildAffectedTestPlan(ops, available);
+    expect(plan.mode).toBe('selected');
+    const commands = buildSelectedTestCommands(plan, '1');
+    expect(commands).toContainEqual([
+      'node',
+      expect.arrayContaining([
+        '--experimental-test-coverage',
+        '--test-coverage-lines=89',
+        '--test-coverage-branches=78',
+        '--test-coverage-functions=95',
+        ops[3],
+        ops[4],
+      ]),
+    ]);
+    expect(plan.scriptVitestTests).toEqual(
+      expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ])
+    );
+  });
+
+  it('qualifies bundled prompts using the CI changed-source coverage runner and real browser story', () => {
+    const plan = buildAffectedTestPlan(packaging, available);
+    expect(plan.mode).toBe('selected');
+    const commands = buildSelectedTestCommands(
+      plan,
+      '1',
+      'a'.repeat(40),
+      'b'.repeat(40)
+    );
+    expect(commands).toContainEqual([
+      'env',
+      expect.arrayContaining([
+        'pnpm',
+        '--filter',
+        '@jovie/web',
+        'test:coverage',
+        '--changed',
+        'a'.repeat(40),
+        'JOVIE_COVERAGE_INCLUDE=components/features/admin/system-map/AdminSystemMapSkillsTab.tsx\nlib/services/retouching/style.ts\nlib/services/retouching/style-prompt.ts',
+      ]),
+    ]);
+    expect(commands).toContainEqual([
+      'pnpm',
+      expect.arrayContaining([
+        '--config=vitest.config.storybook.mts',
+        packaging[2].replace('apps/web/', ''),
+      ]),
+    ]);
+    expect(commands).toContainEqual([
+      'node',
+      [
+        'scripts/check-changed-test-coverage.mjs',
+        '--base',
+        'a'.repeat(40),
+        '--head',
+        'b'.repeat(40),
+      ],
+    ]);
+    expect(() => buildSelectedTestCommands(plan, '1')).toThrow(
+      'exact base and head'
+    );
+  });
+
+  for (const peer of [
+    'scripts/unreviewed.mjs',
+    'apps/web/lib/services/unreviewed.ts',
+    'apps/web/components/Unknown.tsx',
+    'package.json',
+    'apps/web/vitest.config.fast.mts',
+  ]) {
+    it(`retains full fallback for unknown or global peer ${peer}`, () => {
+      for (const lane of [ops, packaging]) {
+        expect(buildAffectedTestPlan([...lane, peer], available).mode).toBe(
+          'full'
+        );
+      }
+    });
+  }
+
+  it('retains full fallback for standalone CI runner edits and missing required proof files', () => {
+    expect(
+      buildAffectedTestPlan(['scripts/ci-fast-lanes.mjs'], available).mode
+    ).toBe('full');
+    for (const lane of [ops, packaging]) {
+      expect(
+        buildAffectedTestPlan(lane, { isFileAvailable: () => false }).mode
+      ).toBe('full');
+    }
+  });
+});
+
+describe('linear sync on merge selection', () => {
+  const lane = [
+    '.github/workflows/linear-sync-on-merge.yml',
+    'scripts/lib/linear-sync-on-merge.mjs',
+    'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+    'docs/REPOSITORY_SOURCES.md',
+    'scripts/agent-context/rule-scopes.json',
+    'scripts/run-affected-tests.mjs',
+  ];
+
+  it('runs the JOV-6586 and JOV-5853 regressions for the merge sync lane', () => {
+    const plan = buildAffectedTestPlan(lane);
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+  });
+
+  it('falls back to the full suite when the merge sync proof is missing or an unknown peer is included', () => {
+    expect(
+      buildAffectedTestPlan(lane, { isFileAvailable: () => false }).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan([...lane, 'scripts/unrelated-peer.mjs']).mode
+    ).toBe('full');
+  });
 });

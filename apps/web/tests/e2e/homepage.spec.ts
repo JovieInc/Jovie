@@ -62,53 +62,53 @@ test.describe('Homepage', () => {
     await gotoHomepage(page);
   });
 
-  test('renders the editorial hero with the name search as the only control', async ({
+  test('renders the canonical identity hero with the one primary action', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
 
     await expect(hero).toBeVisible();
-    await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Control how the world sees you.',
+        level: 1,
+        name: 'Your living identity on the internet.',
       })
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'Find what the internet knows. Turn it into relationships.'
+        'Your work, your links, your next chapter. Together in your Jovie profile.'
       )
     ).toBeVisible();
-    const nameSearch = hero.getByPlaceholder('Search your name');
+    await expect(hero.getByText('Jovie / Identity, connected')).toBeVisible();
+    const heroSearch = hero.getByTestId('homepage-editorial-hero-search');
+    const nameSearch = heroSearch.getByPlaceholder('Search your name');
     await expect(nameSearch).toBeVisible();
     await expect(nameSearch).toHaveAccessibleName('Search your name');
     await expect(
-      hero.getByRole('button', { name: 'Find me', exact: true })
+      heroSearch.getByRole('button', { name: 'Find me', exact: true })
     ).toBeEnabled();
-    await expect(hero.getByRole('link')).toHaveCount(0);
-    await expect(hero.getByRole('button')).toHaveCount(1);
+    await expect(heroSearch.getByRole('link')).toHaveCount(0);
+    await expect(hero.getByText('Request access')).toHaveCount(0);
     await expect(hero.getByText('Get started')).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
 
-    // The hero owns the first viewport.
-    const heroBox = await hero.boundingBox();
-    const viewport = page.viewportSize();
-    expect(heroBox?.y ?? 1).toBeLessThanOrEqual(0);
-    expect(heroBox?.height ?? 0).toBeGreaterThanOrEqual(
-      (viewport?.height ?? 0) - 1
-    );
+    // Illustrative specimen, labeled as such, with a real portrait.
+    const specimen = hero.getByTestId('homepage-profile-specimen');
+    await expect(specimen.getByText('Avery Chen')).toBeVisible();
+    await expect(
+      specimen.getByText('Your Jovie profile · Illustrative preview')
+    ).toBeVisible();
+    await expect(specimen.getByRole('img')).toHaveJSProperty('complete', true);
 
-    const searchBox = await hero
-      .getByTestId('homepage-editorial-hero-search')
-      .boundingBox();
-    const inputBox = await hero
-      .getByPlaceholder('Search your name')
-      .boundingBox();
-    expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
-    expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
+    // The hero light bleeds under the docked header to y=0.
+    const heroBox = await hero.boundingBox();
+    expect(heroBox?.y ?? 1).toBeLessThanOrEqual(0);
+    await expect(
+      hero.getByTestId('homepage-identity-hero-light')
+    ).toHaveAttribute('aria-hidden', 'true');
   });
 
-  test('header uses the canonical marketing shell with full navigation', async ({
+  test('header is the canonical docked shell with the Customers flyout', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
@@ -118,11 +118,6 @@ test.describe('Homepage', () => {
       'data-presentation',
       'marketing-glass'
     );
-    await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(header.getByRole('link', { name: 'Artists' })).toHaveAttribute(
-      'href',
-      '/artists'
-    );
     await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/product'
@@ -131,22 +126,33 @@ test.describe('Homepage', () => {
       'href',
       '/pricing'
     );
-    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
-      0
-    );
-    await expect(header.getByRole('button', { name: 'Resources' })).toHaveCount(
-      0
-    );
-    await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Get started' })
+      header.getByRole('link', { name: 'Request access' })
     ).toHaveAttribute('href', '/signup');
+
+    const viewport = page.viewportSize();
+    test.skip(
+      (viewport?.width ?? 0) < 1024,
+      'The Customers flyout is a desktop navigation affordance'
+    );
+    const trigger = header.getByRole('button', { name: /Customers/ });
+    await trigger.hover();
+    const flyout = page.locator('#marketing-header-flyout-customers');
+    await expect(flyout).toBeVisible();
+    await expect(
+      flyout.getByRole('link', { name: 'Investors' })
+    ).toHaveAttribute('href', '/investors');
+    await expect(flyout.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/solutions/artists'
+    );
+    await expect(flyout.getByRole('link')).toHaveCount(2);
+    await page.keyboard.press('Escape');
+    await expect(flyout).toHaveCount(0);
   });
 
   test('canonical homepage controls grow natively and trust artwork stays in its slots', async ({
@@ -325,106 +331,24 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('canonical header has no flyout menus', async ({ page }) => {
+  test('canonical header has only the Customers flyout', async ({ page }) => {
     const header = page.getByTestId('header-nav');
-    const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
     await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
     await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
-    await expect(toolsFlyout).toHaveCount(0);
+    await expect(page.locator('#marketing-header-flyout-tools')).toHaveCount(0);
   });
 
-  test('hero backdrop is an image-free abstract field with centered content', async ({
-    page,
-  }) => {
-    const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
-
-    await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
-    await expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
-    await expect(backdrop).toHaveAttribute(
-      'data-hero-visual',
-      'abstract-light-field'
-    );
-    await expect(backdrop.locator('picture, img, video')).toHaveCount(0);
-    await expect(
-      backdrop.locator('.homepage-editorial-hero__light-well')
-    ).toHaveCount(1);
-    expect(
-      await backdrop
-        .locator('.homepage-editorial-hero__light-well')
-        .evaluate(element => {
-          const style = getComputedStyle(element);
-          const rect = element.getBoundingClientRect();
-          return {
-            backgroundImage: style.backgroundImage,
-            opacity: Number.parseFloat(style.opacity),
-            height: rect.height,
-            width: rect.width,
-          };
-        })
-    ).toMatchObject({
-      backgroundImage: expect.not.stringMatching(/^none$/),
-      opacity: expect.any(Number),
-      height: expect.any(Number),
-      width: expect.any(Number),
-    });
-
-    const copyBox = await page
-      .locator('.homepage-editorial-hero__copy')
-      .boundingBox();
-    const viewport = page.viewportSize();
-    const copyCenter = (copyBox?.x ?? 0) + (copyBox?.width ?? 0) / 2;
-    const viewportCenter = (viewport?.width ?? 0) / 2;
-    expect(Math.abs(copyCenter - viewportCenter)).toBeLessThanOrEqual(1);
-    expect(copyBox?.y ?? -1).toBeGreaterThan(0);
-    expect((copyBox?.y ?? 0) + (copyBox?.height ?? 0)).toBeLessThan(
-      viewport?.height ?? 0
-    );
-  });
-
-  test('hero reveal is geometry-safe, interactive, and static under reduced motion', async ({
-    page,
-  }) => {
-    await expect(
-      page
-        .getByTestId('marketing-section-hero')
-        .locator('[data-hero-layer="active"]')
-    ).toHaveCount(1);
-    const copy = page.locator('.homepage-editorial-hero__copy');
-    const before = await copy.boundingBox();
-    expect(
-      await copy.evaluate(element => {
-        const style = getComputedStyle(element);
-        return [style.animationDelay, style.animationName, style.pointerEvents];
-      })
-    ).toEqual(['0.1s', 'homepage-hero-content-reveal', 'auto']);
-    await expect(page.getByTestId('homepage-primary-cta')).toBeEnabled();
-    await expect
-      .poll(() => copy.evaluate(element => +getComputedStyle(element).opacity))
-      .toBe(1);
-    expect(await copy.boundingBox()).toEqual(before);
-
-    const hydrationErrors: string[] = [];
-    page.on('console', message => {
-      if (
-        message.type() === 'error' &&
-        message.text().toLowerCase().includes('hydrat')
-      ) {
-        hydrationErrors.push(message.text());
-      }
-    });
+  test('keeps the hero still under reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await gotoHomepage(page);
-    expect(
-      await copy.evaluate(element => {
-        const style = getComputedStyle(element);
-        return [style.animationName, style.opacity];
-      })
-    ).toEqual(['none', '1']);
-    expect(hydrationErrors).toEqual([]);
+    const animation = await page
+      .getByTestId('homepage-identity-hero-light')
+      .evaluate(node => getComputedStyle(node).animationName);
+    expect(animation).toBe('none');
   });
 
-  test('locks the nine certified sections, their order, heading lines, and CLS', async ({
+  test('locks current editorial sections, action states, heading lines, and CLS', async ({
     page,
     browserName,
   }) => {
@@ -447,13 +371,9 @@ test.describe('Homepage', () => {
 
     const sectionIds = [
       'marketing-section-hero',
-      'marketing-section-logo-cloud',
       'homepage-section-connected',
-      'homepage-section-found',
-      'homepage-section-know',
       'homepage-section-relationships',
-      'homepage-section-smarter',
-      'homepage-section-built',
+      'homepage-editorial-changelog',
       'homepage-close',
     ];
     const sectionTops = await page.evaluate(
@@ -471,102 +391,53 @@ test.describe('Homepage', () => {
     expect(sectionTops.some(top => Number.isNaN(top))).toBe(false);
     expect(sectionTops).toEqual([...sectionTops].sort((a, b) => a - b));
 
-    const heroToProofBoundary = await page.evaluate(() => {
-      const hero = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-hero"]'
-      );
-      const stack = document.querySelector<HTMLElement>(
-        '[data-testid="homepage-story-stack"]'
-      );
-      const proofSection = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-logo-cloud"]'
-      );
-      if (!(hero && stack && proofSection)) return null;
-      return {
-        gap:
-          stack.getBoundingClientRect().top -
-          hero.getBoundingClientRect().bottom,
-        proofOffset:
-          proofSection.getBoundingClientRect().top -
-          stack.getBoundingClientRect().top,
-      };
-    });
-    expect(heroToProofBoundary).not.toBeNull();
-    expect(heroToProofBoundary?.gap).toBeGreaterThanOrEqual(0);
-    expect(heroToProofBoundary?.gap).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
-    ).toBeLessThanOrEqual(1);
-
-    // Section 2 retains verified logos on the page
-    // background, never a frosted card.
-    const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(
-      page.getByText("Proof is earned. We don't borrow it.", { exact: true })
-    ).toHaveCount(0);
-    await expect(
-      proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
-    ).toBeVisible();
-    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
+    await expect(page.getByTestId('marketing-section-logo-cloud')).toHaveCount(
+      0
     );
-    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
-    await expect(proof.locator('svg')).toHaveCount(4);
-
-    // Locked section copy, verbatim.
-    for (const [id, headline, body] of [
-      [
-        'connected',
-        'Everything about you, connected.',
-        'Your work, links, story, and presence—organized into one living profile.',
-      ],
-      [
-        'found',
-        'Be found. Be understood.',
-        'Share the right version of you, legible wherever people want to know how you can help.',
-      ],
-      [
-        'know',
-        'Know who cares.',
-        'See who is paying attention, what brought them to you, and what they may want next.',
-      ],
-      [
-        'relationships',
-        'Turn attention into relationships.',
-        'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-      ],
-      [
-        'smarter',
-        'A presence that gets smarter.',
-        'Every interaction improves what you know, what you show, and what you do next.',
-      ],
-      [
-        'built',
-        'Built around who you are.',
-        'Jovie adapts to your work without reducing you to a category.',
-      ],
-    ] as const) {
-      const section = page.locator(
-        `[data-homepage-testid="homepage-section-${id}"]`
-      );
-      await expect(
-        section.getByRole('heading', { level: 2, name: headline })
-      ).toBeVisible();
-      await expect(section.getByText(body)).toBeVisible();
-    }
-
-    // Real product exports load at device quality where they appear.
     const connected = page.locator(
       '[data-homepage-testid="homepage-section-connected"]'
     );
     await connected.scrollIntoViewIfNeeded();
-    await expect(connected.locator('img')).toHaveCount(1);
+    await expect(
+      connected.getByRole('heading', {
+        name: 'Everything about you, connected.',
+      })
+    ).toBeVisible();
+    await expect(
+      connected.getByText('IDENTITY, ACROSS THE INTERNET')
+    ).toBeVisible();
+    await expect(
+      connected.getByText(
+        'Your work and story are scattered across the internet. Your identity should be easier to see.'
+      )
+    ).toBeVisible();
+    // JOV-6297: the conceptual identity artwork is replaced by the approved
+    // customer-zero profile surface — real avatar plus the real public
+    // profile export on one editorial surface.
+    await connected.scrollIntoViewIfNeeded();
+    await expect(connected.locator('img')).toHaveCount(2);
+    await expect(connected.getByText('Tim White')).toBeVisible();
+    await expect(
+      connected.locator('img[alt="Tim White Profile — Listen"]')
+    ).toBeVisible();
     const relationships = page.locator(
       '[data-homepage-testid="homepage-section-relationships"]'
     );
     await relationships.scrollIntoViewIfNeeded();
-    await expect(relationships.locator('img')).toHaveCount(3);
+    // Static ordered visibility states: the public profile for people and
+    // the shipped {username}/llms.txt surface for agents.
+    const outcomes = relationships.getByRole('list', {
+      name: 'Relationships',
+    });
+    await expect(outcomes.getByRole('listitem')).toHaveCount(3);
+    const visibility = relationships.getByRole('list', {
+      name: 'One Profile, Legible To People And To Agents',
+    });
+    await expect(visibility.getByRole('listitem')).toHaveCount(2);
+    await expect(visibility.locator('[data-audience="agents"]')).toContainText(
+      'Canonical URL'
+    );
+    await expect(relationships.locator('img')).toHaveCount(1);
     const exportSelector =
       '[data-homepage-testid="homepage-section-connected"] img, [data-homepage-testid="homepage-section-relationships"] img';
     await page.waitForFunction(
@@ -578,18 +449,25 @@ test.describe('Homepage', () => {
     );
     const exportQuality = await page
       .locator(exportSelector)
-      .evaluateAll(elements =>
-        elements.map(element => {
-          const img = element as HTMLImageElement;
-          const rect = img.getBoundingClientRect();
-          return {
-            alt: img.alt,
-            naturalWidth: img.naturalWidth,
-            requiredWidth: Math.ceil(rect.width * devicePixelRatio),
-          };
-        })
+      .evaluateAll(async elements =>
+        Promise.all(
+          elements.map(async element => {
+            const img = element as HTMLImageElement;
+            const rect = img.getBoundingClientRect();
+            // Responsive srcset naturalWidth is density-corrected. Decode the
+            // selected resource separately to measure its actual pixel width.
+            const resource = new Image();
+            resource.src = img.currentSrc;
+            await resource.decode();
+            return {
+              alt: img.alt,
+              naturalWidth: resource.naturalWidth,
+              requiredWidth: Math.ceil(rect.width * devicePixelRatio),
+            };
+          })
+        )
       );
-    expect(exportQuality).toHaveLength(4);
+    expect(exportQuality).toHaveLength(3);
     for (const image of exportQuality) {
       expect(
         image.naturalWidth,
@@ -597,20 +475,16 @@ test.describe('Homepage', () => {
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
 
-    // Section 9 repeats the name search; CTA is Find me, never Search.
     const close = page.getByTestId('marketing-section-cta');
     await close.scrollIntoViewIfNeeded();
     await expect(
-      close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
+      close.getByRole('heading', { name: 'Take control of your presence.' })
     ).toBeVisible();
-    await expect(close.getByText('Start with your name.')).toBeVisible();
-    await expect(close.getByPlaceholder('Search your name')).toBeVisible();
-    await expect(
-      close.getByRole('button', { name: 'Find me', exact: true })
-    ).toBeEnabled();
+    await close.getByRole('button', { name: 'Find your profile' }).click();
+    await expect(page.getByPlaceholder('Search your name')).toBeFocused();
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Search$/ })).toHaveCount(0);
     await expect(page.getByText('Get started')).toHaveCount(0);
     await expect(page.getByText('Drop more music')).toHaveCount(0);
@@ -637,7 +511,7 @@ test.describe('Homepage', () => {
         );
       });
       const sectionHeadings = page.locator(
-        '.homepage-editorial-hero__headline, [data-homepage-section-heading]'
+        '.homepage-identity-hero__headline, [data-homepage-section-heading]'
       );
       const headingLines = await sectionHeadings.evaluateAll(headings =>
         headings.map(heading => {
@@ -649,7 +523,7 @@ test.describe('Homepage', () => {
           );
         })
       );
-      expect(headingLines).toHaveLength(8);
+      expect(headingLines).toHaveLength(4);
       await expect
         .poll(async () =>
           Math.max(
@@ -678,6 +552,96 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Privacy' })).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
+  });
+
+  test('connected identity card keeps the profile export uncropped, legible, and paired', async ({
+    page,
+  }) => {
+    for (const [width, height] of [
+      [1440, 900],
+      [390, 844],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      await gotoHomepage(page);
+      const card = page.locator('[data-homepage-visual="connected"]');
+      await card.scrollIntoViewIfNeeded();
+      const exportImage = card.locator('img[alt="Tim White Profile — Listen"]');
+      await expect(exportImage).toBeVisible();
+      await page.waitForFunction(
+        el => el instanceof HTMLImageElement && el.complete,
+        await exportImage.elementHandle()
+      );
+
+      const layout = await card.evaluate(el => {
+        const probe = document
+          .createElement('canvas')
+          .getContext('2d', { willReadFrequently: true })!;
+        const rgba = (value: string) => {
+          probe.clearRect(0, 0, 1, 1);
+          probe.fillStyle = value;
+          probe.fillRect(0, 0, 1, 1);
+          return Array.from(probe.getImageData(0, 0, 1, 1).data);
+        };
+        const luminance = ([r, g, b]: number[]) => {
+          const channel = (c: number) => {
+            const v = c / 255;
+            return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+          };
+          return (
+            0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+          );
+        };
+        const box = (node: Element) => node.getBoundingClientRect();
+        const cardBox = box(el);
+        const identity = el.querySelector(
+          '.homepage-connected-profile__identity'
+        )!;
+        const name = el.querySelector('.homepage-connected-profile__name')!;
+        const image = el.querySelector('.homepage-connected-artwork__image')!;
+        const bg = rgba(getComputedStyle(el).backgroundColor);
+        const [r, g, b, a] = rgba(getComputedStyle(name).color);
+        const alpha = a / 255;
+        const ink = [r, g, b].map((c, i) => c * alpha + bg[i] * (1 - alpha));
+        const [hi, lo] = [luminance(ink), luminance(bg)].sort((x, y) => y - x);
+        const identityBox = box(identity);
+        const imageBox = box(image);
+        return {
+          contrast: (hi + 0.05) / (lo + 0.05),
+          card: {
+            left: cardBox.left,
+            right: cardBox.right,
+            top: cardBox.top,
+            bottom: cardBox.bottom,
+          },
+          identity: { left: identityBox.left, right: identityBox.right },
+          image: {
+            left: imageBox.left,
+            right: imageBox.right,
+            top: imageBox.top,
+            bottom: imageBox.bottom,
+          },
+        };
+      });
+
+      // The name sits on the warm-white artifact; it must read, not vanish.
+      expect(layout.contrast).toBeGreaterThanOrEqual(4.5);
+      // Never crop the product export: it stays wholly inside the card.
+      expect(layout.image.top).toBeGreaterThanOrEqual(layout.card.top - 1);
+      expect(layout.image.bottom).toBeLessThanOrEqual(layout.card.bottom + 1);
+      expect(layout.image.left).toBeGreaterThanOrEqual(layout.card.left - 1);
+      expect(layout.image.right).toBeLessThanOrEqual(layout.card.right + 1);
+
+      if (width >= 1024) {
+        // Identity and export read as one centered pair: no dead column.
+        const leftSpace = layout.identity.left - layout.card.left;
+        const rightSpace = layout.card.right - layout.image.right;
+        expect(Math.abs(leftSpace - rightSpace)).toBeLessThanOrEqual(24);
+        const pairGap = layout.image.left - layout.identity.right;
+        expect(pairGap).toBeLessThanOrEqual(
+          (layout.card.right - layout.card.left) * 0.12
+        );
+      }
+    }
   });
 
   test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
@@ -755,7 +719,7 @@ test.describe('Homepage', () => {
     await gotoHomepage(page);
 
     const heading = page.getByRole('heading', {
-      name: 'Control how the world sees you.',
+      name: 'Your living identity on the internet.',
     });
     await expect(heading).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -851,7 +815,7 @@ test.describe('Homepage', () => {
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Get started', exact: true })
+      mobileNav.getByRole('link', { name: 'Request access', exact: true })
     ).toHaveAttribute('href', '/signup');
   });
 
@@ -907,7 +871,7 @@ test.describe('Homepage', () => {
       await gotoHomepage(page);
       await page.evaluate(() => document.fonts.ready);
 
-      const copy = page.locator('.homepage-editorial-hero__copy');
+      const copy = page.locator('.homepage-identity-hero__inner');
       const copyBox = await copy.boundingBox();
       const heroBox = await page
         .getByTestId('marketing-section-hero')
@@ -927,7 +891,7 @@ test.describe('Homepage', () => {
       expect(horizontalOverflow).toBeLessThanOrEqual(1);
 
       const heading = page.getByRole('heading', {
-        name: 'Control how the world sees you.',
+        name: 'Your living identity on the internet.',
       });
       const headingLines = await heading.evaluate(element => {
         const style = getComputedStyle(element);
@@ -1091,7 +1055,7 @@ test.describe('Homepage', () => {
     const heroSearch = await measureSearch(
       '[data-testid="homepage-editorial-hero-search"]'
     );
-    // K4ar1 closing owns one focus-only action; the hero field is the sole
+    // The close owns one focus-only action; the hero field is the sole
     // search surface, so a duplicated close-search node must stay absent.
     expect(await page.getByTestId('homepage-close-search').count()).toBe(0);
     expect(heroSearch).not.toBeNull();
@@ -1111,24 +1075,10 @@ test.describe('Homepage', () => {
     expect(focused?.fieldBackground).toBe(idleBackground);
     expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
 
-    const lightWell = page.locator('.homepage-editorial-hero__light-well');
-    expect(
-      await lightWell.evaluate(element => {
-        const style = getComputedStyle(element);
-        return {
-          borderWidth: style.borderWidth,
-          backgroundImage: style.backgroundImage,
-        };
-      })
-    ).toMatchObject({
-      borderWidth: '0px',
-      backgroundImage: expect.not.stringMatching(/55\.1%/),
-    });
-
     await page.setViewportSize({ width: 900, height: 800 });
     await page.evaluate(() => document.fonts.ready);
     const heading = page.getByRole('heading', {
-      name: 'Control how the world sees you.',
+      name: 'Your living identity on the internet.',
     });
     const headingLines = await heading.evaluate(element => {
       const style = getComputedStyle(element);
@@ -1138,7 +1088,8 @@ test.describe('Homepage', () => {
           0.05
       );
     });
-    expect(headingLines).toBe(1);
+    // The canonical headline is a balanced two-line measure.
+    expect(headingLines).toBeLessThanOrEqual(2);
   });
 
   test('loads without critical console errors', async ({ page }) => {
@@ -1166,12 +1117,11 @@ test.describe('Homepage', () => {
     const ctaLinks = page.locator('[data-cta-sign-up="true"]');
     const count = await ctaLinks.count();
 
-    // The certified homepage converts through the name search (two Find me
-    // buttons); anchor sign-up CTAs are optional, but any that exist must
-    // still route through /start.
+    // The certified homepage converts through one Find me search. Header
+    // sign-up anchors, when present, still land on /signup.
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(1);
 
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);

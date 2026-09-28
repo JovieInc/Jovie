@@ -15,7 +15,7 @@ interface CaptionTrackRef {
 }
 
 export function parseWebVtt(vtt: string): TranscriptSegment[] {
-  const lines = vtt.replace(/\r\n/g, '\n').split('\n');
+  const lines = vtt.replaceAll('\r\n', '\n').split('\n');
   const segments: TranscriptSegment[] = [];
 
   for (let i = 0; i < lines.length; i += 1) {

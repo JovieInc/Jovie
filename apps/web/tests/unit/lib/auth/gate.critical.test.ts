@@ -288,6 +288,49 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(result.redirectTo).toContain('/start');
   });
 
+  it('routes a provisioned pending user without a receipt back to /start', async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: 'ba_user_1', email: 'artist@example.com' },
+      session: { id: 'sess_1' },
+    });
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
+    mockDbSelect.mockReturnValue(
+      chainLimit([
+        activeDbUser({
+          userStatus: 'waitlist_pending',
+          waitlistEntryId: null,
+          profileId: null,
+        }),
+      ])
+    );
+
+    const result = await resolveUserState({ createDbUserIfMissing: false });
+
+    expect(result.state).toBe(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION);
+    expect(result.redirectTo).toContain('/start');
+  });
+
+  it('keeps a durable pending receipt gated after the launch gate opens', async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: 'ba_user_1', email: 'artist@example.com' },
+      session: { id: 'sess_1' },
+    });
+    mockDbSelect.mockReturnValue(
+      chainLimit([
+        activeDbUser({
+          userStatus: 'waitlist_pending',
+          waitlistEntryId: 'entry-1',
+          profileId: null,
+        }),
+      ])
+    );
+
+    const result = await resolveUserState();
+
+    expect(result.state).toBe(CanonicalUserState.WAITLIST_PENDING);
+    expect(result.redirectTo).toBe('/waitlist');
+  });
+
   it('returns BANNED when status-checker marks the user blocked', async () => {
     mockGetSession.mockResolvedValue({
       user: { id: 'ba_user_1', email: 'banned@example.com' },

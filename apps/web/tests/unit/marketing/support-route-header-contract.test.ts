@@ -36,7 +36,14 @@ describe('support route header contract', () => {
       'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
     expect(headerSource).toContain("treatment: 'wordmark'");
-    expect(headerSource).toContain('NAV_LINK_BY_LABEL.Artists');
+    expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
+    // Canonical Pen header: the Customers flyout is the only glass flyout.
+    expect(headerSource).toContain(
+      'const MARKETING_GLASS_FLYOUT_MENUS: readonly HeaderFlyoutMenu[] = [\n  MARKETING_CUSTOMERS_FLYOUT,\n];'
+    );
+    expect(headerSource).toContain(
+      'flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,'
+    );
     expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
     expect(headerSource).toContain('showContactLink={false}');
@@ -45,6 +52,16 @@ describe('support route header contract', () => {
     expect(headerSource).toContain("? 'sm'");
     expect(headerSource).toContain('marketing-header-growth-space');
     expect(headerSource).toContain('ResizeObserver');
+    // Icon-only brand comes from explicit per-page config, never DOM text.
+    expect(headerSource).toContain(
+      'resolveMarketingHeaderBrand(pathname, brand)'
+    );
+    expect(headerSource).toContain(
+      "logoReveal={resolvedLogoVariant === 'icon'}"
+    );
+    expect(headerSource).not.toMatch(
+      /textContent|innerText|querySelector\('h1/
+    );
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);

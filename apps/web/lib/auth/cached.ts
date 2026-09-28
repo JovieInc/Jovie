@@ -1,22 +1,24 @@
 import 'server-only';
 
-import { headers } from 'next/headers';
 import { cache } from 'react';
 import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
-import { auth } from '@/lib/auth/better-auth';
 import {
   buildDevTestAuthCurrentUser,
   getCachedDevTestAuthSession,
 } from '@/lib/auth/dev-test-auth.server';
 import type { JovieUser } from '@/lib/auth/jovie-user';
 import { toJovieUser } from '@/lib/auth/jovie-user';
+import {
+  getRequestSession,
+  type RequestSessionRead,
+} from '@/lib/auth/request-session';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { attachSentryContext } from '@/lib/sentry/set-user-context';
 
 /**
  * Cached server-identity source (Clerk → Better Auth migration, build-safe
- * commit ⑤). Reads Better Auth sessions via `auth.api.getSession({ headers })`
- * and maps the BA user id to the app `users` row through
+ * commit ⑤). Reads Better Auth sessions through `getRequestSession` (one
+ * `auth.api.getSession` per request and mode) and maps the BA user id to the app `users` row through
  * `getAppUserByBetterAuthId` (single indexed query, memoized per request).
  *
  * Export names are preserved — `getCachedAuth`, `getCachedSessionTokenAuth`,
@@ -27,6 +29,8 @@ import { attachSentryContext } from '@/lib/sentry/set-user-context';
  *
  * Better Auth is the live session path. A missing or invalid Better Auth
  * session yields NULL_AUTH_RESULT; there is no fallback to the retired provider.
+ *
+ * Cookie cache for reads. `session: 'fresh'` disables it for identity too.
  */
 
 /** `userId` is `users.id`, never Better Auth or `users.clerkId`. */
@@ -71,13 +75,28 @@ function isMissingAuthRequestContext(error: unknown): boolean {
   );
 }
 
-async function readBetterAuthSession(): Promise<AuthResult> {
+type SessionRead = RequestSessionRead;
+
+interface FreshAuthSlot {
+  settled: boolean;
+  result: AuthResult;
+}
+
+/** Per-request slot so a later cookie read reuses the fresh identity. */
+const freshAuthSlot = cache(
+  (): FreshAuthSlot => ({
+    settled: false,
+    result: NULL_AUTH_RESULT,
+  })
+);
+
+function loadBetterAuthSession(mode: SessionRead) {
+  return getRequestSession(mode);
+}
+
+async function readBetterAuthSession(mode: SessionRead): Promise<AuthResult> {
   try {
-    const headerStore = await headers();
-    const session = await auth.api.getSession({
-      headers: headerStore,
-      query: { disableCookieCache: true },
-    });
+    const session = await loadBetterAuthSession(mode);
     if (!session) {
       return NULL_AUTH_RESULT;
     }
@@ -111,7 +130,10 @@ async function readBetterAuthSession(): Promise<AuthResult> {
   }
 }
 
-async function resolveCachedAuth(): Promise<AuthResult> {
+async function resolveRequestAuth(mode: SessionRead): Promise<AuthResult> {
+  const slot = freshAuthSlot();
+  if (slot.settled) return slot.result;
+
   const bypassSession = await getCachedDevTestAuthSession();
   if (bypassSession) {
     const result: AuthResult = {
@@ -120,28 +142,45 @@ async function resolveCachedAuth(): Promise<AuthResult> {
       orgId: null,
     };
     await attachSentryContext(result.userId);
+    if (mode === 'fresh') {
+      slot.settled = true;
+      slot.result = result;
+    }
     return result;
   }
 
-  return readBetterAuthSession();
+  const result = await readBetterAuthSession(mode);
+  if (mode === 'fresh') {
+    slot.settled = true;
+    slot.result = result;
+  }
+  return result;
 }
 
-export const getCachedAuth = cache(async (): Promise<AuthResult> => {
-  return resolveCachedAuth();
+export const getCachedAuth = cache(
+  async (options?: { session?: 'cookie' | 'fresh' }): Promise<AuthResult> => {
+    return resolveRequestAuth(
+      options?.session === 'fresh' ? 'fresh' : 'cookie'
+    );
+  }
+);
+
+/** Authoritative session read for security mutations. */
+export const getFreshAuth = cache(async (): Promise<AuthResult> => {
+  return resolveRequestAuth('fresh');
 });
 
 export const getCachedSessionTokenAuth = cache(
   async (): Promise<AuthResult> => {
-    // Better Auth's getSession always validates the full session token
-    // (signed cookie + DB/Redis lookup); there's no separate "session-token
-    // only" tier. Preserve the export name so callers don't churn.
-    return resolveCachedAuth();
+    // Same cookie-cached read as getCachedAuth. There is no separate
+    // session-token tier. The export name stays so callers don't churn.
+    return getCachedAuth();
   }
 );
 
 export const getOptionalAuth = cache(async (): Promise<AuthResult> => {
   try {
-    return await resolveCachedAuth();
+    return await getCachedAuth();
   } catch (error) {
     if (isMissingAuthRequestContext(error)) {
       return NULL_AUTH_RESULT;
@@ -151,7 +190,7 @@ export const getOptionalAuth = cache(async (): Promise<AuthResult> => {
 });
 
 export const getCachedCurrentUser = cache(
-  async (): Promise<JovieUser | null> => {
+  async (options?: { session?: SessionRead }): Promise<JovieUser | null> => {
     const bypassSession = await getCachedDevTestAuthSession();
     if (bypassSession) {
       const bypassUser = buildDevTestAuthCurrentUser(bypassSession);
@@ -180,11 +219,9 @@ export const getCachedCurrentUser = cache(
     }
 
     try {
-      const headerStore = await headers();
-      const session = await auth.api.getSession({
-        headers: headerStore,
-        query: { disableCookieCache: true },
-      });
+      const session = await loadBetterAuthSession(
+        options?.session === 'fresh' ? 'fresh' : 'cookie'
+      );
       if (!session) {
         return null;
       }

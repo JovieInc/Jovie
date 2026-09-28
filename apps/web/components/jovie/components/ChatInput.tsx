@@ -51,7 +51,7 @@ import {
   ComposerSendButton,
 } from './ChatComposerToolbar';
 import { ChipTray } from './ChipTray';
-import { SPRING_HEIGHT, TRANSITION_SURFACE } from './chat-motion';
+import { TRANSITION_SURFACE } from './chat-motion';
 import { EntityPreviewPane } from './EntityPreviewPane';
 import {
   activeEntityFor,
@@ -351,15 +351,24 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
     const latestOnChangeRef = useRef(onChange);
-    const latestValueRef = useRef(value);
+    // Last string handed to onChange. The DOM-level input listener and React's
+    // synthetic onChange both fire for a single keystroke; dedupe so each edit
+    // produces one state update (JOV-5325).
+    const lastNotifiedValueRef = useRef(value);
     useImperativeHandle(ref, () => internalTextareaRef.current!, []);
+
+    const notifyChange = useCallback((next: string) => {
+      if (next === lastNotifiedValueRef.current) return;
+      lastNotifiedValueRef.current = next;
+      latestOnChangeRef.current(next);
+    }, []);
 
     useEffect(() => {
       latestOnChangeRef.current = onChange;
     }, [onChange]);
 
     useEffect(() => {
-      latestValueRef.current = value;
+      lastNotifiedValueRef.current = value;
     }, [value]);
 
     const scheduleTextareaRefocus = useCallback(() => {
@@ -373,10 +382,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       if (!textarea) return;
 
       const syncDomValue = () => {
-        const nextValue = textarea.value;
-        if (nextValue !== latestValueRef.current) {
-          latestOnChangeRef.current(nextValue);
-        }
+        notifyChange(textarea.value);
       };
 
       syncDomValue();
@@ -387,7 +393,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         textarea.removeEventListener('input', syncDomValue);
         textarea.removeEventListener('change', syncDomValue);
       };
-    }, []);
+    }, [notifyChange]);
 
     const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
       useTextareaAutosize({
@@ -458,7 +464,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // direct prefix like `/release ` or `/event `.
     const handleChange = useCallback(
       (next: string) => {
-        onChange(next);
+        notifyChange(next);
         const el = internalTextareaRef.current;
         const caret = el?.selectionStart ?? next.length;
         const trigger = detectSlashTriggerAt(next, caret);
@@ -491,7 +497,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           handlePickerClose();
         }
       },
-      [handlePickerClose, onChange, onPickerOpenChange, picker]
+      [handlePickerClose, notifyChange, onPickerOpenChange, picker]
     );
 
     const stripSlashQuery = useCallback((): number => {
@@ -501,9 +507,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       const el = internalTextareaRef.current;
       const caret = el?.selectionStart ?? value.length;
       const nextValue = value.slice(0, startIdx) + value.slice(caret);
-      onChange(nextValue);
+      notifyChange(nextValue);
       return startIdx;
-    }, [onChange, picker.state, pickerFromPlus, value]);
+    }, [notifyChange, picker.state, pickerFromPlus, value]);
 
     const replaceSlashQueryWithToken = useCallback(
       (token: string): number => {
@@ -521,14 +527,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         const replacement = `${leadingSpace}${token}${trailingSpace}`;
         const nextValue = before + replacement + after;
         const nextCaret = before.length + replacement.length;
-        onChange(nextValue);
+        notifyChange(nextValue);
         globalThis.setTimeout(() => {
           internalTextareaRef.current?.focus();
           internalTextareaRef.current?.setSelectionRange(nextCaret, nextCaret);
         }, 0);
         return nextCaret;
       },
-      [onChange, picker.state, pickerFromPlus, value]
+      [notifyChange, picker.state, pickerFromPlus, value]
     );
 
     const handleSelectSkill = useCallback(
@@ -669,7 +675,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       toggle: toggleDictation,
     } = useSpeechRecognition({
       onTranscript: sessionTranscript => {
-        onChange(
+        notifyChange(
           joinDictationText(dictationBaselineRef.current, sessionTranscript)
         );
       },
@@ -686,8 +692,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handleMicCancel = useCallback(() => {
       if (!isListening) return;
       cancelDictation();
-      onChange(dictationBaselineRef.current);
-    }, [cancelDictation, isListening, onChange]);
+      notifyChange(dictationBaselineRef.current);
+    }, [cancelDictation, isListening, notifyChange]);
 
     // Sending must seal dictation first: Web Speech keeps streaming after the
     // draft is cleared, and a late result would re-insert the sent text into
@@ -1301,14 +1307,13 @@ function InputRow({
             <ChipTray chips={chips} onRemoveAt={onRemoveChipAt} />
           ) : null}
 
-          <motion.textarea
+          {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: combobox ARIA attributes are only rendered while `role='combobox'` is set (picker open). */}
+          <textarea
             ref={internalTextareaRef}
             value={value}
             onChange={e => onChange(e.target.value)}
             placeholder={placeholder || undefined}
             rows={1}
-            animate={reducedMotion ? undefined : { height: measuredHeight }}
-            transition={reducedMotion ? undefined : SPRING_HEIGHT}
             className={cn(
               'system-b-chat-composer-input min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent px-1 py-1 placeholder:text-quaternary-token',
               isHero
@@ -1324,8 +1329,11 @@ function InputRow({
               'focus:shadow-none! focus-visible:shadow-none! shadow-none [outline:none]',
               isAtMaxHeight ? 'overflow-y-auto' : 'overflow-hidden'
             )}
+            // Height snaps to the measured value on the same frame as the
+            // keystroke — no spring — so the caret never waits on animation
+            // (JOV-5325).
             style={{
-              ...(reducedMotion ? { height: measuredHeight } : null),
+              height: measuredHeight,
               boxShadow: 'none',
               outline: 'none',
             }}

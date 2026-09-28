@@ -54,6 +54,7 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
+import { readAuthorizedProfileViews } from '@/lib/analytics/authorized-read';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { getSessionContext } from '@/lib/auth/session';
@@ -180,10 +181,10 @@ import {
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
 import {
+  AlbumArtGatewayUnconfiguredError,
   buildAlbumArtBackgroundPrompt,
   generateAlbumArtBackgrounds,
-  isXaiConfigured,
-  XaiApiKeyMissingError,
+  isAlbumArtGatewayConfigured,
 } from '@/lib/services/album-art/provider-xai';
 import { renderAlbumArtCandidate } from '@/lib/services/album-art/render';
 import {
@@ -215,6 +216,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 export const dynamic = 'force-dynamic';
@@ -263,7 +265,6 @@ async function fetchArtistContext(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       spotifyUrl: creatorProfiles.spotifyUrl,
       appleMusicUrl: creatorProfiles.appleMusicUrl,
-      profileViews: creatorProfiles.profileViews,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, profileId))
@@ -279,7 +280,7 @@ async function fetchArtistContext(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
-  const [linkCounts, tipTotals, clickStats] = await Promise.all([
+  const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
     db
       .select({
         totalActive: count(),
@@ -314,6 +315,13 @@ async function fetchArtistContext(
         )
       )
       .then(r => r[0]),
+    readAuthorizedProfileViews(appUserId).catch(error => {
+      logger.warn('Authorized analytics unavailable for chat context', {
+        profileId,
+        error,
+      });
+      return 0;
+    }),
   ]);
 
   return {
@@ -325,7 +333,7 @@ async function fetchArtistContext(
     spotifyPopularity: result.spotifyPopularity,
     spotifyUrl: result.spotifyUrl,
     appleMusicUrl: result.appleMusicUrl,
-    profileViews: result.profileViews ?? 0,
+    profileViews,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
     hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
     tippingStats: {
@@ -1035,7 +1043,7 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
-      if (!isXaiConfigured()) {
+      if (!isAlbumArtGatewayConfigured()) {
         return {
           success: false as const,
           retryable: false,
@@ -1185,8 +1193,8 @@ function createGenerateAlbumArtTool(params: {
           })),
         };
       } catch (error) {
-        if (error instanceof XaiApiKeyMissingError) {
-          // Provider key may go missing between the early check and the call
+        if (error instanceof AlbumArtGatewayUnconfiguredError) {
+          // Gateway auth may be missing between the early check and the call
           // (e.g. env reload). Treat as feature_disabled, do not capture.
           return {
             success: false as const,
@@ -2470,8 +2478,10 @@ export async function POST(req: Request) {
     }
   }
 
-  // Validate that either profileId or artistContext is provided
+  // OV turns use the account-bound Summer door, including its unavailable
+  // response, without an artist profile. Customer chat still requires context.
   if (
+    chatMode !== 'ov' &&
     !toNullableString(profileId) &&
     (!body.artistContext || typeof body.artistContext !== 'object')
   ) {
@@ -2515,7 +2525,7 @@ export async function POST(req: Request) {
   );
   const albumArtCapability = resolveAlbumArtCapability({
     featureEnabled: albumArtFeatureEnabled,
-    providerConfigured: isXaiConfigured(),
+    providerConfigured: isAlbumArtGatewayConfigured(),
     entitlements: currentUserEntitlements,
   });
   const retouchCapability = resolveRetouchCapability({

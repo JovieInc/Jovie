@@ -83,7 +83,7 @@ After a train merges to `main`, reset the integration branch from `main` before 
 |----------|---------|
 | `.context/loop-state.json` | Active integration bases, waves, train PRs |
 | `scripts/loop-integration-ship.sh` | Fast ship feature branch → integration |
-| `scripts/drain-pr-queue.sh` | Reconcile blocked PRs and queue safe exact heads |
+| GitHub native merge queue | Validate combined heads after normal Merge when ready |
 | `scripts/loop-train-drain.sh` | Rebase train PRs, auto-merge when CLEAN |
 
 ## Enforcement

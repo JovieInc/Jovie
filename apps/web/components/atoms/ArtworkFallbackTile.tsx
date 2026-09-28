@@ -1,4 +1,4 @@
-import { Disc3 } from 'lucide-react';
+import { AudioLines } from 'lucide-react';
 import {
   getArtworkFallbackAccentStyle,
   getArtworkFallbackSurfaceStyle,
@@ -49,7 +49,7 @@ export function ArtworkFallbackTile({
           data-artwork-fallback-sleeve='true'
         />
       ) : null}
-      <Disc3
+      <AudioLines
         aria-hidden='true'
         className={cn(
           'relative z-10',

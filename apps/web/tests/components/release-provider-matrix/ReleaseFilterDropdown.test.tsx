@@ -328,6 +328,13 @@ describe('ReleaseFilterDropdown', () => {
       expect(screen.getByText('Release Type')).toBeInTheDocument();
     });
 
+    it('uses the banned-icon-safe Layers glyph for the release-type pill', () => {
+      renderDropdown({ releaseTypes: ['album'] as ReleaseType[] });
+
+      expect(screen.getAllByTestId('icon-Layers').length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('icon-Disc3')).toBeNull();
+    });
+
     it('shows popularity filter pill when levels are selected', () => {
       renderDropdown({ popularity: ['high'] as PopularityLevel[] });
 

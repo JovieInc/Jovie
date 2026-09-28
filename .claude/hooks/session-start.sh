@@ -72,7 +72,7 @@ if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   if ! command -v pnpm &> /dev/null; then
     echo "Installing pnpm..."
     corepack enable 2>/dev/null
-    corepack prepare pnpm@9.15.4 --activate
+    corepack prepare pnpm@9.15.9 --activate
   fi
 
   # Install with frozen lockfile for reproducibility
@@ -111,8 +111,8 @@ PNPM_OK="[OK]"
 if [ "$(echo "$NODE_VER" | sed 's/v\([0-9]*\).*/\1/')" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
   NODE_OK="[WRONG - need v${REQUIRED_NODE_MAJOR}+]"
 fi
-if [ "$PNPM_VER" != "9.15.4" ] && [ "$PNPM_VER" != "not found" ]; then
-  PNPM_OK="[WRONG - need 9.15.4]"
+if [ "$PNPM_VER" != "9.15.9" ] && [ "$PNPM_VER" != "not found" ]; then
+  PNPM_OK="[WRONG - need 9.15.9]"
 fi
 
 echo "  Node.js: $NODE_VER $NODE_OK"

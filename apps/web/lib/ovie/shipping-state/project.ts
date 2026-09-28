@@ -1,5 +1,7 @@
 import {
+  type DeliverySummary,
   emptyCounts,
+  emptyDeliverySummary,
   emptyDurations,
   isExactSha,
   M1_SOURCE_TO_PROJECTION_BUDGET_MS,
@@ -128,14 +130,7 @@ export function projectMeanings(
   const wrap = (value: boolean | null) =>
     value == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(value);
   return {
-    merged: wrap(
-      meaningFromHint(
-        sources['fleet-receipt'],
-        'merged',
-        'not-merged',
-        () => null
-      )
-    ),
+    merged: wrap(measuredOrNull(sources['github-merges'], 'merged')),
     queued: wrap(queued),
     ciGreen: wrap(
       meaningFromHint(ci, 'ciGreen', 'ci-not-green', () =>
@@ -165,13 +160,22 @@ function pickCount(
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const start =
-    sources['github-native-merge-queue'].sourceTimestamp ??
-    sources['fleet-receipt'].sourceTimestamp;
-  const end =
-    sources['live-build-info'].sourceTimestamp ??
-    sources['production-controller'].sourceTimestamp;
+  const startObservation = sources['github-native-merge-queue'];
+  const endObservation = sources['live-build-info'].sourceTimestamp
+    ? sources['live-build-info']
+    : sources['production-controller'];
+  const start = startObservation.sourceTimestamp;
+  const end = endObservation.sourceTimestamp;
   if (start == null || end == null) return NOT_MEASURED_DURATION;
+  // Subtracting unrelated producer clocks without shared work/build identity
+  // fabricates a duration; only a matched exact SHA or work id ships this.
+  const startSha = startObservation.correlation.sha;
+  const endSha = endObservation.correlation.sha;
+  const sharedSha = isExactSha(startSha) && startSha === endSha;
+  const sharedWork =
+    startObservation.correlation.workId != null &&
+    startObservation.correlation.workId === endObservation.correlation.workId;
+  if (!sharedSha && !sharedWork) return NOT_MEASURED_DURATION;
   const startMs = Date.parse(start);
   const endMs = Date.parse(end);
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
@@ -186,26 +190,6 @@ function revisionFingerprint(
   return SHIPPING_SOURCE_IDS.map(
     sourceId => sources[sourceId].sourceRevision ?? sources[sourceId].state
   ).join('|');
-}
-
-function operationalTaskSource(
-  sources: Readonly<Record<ShippingSourceId, SourceObservation>>,
-  lastKnown?: ShippingStateProjection | null
-) {
-  if (SUCCESS_STATES.has(sources['symphony-runtime'].state)) {
-    return 'symphony-runtime' as const;
-  }
-  if (lastKnown?.operationalTasks.sourceId) {
-    return lastKnown.operationalTasks.sourceId;
-  }
-  const taskReceipt = sources['symphony-task'];
-  if (
-    SUCCESS_STATES.has(taskReceipt.state) &&
-    taskReceipt.entities.some(entity => entity.operationalTask)
-  ) {
-    return 'symphony-task' as const;
-  }
-  return 'symphony-runtime' as const;
 }
 
 function taskDeltas(
@@ -263,7 +247,7 @@ function projectOperationalTasks(input: {
   readonly publishing: boolean;
   readonly lastKnown?: ShippingStateProjection | null;
 }): OperationalTaskFeed {
-  const sourceId = operationalTaskSource(input.sources, input.lastKnown);
+  const sourceId = 'lane-pull-requests' as const;
   const source = input.sources[sourceId];
   const currentTasks = source.entities.flatMap(entity =>
     entity.operationalTask ? [entity.operationalTask] : []
@@ -271,17 +255,16 @@ function projectOperationalTasks(input: {
   const last = input.lastKnown?.operationalTasks;
   const currentUsable = SUCCESS_STATES.has(source.state);
   const tasks = currentUsable ? currentTasks : (last?.tasks ?? []);
-  const syncState: OperationalTaskFeed['syncState'] = !input.publishing
-    ? last
-      ? 'stale'
-      : 'failed'
-    : source.state === 'fresh'
-      ? 'fresh'
-      : currentUsable || last
-        ? 'stale'
-        : source.state === 'unknown'
-          ? 'syncing'
-          : 'failed';
+  let syncState: OperationalTaskFeed['syncState'] = 'failed';
+  if (!input.publishing) {
+    syncState = last ? 'stale' : 'failed';
+  } else if (source.state === 'fresh') {
+    syncState = 'fresh';
+  } else if (currentUsable || last) {
+    syncState = 'stale';
+  } else if (source.state === 'unknown') {
+    syncState = 'syncing';
+  }
   return {
     canonicalSource: 'linear',
     cacheMode: 'local-reconciled',
@@ -300,6 +283,26 @@ function projectOperationalTasks(input: {
   };
 }
 
+/**
+ * Merge each live source's delivery block over an all-not-measured summary.
+ * A source that failed contributes nothing, so only its metrics read n/a.
+ */
+export function projectDelivery(
+  sources: Readonly<Record<ShippingSourceId, SourceObservation>>
+): DeliverySummary {
+  let delivery = emptyDeliverySummary();
+  for (const sourceId of SHIPPING_SOURCE_IDS) {
+    const source = sources[sourceId];
+    if (!SUCCESS_STATES.has(source.state) || source.delivery == null) continue;
+    delivery = { ...delivery, ...source.delivery };
+  }
+  const lanes = sources['lanes-status'];
+  return {
+    ...delivery,
+    lanes: { ...delivery.lanes, stale: lanes.state === 'stale' },
+  };
+}
+
 export function projectShippingState(input: {
   readonly sequence: number;
   readonly observationTimestamp: string;
@@ -314,16 +317,17 @@ export function projectShippingState(input: {
     SHIPPING_SOURCE_IDS.map(sourceId => input.sources[sourceId].state)
   );
   const deadline = freshnessDeadline(input.observationTimestamp);
-  const state = input.publishing
-    ? observationFreshness(
-        input.observationTimestamp,
-        deadline,
-        input.nowIso,
-        combined
-      )
-    : input.lastKnown
-      ? 'stale'
-      : 'unavailable';
+  let state: ObservationState = 'unavailable';
+  if (input.publishing) {
+    state = observationFreshness(
+      input.observationTimestamp,
+      deadline,
+      input.nowIso,
+      combined
+    );
+  } else if (input.lastKnown) {
+    state = 'stale';
+  }
   const successful = SHIPPING_SOURCE_IDS.some(sourceId =>
     SUCCESS_STATES.has(input.sources[sourceId].state)
   );
@@ -332,7 +336,7 @@ export function projectShippingState(input: {
   return {
     producerId: SHIPPING_STATE_PRODUCER_ID,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
-    sourceId: 'fleet-receipt',
+    sourceId: 'lanes-status',
     entityId: 'ovie.shipping-state',
     schema: SHIPPING_STATE_SCHEMA,
     eventId,
@@ -348,10 +352,14 @@ export function projectShippingState(input: {
     lastSuccess: successful
       ? { at: input.observationTimestamp, sequence: input.sequence, eventId }
       : (input.lastKnown?.lastSuccess ?? null),
+    // Only a failed source is a projection error. A live read that reports a
+    // negative outcome (CI red, production unverified) is a measured "No".
     lastError:
-      SHIPPING_SOURCE_IDS.map(id => input.sources[id].lastError).find(
-        error => error != null
-      ) ??
+      SHIPPING_SOURCE_IDS.filter(
+        id => !SUCCESS_STATES.has(input.sources[id].state)
+      )
+        .map(id => input.sources[id].lastError)
+        .find(error => error != null) ??
       (input.publishing
         ? null
         : {
@@ -367,8 +375,9 @@ export function projectShippingState(input: {
     meanings: projectMeanings(input.sources),
     timeToShipSeconds: timeToShip(input.sources),
     retrying: pickCount(input.sources, 'retrying'),
-    terminalFailures: pickCount(input.sources, 'blocked'),
+    terminalFailures: pickCount(input.sources, 'terminalFailures'),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
+    delivery: projectDelivery(input.sources),
     operationalTasks: projectOperationalTasks(input),
   };
 }
@@ -404,6 +413,10 @@ export function ageShippingStateProjection(
           aggregateState
         )
       : projection.state,
+    // Delivery is derived from source states (success gating, lanes.stale); re-derive after aging.
+    delivery: projection.delivery
+      ? projectDelivery(sources)
+      : projection.delivery,
     operationalTasks: {
       ...projection.operationalTasks,
       syncState:
@@ -467,6 +480,7 @@ function emptyObservation(
     entities: [],
     counts: emptyCounts(),
     durations: emptyDurations(),
+    delivery: null,
   };
 }
 
@@ -517,7 +531,7 @@ export function unknownProjection(input: {
   return {
     producerId: SHIPPING_STATE_PRODUCER_ID,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
-    sourceId: 'fleet-receipt',
+    sourceId: 'lanes-status',
     entityId: 'ovie.shipping-state',
     schema: SHIPPING_STATE_SCHEMA,
     eventId,
@@ -556,11 +570,12 @@ export function unknownProjection(input: {
     retrying: NOT_MEASURED_COUNT,
     terminalFailures: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,
+    delivery: emptyDeliverySummary(),
     operationalTasks: {
       canonicalSource: 'linear',
       cacheMode: 'local-reconciled',
       syncState: input.publishing ? 'syncing' : 'failed',
-      sourceId: 'symphony-runtime',
+      sourceId: 'lane-pull-requests',
       observedAt: null,
       lastSyncedAt: null,
       freshnessDeadline: null,

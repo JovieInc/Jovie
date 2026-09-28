@@ -62,6 +62,14 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /**
+   * Redeem the return code shown by the browser when the jovie:// deep link
+   * could not reach the app. The main process adds the PKCE verifier.
+   */
+  readonly redeemDesktopAuthReturnCode?: (returnCode: string) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
   /** Open the current isolated public profile in the system browser. */
   readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
@@ -345,12 +353,14 @@ function reportInstallFailure(error: unknown): void {
   openManualDownload();
 }
 
-function handleInstallResult(result: InstallUpdateResult): void {
+function handleInstallResult(result: InstallUpdateResult): boolean {
   if (result && result.ok === false) {
     reportInstallFailure(
       new Error(result.reason ?? 'installUpdateAndRestart returned ok=false')
     );
+    return false;
   }
+  return true;
 }
 
 /**
@@ -359,25 +369,22 @@ function handleInstallResult(result: InstallUpdateResult): void {
  * the latest signed build — the fix for the chicken-and-egg where unsigned
  * stale binaries can't auto-update themselves.
  */
-function safeInstallUpdateAndRestart(): void {
+async function safeInstallUpdateAndRestart(): Promise<boolean> {
   const api = getRawElectronAPI();
 
   if (api && typeof api.installUpdateAndRestart === 'function') {
     try {
-      const result = api.installUpdateAndRestart();
-      if (result && typeof result.then === 'function') {
-        void result.then(handleInstallResult).catch(reportInstallFailure);
-      }
-      return;
+      return handleInstallResult(await api.installUpdateAndRestart());
     } catch (error) {
       reportInstallFailure(error);
-      return;
+      return false;
     }
   } else if (api) {
     reportMissingBridgeMethod('installUpdateAndRestart');
   }
 
   openManualDownload();
+  return false;
 }
 
 export function isElectronRuntime(): boolean {
@@ -439,8 +446,8 @@ export interface DesktopUpdateState {
   readonly available: boolean;
   /** True once the update download completes (ready to install). */
   readonly downloaded: boolean;
-  /** Trigger quit-and-install, or fall back to opening the download page. */
-  readonly install: () => void;
+  /** True when quit-and-install starts; false after the manual-download fallback. */
+  readonly install: () => Promise<boolean>;
 }
 
 /**
@@ -528,6 +535,30 @@ export async function copyDesktopAuthUrl(
     reportMissingBridgeMethod('copyDesktopAuthUrl');
   }
   return { ok: false, reason: 'desktop-auth-copy-bridge-unavailable' };
+}
+
+/** Older Mac builds cannot redeem return codes; hide the entry for them. */
+export function supportsDesktopAuthReturnCode(): boolean {
+  const api = getRawElectronAPI();
+  return typeof api?.redeemDesktopAuthReturnCode === 'function';
+}
+
+export async function redeemDesktopAuthReturnCode(
+  returnCode: string
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.redeemDesktopAuthReturnCode === 'function') {
+    const result = await api.redeemDesktopAuthReturnCode(returnCode);
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason ?? 'desktop-auth-return-code-failed',
+    };
+  }
+  if (api) {
+    reportMissingBridgeMethod('redeemDesktopAuthReturnCode');
+  }
+  return { ok: false, reason: 'desktop-auth-return-code-bridge-unavailable' };
 }
 
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
@@ -784,6 +815,8 @@ export const __testing = {
   startDesktopAuthHandoff,
   openDesktopAuthUrl,
   copyDesktopAuthUrl,
+  redeemDesktopAuthReturnCode,
+  supportsDesktopAuthReturnCode,
   openPublicProfileInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,

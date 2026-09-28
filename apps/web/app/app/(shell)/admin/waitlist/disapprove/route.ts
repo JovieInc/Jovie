@@ -17,7 +17,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 export async function POST(request: Request) {
   let entitlements;
   try {
-    entitlements = await getCurrentUserEntitlements();
+    entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },

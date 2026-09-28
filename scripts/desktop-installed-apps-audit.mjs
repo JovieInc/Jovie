@@ -24,6 +24,13 @@ const GITHUB_REPO = 'JovieInc/Jovie';
 const BUILD_IDENTITY_RESOURCE_NAME = 'build-identity.json';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
+const STAGING_VERSION = /^\d+\.\d+\.\d+-staging\.[1-9]\d*\.[1-9]\d*$/;
+
+function versionMatchesChannel(channel, version) {
+  return channel === 'staging'
+    ? STAGING_VERSION.test(version)
+    : SEMVER.test(version);
+}
 const BUILD_IDENTITY_KEYS = new Set([
   'channel',
   'version',
@@ -66,7 +73,7 @@ function isDesktopBuildIdentityRecord(value) {
     keys.every(key => BUILD_IDENTITY_KEYS.has(key)) &&
     ['production', 'staging', 'local'].includes(value.channel) &&
     typeof value.version === 'string' &&
-    SEMVER.test(value.version) &&
+    versionMatchesChannel(value.channel, value.version) &&
     (value.sourceRevision === null ||
       (typeof value.sourceRevision === 'string' &&
         FULL_SHA.test(value.sourceRevision))) &&
@@ -103,7 +110,7 @@ export function readDesktopBuildIdentity(appPath) {
 function buildIdentityHasReleaseProvenance(identity) {
   return (
     (identity.channel === 'production' || identity.channel === 'staging') &&
-    SEMVER.test(identity.version) &&
+    versionMatchesChannel(identity.channel, identity.version) &&
     typeof identity.sourceRevision === 'string' &&
     FULL_SHA.test(identity.sourceRevision) &&
     isIsoTimestamp(identity.builtAt)
@@ -192,11 +199,12 @@ export function readApplicationBundleVersion(appPath) {
 }
 
 /**
+ * @param {typeof execFileSync} [runPs]
  * @returns {Array<{ readonly pid: string; readonly command: string }>}
  */
-export function listRunningJovieProcesses() {
+export function listRunningJovieProcesses(runPs = execFileSync) {
   try {
-    const output = execFileSync('ps', ['-axo', 'pid=,command='], {
+    const output = runPs('ps', ['-axo', 'pid=,command='], {
       encoding: 'utf8',
     });
     return output
@@ -211,8 +219,11 @@ export function listRunningJovieProcesses() {
           command: match?.[2] ?? line,
         };
       });
-  } catch {
-    return [];
+  } catch (cause) {
+    throw new Error(
+      'Running process inventory unavailable; desktop audit cannot pass.',
+      { cause }
+    );
   }
 }
 
@@ -310,7 +321,7 @@ export function evaluateDesktopUpdateFreshness(input) {
   };
 }
 
-/** @returns {Promise<{ readonly name?: unknown; readonly published_at?: unknown }>} */
+/** @returns {Promise<{ readonly name?: unknown; readonly published_at?: unknown; readonly updated_at?: unknown }>} */
 async function githubJson(url, fetchImpl = fetch) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -323,17 +334,19 @@ async function githubJson(url, fetchImpl = fetch) {
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`GitHub ${response.status} for ${url}`);
-  return /** @type {Promise<{ readonly name?: unknown; readonly published_at?: unknown }>} */ (
+  return /** @type {Promise<{ readonly name?: unknown; readonly published_at?: unknown; readonly updated_at?: unknown }>} */ (
     response.json()
   );
 }
 
-function shippedVersion(release, prefix) {
+function shippedVersion(release, prefix, rolling = false) {
   const name = typeof release?.name === 'string' ? release.name : null;
+  // GitHub preserves published_at when the rolling staging release is updated.
+  // The current asset/feed generation is dated by updated_at instead.
+  const publishedAt = rolling ? release?.updated_at : release?.published_at;
   return {
     version: prefix && name ? name.replace(prefix, '') : name,
-    publishedAt:
-      typeof release?.published_at === 'string' ? release.published_at : null,
+    publishedAt: typeof publishedAt === 'string' ? publishedAt : null,
   };
 }
 
@@ -348,7 +361,7 @@ export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
   ).catch(() => null);
   return {
     production: shippedVersion(production),
-    staging: shippedVersion(staging, /^Desktop staging\s+/i),
+    staging: shippedVersion(staging, /^Desktop staging\s+/i, true),
   };
 }
 

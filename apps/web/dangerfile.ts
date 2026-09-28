@@ -1,4 +1,5 @@
 import { danger, fail, warn } from 'danger';
+import { evaluateBugToTestRule } from './lib/testing/bug-to-test-rule';
 
 // Fail if PR is too large (> 500 LOC)
 const linesOfCode = danger.github.pr.additions + danger.github.pr.deletions;
@@ -8,15 +9,7 @@ if (linesOfCode > 500) {
   );
 }
 
-const testFilePattern = /\.(test|spec)\.(t|j)sx?$/i;
-const bugFixCommitPattern = /^fix(\(|:)/i;
-const bugFixTitlePattern = /^fix(\(|:)/i;
-const bugFixBodyPattern =
-  /- \[[xX]\] Bug fix \(non-breaking change which fixes an issue\)/;
-const bugToTestWaiverPattern = /bug-to-test:\s*(waived|n\/a|not applicable)\b/i;
-const bugToTestSatisfiedPattern = /bug-to-test:\s*(satisfied|pass|passed)\b/i;
-const regressionTestReferencePattern =
-  /Regression test:\s*[`']?[\w./-]+\.(test|spec)\./i;
+const testFilePattern = /\.(test|spec)\.[cm]?[jt]sx?$/i;
 
 const changedFiles = [
   ...danger.git.created_files,
@@ -27,26 +20,15 @@ const changedFiles = [
 const hasTestChanges = changedFiles.some(file => testFilePattern.test(file));
 const commitMessages = danger.git.commits.map(commit => commit.message);
 
-const bugFixCommitMessages = commitMessages.filter(message =>
-  bugFixCommitPattern.test(message.split('\n')[0]?.trim() ?? '')
-);
-const isBugFixTitle = bugFixTitlePattern.test(danger.github.pr.title.trim());
-const isBugFixBody = bugFixBodyPattern.test(danger.github.pr.body ?? '');
-const isBugFixPr =
-  bugFixCommitMessages.length > 0 || isBugFixTitle || isBugFixBody;
+const bugToTest = evaluateBugToTestRule({
+  changedFiles,
+  commitMessages,
+  prTitle: danger.github.pr.title,
+  prBody: danger.github.pr.body ?? undefined,
+});
 
-const hasBugToTestEvidence =
-  hasTestChanges ||
-  bugToTestSatisfiedPattern.test(danger.github.pr.body ?? '') ||
-  regressionTestReferencePattern.test(danger.github.pr.body ?? '');
-const hasBugToTestWaiver = bugToTestWaiverPattern.test(
-  danger.github.pr.body ?? ''
-);
-
-if (isBugFixPr && !hasBugToTestEvidence && !hasBugToTestWaiver) {
-  fail(
-    'Bug-to-test rule: bug-fix PRs must add/update a regression test (*.test.* / *.spec.*) or document `bug-to-test: waived — <reason>` in the PR body.'
-  );
+if (!bugToTest.passed) {
+  fail(`Bug-to-test rule: ${bugToTest.summary}`);
 }
 
 // Warn if app or key component directories are touched but no tests added

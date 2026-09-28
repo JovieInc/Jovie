@@ -230,6 +230,60 @@ describe('AdminFeaturesTable', () => {
     );
   });
 
+  it('names a production enable, disable, and reset in the confirm dialog', async () => {
+    const user = userEvent.setup();
+    const row = {
+      flagKey: 'spotify_oauth',
+      name: 'Spotify Oauth',
+      description: 'Connect Spotify accounts via OAuth.',
+      defaultEnabled: false,
+      dev: null,
+      staging: null,
+      prod: null,
+    };
+
+    const enableView = render(
+      <AdminFeaturesTable initialRows={[row]} currentTier='prod' />
+    );
+    await user.click(
+      screen.getByRole('switch', {
+        name: /Prod \(current\): Off, Default/,
+      })
+    );
+    expect(
+      screen.getByText(
+        'This will enable Spotify Oauth (spotify_oauth) in production.'
+      )
+    ).toBeInTheDocument();
+    enableView.unmount();
+
+    render(
+      <AdminFeaturesTable
+        initialRows={[{ ...row, prod: true }]}
+        currentTier='prod'
+      />
+    );
+    await user.click(
+      screen.getByRole('switch', {
+        name: /Prod \(current\): On, Override/,
+      })
+    );
+    expect(
+      screen.getByText(
+        'This will disable Spotify Oauth (spotify_oauth) in production.'
+      )
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Reset Prod to default' })
+    );
+    expect(
+      screen.getByText(
+        'This will reset to its default Spotify Oauth (spotify_oauth) in production.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('keeps flag name and description visible alongside the raw key', () => {
     render(<AdminFeaturesTable initialRows={ROWS} currentTier='prod' />);
 

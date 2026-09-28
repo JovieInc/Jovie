@@ -18,6 +18,24 @@ function readyEnv(authOrigin = 'https://jov.ie') {
 }
 
 describe('signup onboarding readiness', () => {
+  it('reports a local target as passed without production keys', () => {
+    const result = checkSignupOnboardingReadiness({
+      env: {},
+      target: 'local',
+      source: 'env',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.required).toEqual([]);
+    expect(formatSignupOnboardingReadinessReport(result)).toBe(
+      [
+        '[signup-readiness] target=local source=env',
+        '[signup-readiness] local target: no production signup keys required',
+        '[signup-readiness] status=passed',
+      ].join('\n')
+    );
+  });
+
   it('passes only when every required production signup env var is present', () => {
     const env = readyEnv();
 
@@ -31,6 +49,26 @@ describe('signup onboarding readiness', () => {
     expect(result.missing).toEqual([]);
     expect(result.invalid).toEqual([]);
     expect(result.present).toEqual([...REQUIRED_SIGNUP_ONBOARDING_ENV_KEYS]);
+    const readyReport = formatSignupOnboardingReadinessReport(result);
+    expect(readyReport).toContain('DATABASE_URL: SET');
+    expect(readyReport).toContain('BETTER_AUTH_SECRET: SET');
+  });
+
+  it('labels a missing production signup key MISSING and leaves the others SET', () => {
+    const env = readyEnv();
+    delete env.DATABASE_URL;
+
+    const result = checkSignupOnboardingReadiness({
+      env,
+      target: 'prd',
+      source: 'env',
+    });
+    const report = formatSignupOnboardingReadinessReport(result);
+
+    expect(result.missing).toEqual(['DATABASE_URL']);
+    expect(report).toContain('DATABASE_URL: MISSING');
+    expect(report).toContain('BETTER_AUTH_SECRET: SET');
+    expect(report).toContain('BETTER_AUTH_URL: SET');
   });
 
   it('fails closed on a present but invalid production auth URL without printing it', () => {

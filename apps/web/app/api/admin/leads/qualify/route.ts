@@ -15,7 +15,7 @@ export const maxDuration = 300;
  * POST /api/admin/leads/qualify — Trigger qualification for discovered leads.
  */
 export async function POST() {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

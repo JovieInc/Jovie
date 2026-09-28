@@ -16,7 +16,6 @@ export const WEB196_RELEASE_ARGS = {
     title: RELEASE.title,
     artworkUrl: RELEASE.artworkUrl ?? null,
     releaseDate: RELEASE.releaseDate ?? null,
-    previewUrl: RELEASE.previewUrl ?? null,
   },
   artist: {
     name: ARTIST.displayName,

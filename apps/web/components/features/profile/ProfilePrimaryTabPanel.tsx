@@ -14,6 +14,9 @@ import type {
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
+import { ProfileEventsCard } from '@/features/profile/ProfileEventsCard';
+import { ProfilePaymentsCard } from '@/features/profile/ProfilePaymentsCard';
+import { ProfileStayCloseCard } from '@/features/profile/ProfileStayCloseCard';
 import {
   PUBLIC_MUSIC_EMPTY_DESCRIPTION,
   PUBLIC_MUSIC_EMPTY_HEADING,
@@ -23,12 +26,22 @@ import {
 } from '@/features/profile/profile-surface-state';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
-import { TourDrawerContent } from '@/features/profile/TourModePanel';
+import {
+  TourDrawerContent,
+  TourEventAlertsAction,
+} from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
+import {
+  type ProfileCardAccentAssignment,
+  type ProfileModeCardKind,
+  resolveProfileModeCardAccents,
+} from '@/lib/profile/mode-card-accent';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
+import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
@@ -36,7 +49,9 @@ import type { PressPhoto } from '@/types/press-photos';
 const PANEL_CLASS_NAME =
   'rounded-(--profile-card-radius) border border-[color:var(--profile-panel-border)] bg-[color:var(--profile-content-bg)] p-5 shadow-(--profile-panel-shadow) backdrop-blur-2xl';
 const OTP_SLOT_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
-const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
+// Cancels the Music scrollport's --page-pad so full-bleed rows meet the
+// shell edge. A fixed -mx-4 undershoots that padding and gets clipped.
+const MUSIC_BLEED_CLASS_NAME = '-mx-(--page-pad) min-w-0 pb-2';
 
 interface ProfilePrimaryTabPanelProps {
   readonly mode: Exclude<ProfilePrimaryTab, 'profile'>;
@@ -55,6 +70,8 @@ interface ProfilePrimaryTabPanelProps {
   readonly genres?: string[] | null;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  readonly contacts?: readonly PublicContact[];
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly tourDates?: readonly TourDateViewModel[];
   readonly releases?: readonly PublicRelease[];
   readonly catalogLoadFailed?: boolean;
@@ -62,7 +79,15 @@ interface ProfilePrimaryTabPanelProps {
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
+  /** Rotating mode-card accents shared with the home featured card. */
+  readonly modeCardAccents?: Readonly<
+    Record<ProfileModeCardKind, ProfileCardAccentAssignment>
+  >;
+  /** Venmo link for the Payments card; null hides the card. */
+  readonly paymentsVenmoLink?: string | null;
 }
+
+const DEFAULT_MODE_CARD_ACCENTS = resolveProfileModeCardAccents();
 
 function SectionIntro({
   title,
@@ -185,6 +210,7 @@ function SubscribePanel({
   onSubscriptionActivated,
   keepSubscribeFlowMounted = false,
   sourceContext,
+  accent,
 }: Readonly<{
   artist: Artist;
   isSubscribed: boolean;
@@ -201,6 +227,7 @@ function SubscribePanel({
   onSubscriptionActivated?: () => void;
   keepSubscribeFlowMounted?: boolean;
   sourceContext?: NotificationSourceContext;
+  accent: ProfileCardAccentAssignment;
 }>) {
   if (renderMode === 'preview') {
     return (
@@ -219,42 +246,38 @@ function SubscribePanel({
 
   if (!isSubscribed || keepSubscribeFlowMounted) {
     return (
-      <div
-        className={cn(
-          NATIVE_PANEL_CLASS_NAME,
-          'flex h-full min-h-full flex-col'
-        )}
-        data-testid='profile-primary-tab-subscribe'
-      >
-        {subscribeTwoStep ? (
-          <TwoStepNotificationsCTA
-            artist={artist}
-            startExpanded
-            presentation='inline'
-            portalContainer={notificationsPortalContainer}
-            onFlowClosed={onFlowClosed}
-            onSubscriptionActivated={onSubscriptionActivated}
-            experimentVariant={alertOptInVariant}
-            source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
-            sourceContext={sourceContext}
-          />
-        ) : (
-          <ArtistNotificationsCTA
-            artist={artist}
-            presentation='inline'
-            variant='button'
-            autoOpen
-            forceExpanded
-            hideListenFallback
-            source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
-            sourceContext={sourceContext}
-            portalContainer={notificationsPortalContainer}
-            onFlowClosed={onFlowClosed}
-            onSubscriptionActivated={onSubscriptionActivated}
-            experimentVariant={alertOptInVariant}
-          />
-        )}
-      </div>
+      <ProfileStayCloseCard accent={accent}>
+        <div className='-mx-4 -mb-4'>
+          {subscribeTwoStep ? (
+            <TwoStepNotificationsCTA
+              artist={artist}
+              startExpanded
+              presentation='inline'
+              portalContainer={notificationsPortalContainer}
+              onFlowClosed={onFlowClosed}
+              onSubscriptionActivated={onSubscriptionActivated}
+              experimentVariant={alertOptInVariant}
+              source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
+              sourceContext={sourceContext}
+            />
+          ) : (
+            <ArtistNotificationsCTA
+              artist={artist}
+              presentation='inline'
+              variant='button'
+              autoOpen
+              forceExpanded
+              hideListenFallback
+              source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
+              sourceContext={sourceContext}
+              portalContainer={notificationsPortalContainer}
+              onFlowClosed={onFlowClosed}
+              onSubscriptionActivated={onSubscriptionActivated}
+              experimentVariant={alertOptInVariant}
+            />
+          )}
+        </div>
+      </ProfileStayCloseCard>
     );
   }
 
@@ -324,12 +347,12 @@ function ProfileMusicErrorState({
       action={
         renderMode === 'preview'
           ? {
-              label: 'Try again',
+              label: 'Try Again',
               onClick: () => {},
               disabled: true,
             }
           : {
-              label: 'Try again',
+              label: 'Try Again',
               onClick: () => {
                 globalThis.location.reload();
               },
@@ -356,6 +379,8 @@ export function ProfilePrimaryTabPanel({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  contacts = [],
+  creditSegments,
   tourDates = [],
   releases = [],
   catalogLoadFailed = false,
@@ -363,6 +388,8 @@ export function ProfilePrimaryTabPanel({
   previewNotificationsState,
   onFlowClosed,
   onSubscriptionActivated,
+  modeCardAccents = DEFAULT_MODE_CARD_ACCENTS,
+  paymentsVenmoLink = null,
 }: Readonly<ProfilePrimaryTabPanelProps>) {
   const [keepSubscribeFlowMounted, setKeepSubscribeFlowMounted] =
     useState(false);
@@ -418,7 +445,7 @@ export function ProfilePrimaryTabPanel({
     if (musicSurface.kind === 'catalog') {
       return (
         <div
-          className='-mx-4 space-y-4 pb-2'
+          className={cn(MUSIC_BLEED_CLASS_NAME, 'space-y-4')}
           data-testid='profile-primary-tab-releases'
         >
           <div>
@@ -440,7 +467,10 @@ export function ProfilePrimaryTabPanel({
 
     return (
       <div
-        className={cn(NATIVE_PANEL_CLASS_NAME, 'flex min-h-full flex-col')}
+        className={cn(
+          MUSIC_BLEED_CLASS_NAME,
+          'flex min-h-full flex-col space-y-0'
+        )}
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>
@@ -477,21 +507,26 @@ export function ProfilePrimaryTabPanel({
 
   if (mode === 'tour') {
     return (
-      <div
-        className={cn(NATIVE_PANEL_CLASS_NAME, 'flex min-h-full flex-col')}
-        data-testid='profile-primary-tab-tour'
-      >
-        <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-            Shows
-          </h2>
-        </div>
-        <TourDrawerContent
-          artist={artist}
-          tourDates={[...tourDates]}
-          emptyStateSourceContext={eventsEmptySourceContext}
-          renderMode={renderMode}
-        />
+      <div data-testid='profile-primary-tab-tour'>
+        <ProfileEventsCard
+          accent={modeCardAccents.events}
+          hasEvents={tourDates.length > 0}
+          emptyAction={
+            <TourEventAlertsAction
+              artist={artist}
+              sourceContext={eventsEmptySourceContext}
+              renderMode={renderMode}
+            />
+          }
+        >
+          <TourDrawerContent
+            artist={artist}
+            tourDates={[...tourDates]}
+            emptyStateSourceContext={eventsEmptySourceContext}
+            renderMode={renderMode}
+            className='-mx-4'
+          />
+        </ProfileEventsCard>
       </div>
     );
   }
@@ -514,25 +549,36 @@ export function ProfilePrimaryTabPanel({
         onSubscriptionActivated={handleSubscriptionActivated}
         keepSubscribeFlowMounted={keepSubscribeFlowMounted}
         sourceContext={subscribeSourceContext}
+        accent={modeCardAccents['stay-close']}
       />
     );
   }
 
   return (
-    <div className={PANEL_CLASS_NAME} data-testid='profile-primary-tab-about'>
-      <SectionIntro title='About' />
-      <div
-        className={cn(
-          'text-white/80',
-          renderMode === 'preview' && 'pointer-events-none'
-        )}
-      >
-        <AboutSection
-          artist={artist}
-          genres={genres}
-          pressPhotos={pressPhotos}
-          allowPhotoDownloads={allowPhotoDownloads}
-        />
+    <div className='flex flex-col gap-4'>
+      <ProfilePaymentsCard
+        artistName={artist.name}
+        venmoLink={paymentsVenmoLink}
+        accent={modeCardAccents.payments}
+        renderMode={renderMode}
+      />
+      <div className={PANEL_CLASS_NAME} data-testid='profile-primary-tab-about'>
+        <SectionIntro title='About' />
+        <div
+          className={cn(
+            'text-white/80',
+            renderMode === 'preview' && 'pointer-events-none'
+          )}
+        >
+          <AboutSection
+            artist={artist}
+            genres={genres}
+            pressPhotos={pressPhotos}
+            allowPhotoDownloads={allowPhotoDownloads}
+            creditSegments={creditSegments}
+            contacts={contacts}
+          />
+        </div>
       </div>
     </div>
   );

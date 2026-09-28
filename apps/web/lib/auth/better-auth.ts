@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { oauthProvider } from '@better-auth/oauth-provider';
+import { passkey } from '@better-auth/passkey';
 import {
   type BetterAuthOptions,
   type BetterAuthPlugin,
@@ -15,6 +16,7 @@ import {
   oneTap,
   oneTimeToken,
 } from 'better-auth/plugins';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { db } from '@/lib/db';
 import {
   baAccounts,
@@ -26,6 +28,7 @@ import {
   baOauthConsents,
   baOauthRefreshTokens,
   baOauthResources,
+  baPasskeys,
   baSessions,
   baUsers,
   baVerifications,
@@ -34,14 +37,16 @@ import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
+import { resolveOvieWebOrigin } from './ovie-web-origin';
 import { provisionAppUser } from './provision';
 import {
   AUTH_RATE_LIMIT_RULES,
   isDeterministicTestOtpEmail,
 } from './rate-limit-rules';
-import { secondaryStorage } from './secondary-storage';
+import { authRateLimitStorage } from './rate-limit-storage';
 
 export {
   AUTH_RATE_LIMIT_RULES,
@@ -90,7 +95,14 @@ export function resolveTrustedOrigins(): string[] {
   const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL]
     .map(originFromVercelHost)
     .filter((origin): origin is string => Boolean(origin));
-  return [...new Set([...STATIC_TRUSTED_ORIGINS, ...vercelOrigins])];
+  const ovieOrigin = resolveOvieWebOrigin(env.OVIE_WEB_ORIGIN, env);
+  return [
+    ...new Set([
+      ...STATIC_TRUSTED_ORIGINS,
+      ...vercelOrigins,
+      ...(ovieOrigin ? [ovieOrigin.origin] : []),
+    ]),
+  ];
 }
 
 /**
@@ -173,6 +185,11 @@ function resolveLoopbackHostPatterns(): string[] {
 
 function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
   const localBetterAuthUrl = resolveLocalBetterAuthUrl();
+  const ovieOrigin = resolveOvieWebOrigin(env.OVIE_WEB_ORIGIN, env);
+  const localProtocol =
+    localBetterAuthUrl?.protocol === 'http:' ||
+    env.VERCEL_ENV === 'development' ||
+    (!env.VERCEL_ENV && env.NODE_ENV !== 'production');
 
   return {
     allowedHosts: [
@@ -187,15 +204,21 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
           ...resolveLoopbackHostPatterns(),
           env.VERCEL_URL,
           env.VERCEL_BRANCH_URL,
+          ovieOrigin?.host,
         ].filter((host): host is string => Boolean(host))
       ),
     ],
+    // A development server can serve local HTTP and a configured remote
+    // HTTPS Ovie origin. Let Better Auth use each request's scheme in that
+    // mixed case instead of forcing remote callbacks onto HTTP.
     protocol:
-      localBetterAuthUrl?.protocol === 'http:' ||
-      env.VERCEL_ENV === 'development' ||
-      (!env.VERCEL_ENV && env.NODE_ENV !== 'production')
-        ? 'http'
-        : 'https',
+      localProtocol &&
+      ovieOrigin &&
+      !LOOPBACK_HOSTNAMES.has(ovieOrigin.hostname)
+        ? undefined
+        : localProtocol
+          ? 'http'
+          : 'https',
   };
 }
 
@@ -318,6 +341,9 @@ function buildPlugins() {
       disableClientRequest: true,
       storeToken: 'hashed',
     }),
+    // Admin second factor (JOV-4806): Touch ID / platform passkeys.
+    passkey({ rpName: 'Jovie' }),
+    adminPasskeyStepUp(),
     // nextCookies MUST stay last so Set-Cookie propagates through Next.js
     // server actions (better-auth docs + plan).
     nextCookies(),
@@ -347,6 +373,7 @@ export const auth = betterAuth({
       oauthResource: baOauthResources,
       oauthClientResource: baOauthClientResources,
       oauthClientAssertion: baOauthClientAssertions,
+      passkey: baPasskeys,
     },
   }),
   socialProviders: buildSocialProviders(),
@@ -354,18 +381,17 @@ export const auth = betterAuth({
     expiresIn: 604800, // 7 days
     updateAge: 86400, // roll expiry at most once per day
     cookieCache: { enabled: true, maxAge: 300 },
-    // Postgres stays the durable session store; Redis loss ≠ mass logout.
+    // Postgres is the durable session store. The cookie cache covers repeat
+    // reads for five minutes. Redis is not a session replica.
     storeSessionInDatabase: true,
   },
   verification: {
-    // Keep OTP/verification values durable in ba_verifications as well —
-    // secondary storage is best-effort by design.
+    // OTP and other one-time values stay in ba_verifications.
     storeInDatabase: true,
   },
-  secondaryStorage,
   rateLimit: {
     enabled: true,
-    storage: 'secondary-storage',
+    customStorage: authRateLimitStorage,
     customRules: AUTH_RATE_LIMIT_RULES,
   },
   trustedOrigins: () => resolveTrustedOrigins(),
@@ -379,6 +405,12 @@ export const auth = betterAuth({
               email: user.email,
               emailVerified: user.emailVerified,
               name: user.name,
+            });
+            // A new account is the signup funnel's auth success. Sign-ins of
+            // existing accounts never reach this hook.
+            await recordFunnelStep({
+              funnel: 'artist_signup',
+              step: 'auth_success',
             });
           } catch (error) {
             // provisionAppUser never throws by contract; this is

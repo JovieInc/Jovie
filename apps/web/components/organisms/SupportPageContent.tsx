@@ -1,56 +1,52 @@
-import { FaqSection, MarketingHero } from '@/components/marketing';
-import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
+import Image from 'next/image';
+import '@/components/marketing/MarketingRouteHero.css';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import {
   SupportChannels,
   SupportCta,
 } from '../../app/(marketing)/support/SupportContent';
 
-export const SUPPORT_FAQ_ITEMS = [
-  {
-    question: 'How do I get started with Jovie?',
-    answer: `Create an account, pick your handle, connect Spotify or Apple Music, and set up your profile. Full walkthrough at ${DOCS_URL}/getting-started.`,
-  },
-  {
-    question: 'How do smart links work?',
-    answer:
-      'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
-  },
-  {
-    question: 'How do I upgrade my plan?',
-    answer:
-      'Head to Settings \u2192 Billing to view available plans and manage your subscription.',
-  },
-  {
-    question: 'How do I contact support?',
-    answer: `Email ${SUPPORT_EMAIL} \u2014 we typically respond within one business day.`,
-  },
-] as const;
-
 export function SupportPageContent() {
   return (
     <>
       <MarketingHero
-        variant='left'
+        variant='unstyled'
         headingId='support-hero-heading'
         testId='support-hero'
+        className='marketing-hero-dock marketing-hero-dock--inset relative w-full overflow-hidden pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32'
       >
-        <p className='text-sm font-medium text-tertiary-token'>Support</p>
-        <h1
-          id='support-hero-heading'
-          className='system-b-marketing-route-title mt-6 text-primary-token'
+        <div className='marketing-route-hero__media' aria-hidden='true'>
+          <Image
+            src='/images/hero/support-hero.webp'
+            alt=''
+            fill
+            sizes='100vw'
+            priority
+          />
+        </div>
+        <div className='marketing-route-hero__scrim' aria-hidden='true' />
+        <div
+          className='marketing-route-hero__accent marketing-route-hero__accent--blue'
+          aria-hidden='true'
+        />
+        <MarketingContainer
+          width='page'
+          className='marketing-route-hero__content'
         >
-          We&apos;re Here To Help.
-        </h1>
-        <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
-          Browse our docs or reach out to our team.
-        </p>
+          <p className='text-sm font-medium text-tertiary-token'>Support</p>
+          <h1
+            id='support-hero-heading'
+            className='system-b-marketing-route-title mt-6 text-primary-token'
+          >
+            We&apos;re Here To Help.
+          </h1>
+          <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
+            Browse the Help Center or reach out to our team.
+          </p>
+        </MarketingContainer>
       </MarketingHero>
 
       <SupportChannels />
-      <FaqSection
-        items={[...SUPPORT_FAQ_ITEMS]}
-        headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
-      />
       <SupportCta />
     </>
   );

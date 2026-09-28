@@ -17,6 +17,8 @@ describe('generateMusicStructuredData artistSameAs', () => {
         providerLinks: [
           { providerId: 'spotify', url: 'https://open.spotify.com/album/1' },
         ],
+        // Owner-as-artist credit evidence: sameAs rides the accepted credit.
+        primaryArtists: [{ name: 'Artist', handle: 'artist' }],
       },
       {
         displayName: 'Artist',
@@ -46,6 +48,7 @@ describe('generateMusicStructuredData artistSameAs', () => {
         artworkUrl: null,
         releaseDate: null,
         providerLinks: [],
+        primaryArtists: [{ name: 'artist', handle: 'artist' }],
       },
       {
         displayName: null,

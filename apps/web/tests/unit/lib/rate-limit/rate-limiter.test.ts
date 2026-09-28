@@ -37,6 +37,17 @@ const {
 const mockCreateRedisRateLimiter = vi.hoisted(() => vi.fn());
 const mockSentryMetricCount = vi.hoisted(() => vi.fn());
 const mockAfter = vi.hoisted(() => vi.fn());
+const mockEnv = vi.hoisted(() => ({
+  NODE_ENV: 'production' as string,
+  VERCEL_ENV: 'production' as string | undefined,
+  CI: undefined as string | undefined,
+  E2E_TEST_MODE: undefined as string | undefined,
+  VITEST: undefined as string | undefined,
+  UPSTASH_REDIS_REST_URL: undefined as string | undefined,
+  UPSTASH_REDIS_REST_TOKEN: undefined as string | undefined,
+  REDIS_URL: undefined as string | undefined,
+  JOVIE_ALLOW_PRODUCTION_UPSTASH: undefined as string | undefined,
+}));
 
 vi.mock('@/lib/rate-limit/redis-limiter', () => ({
   createRedisRateLimiter: mockCreateRedisRateLimiter,
@@ -50,11 +61,12 @@ vi.mock('@/lib/rate-limit/memory-limiter', () => ({
 vi.mock('@sentry/nextjs', () => ({
   getClient: vi.fn(() => undefined),
   addBreadcrumb: vi.fn(),
+  captureMessage: vi.fn(),
   metrics: { count: mockSentryMetricCount },
 }));
 
 vi.mock('@/lib/env-server', () => ({
-  env: { NODE_ENV: 'test' },
+  env: mockEnv,
 }));
 
 vi.mock('next/server', () => ({
@@ -69,6 +81,7 @@ import {
   RateLimiter,
   resetRedisCircuitBreaker,
 } from '@/lib/rate-limit/rate-limiter';
+import type { RateLimitConfig } from '@/lib/rate-limit/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const baseConfig = {
@@ -77,15 +90,24 @@ const baseConfig = {
   window: '1m',
   prefix: 'test',
   analytics: false,
-  algorithm: 'fixed-window' as const,
-  trafficClass: 'internal' as const,
-};
+  algorithm: 'fixed-window',
+  trafficClass: 'internal',
+} as const satisfies RateLimitConfig;
 
 // ── Tests ──────────────────────────────────────────────────────────────
 describe('rate-limiter.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetRedisCircuitBreaker();
+    mockEnv.NODE_ENV = 'production';
+    mockEnv.VERCEL_ENV = 'production';
+    mockEnv.CI = undefined;
+    mockEnv.E2E_TEST_MODE = undefined;
+    mockEnv.VITEST = undefined;
+    mockEnv.UPSTASH_REDIS_REST_URL = undefined;
+    mockEnv.UPSTASH_REDIS_REST_TOKEN = undefined;
+    mockEnv.REDIS_URL = undefined;
+    mockEnv.JOVIE_ALLOW_PRODUCTION_UPSTASH = undefined;
     MockMemoryClass.mock.calls = [];
     MockMemoryClass.mock.instances = [];
     mockAfter.mockReset();
@@ -158,13 +180,11 @@ describe('rate-limiter.ts', () => {
       expect(limiter.isRedisActive()).toBe(false);
     });
 
-    it('logs a warning when Redis is unavailable and warnOnFallback is true', () => {
+    it('does not emit a second fallback warning after the Redis factory', () => {
       mockCreateRedisRateLimiter.mockReturnValue(null);
       const logger = vi.fn();
       new RateLimiter(baseConfig, { warnOnFallback: true, logger });
-      expect(logger).toHaveBeenCalledWith(
-        expect.stringContaining('Redis unavailable')
-      );
+      expect(logger).not.toHaveBeenCalled();
     });
 
     it('does not log when warnOnFallback is false', () => {
@@ -329,6 +349,72 @@ describe('rate-limiter.ts', () => {
       expect(result.unavailable).toBe(true);
       expect(result.backend).toBe('unavailable');
       expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+    });
+
+    it('still fail-closes in production when E2E and CI flags are set', async () => {
+      mockEnv.NODE_ENV = 'test';
+      mockEnv.CI = 'true';
+      mockEnv.E2E_TEST_MODE = '1';
+      mockEnv.VERCEL_ENV = 'production';
+      mockCreateRedisRateLimiter.mockReturnValue(null);
+
+      const limiter = new RateLimiter(
+        { ...baseConfig, requireRedis: true },
+        { warnOnFallback: false }
+      );
+      const result = await limiter.limit('user-1');
+
+      expect(result.success).toBe(false);
+      expect(result.unavailable).toBe(true);
+      expect(result.backend).toBe('unavailable');
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+    });
+
+    it('uses the in-memory store outside production even when requireRedis is set', async () => {
+      mockEnv.NODE_ENV = 'test';
+      mockEnv.VERCEL_ENV = undefined;
+      mockEnv.CI = 'true';
+      mockCreateRedisRateLimiter.mockReturnValue(null);
+      const memoryResult = {
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: new Date(),
+      };
+      mockMemoryInstance.limit.mockResolvedValue(memoryResult);
+
+      const limiter = new RateLimiter(
+        { ...baseConfig, requireRedis: true },
+        { warnOnFallback: false }
+      );
+      const result = await limiter.limit('preview-user');
+
+      expect(mockCreateRedisRateLimiter).not.toHaveBeenCalled();
+      expect(result).toEqual({ ...memoryResult, backend: 'memory' });
+      expect(result.degraded).toBeUndefined();
+      expect(result.unavailable).toBeUndefined();
+    });
+
+    it('uses the in-memory store on Vercel preview', async () => {
+      mockEnv.NODE_ENV = 'production';
+      mockEnv.VERCEL_ENV = 'preview';
+      const memoryResult = {
+        success: true,
+        limit: 10,
+        remaining: 8,
+        reset: new Date(),
+      };
+      mockMemoryInstance.limit.mockResolvedValue(memoryResult);
+
+      const limiter = new RateLimiter(
+        { ...baseConfig, requireRedis: true },
+        { warnOnFallback: false }
+      );
+      const result = await limiter.limit('preview-user');
+
+      expect(mockCreateRedisRateLimiter).not.toHaveBeenCalled();
+      expect(result.backend).toBe('memory');
+      expect(result.success).toBe(true);
     });
 
     it('returns bounded failure when Redis throws and requireRedis is true', async () => {
@@ -621,7 +707,7 @@ describe('rate-limiter.ts', () => {
     });
 
     it('preserves analytics field', () => {
-      const configWithAnalytics = { ...baseConfig, analytics: false };
+      const configWithAnalytics = { ...baseConfig, analytics: false as const };
       const limiter = new RateLimiter(configWithAnalytics);
       expect(limiter.getConfig().analytics).toBe(false);
     });

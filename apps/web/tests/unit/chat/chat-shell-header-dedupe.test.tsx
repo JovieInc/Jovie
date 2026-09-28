@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -68,39 +69,46 @@ describe('/app/chat composed shell header (JOV-4347)', () => {
   it.each([
     { breakpoint: 'mobile', width: 375 },
     { breakpoint: 'desktop', width: 1280 },
-  ])('exposes one heading and profile action at the $breakpoint contract', ({
-    width,
-  }) => {
-    Object.defineProperty(window, 'innerWidth', {
-      configurable: true,
-      value: width,
-    });
+  ])(
+    'exposes one heading and profile action at the $breakpoint contract',
+    ({ width }) => {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: width,
+      });
 
-    render(
-      <AuthShell
-        section='dashboard'
-        breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
-        headerAction={
-          <button type='button' aria-label='Show Tim White profile'>
-            TW
-          </button>
-        }
-        isChatRoute
-      >
-        <div>Chat workspace</div>
-      </AuthShell>
-    );
+      render(
+        <QueryClientProvider
+          client={
+            new QueryClient({ defaultOptions: { queries: { retry: false } } })
+          }
+        >
+          <AuthShell
+            section='dashboard'
+            breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
+            headerAction={
+              <button type='button' aria-label='Show Tim White profile'>
+                TW
+              </button>
+            }
+            isChatRoute
+          >
+            <div>Chat workspace</div>
+          </AuthShell>
+        </QueryClientProvider>
+      );
 
-    expect(screen.getByTestId('composed-chat-shell')).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('heading', { name: 'New Chat', level: 1 })
-    ).toHaveLength(1);
-    expect(
-      screen.getAllByRole('button', { name: 'Show Tim White profile' })
-    ).toHaveLength(1);
-    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
-      'href',
-      '/app/chat'
-    );
-  });
+      expect(screen.getByTestId('composed-chat-shell')).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('heading', { name: 'New Chat', level: 1 })
+      ).toHaveLength(1);
+      expect(
+        screen.getAllByRole('button', { name: 'Show Tim White profile' })
+      ).toHaveLength(1);
+      expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+        'href',
+        '/app/chat'
+      );
+    }
+  );
 });

@@ -78,9 +78,7 @@ describe('RATE_LIMIT_OUTAGE_POLICY', () => {
 
 describe('REDIS_DATA_CONSUMERS', () => {
   it('separates fail-closed coordination from origin-read caches', () => {
-    expect(REDIS_DATA_CONSUMERS['auth/secondary-storage'].class).toBe(
-      'mandatory'
-    );
+    expect(REDIS_DATA_CONSUMERS['auth/rate-limit'].class).toBe('advisory');
     expect(REDIS_DATA_CONSUMERS['db/cache']).toMatchObject({
       class: 'optional',
       staleBound: expect.stringMatching(/ttl/i),

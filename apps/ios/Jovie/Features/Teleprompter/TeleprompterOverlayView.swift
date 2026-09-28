@@ -1,6 +1,11 @@
 import AVFoundation
 import SwiftUI
 
+/// Shared background fill for teleprompter control chrome (capsules and
+/// rounded-rect buttons). Named to replace seven identical
+/// `Color.black.opacity(0.58)` literals with one source of truth.
+private let teleprompterControlScrim = Color.black.opacity(0.58)
+
 /// Camera preview bridge for the teleprompter overlay. The preview layer is
 /// owned by the controller's session; the view only re-points it.
 private struct TeleprompterCameraPreview: UIViewRepresentable {
@@ -314,18 +319,13 @@ struct TeleprompterOverlayView: View {
           Spacer(minLength: 0)
         }
 
-        if viewModel.overlayVisibility == .visible, viewModel.contentMode == .prompt {
-          promptFeedbackControls
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, JovieSpacing.large)
-            .padding(.bottom, JovieSpacing.medium)
-        }
-
-        if viewModel.contentMode == .script, viewModel.overlayVisibility == .visible {
-          controlBar
+        if viewModel.overlayVisibility == .visible {
+          controlSheet
             .padding(.horizontal, JovieSpacing.large)
             .padding(.bottom, isLandscape ? JovieSpacing.small : JovieSpacing.xxLarge)
         } else {
+          // Live-only peek keeps a stop control on screen while the sheet is
+          // hidden; the overlay auto-resumes after the peek window.
           promptRecordControl
             .padding(.bottom, isLandscape ? JovieSpacing.small : JovieSpacing.xxLarge)
         }
@@ -362,11 +362,10 @@ struct TeleprompterOverlayView: View {
         contentModeButton(.prompt, title: "Prompt")
       }
       .padding(3)
-      .background(Color.black.opacity(0.58), in: Capsule())
+      .background(teleprompterControlScrim, in: Capsule())
       .accessibilityElement(children: .contain)
 
       overlayVisibilityButton
-      framingGridButton
     }
   }
 
@@ -377,7 +376,6 @@ struct TeleprompterOverlayView: View {
         recordingStatus
         Spacer(minLength: 0)
         overlayVisibilityButton
-        framingGridButton
       }
 
       HStack(spacing: 2) {
@@ -385,7 +383,7 @@ struct TeleprompterOverlayView: View {
         contentModeButton(.prompt, title: "Prompt")
       }
       .padding(3)
-      .background(Color.black.opacity(0.58), in: Capsule())
+      .background(teleprompterControlScrim, in: Capsule())
       .accessibilityElement(children: .contain)
     }
   }
@@ -396,7 +394,7 @@ struct TeleprompterOverlayView: View {
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(JovieColor.textPrimary)
         .frame(width: 56, height: 56)
-        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(teleprompterControlScrim, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityLabel("Close capture")
@@ -415,7 +413,7 @@ struct TeleprompterOverlayView: View {
     .foregroundStyle(JovieColor.textPrimary)
     .padding(.horizontal, JovieSpacing.medium)
     .frame(minHeight: 44)
-    .background(Color.black.opacity(0.58), in: Capsule())
+    .background(teleprompterControlScrim, in: Capsule())
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
       viewModel.isRecording
@@ -459,7 +457,7 @@ struct TeleprompterOverlayView: View {
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(JovieColor.accent)
         .frame(width: 56, height: 56)
-        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(teleprompterControlScrim, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     .buttonStyle(.plain)
     .accessibilityLabel(
@@ -471,21 +469,6 @@ struct TeleprompterOverlayView: View {
         : "Restores the prompt immediately. Recording continues."
     )
     .accessibilityIdentifier("teleprompter-overlay-toggle")
-  }
-
-  private var framingGridButton: some View {
-    Button {
-      viewModel.setFramingGridEnabled(viewModel.framingGrid == .off)
-    } label: {
-      Image(systemName: "grid")
-        .font(.system(size: 16, weight: .semibold))
-        .foregroundStyle(viewModel.framingGrid == .thirds ? JovieColor.accent : JovieColor.textPrimary)
-        .frame(width: 56, height: 56)
-        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(viewModel.framingGrid == .thirds ? "Hide framing grid" : "Show framing grid")
-    .accessibilityIdentifier("teleprompter-grid-toggle")
   }
 
   private var promptRegion: some View {
@@ -503,41 +486,6 @@ struct TeleprompterOverlayView: View {
         .accessibilityIdentifier("teleprompter-prompt")
     }
     .frame(height: 180)
-  }
-
-  private var promptFeedbackControls: some View {
-    HStack(spacing: 4) {
-      promptFeedbackButton(.useful, systemImage: "hand.thumbsup.fill", label: "Useful prompt")
-      promptFeedbackButton(.notUseful, systemImage: "hand.thumbsdown.fill", label: "Not useful prompt")
-    }
-    .padding(4)
-    .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    .accessibilityElement(children: .contain)
-  }
-
-  private func promptFeedbackButton(
-    _ feedback: TeleprompterPromptFeedback,
-    systemImage: String,
-    label: String
-  ) -> some View {
-    Button {
-      viewModel.submitPromptFeedback(feedback)
-    } label: {
-      Image(systemName: systemImage)
-        .font(.system(size: 17, weight: .semibold))
-        .foregroundStyle(
-          viewModel.pendingPromptFeedback == feedback
-            ? JovieColor.accent
-            : JovieColor.textPrimary
-        )
-        .frame(width: 56, height: 56)
-    }
-    .frame(width: 56, height: 56)
-    .contentShape(Rectangle())
-    .buttonStyle(.plain)
-    .accessibilityLabel(label)
-    .accessibilityHint("Saved privately on this iPhone while offline")
-    .accessibilityIdentifier("teleprompter-feedback-\(feedback.rawValue)")
   }
 
   private var promptRecordControl: some View {
@@ -620,7 +568,11 @@ struct TeleprompterOverlayView: View {
     .animation(JovieMotion.subtle, value: isLockedWhileLive)
   }
 
-  private var controlBar: some View {
+  /// BMC-style bottom glass sheet (JOV-5343): record control on the left,
+  /// a fixed 2×3 thumb cluster on the right so every toggle sits in one-hand
+  /// reach. All cluster slots reuse controls the overlay already owns; the
+  /// sheet adds no new capture behavior.
+  private var controlSheet: some View {
     VStack(spacing: JovieSpacing.medium) {
       // Status row: fixed height, reserved slots for elapsed time and the
       // recognition caption so start/stop never shift the buttons.
@@ -646,80 +598,214 @@ struct TeleprompterOverlayView: View {
       }
       .frame(height: 20)
 
-      HStack(spacing: JovieSpacing.xLarge) {
-        Button(action: handleClose) {
-          Image(systemName: "xmark")
-            .font(.system(size: 16, weight: .semibold))
+      HStack(alignment: .center, spacing: JovieSpacing.xLarge) {
+        if viewModel.contentMode == .script {
+          scriptRecordControl
+        } else {
+          promptRecordControl
         }
-        .buttonStyle(JovieIconButtonStyle())
-        .accessibilityLabel("Close teleprompter")
-        .accessibilityIdentifier("teleprompter-close")
 
-        Button {
-          viewModel.presentationMode =
-            viewModel.presentationMode == .notch ? .fullscreen : .notch
-        } label: {
-          Image(
-            systemName: viewModel.presentationMode == .notch
-              ? "rectangle.expand.vertical"
-              : "rectangle.compress.vertical"
-          )
-          .font(.system(size: 16, weight: .semibold))
-        }
-        .buttonStyle(JovieIconButtonStyle())
-        .accessibilityLabel(
-          viewModel.presentationMode == .notch
-            ? "Switch to fullscreen script"
-            : "Switch to notch script"
-        )
-        .accessibilityIdentifier("teleprompter-mode-toggle")
+        Spacer(minLength: 0)
 
-        Button {
-          if viewModel.isRecording {
-            Task { await viewModel.stopRecording() }
-          } else {
-            Task { await viewModel.startRecording() }
-          }
-        } label: {
-          ZStack {
-            Circle()
-              .stroke(Color.white, lineWidth: 3)
-              .frame(width: 68, height: 68)
-            if viewModel.isRecording {
-              RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(Color.red)
-                .frame(width: 26, height: 26)
-            } else {
-              Circle()
-                .fill(Color.red)
-                .frame(width: 54, height: 54)
-            }
-          }
-        }
-        .buttonStyle(.plain)
-        .disabled(viewModel.isStarting || viewModel.isFinishing)
-        .accessibilityLabel(viewModel.isRecording ? "Stop recording" : "Start recording")
-        .accessibilityIdentifier("teleprompter-record")
-
-        Button {
-          viewModel.isEditingScript.toggle()
-        } label: {
-          Image(systemName: viewModel.isEditingScript ? "checkmark" : "pencil")
-            .font(.system(size: 16, weight: .semibold))
-        }
-        .buttonStyle(JovieIconButtonStyle())
-        .disabled(viewModel.isRecording)
-        .opacity(viewModel.isRecording ? 0.4 : 1)
-        .accessibilityLabel("Edit script")
-        .accessibilityIdentifier("teleprompter-edit")
-
-        // Mirror slot keeps the record button centered: same 44×44 footprint
-        // as the icon buttons (same trick as the Talk overlay title row).
-        Color.clear
-          .frame(width: 44, height: 44)
-          .accessibilityHidden(true)
+        controlCluster
       }
-      .frame(height: 72)
+      .frame(maxWidth: .infinity)
+    }
+    .padding(.horizontal, JovieSpacing.large)
+    .padding(.vertical, JovieSpacing.medium)
+    .background(
+      teleprompterControlScrim,
+      in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+    )
+    .background(
+      .ultraThinMaterial,
+      in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+    )
+    .accessibilityIdentifier("teleprompter-control-sheet")
+  }
+
+  private var scriptRecordControl: some View {
+    Button {
+      if viewModel.isRecording {
+        Task { await viewModel.stopRecording() }
+      } else {
+        Task { await viewModel.startRecording() }
+      }
+    } label: {
+      ZStack {
+        Circle()
+          .stroke(Color.white, lineWidth: 3)
+          .frame(width: 68, height: 68)
+        if viewModel.isRecording {
+          RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(Color.red)
+            .frame(width: 26, height: 26)
+        } else {
+          Circle()
+            .fill(Color.red)
+            .frame(width: 54, height: 54)
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(viewModel.isStarting || viewModel.isFinishing)
+    .accessibilityLabel(viewModel.isRecording ? "Stop recording" : "Start recording")
+    .accessibilityIdentifier("teleprompter-record")
+  }
+
+  private var controlCluster: some View {
+    let rows = TeleprompterControlSheet.cluster(for: viewModel.contentMode)
+    return VStack(spacing: JovieSpacing.small) {
+      ForEach(rows, id: \.self) { row in
+        HStack(spacing: JovieSpacing.medium) {
+          ForEach(row, id: \.self) { control in
+            sheetControlButton(control)
+          }
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
+  }
+
+  private var sheetControlCircleSize: CGFloat {
+    isLandscape ? 44 : 52
+  }
+
+  private func sheetControlButton(_ control: TeleprompterSheetControl) -> some View {
+    Button {
+      performSheetControl(control)
+    } label: {
+      HStack(spacing: 6) {
+        // Vertical label beside the circle, like the reference cluster. The
+        // post-rotation frame pins the layout footprint so labels can't
+        // stretch the row.
+        Text(control.title)
+          .font(JovieFont.body(size: 10, weight: .semibold))
+          .foregroundStyle(JovieColor.textSecondary)
+          .lineLimit(1)
+          .fixedSize()
+          .rotationEffect(.degrees(-90))
+          .frame(width: 12, height: sheetControlCircleSize)
+          .accessibilityHidden(true)
+
+        Image(systemName: sheetControlSystemImage(control))
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(
+            isSheetControlActive(control) ? JovieColor.accent : JovieColor.textPrimary
+          )
+          .frame(width: sheetControlCircleSize, height: sheetControlCircleSize)
+          .background(Color.black.opacity(0.35), in: Circle())
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(control == .editScript && viewModel.isRecording)
+    .opacity(control == .editScript && viewModel.isRecording ? 0.4 : 1)
+    .accessibilityLabel(sheetControlAccessibilityLabel(control))
+    .accessibilityHint(control.accessibilityHint)
+    .accessibilityIdentifier(control.accessibilityIdentifier)
+  }
+
+  private func performSheetControl(_ control: TeleprompterSheetControl) {
+    switch control {
+    case .editScript:
+      viewModel.isEditingScript.toggle()
+    case .presentation:
+      viewModel.presentationMode =
+        viewModel.presentationMode == .notch ? .fullscreen : .notch
+    case .speedOverride:
+      if viewModel.followMode == .auto {
+        viewModel.resumeVoiceFollow()
+      } else {
+        viewModel.engageSpeedOverride()
+      }
+    case .peek:
+      viewModel.setOverlayVisible(viewModel.overlayVisibility != .visible)
+    case .grid:
+      viewModel.setFramingGridEnabled(viewModel.framingGrid == .off)
+    case .close:
+      handleClose()
+    case .usefulFeedback:
+      viewModel.submitPromptFeedback(.useful)
+    case .passFeedback:
+      viewModel.submitPromptFeedback(.notUseful)
+    case .scriptMode:
+      viewModel.contentMode = .script
+      viewModel.setOverlayVisible(true)
+    }
+  }
+
+  private func sheetControlSystemImage(_ control: TeleprompterSheetControl) -> String {
+    switch control {
+    case .editScript:
+      viewModel.isEditingScript ? "checkmark" : "pencil"
+    case .presentation:
+      viewModel.presentationMode == .notch
+        ? "rectangle.expand.vertical"
+        : "rectangle.compress.vertical"
+    case .speedOverride:
+      "speedometer"
+    case .peek:
+      viewModel.overlayVisibility == .visible ? "eye.fill" : "eye.slash.fill"
+    case .grid:
+      "grid"
+    case .close:
+      "xmark"
+    case .usefulFeedback:
+      "hand.thumbsup.fill"
+    case .passFeedback:
+      "hand.thumbsdown.fill"
+    case .scriptMode:
+      "text.alignleft"
+    }
+  }
+
+  private func isSheetControlActive(_ control: TeleprompterSheetControl) -> Bool {
+    switch control {
+    case .editScript:
+      viewModel.isEditingScript
+    case .presentation:
+      viewModel.presentationMode == .fullscreen
+    case .speedOverride:
+      viewModel.followMode == .auto
+    case .peek:
+      viewModel.overlayVisibility == .liveOnly
+    case .grid:
+      viewModel.framingGrid == .thirds
+    case .usefulFeedback:
+      viewModel.pendingPromptFeedback == .useful
+    case .passFeedback:
+      viewModel.pendingPromptFeedback == .notUseful
+    case .close, .scriptMode:
+      false
+    }
+  }
+
+  private func sheetControlAccessibilityLabel(_ control: TeleprompterSheetControl) -> String {
+    switch control {
+    case .editScript:
+      viewModel.isEditingScript ? "Finish editing script" : "Edit script"
+    case .presentation:
+      viewModel.presentationMode == .notch
+        ? "Switch to fullscreen script"
+        : "Switch to notch script"
+    case .speedOverride:
+      viewModel.followMode == .auto
+        ? "Resume voice-following prompt"
+        : "Scroll prompt at a fixed speed"
+    case .peek:
+      viewModel.overlayVisibility == .visible
+        ? "Temporarily hide overlay"
+        : "Show overlay now"
+    case .grid:
+      viewModel.framingGrid == .thirds ? "Hide framing grid" : "Show framing grid"
+    case .close:
+      "Close teleprompter"
+    case .usefulFeedback:
+      "Useful prompt"
+    case .passFeedback:
+      "Not useful prompt"
+    case .scriptMode:
+      "Switch to script mode"
     }
   }
 
@@ -743,5 +829,47 @@ struct TeleprompterOverlayView: View {
     let minutes = totalSeconds / 60
     let remainder = totalSeconds % 60
     return String(format: "%d:%02d", minutes, remainder)
+  }
+}
+
+private extension TeleprompterSheetControl {
+  /// Short cluster label rendered vertically beside the circle.
+  var title: String {
+    switch self {
+    case .editScript: "Edit"
+    case .presentation: "Frame"
+    case .speedOverride: "Speed"
+    case .peek: "Peek"
+    case .grid: "Grid"
+    case .close: "Close"
+    case .usefulFeedback: "Useful"
+    case .passFeedback: "Pass"
+    case .scriptMode: "Script"
+    }
+  }
+
+  /// Sheet slots keep the identifiers the pre-sheet chrome already used
+  /// where a control moved, so existing UI tests keep resolving them.
+  var accessibilityIdentifier: String {
+    switch self {
+    case .editScript: "teleprompter-edit"
+    case .presentation: "teleprompter-mode-toggle"
+    case .speedOverride: "teleprompter-speed-toggle"
+    case .peek: "teleprompter-sheet-peek"
+    case .grid: "teleprompter-grid-toggle"
+    case .close: "teleprompter-close"
+    case .usefulFeedback: "teleprompter-feedback-useful"
+    case .passFeedback: "teleprompter-feedback-notUseful"
+    case .scriptMode: "teleprompter-sheet-script-mode"
+    }
+  }
+
+  var accessibilityHint: String {
+    switch self {
+    case .usefulFeedback, .passFeedback:
+      "Saved privately on this iPhone while offline"
+    default:
+      ""
+    }
   }
 }

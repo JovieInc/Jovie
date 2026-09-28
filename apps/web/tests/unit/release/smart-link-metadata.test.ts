@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   getContentBySlugMock,
   getCreatorByUsernameMock,
+  getCreatorPlanMock,
   getFeaturedSmartLinkStaticParamsMock,
+  getTrackBySlugInReleaseMock,
   hasProfileModeAliasContentCandidateMock,
   getUnpublishedReleasePresenceMock,
   findRedirectByOldSlugMock,
@@ -13,7 +15,9 @@ const {
 } = vi.hoisted(() => ({
   getContentBySlugMock: vi.fn(),
   getCreatorByUsernameMock: vi.fn(),
+  getCreatorPlanMock: vi.fn(),
   getFeaturedSmartLinkStaticParamsMock: vi.fn().mockResolvedValue([]),
+  getTrackBySlugInReleaseMock: vi.fn(),
   hasProfileModeAliasContentCandidateMock: vi.fn(),
   getUnpublishedReleasePresenceMock: vi.fn(),
   findRedirectByOldSlugMock: vi.fn(),
@@ -49,8 +53,10 @@ vi.mock('@/app/[username]/[slug]/_lib/data', () => ({
   checkPromoDownloads: vi.fn(),
   getContentBySlug: getContentBySlugMock,
   getCreatorByUsername: getCreatorByUsernameMock,
+  getCreatorPlan: getCreatorPlanMock,
   getFeaturedSmartLinkStaticParams: getFeaturedSmartLinkStaticParamsMock,
   getReleaseTrackList: vi.fn(),
+  getTrackBySlugInRelease: getTrackBySlugInReleaseMock,
   getUnpublishedReleasePresence: getUnpublishedReleasePresenceMock,
 }));
 
@@ -90,6 +96,12 @@ describe('smart-link metadata', () => {
       throw new Error('NEXT_REDIRECT');
     });
     getFeaturedSmartLinkStaticParamsMock.mockResolvedValue([]);
+    getCreatorPlanMock.mockReset();
+    getCreatorPlanMock.mockResolvedValue({
+      canAccessFutureReleases: true,
+    });
+    getTrackBySlugInReleaseMock.mockReset();
+    getTrackBySlugInReleaseMock.mockResolvedValue(null);
 
     getCreatorByUsernameMock.mockResolvedValue({
       id: 'creator-1',
@@ -99,7 +111,7 @@ describe('smart-link metadata', () => {
     });
   });
 
-  it('uses the nested canonical URL for tracks that belong to a release', async () => {
+  it('uses the nested canonical URL without publishing preview audio', async () => {
     getContentBySlugMock.mockResolvedValue({
       id: 'track-1',
       type: 'track',
@@ -110,7 +122,7 @@ describe('smart-link metadata', () => {
       artworkSizes: null,
       releaseDate: new Date('2024-01-01T00:00:00Z'),
       providerLinks: [{ providerId: 'spotify', url: 'https://spotify.test' }],
-      previewUrl: null,
+      previewUrl: 'https://example.com/preview.mp3',
     });
 
     const { generateMetadata } = await import('@/app/[username]/[slug]/page');
@@ -124,6 +136,7 @@ describe('smart-link metadata', () => {
     expect(metadata.openGraph?.url).toBe(
       'https://jov.ie/dualipa/future-nostalgia/neon-skyline'
     );
+    expect(metadata.openGraph?.audio).toBeUndefined();
   });
 
   it('keeps the short canonical URL for standalone releases', async () => {
@@ -604,5 +617,230 @@ describe('smart-link metadata', () => {
     ).rejects.toThrow('NEXT_NOT_FOUND');
     expect(getCreatorByUsernameMock).not.toHaveBeenCalled();
     expect(getContentBySlugMock).not.toHaveBeenCalled();
+  });
+
+  it('renders MusicAlbum JSON-LD byArtist with the accepted credited artist, not the profile owner', async () => {
+    getCreatorByUsernameMock.mockResolvedValue({
+      id: 'creator-hello',
+      username: 'hello',
+      usernameNormalized: 'hello',
+      displayName: 'hello',
+    });
+    getContentBySlugMock.mockResolvedValue({
+      id: 'release-paradise',
+      type: 'release',
+      slug: 'a-town-called-paradise-deluxe',
+      releaseSlug: null,
+      title: 'A Town Called Paradise (Deluxe)',
+      artworkUrl: null,
+      artworkSizes: null,
+      releaseDate: new Date('2024-07-01T00:00:00Z'),
+      revealDate: null,
+      providerLinks: [
+        { providerId: 'spotify', url: 'https://open.spotify.com/album/1' },
+      ],
+      releaseType: 'album',
+      totalTracks: null,
+      credits: [
+        {
+          role: 'main_artist',
+          label: 'Primary artist',
+          entries: [
+            {
+              artistId: 'artist-tiesto',
+              name: 'Tiësto',
+              handle: null,
+              role: 'main_artist',
+              position: 0,
+            },
+          ],
+        },
+      ],
+      primaryArtists: [
+        {
+          artistId: 'artist-tiesto',
+          name: 'Tiësto',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+      ],
+      durationMs: null,
+      isrc: null,
+      trackNumber: null,
+    });
+
+    const { default: ContentSmartLinkPage } = await import(
+      '@/app/[username]/[slug]/page'
+    );
+    const node = await ContentSmartLinkPage({
+      params: Promise.resolve({
+        username: 'hello',
+        slug: 'a-town-called-paradise-deluxe',
+      }),
+    });
+
+    // Extract the JSON-LD script payload from the rendered server tree.
+    function findJsonLd(element: unknown): string | null {
+      if (!element || typeof element !== 'object') return null;
+      const record = element as Record<string, unknown>;
+      const props = record.props as Record<string, unknown> | undefined;
+      if (
+        record.type === 'script' &&
+        (props?.type as string | undefined) === 'application/ld+json' &&
+        props
+      ) {
+        return String(props.children);
+      }
+      const children = record.children ?? props?.children;
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          const found = findJsonLd(child);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    const jsonLd = findJsonLd(node);
+    expect(jsonLd).toBeTruthy();
+    const graph = JSON.parse(jsonLd as string)['@graph'] as Record<
+      string,
+      unknown
+    >[];
+    const musicSchema = graph.find(item => {
+      const nodeType = item['@type'];
+      return Array.isArray(nodeType)
+        ? nodeType.includes('MusicAlbum')
+        : nodeType === 'MusicAlbum';
+    });
+    expect(musicSchema).toBeDefined();
+    // Owner is "hello"; the accepted credited primary artist is Tiësto.
+    expect(musicSchema?.byArtist).toEqual({
+      '@type': ['MusicGroup', 'Person'],
+      name: 'Tiësto',
+    });
+    expect((musicSchema?.byArtist as Record<string, unknown>).name).not.toBe(
+      'hello'
+    );
+  });
+
+  it('renders track deep-link MusicRecording JSON-LD byArtist with the accepted credited artist', async () => {
+    getCreatorByUsernameMock.mockResolvedValue({
+      id: 'creator-hello',
+      username: 'hello',
+      usernameNormalized: 'hello',
+      displayName: 'hello',
+    });
+    getContentBySlugMock.mockResolvedValue({
+      id: 'release-paradise',
+      type: 'release',
+      slug: 'a-town-called-paradise-deluxe',
+      releaseSlug: null,
+      title: 'A Town Called Paradise (Deluxe)',
+      artworkUrl: null,
+      artworkSizes: null,
+      releaseDate: new Date('2024-07-01T00:00:00Z'),
+      revealDate: null,
+      providerLinks: [],
+      releaseType: 'album',
+      totalTracks: null,
+      durationMs: null,
+      isrc: null,
+      trackNumber: null,
+    });
+    getTrackBySlugInReleaseMock.mockResolvedValue({
+      id: 'recording-red-lights',
+      type: 'track',
+      slug: 'red-lights',
+      title: 'Red Lights',
+      artworkUrl: null,
+      artworkSizes: null,
+      releaseDate: new Date('2024-07-01T00:00:00Z'),
+      revealDate: null,
+      providerLinks: [
+        { providerId: 'spotify', url: 'https://open.spotify.com/track/1' },
+      ],
+      releaseType: null,
+      totalTracks: null,
+      credits: [
+        {
+          role: 'main_artist',
+          label: 'Primary artist',
+          entries: [
+            {
+              artistId: 'artist-tiesto',
+              name: 'Tiësto',
+              handle: null,
+              role: 'main_artist',
+              position: 0,
+            },
+          ],
+        },
+      ],
+      primaryArtists: [
+        {
+          artistId: 'artist-tiesto',
+          name: 'Tiësto',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+      ],
+      durationMs: 210000,
+      isrc: 'USRC17607839',
+      trackNumber: 1,
+      releaseId: 'release-paradise',
+      releaseSlug: 'a-town-called-paradise-deluxe',
+      releaseTitle: 'A Town Called Paradise (Deluxe)',
+    });
+
+    const { default: TrackDeepLinkPage } = await import(
+      '@/app/[username]/[slug]/[trackSlug]/page'
+    );
+    const node = await TrackDeepLinkPage({
+      params: Promise.resolve({
+        username: 'hello',
+        slug: 'a-town-called-paradise-deluxe',
+        trackSlug: 'red-lights',
+      }),
+    });
+
+    function findJsonLd(element: unknown): string | null {
+      if (!element || typeof element !== 'object') return null;
+      const record = element as Record<string, unknown>;
+      const props = record.props as Record<string, unknown> | undefined;
+      if (
+        record.type === 'script' &&
+        (props?.type as string | undefined) === 'application/ld+json' &&
+        props
+      ) {
+        return String(props.children);
+      }
+      const children = record.children ?? props?.children;
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          const found = findJsonLd(child);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    const jsonLd = findJsonLd(node);
+    expect(jsonLd).toBeTruthy();
+    const graph = JSON.parse(jsonLd as string)['@graph'] as Record<
+      string,
+      unknown
+    >[];
+    const musicSchema = graph.find(item => item['@type'] === 'MusicRecording');
+    expect(musicSchema).toBeDefined();
+    // The track route passes its own accepted credits: Tiësto, not owner hello.
+    expect(musicSchema?.byArtist).toEqual({
+      '@type': ['MusicGroup', 'Person'],
+      name: 'Tiësto',
+    });
   });
 });

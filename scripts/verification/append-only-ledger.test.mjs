@@ -42,6 +42,7 @@ function evidence(overrides = {}) {
     auditDefinitionDigest: auditDefinitionDigest(SYMPHONY_CHANGE_SAFETY_AUDIT),
     toolDigest: DIGEST,
     modelDigest: null,
+    configVersion: 'web-runtime-1',
     configDigest: DIGEST,
     inputBundleDigest: DIGEST,
     redactionManifestDigest: DIGEST,

@@ -4,7 +4,7 @@
  * Admin-only. Sets the per-environment override for a runtime feature flag.
  * `enabled: null` clears the cell (flag falls back to its code default for
  * that environment). Works in all environments including production, gated by
- * `requireAdmin()`. Backs the admin Features page and the dev bar
+ * `requireAdmin({ session: 'fresh' })`. Backs the admin Features page and the dev bar
  * "publish to env" action.
  *
  * Every write appends a `feature_flag_audit_events` row (actor, previous/new
@@ -33,10 +33,10 @@ const RequestSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const authError = await requireAdmin();
+  const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -13,6 +13,8 @@ export const DESIGN_SYSTEM_COMPONENT_IDS = [
   'atom.input',
   'atom.separator',
   'atom.switch',
+  'atom.sheet',
+  'atom.kbd',
   'atom.icon-button',
   'atom.link',
   'atom.brand-logo',
@@ -158,6 +160,91 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
     },
   },
   {
+    id: 'atom.sheet',
+    layer: 'atom',
+    source: 'packages/ui/atoms/sheet.tsx',
+    exportName: 'Sheet',
+    storySource: 'packages/ui/atoms/sheet.stories.tsx',
+    storybookTitle: 'UI/Atoms/Sheet',
+    storyExport: 'ConformanceMatrix',
+    testSources: [
+      'apps/web/tests/e2e/storybook-sheet.spec.ts',
+      'packages/ui/atoms/sheet.test.tsx',
+    ],
+    dependsOn: [],
+    compatibilityConsumers: [
+      {
+        source: 'apps/web/app/app/(shell)/library/ArtistRulesSheet.tsx',
+        exportName: 'ArtistRulesSheet',
+        canonicalImportSource: '@jovie/ui',
+      },
+      {
+        source: 'apps/web/app/app/(shell)/library/LibrarySurface.tsx',
+        exportName: 'LibrarySurface',
+        canonicalImportSource: '@jovie/ui',
+      },
+      {
+        source: 'apps/web/components/features/release/ReleaseCreditsDialog.tsx',
+        exportName: 'ReleaseCreditsDialog',
+        canonicalImportSource: '@jovie/ui',
+      },
+      {
+        source:
+          'apps/web/components/jovie/release-calendar/ReleaseMomentDrawer.tsx',
+        exportName: 'ReleaseMomentDrawer',
+        canonicalImportSource: '@jovie/ui',
+      },
+      {
+        source: 'apps/web/components/organisms/CookieModal.tsx',
+        exportName: 'CookieModal',
+        canonicalImportSource: '@jovie/ui',
+      },
+      {
+        source:
+          'apps/web/components/organisms/keyboard-shortcuts-sheet/KeyboardShortcutsSheet.tsx',
+        exportName: 'KeyboardShortcutsSheet',
+        canonicalImportSource: '@jovie/ui',
+      },
+      {
+        source: 'apps/web/components/organisms/sidebar/sidebar.tsx',
+        exportName: 'Sidebar',
+        canonicalImportSource: '@jovie/ui',
+      },
+    ],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'No source-mapped Pen Sheet root exists; source ownership remains authoritative until Pen promotion.',
+    variantAxes: {
+      side: ['top', 'bottom', 'left', 'right'],
+      rendering: ['portal', 'inline'],
+      state: ['closed', 'open', 'controlled'],
+      interaction: ['trigger', 'close-button', 'escape', 'outside-click'],
+      viewport: ['desktop', 'compact'],
+      theme: ['light', 'dark'],
+      motion: ['default', 'reduced'],
+    },
+  },
+  {
+    id: 'atom.kbd',
+    layer: 'atom',
+    source: 'packages/ui/atoms/kbd.tsx',
+    exportName: 'Kbd',
+    storySource: 'packages/ui/atoms/kbd.stories.tsx',
+    storybookTitle: 'UI/Atoms/Kbd',
+    storyExport: 'ShortcutSequence',
+    testSources: ['packages/ui/atoms/kbd.test.tsx'],
+    dependsOn: [],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'No source-mapped Pen Kbd root exists; source ownership remains authoritative until Pen promotion.',
+    variantAxes: {
+      variant: ['default', 'tooltip'],
+    },
+  },
+  {
     id: 'atom.icon-button',
     layer: 'atom',
     source: 'packages/ui/atoms/icon-button.tsx',
@@ -200,10 +287,8 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
         canonicalImportSource: '@jovie/ui',
       },
     ],
-    penRootId: null,
-    referenceEligible: false,
-    penIdentityReason:
-      'No source-mapped Pen icon-button root exists; source ownership remains authoritative until Pen promotion.',
+    penRootId: 'XYhft',
+    referenceEligible: true,
     variantAxes: {
       variant: ICON_BUTTON_VARIANT_NAMES,
       size: ICON_BUTTON_SIZE_NAMES,

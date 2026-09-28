@@ -53,6 +53,20 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('selects the web contract lane for canonical copy rule changes', () => {
+    const receipt = classifyProductLanes([
+      'packages/copy/rules.ts',
+      'packages/copy/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'shared-copy')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['packages/copywriter/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('selects the web contract lane for release communications extraction', () => {
     const receipt = classifyProductLanes([
       'packages/release-communications/index.ts',
@@ -74,7 +88,7 @@ describe('product lane classifier', () => {
       },
       {
         scripts: {
-          'invariants:check': `${before} && python3 scripts/symphony/tests/codex-account-probe.test.py`,
+          'invariants:check': `${before} && python3 scripts/fleet-gate/tests/codex-account-probe.test.py`,
           'ios:test': 'xcodebuild test',
         },
       }
@@ -99,7 +113,7 @@ describe('product lane classifier', () => {
         {
           scripts: {
             'invariants:check':
-              'node scripts/invariants/validate.mjs && python3 scripts/symphony/tests/queue.test.py',
+              'node scripts/invariants/validate.mjs && python3 scripts/fleet-gate/tests/queue.test.py',
           },
           devDependencies: { turbo: '2' },
         }
@@ -157,9 +171,9 @@ describe('product lane classifier', () => {
     const before = 'node scripts/invariants/validate.mjs';
     const unsafe = [
       'node scripts/untrusted.mjs',
-      'python3 scripts/symphony/tests/../untrusted.test.py',
-      'python3 scripts/symphony/tests/probe.test.py --flag',
-      'python3 scripts/symphony/tests/probe.test.py; node scripts/untrusted.mjs',
+      'python3 scripts/fleet-gate/tests/../untrusted.test.py',
+      'python3 scripts/fleet-gate/tests/probe.test.py --flag',
+      'python3 scripts/fleet-gate/tests/probe.test.py; node scripts/untrusted.mjs',
     ];
     const receipts = [
       classifyProductLanes(['package.json']),
@@ -229,7 +243,7 @@ describe('product lane classifier', () => {
       git(['commit', '-q', '-m', 'before']);
       const base = git(['rev-parse', 'HEAD']);
       writePackage(
-        'node before.mjs && python3 scripts/symphony/tests/probe.test.py'
+        'node before.mjs && python3 scripts/fleet-gate/tests/probe.test.py'
       );
       git(['add', 'package.json']);
       git(['commit', '-q', '-m', 'after']);
@@ -272,6 +286,10 @@ describe('product lane classifier', () => {
       ['apps/ios/Jovie/App.swift', ['ios']],
       ['apps/desktop/src/main.ts', ['mac']],
       ['apps/web/app/page.tsx', ['web']],
+      ['apps/ovie/app/page.tsx', ['web']],
+      ['apps/ovie/proxy.ts', ['web']],
+      ['apps/ovie/scripts/routes.mjs', ['web']],
+      ['apps/ovie/vercel.json', ['web']],
       ['packages/jovie-cli/src/client.ts', ['web']],
       ['.github/workflows/ios-ci.yml', ['ios']],
       ['.github/workflows/desktop-release.yml', ['mac']],
@@ -289,10 +307,15 @@ describe('product lane classifier', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
       ]).selectedLanes
     ).toEqual(['operations']);
+    // Workflow-only diffs stay off the web lane; the operations structural
+    // lane runs apps/web/tests/unit/ci instead (ci-fast-lanes.test.mjs).
     expect(
-      classifyProductLanes([
-        'scripts/symphony/signals/gem-publisher-commission.request',
-      ]).selectedLanes
+      classifyProductLanes(['.github/workflows/pr-size-guard.yml'])
+        .selectedLanes
+    ).toEqual(['operations']);
+    expect(
+      classifyProductLanes(['ops/signals/gem-publisher-commission.request'])
+        .selectedLanes
     ).toEqual(['operations']);
     // ops/ is mapped for future fleet signals; Path Changes still trusts main's
     // classifier, so new ops/* files need that mapping already on main.

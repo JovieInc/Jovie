@@ -105,6 +105,10 @@ describe('Marketing terminal CTA wrappers', () => {
     expect(
       screen.getByTestId('marketing-footer-cta').querySelectorAll('a')
     ).toHaveLength(1);
+    const gradient = screen
+      .getByTestId('marketing-footer-cta')
+      .querySelector('[id^="marketing-footer-cta-primary-"]');
+    expect(gradient?.getAttribute('id')).not.toContain(':');
   });
 
   it('keeps cinematic primary and optional secondary on the same Button family', () => {

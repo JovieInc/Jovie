@@ -84,7 +84,11 @@ import {
   queryKeys,
   STANDARD_CACHE,
 } from '@/lib/queries';
-import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
+import {
+  type CellContext,
+  type ColumnDef,
+  createColumnHelper,
+} from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import {
   AddConnectionRail,
@@ -475,6 +479,46 @@ function ConnectionUrlDisplay({
   );
 }
 
+function ConnectionSecondaryIdentity({
+  row,
+}: Readonly<{ row: ProfileWorkspaceRow }>) {
+  if (row.rowType === 'connector') {
+    return (
+      <ConnectionUrlDisplay
+        row={row}
+        className='text-xs text-tertiary-token max-sm:hidden'
+      />
+    );
+  }
+
+  const handle = getPresenceHandle(row);
+  const platform = getPresencePlatformLabel(row);
+  const showPlatform = row.label !== platform;
+  if (!handle && !showPlatform) return null;
+
+  return (
+    <div
+      data-testid='presence-page-identity'
+      className='truncate text-xs text-tertiary-token'
+      title={[showPlatform ? platform : null, handle]
+        .filter(Boolean)
+        .join(' · ')}
+    >
+      {showPlatform ? <span>{platform}</span> : null}
+      {showPlatform && handle ? ' · ' : null}
+      {handle ? <span>{handle}</span> : null}
+    </div>
+  );
+}
+
+function ArtistCell(context: CellContext<ProfileWorkspaceRow, string>) {
+  return (
+    <span className='truncate text-sm text-primary-token'>
+      {context.getValue()}
+    </span>
+  );
+}
+
 function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const label = kindLabel(row);
   return (
@@ -507,7 +551,14 @@ function StatusCell({
           ? CircleX
           : Circle;
   return (
-    <SimpleTooltip content={status.label}>
+    <SimpleTooltip
+      content={
+        <span>
+          <strong className='block'>{status.label}</strong>
+          <span>{status.nextAction}</span>
+        </span>
+      }
+    >
       <span
         className={cn(
           'inline-flex min-h-7 items-center gap-1.5 text-xs text-tertiary-token',
@@ -1344,9 +1395,9 @@ export function ProfilesWorkspace({
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
-        header: 'Profile / Page',
-        size: 150,
-        minSize: 100,
+        header: 'Platform / Page',
+        size: 200,
+        minSize: 140,
         meta: { className: 'px-3' },
         cell: context => {
           const row = context.row.original;
@@ -1367,30 +1418,10 @@ export function ProfilesWorkspace({
               )}
               <div className='min-w-0'>
                 <div className='truncate text-sm font-medium text-primary-token'>
-                  {getPresenceEntityName(row, data?.artist.name ?? row.label)}
+                  {row.label}
                 </div>
-                {row.rowType === 'connector' ? (
-                  <ConnectionUrlDisplay
-                    row={row}
-                    className='text-xs text-tertiary-token max-sm:hidden'
-                  />
-                ) : (
-                  <div
-                    data-testid='presence-page-identity'
-                    className='truncate text-xs text-tertiary-token'
-                    title={
-                      getPresenceHandle(row) ?? getPresencePlatformLabel(row)
-                    }
-                  >
-                    <span>{getPresencePlatformLabel(row)}</span>
-                    {getPresenceHandle(row) ? (
-                      <>
-                        {' '}
-                        · <span>{getPresenceHandle(row)}</span>
-                      </>
-                    ) : null}
-                  </div>
-                )}
+                <ConnectionSecondaryIdentity row={row} />
+                <div className={styles.mobileArtist}>{data?.artist.name}</div>
                 <div className={styles.mobileStatus}>
                   <StatusCell
                     row={row}
@@ -1401,6 +1432,13 @@ export function ProfilesWorkspace({
             </div>
           );
         },
+      }),
+      columnHelper.accessor(() => data?.artist.name ?? '', {
+        id: 'artist',
+        header: 'Artist',
+        size: 180,
+        meta: { className: cn('px-3', styles.artistColumn) },
+        cell: ArtistCell,
       }),
       columnHelper.display({
         id: 'type',

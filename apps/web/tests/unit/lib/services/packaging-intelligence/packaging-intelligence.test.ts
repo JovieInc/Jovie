@@ -152,6 +152,8 @@ describe('packaging intelligence', () => {
 
   it('parses WebVTT and extracts the first-30s hook window', () => {
     const segments = parseWebVtt(SAMPLE_VTT);
+    const crlfSegments = parseWebVtt(SAMPLE_VTT.replaceAll('\n', '\r\n'));
+    expect(crlfSegments).toEqual(segments);
     expect(segments).toHaveLength(3);
     expect(extractFirst30sHookText(segments)).toBe(
       'Hook line one. Hook line two.'
@@ -254,8 +256,14 @@ describe('packaging intelligence', () => {
     for (const result of evaluateAllPackagingRuleCases()) {
       expect(result.passed, result.reason).toBe(true);
     }
-    expect(evaluatePackagingRuleCase('hook-text-on-face').passed).toBe(true);
-    expect(evaluatePackagingRuleCase('cover-with-hook-text').passed).toBe(true);
+    expect(evaluatePackagingRuleCase('hook-text-on-face')).toMatchObject({
+      passed: true,
+      reason: 'Hook text on a face is refused; off-face hook is allowed',
+    });
+    expect(evaluatePackagingRuleCase('cover-with-hook-text')).toMatchObject({
+      passed: true,
+      reason: 'Cover hooky text is refused; square contain is allowed',
+    });
     expect(evaluatePackagingRuleCase('no-image-unknown').passed).toBe(true);
     expect(evaluatePackagingRuleCase('cover-vs-thumb').passed).toBe(true);
   });

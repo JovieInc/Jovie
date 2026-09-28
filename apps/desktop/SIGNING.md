@@ -137,6 +137,12 @@ To publish staging from exact current `main` after its `CI` run is green:
 gh workflow run desktop-release.yml --ref main -f environment=staging
 ```
 
+The same publisher also reconciles staging daily. It verifies exact green
+`main` CI, compares desktop source with the last signed staging release, and
+publishes only when that source changed. A superseded main generation skips;
+missing or untrusted staging release provenance fails closed and requires the
+explicit manual bootstrap path above.
+
 The workflow derives the next-patch
 `X.Y.(Z+1)-staging.<run-id>.<attempt>` version, updates only the
 `desktop-staging` rolling prerelease and `staging-mac.yml`, and binds its exact
@@ -154,6 +160,41 @@ falls back to opening the GitHub releases page when the bridge is unusable
 After installing the first signed build, subsequent production-impacting
 desktop changes on verified `main` trigger an auto-update they can apply with
 one click.
+
+## How a release reaches an installed app
+
+1. A desktop-impacting change lands on `main`. The next Production Controller
+   generation that verifies it (`Production Verified`) triggers
+   `desktop-release`. Publication is forward-only: the verified generation
+   may be current `main` or a trusted ancestor of it. Requiring exact current
+   `main` starved production desktop from 26.9.14 onward (2026-09-21..26)
+   while the merge queue landed faster than the controller verified. A
+   generation that left `main`'s lineage still fails closed, and one already
+   covered by a newer publish is skipped.
+2. Source changes without a `VERSION` change open one bot stamp PR
+   (`cursor/stable-desktop-publish-*`, `merge-queue` label). The stamp is
+   skipped when `main` already carries newer release state.
+3. The next verified generation containing the stamp builds, signs,
+   notarizes, and publishes `v<VERSION>` with `latest-mac.yml`.
+4. The installed app checks on launch, every 30 minutes, on wake/unlock
+   (at most every 5 minutes), and via the 03:17 LaunchAgent when closed. It
+   downloads in the background and installs on quit. A menu item and the
+   renderer pill offer "Restart to install update". A running app also
+   restarts into a downloaded update between 01:00 and 06:00 local time
+   after 20 idle minutes, never while audio plays or a composer holds text.
+
+Hosted Ovie (`/app`, `/hud`) loads live from `jov.ie`, so web deploys need no
+native release. The app polls `/api/health/build-info` every minute. The HUD
+reloads on a new build immediately. App windows reload when hidden, or when
+unfocused after 10 idle minutes, and never with unsent composer text.
+
+Staging and production use distinct updater caches (`extraMetadata.name` in
+`electron-builder.staging.yml`). A shared cache let each app clear the other's
+pending download before install-on-quit.
+
+electron-updater (Squirrel.Mac) has no post-install rollback. The staging
+channel is the canary: it publishes signed prereleases from green `main`
+before production stamps land.
 
 ## Cost & cadence
 

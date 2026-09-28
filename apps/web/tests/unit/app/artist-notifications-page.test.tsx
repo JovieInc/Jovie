@@ -4,6 +4,7 @@ import ArtistNotificationsPage from '@/app/(marketing)/artist-notifications/page
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_NOTIFICATIONS_SECTION_ORDER } from '@/data/artistNotificationsPageOrder';
+import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 function expectArtistNotificationsSectionOrder() {
   const sectionTestIds = ARTIST_NOTIFICATIONS_SECTION_ORDER.map(
@@ -37,7 +38,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       heroSection.getByRole('heading', {
-        name: 'Reach Every Fan. Automatically.',
+        name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
       })
     ).toBeInTheDocument();
     expect(
@@ -47,8 +48,8 @@ describe('ArtistNotificationsPage', () => {
 
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(
-      screen.getByText('Trusted by artists and teams releasing on')
-    ).toBeInTheDocument();
+      screen.queryByText('Trusted by artists and teams releasing on')
+    ).not.toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', { name: 'Capture every fan.' })

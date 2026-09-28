@@ -9,6 +9,7 @@ import {
   isMarketingPlanActive,
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
+import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import { cn } from '@/lib/utils';
 
 type MarketingPricingMode = 'compact' | 'expanded';
@@ -78,14 +79,16 @@ function MarketingPricingPlanCard({
         </Link>
       </Button>
 
-      <ul className='marketing-pricing-plan-card__features'>
-        {plan.features.map(feature => (
-          <li key={feature}>
-            <Check aria-hidden='true' size={15} strokeWidth={1.8} />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+      {plan.features.length > 0 ? (
+        <ul className='marketing-pricing-plan-card__features'>
+          {plan.features.map(feature => (
+            <li key={feature}>
+              <Check aria-hidden='true' size={15} strokeWidth={1.8} />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </article>
   );
 }
@@ -103,6 +106,7 @@ export function MarketingPricingPlans({
 
   return (
     <div
+      data-offer-contract={ARTIST_VISIBILITY_OFFER_CONTRACT_ID}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}
       data-marketing-section='pricing'
       data-marketing-variant={variant}

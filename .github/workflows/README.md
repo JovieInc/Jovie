@@ -16,8 +16,11 @@ This repository uses trunk-based development with a single long-lived branch:
 ## Drain Activation Order
 
 Workflow triggers below describe YAML capability, not live GitHub enablement.
-During the all-PR drain, enable **Merge Queue Auto-Enroll** and **Auto-Ready Agent
-Drafts** first. Enable **Main CI Health Monitor** and **Main Autofix** only after
+The all-PR drain is retired: **Merge Queue Auto-Enroll** is disabled and removed at source,
+while **Auto-Ready Agent Drafts** has been `disabled_manually` since
+2026-07-20 (verified 2026-09-20) — drafts are undrafted by their writer, not
+automatically; re-enabling it is a founder decision. Enable **Main CI Health
+Monitor** and **Main Autofix** only after
 the queue and production topology have produced bounded proof. GitHub AI
 Orchestrator, GitHub AI Dispatcher, and Agent Tick are retired at source because
 Linear-backed Symphony is the sole intake selector. Keep Agent Pipeline, PR
@@ -29,9 +32,13 @@ should register active on land; verify their live state before relying on
 continuous delivery. A workflow-file merge does not re-enable a workflow that
 GitHub already marks disabled. GitHub AI Orchestrator workflow ID `306926687`
 was verified `disabled_manually` at rollout preparation. Runner Health Monitor
-workflow ID `307794302` was also verified `disabled_manually` after its legacy
-repository-variable mutation failed with HTTP 403; keep it disabled until this
-observer-only definition lands and is proven, then re-enable the observer.
+workflow ID `307794302` was re-enabled after its observer-only definition
+landed and is `active` (verified 2026-09-20); it remains observer-only and
+never mutates routing variables. Several other workflow IDs still register as
+`active` in GitHub's API with no file on `main` (Vercel Preview, CodeQL
+Analysis, Neon Branches, Agent PR Verify Ready, Actions Concurrency Canary,
+Visual Approval Guard) — they are inert residue from deleted files and cannot
+run.
 
 ## Vercel Preview Deployments
 
@@ -96,7 +103,7 @@ The `agent-landing-sweep.yml` workflow is manual-only. When explicitly dispatche
 - No sensitive files changed (auth, billing, migrations, CI, etc.)
 - No active machine gate or terminal-red required check
 - Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
-- Queue pressure below threshold (12 PRs already queued)
+- Queue pressure below the dynamic threshold (`MERGE_QUEUE_POLICY.maxQueueDepth` in `scripts/lib/merge-queue-guard.mjs`, currently 16 PRs already queued)
 
 Use it as an operator recovery tool when the event-driven pipeline missed delivery; it is not an active polling loop.
 
@@ -116,7 +123,7 @@ GitHub-Issue workflows remain visible for auditability but cannot run:
 
 - **`linear-sync-on-merge.yml`**
   - Trigger: `pull_request.closed` (merged)
-  - Behavior: reads the canonical Linear marker from the merged PR and transitions that issue to Done
+  - Behavior: reads the canonical Linear marker from the merged PR and transitions that issue to Done only when every linked PR is already merged or closed and the issue is not a commissioning or parent issue. Otherwise it leaves the issue open and comments with the reason.
 
 ## Main CI Health Monitor
 
@@ -164,10 +171,12 @@ after a push. It enforces the same 5 open-agent-PR capacity cap before creating
 new draft PRs; downstream verification and agent pipeline jobs decide when a
 draft is ready and whether auto-merge is eligible. For provenance-authorized
 agent PRs, manual Auto-Ready recovery can still pair the ready transition with
-native auto-merge intent. Green-source Auto-Ready undrafts a draft only after
-PR Ready + required checks are SUCCESS and mergeability is CLEAN; Auto-Enroll
-then consumes `ready_for_review`. An unchanged `ready_for_review` event never
-launches another CI flight.
+native auto-merge intent. The automated **Auto-Ready Agent Drafts** workflow is
+currently `disabled_manually` (since 2026-07-20, verified 2026-09-20); when
+active, green-source Auto-Ready undrafts a draft only after
+PR Ready + required checks are SUCCESS and mergeability is CLEAN, and
+The finishing agent requests native Merge when ready against the exact head.
+An unchanged `ready_for_review` event never launches another CI flight.
 
 <!-- ci-harness:start -->
 ## CI Agent Harness
@@ -195,9 +204,9 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
-| Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. | none |
-| Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. JOV-INV-033 rescans Done-sprint HTML (JOV-6218 pricing truth, JOV-6260 directory hygiene) against that same URL before the `Production Verified` marker. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. | none |
+| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
+| Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. Lineage is forward-only: after authorization a generation that is still an ancestor of main ships even though main advanced, yields only to a generation already queued behind it, and never yields once main has carried unshipped commits past the starvation bound (release-lineage-gate.sh, 90 min). | none |
+| Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. JOV-INV-033 rescans Done-sprint HTML (JOV-6218 pricing truth, JOV-6260 directory hygiene) against that same URL before the `Production Verified` marker. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. The five-minute continuity guard also reports production-stale (main has carried unshipped commits for 2 h) to the founder Slack path without admitting a provider-recovery task. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
 
 ### Merge Gates
@@ -216,6 +225,9 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Exact-head Coverage` | both | exact-head-coverage | `pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>` |
 | `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |
+| `Ovie Build (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie build` |
+| `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
+| `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
 | `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test` |

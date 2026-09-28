@@ -13,10 +13,7 @@ import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedire
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
 import { buildBreadcrumbObject } from '@/lib/constants/schemas';
-import {
-  derivePreviewState,
-  getProviderConfidence,
-} from '@/lib/discography/audio-qa';
+import { getProviderConfidence } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -122,13 +119,6 @@ export default async function TrackDeepLinkPage({
       };
     })
     .filter(p => p.url);
-  const previewState = derivePreviewState({
-    audioUrl: null,
-    previewUrl: track.previewUrl ?? null,
-    metadata: track.previewMetadata ?? null,
-    providerLinks: effectiveProviderLinks,
-  });
-
   const ownerName = creator.displayName ?? creator.username;
   const artistByline = resolveSmartLinkArtistByline({
     primaryArtists: track.primaryArtists,
@@ -168,6 +158,7 @@ export default async function TrackDeepLinkPage({
       artworkUrl: track.artworkUrl,
       releaseDate: track.releaseDate,
       providerLinks: effectiveProviderLinks,
+      primaryArtists: track.primaryArtists,
       durationMs: track.durationMs,
       isrc: track.isrc,
       trackNumber: track.trackNumber,
@@ -215,10 +206,6 @@ export default async function TrackDeepLinkPage({
           title: track.title,
           artworkUrl: track.artworkUrl,
           releaseDate: toISOStringOrNull(track.releaseDate),
-          previewUrl: track.previewUrl ?? null,
-          isrc: track.isrc ?? null,
-          previewVerification: previewState.previewVerification,
-          previewSource: previewState.previewSource,
         }}
         artist={{
           name: ownerName,

@@ -38,12 +38,16 @@ const VIEWPORTS: readonly LayoutViewport[] = [
   { id: '430x932', width: 430, height: 932, isMobile: true },
   { id: '768x1024', width: 768, height: 1024, isMobile: false },
   { id: '1024x768', width: 1024, height: 768, isMobile: false },
+  { id: '1179x932', width: 1179, height: 932, isMobile: false },
+  { id: '1180x932', width: 1180, height: 932, isMobile: false },
   { id: '1280x800', width: 1280, height: 800, isMobile: false },
   { id: '1440x900', width: 1440, height: 900, isMobile: false },
+  { id: '1512x932', width: 1512, height: 932, isMobile: false },
 ];
 
 const READY_SELECTORS = [
   '[data-testid="profile-compact-surface"]',
+  '[data-testid="profile-desktop-surface"]',
   '[data-testid="profile-header"]',
   '[data-testid="profile-compact-shell"]',
 ] as const;
@@ -104,6 +108,34 @@ async function prepareProfilePage(page: Page, viewport: LayoutViewport) {
     .catch(() => {});
 }
 
+async function prepareProfileAdmissionFixture(
+  page: Page,
+  viewport: Pick<LayoutViewport, 'width' | 'height'>,
+  longName = false
+) {
+  await installPublicRouteMocks(page);
+  await page.setViewportSize({
+    width: viewport.width,
+    height: viewport.height,
+  });
+
+  const response = await page.goto(
+    `/renders/profile-admission?layout=public${longName ? '&name=long' : ''}`,
+    {
+      waitUntil: 'domcontentloaded',
+      timeout: 120_000,
+    }
+  );
+  expect(response?.status() ?? 0, 'profile admission fixture should load').toBe(
+    200
+  );
+  await waitForHydration(page);
+  await waitForAnyVisible(page, READY_SELECTORS);
+  await page
+    .waitForLoadState('networkidle', { timeout: 10_000 })
+    .catch(() => {});
+}
+
 async function saveApprovalScreenshot(page: Page, viewport: LayoutViewport) {
   if (!APPROVAL_SCREENSHOTS) return;
 
@@ -141,8 +173,8 @@ async function collectLayoutMetrics(page: Page) {
       : isVisibleBox(shell)
         ? shell
         : (shell ?? desktopShell);
-    const cover = document.querySelector<HTMLElement>(
-      '[data-testid="profile-cover"], [data-testid="profile-desktop-cover"]'
+    const compactCover = document.querySelector<HTMLElement>(
+      '[data-testid="profile-cover"]'
     );
     const scroll = document.querySelector<HTMLElement>(
       '[data-testid="profile-content-scroll"]'
@@ -156,6 +188,7 @@ async function collectLayoutMetrics(page: Page) {
     const desktopCover = document.querySelector<HTMLElement>(
       '[data-testid="profile-desktop-cover"]'
     );
+    const cover = isVisibleBox(desktopCover) ? desktopCover : compactCover;
     const desktopAlerts = document.querySelector<HTMLElement>(
       '[data-testid="profile-desktop-alerts-card"]'
     );
@@ -211,6 +244,8 @@ async function collectLayoutMetrics(page: Page) {
           '[data-testid="profile-home-alerts-row"]',
           '[data-testid="profile-home-alerts-fallback-card"]',
           '[data-testid="profile-tab-bar"] button',
+          '[data-testid="profile-desktop-surface"] nav button',
+          '[data-testid="profile-desktop-surface"] button[aria-label="Menu"]',
           'article a',
           'article button',
         ].join(', ')
@@ -242,7 +277,7 @@ async function collectLayoutMetrics(page: Page) {
       document.querySelectorAll<HTMLElement>(
         [
           '[data-testid="profile-header"]',
-          '[data-testid="profile-hero-identity-block"]',
+          '[data-testid="profile-identity-header"]',
           '[data-testid$="-title"]',
         ].join(', ')
       )
@@ -265,11 +300,24 @@ async function collectLayoutMetrics(page: Page) {
       root: box(root),
       shell: box(activeShell),
       cover: box(cover),
+      media: box(
+        document.querySelector<HTMLElement>(
+          '[data-testid="profile-identity-portrait"]'
+        )
+      ),
+      identity: box(
+        document.querySelector<HTMLElement>(
+          '[data-testid="profile-identity-header"]'
+        )
+      ),
       homeRail: box(homeRail),
       desktopCover: box(desktopCover),
       desktopAlerts: box(desktopAlerts),
       desktopSecondaryGrid: box(desktopSecondaryGrid),
       scroll: box(scroll),
+      scrollPaddingBottom: scroll
+        ? Number.parseFloat(window.getComputedStyle(scroll).paddingBottom)
+        : null,
       nav: box(nav),
       navRail: box(navRail),
       visibleLargeImages,
@@ -308,7 +356,7 @@ test.describe('Public profile /tim layout hardening @regression', () => {
     expect(metrics.navRail?.height ?? 0).toBeGreaterThanOrEqual(30);
     expect(metrics.navRail?.height ?? 0).toBeLessThanOrEqual(34);
 
-    const tabNames = new Set(['Home', 'Music', 'Shows', 'About']);
+    const tabNames = new Set(['Home', 'Music', 'Events', 'About']);
     const tabTargets = metrics.actionTargets.filter(target =>
       tabNames.has(target.label)
     );
@@ -323,6 +371,372 @@ test.describe('Public profile /tim layout hardening @regression', () => {
         `${target.label} should stay at least 44px tall`
       ).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  test('long identity stays bounded and keeps the featured card attached', async ({
+    page,
+  }, testInfo) => {
+    const viewport = { width: 320, height: 568 };
+    await prepareProfileAdmissionFixture(page, viewport, true);
+
+    const name = page.getByTestId('profile-identity-link').locator('span');
+    await expect(name).toBeVisible();
+    await name.evaluate(element => {
+      element.textContent =
+        'Northwest Territories and the Pacific Northwest Collective';
+    });
+
+    const metrics = await collectLayoutMetrics(page);
+    expect(metrics.media, 'edge fixture portrait is required').not.toBeNull();
+    expect(
+      metrics.identity,
+      'edge fixture identity is required'
+    ).not.toBeNull();
+    expect(
+      metrics.homeRail,
+      'edge fixture home rail is required'
+    ).not.toBeNull();
+
+    const media = metrics.media;
+    const identity = metrics.identity;
+    const homeRail = metrics.homeRail;
+    if (!media || !identity || !homeRail) {
+      throw new Error('edge fixture lost a required mobile geometry node');
+    }
+
+    const nameGeometry = await page
+      .getByTestId('profile-identity-link')
+      .evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, height: rect.height };
+      });
+
+    expect(metrics.horizontalOverflow).toBeLessThanOrEqual(1);
+    expect(nameGeometry.left).toBeGreaterThanOrEqual(identity.left - 1);
+    expect(nameGeometry.right).toBeLessThanOrEqual(identity.right + 1);
+    expect(nameGeometry.height).toBeGreaterThanOrEqual(44);
+    expect(media.width).toBeCloseTo(80, 0);
+    expect(media.height).toBeCloseTo(80, 0);
+    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
+    expect(homeRail.top - identity.bottom).toBeLessThanOrEqual(8);
+
+    const screenshotPath = testInfo.outputPath(
+      'profile-long-identity-320x568.png'
+    );
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+    await testInfo.attach('long-identity-320x568', {
+      path: screenshotPath,
+      contentType: 'image/png',
+    });
+  });
+
+  test('200% text zoom keeps the portrait square and card ordering at narrow mobile', async ({
+    page,
+  }, testInfo) => {
+    const viewport = { width: 320, height: 568 };
+    await prepareProfileAdmissionFixture(page, viewport);
+    await page.addStyleTag({ content: 'html { font-size: 200%; }' });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(100);
+    await expect
+      .poll(
+        () =>
+          page
+            .getByTestId('profile-compact-surface')
+            .getAttribute('data-profile-overflow-mode'),
+        { timeout: 5_000 }
+      )
+      .toBe('scroll');
+
+    const metrics = await collectLayoutMetrics(page);
+    expect(metrics.media, '200% fixture portrait is required').not.toBeNull();
+    expect(
+      metrics.identity,
+      '200% fixture identity is required'
+    ).not.toBeNull();
+    expect(
+      metrics.homeRail,
+      '200% fixture home rail is required'
+    ).not.toBeNull();
+
+    const media = metrics.media;
+    const identity = metrics.identity;
+    const homeRail = metrics.homeRail;
+    if (!media || !identity || !homeRail) {
+      throw new Error('200% fixture lost a required mobile geometry node');
+    }
+
+    expect(metrics.horizontalOverflow).toBeLessThanOrEqual(1);
+    // The portrait scales with text and stays a circle, never squashed.
+    expect(Math.abs(media.width - media.height)).toBeLessThanOrEqual(1);
+    expect(media.width).toBeGreaterThanOrEqual(80);
+    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
+    expect(homeRail.top - identity.bottom).toBeLessThanOrEqual(8);
+
+    const screenshotPath = testInfo.outputPath(
+      'jov6254-text-zoom-200-320x568.png'
+    );
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+    await testInfo.attach('text-zoom-200-320x568', {
+      path: screenshotPath,
+      contentType: 'image/png',
+    });
+  });
+
+  test('200% text zoom keeps the primary card and CTA keyboard reachable above the dock', async ({
+    page,
+  }) => {
+    const viewport = { width: 320, height: 568 };
+    await prepareProfileAdmissionFixture(page, viewport);
+    await page.addStyleTag({ content: 'html { font-size: 200%; }' });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(100);
+    await expect
+      .poll(
+        () =>
+          page
+            .getByTestId('profile-compact-surface')
+            .getAttribute('data-profile-overflow-mode'),
+        { timeout: 5_000 }
+      )
+      .toBe('scroll');
+
+    const pac = page.getByTestId('profile-pac');
+    const action = pac.getByRole('link', { name: /^(Play|Listen)/i }).first();
+    await expect(pac, '200% fixture primary card is required').toHaveCount(1);
+    await expect(action, '200% fixture primary CTA is required').toHaveCount(1);
+    await expect(action).toHaveAttribute('href', /^\//);
+
+    await page.evaluate(() => {
+      const link = document.querySelector<HTMLElement>(
+        '[data-testid="profile-pac"] a[href]'
+      );
+      if (!link) throw new Error('200% fixture primary CTA is missing');
+      const pageWindow = window as typeof window & {
+        __jov6254PrimaryCtaActivated?: boolean;
+      };
+      pageWindow.__jov6254PrimaryCtaActivated = false;
+      link.addEventListener(
+        'click',
+        event => {
+          event.preventDefault();
+          pageWindow.__jov6254PrimaryCtaActivated = true;
+        },
+        { once: true }
+      );
+    });
+
+    // Focus is the browser's keyboard path: the containing public profile must
+    // scroll the focused CTA into the viewport rather than leaving it behind a
+    // zero-height content remainder or the fixed dock.
+    await action.focus();
+    await page.waitForTimeout(100);
+    const reachability = await page.evaluate(() => {
+      const read = (selector: string) => {
+        const element = document.querySelector<HTMLElement>(selector);
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+        };
+      };
+      const action = read('[data-testid="profile-pac"] a[href]');
+      const pac = read('[data-testid="profile-pac"]');
+      const dock = read('[data-testid="profile-tab-bar"]');
+      const scrollHost =
+        document.querySelector<HTMLElement>('.profile-viewport');
+      const contentScroll = document.querySelector<HTMLElement>(
+        '[data-testid="profile-content-scroll"]'
+      );
+      const actionIsAboveDock = Boolean(
+        action &&
+          dock &&
+          action.bottom > 0 &&
+          action.top < window.innerHeight &&
+          action.bottom <= dock.top - 4 &&
+          action.left >= -1 &&
+          action.right <= window.innerWidth + 1
+      );
+      const pacIsAboveDock = Boolean(
+        pac &&
+          dock &&
+          pac.bottom > 0 &&
+          pac.top < window.innerHeight &&
+          pac.bottom <= dock.top - 4
+      );
+
+      return {
+        action,
+        pac,
+        dock,
+        actionIsAboveDock,
+        pacIsAboveDock,
+        active:
+          document.activeElement ===
+          document.querySelector('[data-testid="profile-pac"] a[href]'),
+        documentScrollTop: window.scrollY,
+        documentScrollHeight: document.documentElement.scrollHeight,
+        viewportScrollTop: scrollHost?.scrollTop ?? null,
+        viewportScrollHeight: scrollHost?.scrollHeight ?? null,
+        contentScrollTop: contentScroll?.scrollTop ?? null,
+        contentScrollHeight: contentScroll?.scrollHeight ?? null,
+      };
+    });
+
+    expect(reachability.active, 'keyboard focus should remain on the CTA').toBe(
+      true
+    );
+    expect(
+      reachability.actionIsAboveDock,
+      JSON.stringify(reachability, null, 2)
+    ).toBe(true);
+    expect(
+      reachability.pacIsAboveDock,
+      JSON.stringify(reachability, null, 2)
+    ).toBe(true);
+
+    await action.press('Enter');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (
+              window as typeof window & {
+                __jov6254PrimaryCtaActivated?: boolean;
+              }
+            ).__jov6254PrimaryCtaActivated === true
+        )
+      )
+      .toBe(true);
+  });
+
+  test('scopes overflow mode to mobile home and clears stale fitting state', async ({
+    page,
+  }) => {
+    const viewport = { width: 320, height: 568 };
+    await prepareProfileAdmissionFixture(page, viewport);
+    const zoomStyle = await page.addStyleTag({
+      content: 'html { font-size: 200%; }',
+    });
+    await page.evaluate(() => document.fonts.ready);
+
+    const surface = page.getByTestId('profile-compact-surface');
+    const surfaceRoot = page.locator('[data-testid="profile-compact-surface"]');
+    await expect
+      .poll(() => surface.getAttribute('data-profile-overflow-mode'))
+      .toBe('scroll');
+    await expect
+      .poll(() => surfaceRoot.getAttribute('data-mode'))
+      .toBe('profile');
+
+    await page
+      .getByTestId('profile-tab-bar')
+      .getByRole('button', { name: 'Music' })
+      .click();
+    await expect
+      .poll(() => surfaceRoot.getAttribute('data-mode'))
+      .toBe('listen');
+    await expect(surface).not.toHaveAttribute('data-profile-overflow-mode');
+    await expect(page.locator('[data-profile-mode]')).not.toHaveAttribute(
+      'data-profile-overflow-mode'
+    );
+
+    await page
+      .getByTestId('profile-tab-bar')
+      .getByRole('button', { name: 'Home' })
+      .click();
+    await expect
+      .poll(() => surfaceRoot.getAttribute('data-mode'))
+      .toBe('profile');
+    await expect
+      .poll(() => surface.getAttribute('data-profile-overflow-mode'))
+      .toBe('scroll');
+
+    // Removing the zoom alone must invalidate the measured identity geometry;
+    // this exercises the ResizeObserver path without a remount or resize.
+    await zoomStyle.evaluate(style => style.remove());
+    await expect
+      .poll(() => surface.getAttribute('data-profile-overflow-mode'))
+      .toBeNull();
+
+    const secondZoomStyle = await page.addStyleTag({
+      content: 'html { font-size: 200%; }',
+    });
+    await expect
+      .poll(() => surface.getAttribute('data-profile-overflow-mode'))
+      .toBe('scroll');
+
+    // A desktop resize must not measure or retain mobile overflow state. When
+    // the viewport returns to mobile, the still-zoomed content is measured as
+    // a fresh mobile-home decision.
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect(surface).not.toHaveAttribute('data-profile-overflow-mode');
+    await page.setViewportSize({ width: 320, height: 568 });
+    await expect
+      .poll(() => surface.getAttribute('data-profile-overflow-mode'))
+      .toBe('scroll');
+
+    // Removing the zoom makes the same home surface fit again. Resize is kept
+    // in the transition so the test exercises the invalidation path rather
+    // than relying on a remount to clear state.
+    await secondZoomStyle.evaluate(style => style.remove());
+    await page.setViewportSize({ width: 320, height: 740 });
+    await expect
+      .poll(() => surface.getAttribute('data-profile-overflow-mode'))
+      .toBeNull();
+    await expect(page.locator('[data-profile-mode]')).not.toHaveAttribute(
+      'data-profile-overflow-mode'
+    );
+  });
+
+  test('long identity remains bounded in the compact desktop layout', async ({
+    page,
+  }) => {
+    const viewport = { width: 1024, height: 768 };
+    await prepareProfileAdmissionFixture(page, viewport, true);
+
+    const name = page.getByTestId('profile-identity-link').locator('span');
+    await expect(name).toBeVisible();
+    await name.evaluate(element => {
+      element.textContent =
+        'Northwest Territories and the Pacific Northwest Collective';
+    });
+
+    const metrics = await collectLayoutMetrics(page);
+    expect(
+      metrics.identity,
+      'compact desktop identity is required'
+    ).not.toBeNull();
+    expect(metrics.homeRail, 'compact desktop rail is required').not.toBeNull();
+
+    const identity = metrics.identity;
+    const homeRail = metrics.homeRail;
+    if (!identity || !homeRail) {
+      throw new Error('compact desktop fixture lost a required geometry node');
+    }
+
+    const nameGeometry = await page
+      .getByTestId('profile-identity-link')
+      .evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          right: rect.right,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+        };
+      });
+
+    expect(metrics.horizontalOverflow).toBeLessThanOrEqual(1);
+    expect(nameGeometry.right).toBeLessThanOrEqual(identity.right + 1);
+    expect(
+      nameGeometry.scrollWidth - nameGeometry.clientWidth
+    ).toBeLessThanOrEqual(2);
+    expect(homeRail.top).toBeGreaterThanOrEqual(identity.bottom - 1);
   });
 
   for (const viewport of VIEWPORTS) {
@@ -349,32 +763,59 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       ).not.toBeNull();
       expect(metrics.shell?.left ?? 0).toBeGreaterThanOrEqual(-1);
       expect(metrics.shell?.right ?? 0).toBeLessThanOrEqual(viewport.width + 1);
-      // The iOS-grade compact profile owns a stable token-driven hero
-      // (clamp(220px, 34svh, 400px)); media crops rather than squashing. The
-      // desktop shell keeps its independent 240px composition floor here.
-      expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(
-        viewport.isMobile ? 220 : 240
-      );
+      // The compact profile leads with the 80px identity portrait; the
+      // desktop shell (when shipped) keeps its independent 240px composition
+      // floor.
+      if (!viewport.isMobile && metrics.desktopCover) {
+        expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(240);
+      }
 
-      if (
-        viewport.isMobile &&
-        viewport.height >= 800 &&
-        metrics.cover &&
-        metrics.homeRail &&
-        metrics.nav
-      ) {
-        const deadSpaceBelowCards = metrics.nav.top - metrics.homeRail.bottom;
+      if (viewport.isMobile) {
         expect(
-          deadSpaceBelowCards,
-          `${viewport.id} should not leave dead space below home cards`
-        ).toBeLessThanOrEqual(24);
+          metrics.media,
+          `${viewport.id} portrait is required`
+        ).not.toBeNull();
         expect(
-          Math.abs(
-            metrics.cover.height -
-              Math.min(400, Math.max(220, viewport.height * 0.34))
-          ),
-          `${viewport.id} tall mobile hero should follow the tokenized 34svh composition`
+          metrics.identity,
+          `${viewport.id} identity is required`
+        ).not.toBeNull();
+        expect(
+          metrics.homeRail,
+          `${viewport.id} home rail is required`
+        ).not.toBeNull();
+
+        const media = metrics.media;
+        const identity = metrics.identity;
+        const homeRail = metrics.homeRail;
+        if (!media || !identity || !homeRail) {
+          throw new Error(
+            `${viewport.id} mobile layout is missing a required geometry node`
+          );
+        }
+
+        expect(
+          Math.abs(media.width - 80),
+          `${viewport.id} portrait should be 80px`
         ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(media.height - 80),
+          `${viewport.id} portrait should be 80px`
+        ).toBeLessThanOrEqual(1);
+        expect(
+          homeRail.top - identity.bottom,
+          `${viewport.id} featured card should follow the identity without a spacer`
+        ).toBeGreaterThanOrEqual(-1);
+        expect(
+          homeRail.top - identity.bottom,
+          `${viewport.id} featured card should stay close to the identity`
+        ).toBeLessThanOrEqual(8);
+        if (viewport.height >= 800 && metrics.nav && metrics.homeRail) {
+          const deadSpaceBelowCards = metrics.nav.top - metrics.homeRail.bottom;
+          expect(
+            deadSpaceBelowCards,
+            `${viewport.id} should not leave dead space below home cards`
+          ).toBeLessThanOrEqual(24);
+        }
       }
 
       for (const image of metrics.visibleLargeImages) {
@@ -418,9 +859,9 @@ test.describe('Public profile /tim layout hardening @regression', () => {
 
       if (metrics.nav && metrics.scroll) {
         expect(
-          metrics.nav.top - metrics.scroll.bottom,
-          `${viewport.id} bottom nav should not cover scroll content`
-        ).toBeGreaterThanOrEqual(-2);
+          metrics.scrollPaddingBottom ?? 0,
+          `${viewport.id} scroll content should reserve the floating bottom nav`
+        ).toBeGreaterThanOrEqual(metrics.nav.height);
       }
 
       if (metrics.desktopCover && metrics.desktopAlerts) {

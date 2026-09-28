@@ -187,6 +187,33 @@ describe('useTrackAudioPlayer', () => {
     expect(errorCb).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps error status when a queued pause event lands after failure', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+
+    act(() => {
+      fireAudioEvent('error');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('error');
+
+    // Real browsers dispatch media events asynchronously: the pause() inside
+    // handlePlaybackFailure queues a 'pause' event that lands after the error
+    // state was set. It must not downgrade the terminal 'error' status.
+    act(() => {
+      fireAudioEvent('pause');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('error');
+    expect(result.current.playbackState.isPlaying).toBe(false);
+  });
+
   it('sets isPlaying to false and resets currentTime on ended event', async () => {
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
@@ -370,6 +397,8 @@ describe('useTrackAudioPlayer', () => {
       artistName: null,
       artworkUrl: null,
       hasLyrics: false,
+      bpm: null,
+      musicalKey: null,
       queueLength: 0,
       queueIndex: -1,
       hasNext: false,

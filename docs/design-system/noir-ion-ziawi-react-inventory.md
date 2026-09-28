@@ -17,11 +17,11 @@
 
 | Role | Dark | Light |
 |---|---|---|
-| canvas | `#030407` | `#F8FAFD` |
-| shell | `#06080D` | `#F3F5F8` |
-| card | `#0F1420` | `#EAEDF1` |
-| elevated | `#151B2A` | `#DFE3E8` |
-| floating | `#1B2436` | `#D4D9E0` |
+| canvas | `#030406` | `#F3F4F6` |
+| shell | `#07080A` | `#F9FAFC` |
+| card | `#131417` | `#FFFFFF` |
+| elevated | `#1A1B1E` | `#FFFFFF` |
+| floating | `#232427` | `#FFFFFF` |
 
 **Accents — exactly 6**
 
@@ -121,7 +121,7 @@ extension of the input.
 3. Six accents: ion `#11AFFF`; ultra/pulse/mint/orange/red stay lock hexes;
    aqua/gold/flare remain same-hex aliases.
 4. Five-surface ladder; `--noir-ion-panel` removed; `--linear-panel-bg`
-   remaps to card `#0F1420`.
+   remaps to card `#131417`.
 5. ActionButton / product CTAs: 28 visible, 510, radius 999; mobile 44 hit
    wrapping the 28px pill.
 6. Fail-closed tests lock ZiaWI `#11AFFF` focus/ion and 28 visible / 44 mobile hit.

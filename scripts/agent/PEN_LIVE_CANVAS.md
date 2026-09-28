@@ -39,7 +39,7 @@ Dirty/unsaved is not a bail. Keep one writer and the canonical path lock.
 node scripts/agent/pen-live-canvas-persist.mjs \
   --phase attach \
   --profile jovie-founder-design-studio \
-  --active-path "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen" \
+  --active-path "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen" \
   --attach-mode desktop \
   --writer agent-veronica \
   --batch-id jov-5069-live-canvas \
@@ -60,7 +60,7 @@ the locked file moved:
 node scripts/agent/pen-live-canvas-persist.mjs \
   --phase persist \
   --profile jovie-founder-design-studio \
-  --active-path "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen" \
+  --active-path "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen" \
   --attach-mode desktop \
   --writer agent-veronica \
   --batch-id jov-5069-live-canvas \

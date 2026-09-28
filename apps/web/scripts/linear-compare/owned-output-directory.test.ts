@@ -44,18 +44,16 @@ describe('resetOwnedOutputDirectory', () => {
     );
   });
 
-  it.each([
-    '../outside',
-    'nested/producer',
-    '.',
-    '',
-  ])('rejects a producer path outside one owned segment: %j', producer => {
-    const root = makeOutputRoot();
+  it.each(['../outside', 'nested/producer', '.', ''])(
+    'rejects a producer path outside one owned segment: %j',
+    producer => {
+      const root = makeOutputRoot();
 
-    expect(() => resetOwnedOutputDirectory(root, producer)).toThrow(
-      'Invalid output producer name'
-    );
-  });
+      expect(() => resetOwnedOutputDirectory(root, producer)).toThrow(
+        'Invalid output producer name'
+      );
+    }
+  );
 
   it('refuses to replace a symlinked producer directory', () => {
     const root = makeOutputRoot();

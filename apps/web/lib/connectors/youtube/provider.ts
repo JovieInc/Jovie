@@ -231,16 +231,12 @@ function metricRange(
   const end = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1)
   );
-  const days =
-    window === 'day_1'
-      ? 1
-      : window === 'day_7'
-        ? 7
-        : window === 'day_28' || window === 'experiment'
-          ? 28
-          : window === 'day_90'
-            ? 90
-            : null;
+  let days: number | null;
+  if (window === 'day_1') days = 1;
+  else if (window === 'day_7') days = 7;
+  else if (window === 'day_28' || window === 'experiment') days = 28;
+  else if (window === 'day_90') days = 90;
+  else days = null;
   const start =
     days === null
       ? new Date(Date.UTC(2005, 1, 14))

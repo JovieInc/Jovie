@@ -5,6 +5,15 @@
  * using explicit named exports for deterministic tree-shaking.
  */
 
+// Pixel Tracking (Events, Creator Configs)
+export {
+  type AcquisitionFirstTouch,
+  type AcquisitionJourney,
+  acquisitionJourneys,
+  insertAcquisitionJourneySchema,
+  type NewAcquisitionJourney,
+  selectAcquisitionJourneySchema,
+} from './acquisition';
 // Admin
 export {
   type AdminAuditLog,
@@ -137,6 +146,7 @@ export {
   baOauthConsents,
   baOauthRefreshTokens,
   baOauthResources,
+  baPasskeys,
   baSessions,
   baUsers,
   baVerifications,
@@ -181,6 +191,14 @@ export {
   selectChatMessageSchema,
   selectChatTurnSchema,
 } from './chat';
+// Coding Agent Run Ingestion (JOV-6508)
+export {
+  type CodingAgentRun,
+  codingAgentRuns,
+  insertCodingAgentRunSchema,
+  type NewCodingAgentRun,
+  selectCodingAgentRunSchema,
+} from './coding-agent-runs';
 // AI Connectors (v1)
 export {
   type AgentRun,
@@ -393,6 +411,9 @@ export {
   catalogScanStatusEnum,
   chatMessageRoleEnum,
   claimInviteStatusEnum,
+  codingAgentCostSourceEnum,
+  codingAgentOutcomeEnum,
+  codingAgentSourceEnum,
   connectorProviderEnum,
   connectorStatusEnum,
   contactChannelEnum,
@@ -438,6 +459,9 @@ export {
   merchGenerationStatusEnum,
   merchOrderStatusEnum,
   merchPayoutStatusEnum,
+  merchQaDispositionEnum,
+  merchQaSeverityEnum,
+  merchQaVerdictEnum,
   merchTechniqueEnum,
   metadataSubmissionIssueStatusEnum,
   metadataSubmissionStatusEnum,
@@ -499,6 +523,21 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Finance (Owner-only personal financial data — JOV-4609)
+export {
+  type FinanceAccount,
+  type FinanceExport,
+  type FinanceInstitution,
+  type FinanceTransaction,
+  financeAccounts,
+  financeExports,
+  financeInstitutions,
+  financeTransactions,
+  type NewFinanceAccount,
+  type NewFinanceExport,
+  type NewFinanceInstitution,
+  type NewFinanceTransaction,
+} from './finance';
 // Identity (Cross-platform artist identity links)
 export {
   type ArtistIdentityLink,
@@ -829,6 +868,7 @@ export {
 } from './memory';
 // Merch (Jovie-owned storefront products, orders, fulfillment, payout ledger)
 export {
+  insertMerchCandidateQaReviewSchema,
   insertMerchCardSchema,
   insertMerchDesignOptionSchema,
   insertMerchFulfillmentJobSchema,
@@ -836,6 +876,7 @@ export {
   insertMerchOrderSchema,
   insertMerchPayoutLedgerEntrySchema,
   type MerchArtistBrief,
+  type MerchCandidateQaReview,
   type MerchCard,
   type MerchDesignOption,
   type MerchFulfillmentJob,
@@ -848,18 +889,21 @@ export {
   type MerchShippingAddress,
   type MerchVariantMap,
   type MerchVisibilityRules,
+  merchCandidateQaReviews,
   merchCards,
   merchDesignOptions,
   merchFulfillmentJobs,
   merchGenerationBatches,
   merchOrders,
   merchPayoutLedgerEntries,
+  type NewMerchCandidateQaReview,
   type NewMerchCard,
   type NewMerchDesignOption,
   type NewMerchFulfillmentJob,
   type NewMerchGenerationBatch,
   type NewMerchOrder,
   type NewMerchPayoutLedgerEntry,
+  selectMerchCandidateQaReviewSchema,
   selectMerchCardSchema,
   selectMerchDesignOptionSchema,
   selectMerchFulfillmentJobSchema,
@@ -940,7 +984,6 @@ export {
   type OvieOperatingKvRow,
   ovieOperatingKv,
 } from './ovie';
-// Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
   creatorPixels,
@@ -1092,6 +1135,21 @@ export {
   selectPromoDownloadEventSchema,
   selectPromoDownloadSchema,
 } from './promo-downloads';
+// Recipient preferences (quiet hours, channels, marketing consent) — JOV-6141
+export {
+  BRIEFING_BEHAVIORS,
+  DEFAULT_QUIET_HOURS_END,
+  DEFAULT_QUIET_HOURS_START,
+  MARKETING_CONSENT_VERSION,
+  type NewRecipientPreference,
+  RECIPIENT_CHANNELS,
+  RECIPIENT_KINDS,
+  RECIPIENT_PREFERENCES_VERSION,
+  type RecipientPreference,
+  recipientPreferences,
+  TIM_DEFAULT_TIMEZONE,
+  WEEKEND_BEHAVIORS,
+} from './recipient-preferences';
 // Referral Program (Codes, Referrals, Commissions)
 export {
   insertReferralCodeSchema,

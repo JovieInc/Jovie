@@ -18,9 +18,9 @@ import {
 } from './contract';
 
 const SECRET_RE =
-  /\b(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_(?:live|test)_[A-Za-z0-9]+|Bearer\s+[A-Za-z0-9._\-]+|xox[baprs]-[A-Za-z0-9-]+)\b/gi;
+  /\b(gh[pousr]_[A-Z0-9_]{20,}|github_pat_[A-Z0-9_]{20,}|sk_(?:live|test)_[A-Z0-9]+|Bearer\s+[A-Z0-9._\-]+|xox[baprs]-[A-Z0-9-]+)\b/gi;
 const SECRET_SHAPED_RE =
-  /(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_(?:live|test)_[A-Za-z0-9]+|xox[baprs]-[A-Za-z0-9-]+)/i;
+  /(?:gh[pousr]_[A-Z0-9_]{20,}|github_pat_[A-Z0-9_]{20,}|sk_(?:live|test)_[A-Z0-9]+|xox[baprs]-[A-Z0-9-]+)/i;
 const PATH_RE =
   /(?:\/(?:home|Users|root|private|tmp|opt|usr|Library|var\/log|etc)\/[^\s"'`]+|~\/[^\s"'`]+|(?:[A-Za-z]:)?\\Users\\[^\s"'`]+)/g;
 const PROMPT_RE = /\b(?:system prompt|conversation|chat log)\b/gi;
@@ -77,12 +77,6 @@ function sourceSchema(
 ): string {
   const expected = SHIPPING_SOURCE_SCHEMAS[sourceId];
   if (candidate === expected) return candidate;
-  if (
-    sourceId === 'symphony-runtime' &&
-    candidate === 'symphony-runtime-state/v1'
-  ) {
-    return candidate;
-  }
   if (
     sourceId === 'production-controller' &&
     candidate === 'github-actions-run/v1'

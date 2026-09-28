@@ -1,45 +1,24 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
+import { WHITE_SPACE_STYLE_PROMPT } from '@/lib/services/retouching/style-prompt';
 import { SkillDocCard } from './SkillDocCard';
 
-const promptReaders: Record<string, () => Promise<string>> = {
-  'apps/web/lib/services/retouching/styles/white-space.md': () =>
-    fs.readFile(
-      path.join(
-        process.cwd(),
-        'lib',
-        'services',
-        'retouching',
-        'styles',
-        'white-space.md'
-      ),
-      'utf-8'
-    ),
+// Use the bundled prompt; runtime Markdown is excluded from Vercel uploads.
+// style.test.ts verifies this value against the canonical document byte-for-byte.
+const promptContentByPath: Record<string, string> = {
+  'apps/web/lib/services/retouching/styles/white-space.md':
+    WHITE_SPACE_STYLE_PROMPT,
 };
 
-async function readPromptContent(
-  promptPath: string | undefined
-): Promise<string | null> {
-  if (!promptPath) return null;
-  try {
-    return (await promptReaders[promptPath]?.()) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export async function AdminSystemMapSkillsTab() {
+export function AdminSystemMapSkillsTab() {
   const skills = Object.values(SKILL_REGISTRY);
 
-  const skillsWithDocs = await Promise.all(
-    skills.map(async skill => ({
-      ...skill,
-      promptContent: await readPromptContent(
-        'promptPath' in skill ? skill.promptPath : undefined
-      ),
-    }))
-  );
+  const skillsWithDocs = skills.map(skill => ({
+    ...skill,
+    promptContent:
+      'promptPath' in skill && skill.promptPath
+        ? (promptContentByPath[skill.promptPath] ?? null)
+        : null,
+  }));
 
   return (
     <div data-testid='system-map-skills' className='space-y-3'>

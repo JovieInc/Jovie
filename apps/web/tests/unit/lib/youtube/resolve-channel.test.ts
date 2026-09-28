@@ -54,11 +54,12 @@ describe('parseYouTubeChannelInput', () => {
     ],
   ];
 
-  it.each(
-    parseCases.map(([input, expected]) => ({ input, expected }))
-  )('parses $input', ({ input, expected }) => {
-    expect(parseYouTubeChannelInput(input)).toEqual(expected);
-  });
+  it.each(parseCases.map(([input, expected]) => ({ input, expected })))(
+    'parses $input',
+    ({ input, expected }) => {
+      expect(parseYouTubeChannelInput(input)).toEqual(expected);
+    }
+  );
 
   const rejectCases: readonly string[] = [
     '',
@@ -73,11 +74,12 @@ describe('parseYouTubeChannelInput', () => {
     'x'.repeat(201),
   ];
 
-  it.each(rejectCases.map(input => ({ input })))('rejects $input', ({
-    input,
-  }) => {
-    expect(parseYouTubeChannelInput(input)).toBeNull();
-  });
+  it.each(rejectCases.map(input => ({ input })))(
+    'rejects $input',
+    ({ input }) => {
+      expect(parseYouTubeChannelInput(input)).toBeNull();
+    }
+  );
 });
 
 describe('resolveYouTubeChannel / listRecentPublicVideos', () => {

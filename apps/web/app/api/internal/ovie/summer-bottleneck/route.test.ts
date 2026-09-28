@@ -1,15 +1,27 @@
-import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, verify as nodeVerify } from 'node:crypto';
-import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getVercelOidcToken: vi.fn(),
   verifyCronRequest: vi.fn(),
+  resolveSummerEveCallerOrigin: vi.fn(async () => ({
+    origin: 'https://summer.jov.ie',
+    deploymentId: 'dpl_live',
+  })),
 }));
 
 vi.mock('@vercel/oidc', () => ({
   getVercelOidcToken: mocks.getVercelOidcToken,
+}));
+
+vi.mock('@/lib/ovie/summer-production-pin', () => ({
+  resolveSummerEveCallerOrigin: mocks.resolveSummerEveCallerOrigin,
+  logSummerBridgeEvent: (entry: Readonly<Record<string, unknown>>) => {
+    console.error(entry);
+  },
+  SummerPinInvalidError: class SummerPinInvalidError extends Error {
+    readonly code = 'summer_pin_invalid';
+  },
 }));
 
 vi.mock('@/lib/cron/auth', () => ({
@@ -23,7 +35,10 @@ vi.mock('@/lib/utils/logger', () => ({
 import admissionsFixture from '@/lib/ovie/fixtures/summer-admissions-v1.json';
 import ciAuditV2Fixture from '@/lib/ovie/fixtures/summer-ci-audit-v2.json';
 import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
+import publisherSnapshots from '@/lib/ovie/fixtures/summer-publisher-snapshots-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
+import { SummerPinInvalidError } from '@/lib/ovie/summer-production-pin';
+import * as summerShadowClient from '@/lib/ovie/summer-shadow-client';
 import { POST } from './route';
 
 const NOW = '2026-09-04T20:00:00.000Z';
@@ -145,65 +160,18 @@ function request(body: unknown) {
   });
 }
 
-// Exercise the actual publisher composition, using only its synthetic test inputs.
-// No host observation, credential access, or submission runs in this subprocess.
+// Frozen composition of the retired Gem publisher (now JovieInc/symphony-control)
+// over its synthetic test inputs. The Symphony Elixir control plane no longer
+// ships in Jovie, so the route contract pins these snapshots.
 function publisherSnapshot(
   providerState?: 'ALLOWED' | 'HELD' | 'UNKNOWN',
   ciAuditV2 = false
 ) {
-  const fixturePath = resolve(
-    process.cwd(),
-    '../../scripts/symphony/tests/summer-publisher-admissions.test.py'
-  );
-  return JSON.parse(
-    execFileSync(
-      'python3',
-      [
-        '-c',
-        `import json, runpy, sys
-fixture = runpy.run_path(sys.argv[1])
-case = fixture['TaskAdmissionPublicationTests']()
-case.setUp()
-for row in case.audit['classes']:
-    row['blockedSince'] = fixture['FRESH_AT']
-case.reference.update(mode='isolated-cli', issueId='11111111-1111-4111-8111-111111111111',
-    ownerId='22222222-2222-4222-8222-222222222222', issueRevision=fixture['FRESH_AT'],
-    repository='JovieInc/Jovie', pr=1, head=fixture['MAIN_SHA'],
-    workspace='/fixture/owned-repair', writerUnit='fixture-repair.service')
-if sys.argv[2]:
-    provider_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('existing-pr-repair.test.py')))
-    provider_case = provider_fixture['RepairTests']()
-    clock = provider_fixture['mock'].patch.object(
-        provider_fixture['repair'].time, 'time', return_value=fixture['NOW'].timestamp())
-    clock.start()
-    try:
-        provider_case.setUp()
-        provider_case.stack.enter_context(provider_fixture['mock'].patch.object(
-            provider_fixture['repair'], '_iso_now', return_value=fixture['NOW'].isoformat()))
-        _task, payload, config = provider_case.allowance_fixture()
-        if sys.argv[2] == 'HELD':
-            config['creditUsagePercent'] = 100
-        elif sys.argv[2] == 'UNKNOWN':
-            config.pop('creditUsagePercent')
-        case.observed.update(provider_fixture['repair'].observe_grok_allowance(payload,
-            opener=lambda *_args, **_kwargs: provider_case.allowance_response(config)))
-    finally:
-        provider_case.doCleanups()
-        clock.stop()
-if sys.argv[3]:
-    ci_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('summer-ci-audit.test.py')))
-    case.fleet['signals']['ciAudit'] = ci_fixture['fixture'](
-        [ci_fixture['check'](completed_at=fixture['FRESH_AT'])], clock=lambda: fixture['NOW'])
-print(json.dumps(fixture['MODULE'].compose_snapshot(case.fleet, case.runtime,
-    fixture['NOW'], case.attestation, existing_repair=case.reference,
-    task_admissions=case.observed)))`,
-        fixturePath,
-        providerState ?? '',
-        ciAuditV2 ? 'v2' : '',
-      ],
-      { encoding: 'utf8', timeout: 5000 }
-    )
-  );
+  const key = `${providerState ?? ''}:${ciAuditV2 ? 'v2' : ''}`;
+  const snapshot = (publisherSnapshots as Record<string, unknown>)[key];
+  if (!snapshot) throw new Error(`Missing publisher snapshot ${key}`);
+  // JSON round-trip keeps the untyped fixture shape the route contract mutates.
+  return JSON.parse(JSON.stringify(snapshot));
 }
 
 function fixtureProjection(
@@ -230,16 +198,17 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', SOURCE);
     vi.stubEnv(
-      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
-    );
-    vi.stubEnv(
       'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
       PRODUCER_PRIVATE_KEY
     );
     vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', PRODUCER_KEY_ID);
     mocks.verifyCronRequest.mockReturnValue(null);
     mocks.getVercelOidcToken.mockResolvedValue(oidcToken());
+    mocks.resolveSummerEveCallerOrigin.mockReset();
+    mocks.resolveSummerEveCallerOrigin.mockResolvedValue({
+      origin: 'https://summer.jov.ie',
+      deploymentId: 'dpl_live',
+    });
   });
 
   afterEach(() => {
@@ -293,8 +262,20 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     );
     vi.stubGlobal('fetch', fetch);
     expect(input.signals.ciAudit.measurements).toHaveLength(1);
-    expect(input.signals.ciAudit.classes).toEqual([]);
-    expect(input.signals.ciAudit.excludedClasses).toHaveLength(6);
+    expect(input.signals.ciAudit.classes).toEqual([
+      {
+        id: 'affected-only-unit-selection',
+        state: 'open',
+        owner: 'ci-risk-classifier',
+        'impact-rule': 'affected-unit-paths-only',
+        action: 'remediate-selected-ci-audit-class',
+        handle: 'audit:affected-only-units',
+      },
+    ]);
+    expect(input.signals.ciAudit.excludedClasses).toHaveLength(5);
+    expect(
+      input.signals.ciAudit.excludedClasses.map((row: { id: string }) => row.id)
+    ).not.toContain('affected-only-unit-selection');
     expect((await POST(request(input))).status).toBe(202);
     expect(
       JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).signals.ciAudit
@@ -313,6 +294,12 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.stubGlobal('fetch', fetch);
     for (const change of [
       { excludedClasses: [...audit.excludedClasses].reverse() },
+      {
+        classes: [{ ...audit.classes[0], id: 'controller-cascade-coalescing' }],
+      },
+      { classes: [{ ...audit.classes[0], state: 'implemented' }] },
+      { classes: [{ ...audit.classes[0], owner: 'forged-owner' }] },
+      { classes: [] },
       { measurements: [...audit.measurements, ...audit.measurements] },
       {
         measurements: [
@@ -581,30 +568,34 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    undefined,
-    '',
-    'https://evil.test',
-    'http://jovie-eve-shadow-abc123-jovie.vercel.app',
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app.evil.test',
-    `https://${['user', 'secret'].join(':')}@jovie-eve-shadow-abc123-jovie.vercel.app`,
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app/path',
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app?token=secret',
-    'https://jovie-eve-shadow-abc123-jovie.vercel.app#fragment',
-    'https://jovie-eve-shadow.vercel.app',
-  ])('fails closed for missing or malicious destination %#', async origin => {
-    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', origin);
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
-    const response = await POST(request(validSnapshot()));
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({
-      ok: false,
-      code: 'eve_destination_unavailable',
-    });
-    expect(fetch).not.toHaveBeenCalled();
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-  });
+  it.each([undefined, '', 'https://evil.test', 'legacy-ignored'])(
+    'posts to the production domain when a deprecated origin is %#',
+    async origin => {
+      if (origin !== undefined) {
+        vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', origin);
+        vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'legacy-ignored');
+      }
+      const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: {
+              eventId: validSnapshot().eventId,
+              decision: 'accepted',
+            },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      const response = await POST(request(validSnapshot()));
+      expect(response.status).toBe(202);
+      expect(String(fetch.mock.calls[0]?.[0])).toBe(
+        'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
+      );
+      expect(mocks.resolveSummerEveCallerOrigin).toHaveBeenCalledWith();
+    }
+  );
 
   it.each([302, 307, 308])(
     'rejects an upstream %i redirect without retry or second destination',
@@ -962,7 +953,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(call).toBeDefined();
     const [url, init] = call as Parameters<typeof globalThis.fetch>;
     expect(String(url)).toBe(
-      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-bottleneck/events'
+      'https://summer.jov.ie/ovie/v1/summer-bottleneck/events'
     );
     expect(init).toMatchObject({
       method: 'POST',
@@ -973,6 +964,8 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
         'content-type': 'application/json',
       },
     });
+    expect(init?.headers).not.toHaveProperty('x-vercel-protection-bypass');
+    expect(init?.headers).not.toHaveProperty('x-vercel-set-bypass-cookie');
     const delivered = JSON.parse(String(init?.body));
     expect(delivered.producerAttestation).toMatchObject({
       algorithm: 'Ed25519',
@@ -990,6 +983,70 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
         Buffer.from(delivered.producerAttestation.signature, 'base64url')
       )
     ).toBe(true);
+  });
+
+  it('attaches the eve-shadow bypass secret without a cookie or query secret', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', 'eve-shadow-secret');
+    vi.stubEnv('VERCEL_AUTOMATION_BYPASS_SECRET', 'jovie-project-secret');
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        {
+          ok: true,
+          receipt: { eventId: validSnapshot().eventId, decision: 'accepted' },
+        },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(202);
+    const [url, init] = fetch.mock.calls[0] as Parameters<
+      typeof globalThis.fetch
+    >;
+    expect(String(url)).not.toContain('eve-shadow-secret');
+    expect(String(url)).not.toContain('x-vercel-protection-bypass');
+    expect(init?.headers).toMatchObject({
+      authorization: `Bearer ${oidcToken()}`,
+      'x-vercel-trusted-oidc-idp-token': oidcToken(),
+      'x-vercel-protection-bypass': 'eve-shadow-secret',
+    });
+    expect(init?.headers).not.toHaveProperty('x-vercel-set-bypass-cookie');
+    expect(JSON.stringify(init?.headers)).not.toContain('jovie-project-secret');
+  });
+
+  it('rejects a header-unsafe eve bypass secret before delivery', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_PROTECTION_BYPASS_SECRET', 'bad\nsecret');
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'eve_protection_bypass_invalid',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('propagates unexpected transport-header errors without delivering the snapshot', async () => {
+    const error = new Error('Unexpected transport-header failure');
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const transportHeaders = vi
+      .spyOn(summerShadowClient, 'eveShadowTransportHeaders')
+      .mockImplementationOnce(() => {
+        throw error;
+      });
+
+    try {
+      await expect(POST(request(validSnapshot()))).rejects.toBe(error);
+      expect(transportHeaders).toHaveBeenCalledWith(oidcToken());
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      transportHeaders.mockRestore();
+    }
   });
 
   it('accepts main ahead of the deployed bridge and preserves explicit unknown authorities', async () => {
@@ -1109,22 +1166,6 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     }
   );
 
-  it('fails closed when the Eve destination is missing or outside the allowlist', async () => {
-    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'https://evil.example.com');
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
-
-    const response = await POST(request(validSnapshot()));
-
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      ok: false,
-      code: 'eve_destination_unavailable',
-    });
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
   it('rejects an all-zero source SHA before signing', async () => {
     const response = await POST(
       request({ ...validSnapshot(), sourceVersion: '0'.repeat(40) })
@@ -1205,6 +1246,41 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     await expect(response.json()).resolves.toMatchObject({
       code: 'invalid_bottleneck_snapshot',
     });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('propagates unexpected pin checker failures before OIDC or delivery', async () => {
+    const failure = new Error('pin checker crashed');
+    mocks.resolveSummerEveCallerOrigin.mockRejectedValueOnce(failure);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(POST(request(validSnapshot()))).rejects.toBe(failure);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('maps an invalid Summer pin to 503 before OIDC or delivery', async () => {
+    mocks.resolveSummerEveCallerOrigin.mockRejectedValueOnce(
+      new SummerPinInvalidError(
+        {
+          origin: 'https://summer.jov.ie',
+          projectId: 'prj_LaVQva346cjp5XfrbAIIQUln7tPH',
+          environment: 'production',
+          status: 'source-bound',
+        },
+        { status: 404 }
+      )
+    );
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const response = await POST(request(validSnapshot()));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'summer_pin_invalid',
+    });
+    expect(fetch).not.toHaveBeenCalled();
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 

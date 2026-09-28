@@ -48,3 +48,30 @@ describe('OpportunityCard formats', () => {
     expect(onReview).toHaveBeenCalledOnce();
   });
 });
+
+it('prevents selecting a disabled compact card until downloading completes', async () => {
+  const onSelect = vi.fn();
+  const { rerender } = render(
+    <OpportunityCard
+      format='compact'
+      title='Update'
+      description='Downloading'
+      icon={<span />}
+      disabled
+      onSelect={onSelect}
+    />
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+  expect(onSelect).not.toHaveBeenCalled();
+  rerender(
+    <OpportunityCard
+      format='compact'
+      title='Update'
+      description='Ready'
+      icon={<span />}
+      onSelect={onSelect}
+    />
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+  expect(onSelect).toHaveBeenCalledOnce();
+});

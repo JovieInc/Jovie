@@ -16,6 +16,7 @@ function row(
     artistProfileId: 'ce9ee7b4-67b8-4b3e-a077-698d42893ddb',
     profileIsPublic: true,
     profileIsClaimed: false,
+    profileUsername: 'austinleeds',
     creditName: null,
     role: 'main_artist',
     position: 1,
@@ -137,6 +138,27 @@ describe('structured release collaborator projection', () => {
     const result = project([
       row({ profileIsPublic: false, profileIsClaimed: true }),
     ]);
+
+    expect(result[0]).toMatchObject({
+      href: null,
+      profileState: 'unavailable',
+    });
+  });
+
+  it.each(['tmoc0g1x9dwmk71', 'testartist', 'dualipa'])(
+    'does not expose a public binding whose handle is ineligible: %s',
+    profileUsername => {
+      const result = project([row({ profileUsername })]);
+
+      expect(result[0]).toMatchObject({
+        href: null,
+        profileState: 'unavailable',
+      });
+    }
+  );
+
+  it('fails closed when a bound profile has no resolvable username', () => {
+    const result = project([row({ profileUsername: null })]);
 
     expect(result[0]).toMatchObject({
       href: null,

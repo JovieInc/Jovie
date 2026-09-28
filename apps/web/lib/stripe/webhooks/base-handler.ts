@@ -13,6 +13,13 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError } from '@/lib/error-tracking';
+import {
+  type CheckoutCorrelation,
+  extractCheckoutCorrelation,
+  hasCheckoutCorrelation,
+  mergeCheckoutCorrelation,
+  toCheckoutCorrelationReceiptFields,
+} from '@/lib/stripe/checkout-correlation';
 import { getPlanFromPriceId } from '@/lib/stripe/config';
 import {
   type BillingAuditEventType,
@@ -39,6 +46,9 @@ export interface ProcessSubscriptionResult extends HandlerResult {
 
   /** Whether the subscription is currently active */
   isActive?: boolean;
+
+  /** Durable checkout correlation recovered from session/subscription metadata. */
+  correlation?: CheckoutCorrelation;
 }
 
 /**
@@ -59,6 +69,12 @@ export interface ProcessSubscriptionOptions {
 
   /** The type of event that triggered this processing */
   eventType: BillingAuditEventType;
+
+  /** Session-level correlation; subscription metadata fills any gaps. */
+  correlation?: CheckoutCorrelation;
+
+  /** Authoritative payment facts from the triggering Stripe object. */
+  paymentFacts?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -119,6 +135,17 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
    * @returns Promise resolving to the processing result
    * @throws If price ID is missing
    */
+  protected resolveCheckoutCorrelation(
+    subscription: Stripe.Subscription,
+    sessionCorrelation?: CheckoutCorrelation
+  ): CheckoutCorrelation | undefined {
+    const correlation = mergeCheckoutCorrelation(
+      sessionCorrelation,
+      extractCheckoutCorrelation(subscription.metadata)
+    );
+    return hasCheckoutCorrelation(correlation) ? correlation : undefined;
+  }
+
   protected async processSubscription(
     options: ProcessSubscriptionOptions
   ): Promise<ProcessSubscriptionResult> {
@@ -128,7 +155,12 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       stripeEventId,
       stripeEventTimestamp,
       eventType,
+      paymentFacts,
     } = options;
+    const correlation = this.resolveCheckoutCorrelation(
+      subscription,
+      options.correlation
+    );
 
     // Determine if subscription is active
     const isActive = isActiveSubscription(subscription.status);
@@ -140,7 +172,9 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
         userId,
         stripeEventId,
         stripeEventTimestamp,
-        eventType
+        eventType,
+        correlation,
+        paymentFacts
       );
     }
 
@@ -150,7 +184,9 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       userId,
       stripeEventId,
       stripeEventTimestamp,
-      eventType
+      eventType,
+      correlation,
+      paymentFacts
     );
   }
 
@@ -164,7 +200,9 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
     userId: string,
     stripeEventId: string,
     stripeEventTimestamp: Date,
-    eventType: BillingAuditEventType
+    eventType: BillingAuditEventType,
+    correlation?: CheckoutCorrelation,
+    paymentFacts?: Readonly<Record<string, unknown>>
   ): Promise<ProcessSubscriptionResult> {
     // Determine the appropriate event type for downgrade
     const downgradeEventType: BillingAuditEventType =
@@ -185,6 +223,8 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       source: 'webhook',
       metadata: {
         subscriptionStatus: subscription.status,
+        ...toCheckoutCorrelationReceiptFields(correlation),
+        ...paymentFacts,
       },
     });
 
@@ -207,6 +247,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       isActive: false,
       skipped: result.skipped,
       reason: result.reason,
+      ...(correlation ? { correlation } : {}),
     };
   }
 
@@ -223,7 +264,9 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
     userId: string,
     stripeEventId: string,
     stripeEventTimestamp: Date,
-    eventType: BillingAuditEventType
+    eventType: BillingAuditEventType,
+    correlation?: CheckoutCorrelation,
+    paymentFacts?: Readonly<Record<string, unknown>>
   ): Promise<ProcessSubscriptionResult> {
     // Get the price ID from the subscription to determine the plan
     const priceId = subscription.items.data[0]?.price.id;
@@ -276,6 +319,8 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       metadata: {
         priceId,
         subscriptionStatus: subscription.status,
+        ...toCheckoutCorrelationReceiptFields(correlation),
+        ...paymentFacts,
       },
     });
 
@@ -299,6 +344,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       plan,
       skipped: result.skipped,
       reason: result.reason,
+      ...(correlation ? { correlation } : {}),
     };
   }
 }

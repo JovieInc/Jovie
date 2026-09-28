@@ -38,7 +38,7 @@ function matchesExactRoute(
   ...routes: readonly string[]
 ): boolean {
   if (!pathname) return false;
-  return routes.some(route => pathname === route);
+  return routes.includes(pathname);
 }
 
 function matchesRoutePrefix(
