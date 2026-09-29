@@ -395,7 +395,7 @@ export function HeroSpotifySearch({
 
   const submitControl = isEditorial ? (
     <Button
-      type='button'
+      type='submit'
       size='marketing'
       variant='primary'
       loading={isLoading && Boolean(trimmedQuery)}
@@ -407,7 +407,7 @@ export function HeroSpotifySearch({
     </Button>
   ) : (
     <button
-      type='button'
+      type='submit'
       disabled={claimButtonDisabled}
       onClick={handleClaimArtist}
       data-testid={submitTestId}
@@ -441,7 +441,15 @@ export function HeroSpotifySearch({
         treatment={isEditorial ? 'editorial' : 'default'}
         className={isEditorial ? 'rounded-full' : undefined}
       >
-        <div className={fieldClassName}>
+        <form
+          action={APP_ROUTES.START}
+          className={fieldClassName}
+          method='get'
+          onSubmit={event => {
+            event.preventDefault();
+            handleClaimArtist();
+          }}
+        >
           {isEditorial ? (
             <Search
               aria-hidden='true'
@@ -458,6 +466,7 @@ export function HeroSpotifySearch({
           <input
             ref={inputRef}
             id={inputId}
+            name='artist_name'
             type='text'
             value={searchQuery}
             onChange={handleSearchInputChange}
@@ -509,7 +518,7 @@ export function HeroSpotifySearch({
           ) : (
             <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
           )}
-        </div>
+        </form>
 
         {/* Dropdown results — inside InputAuraFrame so group-focus-within stays active while interacting */}
         {shouldShowDropdown && (

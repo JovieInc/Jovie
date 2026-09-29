@@ -68,6 +68,17 @@ Gaps closed after the first week (no PR may sit unowned):
   only): DIRTY gets `conflict`, a red rollup gets `red`, a CLEAN lane draft gets `green`, a lane
   draft idle for 48h gets `stale` (or is closed when superseded or out of attempts, its issue
   back to Todo), and a PR that went CLEAN or entered the queue starts a fresh episode.
+- Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
+  drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
+  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). An aged-out agent
+  draft is closed as abandoned — unless its body names a still-open dependency
+  ("blocked by #n", "pull/n"), in which case it holds as `hold:dependency` and is revalidated
+  every sweep: the note is never authoritative once the dependency lands or closes. A human's
+  branch is never touched.
+- Every open PR also gets one truthful disposition in `reconcile.json` (`dispositions`,
+  oldest first: `advancing`, `queued`, `ready`, `hold:<reason>`, `hold:dependency`,
+  `closing`, `draft`, `orphaned`), and the doctor raises `aged-prs` for anything open past
+  7 days so the shipping cockpit always names the oldest PRs and why they are still open.
 - Invariant: every open non-draft PR is in the merge queue, carries a `lane-fix-*` label the
   lanes will still act on, or is held with a reason (a hold label, or `lane-fix-exhausted`
   after bug intake). Anything else is listed in `reconcile.json` and raised by the doctor as
@@ -111,11 +122,18 @@ disk and the HUD heartbeat, and writes `doctor.json` (the HUD's NEEDS ATTENTION 
 Each new alert key opens a Linear issue in Triage (label `symphony`, "Symphony doctor:
 <key>") so Summer routes it; when the condition clears the issue is commented and moved
 to Done; a key that fires again within six hours reopens the same issue. Keys:
-`tick-error`, `provider-down:<lane>`, `provider-idle:codex`, `codex-all-banked`, `codex-broken`, `linear-down`,
+`tick-error`, `provider-down:<lane>`, `provider-idle:<lane>`, `codex-all-banked`, `codex-broken`, `linear-down`,
 `pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `disk-critical`,
 `github-quota`, `hud-stale`, `orphan-prs`.
-`provider-idle:codex` is urgent: after five continuous minutes with compatible work, an
-available ChatGPT account, configured slots, and zero Codex workers, capacity is being lost.
+`provider-idle:<lane>` is urgent: after five continuous minutes with compatible work, a
+healthy provider, configured slots, repeated dispatch attempts, and zero workers, capacity
+is being lost. Every alert also produces a generation-deduped
+`jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
+status feed. The receipt carries its owner, affected resources, first observation, source
+freshness, ten-minute escalation deadline, recovery result, next action, and terminal
+health proof. A new generation wakes Summer once through Linear and reopens JOV-6004 when
+that invariant had been closed; unknown Linear/pool state remains degraded evidence in the
+status feed even when Linear cannot carry the escalation itself.
 
 ## Codex lane
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, IconButton } from '@jovie/ui';
 import { X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useRef } from 'react';
@@ -23,10 +23,26 @@ export interface TeleprompterShowcaseInterstitialProps {
   readonly onStartRecording: () => void;
 }
 
-const SHOWCASE_GRADIENT_STYLE: CSSProperties = {
+// This showcase surface is intentionally always dark in both themes, so the
+// canonical semantic token vars are scoped locally instead of using raw
+// white/black palette utilities.
+const SHOWCASE_SURFACE_STYLE: CSSProperties = {
   background:
     'radial-gradient(120% 100% at 50% -8%, color-mix(in oklab, var(--color-accent-blue) 36%, #101020) 0%, #0a0a12 58%)',
-};
+  boxShadow: '0 28px 80px rgba(0, 0, 0, 0.5)',
+  '--color-text-primary-token': '#ffffff',
+  '--color-text-secondary-token': 'rgba(255, 255, 255, 0.75)',
+  '--color-text-tertiary-token': 'rgba(255, 255, 255, 0.65)',
+  '--color-bg-surface-1': 'rgba(255, 255, 255, 0.08)',
+  '--color-bg-surface-2': 'rgba(255, 255, 255, 0.14)',
+  '--color-interactive-hover': 'rgba(255, 255, 255, 0.1)',
+  '--color-border-subtle': 'rgba(255, 255, 255, 0.12)',
+  '--color-border-focus': 'rgba(255, 255, 255, 0.55)',
+  '--color-bg-page': '#0a0a12',
+  '--color-btn-primary-bg': '#ffffff',
+  '--color-btn-primary-fg': '#000000',
+  '--color-btn-primary-hover': 'rgba(255, 255, 255, 0.92)',
+} as CSSProperties;
 
 export function TeleprompterShowcaseInterstitial({
   open,
@@ -85,32 +101,34 @@ export function TeleprompterShowcaseInterstitial({
         aria-labelledby='teleprompter-showcase-title'
         className={cn(
           'relative z-10',
-          'relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/12',
-          'p-6 text-white shadow-[0_28px_80px_rgba(0,0,0,0.5)] dark:text-white sm:p-8'
+          'w-full max-w-lg overflow-hidden rounded-3xl border border-subtle',
+          'p-6 text-primary-token sm:p-8'
         )}
-        style={SHOWCASE_GRADIENT_STYLE}
+        style={SHOWCASE_SURFACE_STYLE}
       >
-        <button
-          type='button'
+        <IconButton
+          variant='ghost'
+          size='md'
           onClick={handleDismiss}
-          className='absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/14 bg-white/8 text-white/80 transition-colors hover:bg-white/14 dark:text-white/80'
-          aria-label='Dismiss Teleprompter Preview'
+          className='absolute right-4 top-4'
+          ariaLabel='Dismiss Teleprompter Preview'
         >
-          <X className='h-4 w-4' aria-hidden='true' />
-        </button>
+          <X aria-hidden='true' />
+        </IconButton>
 
         <div className='grid gap-6 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center'>
           <div className='min-w-0'>
-            <p className='text-2xs font-medium text-white/65 dark:text-white/65'>
-              {title}
-            </p>
+            <p className='text-2xs font-medium text-tertiary-token'>{title}</p>
             <h2
               id='teleprompter-showcase-title'
-              className='mt-2 text-xl font-semibold tracking-tighter text-white dark:text-white'
+              className='mt-2 text-xl font-semibold tracking-tighter'
             >
               {'Record With A Voice Following Teleprompter'}
             </h2>
-            <p className='mt-2 max-w-[34ch] text-sm leading-5 text-white/72 dark:text-white/72'>
+            <p
+              className='mt-2 text-sm leading-5 text-secondary-token'
+              style={{ maxWidth: '34ch' }}
+            >
               Jovie scrolls your script in real time as you speak, so you keep
               eye contact with the camera.
             </p>
@@ -118,7 +136,6 @@ export function TeleprompterShowcaseInterstitial({
               <Button
                 type='button'
                 size='sm'
-                className='bg-white text-black hover:bg-white/92 dark:bg-white dark:text-black dark:hover:bg-white/92'
                 onClick={handleStart}
                 data-testid='teleprompter-showcase-start'
               >
@@ -127,8 +144,7 @@ export function TeleprompterShowcaseInterstitial({
               <Button
                 type='button'
                 size='sm'
-                variant='outline'
-                className='border-white/20 bg-transparent text-white hover:bg-white/10 dark:text-white'
+                variant='tertiary'
                 onClick={handleDismiss}
               >
                 Not Now

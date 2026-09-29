@@ -618,15 +618,21 @@ const nextConfig = {
 
     return {
       beforeFiles: [
+        {
+          source: '/hud/wiki',
+          destination: '/app/ov/wiki',
+        },
+        {
+          source: '/hud/wiki/:path*',
+          destination: '/app/ov/wiki/:path*',
+        },
         // Default /hud is a filesystem route outside /app/(shell). Intercept
-        // it before that page so Ops inherits sidebar + app chrome. Isolated
-        // query modes stay on /hud: fullscreen and kiosk token. The packaged
-        // Mac door (?ovie=mac) also gets the shell so the founder can reach
-        // Chat, Growth and revenue from Ops (JOV-6164).
+        // it before that page so Ops inherits sidebar + app chrome. A signed
+        // kiosk token is the only presentation boundary; browser fullscreen
+        // expands the existing main-content surface.
         {
           source: '/hud',
           missing: [
-            { type: 'query', key: 'fs', value: '1' },
             { type: 'query', key: 'kiosk' },
             { type: 'query', key: 'mode', value: 'kiosk' },
           ],

@@ -224,7 +224,10 @@ export default function DownloadPage() {
                 </div>
 
                 <div className='relative min-h-96 lg:min-h-144'>
-                  <div className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'>
+                  <div
+                    className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
+                    data-overlap='intentional'
+                  >
                     <Image
                       src={DESKTOP_IMAGE.publicUrl}
                       alt='Jovie public demo showing the releases catalog'
@@ -236,7 +239,10 @@ export default function DownloadPage() {
                       className='h-full w-full object-cover object-left-top opacity-90'
                     />
                   </div>
-                  <div className='absolute top-0 right-0 w-52 overflow-hidden rounded-3xl border border-subtle bg-(--system-b-cinematic-black) shadow-card max-sm:hidden'>
+                  <div
+                    className='absolute top-0 right-0 w-52 overflow-hidden rounded-3xl border border-subtle bg-(--system-b-cinematic-black) shadow-card max-sm:hidden'
+                    data-overlap='intentional'
+                  >
                     <Image
                       src={PROFILE_IMAGE.publicUrl}
                       alt='Jovie iPhone alpha profile QR and public profile surface'

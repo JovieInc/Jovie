@@ -130,7 +130,8 @@ const UNIFIED_TABLE =
 const UNIFIED_TABLE_NO_INSET: PenParitySource = {
   kind: 'structural',
   file: UNIFIED_TABLE,
-  contains: "className={cn('overflow-auto', containerClassName)}",
+  contains:
+    "className={cn('w-full min-w-0 overflow-auto', containerClassName)}",
   value: 0,
 };
 const pageToolbar = (exportRef: string, utility: string): PenParitySource => ({

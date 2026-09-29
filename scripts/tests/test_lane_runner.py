@@ -323,6 +323,18 @@ class ProviderAndLockTest(unittest.TestCase):
 class FakeLinear:
     def __init__(self, issues):
         self.issues, self.moves, self.comments, self.triaged = issues, [], [], []
+        self.issue_state = {"name": "Todo", "type": "unstarted"}
+
+    def gql(self, query, variables):
+        # The issue-lookup used for terminal dispositions (pr_events.linear_issue).
+        number = int(variables.get("n") or 0)
+        issue_id = f"id-JOV-{number}"
+        comments = [{"body": body} for iid, body in self.comments if iid == issue_id]
+        node = {"id": issue_id, "state": self.issue_state, "comments": {"nodes": comments}}
+        return {"issues": {"nodes": [] if self.missing_issue(number) else [node]}}
+
+    def missing_issue(self, number):
+        return number in getattr(self, "missing", set())
 
     def create_triage(self, title, description, dedupe=None):
         if dedupe and any(dedupe in open_title for open_title in getattr(self, "open_titles", [])):
@@ -585,13 +597,13 @@ class WorkerTest(unittest.TestCase):
             failures = json.loads((self.host.state / "failures.json").read_text())
             failures["JOV-3"]["at"] = 0  # skip the retry backoff between attempts
             (self.host.state / "failures.json").write_text(json.dumps(failures))
-        self.assertEqual([m[1] for m in self.linear.moves if m[1] != "In Progress"], ["Todo", "Todo", "Triage"])
+        self.assertEqual([m[1] for m in self.linear.moves if m[1] != "In Progress"], ["Todo", "Todo", "Backlog"])
         self.assertEqual(json.loads((self.host.state / "failures.json").read_text())["JOV-3"]["count"], 3)
 
-    def test_not_shippable_goes_to_triage_without_a_failure(self):
+    def test_not_shippable_gets_a_terminal_disposition_without_a_failure(self):
         lane.run_issue = lambda *a: {"verdict": "not-shippable", "reasons": ["already fixed"]}
         lane.worker(self.host, "devin")
-        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Triage"))
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Backlog"))
         self.assertFalse((self.host.state / "failures.json").exists())
         self.assertEqual(len(self.execs), 1)
 
@@ -600,7 +612,7 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(lane.worker(self.host, "devin"), 1)
         self.assertTrue(lane.cooling(self.host, "devin"))
         self.assertFalse((self.host.state / "failures.json").exists())
-        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Triage"))
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Backlog"))
         self.assertEqual(self.execs, [])
 
     def test_red_prs_are_fixed_before_new_issues_are_claimed(self):
@@ -827,7 +839,13 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(lane.red_pr([self.pr()], {"5": {"sha": "h1", "count": 1, "at": time.time(),
                                                          "endedAt": time.time()}})["number"], 5,
                          "an attempt that ended without moving the head never parks the PR")
-        self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}}))
+        # The spent head and the head our own fix pushed stay terminal; a head nobody here
+        # pushed is new authoritative evidence and re-enters a fresh bounded generation (JOV-7089).
+        self.assertIsNone(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h2", "count": 2}}))
+        self.assertIsNone(lane.red_pr([self.pr(sha="h2")],
+                                      {"5": {"sha": "h1", "count": 2, "pushed": True, "pushedHead": "h2"}}))
+        self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}})["number"], 5,
+                         "an external head is re-entry evidence, not part of the dead generation")
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
 
     def test_red_pr_never_takes_a_held_pr(self):
@@ -1049,12 +1067,17 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][:4], ["gh", "pr", "view", "8"])
 
-    def test_exhausted_heads_escalate_once_to_triage(self):
-        stuck = {**self.pr(number=7), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
+    def test_exhausted_heads_get_one_terminal_disposition_not_queue_inventory(self):
+        stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
+                 "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
         attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}
         self.assertEqual([pr["number"] for pr in lane.exhausted_prs([stuck], attempts)], [7])
-        self.assertEqual([pr["number"] for pr in lane.exhausted_prs([{**stuck, "headRefOid": "h2"}], attempts)], [7],
-                         "the head the last fix pushed is still stuck: spent attempts escalate, never wait silently")
+        self.assertEqual([pr["number"] for pr in lane.exhausted_prs(
+            [{**stuck, "headRefOid": "h2"}],
+            {"7": {**attempts["7"], "pushed": True, "pushedHead": "h2"}})], [7],
+            "the head the last fix pushed is still stuck: spent attempts escalate, never wait silently")
+        self.assertEqual(lane.exhausted_prs([{**stuck, "headRefOid": "h2"}], attempts), [],
+                         "a head nobody here pushed is new evidence: the fix loop owns re-entry")
         green = {**stuck, "headRefOid": "h2", "mergeStateStatus": "CLEAN",
                  "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}]}
         self.assertEqual(lane.exhausted_prs([green], attempts), [], "a head that went green is not escalated")
@@ -1071,16 +1094,23 @@ class FixRedTest(unittest.TestCase):
                 lane.escalate_exhausted(host, [stuck], linear)
             finally:
                 lane.sh = real
-            self.assertEqual(linear.triaged, ["Fix loop exhausted: PR #7 stuck one"], "escalated exactly once")
+            self.assertEqual(linear.triaged, [], "a terminal outcome is not generic Triage inventory (JOV-7089)")
+            self.assertEqual(linear.moves, [("id-JOV-7", "Backlog")],
+                             "the owning issue gets exactly one explicit disposition")
+            self.assertEqual(len(linear.comments), 1, "one durable disposition receipt")
+            self.assertIn("terminal-disposition pr=7 head=h1", linear.comments[0][1])
+            self.assertIn("jovie-terminal-disposition/v1", linear.comments[0][1])
             self.assertEqual(len([p for p in posted if p[:3] == ["gh", "pr", "comment"]]), 1)
             self.assertTrue(json.loads((host.state / "fix-attempts.json").read_text())["7"]["escalated"])
 
-    def test_exhausted_intake_dedupes_on_linear_when_local_flag_is_lost(self):
-        stuck = {**self.pr(number=19246), "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck"}
+    def test_terminal_disposition_dedupes_on_the_issue_when_local_flag_is_lost(self):
+        stuck = {**self.pr(number=19246), "headRefName": "devin/jov-46-20260928000000",
+                 "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck"}
         real = lane.sh
         lane.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout="")
         linear = FakeLinear([])
-        linear.open_titles = ["Fix loop exhausted: PR #19246 stuck"]
+        # The disposition receipt for this head already exists on the owning issue.
+        linear.comments.append(("id-JOV-46", "🤖 lanes terminal-disposition pr=19246 head=h1: …"))
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
             # A later attempt rewrote the record without `escalated` (the duplicate-issue bug).
@@ -1089,9 +1119,8 @@ class FixRedTest(unittest.TestCase):
                 lane.escalate_exhausted(host, [stuck], linear)
             finally:
                 lane.sh = real
-        self.assertEqual(linear.triaged, [], "an open intake issue for the PR already exists")
-        linear.open_titles = ["Fix loop exhausted: PR #1924 other"]
-        self.assertEqual(linear.create_triage("t", "d", dedupe="PR #19246 "), "triage-id", "no prefix collisions")
+        self.assertEqual(linear.triaged, [], "no queue inventory for a terminal generation")
+        self.assertEqual(linear.moves, [], "a receipted disposition is not applied twice")
 
     def test_claim_records_attempt_before_work(self):
         real = lane.open_prs_summary, lane.sh
@@ -1282,6 +1311,26 @@ class UpdateTest(unittest.TestCase):
                     os.environ.pop("LANES_SELFTEST", None)
                 else:
                     os.environ["LANES_SELFTEST"] = old_env
+
+
+class UpdateBackoffTest(unittest.TestCase):
+    def test_a_refused_tree_backs_off_instead_of_stalling_every_dispatch_tick(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp) / "state", repo=Path(tmp) / "no-repo")
+            host.state.mkdir()
+            real = lane.sh
+            lane.sh = lambda cmd, **k: SimpleNamespace(returncode=0, stderr="", stdout="t1\n" if "rev-parse" in cmd else "")
+            try:
+                refused = host.state / "update-refused.json"
+                refused.write_text(json.dumps({"tree": "t1", "at": time.time(), "why": "self-test timeout"}))
+                self.assertEqual(lane.install_release(host), 1)
+                self.assertFalse((host.state / "releases").exists(), "no self-test ran inside the backoff window")
+                refused.write_text(json.dumps({"tree": "t1", "at": time.time() - lane.UPDATE_RETRY_S - 1}))
+                with self.assertRaises(Exception):  # past the window it tries again (git archive here fails)
+                    lane.install_release(host)
+                self.assertTrue((host.state / "releases").exists())
+            finally:
+                lane.sh = real
 
 
 class RequeueTest(unittest.TestCase):

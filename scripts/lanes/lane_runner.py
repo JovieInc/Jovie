@@ -888,6 +888,12 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False) 
     return {**result, "verdict": "landing" if queued.returncode == 0 else "verified-not-queued"}
 
 
+UPDATE_TEST_TIMEOUT_S = 900
+# `update` runs ahead of every dispatch tick, so a refused tree waits this long before its
+# self-test runs again instead of stalling dispatch every minute.
+UPDATE_RETRY_S = 1800
+
+
 def update_json(path: Path, change) -> None:
     data = json.loads(path.read_text()) if path.exists() else {}
     change(data)
@@ -974,7 +980,8 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
             if not any(check.get("conclusion") in RED for check in checks):
                 continue
         record = attempts.get(str(pr["number"]), {})
-        if pr_events.in_flight(record, pr, time.time()) or record.get("count", 0) >= MAX_FIX_ATTEMPTS:
+        if pr_events.in_flight(record, pr, time.time()) \
+                or pr_events.spent(record, pr["headRefOid"], MAX_FIX_ATTEMPTS):
             continue
         return pr
     return None
@@ -990,9 +997,10 @@ def exhausted_prs(prs: list[dict], attempts: dict, held: dict | None = None) -> 
         if not pr_events.fixable_hold((held or {}).get(str(pr["number"])), pr["headRefOid"]):
             stuck.append(pr)  # deterministic hold: intake once, not MAX_FIX_ATTEMPTS model calls
             continue
-        # Spent attempts are terminal for the PR (red_pr never retries it), so a head the last
-        # fix pushed that is still stuck escalates too instead of waiting silently.
-        if record.get("count", 0) >= MAX_FIX_ATTEMPTS:
+        # Spent attempts are terminal for this head's generation (red_pr never retries it), so
+        # a head the last fix pushed that is still stuck escalates too instead of waiting
+        # silently. A head nobody here pushed is new evidence: re-entry, not escalation.
+        if pr_events.spent(record, pr["headRefOid"], MAX_FIX_ATTEMPTS):
             checks = pr.get("statusCheckRollup") or []
             if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED" \
                     or any(check.get("conclusion") in RED for check in checks):
@@ -1000,33 +1008,68 @@ def exhausted_prs(prs: list[dict], attempts: dict, held: dict | None = None) -> 
     return stuck
 
 
+def owning_issue(linear, pr: dict) -> dict | None:
+    """The Linear issue this PR's lane branch names — the durable owner of the fix generation."""
+    found = LANE_BRANCH.match(pr.get("headRefName") or "")
+    if not found:
+        return None
+    try:
+        return pr_events.linear_issue(linear, found.group("issue"))
+    except Exception:
+        return None
+
+
+DISPOSITION_MARKER = "terminal-disposition"
+
+
+def apply_terminal_disposition(linear, pr: dict, record: dict, reason: str) -> None:
+    """JOV-7089: a terminal fix generation never falls back into an ordinary work queue. The
+    owning issue moves out of Todo/Triage to Backlog under one durable receipt naming the
+    terminal head and the re-entry conditions; the marker dedupes repeat escalations across
+    hosts and passes, so the disposition is applied exactly once per terminal head."""
+    issue = owning_issue(linear, pr)
+    if not issue or (issue.get("state") or {}).get("type") in ("completed", "canceled"):
+        return
+    marker = f"{DISPOSITION_MARKER} pr={pr['number']} head={pr['headRefOid']}"
+    if any(marker in (node.get("body") or "")
+           for node in (issue.get("comments") or {}).get("nodes") or []):
+        return
+    linear.move(issue["id"], "Backlog")
+    receipt = {"schema": "jovie-terminal-disposition/v1", "pr": pr["number"], "url": pr.get("url"),
+               "terminalGeneration": {"head": pr["headRefOid"], "attempts": record.get("count", 0),
+                                      "reason": reason},
+               "disposition": "needs-human-decision",
+               "reentry": ["new-pr-head", "cleared-dependency", "config-change", "policy-override"]}
+    linear.comment(issue["id"],
+                   f"🤖 lanes {marker}: {record.get('count', 0) or 'no'} fix attempts on head "
+                   f"`{pr['headRefOid'][:12]}` reached a terminal outcome (`{reason}`); the diagnosis "
+                   "stays on the PR and in the execution ledger. This issue waits in Backlog — retry "
+                   "exhaustion is not Todo/Triage admission (JOV-7089). Re-entry needs new "
+                   "authoritative evidence: a new PR head, a cleared dependency, a relevant "
+                   "config/environment change, or a certified policy override with a new bounded "
+                   f"envelope.\n```json\n{json.dumps(receipt, sort_keys=True)}\n```")
+
+
 def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
-    """Bug intake, never Tim: comment on the PR, open a Linear Triage issue once, mark it escalated."""
+    """Terminal disposition, never a queue: comment on the PR, tombstone the head, move the
+    owning issue to its explicit Backlog disposition once (JOV-7089)."""
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
     for pr in exhausted_prs(prs, attempts, held):
         record = attempts.get(str(pr["number"]), {})
         if record.get("count", 0):
+            reason = "fix-exhausted"
             body = (f"🤖 lanes: {MAX_FIX_ATTEMPTS} fix attempts on head `{pr['headRefOid'][:7]}` did not make this PR green "
                     f"(merge state {pr.get('mergeStateStatus')}, review {pr.get('reviewDecision') or 'none'}). "
-                    "Filed through bug intake (Linear Triage); the lanes stop here.")
+                    "Terminal disposition on the owning issue (needs human decision); the lanes stop here. "
+                    "Re-entry needs a new head, a cleared dependency, or a policy override (JOV-7089).")
         else:
-            code = (held.get(str(pr["number"])) or {}).get("reason") or "unfixable"
+            reason = (held.get(str(pr["number"])) or {}).get("reason") or "unfixable"
             body = (f"🤖 lanes: the gate held head `{pr['headRefOid'][:7]}` for a reason no code push can clear "
-                    f"(`{code}`; merge state {pr.get('mergeStateStatus')}). "
-                    "Filed through bug intake (Linear Triage); the lanes stop here.")
+                    f"(`{reason}`; merge state {pr.get('mergeStateStatus')}). "
+                    "Terminal disposition on the owning issue (needs human decision); the lanes stop here.")
         sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG, "--body", body])
-        title = ("Fix loop exhausted" if record.get("count", 0) else "Unfixable gate hold") \
-            + f": PR #{pr['number']} {pr.get('title', '')[:80]}"
-        try:
-            # The local `escalated` flag is lost when a later fix attempt rewrites the record (and is
-            # per host), so Linear is the dedupe authority: one open intake issue per PR (JOV-7073).
-            linear.create_triage(title,
-                                 pr_events.bug_report(pr, f"{body}\n\nHost `{HOST}`, {now_iso()}.", HOST, record),
-                                 dedupe=f"PR #{pr['number']} ")
-        except Exception:
-            pass
         attempts[str(pr["number"])] = {**record, "escalated": True}
         pr_events.add_label(pr["number"], pr_events.EXHAUSTED, sh)  # held with a reason, visible on the PR
         # Spent attempts rename the hold fix-exhausted; a zero-attempt hold keeps its real reason.
@@ -1036,6 +1079,11 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
         if found and found.group("lane") in pr_events.disabled_lanes(load_providers()):
             pr_events.return_to_pool(THIS, linear, pr, "orphaned lane PR after its fix attempts ran out")
+        try:
+            # After the pool return so the terminal disposition wins over a Todo re-admission.
+            apply_terminal_disposition(linear, pr, record, reason)
+        except Exception:
+            pass  # Linear down: the PR label and held record still tombstone the head
     path.write_text(json.dumps(attempts))
 
 
@@ -1211,8 +1259,12 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
         finally:
             remove_worktree(host, worktree)
             # The attempt is over: a head it did not move may be tried again by the next lane.
+            # A head the fix itself pushed continues this generation rather than earning
+            # re-entry (JOV-7089), so it is recorded as the generation's self-produced head.
             update_json(host.state / "fix-attempts.json", lambda attempts: attempts.get(str(pr["number"]), {}).update(
-                endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed"))
+                endedAt=time.time(), pushed=receipt.get("verdict") == "fix-pushed",
+                **({"pushedHead": receipt["headAfter"]}
+                   if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter") else {})))
     evidence = read_provider_evidence(provider_evidence)
     if evidence:
         receipt["providerEvidence"] = evidence
@@ -1522,9 +1574,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         entry = held.get(str(pr["number"]), {})
         if entry.get("sha") == pr["headRefOid"]:
             pr = {**pr, "gateEvidence": entry.get("evidence", [])}
-        record = attempts.get(str(pr["number"]), {})
-        attempts[str(pr["number"])] = {"sha": pr["headRefOid"], "count": record.get("count", 0) + 1,
-                                       "lane": name, "at": now}
+        pr_events.record_attempt(attempts, pr["number"], pr["headRefOid"], name, now)
         path.write_text(json.dumps(attempts))
         post_claim(pr["number"], pr["headRefOid"], "fix")
     return pr
@@ -1596,24 +1646,29 @@ def worker(host: Host, name: str) -> int:
         slot.release()
         return reexec(host, name)
     if verdict == "quarantined":
-        linear.move(issue.id, "Triage")
+        # A terminal generation must not sit in a generic work queue (JOV-7089): Backlog is the
+        # explicit human-decision disposition, out of Todo/Triage until a valid re-entry.
+        linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane stopped at the durable execution terminal ({receipt['reasons'][0]}). "
-                                 "Re-entry requires new authoritative revision evidence or a bounded policy override.")
+                                 "Disposition: needs human decision. Re-entry requires new authoritative "
+                                 "revision evidence or a bounded policy override.")
         slot.release()
         return reexec(host, name)
     if verdict == "provider-error":
         cooldown = host.state / "cooldown" / name
         cooldown.parent.mkdir(parents=True, exist_ok=True)
         cooldown.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
-        linear.move(issue.id, "Triage")
+        linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane `{name}` provider failed before working the issue "
-                                 f"({', '.join(receipt.get('reasons', []))}); unknown outcome quarantined, lane cooling down.")
+                                 f"({', '.join(receipt.get('reasons', []))}); unknown outcome quarantined, lane "
+                                 "cooling down. Disposition: blocked on the provider dependency; re-entry "
+                                 "once a healthy lane or a human clears it.")
         slot.release()
         return 1
     if verdict == "not-shippable":
-        linear.move(issue.id, "Triage")
+        linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}\n"
-                                 "Returned to Triage for Summer/owner routing.")
+                                 "Disposition: obsolete/invalid — needs a human decision, not a work queue.")
     elif verdict in ("landing", "verified-not-queued"):
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} passed the lane gate and is "
                                  f"queued; required checks and the merge queue decide.")
@@ -1636,9 +1691,13 @@ def worker(host: Host, name: str) -> int:
         finally:
             claim.release()
         exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
-        linear.move(issue.id, "Triage" if exhausted else "Todo")
+        # A run that exhausted its bounded retries is terminal: Backlog under an explicit
+        # disposition, not generic Triage admission (JOV-7089).
+        linear.move(issue.id, "Backlog" if exhausted else "Todo")
         linear.comment(issue.id, f"🤖 lane `{name}`: {verdict} ({', '.join(receipt.get('reasons', []))}). "
-                                 + ("Returned to Triage after 3 attempts." if exhausted else "Back to Todo."))
+                                 + ("Terminal after 3 attempts — disposition: needs human decision; "
+                                    "re-entry requires new authoritative evidence or a certified policy "
+                                    "override (JOV-7089)." if exhausted else "Back to Todo."))
     slot.release()
     return reexec(host, name)
 
@@ -1784,6 +1843,11 @@ def install_release(host: Host) -> int:
     if not needs_update(marker.read_text().strip() if marker.exists() else None, tree):
         return 0
     release = host.state / "releases" / tree
+    refused_path = host.state / "update-refused.json"
+    refused = json.loads(refused_path.read_text()) if refused_path.exists() else {}
+    if not release.exists() and refused.get("tree") == tree and time.time() - refused.get("at", 0) < UPDATE_RETRY_S:
+        print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
+        return 1
     if not release.exists():
         staging = host.state / "releases" / f".{tree}.tmp"
         shutil.rmtree(staging, ignore_errors=True)
@@ -1794,12 +1858,21 @@ def install_release(host: Host) -> int:
         # The self-test must never touch this host's live state: point it at a scratch dir.
         scratch = staging / ".selftest-state"
         scratch.mkdir(exist_ok=True)
-        test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                              cwd=staging, capture_output=True, text=True, timeout=300,
-                              env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+        # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
+        # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
+        def refuse(why: str) -> int:
+            refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+            return 1
+        try:
+            test = subprocess.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                                  env={**os.environ, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+        except subprocess.TimeoutExpired:
+            refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
+            raise
         if test.returncode != 0:
             print(f"lane update refused: release tests failed\n{test.stderr[-2000:]}", file=sys.stderr)
-            return 1
+            return refuse("release tests failed")
         (staging / "scripts/lanes/.tree").write_text(tree)
         staging.rename(release)
     link = host.state / ".current.tmp"

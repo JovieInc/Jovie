@@ -50,4 +50,27 @@ describe('ChatLinkConfirmationCard', () => {
       'before:min-w-11'
     );
   });
+
+  it('styles the confirm action with canonical button tokens', () => {
+    render(
+      <ChatLinkConfirmationCard
+        profileId='profile-1'
+        platform={{
+          id: 'spotify',
+          name: 'Spotify',
+          icon: 'spotify',
+          color: 'brand-spotify',
+        }}
+        normalizedUrl='https://open.spotify.com/artist/example'
+        originalUrl='https://open.spotify.com/artist/example'
+      />
+    );
+
+    const confirm = document.querySelector(
+      '.system-b-chat-link-primary-action'
+    );
+    expect(confirm?.className).toContain('--color-btn-primary-bg');
+    expect(confirm?.className).toContain('--color-btn-primary-hover');
+    expect(confirm?.className).not.toContain('linear-btn');
+  });
 });

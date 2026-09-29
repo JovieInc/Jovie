@@ -100,6 +100,15 @@ describe('OvieCertificationsWorkspace', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
+  it('delegates the page title to the shell without a redundant heading', () => {
+    mockQuery({ data: fixtureInventory() });
+    render(<OvieCertificationsWorkspace />);
+
+    expect(
+      screen.queryByRole('heading', { name: 'Certifications' })
+    ).toBeNull();
+  });
+
   it('shows the empty state when connected domains have no items', () => {
     mockQuery({ data: { ...fixtureInventory(), rows: [] } });
     render(<OvieCertificationsWorkspace />);

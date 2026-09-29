@@ -7,7 +7,7 @@ import { useCallback, useMemo } from 'react';
 import {
   SidebarMenuAction,
   SidebarMenuActions,
-} from '@/components/organisms/Sidebar';
+} from '@/components/organisms/sidebar';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
