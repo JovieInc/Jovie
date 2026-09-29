@@ -3,6 +3,23 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CREATE_MERCH_HREF, InstantMerchLanding } from './InstantMerchLanding';
 
+vi.mock('next/image', () => ({
+  default: (props: { readonly alt?: string; readonly src?: unknown }) => (
+    <img
+      alt={props.alt ?? ''}
+      src={typeof props.src === 'string' ? props.src : ''}
+    />
+  ),
+}));
+
+vi.mock('@/lib/queries/useConfirmChatMerchActionMutation', () => ({
+  useConfirmChatMerchActionMutation: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
 vi.mock('next/link', () => ({
   default: ({
     href,

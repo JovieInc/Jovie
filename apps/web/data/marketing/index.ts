@@ -378,6 +378,8 @@ export type {
   MarketingRouteDisposition,
   MarketingRouteDispositionLedgerEntry,
   MarketingRouteHealthTarget,
+  ProductEvidenceDeclaration,
+  ProductEvidenceKind,
   RouteManifestEntry,
   RouteRecipeParityReport,
 } from './routeManifest';
@@ -388,11 +390,14 @@ export {
   getRouteManifestEntry,
   getRouteRecipeParity,
   isExempt,
+  isProductRouteEntry,
   isRecipeRoute,
   MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
   MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
+  PRODUCT_ROUTE_RECIPES,
+  productEvidenceDeclarationIssue,
 } from './routeManifest';
 export type {
   AudienceLegality,

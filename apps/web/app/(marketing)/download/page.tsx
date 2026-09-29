@@ -227,6 +227,7 @@ export default function DownloadPage() {
                   <div
                     className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
                     data-overlap='intentional'
+                    data-testid='download-desktop-screenshot'
                   >
                     <Image
                       src={DESKTOP_IMAGE.publicUrl}
