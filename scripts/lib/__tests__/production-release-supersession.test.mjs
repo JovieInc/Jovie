@@ -304,7 +304,10 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
   const fixture = makeFixture('controller-finalize-');
   const marker = join(fixture.root, 'production-generation-verified.json');
   mkdirSync(join(fixture.root, 'release-lineage'), { recursive: true });
-  writeFileSync(join(fixture.root, 'release-lineage/fleet-admission.json'), JSON.stringify({ scopedAdmission: { revision: EXPECTED_SHA } }));
+  writeFileSync(
+    join(fixture.root, 'release-lineage/fleet-admission.json'),
+    JSON.stringify({ scopedAdmission: { revision: EXPECTED_SHA } })
+  );
   stubCommand(
     fixture.bin,
     'gh',

@@ -25,18 +25,15 @@ STATUS_WEIGHT = {"healthy": 0, "unknown": 1, "unhealthy": 2}
 
 class ScopedAdmissionError(ValueError):
     pass
-
 def _string(value: object, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ScopedAdmissionError(f"{name} must be a non-empty string")
     return value.strip()
-
 def _sha(value: object, name: str) -> str:
     revision = _string(value, name)
     if len(revision) != 40 or any(char not in "0123456789abcdef" for char in revision):
         raise ScopedAdmissionError(f"{name} must be an exact lowercase SHA")
     return revision
-
 def _time(value: object, name: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(_string(value, name).replace("Z", "+00:00"))
