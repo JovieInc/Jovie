@@ -149,6 +149,30 @@ describe('MarketingHero source-backed default story', () => {
     ).toHaveClass('marketing-h1-max-two-lines');
   });
 
+  it('lets a landing hero opt out of headline clamping', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='unclamped-heading'
+        title='Never clipped headline'
+        body='Landing body'
+        media={<div>Media</div>}
+        headlineMaxLines='none'
+      />
+    );
+
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: 'Never clipped headline',
+    });
+    expect(heading).not.toHaveClass(
+      'line-clamp-2',
+      'line-clamp-3',
+      'marketing-h1-max-two-lines'
+    );
+    expect(heading).not.toHaveStyle({ WebkitLineClamp: '3' });
+  });
+
   it('uses the canonical growing action contract for a landing secondary CTA', () => {
     render(
       <MarketingHero
