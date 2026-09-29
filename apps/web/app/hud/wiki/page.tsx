@@ -6,6 +6,7 @@ import { WikiSearchForm } from '@/components/features/admin/wiki/WikiSearchForm'
 import { WikiSearchResults } from '@/components/features/admin/wiki/WikiSearchResults';
 import { WikiUnavailableNotice } from '@/components/features/admin/wiki/WikiUnavailableNotice';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import { listPages, searchPages } from '@/lib/wiki/gbrain-client';
 import { groupByNamespace } from '@/lib/wiki/namespace';
 
@@ -15,6 +16,7 @@ interface Props {
 
 export default async function WikiIndexPage({ searchParams }: Props) {
   const access = await getCurrentAdminPageAccess();
+  if (access.hasAdminRole) await assertOviePrivacyUnlocked();
   if (!access.isAuthenticated) unauthorized();
   if (!access.hasAdminRole) forbidden();
 

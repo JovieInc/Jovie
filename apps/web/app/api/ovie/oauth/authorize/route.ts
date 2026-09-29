@@ -7,10 +7,13 @@ import {
   ovieFounderLoginLocation,
   ovieIssuerSecret,
 } from '@/lib/ovie/mcp/oauth';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const denied = await requireOvieApiAccess({ privileged: true });
+  if (denied) return denied;
   const url = new URL(request.url);
   const clientId = url.searchParams.get('client_id') ?? '';
   const redirectUri = url.searchParams.get('redirect_uri') ?? '';

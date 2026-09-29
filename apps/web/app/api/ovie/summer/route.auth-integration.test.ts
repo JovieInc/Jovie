@@ -12,8 +12,8 @@ const mocks = vi.hoisted(() => ({
   store: undefined as OperatingStore | undefined,
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mocks.entitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mocks.entitlements,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
