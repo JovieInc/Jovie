@@ -58,6 +58,11 @@ function macosTopLevelDirs() {
         entry.name !== 'node_modules'
     )
     .map(entry => entry.name)
+    .filter(
+      name =>
+        walkFiles(join('apps/macos', name), abs => abs.endsWith('.swift'))
+          .length > 0
+    )
     .sort();
 }
 
@@ -106,6 +111,10 @@ describe('Mac Swift-control invariants (JOV-5359)', () => {
       'apps/macos',
       abs => abs.endsWith('.swift') && !abs.includes('/.build/')
     );
+    const swiftTopLevelDirs = new Set(
+      macosSwift.map(file => file.split('/')[2])
+    );
+    assert.deepEqual([...swiftTopLevelDirs].sort(), ['MenuMonitor']);
     assert.equal(
       macosSwift.every(file => file.startsWith('apps/macos/MenuMonitor/')),
       true
