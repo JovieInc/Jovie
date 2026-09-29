@@ -9,6 +9,7 @@ import {
   candidateLineKey,
   deriveStepFromToolEvents,
   MIN_CANDIDATE_CONVERSIONS,
+  ONBOARDING_SCRIPT_AUTO_PROMOTION,
   shouldPromoteCandidate,
 } from '@/lib/onboarding/script-aggregation';
 
@@ -210,5 +211,11 @@ describe('candidateLineKey', () => {
     expect(a).toBe(candidateLineKey('waitlist', CLEAN_TEXT));
     expect(a).toMatch(/^waitlist:cand_[0-9a-f]{8}$/);
     expect(a).not.toBe(candidateLineKey('waitlist', `${CLEAN_TEXT} more`));
+  });
+});
+
+describe('ungated promotion freeze (JOV-7140)', () => {
+  it('keeps live-copy promotion off until it runs through evals and a PR', () => {
+    expect(ONBOARDING_SCRIPT_AUTO_PROMOTION).toBe(false);
   });
 });
