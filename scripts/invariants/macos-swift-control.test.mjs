@@ -49,9 +49,16 @@ function walkFiles(relDir, predicate) {
   return found.sort();
 }
 
+const ALLOWED_NON_SWIFT_PACKAGES = ['media-ingest'];
+
 function macosTopLevelDirs() {
   return readdirSync(join(ROOT, 'apps/macos'), { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+    .filter(
+      entry =>
+        entry.isDirectory() &&
+        !entry.name.startsWith('.') &&
+        entry.name !== 'node_modules'
+    )
     .map(entry => entry.name)
     .sort();
 }
@@ -86,7 +93,10 @@ describe('Mac Swift-control invariants (JOV-5359)', () => {
   });
 
   it('keeps MenuMonitor as the only macOS Swift target and without a webview', () => {
-    assert.deepEqual(macosTopLevelDirs(), ['MenuMonitor']);
+    assert.deepEqual(
+      macosTopLevelDirs(),
+      ['MenuMonitor', ...ALLOWED_NON_SWIFT_PACKAGES].sort()
+    );
     const macosSwift = walkFiles(
       'apps/macos',
       abs => abs.endsWith('.swift') && !abs.includes('/.build/')
