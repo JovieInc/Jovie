@@ -110,6 +110,9 @@ describe('SummerCardReviewPanel', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'Summer Card Comment',
     });
+    // JOV-INV-039: the backdrop stacks on the semantic z-modal layer token,
+    // not a raw z-index number.
+    expect(dialog).toHaveClass('z-modal');
     await user.type(
       within(dialog).getByPlaceholderText('Add a comment for this decision'),
       'Cut the second paragraph.'
