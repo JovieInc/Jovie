@@ -193,6 +193,8 @@ export function evaluateAccessSignal(
 export interface OnboardingAccessInput {
   readonly accessControlled: boolean;
   readonly spotifyArtistId: string | null;
+  /** Any public profile link (propose_social_link); qualifies non-artists. */
+  readonly publicProfileUrl?: string | null;
   readonly spotifyFollowers: number | null;
   readonly metrics?: CanonicalArtistMetrics | null;
   readonly signals: readonly Omit<
@@ -213,10 +215,13 @@ export function decideOnboardingAccess(
   input: OnboardingAccessInput
 ): AccessDecision {
   if (input.accessControlled) {
-    if (!input.spotifyArtistId) {
+    // Artists are admitted first; everyone else reserves their name (Tim
+    // 2026-09-29, JOV-3379). Either a confirmed Spotify artist or any public
+    // profile link is enough evidence to save the reservation.
+    if (!input.spotifyArtistId && !input.publicProfileUrl) {
       return {
         kind: 'needs_more_info',
-        rationale: 'confirmed_artist_required_for_waitlist',
+        rationale: 'public_profile_required_for_waitlist',
         score: 0,
       };
     }

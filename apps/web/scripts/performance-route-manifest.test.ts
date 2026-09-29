@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   canonicalSidebarNavigation,
   chatNavItem,
-  inboxNavItem,
 } from '../components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '../constants/routes';
 import {
@@ -72,7 +71,6 @@ describe('performance route manifest', () => {
   it('keeps desktop-visible navigation in warm-measurement parity', () => {
     const routes = getEndUserPerfRouteManifest();
     const desktopVisibleNavigation = [
-      inboxNavItem,
       chatNavItem,
       ...canonicalSidebarNavigation,
     ];
@@ -90,8 +88,17 @@ describe('performance route manifest', () => {
     expect([...warmRoutesByNavigationItem.keys()].sort()).toEqual(
       desktopVisibleNavigation.map(item => item.id).sort()
     );
-    expect(warmRoutesByNavigationItem.has('calendar')).toBe(false);
-    expect(warmRoutesByNavigationItem.has('tasks')).toBe(false);
+    for (const entityOrRetiredId of [
+      'calendar',
+      'contacts',
+      'library',
+      'products',
+      'releases',
+      'tasks',
+      'videos',
+    ]) {
+      expect(warmRoutesByNavigationItem.has(entityOrRetiredId)).toBe(false);
+    }
 
     for (const item of desktopVisibleNavigation) {
       const route = warmRoutesByNavigationItem.get(item.id);
@@ -104,9 +111,6 @@ describe('performance route manifest', () => {
       expect(route?.warmNavigationStartPath).not.toBe(item.href);
       expect(route?.readySelectors.navTrigger).toContain(
         `a[href="${item.href}"]`
-      );
-      expect(route?.readySelectors.navTrigger).toContain(
-        `a[href^="${item.href}?"]`
       );
       expect(route?.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
       expect(
@@ -122,6 +126,10 @@ describe('performance route manifest', () => {
         `canonical nav path "${item.href}" must not also be modeled as a redirect`
       ).toBe(false);
     }
+
+    expect(
+      warmRoutesByNavigationItem.get('home')?.readySelectors.navTrigger?.[0]
+    ).toBe(`a[href="${APP_ROUTES.DASHBOARD}"]:has-text("Home")`);
   });
 
   it('uses Inbox readiness for /app and treats Releases as a Library redirect', () => {

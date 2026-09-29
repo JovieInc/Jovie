@@ -505,6 +505,8 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   for (const fileName of [
     'entitlements.mac.plist',
     'entitlements.mac.inherit.plist',
+    'entitlements.mac.production.plist',
+    'entitlements.mac.staging.plist',
   ]) {
     const entitlements = await readFile(
       join(desktopRoot, 'build', fileName),
@@ -520,6 +522,59 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
       assert.doesNotMatch(entitlements, new RegExp(`<key>${forbidden}</key>`));
     }
   }
+});
+
+// A keychain-access-groups entitlement the embedded profile does not
+// authorize stops the app from launching, so each channel pairs its own.
+test('signed channels pair Touch ID entitlements with a matching Developer ID profile (JOV-6727)', async () => {
+  for (const [config, bundleId] of [
+    ['electron-builder.yml', 'app.jov.ie'],
+    ['electron-builder.staging.yml', 'app.jov.ie.staging'],
+  ]) {
+    const builder = await readFile(join(desktopRoot, config), 'utf8');
+    assert.match(
+      builder,
+      new RegExp(`^appId: ${bundleId.replaceAll('.', '\\.')}$`, 'm')
+    );
+    const entitlementsPath = builder.match(/^ {2}entitlements: (\S+)$/m)?.[1];
+    const profilePath = builder.match(/^ {2}provisioningProfile: (\S+)$/m)?.[1];
+    assert.ok(entitlementsPath && profilePath, `${config} needs both`);
+
+    const appId = `G24T327LXT.${bundleId}`;
+    const entitlements = await readFile(
+      join(desktopRoot, entitlementsPath),
+      'utf8'
+    );
+    assert.match(entitlements, new RegExp(`<string>${appId}</string>`));
+    assert.match(
+      entitlements,
+      new RegExp(`<string>${appId}\\.webauthn</string>`)
+    );
+    const profile = (await readFile(join(desktopRoot, profilePath))).toString(
+      'latin1'
+    );
+    assert.ok(
+      profile.includes(`<string>${appId}</string>`),
+      `${profilePath} must be for ${bundleId}`
+    );
+    assert.ok(
+      profile.includes('<string>G24T327LXT.*</string>'),
+      `${profilePath} must allow the team keychain groups`
+    );
+  }
+
+  // Local builds have no profile, so they must not claim the entitlement.
+  const local = await readFile(
+    join(desktopRoot, 'electron-builder.local.yml'),
+    'utf8'
+  );
+  assert.doesNotMatch(local, /provisioningProfile/);
+  assert.match(local, /^ {2}entitlements: build\/entitlements\.mac\.plist$/m);
+  const base = await readFile(
+    join(desktopRoot, 'build/entitlements.mac.plist'),
+    'utf8'
+  );
+  assert.doesNotMatch(base, /keychain-access-groups/);
 });
 
 test('macOS disables Skia Graphite and only the main window opts out of throttling (JOV-5289)', async () => {
@@ -1234,6 +1289,32 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   assert.match(
     preloadSource,
     /redeemDesktopAuthReturnCode: \(returnCode: string\) =>[\s\S]{0,120}?REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL/
+  );
+
+  // Touch ID (JOV-6727): WebAuthn is configured only from the pure resolver
+  // (signed build + embedded provisioning profile), the account picker
+  // always answers, state writes are allowlisted, and in-app passkey
+  // completion is limited to the trusted auth surfaces.
+  assert.match(
+    mainSource,
+    /resolveDesktopWebAuthnConfig\(\{[\s\S]{0,300}?embedded\.provisionprofile[\s\S]{0,300}?app\.configureWebAuthn\(\{ touchID: config \}\)/
+  );
+  assert.match(
+    mainSource,
+    /'select-webauthn-account'[\s\S]{0,1200}?\.catch\(\(\) => callback\(\)\)/
+  );
+  assert.match(
+    mainSource,
+    /SET_DESKTOP_PASSKEY_STATE_CHANNEL,[\s\S]{0,300}?applyDesktopPasskeyStateUpdate\(update\)[\s\S]{0,120}?isTrustedIpcSender\(event\)/
+  );
+  assert.match(
+    mainSource,
+    /COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL,[\s\S]{0,200}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,120}?!desktopPasskeyAvailable/
+  );
+  assert.match(mainSource, /mode: 0o600/);
+  assert.match(
+    preloadSource,
+    /completeDesktopPasskeySignIn: \(\) =>[\s\S]{0,120}?COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL/
   );
 
   // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.

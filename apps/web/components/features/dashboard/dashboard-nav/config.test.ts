@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   artistNavigation,
   CUSTOMER_NAV_CAPACITY,
+  canonicalSidebarNavigation,
   desktopMoreNavigation,
   desktopPrimaryNavigation,
   mobileExpandedNavigation,
@@ -12,16 +13,10 @@ import {
 } from './config';
 
 const CANONICAL_NAVIGATION = [
-  ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
-  ['chat', 'New Chat', APP_ROUTES.CHAT],
-  ['library', 'Library', APP_ROUTES.LIBRARY],
-  ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
-  ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
-  ['tasks', 'Tasks', APP_ROUTES.TASKS],
-] as const;
-
-const ARTIST_NAVIGATION = [
+  ['home', 'Home', APP_ROUTES.DASHBOARD],
   ['presence', 'Presence', APP_ROUTES.PRESENCE],
+  ['links', 'Links', APP_ROUTES.CHAT_PROFILE_PANEL],
+  ['audience', 'Audience', APP_ROUTES.CONTACTS_AUDIENCE],
 ] as const;
 
 function toContract(
@@ -31,10 +26,10 @@ function toContract(
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps the canonical primary six in the DESIGN.md order', () => {
+  it('keeps the four job-level roots in the DESIGN.md order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
-    expect(primaryNavigation.find(item => item.id === 'chat')?.tone).toBe(
-      'primary'
+    expect(toContract(canonicalSidebarNavigation)).toEqual(
+      CANONICAL_NAVIGATION
     );
     expect(primaryNavigation.every(item => item.tier === 'core')).toBe(true);
   });
@@ -48,8 +43,8 @@ describe('canonical customer shell navigation', () => {
     );
   });
 
-  it('keeps Presence as the single contextual artist-group destination', () => {
-    expect(toContract(artistNavigation)).toEqual(ARTIST_NAVIGATION);
+  it('keeps entity categories out of contextual root overflow by default', () => {
+    expect(artistNavigation).toEqual([]);
   });
 
   it('derives mobile primary + More destinations from the capacity partition', () => {
@@ -84,29 +79,41 @@ describe('canonical customer shell navigation', () => {
     );
   });
 
-  it('keeps retired primary destinations out while Tasks returns as primary and Presence stays contextual', () => {
+  it('keeps entity taxonomies and retired workflows out of root navigation', () => {
     const ids = primaryNavigation.map(item => item.id);
     const labels = primaryNavigation.map(item => item.name);
 
-    expect(ids).not.toEqual(
-      expect.arrayContaining([
-        'search',
-        'touring',
-        'audience',
-        'releases',
-        'profiles',
-      ])
-    );
-    expect(labels).not.toEqual(
-      expect.arrayContaining(['Search', 'Touring', 'Audience', 'Releases'])
-    );
-    expect(ids).toContain('tasks');
-    expect(artistNavigation.map(item => item.id)).toEqual(['presence']);
+    for (const id of [
+      'calendar',
+      'chat',
+      'contacts',
+      'events',
+      'library',
+      'products',
+      'releases',
+      'tasks',
+      'videos',
+    ]) {
+      expect(ids).not.toContain(id);
+    }
+    for (const label of [
+      'Calendar',
+      'Contacts',
+      'Events',
+      'Library',
+      'Products',
+      'Releases',
+      'Tasks',
+      'Videos',
+    ]) {
+      expect(labels).not.toContain(label);
+    }
+
+    // Removed roots remain addressable for contextual links and old bookmarks.
     expect(APP_ROUTES.TOUR_DATES).toBe('/app/tour-dates');
-    expect(APP_ROUTES.AUDIENCE).toBe('/app/audience');
-    expect(APP_ROUTES.PRESENCE).toBe('/app/presence');
-    expect(APP_ROUTES.PROFILES).toBe('/app/profiles');
     expect(APP_ROUTES.RELEASES).toBe('/app/releases');
     expect(APP_ROUTES.TASKS).toBe('/app/tasks');
+    expect(APP_ROUTES.LIBRARY).toBe('/app/library');
+    expect(APP_ROUTES.CALENDAR).toBe('/app/calendar');
   });
 });

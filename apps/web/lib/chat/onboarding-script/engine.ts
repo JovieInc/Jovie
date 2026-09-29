@@ -305,6 +305,7 @@ function decideAccess(
   return decideOnboardingAccess({
     accessControlled: state.accessControlled,
     spotifyArtistId: state.spotifyArtistId,
+    publicProfileUrl: state.publicProfileUrl,
     spotifyFollowers: state.spotifyFollowers,
     metrics: state.artistMetrics,
     signals: state.signals,

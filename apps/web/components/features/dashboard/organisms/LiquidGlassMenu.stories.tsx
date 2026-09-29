@@ -36,6 +36,9 @@ const meta = {
   component: LiquidGlassMenu,
   parameters: {
     layout: 'fullscreen',
+    jovie: {
+      uncoveredProps: ['item', 'inputMethod', 'items', 'pathname'],
+    },
   },
   args: {
     primaryItems,

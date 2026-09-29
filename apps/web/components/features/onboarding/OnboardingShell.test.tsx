@@ -1,10 +1,21 @@
 import { act, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { OnboardingShell } from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
-  AppShellFrame: ({ main }: { readonly main: ReactNode }) => <>{main}</>,
+  AppShellFrame: ({
+    main,
+    rightPanel,
+  }: {
+    readonly main: ReactNode;
+    readonly rightPanel?: ReactNode;
+  }) => (
+    <>
+      {main}
+      {rightPanel}
+    </>
+  ),
 }));
 
 vi.mock('@/components/organisms/sidebar', () => ({
@@ -13,17 +24,33 @@ vi.mock('@/components/organisms/sidebar', () => ({
   ),
 }));
 
+const builderState = vi.hoisted(() => ({ current: null as unknown }));
+
 vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
   OnboardingChat: ({
+    headerOverlay,
+    onProfileBuilderChange,
     turnstilePanel,
   }: {
+    readonly headerOverlay?: boolean;
+    readonly onProfileBuilderChange?: (state: never) => void;
     readonly turnstilePanel: ReactNode;
-  }) => (
-    <>
-      <div data-testid='onboarding-chat' />
-      {turnstilePanel}
-    </>
-  ),
+  }) => {
+    useEffect(() => {
+      if (builderState.current) {
+        onProfileBuilderChange?.(builderState.current as never);
+      }
+    }, [onProfileBuilderChange]);
+    return (
+      <>
+        <div
+          data-testid='onboarding-chat'
+          data-header-overlay={headerOverlay ? 'true' : 'false'}
+        />
+        {turnstilePanel}
+      </>
+    );
+  },
 }));
 
 const turnstileProps = vi.hoisted(() => ({
@@ -86,5 +113,27 @@ describe('OnboardingShell status', () => {
     );
     expect(alert).toHaveAttribute('role', 'alert');
     expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
+  });
+
+  it('passes headerOverlay to the chat while the visitor is anonymous (JOV-7192)', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+      'data-header-overlay',
+      'true'
+    );
+  });
+
+  it('shows the side profile preview for a non-artist with a public profile (JOV-3379)', () => {
+    builderState.current = {
+      artist: null,
+      artistConfirmed: false,
+      handle: 'avery',
+      socialLinks: ['https://instagram.com/avery'],
+    };
+    render(<OnboardingShell sessionLabel='pending' />);
+    builderState.current = null;
+
+    expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
   });
 });

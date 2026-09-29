@@ -22,6 +22,7 @@ import {
   EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   type OnboardingProfileBuilderState,
   OnboardingProfileRail,
+  resolvePreviewArtist,
 } from './OnboardingProfileRail';
 import {
   isOnboardingTurnstilePanelVisible,
@@ -161,7 +162,7 @@ export function OnboardingShell({
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
-  const sideProfileRail = profileBuilderState.artist ? (
+  const sideProfileRail = resolvePreviewArtist(profileBuilderState) ? (
     <OnboardingProfileRail state={profileBuilderState} />
   ) : null;
 
@@ -190,6 +191,7 @@ export function OnboardingShell({
               </div>
             ) : null}
             <OnboardingChat
+              headerOverlay={!isSignedIn}
               intentId={intentId}
               onConversationActivity={handleConversationActivity}
               onProfileBuilderChange={setProfileBuilderState}
