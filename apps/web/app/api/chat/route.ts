@@ -130,6 +130,7 @@ import {
   type ChatTelemetry,
   type ReleaseContext,
 } from '@/lib/chat/types';
+import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
 import { db } from '@/lib/db';
@@ -3155,6 +3156,20 @@ export async function POST(req: Request) {
             responseMessage.parts as Array<{ type: string; text?: string }>
           )
         ).text;
+        // Copy floor (canon/VOICE.md): a streamed reply can't be blocked
+        // mid-flight, so gate the completed text before it persists. A floor
+        // violation swaps in a safe fallback and logs the rules that fired.
+        const gatedReply = gateAssistantReply(assistantText);
+        if (gatedReply.violations.length > 0) {
+          logger.warn(
+            'Assistant reply failed copy floor; persisting fallback',
+            {
+              requestId,
+              turnId: reservedTurn.turnId,
+              rules: gatedReply.violations.map(violation => violation.rule),
+            }
+          );
+        }
         const toolCalls = preparePersistedToolEventsForTurnFinish({
           parts: responseMessage.parts,
           isAborted,
@@ -3175,7 +3190,7 @@ export async function POST(req: Request) {
           status: isAborted ? 'canceled' : 'completed',
           content: isAborted
             ? 'This response was canceled before Jovie could finish. Retry when you are ready.'
-            : assistantText,
+            : gatedReply.text,
           toolCalls,
           ...(isAborted
             ? {

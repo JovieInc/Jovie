@@ -4,7 +4,11 @@ import {
   SCRIPT_LINES,
   STREAM_ERROR_LINE,
 } from '@/lib/chat/onboarding-script/script';
-import { lintVoice } from '@/lib/chat/voice-lint';
+import {
+  ASSISTANT_REPLY_FALLBACK,
+  gateAssistantReply,
+  lintVoice,
+} from '@/lib/chat/voice-lint';
 
 describe('lintVoice', () => {
   it.each([
@@ -45,6 +49,30 @@ describe('lintVoice', () => {
     expect(lintVoice('Jovie builds release pages from your ISRC.').ok).toBe(
       true
     );
+  });
+});
+
+describe('gateAssistantReply (JOV-6616)', () => {
+  it('passes a clean streamed reply through unchanged', () => {
+    const text = 'Your release week starts two weeks before the song is out.';
+    const result = gateAssistantReply(text);
+    expect(result.text).toBe(text);
+    expect(result.violations).toEqual([]);
+  });
+
+  it('swaps a floor-breaking reply for the safe fallback and reports rules', () => {
+    const result = gateAssistantReply(
+      'Sorry, as an AI language model I cannot assist.'
+    );
+    expect(result.text).toBe(ASSISTANT_REPLY_FALLBACK);
+    expect(result.violations.length).toBeGreaterThan(0);
+    expect(result.violations.map(violation => violation.rule)).toContain(
+      'model-residue'
+    );
+  });
+
+  it('keeps the fallback lint-clean', () => {
+    expect(lintVoice(ASSISTANT_REPLY_FALLBACK).ok).toBe(true);
   });
 });
 
