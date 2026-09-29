@@ -346,6 +346,25 @@ describe('JovieChat styling regressions', () => {
     );
   });
 
+  it('renders the greeting (not chips) for the bare and suggestion-pill empty states (JOV-7150)', () => {
+    // The chip/suggestion rail is retired for the bare and chip-only
+    // affordances — ChatEmptyStateGreeting owns that slot instead. Real
+    // render coverage lives in JovieChat.empty-state.test.tsx; this locks
+    // the source contract so SuggestedPrompts cannot come back for those
+    // two states without touching this test.
+    const jovieChatSource = readFileSync(
+      resolve(process.cwd(), 'components/jovie/JovieChat.tsx'),
+      'utf8'
+    );
+
+    expect(jovieChatSource).toMatch(
+      /showEmptyGreeting \? \([\s\S]{0,80}<ChatEmptyStateGreeting/
+    );
+    // FEATURED_SKILL_SUGGESTIONS (an affordance-priority count) is still
+    // imported from that module; the JSX component itself is retired.
+    expect(jovieChatSource).not.toContain('<SuggestedPrompts');
+  });
+
   it('marks an empty conversation-load shell as busy for assistive technology', () => {
     mockChatState.isLoadingConversation = true;
     mockChatState.hasMessages = false;
