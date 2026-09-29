@@ -23,10 +23,28 @@ routes it loads (`/desktop-auth`, `/auth/start`, `/auth/callback`,
 
 When the `jovie://` link cannot reach the app, the return page also shows an
 8-letter return code (RFC 8628 section 6.1 alphabet: consonants only, no
-look-alikes). "Enter a Code" in the handoff takes it; the main process posts
+look-alikes). "Enter A Code" in the handoff takes it; the main process posts
 it to `/api/auth/native/handback` with the pending flow nonce and PKCE
 verifier and receives the same code/state pair the deep link carries. The
 exchange still requires the verifier.
+
+## Loopback return (RFC 8252 section 7.3)
+
+The app also listens on 127.0.0.1 with an ephemeral port and advertises it as
+`desktop_loopback` at `/auth/start`. `/auth/native-return` then hands the
+same code/state/desktop_flow the deep link carries straight to the listener,
+so same-device sign-in completes with zero typing even when `jovie://` is not
+handled. The page uses a background fetch, not a top-level navigation: a
+top-level navigation to a dead listener strands the cross-device path (a
+sign-in finished on a phone has nothing on 127.0.0.1) on a browser error
+page before the user can read the return code. Binding still requires the
+pending flow nonce, and the exchange still requires the PKCE verifier — the
+loopback carries no secret the deep link does not.
+
+For the phone path the handoff shows the sign-in link as a QR code ("Scan
+With Phone"), which pairs with the return code shown at the end of the
+flow. The QR encodes only the public `/auth/start` URL; the verifier never
+leaves the app.
 
 Why a typed code and not a background poll: a poll keyed by the flow would let
 anyone who crafts a sign-in link with their own verifier collect a victim's
@@ -81,8 +99,8 @@ broken (user cannot finish without outside help).
 | No default browser set | works (macOS falls back to Safari) | works |
 | `openExternal` rejects | works (error + Try Again + Copy) | works |
 | `openExternal` resolves but nothing visible | degraded ("Check your browser." forever) | works (after 30s: copy the link into any browser; finish with the code) |
-| Deep link blocked, handler missing, second copy, translocated app | broken (signed in on web, app never hears back; a second copy shows its own sign-in) | works (handler reclaimed before each handoff; return code finishes) |
-| Already signed in on web | degraded (must "Choose an account", which signs the browser out and asks for sign-in again) | degraded (unchanged; taste/security call below) |
+| Deep link blocked, handler missing, second copy, translocated app | broken (signed in on web, app never hears back; a second copy shows its own sign-in) | works (loopback listener receives the completion without the scheme; handler reclaimed before each handoff; return code finishes) |
+| Already signed in on web | degraded (must "Choose an account", which signs the browser out and asks for sign-in again) | works ("Continue as <email>" behind an explicit click, "Use a different account" signs out first — #18933) |
 | Different account on web | works (explicit account switch) | works |
 | Browser in another Space or full-screen app | degraded | works (30s hint, copy link, code) |
 | Offline, or network drops mid-flow | degraded (browser errors; app waits) | works (retry; code entry reports "Could not reach Jovie" and keeps the flow) |
@@ -132,15 +150,16 @@ changes never shift the column: action stack, two-line status, one text row.
 
 | State | Action stack | Status line | Text row |
 | --- | --- | --- | --- |
-| Idle | Continue in Browser / Copy Sign-In Link / Cancel Sign-In | (empty) | Enter a Code (canonical link Button, sm) |
-| Opening | Opening Browser... (disabled) / Copy (disabled) / Cancel | (empty) | Enter a Code |
-| Waiting | Open Browser Again / Copy Sign-In Link / Cancel | Check your browser. | Enter a Code |
-| Waiting 30s+ | same | Not seeing it? Copy the sign-in link and paste it into any browser. | Enter a Code |
-| Copied | same | Sign-in link copied. Paste it into any browser. | Enter a Code |
-| Open failed | Try Again / Copy / Cancel | The browser did not open. Try again, or copy the sign-in link. | Enter a Code |
-| Code entry | Code input (XXXX-XXXX, mono, letter-spaced) / Continue / Cancel | Signed in but Jovie did not open? Enter the code your browser shows. | Back to Browser Sign-In |
-| Code wrong | same, input keeps focus | That code did not match. Check it and try again. | Back to Browser Sign-In |
-| Code expired | same | This sign-in expired. Open the browser again for a new code. | Back to Browser Sign-In |
+| Idle | Continue in Browser / Copy Sign-In Link / Cancel Sign-In | (empty) | Enter A Code · Scan With Phone (canonical link Buttons, sm) |
+| Opening | Opening Browser... (disabled) / Copy (disabled) / Cancel | (empty) | Enter A Code · Scan With Phone |
+| Waiting | Open Browser Again / Copy Sign-In Link / Cancel | Check your browser. | Enter A Code · Scan With Phone |
+| Waiting 30s+ | same | Not seeing it? Copy the sign-in link and paste it into any browser. | Enter A Code · Scan With Phone |
+| Copied | same | Sign-in link copied. Paste it into any browser. | Enter A Code · Scan With Phone |
+| Open failed | Try Again / Copy / Cancel | The browser did not open. Try again, or copy the sign-in link. | Enter A Code · Scan With Phone |
+| QR | QR of the sign-in link (176px, white card) | Scan with your phone to finish sign-in there. | Back To Browser Sign-in |
+| Code entry | Code input (XXXX-XXXX, mono, letter-spaced) / Continue / Cancel | Signed in but Jovie did not open? Enter the code your browser shows. | Back To Browser Sign-in |
+| Code wrong | same, input keeps focus | That code did not match. Check it and try again. | Back To Browser Sign-in |
+| Code expired | same | This sign-in expired. Open the browser again for a new code. | Back To Browser Sign-in |
 | Signing in | Continue shows Signing In... (disabled) | Signing in... | disabled |
 
 Browser return page (`/auth/native-return`, web card): under "Return to
