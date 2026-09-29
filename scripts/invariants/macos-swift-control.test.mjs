@@ -55,6 +55,7 @@ function macosSwiftTargetDirs() {
       entry =>
         entry.isDirectory() &&
         !entry.name.startsWith('.') &&
+        entry.name !== 'node_modules' &&
         existsSync(join(ROOT, 'apps/macos', entry.name, 'Package.swift'))
     )
     .map(entry => entry.name)
