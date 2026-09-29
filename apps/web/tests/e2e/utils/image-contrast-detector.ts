@@ -110,7 +110,15 @@ async function scanCandidates(page: Page): Promise<PageScan> {
     const round = (value: number): number => Math.round(value * 100) / 100;
     const isRendered = (element: Element): boolean => {
       const rect = element.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return false;
+      // Screen-reader-only text (Tailwind's sr-only: exactly 1x1px,
+      // clipped, -1px margin) is never painted for sighted users, so a
+      // visual contrast check against it is meaningless — exclude it the
+      // same way display:none/visibility:hidden already are, rather than
+      // certifying (or failing) a color nobody sees. Require *both*
+      // dimensions to be this collapsed, not just one, so a real 1px-tall
+      // divider or gradient rule (full width, genuinely painted) isn't
+      // dropped as an image layer or a candidate.
+      if (rect.width <= 1 && rect.height <= 1) return false;
       const style = getComputedStyle(element);
       return (
         style.display !== 'none' &&
@@ -204,6 +212,27 @@ async function scanCandidates(page: Page): Promise<PageScan> {
       if (seen.has(element) || !isRendered(element)) return;
       const clipped = intersectViewport(element.getBoundingClientRect());
       if (!clipped) return;
+      // Resolve the real hit-test stack at the candidate's own center once,
+      // up front. A later, unrelated, fully opaque sibling (an open drawer
+      // sheet, a modal scrim) can cover a candidate that still has a
+      // perfectly normal box and an ancestor that paints a CSS image
+      // further up the tree — that ancestor relationship alone doesn't mean
+      // a user can see the two together. If the candidate itself isn't
+      // reachable at its own sample point, nothing is visually at risk
+      // there, regardless of what the DOM ancestry contains.
+      const sampleX = Math.min(
+        viewportWidth - 1,
+        Math.max(0, clipped.x + clipped.width / 2)
+      );
+      const sampleY = Math.min(
+        viewportHeight - 1,
+        Math.max(0, clipped.y + clipped.height / 2)
+      );
+      const stack = document.elementsFromPoint(sampleX, sampleY);
+      const candidateDepth = stack.findIndex(
+        item => item === element || element.contains(item)
+      );
+      if (candidateDepth === -1) return;
       const layersBehind = imageLayers.filter(({ element: layer, rect }) => {
         if (element.contains(layer)) return false;
         const overlapX =
@@ -215,26 +244,10 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         if (overlapX <= 0 || overlapY <= 0) return false;
         if (layer.contains(element)) return true;
         // The layer must stack below the candidate at the overlap point.
-        const sampleX = Math.min(
-          viewportWidth - 1,
-          Math.max(0, clipped.x + clipped.width / 2)
-        );
-        const sampleY = Math.min(
-          viewportHeight - 1,
-          Math.max(0, clipped.y + clipped.height / 2)
-        );
-        const stack = document.elementsFromPoint(sampleX, sampleY);
-        const candidateDepth = stack.findIndex(
-          item => item === element || element.contains(item)
-        );
         const layerDepth = stack.findIndex(
           item => item === layer || layer.contains(item)
         );
-        return (
-          candidateDepth !== -1 &&
-          layerDepth !== -1 &&
-          layerDepth > candidateDepth
-        );
+        return layerDepth !== -1 && layerDepth > candidateDepth;
       });
       if (layersBehind.length === 0) return;
       seen.add(element);
@@ -259,15 +272,31 @@ async function scanCandidates(page: Page): Promise<PageScan> {
         continue;
       }
       // Interactive controls whose label lives in a descendant: certify the
-      // control's box itself (e.g. icon-labeled buttons over imagery).
+      // control's box itself (e.g. icon-labeled buttons over imagery). Only
+      // for a true icon-only control (aria-label, no visible text node
+      // anywhere inside): a control whose label instead comes from real
+      // text is skipped here and left to the plain hasDirectText branch
+      // above, which will reach that same descendant on its own turn and
+      // sample its own box and color — the descendant can explicitly
+      // override an inherited foreground and sits in a tighter box than the
+      // control's full hit target (e.g. dark ink on a light pill face
+      // nested in a control that otherwise inherits a light-on-dark
+      // default, padded past the pill's own edges), so sampling the
+      // control itself would certify a box and a color nobody sees.
       if (isInteractive(element)) {
-        const label = (
-          element.getAttribute('aria-label') ??
-          element.textContent ??
-          ''
-        )
-          .replace(/\s+/g, ' ')
-          .trim();
+        const ariaLabel = element.getAttribute('aria-label');
+        if (!ariaLabel) continue;
+        // A visually hidden duplicate (sr-only span mirroring the
+        // aria-label) isn't where the glyph actually paints, so it must not
+        // count as "the label lives in a descendant" — that would defer to
+        // a descendant this same loop is about to discard via isRendered's
+        // own sr-only exclusion, silently dropping the control from
+        // checking entirely.
+        const hasVisibleNestedText = Array.from(
+          element.querySelectorAll('*')
+        ).some(candidate => isRendered(candidate) && hasDirectText(candidate));
+        if (hasVisibleNestedText) continue;
+        const label = ariaLabel.replace(/\s+/g, ' ').trim();
         if (label) pushCandidate(element, label);
       }
     }

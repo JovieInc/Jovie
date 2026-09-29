@@ -202,6 +202,76 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.receipts.length).toBeGreaterThan(0);
     expect(snapshot.receipts.every(receipt => receipt.pass)).toBe(true);
   });
+
+  // JOV-INV-019 (2026-09-29): a real /unfazed pass surfaced three detector
+  // false positives — none reflected what a sighted user actually sees.
+  test('samples a nested override color and box instead of an interactive control that inherits a different one', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main>' +
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#ffffff 100%,#ffffff 100%)"></div>' +
+        '<a href="/pay" style="position:relative;display:flex;height:44px;width:160px;align-items:center;justify-content:center;color:#ffffff">' +
+        '<span style="display:flex;height:28px;width:140px;align-items:center;justify-content:center;border-radius:9999px;background:#050608;color:#f7f8f8">Pay $10</span>' +
+        '</a>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(snapshot.findings).toEqual([]);
+    expect(snapshot.receipts.some(receipt => receipt.text === 'Pay $10')).toBe(
+      true
+    );
+    expect(
+      snapshot.receipts.every(
+        receipt => receipt.text !== 'Pay $10' || receipt.pass
+      )
+    ).toBe(true);
+  });
+
+  test('excludes a visually hidden sr-only label from image-contrast candidates', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main>' +
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#ffffff 100%,#ffffff 100%)"></div>' +
+        '<button aria-label="Home" style="position:relative;color:#ffffff">' +
+        '<span style="position:absolute;width:1px;height:1px;overflow:hidden;white-space:nowrap;clip:rect(0,0,0,0)">Home</span>' +
+        '<svg aria-hidden="true" width="16" height="16"><circle cx="8" cy="8" r="6" fill="currentColor"></circle></svg>' +
+        '</button>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(snapshot.findings.map(finding => finding.kind)).toContain(
+      'image-contrast'
+    );
+    expect(
+      snapshot.receipts.some(
+        receipt => receipt.text === 'Home' && !receipt.pass
+      )
+    ).toBe(true);
+  });
+
+  test('excludes a candidate fully covered by a later opaque overlay', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main>' +
+        // A real dialog/drawer disables pointer-events on the page behind
+        // it (Vaul/Radix scroll-lock + focus boundary), which also removes
+        // it from elementsFromPoint's hit chain — this is what the fix
+        // relies on, so the fixture must reproduce it, not just the
+        // z-ordering.
+        '<div style="position:fixed;inset:0;background-image:linear-gradient(115deg,#050505 100%,#050505 100%);pointer-events:none">' +
+        '<span style="position:absolute;top:40px;left:20px;color:#f7f8f8;font-size:15px">Behind the sheet</span>' +
+        '</div>' +
+        '<div style="position:fixed;inset:0;background:#050608">Sheet content</div>' +
+        '</main>'
+    );
+    const snapshot = await inspectImageContrast(page);
+    expect(
+      snapshot.receipts.some(receipt => receipt.text === 'Behind the sheet')
+    ).toBe(false);
+  });
 });
 
 test('certifies every marketing route and public-profile open state', async ({
