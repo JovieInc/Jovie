@@ -72,10 +72,10 @@ export const contactsNavItem: NavItem = {
   description: 'Manage artist contacts',
 };
 
-export const profilesNavItem: NavItem = {
+export const presenceNavItem: NavItem = {
   name: 'Presence',
-  href: APP_ROUTES.PROFILES,
-  id: 'profiles',
+  href: APP_ROUTES.PRESENCE,
+  id: 'presence',
   icon: Waypoints,
   iconName: 'Waypoints',
   tier: 'core',
@@ -86,7 +86,7 @@ export const profilesNavItem: NavItem = {
 export const canonicalSidebarNavigation = [
   { ...libraryNavItem, icon: Library, iconName: undefined },
   { ...contactsNavItem, icon: Users, iconName: undefined },
-  { ...profilesNavItem, icon: Activity, iconName: undefined },
+  { ...presenceNavItem, icon: Activity, iconName: undefined },
 ] as const satisfies readonly NavItem[];
 
 export const calendarNavItem: NavItem = {
@@ -111,18 +111,18 @@ export const tasksNavItem: NavItem = {
 
 /**
  * Contextual artist-scoped destinations rendered in the artist group, not the
- * primary rail. Presence (`/app/profiles`) is the sole contextual entry per
+ * primary rail. Presence (`/app/presence`) is the sole contextual entry per
  * the JOV-4866 IA decision (Tasks is primary, Presence contextual).
  */
 export const artistNavigation = [
-  profilesNavItem,
+  presenceNavItem,
 ] as const satisfies readonly NavItem[];
 
 /**
  * Founder-approved canonical customer shell IA (DESIGN.md "App IA & Page
  * Scaffold"), realigned in JOV-4866: one ordered tuple — Inbox, Chat,
  * Library, Contacts, Calendar, Tasks — shared by desktop, mobile, and the
- * route coverage test. Presence (`/app/profiles`) is contextual and lives in
+ * route coverage test. Presence (`/app/presence`) is contextual and lives in
  * `artistNavigation`.
  *
  * Capacity (JOV-4515): every entry here is `core` and must fit the desktop

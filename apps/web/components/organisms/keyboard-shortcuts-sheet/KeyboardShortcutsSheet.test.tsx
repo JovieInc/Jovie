@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
 import { describe, expect, it } from 'vitest';
-import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  DashboardDataContext,
+  type DashboardDataContextValue,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { FounderDoorProvider } from '@/contexts/FounderDoorContext';
 import {
   KeyboardShortcutsProvider,
@@ -20,7 +22,15 @@ function OpenOnMount() {
 
 function renderSheet(isAdmin: boolean) {
   return render(
-    <DashboardDataContext.Provider value={{ isAdmin } as DashboardData}>
+    <DashboardDataContext.Provider
+      value={
+        {
+          isAdmin,
+          identities: [],
+          activeIdentity: null,
+        } as unknown as DashboardDataContextValue
+      }
+    >
       <FounderDoorProvider>
         <KeyboardShortcutsProvider>
           <OpenOnMount />
