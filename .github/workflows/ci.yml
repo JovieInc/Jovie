@@ -653,10 +653,8 @@ jobs:
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(cat "$PATH_DIFF_DIR/files.txt")
             if [[ "${IS_NOOP:-}" == "true" ]]; then
-              # Path Changes succeeds with every optional lane disabled, while
-              # merge-group admission, ci-fast, secret, migration, and PR Ready
-              # still validate the exact combined head. The typed no-op output
-              # lets only unit and build/layout skip their expensive work.
+              # Typed no-op: Path Changes passes with all optional lanes off;
+              # merge-group gates still validate the exact combined head.
               PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
               mkdir -p "$PRODUCT_LANE_DIR"
               : > "$PRODUCT_LANE_DIR/changed-paths.txt"
@@ -709,29 +707,12 @@ jobs:
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
-              # The auto-merge result can be tree-identical to origin/<base>
-              # when the PR's changes already landed (e.g. an identical change
-              # squash-merged through the queue first). That is not a fetch
-              # failure: classify the PR head's own diff vs the merge-base so
-              # lanes still validate the exact head instead of hard-failing.
+              # Merge tree-identical to base; classify merge-base..head (JOV-6820).
               PULL_REQUEST_HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-              if [[ ! "$PULL_REQUEST_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-                echo "::error::pull_request head.sha is not a usable exact SHA"
-                exit 1
-              fi
-              if ! git cat-file -e "${PULL_REQUEST_HEAD_SHA}^{commit}" 2>/dev/null; then
-                git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"
-              fi
-              # The fallback diff is merge-base(origin/base, head)..head, so the
-              # semantic classifier must read package.json et al. at those same
-              # refs; HEAD here is tree-identical to origin/<base> and would
-              # show no delta. Trusted policy scripts stay pinned to the live
-              # base via CLASSIFICATION_POLICY_REF.
-              CLASSIFICATION_BASE_REF=$(git merge-base \
-                "origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")
+              git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"
+              CLASSIFICATION_BASE_REF=$(git merge-base "origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")
               CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"
-              CHANGED_FILES=$(git diff --no-renames --name-only \
-                "$CLASSIFICATION_BASE_REF" "$CLASSIFICATION_HEAD_REF")
+              CHANGED_FILES=$(git diff --no-renames --name-only "$CLASSIFICATION_BASE_REF" "$CLASSIFICATION_HEAD_REF")
             fi
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
@@ -912,11 +893,7 @@ jobs:
             echo "run_e2e=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Launch-gate golden path (JOV-3758). Mirrors docs/launch/LAUNCH_GATES.md's
-          # path list: onboarding routes/components/libs, auth signup/signin entrypoints,
-          # dashboard shell/releases flows, billing/checkout API routes used by the golden
-          # path, golden-path Playwright specs + helpers, and launch-gate CI/Lighthouse/perf
-          # config. Docs-only changes never reach here (handled by the docs-only guard above).
+          # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
           LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/signin/|apps/web/app/signup/|apps/web/app/sign-in/|apps/web/app/sign-up/|apps/web/app/app/\(shell\)/dashboard/|apps/web/app/app/\(shell\)/layout\.tsx|apps/web/components/features/dashboard/|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/\.lighthouserc\.onboarding\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
@@ -932,11 +909,7 @@ jobs:
             echo "run_drizzle=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Neon ephemeral-branch gate: only spin up Neon when DB-relevant code changed.
-          # Covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
-          # lockfile changes that could affect drizzle/DB deps. Version-only package
-          # metadata changes should not spin up ephemeral Neon branches.
-          # Jobs that create ephemeral Neon branches must check this flag before doing so.
+          # Neon ephemeral-branch gate: only spin up Neon for DB-relevant changes.
           NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/queries/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
             echo "run_neon=true" >> "$GITHUB_OUTPUT"
