@@ -5225,8 +5225,6 @@ describe('production promotion exact-artifact contract', () => {
       readFileSync(productionControllerRunLiveFixturePath, 'utf8')
     );
 
-    expect(health).toContain('workflow_run:');
-    expect(health).toContain('workflows: [Production Controller]');
     expect(health).not.toContain(
       'workflows: [Production Controller, Production Marker Recovery]'
     );
@@ -5572,10 +5570,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
 
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('workflow_run:');
-    expect(workflow).toContain('workflows: [Production Controller]');
-    expect(workflow).toContain('types: [completed]');
-    expect(workflow).toContain('branches: [main]');
+    expect(workflow).not.toContain('workflow_run:');
     expect(workflow).not.toContain('push:');
     expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('group: production-mutation');
@@ -5612,7 +5607,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
     const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
-    expect(fleetRefresh).toContain('workflows: [CI, Production Controller]');
+    expect(fleetRefresh).not.toContain('workflow_run:');
     expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 

@@ -3966,11 +3966,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("schedule:", content)
         self.assertNotIn("cron:", content)
         self.assertIn("pull_request_target:", content)
-        self.assertIn("workflow_run:", content)
-        self.assertIn(
-            "workflows: [CI, Production Controller]",
-            content,
-        )
+        self.assertNotIn("workflow_run:", content)
         self.assertNotIn("Production Marker Recovery]", content)
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
@@ -4000,7 +3996,6 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("live_persist_override_nonzero", wrapper)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST=1", wrapper)
         self.assertNotIn('FLEET_GATE_ALLOW_LIVE_PERSIST="1"', wrapper)
-        self.assertIn("github.event.workflow_run.conclusion != 'cancelled'", content)
         self.assertIn("github.event.pull_request.merged != true", content)
         self.assertIn("github.event.label.name == 'hold'", content)
         self.assertIn("github.event.label.name == 'gated'", content)

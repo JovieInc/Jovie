@@ -7,8 +7,8 @@ name: Post-Deploy Probes
 # every generation is superseded inside that window, so the probes go dark
 # exactly when velocity is highest. This workflow re-probes the landed
 # canonical production deployment — production health, not release candidacy —
-# after each completed controller run, and skips itself when the in-lease
-# probes already produced exact evidence.
+# only when an operator explicitly dispatches this compatibility fallback.
+# compatibility-expiry: 2026-10-31; delete after in-band probes cover drains.
 #
 # Hard boundaries (do not relax):
 # - Read-only evidence. No production mutation, no marker writes, no rollback.
@@ -18,10 +18,6 @@ name: Post-Deploy Probes
 #   CI-attempt + Main Release Ready contract is untouched.
 
 on:
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 permissions:
