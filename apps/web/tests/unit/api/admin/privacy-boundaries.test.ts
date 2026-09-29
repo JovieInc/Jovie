@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(),
+  privilegedAccess: vi.fn(),
   data: vi.fn(),
   effect: vi.fn(),
 }));
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
   getOvieOperatorEntitlements: mocks.access,
+  requireOvieApiAccess: mocks.privilegedAccess,
 }));
 vi.mock('@/lib/admin/roles', () => ({ isAdmin: vi.fn(async () => false) }));
 vi.mock('@/lib/db', () => ({
@@ -150,6 +152,9 @@ describe('admin privacy boundary enforcement', () => {
       isAdmin: false,
       userId: 'operator',
     });
+    mocks.privilegedAccess.mockResolvedValue(
+      new Response(null, { status: 403 })
+    );
     mocks.data.mockImplementation(() => {
       throw Error('Private data reached before authorization');
     });
@@ -173,7 +178,19 @@ describe('admin privacy boundary enforcement', () => {
         }),
       });
       expect([401, 403]).toContain(response.status);
-      expect(mocks.access).toHaveBeenCalled();
+      const privileged =
+        method === 'POST' &&
+        [
+          '/api/admin/creator-invite',
+          '/api/admin/creator-invite/bulk',
+          '/api/admin/creator-ingest/rerun',
+          '/api/admin/re-enrich',
+        ].includes(path);
+      if (privileged)
+        expect(mocks.privilegedAccess).toHaveBeenCalledWith({
+          privileged: true,
+        });
+      else expect(mocks.access).toHaveBeenCalled();
       expect(mocks.data).not.toHaveBeenCalled();
       expect(mocks.effect).not.toHaveBeenCalled();
       const scope = mocks.access.mock.calls.at(-1)?.[0];
@@ -189,4 +206,39 @@ describe('admin privacy boundary enforcement', () => {
         expect(scope?.purpose).not.toBe('read');
     }
   );
+});
+
+// Invoke real mutation handlers with every central-denial contract, before any
+// body parsing, database work, or outbound action can occur.
+describe.each([
+  ['creator invite', Route13.POST],
+  ['bulk invites', Route11.POST],
+  ['ingestion rerun', Route9.POST],
+  ['re-enrichment', Route42.POST],
+] as const)('%s privileged denial contract', (_name, handler) => {
+  it.each([
+    [401, 'UNAUTHORIZED'],
+    [403, 'FORBIDDEN'],
+    [403, 'PASSKEY_STEP_UP_REQUIRED'],
+    [403, 'PRIVACY_UNLOCK_REQUIRED'],
+    [503, 'PRIVACY_UNAVAILABLE'],
+  ])('preserves %s %s before effects', async (status, code) => {
+    vi.clearAllMocks();
+    const denial = new Response(JSON.stringify({ error: code, code }), {
+      status: Number(status),
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
+    mocks.privilegedAccess.mockResolvedValue(denial);
+    const request = new NextRequest('https://jov.ie/api/admin', {
+      method: 'POST',
+      body: '{}',
+    });
+    const response = await handler(request);
+    expect(response).toBe(denial);
+    expect(await response.json()).toEqual({ error: code, code });
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(mocks.privilegedAccess).toHaveBeenCalledWith({ privileged: true });
+    expect(mocks.data).not.toHaveBeenCalled();
+    expect(mocks.effect).not.toHaveBeenCalled();
+  });
 });
