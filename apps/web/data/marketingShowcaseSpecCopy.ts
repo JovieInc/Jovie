@@ -34,7 +34,7 @@ export const SHIPPED_SITES_SHOWCASE_COPY = {
 
 export const PLATFORM_SPEC_BENTO_COPY = {
   headline: 'The Artist Platform',
-  body: 'Profiles, capture, routing, and audience signal. Dark product surfaces, Jovie accents only.',
+  body: 'Profiles, capture, routing, and audience signal.',
 } as const;
 
 export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
@@ -94,8 +94,8 @@ export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
     handle: TIM_WHITE_PROFILE.publicProfileDisplay,
     href: LIVE_PROFILE_HREF,
     label: 'Desktop Site',
-    scenarioId: 'public-profile-desktop',
-    alt: "Tim White's public Jovie artist site on desktop.",
+    scenarioId: 'tim-white-profile-live-desktop',
+    alt: "Demo of Tim White's Jovie artist profile on desktop.",
     kind: 'desktop',
   },
   {
@@ -115,8 +115,8 @@ export const PLATFORM_SPEC_TILES: readonly PlatformSpecTile[] = [
     title: 'One Adaptive Profile',
     body: 'The same artist site puts the right action first as the release moment changes.',
     accent: 'purple',
-    scenarioId: 'public-profile-desktop',
-    alt: 'Jovie public artist profile on desktop with the live release in view.',
+    scenarioId: 'tim-white-profile-live-desktop',
+    alt: "Demo of Tim White's Jovie artist profile on desktop.",
     layoutClassName: 'xl:col-span-8 xl:row-span-2',
     kind: 'desktop',
   },

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import type { ImgHTMLAttributes } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
 import { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro';
@@ -44,6 +45,21 @@ describe('Artist profile section delegation', () => {
     expect(hero.contains(adaptive)).toBe(false);
     expect(adaptive).toHaveAttribute('data-marketing-occurrence', 'adaptive');
   });
+  it('visibly identifies sample fan opt-ins without pretending to send a message', () => {
+    render(
+      <ArtistProfileCaptureSection capture={ARTIST_PROFILE_COPY.capture} />
+    );
+    expect(
+      screen.getByText('Illustrative opt-in · no message is sent')
+    ).toBeVisible();
+    expect(
+      screen.getByTestId('artist-profile-capture-demo').querySelector('input')
+    ).toBeNull();
+    expect(
+      screen.getByTestId('artist-profile-capture-demo').querySelector('button')
+    ).toBeNull();
+  });
+
   it('preserves FAQ button behavior under its declared semantic owner', () => {
     render(<ArtistProfileFaq faq={ARTIST_PROFILE_COPY.faq} />);
     const root = screen.getByTestId('marketing-section-faq');

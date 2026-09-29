@@ -42,6 +42,10 @@ export function MarketingPlatformSpecBento({
           bodyClassName='max-w-xl'
         />
 
+        <p className='mt-4 text-sm text-secondary-token'>
+          Preserved product demonstrations · illustrative data
+        </p>
+
         <div className='m-spec-bento__grid mt-10'>
           {PLATFORM_SPEC_TILES.map(tile => {
             const image = getShippedSiteImage(tile.scenarioId);

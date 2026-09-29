@@ -77,9 +77,8 @@ export function ArtistProfileCaptureSection({
           className='ap-capture-loop__visual relative'
           data-testid='artist-profile-capture-demo'
         >
-          <figcaption className='sr-only'>
-            A focused Jovie fan opt-in accepts an email, confirms the fan, and
-            turns that moment into an audience the artist can reach again.
+          <figcaption className='mb-4 text-sm text-secondary-token'>
+            Illustrative opt-in · no message is sent
           </figcaption>
           <ArtistProfileCaptureVisual
             capture={capture}

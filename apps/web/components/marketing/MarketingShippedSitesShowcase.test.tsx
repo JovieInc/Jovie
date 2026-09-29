@@ -62,6 +62,19 @@ describe('MarketingShippedSitesShowcase', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('uses the Tim White desktop demonstration for its Tim White identity', () => {
+    render(<MarketingShippedSitesShowcase />);
+    const desktop = screen.getByRole('img', {
+      name: /demo of Tim White.*desktop/i,
+    });
+    expect(desktop.getAttribute('src')).toContain(
+      'tim-white-profile-live-desktop.png'
+    );
+    expect(
+      desktop.closest('[data-testid="shipped-site-tile"]')
+    ).toHaveTextContent('Tim White');
+  });
+
   it('stays on artist profiles and off the umbrella homepage', () => {
     const repoRoot = path.resolve(
       path.dirname(new URL(import.meta.url).pathname),

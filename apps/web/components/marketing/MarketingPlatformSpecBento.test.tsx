@@ -21,6 +21,18 @@ describe('MarketingPlatformSpecBento', () => {
       '5-screenshot-bento'
     );
 
+    expect(
+      screen.queryByText(/Dark product surfaces, Jovie accents only/i)
+    ).toBeNull();
+    expect(
+      screen.getByText('Preserved product demonstrations · illustrative data')
+    ).toBeVisible();
+    expect(
+      screen
+        .getByRole('img', { name: /demo of Tim White.*desktop/i })
+        .getAttribute('src')
+    ).toContain('tim-white-profile-live-desktop.png');
+
     const tiles = screen.getAllByTestId('platform-spec-tile');
     expect(tiles).toHaveLength(PLATFORM_SPEC_TILES.length);
 
