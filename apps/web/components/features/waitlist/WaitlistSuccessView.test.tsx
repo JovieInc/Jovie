@@ -49,7 +49,7 @@ describe('WaitlistSuccessView', () => {
     ).toBeVisible();
     expect(
       screen.getByText(
-        "jov.ie/tim is yours. Your name and profile are reserved — we'll email you the moment your spot opens."
+        "jov.ie/tim is yours. Your name and profile are reserved, and we'll email you the moment your spot opens."
       )
     ).toBeVisible();
     expect(screen.queryByText(/Request saved\./)).toBeNull();

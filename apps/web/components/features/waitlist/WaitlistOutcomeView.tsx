@@ -84,7 +84,7 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     title: "You're on the list",
     body: (hasEmail, reservedHandle) =>
       reservedHandle
-        ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved — we'll email you the moment your spot opens.`
+        ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved, and we'll email you the moment your spot opens.`
         : hasEmail
           ? "We're opening Jovie in waves. Your request is saved, and we'll email you the moment your spot opens."
           : "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens.",
