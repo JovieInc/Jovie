@@ -15,10 +15,13 @@ import type { MerchDesignCarouselResult } from '@/lib/merch/types';
 const CREATE_MERCH_HREF = `${APP_ROUTES.CHAT}?q=${encodeURIComponent('Make me merch')}`;
 
 /**
- * Representative Phase-A design concepts rendered by the real merch
- * review carousel — the same component the chat mounts after generation.
- * Selecting a concept without a signed-in profile submits the choice into
- * the authenticated merch conversation via the chat prompt bridge.
+ * Tim White dogfood concepts rendered by the real merch review carousel —
+ * the same component the chat mounts after generation. The preview images
+ * are garment mockups produced by the canonical merch pipeline
+ * (`buildPrintSvg` + `renderMockup` in lib/merch/artwork, see
+ * scripts/generate-instant-merch-proof.ts), not album art. Selecting a
+ * concept without a signed-in profile submits the choice into the
+ * authenticated merch conversation via the chat prompt bridge.
  */
 const MERCH_LANDING_RESULT: MerchDesignCarouselResult = {
   success: true,
@@ -31,7 +34,7 @@ const MERCH_LANDING_RESULT: MerchDesignCarouselResult = {
       design_name: 'Never Say A Word — lyric tee',
       concept: 'Single lyric line over the release artwork palette.',
       status: 'ready',
-      preview_url: '/img/releases/never-say-a-word.jpg',
+      preview_url: '/images/merch/never-say-a-word-tee-mockup.webp',
       slots: {
         artist_name: 'Tim White',
         lyric: 'Never say a word',
@@ -44,7 +47,7 @@ const MERCH_LANDING_RESULT: MerchDesignCarouselResult = {
       design_name: 'The Deep End — cover hoodie',
       concept: 'Cover art centered on a heavyweight hoodie.',
       status: 'ready',
-      preview_url: '/img/releases/the-deep-end.jpg',
+      preview_url: '/images/merch/the-deep-end-hoodie-mockup.webp',
       slots: {
         artist_name: 'Tim White',
         short_text: 'The Deep End',
@@ -57,7 +60,7 @@ const MERCH_LANDING_RESULT: MerchDesignCarouselResult = {
       design_name: 'Take Me Over — wordmark cap',
       concept: 'Minimal wordmark treatment on a limited cap.',
       status: 'ready',
-      preview_url: '/img/releases/take-me-over.jpg',
+      preview_url: '/images/merch/take-me-over-cap-mockup.webp',
       slots: {
         artist_name: 'Tim White',
         short_text: 'Take Me Over',
@@ -95,6 +98,7 @@ export function InstantMerchLanding() {
             height: 901,
           }}
           headingId='instant-merch-hero-heading'
+          headlineMaxLines='none'
           sectionTestId='marketing-section-hero'
           primaryCtaLabel={copy.hero.primaryCta}
           primaryCtaHref={CREATE_MERCH_HREF}

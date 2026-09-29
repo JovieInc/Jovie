@@ -2,6 +2,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildDesignCiJudgeMatrix,
@@ -9,6 +10,7 @@ import {
   computeArtifactHash,
   evaluateDesignCiJudgeMatrix,
   evaluateDeterministicRow,
+  formatMatrixReport,
   REPO_ROOT,
   type RoutedInvariantRow,
   resolveConsumerExecution,
@@ -161,10 +163,31 @@ describe('runConsumerExecution: real process execution', () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.usageError).toBe(true);
   });
+
+  it('deliberate red: a hung consumer is killed and fails with a timeout reason, not a stall', () => {
+    workDir = mkdtempSync(join(tmpdir(), 'design-ci-eval-hang-'));
+    const fixturePath = join(workDir, 'hangs.sh');
+    writeFileSync(fixturePath, '#!/usr/bin/env bash\nsleep 5\n');
+    const outcome = runConsumerExecution(
+      { kind: 'bash', execPath: fixturePath },
+      // Real ceiling is 120_000ms — a genuine hang here would stall the
+      // whole suite. A short override exercises the exact same timeout
+      // path execFileSync takes in production, just faster.
+      200
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.usageError).toBe(false);
+    expect(outcome.output).toMatch(/timed out after 200ms/);
+  });
 });
 
 describe('evaluateDeterministicRow', () => {
   const cache = new Map<string, ConsumerCheckOutcome>();
+  let hangWorkDir: string;
+
+  afterEach(() => {
+    if (hangWorkDir) rmSync(hangWorkDir, { recursive: true, force: true });
+  });
 
   function row(
     overrides: Partial<RoutedInvariantRow> = {}
@@ -206,6 +229,21 @@ describe('evaluateDeterministicRow', () => {
     expect(result.insufficientReason).toBe('no-executable-proof');
   });
 
+  it('deliberate red: a hung consumer becomes a real fail with a timeout reason, not a stall', () => {
+    hangWorkDir = mkdtempSync(join(tmpdir(), 'design-ci-eval-row-hang-'));
+    const fixturePath = join(hangWorkDir, 'hangs.sh');
+    writeFileSync(fixturePath, '#!/usr/bin/env bash\nsleep 5\n');
+    const result = evaluateDeterministicRow(
+      row({ routeEvidence: [fixturePath] }),
+      REPO_ROOT,
+      new Map<string, ConsumerCheckOutcome>(),
+      200
+    );
+    expect(result.state).toBe('fail');
+    expect(result.insufficientReason).toBeNull();
+    expect(result.detail).toMatch(/timed out after 200ms/);
+  });
+
   it('dedupes two evidence entries that resolve to the same underlying file', () => {
     const sharedCache = new Map<string, ConsumerCheckOutcome>();
     let callCount = 0;
@@ -232,6 +270,12 @@ describe('evaluateDeterministicRow', () => {
 });
 
 describe('evaluateDesignCiJudgeMatrix', () => {
+  let zindexWorkDir: string;
+
+  afterEach(() => {
+    if (zindexWorkDir) rmSync(zindexWorkDir, { recursive: true, force: true });
+  });
+
   it('never runs or reports a deterministic row with zero applicable units', () => {
     const matrix = {
       generatedAt: new Date().toISOString(),
@@ -295,6 +339,88 @@ describe('evaluateDesignCiJudgeMatrix', () => {
     expect(
       evaluated.cells.every(cell => cell.insufficientReason === null)
     ).toBe(true);
+  });
+
+  it('deliberate red: a real invariant check (raw z-index scanner) fails on its own red fixture, and the report lists it first', () => {
+    zindexWorkDir = mkdtempSync(join(tmpdir(), 'design-ci-eval-zindex-'));
+    // A generated node --test file that imports the REAL scanner (not a
+    // mock) and runs it against the REAL known-bad fixture used by
+    // JOV-INV-040's own deliberate-red evidence. The assertion below is
+    // deliberately inverted (expects zero findings) so the real detector
+    // finding real violations makes this test — and therefore the row —
+    // fail for a genuine reason, not a fabricated one.
+    const scannerModuleUrl = pathToFileURL(
+      join(REPO_ROOT, 'scripts/invariants/overlay-layer-contract.mjs')
+    ).href;
+    const redFixturePath = join(
+      REPO_ROOT,
+      'scripts/invariants/fixtures/overlay-layer-contract/red/Overlay.tsx'
+    );
+    const generatedTestPath = join(
+      zindexWorkDir,
+      'real-zindex-scanner.test.mjs'
+    );
+    writeFileSync(
+      generatedTestPath,
+      [
+        "import assert from 'node:assert/strict';",
+        "import { readFileSync } from 'node:fs';",
+        "import { test } from 'node:test';",
+        `import { scanRawZIndex } from ${JSON.stringify(scannerModuleUrl)};`,
+        '',
+        "test('the real scanner must find nothing in the deliberately bad fixture (deliberately wrong — proves a genuine fail)', () => {",
+        `  const source = readFileSync(${JSON.stringify(redFixturePath)}, 'utf8');`,
+        `  const findings = scanRawZIndex(${JSON.stringify(redFixturePath)}, source);`,
+        '  assert.equal(findings.length, 0);',
+        '});',
+        '',
+      ].join('\n')
+    );
+
+    const row: RoutedInvariantRow = {
+      rowId: 'FIXTURE-REAL-ZINDEX-RED',
+      invariantId: 'FIXTURE-REAL-ZINDEX-RED',
+      ruleId: null,
+      title: 'fixture: real raw z-index scanner red',
+      products: ['Jovie'],
+      surfaces: ['*'],
+      route: 'deterministic',
+      routeEvidence: [generatedTestPath],
+    };
+    const matrix = {
+      generatedAt: new Date().toISOString(),
+      rows: [row],
+      units: [],
+      cells: [
+        {
+          rowId: row.rowId,
+          unitId: 'unit-a',
+          route: 'deterministic' as const,
+          state: 'insufficient' as const,
+          insufficientReason: 'not-yet-evaluated' as const,
+        },
+      ],
+    };
+
+    const { matrix: evaluated, rowEvaluations } = evaluateDesignCiJudgeMatrix(
+      matrix,
+      REPO_ROOT
+    );
+    expect(rowEvaluations).toHaveLength(1);
+    expect(rowEvaluations[0]?.state).toBe('fail');
+    expect(evaluated.cells[0]?.state).toBe('fail');
+
+    const report = formatMatrixReport(evaluated, rowEvaluations);
+    const failedHeaderIndex = report.indexOf('FAILED (');
+    const rowLineIndex = report.indexOf(row.rowId);
+    const summaryHeaderIndex = report.indexOf(
+      'design-ci judge matrix — generated'
+    );
+    // The fail list is the first thing printed — before the row's own
+    // line, and both come before the summary counts.
+    expect(failedHeaderIndex).toBe(0);
+    expect(rowLineIndex).toBeGreaterThan(failedHeaderIndex);
+    expect(rowLineIndex).toBeLessThan(summaryHeaderIndex);
   });
 
   it(// This runs the full real matrix (all 1017 deterministic cells) once —
