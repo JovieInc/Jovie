@@ -13,7 +13,9 @@
     "components/**/*.stories.ts",
     "components/**/*.stories.tsx",
     ".storybook/**/*.ts",
-    ".storybook/**/*.tsx"
+    ".storybook/**/*.tsx",
+    "types/**/*.ts",
+    "types/**/*.d.ts"
   ],
   "exclude": ["node_modules", ".next/**"]
 }

@@ -73,7 +73,7 @@ export function HomepageIdentityHero({
           variant='floating'
           glowTone='none'
           testId='homepage-claim-card'
-          className='product-claim-card w-full max-w-120'
+          className='product-claim-card w-full max-w-85'
           contentClassName='flex flex-col gap-4 px-5 py-5 sm:gap-5 sm:px-9 sm:py-10'
         >
           <div
@@ -91,7 +91,9 @@ export function HomepageIdentityHero({
               />
               <div className='min-w-0'>
                 <p className='text-base text-primary-token'>{preview.name}</p>
-                <p className='text-sm text-tertiary-token'>{preview.role}</p>
+                <p className='whitespace-nowrap text-sm text-tertiary-token'>
+                  {preview.role}
+                </p>
               </div>
               <p className='product-claim-card__status ml-auto text-secondary-token'>
                 {preview.label}

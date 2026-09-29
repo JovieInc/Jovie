@@ -32,7 +32,7 @@ function ContainerDemo({
 }
 
 export const Page: Story = {
-  args: { width: 'page' },
+  args: { width: 'page', children: null },
   render: args => (
     <MarketingContainer width={args.width}>
       <ContainerDemo
@@ -44,7 +44,7 @@ export const Page: Story = {
 };
 
 export const Landing: Story = {
-  args: { width: 'landing' },
+  args: { width: 'landing', children: null },
   render: args => (
     <MarketingContainer width={args.width}>
       <ContainerDemo
@@ -56,7 +56,7 @@ export const Landing: Story = {
 };
 
 export const Prose: Story = {
-  args: { width: 'prose' },
+  args: { width: 'prose', children: null },
   render: args => (
     <MarketingContainer width={args.width}>
       <ContainerDemo
