@@ -54,7 +54,6 @@ describe('AskJovieWidget', () => {
       screen.getByRole('dialog', { name: 'Ask Jovie about Test Artist' })
     ).toBeVisible();
     expect(fetchMock).not.toHaveBeenCalled();
-
   });
 
   it('opens the dialog with a greeting and suggested questions', () => {
