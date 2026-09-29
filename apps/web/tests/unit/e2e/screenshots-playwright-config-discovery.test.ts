@@ -11,6 +11,21 @@ import { afterEach, describe, expect, it } from 'vitest';
 // screenshots.yml on every run since that merge, skipping every step after
 // them. Fixed in #19467; this guards against the same class of gap for any
 // future producer spec.
+// Playwright's TestConfig['testMatch'] type also allows RegExp entries;
+// ours are always string globs (see the array literal in
+// playwright.config.screenshots.ts), so assert that here rather than at
+// every call site.
+function toGlobFilenames(testMatch: readonly (string | RegExp)[]): string[] {
+  return testMatch.map(pattern => {
+    if (typeof pattern !== 'string') {
+      throw new Error(
+        `Expected a string glob pattern in testMatch, got a RegExp: ${pattern}`
+      );
+    }
+    return pattern.replace(/^\*\*\//, '');
+  });
+}
+
 describe('screenshots Playwright config test discovery', () => {
   const productScreenshotsDir = resolve(
     import.meta.dirname,
@@ -34,9 +49,7 @@ describe('screenshots Playwright config test discovery', () => {
         'playwright.config.screenshots.ts testMatch is expected to be an array of glob patterns.'
       );
     }
-    const matchedFilenames = new Set(
-      testMatch.map(pattern => pattern.replace(/^\*\*\//, ''))
-    );
+    const matchedFilenames = new Set(toGlobFilenames(testMatch));
 
     const producerSpecs = readdirSync(productScreenshotsDir).filter(name =>
       name.endsWith('-screen-proof.spec.ts')
@@ -65,9 +78,7 @@ describe('screenshots Playwright config test discovery', () => {
     }
     const onDisk = new Set(readdirSync(productScreenshotsDir));
 
-    const stale = testMatch
-      .map(pattern => pattern.replace(/^\*\*\//, ''))
-      .filter(name => !onDisk.has(name));
+    const stale = toGlobFilenames(testMatch).filter(name => !onDisk.has(name));
     expect(
       stale,
       `testMatch references ${stale.join(', ')}, which no longer exist under tests/product-screenshots/.`
