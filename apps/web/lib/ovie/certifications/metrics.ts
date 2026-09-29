@@ -315,6 +315,208 @@ function scopeFacts(
   };
 }
 
+function isMachineCertifiable(
+  subject: MetricsSubject,
+  receipts: readonly DogfoodReceipt[]
+): boolean {
+  return (
+    subject.deploy !== null &&
+    subject.requiredMissions.length > 0 &&
+    evaluateDogfoodReliability(
+      receipts.filter(receipt => receipt.subjectId === subject.id),
+      subject.deploy,
+      subject.requiredMissions
+    ).machineCertifiable
+  );
+}
+
+function latestDecisionsBySubject(
+  facts: ScopeFacts
+): Map<string, MetricsFounderDecision> {
+  const decisionBySubject = new Map<string, MetricsFounderDecision>();
+  for (const decision of [...facts.decisions].sort((a, b) =>
+    a.decidedAt.localeCompare(b.decidedAt)
+  )) {
+    // Latest founder decision on the subject is the calibration label.
+    decisionBySubject.set(decision.subjectId, decision);
+  }
+  return decisionBySubject;
+}
+
+function dogfoodKindCoverage(facts: ScopeFacts): MetricValue {
+  const kindCounts = facts.subjects.map(subject => {
+    const kinds = new Set(
+      facts.receipts
+        .filter(
+          receipt =>
+            receipt.subjectId === subject.id &&
+            receipt.outcome === 'passed' &&
+            (subject.deploy === null ||
+              (receipt.commitSha === subject.deploy.commitSha &&
+                receipt.deploymentId === subject.deploy.deploymentId))
+        )
+        .map(receipt => receipt.kind)
+    );
+    return kinds.size;
+  });
+  return metric(
+    facts.subjects.length === 0
+      ? null
+      : kindCounts.reduce((a, b) => a + b, 0) / facts.subjects.length,
+    facts.subjects.length
+  );
+}
+
+function driverReliability(
+  facts: ScopeFacts,
+  input: CertificationMetricsInput
+): Record<string, MetricValue> {
+  const knownGood = new Set(input.knownGoodDeploymentIds);
+  const byDriver = new Map<string, { passed: number; total: number }>();
+  for (const receipt of facts.receipts) {
+    if (!knownGood.has(receipt.deploymentId)) continue;
+    const bucket = byDriver.get(receipt.driver) ?? { passed: 0, total: 0 };
+    bucket.total += 1;
+    if (receipt.outcome === 'passed') bucket.passed += 1;
+    byDriver.set(receipt.driver, bucket);
+  }
+  const result: Record<string, MetricValue> = {};
+  for (const [driver, bucket] of [...byDriver.entries()].sort(([a], [b]) =>
+    a.localeCompare(b)
+  )) {
+    result[driver] = rate(bucket.passed, bucket.total);
+  }
+  return result;
+}
+
+function judgeCalibration(
+  facts: ScopeFacts,
+  decisionBySubject: Map<string, MetricsFounderDecision>
+): JudgeRungCalibration[] {
+  const judgeRungs = new Map<number, { agree: number; total: number }>();
+  for (const receipt of facts.judgeReceipts) {
+    const label = decisionBySubject.get(receipt.subjectId);
+    if (!label || receipt.verdict === 'uncertain') continue;
+    const agrees =
+      (receipt.verdict === 'certify' && label.decision === 'approved') ||
+      (receipt.verdict === 'reject' && label.decision !== 'approved');
+    const bucket = judgeRungs.get(receipt.rung) ?? { agree: 0, total: 0 };
+    bucket.total += 1;
+    if (agrees) bucket.agree += 1;
+    judgeRungs.set(receipt.rung, bucket);
+  }
+  return [...judgeRungs.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([rung, bucket]) => ({
+      rung,
+      agreementRate: rate(bucket.agree, bucket.total),
+    }));
+}
+
+function escalationMix(facts: ScopeFacts): EscalationRungMix[] {
+  const escalated = facts.subjects.filter(
+    subject => subject.escalationRungResolved !== null
+  );
+  const rungCounts = new Map<number, number>();
+  for (const subject of escalated) {
+    const rung = subject.escalationRungResolved as number;
+    rungCounts.set(rung, (rungCounts.get(rung) ?? 0) + 1);
+  }
+  return [...rungCounts.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([rung, count]) => ({
+      rung,
+      share: rate(count, escalated.length),
+      totalCostUsd: facts.judgeReceipts
+        .filter(receipt => receipt.rung === rung)
+        .reduce((sum, receipt) => sum + (receipt.costUsd ?? 0), 0),
+    }));
+}
+
+function cycleTime(facts: ScopeFacts): CycleTimeMetric[] {
+  return CERTIFICATION_CONFIDENCE_TIERS.map(tier => {
+    const durations = facts.subjects
+      .filter(
+        subject =>
+          subject.confidenceTier === tier &&
+          subject.machineCertifiedAt !== null &&
+          subject.fullyRolledOutAt !== null
+      )
+      .map(subject =>
+        minutesBetween(
+          subject.machineCertifiedAt as string,
+          subject.fullyRolledOutAt as string
+        )
+      )
+      .sort((a, b) => a - b);
+    return {
+      tier,
+      p50Minutes: percentile(durations, 50),
+      p90Minutes: percentile(durations, 90),
+      sampleSize: durations.length,
+    };
+  });
+}
+
+function killSwitchMttrMinutes(facts: ScopeFacts): MetricValue {
+  const killIntervals = facts.subjects
+    .flatMap(subject => subject.killSwitches)
+    .map(event => minutesBetween(event.failedAt, event.flagOffAt));
+  return metric(
+    killIntervals.length === 0
+      ? null
+      : killIntervals.reduce((a, b) => a + b, 0) / killIntervals.length,
+    killIntervals.length
+  );
+}
+
+function signalHealth(
+  facts: ScopeFacts,
+  decisionBySubject: Map<string, MetricsFounderDecision>
+): SignalHealthMetric {
+  const advisors = facts.roster.filter(
+    member =>
+      member.tier === 'advisor' &&
+      member.signalState !== 'retired' &&
+      member.signalState !== 'paused'
+  ).length;
+  const qualifiedPool = facts.roster.filter(
+    member =>
+      (member.tier === 'alpha' || member.tier === 'beta') &&
+      member.signalState === 'qualified'
+  ).length;
+  const sent = facts.roster.reduce((sum, m) => sum + m.reportsSent, 0);
+  const replied = facts.roster.reduce((sum, m) => sum + m.repliesReceived, 0);
+
+  const signalBySubject = new Map<string, number>();
+  for (const report of facts.signalReports) {
+    signalBySubject.set(
+      report.subjectId,
+      (signalBySubject.get(report.subjectId) ?? 0) + report.weight
+    );
+  }
+  let agreeCount = 0;
+  let agreeTotal = 0;
+  for (const [subjectId, aggregate] of signalBySubject) {
+    const label = decisionBySubject.get(subjectId);
+    if (!label) continue;
+    agreeTotal += 1;
+    if (
+      (label.decision === 'approved' && aggregate > 0) ||
+      (label.decision !== 'approved' && aggregate < 0)
+    ) {
+      agreeCount += 1;
+    }
+  }
+
+  return {
+    advisors,
+    qualifiedPoolMembers: qualifiedPool,
+    replyRate: rate(replied, sent),
+    agreementWithTim: rate(agreeCount, agreeTotal),
+  };
+}
+
 function computeScopeMetrics(
   facts: ScopeFacts,
   input: CertificationMetricsInput
@@ -381,174 +583,19 @@ function computeScopeMetrics(
     defectsOnPromoted.length
   );
 
-  const certifiable = facts.subjects.filter(
-    subject =>
-      subject.deploy !== null &&
-      subject.requiredMissions.length > 0 &&
-      evaluateDogfoodReliability(
-        facts.receipts.filter(receipt => receipt.subjectId === subject.id),
-        subject.deploy,
-        subject.requiredMissions
-      ).machineCertifiable
-  );
   const machineCertifiableCoverage = rate(
-    certifiable.length,
+    facts.subjects.filter(subject =>
+      isMachineCertifiable(subject, facts.receipts)
+    ).length,
     facts.subjects.length
   );
-
-  const kindCounts = facts.subjects.map(subject => {
-    const kinds = new Set(
-      facts.receipts
-        .filter(
-          receipt =>
-            receipt.subjectId === subject.id &&
-            receipt.outcome === 'passed' &&
-            (subject.deploy === null ||
-              (receipt.commitSha === subject.deploy.commitSha &&
-                receipt.deploymentId === subject.deploy.deploymentId))
-        )
-        .map(receipt => receipt.kind)
-    );
-    return kinds.size;
-  });
-  const dogfoodKindCoverage = metric(
-    facts.subjects.length === 0
-      ? null
-      : kindCounts.reduce((a, b) => a + b, 0) / facts.subjects.length,
-    facts.subjects.length
-  );
-
-  const knownGood = new Set(input.knownGoodDeploymentIds);
-  const driverReliability: Record<string, MetricValue> = {};
-  const byDriver = new Map<string, { passed: number; total: number }>();
-  for (const receipt of facts.receipts) {
-    if (!knownGood.has(receipt.deploymentId)) continue;
-    const bucket = byDriver.get(receipt.driver) ?? { passed: 0, total: 0 };
-    bucket.total += 1;
-    if (receipt.outcome === 'passed') bucket.passed += 1;
-    byDriver.set(receipt.driver, bucket);
-  }
-  for (const [driver, bucket] of [...byDriver.entries()].sort()) {
-    driverReliability[driver] = rate(bucket.passed, bucket.total);
-  }
 
   const canaryCoverage = rate(
     facts.subjects.filter(subject => subject.hasCanary).length,
     facts.subjects.length
   );
 
-  const decisionBySubject = new Map<string, MetricsFounderDecision>();
-  for (const decision of [...facts.decisions].sort((a, b) =>
-    a.decidedAt.localeCompare(b.decidedAt)
-  )) {
-    // Latest founder decision on the subject is the calibration label.
-    decisionBySubject.set(decision.subjectId, decision);
-  }
-  const judgeRungs = new Map<number, { agree: number; total: number }>();
-  for (const receipt of facts.judgeReceipts) {
-    const label = decisionBySubject.get(receipt.subjectId);
-    if (!label || receipt.verdict === 'uncertain') continue;
-    const agrees =
-      (receipt.verdict === 'certify' && label.decision === 'approved') ||
-      (receipt.verdict === 'reject' && label.decision !== 'approved');
-    const bucket = judgeRungs.get(receipt.rung) ?? { agree: 0, total: 0 };
-    bucket.total += 1;
-    if (agrees) bucket.agree += 1;
-    judgeRungs.set(receipt.rung, bucket);
-  }
-  const judgeCalibration = [...judgeRungs.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([rung, bucket]) => ({
-      rung,
-      agreementRate: rate(bucket.agree, bucket.total),
-    }));
-
-  const escalated = facts.subjects.filter(
-    subject => subject.escalationRungResolved !== null
-  );
-  const rungCounts = new Map<number, number>();
-  for (const subject of escalated) {
-    const rung = subject.escalationRungResolved as number;
-    rungCounts.set(rung, (rungCounts.get(rung) ?? 0) + 1);
-  }
-  const escalationMix = [...rungCounts.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([rung, count]) => ({
-      rung,
-      share: rate(count, escalated.length),
-      totalCostUsd: facts.judgeReceipts
-        .filter(receipt => receipt.rung === rung)
-        .reduce((sum, receipt) => sum + (receipt.costUsd ?? 0), 0),
-    }));
-
-  const cycleTime = CERTIFICATION_CONFIDENCE_TIERS.map(tier => {
-    const durations = facts.subjects
-      .filter(
-        subject =>
-          subject.confidenceTier === tier &&
-          subject.machineCertifiedAt !== null &&
-          subject.fullyRolledOutAt !== null
-      )
-      .map(subject =>
-        minutesBetween(
-          subject.machineCertifiedAt as string,
-          subject.fullyRolledOutAt as string
-        )
-      )
-      .sort((a, b) => a - b);
-    return {
-      tier,
-      p50Minutes: percentile(durations, 50),
-      p90Minutes: percentile(durations, 90),
-      sampleSize: durations.length,
-    };
-  });
-
-  const killIntervals = facts.subjects
-    .flatMap(subject => subject.killSwitches)
-    .map(event => minutesBetween(event.failedAt, event.flagOffAt))
-    .sort((a, b) => a - b);
-  const killSwitchMttrMinutes = metric(
-    killIntervals.length === 0
-      ? null
-      : killIntervals.reduce((a, b) => a + b, 0) / killIntervals.length,
-    killIntervals.length
-  );
-
-  const advisors = facts.roster.filter(
-    member =>
-      member.tier === 'advisor' &&
-      member.signalState !== 'retired' &&
-      member.signalState !== 'paused'
-  ).length;
-  const qualifiedPool = facts.roster.filter(
-    member =>
-      (member.tier === 'alpha' || member.tier === 'beta') &&
-      member.signalState === 'qualified'
-  ).length;
-  const sent = facts.roster.reduce((sum, m) => sum + m.reportsSent, 0);
-  const replied = facts.roster.reduce((sum, m) => sum + m.repliesReceived, 0);
-
-  const signalBySubject = new Map<string, number>();
-  for (const report of facts.signalReports) {
-    signalBySubject.set(
-      report.subjectId,
-      (signalBySubject.get(report.subjectId) ?? 0) + report.weight
-    );
-  }
-  let agreeCount = 0;
-  let agreeTotal = 0;
-  for (const [subjectId, aggregate] of signalBySubject) {
-    const label = decisionBySubject.get(subjectId);
-    if (!label) continue;
-    agreeTotal += 1;
-    if (
-      (label.decision === 'approved' && aggregate > 0) ||
-      (label.decision !== 'approved' && aggregate < 0)
-    ) {
-      agreeCount += 1;
-    }
-  }
+  const decisionBySubject = latestDecisionsBySubject(facts);
 
   return {
     founderBlockingMinutes,
@@ -557,19 +604,14 @@ function computeScopeMetrics(
     escapedDefectsPer100Promotions,
     dogfoodCatchRate,
     machineCertifiableCoverage,
-    dogfoodKindCoverage,
-    driverReliability,
+    dogfoodKindCoverage: dogfoodKindCoverage(facts),
+    driverReliability: driverReliability(facts, input),
     canaryCoverage,
-    judgeCalibration,
-    escalationMix,
-    cycleTime,
-    killSwitchMttrMinutes,
-    signalHealth: {
-      advisors,
-      qualifiedPoolMembers: qualifiedPool,
-      replyRate: rate(replied, sent),
-      agreementWithTim: rate(agreeCount, agreeTotal),
-    },
+    judgeCalibration: judgeCalibration(facts, decisionBySubject),
+    escalationMix: escalationMix(facts),
+    cycleTime: cycleTime(facts),
+    killSwitchMttrMinutes: killSwitchMttrMinutes(facts),
+    signalHealth: signalHealth(facts, decisionBySubject),
   };
 }
 
