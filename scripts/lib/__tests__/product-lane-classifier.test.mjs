@@ -298,6 +298,8 @@ describe('product lane classifier', () => {
     for (const [path, lanes] of /** @type {Array<[string, string[]]>} */ ([
       ['apps/ios/Jovie/App.swift', ['ios']],
       ['apps/desktop/src/main.ts', ['mac']],
+      ['packages/media-ingest/src/ingest.ts', ['mac']],
+      ['packages/media-ingest/package.json', ['mac']],
       ['apps/web/app/page.tsx', ['web']],
       ['apps/ovie/app/page.tsx', ['web']],
       ['apps/ovie/proxy.ts', ['web']],
