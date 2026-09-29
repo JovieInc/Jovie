@@ -4,12 +4,6 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DemoVideoPage } from '@/components/features/demo/DemoVideoPage';
-import { APP_ROUTES } from '@/constants/routes';
-import {
-  DEMO_CAPTIONS_PUBLIC_PATH,
-  getDemoVideoDownloadHref,
-  getDemoVideoUrl,
-} from '@/lib/demo-video';
 import demoVideoMeta, {
   Web028DemoVideo,
   Web029DemoVideoAlias,
@@ -40,45 +34,25 @@ vi.mock('@/components/features/demo/DemoVideoPlayer', () => ({
 }));
 
 describe('DemoVideoPage route contract', () => {
-  it('renders the exact accessible production body with canonical media URLs', () => {
-    render(<DemoVideoPage />);
+  it('renders no product demo surface while certification is incomplete', () => {
+    const { container } = render(<DemoVideoPage />);
 
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByTestId('demo-video-player')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: 'Jovie Turns Artist Signals Into Execution',
-      })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('demo-video-player')).toHaveAttribute(
-      'data-label',
-      'Jovie Demo Video'
-    );
-    expect(screen.getByTestId('demo-video-player')).toHaveAttribute(
-      'data-captions-url',
-      DEMO_CAPTIONS_PUBLIC_PATH
-    );
-    expect(screen.getByTestId('demo-video-player')).toHaveAttribute(
-      'data-video-url',
-      getDemoVideoUrl()
-    );
-    expect(screen.getByRole('link', { name: 'Download demo' })).toHaveAttribute(
-      'href',
-      getDemoVideoDownloadHref(getDemoVideoUrl())
-    );
-    expect(screen.getByRole('link', { name: 'Try it free' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.SIGNUP
-    );
+      screen.queryByRole('link', { name: 'Download demo' })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the unmapped production CTA free of a false Pen identity', () => {
-    render(<DemoVideoPage />);
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/features/demo/DemoVideoPage.tsx'),
+      'utf8'
+    );
 
     // primary/md has no source-backed Pen master yet; the contract fails
     // closed instead of stamping another master's root.
-    expect(
-      screen.getByRole('link', { name: 'Try it free' })
-    ).not.toHaveAttribute('data-pen-contract');
+    expect(source).not.toContain('data-pen-contract');
   });
 
   it('binds both route identities to one exact component and no counter body', () => {
