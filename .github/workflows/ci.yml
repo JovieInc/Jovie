@@ -1,11 +1,6 @@
 name: CI
 
 on:
-  pull_request:
-    # Source CI runs once per source revision. Marking an unchanged draft ready
-    # must never launch a second copy of the same validation flight.
-    types: [opened, synchronize, reopened]
-    branches: [main, 'integration/**']
   # GitHub native merge queue validates the exact synthetic combined head.
   merge_group:
     types: [checks_requested]
