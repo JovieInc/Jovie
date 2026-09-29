@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InboxRuntimeNotification } from '@/components/features/opportunity-inbox/InboxRuntimeNotification';
+import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import { renderDashboardNav } from '@/tests/utils/dashboard-nav-test-support';
 import { RuntimeUpdateProvider } from './RuntimeUpdateProvider';
@@ -51,7 +52,26 @@ beforeEach(() => {
   state.install.mockResolvedValue(true);
 });
 afterEach(() => vi.unstubAllGlobals());
+function DesktopUpdateProbe() {
+  const ctx = useDesktopUpdateContext();
+  return (
+    <span data-testid='desktop-update-state'>{ctx?.state.state ?? 'none'}</span>
+  );
+}
+
 describe('updates in the central Inbox', () => {
+  it('exposes the desktop update context to descendants (unsupported on web)', () => {
+    render(
+      <RuntimeUpdateProvider>
+        <DesktopUpdateProbe />
+      </RuntimeUpdateProvider>
+    );
+    expect(screen.getByTestId('desktop-update-state')).toHaveTextContent(
+      'unsupported'
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('shows runtime attention on the canonical shell Inbox bell', () => {
     state.available = true;
     state.downloaded = true;

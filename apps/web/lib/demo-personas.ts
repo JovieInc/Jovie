@@ -605,7 +605,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'miracle-official-music-video',
       releaseType: 'music_video',
       releaseDate: '2023-04-14',
-      artworkUrl: 'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+      artworkUrl: '/images/demo/artwork-video.jpg',
       totalTracks: 0,
       totalDurationMs: 219000,
       label: 'Columbia',
@@ -618,8 +618,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       },
       metadata: {
         youtubeVideoId: 'v7GHn2WJCM4',
-        youtubeThumbnailUrl:
-          'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+        youtubeThumbnailUrl: '/images/demo/artwork-video.jpg',
         youtubeChannelId: 'UCIjYyZxkFucP_W-tmXg_ILw',
         youtubeChannelName: 'Calvin Harris',
         duration: 219,

@@ -21,9 +21,9 @@ export const HOMEPAGE_MEDIA_MAP = {
   connected: {
     chapter: 'connected',
     role: 'dominant-visual',
-    sourceScenarioId: 'tim-white-profile-listen-mobile',
-    sourceRoute: '/demo/showcase/tim-white-profile?mode=listen',
-    asset: getMarketingExportImage('tim-white-profile-listen-mobile'),
+    sourceScenarioId: 'tim-white-profile-live-mobile',
+    sourceRoute: '/demo/showcase/tim-white-profile?release=live',
+    asset: getMarketingExportImage('tim-white-profile-live-mobile'),
     ...sharedReceipt,
   },
   relationships: {
@@ -32,6 +32,14 @@ export const HOMEPAGE_MEDIA_MAP = {
     sourceScenarioId: 'tim-white-profile-subscribe-mobile',
     sourceRoute: '/demo/showcase/tim-white-profile?mode=subscribe',
     asset: getMarketingExportImage('tim-white-profile-subscribe-mobile'),
+    ...sharedReceipt,
+  },
+  pay: {
+    chapter: 'relationships',
+    role: 'supporting-visual',
+    sourceScenarioId: 'tim-white-profile-pay-mobile',
+    sourceRoute: '/demo/showcase/tim-white-profile?mode=pay',
+    asset: getMarketingExportImage('tim-white-profile-pay-mobile'),
     ...sharedReceipt,
   },
 } as const;

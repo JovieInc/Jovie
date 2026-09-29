@@ -216,6 +216,28 @@ export const MARKETING_FEATURE_CAPABILITIES = {
     proofAuthorized: true,
     contentRevision: '2026-08-01',
   },
+  /**
+   * Selective reach ("Send less. Matter more.", JOV-6299). The copy line is
+   * founder-approved, but presenting it as working Jovie behavior is gated on
+   * certified segments, real preview/approval/scheduling/send paths, consent
+   * and quiet-hours handling, capped-send pricing (JOV-6229), and proof that
+   * the delivery states are real policy decisions — none certified yet, so the
+   * capability stays internal-only and unavailable with unauthorized proof.
+   * "Coming soon" demand capture is permitted only through this contract.
+   */
+  'selective-reach': {
+    capabilityId: 'selective-reach',
+    maturity: 'proposed',
+    publication: 'internal_only',
+    access: 'unavailable',
+    audience: 'general',
+    supportedJobs: [
+      'relevance-scoped update delivery',
+      'send now, later, or do-not-interrupt decisions',
+    ],
+    proofAuthorized: false,
+    contentRevision: '2026-09-28',
+  },
 } as const satisfies Readonly<Record<string, FeatureCapabilityRecord>>;
 
 export type MarketingCapabilityId = keyof typeof MARKETING_FEATURE_CAPABILITIES;

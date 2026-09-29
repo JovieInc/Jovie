@@ -88,7 +88,7 @@ describe('public CTA guard', () => {
       '/support'
     );
     // Native text containment and real 44px hit ownership remain browser checks
-    // in homepage.spec.ts; JSDOM cannot certify rendered dimensions.
+    // in cookies.spec.ts hit-testing; JSDOM cannot certify rendered dimensions.
   });
 
   it('adds no competing CTA through the compact Customers flyout', () => {

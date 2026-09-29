@@ -1,9 +1,9 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SUPPORT_FAQ_ITEMS, SupportPageContent } from './SupportPageContent';
+import { SupportPageContent } from './SupportPageContent';
 import { SUPPORT_STORY_RECEIPT } from './SupportPageContent.stories';
 
 vi.mock('@/lib/analytics', () => ({
@@ -12,7 +12,7 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 describe('SupportPageContent', () => {
-  it('renders the exact shipped body in hero, channels, FAQ, CTA order', () => {
+  it('renders the shipped body in hero, channels, CTA order', () => {
     const { container } = render(<SupportPageContent />);
 
     const heading = screen.getByRole('heading', {
@@ -47,15 +47,16 @@ describe('SupportPageContent', () => {
     expect(sectionHeadings).toEqual([
       "We're Here To Help.",
       'How Can We Help?',
-      'Frequently Asked Questions',
       'Still Need Help?',
     ]);
-    expect(screen.getAllByRole('article')).toHaveLength(3);
+    expect(screen.getAllByRole('article')).toHaveLength(2);
     expect(screen.getAllByTestId('support-cta')).toHaveLength(1);
     for (const action of screen
       .getAllByRole('link')
       .filter(link =>
-        /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
+        /^(Browse the Help Center|Contact support)$/.test(
+          link.textContent?.trim() ?? ''
+        )
       )) {
       // Canonical 28px marketing Button atom; it owns the 44px touch target.
       expect(action).toHaveAttribute('data-size', 'marketing');
@@ -70,39 +71,31 @@ describe('SupportPageContent', () => {
       }
       expect(action).not.toHaveClass('public-action-inline');
     }
-    expect(
-      screen.getByRole('link', { name: /send email to support team/i })
-    ).toHaveAttribute('href', 'mailto:support@jov.ie');
   });
 
-  it('keeps the four production FAQ items and copy deterministic', () => {
-    expect(SUPPORT_FAQ_ITEMS).toEqual([
-      {
-        question: 'How do I get started with Jovie?',
-        answer:
-          'Start with Find yourself and follow the setup steps for your profile. Full walkthrough at https://docs.jov.ie/docs/jovie-essentials/start-here.',
-      },
-      {
-        question: 'How do music smart links work?',
-        answer:
-          'When you add a release, Jovie generates a smart link that detects each fan\u2019s preferred streaming platform and routes them there automatically.',
-      },
-      {
-        question: 'How do I upgrade my plan?',
-        answer:
-          'Head to Settings \u2192 Billing to view available plans and manage your subscription.',
-      },
-      {
-        question: 'How do I contact support?',
-        answer:
-          'Email support@jov.ie \u2014 we typically respond within one business day.',
-      },
-    ]);
-
+  it('routes self-serve to the canonical Help Center and keeps contact as the fallback', () => {
     render(<SupportPageContent />);
-    for (const { question } of SUPPORT_FAQ_ITEMS) {
-      expect(screen.getByRole('button', { name: question })).toBeVisible();
+
+    expect(
+      screen.getByRole('link', { name: /browse the help center/i })
+    ).toHaveAttribute('href', 'https://docs.jov.ie/docs');
+    for (const action of screen.getAllByRole('link', {
+      name: /contact support/i,
+    })) {
+      expect(action).toHaveAttribute(
+        'href',
+        'https://docs.jov.ie/contact?from=/support'
+      );
     }
+    // Direct email remains a usable fallback when the Help Center is unreachable.
+    expect(
+      screen.getByRole('link', { name: 'support@jov.ie' })
+    ).toHaveAttribute('href', 'mailto:support@jov.ie');
+    // No duplicate Help Center corpus: the page no longer renders the FAQ
+    // accordion that now lives at docs.jov.ie/docs/manage-jovie/troubleshooting.
+    expect(
+      screen.queryByRole('button', { name: /how do i/i })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps metadata and schema ownership in the route and binds the exact story', () => {
@@ -120,9 +113,9 @@ describe('SupportPageContent', () => {
 
     expect(routeSource).toContain('export const metadata: Metadata');
     expect(routeSource).toContain('export const revalidate = false');
-    expect(routeSource).toContain('buildFaqSchema([...SUPPORT_FAQ_ITEMS])');
     expect(routeSource).toContain('buildBreadcrumbSchema');
-    expect(routeSource.match(/type='application\/ld\+json'/g)).toHaveLength(2);
+    expect(routeSource.match(/type='application\/ld\+json'/g)).toHaveLength(1);
+    expect(routeSource).not.toContain('buildFaqSchema');
     expect(routeSource).toContain('<SupportPageContent />');
     expect(routeSource).not.toContain('<MarketingHero');
     expect(routeSource).not.toContain('<SupportChannels');
@@ -176,14 +169,32 @@ describe('SupportPageContent', () => {
       return;
     }
 
-    expect(() =>
-      execFileSync('git', [
+    // Exit 0 and 1 are git's ancestry verdicts; any other exit is an execution
+    // error, not a verdict — retry it. A shallow boundary severs ancestry for
+    // an explicitly fetched commit, so a non-ancestor verdict in a shallow
+    // checkout proves nothing (same contract as component-ship-gate's
+    // storybook-story-quality-guard).
+    let ancestorStatus: number | null = null;
+    for (
+      let attempt = 0;
+      attempt < 3 && ancestorStatus !== 0 && ancestorStatus !== 1;
+      attempt += 1
+    ) {
+      ancestorStatus = spawnSync('git', [
         'merge-base',
         '--is-ancestor',
         SUPPORT_STORY_RECEIPT.sourceSha,
         'HEAD',
-      ])
-    ).not.toThrow();
+      ]).status;
+    }
+    if (ancestorStatus !== 0) {
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
 
     const sourceAtReceipt = execFileSync(
       'git',

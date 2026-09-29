@@ -24,6 +24,13 @@ vi.mock('next/link', () => ({
   }),
 }));
 
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
+
 describe('Linear-scale density (founder lock 2026-09-25)', () => {
   it('gives the nav sections and threads block the wider pt-5 top gap', () => {
     const source = readFileSync(
@@ -133,5 +140,13 @@ describe('DashboardNav route warming', () => {
         expect(el.className).not.toContain('mask-image');
       }
     }
+  });
+
+  it('imports sidebar chrome from the modular sidebar specifier', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
+    );
+    expect(source).toContain("@/components/organisms/sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });

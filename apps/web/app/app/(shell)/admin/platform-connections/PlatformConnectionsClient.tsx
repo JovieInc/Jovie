@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
+import { SpotifyAccountIdentity } from '@/components/features/admin/SpotifyAccountIdentity';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { useUserSafe } from '@/hooks/useClerkSafe';
@@ -185,32 +186,15 @@ function SpotifyTabContent({
     router.refresh();
   }
 
-  async function connectSpotify() {
+  function connectSpotify() {
     if (!user) return;
     setResult(null);
     setIsConnecting(true);
-    try {
-      // Clerk → Better Auth migration follow-up: `user.createExternalAccount`
-      // was a Clerk-specific API for linking external OAuth accounts (Spotify).
-      // Better Auth does not have an equivalent for non-auth provider
-      // connections. This admin feature needs to be rewired onto a direct
-      // Spotify OAuth flow (separate from the BA auth session). Linear
-      // follow-up filed. For now, surface a clear "not yet migrated" error
-      // so the failure is visible rather than silent.
-      const redirectUrl = `${globalThis.location.origin}${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}`;
-      void redirectUrl;
-      throw new Error(
-        'Spotify connection is being migrated to Better Auth and is temporarily unavailable. See Linear follow-up.'
-      );
-    } catch (error) {
-      setResult({
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to connect Spotify.',
-      });
-    } finally {
-      setIsConnecting(false);
-    }
+    // Canonical connector OAuth flow — same primitive as artist integrations.
+    const returnTo = `${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}?tab=spotify`;
+    router.push(
+      `/api/connectors/spotify/authorize?returnTo=${encodeURIComponent(returnTo)}`
+    );
   }
 
   function handleUseAccount() {
@@ -270,11 +254,16 @@ function SpotifyTabContent({
       <div className='grid gap-3 px-4 py-4 text-app sm:grid-cols-2'>
         <div>
           <p className='font-medium text-primary-token'>Active Publisher</p>
-          <p className='mt-1 text-secondary-token'>
-            {spotifyStatus.accountLabel ??
-              spotifyStatus.clerkUserId ??
-              'Not set'}
-          </p>
+          <div className='mt-1'>
+            {spotifyStatus.accountLabel || spotifyStatus.clerkUserId ? (
+              <SpotifyAccountIdentity
+                displayName={spotifyStatus.accountLabel}
+                accountId={spotifyStatus.clerkUserId}
+              />
+            ) : (
+              <span className='text-secondary-token'>Not set</span>
+            )}
+          </div>
           <p className='mt-1 text-xs text-tertiary-token'>
             {spotifyStatus.updatedAt
               ? `Updated ${formatDate(spotifyStatus.updatedAt)}`
@@ -285,11 +274,15 @@ function SpotifyTabContent({
           <p className='font-medium text-primary-token'>
             Current Admin Account
           </p>
-          <p className='mt-1 text-secondary-token'>
-            {currentUser.hasSpotify
-              ? (currentUser.label ?? 'Spotify connected')
-              : 'Spotify is not connected'}
-          </p>
+          <div className='mt-1'>
+            {currentUser.hasSpotify ? (
+              <SpotifyAccountIdentity displayName={currentUser.label} />
+            ) : (
+              <span className='text-secondary-token'>
+                Spotify is not connected
+              </span>
+            )}
+          </div>
           <MissingScopesList scopes={currentUser.missingScopes} />
         </div>
       </div>

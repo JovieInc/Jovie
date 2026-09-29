@@ -23,11 +23,29 @@ import {
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { changelogInlineText } from '@/lib/changelog-parser';
+import {
+  changelogInlineText,
+  changelogVersionLabel,
+} from '@/lib/changelog-parser';
 import { getChangelogReleases } from '@/lib/changelog-source';
+import {
+  buildArticleSchema,
+  buildBreadcrumbSchema,
+} from '@/lib/constants/schemas';
 import '../changelog-editorial.css';
 
 export const revalidate = false;
+
+const CHANGELOG_OG_IMAGE = `${BASE_URL}/og/default.png`;
+
+function releaseDescription(
+  label: string,
+  summary: string | null | undefined
+): string {
+  return summary
+    ? changelogInlineText(summary)
+    : `Features, improvements, and fixes in ${APP_NAME} ${label}.`;
+}
 
 type ChangelogReleasePageProps = {
   readonly params: Promise<{ readonly version: string }>;
@@ -47,19 +65,27 @@ export async function generateMetadata({
   if (!release) return {};
 
   const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
-  const description = release.summary
-    ? changelogInlineText(release.summary)
-    : `Features, improvements, and fixes in ${APP_NAME} v${version}.`;
+  const label = changelogVersionLabel(version);
+  const description = releaseDescription(label, release.summary);
   return {
-    title: `${APP_NAME} v${version}`,
+    title: `${APP_NAME} ${label}`,
     description,
     alternates: { canonical },
     openGraph: {
-      title: `${APP_NAME} v${version}`,
+      title: `${APP_NAME} ${label}`,
       description,
       type: 'article',
       url: canonical,
       publishedTime: release.date ? `${release.date}T00:00:00Z` : undefined,
+      images: [
+        { url: CHANGELOG_OG_IMAGE, width: 1200, height: 630, alt: APP_NAME },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${APP_NAME} ${label}`,
+      description,
+      images: [CHANGELOG_OG_IMAGE],
     },
   };
 }
@@ -132,8 +158,30 @@ export default async function ChangelogReleasePage({
     0
   );
 
+  const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
+  // Undated releases get breadcrumbs only: Article requires datePublished.
+  const label = changelogVersionLabel(version);
+  const articleSchema = release.date
+    ? buildArticleSchema({
+        headline: `${APP_NAME} ${label}`,
+        description: releaseDescription(label, release.summary),
+        datePublished: release.date,
+        authorName: APP_NAME,
+        url: canonical,
+      })
+    : null;
+  const breadcrumbSchema = buildBreadcrumbSchema([
+    { name: APP_NAME, url: BASE_URL },
+    { name: 'Changelog', url: `${BASE_URL}${APP_ROUTES.CHANGELOG}` },
+    { name: label, url: canonical },
+  ]);
+
   return (
     <section className='min-h-screen bg-base text-primary-token'>
+      {articleSchema ? (
+        <script type='application/ld+json'>{articleSchema}</script>
+      ) : null}
+      <script type='application/ld+json'>{breadcrumbSchema}</script>
       <div className='marketing-hero-dock relative overflow-hidden'>
         <MarketingEditorialHeroPhoto
           src='/images/hero/changelog-version.webp'
@@ -159,15 +207,16 @@ export default async function ChangelogReleasePage({
                 <ChevronRight className='size-3 text-quaternary-token' />
               </li>
               <li aria-current='page' className='text-accent'>
-                {/* ui-casing-allow: semantic version path segment */}/v
-                {release.version}
+                {/* ui-casing-allow: version or date path segment */}/
+                {changelogVersionLabel(release.version)}
               </li>
             </ol>
           </nav>
 
           <div className='mt-8 flex flex-wrap items-center gap-5'>
             <h1 className='changelog-version-identity line-clamp-2 font-mono text-primary-token'>
-              {/* ui-casing-allow: semantic version string */}v{release.version}
+              {/* ui-casing-allow: semantic version or date-key string */}
+              {changelogVersionLabel(release.version)}
             </h1>
             <div className='flex flex-col items-start gap-2'>
               {isLatest && (

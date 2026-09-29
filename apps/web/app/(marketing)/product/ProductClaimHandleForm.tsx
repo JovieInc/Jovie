@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { HandleStatusIcon } from '@/components/features/home/claim-handle/HandleStatusIcon';
 import { useHandleValidation } from '@/components/features/home/claim-handle/useHandleValidation';
 import { InputAuraFrame } from '@/components/features/home/InputAuraFrame';
+import { APP_ROUTES } from '@/constants/routes';
 import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
 import { cn } from '@/lib/utils';
 
@@ -13,13 +14,20 @@ interface ProductClaimHandleFormProps {
   readonly domain: string;
   readonly placeholder: string;
   readonly submitLabel: string;
+  readonly inputId?: string;
+  readonly testIdPrefix?: string;
+  readonly submitTestId?: string;
 }
 
 export function ProductClaimHandleForm({
   domain,
   placeholder,
   submitLabel,
+  inputId = 'product-handle-input',
+  testIdPrefix = 'product',
+  submitTestId = `${testIdPrefix}-claim-cta`,
 }: ProductClaimHandleFormProps) {
+  const statusId = `${inputId}-status`;
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [handle, setHandle] = useState('');
@@ -58,7 +66,9 @@ export function ProductClaimHandleForm({
 
   return (
     <form
-      data-testid='product-claim-form'
+      data-testid={`${testIdPrefix}-claim-form`}
+      action={APP_ROUTES.START}
+      method='get'
       onSubmit={handleSubmit}
       className='w-full'
       noValidate
@@ -66,7 +76,7 @@ export function ProductClaimHandleForm({
     >
       <InputAuraFrame treatment='editorial' className='rounded-full'>
         <div className='relative flex min-h-12 w-full items-center gap-2 overflow-hidden rounded-full border border-transparent bg-page px-2 py-2 pl-4'>
-          <label htmlFor='product-handle-input' className='sr-only'>
+          <label htmlFor={inputId} className='sr-only'>
             Choose Your Handle
           </label>
           <span className='shrink-0 select-none text-base text-tertiary-token'>
@@ -74,7 +84,7 @@ export function ProductClaimHandleForm({
           </span>
           <input
             ref={inputRef}
-            id='product-handle-input'
+            id={inputId}
             name='handle'
             type='text'
             value={handle}
@@ -85,10 +95,10 @@ export function ProductClaimHandleForm({
             autoComplete='off'
             aria-label='Choose Your Handle'
             aria-invalid={unavailable ? 'true' : undefined}
-            aria-describedby='product-handle-status'
+            aria-describedby={statusId}
             className={cn(
               'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token focus-visible:border-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
-              unavailable && 'text-destructive'
+              unavailable && 'text-error'
             )}
           />
           <HandleStatusIcon
@@ -103,7 +113,7 @@ export function ProductClaimHandleForm({
             size='marketing'
             variant='primary'
             disabled={navigating || Boolean(handleError)}
-            data-testid='product-claim-cta'
+            data-testid={submitTestId}
             data-primary-action='true'
             aria-busy={checkingAvail || navigating}
             className='shrink-0'
@@ -113,11 +123,11 @@ export function ProductClaimHandleForm({
         </div>
       </InputAuraFrame>
       <p
-        id='product-handle-status'
-        data-testid='product-handle-status'
+        id={statusId}
+        data-testid={`${testIdPrefix}-handle-status`}
         className={cn(
           'min-h-5 px-1 pt-2 text-xs text-secondary-token',
-          unavailable && 'text-destructive',
+          unavailable && 'text-error',
           available === true && !unavailable && 'text-success'
         )}
         aria-live='polite'

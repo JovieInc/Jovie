@@ -112,7 +112,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[min(42rem,calc(100vw-2rem))]'>
+      <div className='w-screen max-w-2xl px-4'>
         <Story />
       </div>
     ),

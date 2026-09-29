@@ -133,7 +133,7 @@ describe('audited overlay width exception', () => {
       const changed =
         mutation === 'additional export'
           ? `${original}\nexport const unconstrained = 'w-overlay-viewport';`
-          : `${original.replace('fixed left-1/2', 'absolute left-0')}\n// position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]'`;
+          : `${original.replace('fixed left-1/2', 'absolute left-0')}\n// position: 'fixed left-1/2 top-1/2 z-modal [translate:-50%_-50%]'`;
       expect(
         scanSourceFile(owner, changed).some(item =>
           item.rule.includes('unaudited')

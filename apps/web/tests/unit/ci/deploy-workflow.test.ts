@@ -908,7 +908,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(classifierJob).toContain(
       'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
     );
-    expect(classifierJob).toContain("node-version: '22'");
+    expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
     // JOV-4446: merge_group uses exact base/head SHA vars; push alone binds event.before.
     expect([classifierJob.includes('fetch-depth: 0'), classifierJob.includes('filter: blob:none'), classifierJob.includes('git cat-file -e "${DIFF_BASE}^{commit}"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "$HEAD_SHA"'), classifierJob.includes('DIFF_BASE="${{ github.event.before }}"'), classifierJob.includes('|| git show')]).toEqual([true, true, true, true, true, false]);
@@ -964,6 +964,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
     const migrationJob = getJobBlock(workflow, 'migrate-production');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const stagingOnlineIndexStep = getStepBlock(
+      stagingJob,
+      'DB migrate (staging - online indexes)'
+    );
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const resultJob = getJobBlock(workflow, 'release-result');
     const credentialStep = getStepBlock(
@@ -977,6 +981,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const migrateStep = getStepBlock(
       migrationJob,
       'DB migrate (production - Drizzle)'
+    );
+    const onlineIndexStep = getStepBlock(
+      migrationJob,
+      'DB migrate (production - online indexes)'
     );
     const verifyStep = getStepBlock(
       migrationJob,
@@ -1020,12 +1028,27 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrationIndex).toBeGreaterThan(productionHeadIndex);
     expect(stagingJob).toContain('needs: [release-head]');
     expect(stagingJob).not.toContain('migrate-production');
+    expect(stagingJob).toContain('DB migrate (staging - online indexes)');
+    expect(stagingJob.indexOf('staging - Drizzle')).toBeLessThan(
+      stagingJob.indexOf('staging - online indexes')
+    );
+    expect(stagingOnlineIndexStep).toContain('timeout-minutes: 12');
+    expect(stagingOnlineIndexStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}'
+    );
+    expect(stagingOnlineIndexStep).toContain('--config stg');
+    expect(stagingOnlineIndexStep).not.toContain('DOPPLER_TOKEN_PRD');
     expect(promotionJob).toContain('migrate-production');
     expect(promotionJob).toContain(
       "needs.migrate-production.result == 'success'"
     );
 
-    for (const step of [preflightStep, migrateStep, verifyStep]) {
+    for (const step of [
+      preflightStep,
+      migrateStep,
+      onlineIndexStep,
+      verifyStep,
+    ]) {
       expect(step).toContain('DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}');
       expect(step).not.toContain('if:');
       expect(step).toContain('doppler run --project jovie-web --config prd');
@@ -1037,11 +1060,18 @@ describe('deploy workflow Vercel env resolution', () => {
     }
     expect(preflightStep).toContain('scripts/drizzle-migrate-preflight.ts');
     expect(migrateStep).toContain('drizzle:migrate:ci');
+    expect(onlineIndexStep).toContain("ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'");
+    expect(onlineIndexStep).toContain('drizzle:migrate:online-indexes:ci');
+    expect(onlineIndexStep).toContain('timeout-minutes: 12');
+    expect(migrationJob).toContain('timeout-minutes: 30');
     expect(verifyStep).toContain('drizzle:verify:ci');
     expect(migrationJob.indexOf('production preflight')).toBeLessThan(
       migrationJob.indexOf('production - Drizzle')
     );
     expect(migrationJob.indexOf('production - Drizzle')).toBeLessThan(
+      migrationJob.indexOf('production - online indexes')
+    );
+    expect(migrationJob.indexOf('production - online indexes')).toBeLessThan(
       migrationJob.indexOf('production schema check')
     );
     expect(resultJob).toContain(
@@ -1578,7 +1608,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       /\n {6}vercel:\n {8}specifier: 56\.3\.2\n {8}version: 56\.3\.2[(\n]/
     );
     expect(dependabot).toMatch(
-      /- dependency-name: 'vercel'\n\s+versions: \['>=57'\]/
+      /- dependency-name: 'vercel'\n\s+versions: \['>=56\.4'\]/
     );
   });
 
@@ -5185,8 +5215,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
     expect(evaluator).toContain("default: '5'");
     expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('failingRunAttempt < 2');
-    expect(evaluator).toContain('repair_state_unavailable');
+    expect(evaluator).toContain('attemptEvidenceTrusted');
+    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {

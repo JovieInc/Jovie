@@ -37,6 +37,10 @@ const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
 );
+const SETUP_NODE_PNPM_ACTION = readFileSync(
+  resolve(REPO_ROOT, '.github/actions/setup-node-pnpm/action.yml'),
+  'utf8'
+);
 const IOS_CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
   'utf8'
@@ -257,6 +261,33 @@ describe('merge_group workflow contract', () => {
     expect(EVENT.merge_group.head_ref).toContain('gh-readonly-queue/main/');
   });
 
+  it('reuses one validated dependency workspace across isolated merge-group jobs', () => {
+    const producer = getJobBlock(CI_WORKFLOW, 'ci-merge-group-workspace');
+    expect(producer).toContain("github.event_name == 'merge_group'");
+    expect(producer).toContain('github.event.merge_group.head_sha');
+    expect(producer).toContain('save_merge_group_workspace:');
+    expect(producer).toContain(
+      'node scripts/lib/ci-dependency-workspace.mjs validate'
+    );
+
+    const consumers =
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+    for (const jobId of consumers.split(' ')) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job, jobId).toContain('ci-merge-group-workspace');
+      expect(job, jobId).toContain("reuse_merge_group_workspace: 'true'");
+    }
+
+    for (const fragment of [
+      'key: pnpm-node-modules-v4-',
+      "github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true'",
+      'Prepared merge-group dependency workspace was not restored.',
+      'node scripts/lib/ci-dependency-workspace.mjs prepare',
+      'node scripts/lib/ci-dependency-workspace.mjs validate',
+    ])
+      expect(SETUP_NODE_PNPM_ACTION).toContain(fragment);
+  });
+
   it('runs deterministic CI against the synthetic base-to-head diff', () => {
     expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
     expect(CI_WORKFLOW).toContain(
@@ -469,7 +500,13 @@ describe('merge_group workflow contract', () => {
     expect(remaining).toContain('chromatic\\.config\\.json$');
     expect(remaining).toContain('package\\.json$');
     expect(remaining).toContain('shared-ui-visual-arbitrary');
-    expect(remaining).toContain('scripts/doc-freshness-lint');
+    // Control-lane paths moved to data (JOV-6837).
+    expect(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/ci-harness/structural-control-paths.ere'),
+        'utf8'
+      )
+    ).toContain('scripts/doc-freshness-lint');
     expect(remaining).toContain('apps/web/tests/');
 
     for (const jobId of [
@@ -812,8 +849,23 @@ describe('merge_group workflow contract', () => {
     );
     expect(aggregate).not.toContain('ci-pr-vercel-preview');
     expect(aggregate).not.toContain('ci-a11y');
-    expect(aggregate).not.toContain('neon-db');
+    expect(aggregate).toContain('neon-db');
+    expect(aggregate).toContain(
+      '"$RUN_NEON" == "true" && "$DATABASE_CERTIFICATION_RESULT" != "success"'
+    );
     expect(aggregate).not.toContain('deploy-staging');
+
+    const databaseCertification = getJobBlock(CI_WORKFLOW, 'neon-db');
+    expect(databaseCertification).toContain(
+      "github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')"
+    );
+    expect(databaseCertification).toMatch(
+      /continue-on-error: true[\s\S]*run test:integration[\s\S]*steps\.integration-tests\.outcome[\s\S]*steps\.migration-upgrade\.outcome/
+    );
+    expect(databaseCertification).toContain("DB_CERTIFICATION: 'true'");
+    expect(databaseCertification).toContain(
+      'Reject inert database test evidence'
+    );
 
     for (const job of [
       'ci-risk-classifier',
@@ -838,7 +890,7 @@ describe('merge_group workflow contract', () => {
     expect(migrationGuard).toMatch(
       /- uses: actions\/checkout@[^\n]+\n\s+if: needs\.ci-path-changes\.outputs\.run_drizzle == 'true'\n\s+with:\n\s+fetch-depth: 0/
     );
-    expect(migrationGuard).toContain('timeout-minutes: 3');
+    expect(migrationGuard).toContain('timeout-minutes: 6');
     expect(migrationGuard).toContain(
       'run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}'
     );
@@ -850,6 +902,9 @@ describe('merge_group workflow contract', () => {
     );
     expect(migrationGuard).toContain('./scripts/check-migrations.sh');
     expect(migrationGuard).toContain('./scripts/validate-migrations.sh');
+    expect(migrationGuard).toContain(
+      'pnpm exec tsx scripts/online-index-migrate.ts --validate-only'
+    );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     expect(buildLayout).toContain('runs-on: ubuntu-latest');
     expect(buildLayout).toContain('Build exact combined head');
@@ -933,7 +988,7 @@ describe('merge_group workflow contract', () => {
       "github.event_name == 'merge_group'"
     );
     expect(aggregate).toContain(
-      'Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon.'
+      'Only risk-selected database changes provision expiring Neon; preview/A11y evidence remains explicit opt-in or post-merge.'
     );
 
     for (const jobId of ['ci-promptfoo-evals', 'ci-golden-eval-set']) {
@@ -1814,6 +1869,20 @@ ${selectedGateScript}`,
     expect(envLines(build).length).toBeGreaterThan(0);
     expect(envLines(build)).toEqual(envLines(ciBuild));
 
+    // The homepage visual compare restores the same entry, so it builds with
+    // the same NEXT_* env and task hash. NEXT_DISABLE_TOOLBAR is the one extra:
+    // turbo does not hash it and the homepage baselines render without the
+    // cookie banner it disables. No DATABASE_URL/VERCEL_ENV pass-through.
+    const visualBuild = stepIn(
+      getJobBlock(CI_WORKFLOW, 'ci-visual-snapshot-compare'),
+      'Build homepage for rendered snapshot compare'
+    );
+    expect(envLines(visualBuild)).toEqual([
+      ...envLines(build),
+      "          NEXT_DISABLE_TOOLBAR: '1'",
+    ]);
+    expect(visualBuild).not.toMatch(/^ {10}(DATABASE_URL|VERCEL_ENV):/m);
+
     // Size/symlink guard and a single trusted-main save of the primary key.
     const measure = stepIn(
       warm,
@@ -2147,7 +2216,7 @@ ${selectedGateScript}`,
     expect(coalesce).not.toContain('secrets: inherit');
   });
 
-  it('keeps merge groups out of manual evidence and deployment jobs', () => {
+  it('keeps merge groups out of non-database manual evidence and deployment jobs', () => {
     expect(getJobBlock(CI_WORKFLOW, 'neon-db')).not.toContain(
       "github.event_name == 'push'"
     );
@@ -3569,5 +3638,25 @@ describe('merge-group Playwright artifact guard', () => {
       expect(step).toContain('guard-playwright-artifacts.mjs" --run --');
       expect(step).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/u);
     }
+  });
+});
+
+describe('merge-queue green enroll scan window (JOV-6831)', () => {
+  const ENROLL = readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
+    'utf8'
+  );
+
+  it('pages through every open PR instead of one oldest-first window', () => {
+    expect(ENROLL).toContain('after: $cursor');
+    expect(ENROLL).toContain('pageInfo { hasNextPage endCursor }');
+    expect(ENROLL).toContain('} while (cursor);');
+    expect(ENROLL).not.toMatch(/direction:\s*ASC/);
+  });
+
+  it('keeps the rejected-head rule: no re-enqueue without a new push', () => {
+    expect(ENROLL).toContain(
+      'if (removedAt && committedAt && removedAt > committedAt) continue;'
+    );
   });
 });

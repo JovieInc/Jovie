@@ -86,7 +86,7 @@ export const OVERLAY_ITEM_FOCUS =
 const MENU_ITEM_DISABLED_STATE =
   'data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50';
 
-export const DROPDOWN_CONTENT_BASE = `z-50 min-w-48 overflow-hidden ${OVERLAY_CONTENT_RADIUS} ${OVERLAY_SURFACE_BASE} p-1`;
+export const DROPDOWN_CONTENT_BASE = `z-popover min-w-48 overflow-hidden ${OVERLAY_CONTENT_RADIUS} ${OVERLAY_SURFACE_BASE} p-1`;
 
 /**
  * Shadow effect for elevated appearance
@@ -364,6 +364,19 @@ export const MENU_ICON_TRIGGER_BASE =
  * Sub-menu content classes.
  * Supports both DropdownMenu.SubContent and ContextMenu.SubContent Radix vars.
  */
+/**
+ * Keeps a submenu inside the viewport when neither side of its parent has
+ * room for the default 12rem width (three-level menus on a phone). Radix
+ * exposes the space left on the chosen side as a CSS variable; the submenu
+ * narrows into it instead of overflowing the screen edge.
+ */
+export function submenuViewportFitStyle(
+  menu: 'dropdown-menu' | 'context-menu'
+): { maxWidth: string; minWidth: string } {
+  const available = `var(--radix-${menu}-content-available-width)`;
+  return { maxWidth: available, minWidth: `min(12rem, ${available})` };
+}
+
 export const subMenuContentClasses = [
   DROPDOWN_CONTENT_BASE,
   'max-h-96 overflow-y-auto overflow-x-hidden',
@@ -392,7 +405,7 @@ export const searchableSubMenuContentClasses = [
  * Compact base — currently equivalent to DROPDOWN_CONTENT_BASE; retained for future divergence
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-50 min-w-48 overflow-hidden rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-0.5 text-primary-token shadow-popover';
+  'z-popover min-w-48 overflow-hidden rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-0.5 text-primary-token shadow-popover';
 
 /**
  * Complete compact DropdownMenu content classes

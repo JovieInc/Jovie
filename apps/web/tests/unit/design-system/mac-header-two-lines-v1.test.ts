@@ -40,19 +40,35 @@ const {
 const CLAMP_BOUND = /(line-clamp-1|line-clamp-2|truncate|sr-only)/;
 const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
 
-/** Full editorial titles are intentional; all other shell headings remain bounded. */
+/**
+ * Full editorial titles are intentional; all other shell headings remain
+ * bounded. Fail-closed: each exempt file is named here and must mark the
+ * heading with data-wrap='editorial-title' (JOV-6906: marketing h1/h2 must
+ * never truncate their value proposition).
+ */
+const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
+  'apps/web/components/marketing/FaqSection.tsx',
+  'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
+]);
+
 function hasEditorialTitleContract(
   file: string,
   attrs: string,
   source: string
 ): boolean {
-  return (
-    file === 'apps/web/app/(marketing)/blog/components/BlogCard.tsx' &&
-    /data-wrap=['"]editorial-title['"]/.test(attrs) &&
-    !CLAMP_BOUND.test(attrs) &&
-    /row-span-3 grid[^'"\n]*grid-rows-subgrid/.test(source) &&
-    /row-span-2 grid[^'"\n]*grid-rows-subgrid/.test(source)
-  );
+  if (
+    !/data-wrap=['"]editorial-title['"]/.test(attrs) ||
+    CLAMP_BOUND.test(attrs)
+  ) {
+    return false;
+  }
+  if (file === 'apps/web/app/(marketing)/blog/components/BlogCard.tsx') {
+    return (
+      /row-span-3 grid[^'"\n]*grid-rows-subgrid/.test(source) &&
+      /row-span-2 grid[^'"\n]*grid-rows-subgrid/.test(source)
+    );
+  }
+  return FULL_TITLE_HEADING_FILES.has(file);
 }
 
 function shellSurfaceFiles(): string[] {

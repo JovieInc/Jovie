@@ -10,7 +10,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { Icon } from '@/components/atoms/Icon';
+import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -32,7 +33,7 @@ import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '../molecules/TableContextMenu';
-import { cn } from '../table.styles';
+import { cn, iconColors, zIndex } from '../table.styles';
 import { useTableGrouping } from '../utils/useTableGrouping';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 import { useTableKeyboardNav } from './useTableKeyboardNav';
@@ -89,7 +90,7 @@ export interface UnifiedTableProps<TData extends RowData> {
 
   /**
    * Estimated row height for virtualization
-   * @default 32
+   * @default 40
    */
   readonly rowHeight?: number;
 
@@ -284,6 +285,12 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly hideHeader?: boolean;
 
   /**
+   * Accessible caption for the table, rendered sr-only. Pass a surface-specific
+   * label (e.g. "Releases") so screen readers announce more than "Data table".
+   */
+  readonly caption?: string;
+
+  /**
    * Set of expanded row IDs for expandable rows.
    * When provided with renderExpandedContent, enables row expansion.
    */
@@ -307,6 +314,51 @@ export interface UnifiedTableProps<TData extends RowData> {
    * Falls back to getRowId if not provided.
    */
   readonly getExpandableRowId?: (row: TData) => string;
+}
+
+/**
+ * Humanize a column id (e.g. "releaseDate" -> "Release date") for sort
+ * provenance when no string header label is available.
+ */
+function humanizeColumnId(id: string): string {
+  const words = id
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  if (words.length === 0) return id;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * HiddenHeaderSortStatus - Visible + announced sort provenance for tables whose
+ * column header is hidden (eval G4 / GAP-01). Rendered as a sticky status bar
+ * pinned above the scrollable rows so sorted order is never invisible.
+ */
+function HiddenHeaderSortStatus({
+  label,
+  descending,
+}: {
+  readonly label: string;
+  readonly descending: boolean;
+}) {
+  return (
+    <div
+      role='status'
+      className={cn(
+        'sticky top-0',
+        zIndex.toolbar,
+        'flex items-center gap-1.5 border-b border-subtle bg-surface-1 px-3 py-1 text-2xs text-tertiary-token'
+      )}
+    >
+      <Icon
+        name={descending ? 'ArrowDown' : 'ArrowUp'}
+        aria-hidden
+        size={12}
+        className={cn('shrink-0', iconColors.sortIndicator)}
+      />
+      <span>{`Sorted by ${label}, ${descending ? 'descending' : 'ascending'}`}</span>
+    </div>
+  );
 }
 
 /**
@@ -354,7 +406,7 @@ export function UnifiedTable<TData extends RowData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 32,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
   overscan = 5,
   renderRow,
   getRowId,
@@ -389,6 +441,7 @@ export function UnifiedTable<TData extends RowData>({
   isFetchingNextPage,
   onLoadMore,
   hideHeader = false,
+  caption,
   expandedRowIds,
   renderExpandedContent,
   getExpandableRowId,
@@ -649,6 +702,22 @@ export function UnifiedTable<TData extends RowData>({
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
 
+  // Sort provenance for hidden-header tables: with no <thead> there is no
+  // visible indication that rows are sorted, so render a sticky status bar.
+  const activeSort = table.getState().sorting?.[0];
+  const sortStatusNode = useMemo(() => {
+    if (!hideHeader || !activeSort) return null;
+    const sortedColumn = table.getColumn(activeSort.id);
+    const columnHeader = sortedColumn?.columnDef.header;
+    const label =
+      typeof columnHeader === 'string' && columnHeader.trim().length > 0
+        ? columnHeader
+        : humanizeColumnId(activeSort.id);
+    return (
+      <HiddenHeaderSortStatus label={label} descending={activeSort.desc} />
+    );
+  }, [hideHeader, activeSort, table]);
+
   // Common table styles
   const tableClassName = cn(
     'w-full border-separate border-spacing-0 text-app',
@@ -666,10 +735,13 @@ export function UnifiedTable<TData extends RowData>({
     return (
       <div
         ref={setTableContainerRef}
-        className={cn('overflow-auto', containerClassName)}
+        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
+        {sortStatusNode}
         <table className={tableClassName} style={{ minWidth }}>
-          <caption className='sr-only'>Loading table data</caption>
+          <caption className='sr-only'>
+            {caption ?? 'Loading table data'}
+          </caption>
           {!hideHeader && (
             <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
           )}
@@ -689,10 +761,11 @@ export function UnifiedTable<TData extends RowData>({
     return (
       <div
         ref={setTableContainerRef}
-        className={cn('overflow-auto', containerClassName)}
+        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
+        {sortStatusNode}
         <table className={tableClassName} style={{ minWidth }}>
-          <caption className='sr-only'>Empty table</caption>
+          <caption className='sr-only'>{caption ?? 'Empty table'}</caption>
           {!hideHeader && (
             <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
           )}
@@ -713,10 +786,13 @@ export function UnifiedTable<TData extends RowData>({
     return (
       <div
         ref={setTableContainerRef}
-        className={cn('overflow-auto', containerClassName)}
+        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
+        {sortStatusNode}
         <table className={tableClassName} style={{ minWidth }}>
-          <caption className='sr-only'>Grouped table data</caption>
+          <caption className='sr-only'>
+            {caption ?? 'Grouped table data'}
+          </caption>
           {!hideHeader && (
             <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
           )}
@@ -736,10 +812,11 @@ export function UnifiedTable<TData extends RowData>({
   return (
     <div
       ref={setTableContainerRef}
-      className={cn('overflow-auto', containerClassName)}
+      className={cn('w-full min-w-0 overflow-auto', containerClassName)}
     >
+      {sortStatusNode}
       <table className={tableClassName} style={{ minWidth }}>
-        <caption className='sr-only'>Data table</caption>
+        <caption className='sr-only'>{caption ?? 'Data table'}</caption>
         {!hideHeader && (
           <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
         )}

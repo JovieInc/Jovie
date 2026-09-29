@@ -108,7 +108,7 @@ function SummerCardItem({
       <div className='space-y-3 p-3'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 space-y-1'>
-            <p className='text-app font-[560] text-primary-token'>
+            <p className='text-app font-medium text-primary-token'>
               {card.title}
             </p>
             <p className='text-2xs text-tertiary-token'>
@@ -122,7 +122,7 @@ function SummerCardItem({
         </p>
 
         <p className='text-xs text-secondary-token'>
-          <span className='font-[560] text-primary-token'>
+          <span className='font-medium text-primary-token'>
             Recommendation:{' '}
           </span>
           {card.recommendation}
@@ -214,7 +214,7 @@ function SummerCardsBody({
         data-testid='summer-cards-error'
       >
         <div className='space-y-1'>
-          <p className='text-app font-[560] text-primary-token'>
+          <p className='text-app font-medium text-primary-token'>
             {loadError.title}
           </p>
           <p className='text-xs text-secondary-token'>{loadError.detail}</p>
@@ -364,7 +364,7 @@ export function SummerCardReviewPanel() {
         <div className='min-h-36 space-y-3 p-3'>
           <div className='flex items-center justify-between gap-3'>
             <div>
-              <p className='text-xs font-[560] text-primary-token'>
+              <p className='text-xs font-medium text-primary-token'>
                 Summer Approvals
               </p>
               <p className='text-xs text-secondary-token'>
@@ -397,27 +397,24 @@ export function SummerCardReviewPanel() {
       </ContentSurfaceCard>
 
       {pendingComment ? (
+        // biome-ignore lint/a11y/noNoninteractiveElementInteractions: role=dialog is interactive; target===currentTarget is the documented way to detect backdrop clicks.
         <div
           className='fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center'
           role='dialog'
           aria-modal='true'
           aria-label='Summer Card Comment'
+          onMouseDown={event => {
+            if (event.target === event.currentTarget && !submittingId)
+              clearComment();
+          }}
         >
-          <button
-            type='button'
-            aria-label='Close Comment Dialog'
-            className='absolute inset-0 h-auto w-auto cursor-default rounded-none border-0 bg-transparent p-0'
-            onClick={() => {
-              if (!submittingId) clearComment();
-            }}
-          />
           <ContentSurfaceCard
             className='relative z-10 w-full max-w-lg'
             data-testid='summer-card-comment-dialog'
           >
             <div className='space-y-3 p-4'>
               <div className='space-y-1'>
-                <p className='text-sm font-[560] text-primary-token'>
+                <p className='text-sm font-medium text-primary-token'>
                   Comment on &ldquo;{pendingComment.title}&rdquo;
                 </p>
                 <p className='text-xs text-secondary-token'>

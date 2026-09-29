@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, desc, eq } from 'drizzle-orm';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -25,6 +26,7 @@ import {
   requireVerifiedOwnerForReservation,
 } from '@/lib/onboarding/ownership-gate';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
+import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
@@ -434,6 +436,23 @@ export async function materializeClaimedOnboardingProfile({
       )
     );
 
+  // JOV-4514: the claimed conversation now has an owner — attach its durable
+  // work record. Idempotent; non-fatal so a failure never blocks the claim.
+  if (profileId) {
+    try {
+      await ensureChatWorkRecord({
+        conversationId,
+        creatorProfileId: profileId,
+      });
+    } catch (error) {
+      await captureError('Failed to create chat work record', error, {
+        operation: 'materialize_claimed_onboarding_profile',
+        conversationId,
+        profileId,
+      });
+    }
+  }
+
   const artistLabel = describeArtistProfileForVisitor({
     ownershipVerified: true,
     artistName: state.artist?.name ?? null,
@@ -458,6 +477,8 @@ export async function materializeClaimedOnboardingProfile({
     ipAddress,
     userAgent,
   });
+
+  await recordFunnelStep({ funnel: 'artist_signup', step: 'claim_complete' });
 
   return { profileId, handle, status };
 }

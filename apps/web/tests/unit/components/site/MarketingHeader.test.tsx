@@ -203,15 +203,16 @@ describe('MarketingHeader', () => {
     ).toHaveLength(0);
   });
 
-  it('uses the one Request access CTA on the homepage header', () => {
+  it('uses the one Find yourself CTA on the homepage header (JOV-5085)', () => {
     mockUsePathname.mockReturnValue('/');
     render(<MarketingHeader />);
 
-    const ctas = screen.getAllByRole('link', { name: 'Request access' });
+    const ctas = screen.getAllByRole('link', { name: 'Find yourself' });
     expect(ctas.length).toBeGreaterThanOrEqual(1);
     for (const cta of ctas) {
-      expect(cta).toHaveAttribute('href', '/signup');
+      expect(cta).toHaveAttribute('href', '/start');
     }
+    expect(screen.queryByRole('link', { name: 'Request access' })).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -226,10 +227,10 @@ describe('MarketingHeader', () => {
       'data-presentation',
       'marketing-glass'
     );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
+    expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {
@@ -258,9 +259,10 @@ describe('MarketingHeader', () => {
       'href',
       '/product'
     );
-    expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {

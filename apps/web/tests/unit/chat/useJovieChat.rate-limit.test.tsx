@@ -23,7 +23,10 @@ const setMessagesMock = vi.fn();
 let onRejectHandler: (() => void) | undefined;
 let onFinishHandler:
   | ((options: {
-      message: { metadata?: unknown };
+      message: {
+        metadata?: unknown;
+        parts?: Array<Record<string, unknown>>;
+      };
       messages: unknown[];
       isAbort: boolean;
       isDisconnect: boolean;
@@ -31,7 +34,7 @@ let onFinishHandler:
     }) => void)
   | undefined;
 let onErrorHandler: ((error: Error) => void) | undefined;
-let mockStatus: 'ready' | 'streaming' = 'ready';
+let mockStatus: 'error' | 'ready' | 'streaming' = 'ready';
 let currentChatId = 'new-chat';
 let currentTransportConversationId: string | null = null;
 let mockMessages: Array<{
@@ -392,6 +395,7 @@ describe('useJovieChat', () => {
             turnId: 'turn_server',
             requestId: 'req_1',
           },
+          parts: [{ type: 'text', text: 'Hello back' }],
         },
         messages: [],
         isAbort: false,
@@ -485,8 +489,8 @@ describe('useJovieChat', () => {
     expect(result.current.chatError?.message).toBe('Network failed');
   });
 
-  it('clears the loader when the stream reports an error', async () => {
-    const { result } = renderHook(() =>
+  it('clears the loader and can send again after a stream error', async () => {
+    const { result, rerender } = renderHook(() =>
       useJovieChat({ profileId: 'profile_1' })
     );
 
@@ -507,6 +511,45 @@ describe('useJovieChat', () => {
     expect(result.current.isSubmitting).toBe(false);
     expect(result.current.input).toBe('Try this');
     expect(result.current.chatError?.message).toBe('Server failed');
+
+    mockStatus = 'error';
+    rerender();
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(sendMessageMock).toHaveBeenCalledTimes(2);
+    expect(result.current.isSubmitting).toBe(true);
+  });
+
+  it('treats an empty completed turn as a retryable stream failure', async () => {
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+
+    act(() => {
+      result.current.setInput('Try this');
+    });
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    act(() => {
+      onFinishHandler?.({
+        message: { parts: [] },
+        messages: [],
+        isAbort: false,
+        isDisconnect: false,
+        isError: false,
+      });
+    });
+
+    expect(result.current.isSubmitting).toBe(false);
+    expect(result.current.input).toBe('Try this');
+    expect(result.current.chatError).toMatchObject({
+      failedMessage: 'Try this',
+      message: expect.stringMatching(/retry/i),
+    });
   });
 
   it('does not pause the composer for recoverable tool stream failures', async () => {
@@ -602,6 +645,7 @@ describe('useJovieChat', () => {
             turnId: 'turn_server',
             requestId: 'req_1',
           },
+          parts: [{ type: 'text', text: 'Hello back' }],
         },
         messages: [],
         isAbort: false,
@@ -638,6 +682,7 @@ describe('useJovieChat', () => {
             turnId: 'turn_reserved',
             requestId: 'req_reserved',
           },
+          parts: [{ type: 'text', text: 'Hello back' }],
         },
         messages: [],
         isAbort: false,

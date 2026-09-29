@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from '@/components/organisms/Sidebar';
+} from '@/components/organisms/sidebar';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 
 const mockDashboardData: DashboardData = {

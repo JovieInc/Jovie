@@ -32,7 +32,12 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -83,6 +88,42 @@ export const COPY_GATE_PATHS = Object.freeze([
 export const COPY_GATE_COMMAND =
   'pnpm copy:check --diff-base origin/main $(git diff --name-only origin/main...HEAD)';
 
+export const NODE_RUNTIME_CONTRACT_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
+export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
+  '.nvmrc',
+  '.node-version',
+  'config/node-runtime-policy.json',
+  'scripts/node-runtime-policy.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'pnpm-lock.yaml',
+  'package.json',
+  'apps/console/package.json',
+  'apps/ovie/package.json',
+  'apps/web/package.json',
+  'apps/docs/package.json',
+  'apps/should-i-make/package.json',
+  'apps/eve-pilot/package.json',
+  'packages/jovie-cli/package.json',
+  'packages/ui/package.json',
+  'patches/**',
+  '.github/actions/setup-node-pnpm/**',
+  '.github/actions/setup-playwright/**',
+  '.github/runner-image/**',
+  '.github/workflows/agent-pipeline.yml',
+  '.github/workflows/ci.yml',
+  '.github/workflows/e2e-full-matrix.yml',
+  '.github/workflows/fleet-gate-refresh.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  '.github/workflows/node-runtime-compatibility.yml',
+  '.github/workflows/node-runtime-freshness.yml',
+  '.github/workflows/pr-conflict-handler.yml',
+  '.github/workflows/rolling-ci-dispatch.yml',
+  'apps/web/tests/unit/ci/node-runtime-policy.test.ts',
+  'apps/web/tests/unit/ci/node-runtime-contract.test.ts',
+  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+]);
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
@@ -236,8 +277,8 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py -q',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py" --fail-under=85',
     ].join(' && ')
   ),
   ...STRUCTURAL_PYTEST_PARTS,
@@ -245,6 +286,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   '.claude/hooks/post-task-validate.test.mjs',
+  '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
@@ -263,40 +305,51 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
+  'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
+  'scripts/evals/summer-ops-card-copy.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
+  'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
+  'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
+  'scripts/lib/__tests__/canonical-json.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
   'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
   'scripts/lib/observability-fingerprint.test.mjs',
   'scripts/logo-asset-normalization.test.mjs',
   'scripts/observability-issue-github.test.mjs',
   'scripts/observability-issue-sync.test.mjs',
+  'scripts/ops/firecrawl-crawl.test.mjs',
   'scripts/performance-artifact-retention.test.mjs',
+  'scripts/postmortem-linkage-check.test.mjs',
+  'scripts/quality-gap-finder.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/company-registry.test.mjs',
   'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/impact-forecast.test.mjs',
   'scripts/summer-commissioning/product-quality-governor.test.mjs',
   'scripts/summer-commissioning/project-creation-policy.test.mjs',
   'scripts/summer-commissioning/receipt-trust.test.mjs',
-  'scripts/upstash-production-operator.test.mjs',
   'scripts/vercel-source-contract.test.mjs',
   'scripts/verify-workflow-references.test.mjs',
+  'scripts/visual-baseline-adopt.test.mjs',
+  'scripts/web-ai-health-intake.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_NODE_COMMAND = `node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
+  'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
@@ -308,6 +361,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-certification.test.mjs',
   'scripts/lib/__tests__/component-rendered-evaluator.test.mjs',
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
+  'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
@@ -338,12 +392,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
+  'scripts/lib/__tests__/shipping-slo.test.mjs',
   'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
   'scripts/lib/__tests__/story-coverage-ratchet.test.mjs',
   'scripts/lib/__tests__/taste-classifier.test.mjs',
   'scripts/lib/__tests__/taste-label-guard.test.mjs',
   'scripts/lib/__tests__/tracker.test.mjs',
   'scripts/lib/__tests__/typecheck-singleflight-diagnostics.test.mjs',
+  'scripts/lib/__tests__/typecheck-performance.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
@@ -444,6 +500,13 @@ const LANES = [
     run: runProfileAdmission,
   },
   {
+    id: 'merge-group-guards',
+    name: 'Merge-group unit guards',
+    nextLocalCommand:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts',
+    run: runMergeGroupGuards,
+  },
+  {
     id: 'billing-coverage',
     name: 'Billing and fan-send coverage',
     nextLocalCommand: BILLING_COVERAGE_COMMAND,
@@ -454,6 +517,12 @@ const LANES = [
     name: 'Copy gate (changed customer-facing lines)',
     nextLocalCommand: COPY_GATE_COMMAND,
     run: runCopyGate,
+  },
+  {
+    id: 'node-runtime-contracts',
+    name: 'Node runtime contracts',
+    nextLocalCommand: NODE_RUNTIME_CONTRACT_COMMAND,
+    run: runNodeRuntimeContracts,
   },
   {
     id: 'structural',
@@ -495,13 +564,20 @@ export const LANE_GROUPS = Object.freeze({
     'ios-fast',
     'billing-coverage',
     'copy-gate',
+    'node-runtime-contracts',
     'structural',
   ]),
   // ci-fast (structural web) runs these in the background while its structural
   // web commands run. They were the two slowest cheap lanes left in remaining
   // (38s + 35s of a ~150s serial chain that outlasted remaining's structural
   // lane, merge-group run 36270458408); web finished ~100s before remaining.
-  web: Object.freeze(['design-conformance', 'profile-admission']),
+  // merge-group-guards: repo-wide unit guards that used to run only in merge
+  // groups, so PRs green on PR CI poisoned the queue (3 stalls, 2026-09-27).
+  web: Object.freeze([
+    'design-conformance',
+    'profile-admission',
+    'merge-group-guards',
+  ]),
 });
 
 export const LANE_COMMANDS = Object.freeze(
@@ -695,6 +771,38 @@ export function runBillingCoverage() {
     if (result.code !== 0) return { code: result.code, output: combined };
   }
   return { code: 0, output: combined };
+}
+
+export function selectNodeRuntimeContractCommands({ event, runtimeFiles }) {
+  if (
+    event === 'workflow_dispatch' ||
+    !Array.isArray(runtimeFiles) ||
+    runtimeFiles.length > 0
+  ) {
+    return [NODE_RUNTIME_CONTRACT_COMMAND];
+  }
+  return [];
+}
+
+function runNodeRuntimeContracts() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const runtimeFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(NODE_RUNTIME_CONTRACT_PATHS);
+  const commands = selectNodeRuntimeContractCommands({ event, runtimeFiles });
+
+  if (commands.length === 0) {
+    return {
+      code: 0,
+      output:
+        'Node runtime contracts skipped (no runtime contract files changed)\n',
+      skipped: true,
+    };
+  }
+
+  const result = shell(commands[0]);
+  return { code: result.code, output: result.output };
 }
 
 /**
@@ -1442,6 +1550,38 @@ function runProfileAdmission() {
   return shell(LANE_COMMANDS['profile-admission']);
 }
 
+/**
+ * Repo-wide source guards (design-system ratchets, metrics layer) plus the
+ * PR's own changed unit tests. The full Unit Tests shards run only in merge
+ * groups, so without this a PR that trips a guard or breaks its own test is
+ * green on PR CI and fails every merge group behind it (JOV-5301, JOV-6904).
+ */
+function runMergeGroupGuards() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Merge-group guards skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  const ownTests = (
+    changedFiles(['apps/web/**/*.test.ts', 'apps/web/**/*.test.tsx']) || []
+  )
+    .filter(
+      file =>
+        !file.startsWith('apps/web/tests/e2e/') &&
+        existsSync(resolve(REPO_ROOT, file))
+    )
+    .map(file => shellQuote(file.replace(/^apps\/web\//, '')));
+  return shell([LANE_COMMANDS['merge-group-guards'], ...ownTests].join(' '));
+}
+
+/** Quote a path for /bin/sh (route groups like `app/(profile-admission)/`). */
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
 /** Async twin of shell() so structural commands can overlap. */
 function shellAsync(command) {
   return new Promise(resolveResult => {
@@ -1768,6 +1908,7 @@ export async function runStructural(opts = {}) {
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs',
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/promotion-loss-metrics.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/promotion-loss-metrics.test.mjs',
     'pnpm invariants:check',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
@@ -1831,6 +1972,7 @@ export async function runStructural(opts = {}) {
     // is FAIL, not advisory).
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts tests/unit/design-system/single-column-one-width-v1.test.ts tests/unit/design-system/one-chrome-layer-v1.test.ts tests/unit/design-system/one-notification-v1.test.ts tests/unit/design-system/one-modal-layer-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
+    // Merge-group-only unit guards run in their own web lane (merge-group-guards).
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
   const allParts = [
@@ -1838,6 +1980,7 @@ export async function runStructural(opts = {}) {
       ? [
           webCiContractTestsCommand(undefined, [DEPLOY_WORKFLOW_CI_TEST]),
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
+          'pnpm --filter @jovie/web exec node scripts/test-truth-guard.mjs',
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
           // Run the deploy contract by name for operations-only changes too:

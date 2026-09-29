@@ -47,6 +47,10 @@ vi.mock('@/features/dashboard/organisms/SettingsPaySection', () => ({
   SettingsPaySection: () => <div>Pay settings</div>,
 }));
 
+vi.mock('@/app/app/(shell)/library/ArtistRulesSheet', () => ({
+  ArtistRulesSheet: () => <button type='button'>Artist Rules</button>,
+}));
+
 describe('ArtistProfileContent', () => {
   beforeEach(() => {
     contextState.artist = null;
@@ -128,6 +132,12 @@ describe('ArtistProfileContent', () => {
     expect(publicProfile).toHaveAttribute('target', '_blank');
     expect(screen.getByText('Profile fields')).toBeInTheDocument();
     expect(screen.getByText('Pay settings')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Artist Rules' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Artist Rules' })
+    ).toBeInTheDocument();
 
     await act(async () => {
       resolveShop({

@@ -6,7 +6,11 @@ import {
   primaryNavigation,
 } from '@/components/features/dashboard/dashboard-nav/config';
 import { OPERATOR_NAV_ITEMS } from '@/components/organisms/operator-navigation';
-import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import {
+  ADMIN_NAV_REGISTRY,
+  ADMIN_PRIMARY_WORKSPACE_IDS,
+  ADMIN_SETTINGS_TOOL_IDS,
+} from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveAppShellModeFromPathname } from '@/lib/app-shell/mode';
 
@@ -66,6 +70,35 @@ describe('exclusive customer vs OV navigation', () => {
         customerHrefs.includes(href)
       )
     ).toEqual([]);
+  });
+
+  it('organizes the founder cockpit around the five company decisions', () => {
+    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual([
+      'overview',
+      'growth',
+      'product',
+      'operations',
+      'needs_you',
+    ]);
+    expect(
+      ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
+        item => item.label
+      )
+    ).toEqual(['Now', 'Growth', 'Product', 'Operations', 'Needs You']);
+    expect(
+      ADMIN_NAV_REGISTRY.find(item => item.id === 'activity')
+    ).toMatchObject({ label: 'Timeline', section: 'utilities' });
+    expect(
+      ADMIN_NAV_REGISTRY.filter(item =>
+        ['certifications', 'shipping'].includes(item.id)
+      ).map(({ id, section }) => ({ id, section }))
+    ).toEqual([
+      { id: 'certifications', section: 'utilities' },
+      { id: 'shipping', section: 'utilities' },
+    ]);
+    expect(ADMIN_SETTINGS_TOOL_IDS).toEqual(
+      expect.arrayContaining(['certifications', 'shipping'])
+    );
   });
 
   it('resolves OV routes to ov mode and customer routes to customer mode', () => {

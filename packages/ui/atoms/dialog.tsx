@@ -2,7 +2,7 @@
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as React from 'react';
-
+import { useMenuOriginFocusRestore } from '../lib/overlay-focus';
 import {
   centeredContentStyles,
   descriptionStyles,
@@ -68,10 +68,15 @@ const DialogContent = React.forwardRef<
       disablePortal = false,
       hideClose = false,
       testId = 'dialog-content',
+      onCloseAutoFocus,
       ...props
     },
     ref
   ) => {
+    const { contentRef, handleCloseAutoFocus } = useMenuOriginFocusRestore(
+      ref,
+      onCloseAutoFocus
+    );
     const contentClassName = cn(
       centeredContentStyles.position,
       centeredContentStyles.layout,
@@ -85,11 +90,12 @@ const DialogContent = React.forwardRef<
 
     const content = (
       <DialogPrimitive.Content
-        ref={ref}
+        ref={contentRef}
         className={contentClassName}
         data-slot='dialog-content'
         data-testid={testId}
         {...props}
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
         {children}
         {!hideClose && (

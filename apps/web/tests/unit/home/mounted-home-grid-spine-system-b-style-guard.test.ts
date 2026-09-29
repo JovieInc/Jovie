@@ -69,7 +69,7 @@ describe('mounted homepage grid spine System B source contract', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
 
     for (const mount of [
-      '<HomepageEditorialHero',
+      '<HomepageIdentityHero',
       '<HomepageCertifiedSections',
       '<HomepageClose',
     ]) {
@@ -81,6 +81,24 @@ describe('mounted homepage grid spine System B source contract', () => {
 
     expect(
       countOccurrences(pageSource, "data-testid='homepage-story-stack'")
+    ).toBe(1);
+
+    // Canonical Pen v3 dark launch mounts each of its sections exactly once.
+    for (const mount of [
+      '<HomepageIdentityHero',
+      '<HomepageIdentitySections',
+      '<HomepageIdentityClose',
+    ]) {
+      expect(
+        countOccurrences(pageSource, mount),
+        `${pagePath} must mount ${mount} exactly once`
+      ).toBe(1);
+    }
+    expect(
+      countOccurrences(
+        pageSource,
+        "data-testid='homepage-identity-story-stack'"
+      )
     ).toBe(1);
 
     expect(pageSource).not.toContain('MarketingShippedSitesShowcase');

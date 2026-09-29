@@ -14,7 +14,7 @@ const CAROUSEL = readFileSync(
 describe('public profile primary card width', () => {
   it('lets the home rail own the full canonical content width', () => {
     expect(HOME_RAIL).toContain(
-      "className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full'"
+      "className='flex min-h-0 min-w-0 flex-1 flex-col gap-4 md:mx-auto md:w-full'"
     );
     expect(HOME_RAIL).not.toMatch(/profile-home-rail[\s\S]{0,220}max-w-80/);
   });

@@ -87,6 +87,10 @@ describe('AdminUserDetailDrawer', () => {
       'items-start',
       'gap-3'
     );
+    expect(screen.getByTestId('admin-user-entity-header')).toHaveAttribute(
+      'data-layout',
+      'inline'
+    );
     expect(
       screen.getByTestId('drawer-analytics-metric-value-profile-completeness')
     ).toHaveTextContent('80%');

@@ -49,6 +49,15 @@ function sameInteger(left, right) {
   return leftNumber !== null && leftNumber === rightNumber;
 }
 
+// #18844's starvation bound lets a controller run for a newer main head keep
+// the lease and deploy its ancestor generation. Such a run binds only when the
+// live compare API proved the marker SHA is a strict ancestor of its head.
+function headBinds(headSha, context) {
+  return (
+    headSha === context.sha || context.descendantHeads?.has(headSha) === true
+  );
+}
+
 function validateControllerRun(run, context, attempt) {
   if (!run || typeof run !== 'object') return false;
   return (
@@ -56,7 +65,7 @@ function validateControllerRun(run, context, attempt) {
     sameInteger(run.run_attempt, attempt) &&
     sameInteger(run.workflow_id, context.controllerWorkflowId) &&
     run.path === CONTROLLER_PATH &&
-    run.head_sha === context.sha &&
+    headBinds(run.head_sha, context) &&
     run.head_branch === 'main' &&
     run.head_repository?.full_name === context.repo &&
     run.event === 'workflow_run' &&
@@ -71,7 +80,7 @@ function validateControllerJob(job, context, attempt) {
     positiveInteger(job.id) !== null &&
     sameInteger(job.run_id, context.controllerRun) &&
     sameInteger(job.run_attempt, attempt) &&
-    job.head_sha === context.sha &&
+    headBinds(job.head_sha, context) &&
     job.head_branch === 'main' &&
     exactString(job.name) !== null &&
     exactString(job.status) !== null &&
@@ -380,7 +389,22 @@ export function classifyProductionMarkerEvidence(evidence) {
     if (!sha || !/^[0-9a-f]{40}$/.test(sha) || !repo || !controllerWorkflowId) {
       return manual('invalid_context');
     }
-    const context = { sha, repo, controllerWorkflowId };
+    const descendantHeads = evidence.descendantHeads ?? [];
+    if (
+      !Array.isArray(descendantHeads) ||
+      !descendantHeads.every(
+        head =>
+          typeof head === 'string' && SHA_PATTERN.test(head) && head !== sha
+      )
+    ) {
+      return manual('invalid_context');
+    }
+    const context = {
+      sha,
+      repo,
+      controllerWorkflowId,
+      descendantHeads: new Set(descendantHeads),
+    };
     if (!Array.isArray(evidence.markers)) {
       return manual('malformed_marker_listing');
     }
@@ -1005,6 +1029,24 @@ function inspectOnline(args) {
           `repos/${repo}/actions/runs/${sourceRun}/attempts/${sourceAttempt}/jobs?per_page=100`
         )
       );
+    }
+  }
+
+  // Prove ancestry for any marker-producing run whose head is not the marker
+  // SHA. Only a strict ancestor ("ahead" compare) may bind; anything else
+  // stays unbound and the classifier fails closed.
+  evidence.descendantHeads = [];
+  const foreignHeads = new Set(
+    evidence.markers
+      .flatMap(marker => [marker.attemptRun, marker.originalRun])
+      .map(attempt => attempt?.head_sha)
+      .filter(head => typeof head === 'string' && head !== sha)
+  );
+  for (const head of foreignHeads) {
+    if (!SHA_PATTERN.test(head)) continue;
+    const comparison = ghJson(`repos/${repo}/compare/${sha}...${head}`);
+    if (comparison?.status === 'ahead' && comparison?.behind_by === 0) {
+      evidence.descendantHeads.push(head);
     }
   }
 

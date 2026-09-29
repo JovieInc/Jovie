@@ -11,10 +11,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
-import {
-  DrawerMediaThumb,
-  EntityHeaderCard,
-} from '@/components/molecules/drawer';
+import { DrawerMediaThumb, EntityHeader } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
@@ -108,8 +105,8 @@ export function ReleaseArtwork({
   );
 
   return (
-    <EntityHeaderCard
-      image={artworkImage}
+    <EntityHeader
+      thumbnail={artworkImage}
       title={title || 'Untitled'}
       subtitle={artistName}
       data-testid='release-artwork'
