@@ -859,7 +859,10 @@ export async function resolveUserState(
 // =============================================================================
 
 export type { WaitlistAccessResult, WaitlistStatus } from './waitlist-access';
-export { getWaitlistAccess } from './waitlist-access';
+export {
+  getWaitlistAccess,
+  getWaitlistReservedHandle,
+} from './waitlist-access';
 
 // State utilities (getRedirectForState, canAccessApp, canAccessOnboarding,
 // requiresRedirect) are re-exported from canonical-user-state.ts at the top
