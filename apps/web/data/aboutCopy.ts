@@ -20,7 +20,7 @@ export const ABOUT_COPY = {
   origin: {
     heading: 'Why Jovie Exists',
     paragraphs: [
-      'I spent 15 years in music marketing. Worked with Armada Music, Universal Music, ran digital campaigns for artists like Tory Lanez and Megan Thee Stallion, and drove campaigns for brands like Google and the NFL.',
+      'I spent 15 years in music marketing. Worked with Armada Music and Universal Music, ran digital campaigns for recording artists, and drove campaigns for brands like Google and the NFL.',
       'The whole time, I saw the same problem: the people who needed infrastructure the most were the ones who could never afford it. Labels have teams coordinating releases, managing fan data, planning rollouts. Independent artists have themselves and maybe a friend who is decent at Instagram.',
       'Jovie is what I wish existed when I was an artist: one product for presence, relationships, and growth, without reducing you to a category. For musicians, that still means smart links that route fans to the right streaming platform, a profile that converts visitors, audience intelligence, and AI that knows your career data — stream counts, tour dates, collaborations — not a blank prompt.',
     ],
@@ -75,7 +75,7 @@ export const ABOUT_FAQ_ITEMS = [
   {
     question: 'Who founded Jovie?',
     answer:
-      'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for artists like Tory Lanez and Megan Thee Stallion, and brands like Google and the NFL.',
+      'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for recording artists and brands like Google and the NFL.',
   },
   {
     question: 'What does Jovie do?',
