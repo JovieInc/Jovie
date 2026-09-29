@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { OnboardingShell } from './OnboardingShell';
@@ -14,13 +14,34 @@ vi.mock('@/components/organisms/sidebar', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
-  OnboardingChat: () => <div data-testid='onboarding-chat' />,
+  OnboardingChat: ({
+    turnstilePanel,
+  }: {
+    readonly turnstilePanel: ReactNode;
+  }) => (
+    <>
+      <div data-testid='onboarding-chat' />
+      {turnstilePanel}
+    </>
+  ),
+}));
+
+const turnstileProps = vi.hoisted(() => ({
+  current: null as {
+    readonly onStateChange?: (state: {
+      status: string;
+      message: string | null;
+    }) => void;
+  } | null,
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
   getBrowserTurnstileHostname: () => 'localhost',
   isOnboardingTurnstilePanelVisible: () => false,
-  OnboardingTurnstile: () => null,
+  OnboardingTurnstile: (props: Record<string, unknown>) => {
+    turnstileProps.current = props;
+    return null;
+  },
   resolveTurnstileSiteKey: () => null,
 }));
 
@@ -39,5 +60,22 @@ describe('OnboardingShell status', () => {
     expect(alert.className).toContain('border-error/20');
     expect(alert.className).toContain('text-error');
     expect(alert.className).not.toMatch(/\bred-\d/);
+  });
+
+  it('reports a failed chat start without verification jargon or error codes', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    act(() => {
+      turnstileProps.current?.onStateChange?.({
+        status: 'error',
+        message: null,
+      });
+    });
+
+    const alert = screen.getByText(
+      "We couldn't start your chat. Refresh the page to try again."
+    );
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
   });
 });
