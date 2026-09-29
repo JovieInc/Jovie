@@ -32,6 +32,15 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   notifyDesktopAppBooted: vi.fn(),
 }));
 
+const generateQrCodeSvgMock = vi
+  .fn()
+  .mockResolvedValue('<svg data-qr-code="true"></svg>');
+
+vi.mock('@/lib/utils/qr-code', () => ({
+  generateQrCodeSvg: (url: string, size: number) =>
+    generateQrCodeSvgMock(url, size),
+}));
+
 function getAuthUrlParam(): string | null {
   return new URLSearchParams(searchParamsState.value).get('auth_url');
 }
@@ -131,6 +140,40 @@ describe('DesktopAuthPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel Sign-In' }));
 
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a QR of the sign-in link for the phone path', async () => {
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Scan With Phone' }));
+
+    const expectedAuthUrl = new URL(
+      '/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fsettings&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
+      window.location.origin
+    ).toString();
+
+    await waitFor(() => {
+      expect(generateQrCodeSvgMock).toHaveBeenCalledWith(
+        expectedAuthUrl,
+        expect.any(Number)
+      );
+    });
+    const qr = await screen.findByTestId('desktop-auth-qr');
+    expect(qr.querySelector('svg')).not.toBeNull();
+    expect(
+      screen.getByText('Scan with your phone to finish sign-in there.')
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Back To Browser Sign-in' })
+    );
+    expect(
+      screen.getByRole('button', { name: 'Continue in Browser' })
+    ).toBeInTheDocument();
   });
 
   it('keeps continue retryable and shows a stable failure message when browser launch fails', async () => {
@@ -309,7 +352,7 @@ describe('DesktopAuthPage', () => {
 
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enter a Code' })
+      await screen.findByRole('button', { name: 'Enter A Code' })
     );
 
     const input = screen.getByRole('textbox', {
@@ -346,7 +389,7 @@ describe('DesktopAuthPage', () => {
     });
     expect(screen.getByRole('status')).toHaveTextContent('Signing in...');
     expect(
-      screen.getByRole('button', { name: 'Back to Browser Sign-In' })
+      screen.getByRole('button', { name: 'Back To Browser Sign-in' })
     ).toBeDisabled();
   });
 
@@ -368,7 +411,7 @@ describe('DesktopAuthPage', () => {
     );
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enter a Code' })
+      await screen.findByRole('button', { name: 'Enter A Code' })
     );
     fireEvent.change(
       screen.getByRole('textbox', { name: 'Code From Your Browser' }),
@@ -385,11 +428,12 @@ describe('DesktopAuthPage', () => {
     const { DesktopAuthClient } = await import(
       '../../../app/desktop-auth/DesktopAuthClient'
     );
-    const { container } = render(
-      <DesktopAuthClient authUrlParam={getAuthUrlParam()} />
-    );
-    expect(screen.queryByRole('button', { name: 'Enter a Code' })).toBeNull();
-    expect(container.querySelector('[aria-hidden="true"].h-7')).not.toBeNull();
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+    expect(screen.queryByRole('button', { name: 'Enter A Code' })).toBeNull();
+    // The phone path needs no bridge capability, so the row still renders.
+    expect(
+      screen.getByRole('button', { name: 'Scan With Phone' })
+    ).toBeInTheDocument();
   });
 
   it('copies the validated sign-in link and reports copy failures', async () => {

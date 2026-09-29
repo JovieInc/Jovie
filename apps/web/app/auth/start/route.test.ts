@@ -263,6 +263,19 @@ describe('GET /auth/start', () => {
     );
   });
 
+  it('records the advertised loopback listener port for the Mac app', async () => {
+    const base =
+      'http://localhost:3112/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fchat%3Fruntime%3Delectron&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256&desktop_flow=desktop_flow_nonce_12345';
+
+    await GET(new Request(`${base}&desktop_loopback=51234`));
+    expect(hoisted.createStoredAuthState).toHaveBeenLastCalledWith(
+      expect.objectContaining({ desktopLoopbackPort: 51234 })
+    );
+
+    const response = await GET(new Request(`${base}&desktop_loopback=99999x`));
+    expect(response.status).toBe(400);
+  });
+
   it('clears the browser session only after explicit account-switch confirmation', async () => {
     const response = await POST(
       new Request('http://localhost:3112/auth/start', {

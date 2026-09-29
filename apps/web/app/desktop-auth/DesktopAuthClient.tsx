@@ -49,6 +49,8 @@ const STATUS_STILL_WAITING =
 const STATUS_COPIED = 'Sign-in link copied. Paste it into any browser.';
 const STATUS_ENTER_CODE =
   'Signed in but Jovie did not open? Enter the code your browser shows.';
+const STATUS_QR_CODE = 'Scan with your phone to finish sign-in there.';
+const QR_CODE_SIZE = 176;
 const STATUS_REDEEMING = 'Signing in...';
 // Matches the return page: consonants only, formatted XXXX-XXXX.
 const RETURN_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
@@ -147,6 +149,9 @@ export function DesktopAuthHandoffActions({
   const [copyError, setCopyError] = useState<string | null>(null);
   const [stillWaiting, setStillWaiting] = useState(false);
   const [codeMode, setCodeMode] = useState(false);
+  const [qrMode, setQrMode] = useState(false);
+  const [qrSvg, setQrSvg] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
   const [returnCode, setReturnCode] = useState('');
   const [redeemState, setRedeemState] = useState<RedeemState>('idle');
   const [redeemError, setRedeemError] = useState<string | null>(null);
@@ -180,6 +185,35 @@ export function DesktopAuthHandoffActions({
     () => authUrl ?? resolveAuthUrl?.() ?? null,
     [authUrl, resolveAuthUrl]
   );
+
+  // The QR encodes the same link "Copy Sign-In Link" copies — the PKCE
+  // challenge inside is public, the verifier never leaves the app.
+  useEffect(() => {
+    if (!qrMode || qrSvg || qrError) return;
+    const currentAuthUrl = getAuthUrl();
+    if (!currentAuthUrl) {
+      setQrError('The QR code could not be created. Copy the link instead.');
+      return;
+    }
+    let cancelled = false;
+    void import('@/lib/utils/qr-code')
+      .then(({ generateQrCodeSvg }) =>
+        generateQrCodeSvg(currentAuthUrl, QR_CODE_SIZE)
+      )
+      .then(svg => {
+        if (!cancelled) setQrSvg(svg);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setQrError(
+            'The QR code could not be created. Copy the link instead.'
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrMode, qrSvg, qrError, getAuthUrl]);
 
   const updateOpenState = useCallback(
     (state: DesktopAuthOpenState) => {
@@ -274,6 +308,14 @@ export function DesktopAuthHandoffActions({
 
   const toggleCodeMode = useCallback(() => {
     setCodeMode(current => !current);
+    setQrMode(false);
+    setRedeemState('idle');
+    setRedeemError(null);
+  }, []);
+
+  const toggleQrMode = useCallback(() => {
+    setQrMode(current => !current);
+    setCodeMode(false);
     setRedeemState('idle');
     setRedeemError(null);
   }, []);
@@ -301,7 +343,11 @@ export function DesktopAuthHandoffActions({
     redeemState === 'redeeming' || redeemState === 'redeemed'
       ? STATUS_REDEEMING
       : (redeemError ?? STATUS_ENTER_CODE);
-  const statusText = codeMode ? codeStatusText : actionStatusText;
+  const statusText = codeMode
+    ? codeStatusText
+    : qrMode
+      ? (qrError ?? STATUS_QR_CODE)
+      : actionStatusText;
   const cancelButton = showCancelSignIn ? (
     <button
       type='button'
@@ -355,6 +401,22 @@ export function DesktopAuthHandoffActions({
           </button>
           {cancelButton}
         </form>
+      ) : qrMode ? (
+        <div
+          className='mt-8 flex w-full flex-col items-center justify-center gap-3'
+          data-desktop-auth-state='qr'
+          data-testid='desktop-auth-qr'
+        >
+          {qrSvg ? (
+            <div
+              aria-label='QR Code With Your Sign-in Link'
+              className='rounded-xl bg-white p-3 dark:bg-white [&_svg]:block'
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: generateQrCodeSvg emits a static QR matrix; the auth URL is data, never markup
+              dangerouslySetInnerHTML={{ __html: qrSvg }}
+              role='img'
+            />
+          ) : null}
+        </div>
       ) : (
         <div
           className='mt-8 flex w-full flex-col items-center justify-center gap-2'
@@ -388,17 +450,43 @@ export function DesktopAuthHandoffActions({
       >
         {hasAuthUrl ? statusText : 'Start sign-in again from Jovie.'}
       </p>
-      {canRedeemCode && hasAuthUrl ? (
-        <Button
-          type='button'
-          variant='link'
-          size='sm'
-          className='mt-3'
-          disabled={redeemState === 'redeeming' || redeemState === 'redeemed'}
-          onClick={toggleCodeMode}
-        >
-          {codeMode ? 'Back to Browser Sign-In' : 'Enter a Code'}
-        </Button>
+      {hasAuthUrl ? (
+        <div className='mt-3 flex items-center justify-center gap-4'>
+          {codeMode || qrMode ? (
+            <Button
+              type='button'
+              variant='link'
+              size='sm'
+              disabled={
+                redeemState === 'redeeming' || redeemState === 'redeemed'
+              }
+              onClick={codeMode ? toggleCodeMode : toggleQrMode}
+            >
+              Back To Browser Sign-in
+            </Button>
+          ) : (
+            <>
+              {canRedeemCode ? (
+                <Button
+                  type='button'
+                  variant='link'
+                  size='sm'
+                  onClick={toggleCodeMode}
+                >
+                  Enter A Code
+                </Button>
+              ) : null}
+              <Button
+                type='button'
+                variant='link'
+                size='sm'
+                onClick={toggleQrMode}
+              >
+                Scan With Phone
+              </Button>
+            </>
+          )}
+        </div>
       ) : (
         // Reserve the row so the centered shell does not shift once the
         // bridge capability check resolves after mount.

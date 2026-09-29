@@ -27,6 +27,8 @@ const CODE = '00000000000040008000000000000001';
 const STATE = 'abcdef0123456789abcdef0123456789';
 const FLOW = 'htmjTw7x7kSYKEPuInDfGOJ0U9q56p4Y';
 
+const fetchMock = vi.fn().mockResolvedValue(new Response('ok'));
+
 function setSearchParams(query: string) {
   searchParamsMock.mockReturnValue(new URLSearchParams(query));
 }
@@ -59,6 +61,8 @@ function setLocationOrigin(origin: string) {
 describe('NativeReturnPage (native auth bounce)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchMock.mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', fetchMock);
     setPathname('/auth/native-return');
     // jsdom cannot navigate to a custom scheme; swallow the auto-fire assign.
     setLocationOrigin('https://jov.ie');
@@ -111,6 +115,35 @@ describe('NativeReturnPage (native auth bounce)', () => {
     render(<NativeReturnPage />);
     expect(screen.queryByTestId('desktop-return-code')).toBeNull();
   });
+
+  it('hands the completion to the app loopback listener when advertised', () => {
+    setSearchParams(
+      `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&return_code=BCDFGHJK&loopback_port=51234`
+    );
+    render(<NativeReturnPage />);
+
+    // The typed return code stays visible: the loopback fetch runs in the
+    // background so a sign-in finished on another device still works.
+    expect(screen.getByTestId('desktop-return-code')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://127.0.0.1:51234/auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`,
+      expect.objectContaining({ credentials: 'omit' })
+    );
+  });
+
+  it.each([
+    `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`,
+    `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&loopback_port=abc`,
+    `code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&loopback_port=99999`,
+    `client=ios&code=${CODE}&state=${STATE}&desktop_flow=${FLOW}&loopback_port=51234`,
+  ])(
+    'never hits the loopback listener without a valid electron port (%s)',
+    query => {
+      setSearchParams(query);
+      render(<NativeReturnPage />);
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('preserves the deep link without desktop_flow when absent', () => {
     setSearchParams(`code=${CODE}&state=${STATE}`);
