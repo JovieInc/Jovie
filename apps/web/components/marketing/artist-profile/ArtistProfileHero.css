@@ -52,12 +52,6 @@
   width: min(17.5rem, 74vw);
   max-width: none;
   margin: 2rem 0 -9rem;
-  padding: 0.35rem;
-  border-radius: 2.15rem;
-}
-
-.ap-hero__phone .ap-phone-frame__screen {
-  border-radius: 1.78rem;
 }
 
 @media (min-width: 48rem) {
