@@ -48,6 +48,7 @@ function runGate({
   compareFails = false,
   buildInfoFails = false,
   starvationSeconds = 5400,
+  inFlight = false,
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'lineage-gate-'));
   tempRoots.push(root);
@@ -110,6 +111,7 @@ esac
       EXPECTED_SHA,
       GITHUB_OUTPUT: output,
       GITHUB_RUN_ID: '100',
+      IN_FLIGHT: inFlight ? 'true' : 'false',
       PRODUCTION_STARVATION_SECONDS: String(starvationSeconds),
       REPOSITORY: 'JovieInc/Jovie',
     },
@@ -167,14 +169,14 @@ describe('release lineage gate', () => {
     });
   });
 
-  it('keeps the lease despite a queued successor once production is starving', () => {
+  it('drains a queued ancestor to the newest successor once production is starving', () => {
     const run = runGate({
       main: NEWER_SHA,
       pendingSuccessors: 2,
       ageSeconds: 6000,
     });
     expect(run.result.status, run.result.stderr).toBe(0);
-    expect(run.decision).toBe('decision=proceed');
+    expect(run.decision).toBe('decision=yield');
     expect(run.outputs).toMatchObject({
       successor_pending: 'true',
       starving: 'true',
@@ -184,19 +186,69 @@ describe('release lineage gate', () => {
     );
   });
 
+  it('keeps the lease for an in-flight generation despite a queued successor once production is starving', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      pendingSuccessors: 2,
+      ageSeconds: 6000,
+      inFlight: true,
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.decision).toBe('decision=proceed');
+    expect(run.outputs).toMatchObject({
+      successor_pending: 'true',
+      starving: 'true',
+      in_flight: 'true',
+    });
+  });
+
+  it('ships exactly one full pipeline for the newest of five queued generations under starvation', () => {
+    // Five stale generations queued FIFO behind a starving production. Each
+    // still-queued generation yields to its queued successors in seconds, so
+    // only the newest (no successors behind it) proceeds to the pipeline.
+    const queued = 5;
+    for (let position = 0; position < queued; position += 1) {
+      const run = runGate({
+        main: NEWER_SHA,
+        pendingSuccessors: queued - 1 - position,
+        ageSeconds: 6000,
+      });
+      expect(run.result.status, run.result.stderr).toBe(0);
+      expect(run.outputs.starving).toBe('true');
+      expect(run.decision).toBe(
+        position === queued - 1 ? 'decision=proceed' : 'decision=yield'
+      );
+    }
+  });
+
   it('treats unreadable production evidence as starving rather than yielding forever', () => {
     for (const overrides of [
       { buildInfoFails: true },
       { compareFails: true },
     ]) {
-      const run = runGate({
+      // A still-queued generation still yields: its queued successor ships a
+      // newer SHA, so the stale backlog drains instead of running the full
+      // pipeline for every generation.
+      const queued = runGate({
         main: NEWER_SHA,
         pendingSuccessors: 1,
         ...overrides,
       });
-      expect(run.result.status, run.result.stderr).toBe(0);
-      expect(run.decision).toBe('decision=proceed');
-      expect(run.outputs.starving).toBe('true');
+      expect(queued.result.status, queued.result.stderr).toBe(0);
+      expect(queued.decision).toBe('decision=yield');
+      expect(queued.outputs.starving).toBe('true');
+
+      // An in-flight generation keeps the lease so unreadable evidence can
+      // never starve production of a ship.
+      const inFlight = runGate({
+        main: NEWER_SHA,
+        pendingSuccessors: 1,
+        inFlight: true,
+        ...overrides,
+      });
+      expect(inFlight.result.status, inFlight.result.stderr).toBe(0);
+      expect(inFlight.decision).toBe('decision=proceed');
+      expect(inFlight.outputs.starving).toBe('true');
     }
   });
 

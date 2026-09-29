@@ -30,6 +30,13 @@ describe('public site discovery schemas', () => {
     );
 
     expect(schema['@type']).toBe('Organization');
+    expect(schema.address).toEqual({
+      '@type': 'PostalAddress',
+      addressLocality: 'Los Angeles',
+      addressRegion: 'CA',
+      postalCode: '90028',
+      addressCountry: 'US',
+    });
     expect(schema).not.toHaveProperty('sameAs');
   });
 

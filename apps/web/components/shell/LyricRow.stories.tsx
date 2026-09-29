@@ -12,4 +12,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    line: { startSec: 12, text: 'Sunlight through the skyline glass' },
+    index: 0,
+    isActive: false,
+    isFocused: false,
+    editing: false,
+    onFocus: () => {},
+    onSeek: () => {},
+    onStamp: () => {},
+    onChangeText: () => {},
+  },
+};

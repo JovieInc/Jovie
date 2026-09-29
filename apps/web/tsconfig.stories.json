@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "tsBuildInfoFile": ".cache/tsbuildinfo-stories",
+    "skipLibCheck": true
+  },
+  "include": [
+    "app/**/*.stories.ts",
+    "app/**/*.stories.tsx",
+    "components/**/*.stories.ts",
+    "components/**/*.stories.tsx",
+    ".storybook/**/*.ts",
+    ".storybook/**/*.tsx"
+  ],
+  "exclude": ["node_modules", ".next/**"]
+}
