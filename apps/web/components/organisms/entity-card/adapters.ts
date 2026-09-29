@@ -180,10 +180,7 @@ export function contactToEntityCard(
     eyebrow: 'Contact',
     title,
     meta: meta || null,
-    cta: {
-      label: options.ctaLabel ?? preset.ctaLabel,
-      href,
-    },
+    cta: { label: options.ctaLabel ?? preset.ctaLabel, href },
   };
 }
 
