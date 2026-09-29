@@ -242,7 +242,7 @@ export function aggregateLlmCandidates(
     if (text.length < 20 || text.length > 500) continue;
     const stepId = deriveStepFromToolEvents(row.toolCalls);
     if (!stepId || !PROMOTABLE_STEPS.includes(stepId)) continue;
-    const key = `${stepId} ${text}`;
+    const key = `${stepId}\u0000${text}`;
     let entry = byKey.get(key);
     if (!entry) {
       entry = { stepId, text, impressions: new Set(), conversions: new Set() };
@@ -406,17 +406,28 @@ async function promoteAndReweight(): Promise<{
   return { promoted, retired, reweighted };
 }
 
+/**
+ * JOV-7140: promotion, reweighting and retirement change live onboarding copy
+ * from transcript-derived candidates with no eval or review gate. Frozen until
+ * that path runs through the protected promptfoo lane and a PR. Re-enabling is
+ * a reviewed code change, not a runtime toggle. Stats and mining keep running.
+ */
+export const ONBOARDING_SCRIPT_AUTO_PROMOTION = false;
+
 export async function runOnboardingScriptAggregation(): Promise<
   Record<string, unknown>
 > {
   const seedsInserted = await syncSeeds();
   const countersUpdated = await recomputeServedCounters();
   const candidatesInserted = await mineCandidates();
-  const { promoted, retired, reweighted } = await promoteAndReweight();
+  const { promoted, retired, reweighted } = ONBOARDING_SCRIPT_AUTO_PROMOTION
+    ? await promoteAndReweight()
+    : { promoted: 0, retired: 0, reweighted: 0 };
   const summary = {
     seedsInserted,
     countersUpdated,
     candidatesInserted,
+    promotion: ONBOARDING_SCRIPT_AUTO_PROMOTION ? 'enabled' : 'frozen',
     promoted,
     retired,
     reweighted,
