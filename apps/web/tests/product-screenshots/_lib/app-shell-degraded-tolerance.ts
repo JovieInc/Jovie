@@ -45,15 +45,6 @@ export function createAppShellDegradedTolerance(proofRoute: string) {
     }
   }
 
-  // Chrome mirrors each failed fetch/XHR as a console error with no URL, so
-  // this can't be path-scoped the same way — the network-level check above
-  // is the authoritative one; this is a strict subset that can't admit
-  // anything the network-level check would not have already admitted,
-  // since both assertions must pass for the proof to pass.
-  function isExpectedDegradedConsoleError(entry: string): boolean {
-    return /the server responded with a status of (500|503)\b/.test(entry);
-  }
-
   // formatRequestFailure (aborted-image-request.ts) joins as "<url> <error
   // text>"; parse the leading URL out rather than assuming a fixed suffix
   // shape.
@@ -67,9 +58,35 @@ export function createAppShellDegradedTolerance(proofRoute: string) {
     }
   }
 
+  // Chrome mirrors each failed fetch/XHR as a console error with no URL, so
+  // this can't be path-scoped like isExpectedDegradedResponse above. To
+  // still bound it by something real rather than trusting the status text
+  // alone, cap how many can be tolerated at `toleratedResponseCount` — the
+  // number of network responses isExpectedDegradedResponse already
+  // admitted. A console error beyond that count has no corresponding
+  // tolerated network failure to explain it, so it fails the proof.
+  function unexpectedDegradedConsoleErrors(
+    consoleErrors: readonly string[],
+    toleratedResponseCount: number
+  ): string[] {
+    let remaining = toleratedResponseCount;
+    const unexpected: string[] = [];
+    for (const entry of consoleErrors) {
+      const matches = /the server responded with a status of (500|503)\b/.test(
+        entry
+      );
+      if (matches && remaining > 0) {
+        remaining -= 1;
+        continue;
+      }
+      unexpected.push(entry);
+    }
+    return unexpected;
+  }
+
   return {
     isExpectedDegradedResponse,
-    isExpectedDegradedConsoleError,
+    unexpectedDegradedConsoleErrors,
     isExpectedDegradedRequestFailure,
   };
 }

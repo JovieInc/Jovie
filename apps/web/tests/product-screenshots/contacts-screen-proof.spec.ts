@@ -50,7 +50,7 @@ const enterUrl = `/api/dev/test-auth/enter?persona=creator&redirect=${encodeURIC
 // endpoint (GET /api/dashboard/contacts) still fails this proof.
 const {
   isExpectedDegradedResponse,
-  isExpectedDegradedConsoleError,
+  unexpectedDegradedConsoleErrors,
   isExpectedDegradedRequestFailure,
 } = createAppShellDegradedTolerance(proofRoute);
 
@@ -157,8 +157,9 @@ test('emits exact-head contacts desktop and mobile evidence', async ({
     const unexpectedFailedResponses = browserErrors.failedResponses.filter(
       entry => !isExpectedDegradedResponse(entry)
     );
-    const unexpectedConsoleErrors = browserErrors.consoleErrors.filter(
-      entry => !isExpectedDegradedConsoleError(entry)
+    const unexpectedConsoleErrors = unexpectedDegradedConsoleErrors(
+      browserErrors.consoleErrors,
+      browserErrors.failedResponses.length - unexpectedFailedResponses.length
     );
     const unexpectedFailedRequests = browserErrors.failedRequests.filter(
       entry => !isExpectedDegradedRequestFailure(entry)
