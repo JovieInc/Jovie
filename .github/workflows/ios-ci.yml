@@ -119,6 +119,9 @@ jobs:
         if: ${{ inputs.full-regression }}
         timeout-minutes: 30
         env:
+          # GitHub-hosted macOS runners are fresh. A shutdown/boot reset added
+          # ten minutes to the release run without providing isolation.
+          JOVIE_IOS_RESET_SIMULATOR: "0"
           JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "1680"
         run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 
