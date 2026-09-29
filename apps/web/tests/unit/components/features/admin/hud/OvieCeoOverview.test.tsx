@@ -143,6 +143,24 @@ describe('OvieCeoOverview', () => {
     ).toHaveAttribute('data-state', 'stale');
   });
 
+  it('keeps action controls outside the provenance dl (axe only-dlitems)', () => {
+    const onRetry = vi.fn();
+    const metrics = buildMetrics();
+    metrics.sources.stripe = { ...metrics.sources.stripe, state: 'degraded' };
+    const { container } = render(
+      <OvieCeoOverview metrics={metrics} onRetry={onRetry} />
+    );
+
+    const lists = container.querySelectorAll('dl');
+    expect(lists.length).toBeGreaterThan(0);
+    for (const list of lists) {
+      expect(list.querySelector('a, button')).toBeNull();
+    }
+    for (const link of screen.getAllByRole('link', { name: /Inspect/i })) {
+      expect(link.closest('dl')).toBeNull();
+    }
+  });
+
   it('does not flash fresh polled sources as unknown before the clock effect runs', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-22T18:00:00.000Z'));
