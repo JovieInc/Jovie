@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { TooltipProvider } from '@jovie/ui';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import postcss from 'postcss';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -53,8 +54,10 @@ function renderTitlebar(
         ...overrides,
       }}
     >
-      <DesktopTitlebar />
-      <DesktopReleaseIdentity />
+      <TooltipProvider>
+        <DesktopTitlebar />
+        <DesktopReleaseIdentity />
+      </TooltipProvider>
     </SidebarContext.Provider>
   );
 }
@@ -98,9 +101,12 @@ describe('DesktopTitlebar', () => {
     expect(
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('electron-sidebar-toggle').querySelector('svg')
-    ).toBeTruthy();
+    // The desktop toggle is the canonical rail-control primitive — same
+    // pressed/expanded semantics and icon family as the header's control.
+    const sidebarToggle = screen.getByTestId('electron-sidebar-toggle');
+    expect(sidebarToggle).toHaveAttribute('data-rail-toggle', 'left');
+    expect(sidebarToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(sidebarToggle.querySelector('svg')).toBeTruthy();
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -446,8 +452,10 @@ describe('DesktopTitlebar', () => {
           toggleSidebar: vi.fn(),
         }}
       >
-        <DesktopTitlebar />
-        <DesktopReleaseIdentity />
+        <TooltipProvider>
+          <DesktopTitlebar />
+          <DesktopReleaseIdentity />
+        </TooltipProvider>
       </SidebarContext.Provider>
     );
     await waitFor(() => {
@@ -507,8 +515,10 @@ describe('DesktopTitlebar', () => {
           toggleSidebar: vi.fn(),
         }}
       >
-        <DesktopTitlebar />
-        <DesktopReleaseIdentity />
+        <TooltipProvider>
+          <DesktopTitlebar />
+          <DesktopReleaseIdentity />
+        </TooltipProvider>
       </SidebarContext.Provider>
     );
 
@@ -556,8 +566,10 @@ describe('DesktopTitlebar', () => {
           toggleSidebar: vi.fn(),
         }}
       >
-        <DesktopTitlebar />
-        <DesktopReleaseIdentity />
+        <TooltipProvider>
+          <DesktopTitlebar />
+          <DesktopReleaseIdentity />
+        </TooltipProvider>
       </SidebarContext.Provider>
     );
     await waitFor(() => {

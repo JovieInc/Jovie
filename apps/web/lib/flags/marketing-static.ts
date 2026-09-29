@@ -30,6 +30,10 @@ export const FEATURE_FLAGS = {
   // to open the doors. /waitlist remains the pending-receipt route.
   WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: true,
+  // JOV-7208 founder gate: keep the product demo video dark until the media is
+  // a JOV-6251 approved master, JOV-6220 mobile/desktop render + playback
+  // certification is recorded, and Tim approves the video on the unflag PR.
+  SHOW_PRODUCT_DEMO_VIDEO: false,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
   SHOW_FORGEUI_MARKETING_UPDATES: true,
   SHOW_HOMEPAGE_AI_COMPOSER_SECTION: true,
