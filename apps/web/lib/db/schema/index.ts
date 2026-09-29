@@ -501,8 +501,11 @@ export {
   pixelEventTypeEnum,
   pixelForwardStatusEnum,
   playlistStatusEnum,
+  profileApprovalEventEnum,
+  profileApprovalStatusEnum,
   profileClaimRoleEnum,
   profileOwnershipActionEnum,
+  profileRiskyActionEnum,
   providerKindEnum,
   providerLinkOwnerEnum,
   referralCommissionStatusEnum,
@@ -1062,6 +1065,19 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+// Profile team approvals (JOV-6601 least-privilege owner approval)
+export {
+  insertProfileActionApprovalSchema,
+  insertProfileApprovalEventSchema,
+  type NewProfileActionApproval,
+  type NewProfileApprovalEvent,
+  type ProfileActionApproval,
+  type ProfileApprovalEvent,
+  profileActionApprovals,
+  profileApprovalEvents,
+  selectProfileActionApprovalSchema,
+  selectProfileApprovalEventSchema,
+} from './profile-approvals';
 export {
   insertProfileInquirySchema,
   type NewProfileInquiry,
