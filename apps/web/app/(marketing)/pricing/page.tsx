@@ -14,10 +14,12 @@ export const revalidate = false;
 
 const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
 const PRO_MONTHLY_PRICE = `${getPublicPriceClaim('pro').priceLabel}/month`;
+const PRICING_OG_IMAGE = `${BASE_URL}/og/default.png`;
+const PRICING_TITLE = `Pricing | ${APP_NAME} Profiles and Artist Visibility Pro`;
 const requestAccessCopy = `Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access. Request access.`;
 
 export const metadata: Metadata = {
-  title: 'Pricing',
+  title: PRICING_TITLE,
   description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   keywords: [
     'Jovie pricing',
@@ -31,9 +33,13 @@ export const metadata: Metadata = {
     description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
     url: `${BASE_URL}/pricing`,
     type: 'website',
+    images: [
+      { url: PRICING_OG_IMAGE, width: 1200, height: 630, alt: PRICING_TITLE },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
+    images: [PRICING_OG_IMAGE],
     title: `Pricing - ${APP_NAME}`,
     description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
   },
