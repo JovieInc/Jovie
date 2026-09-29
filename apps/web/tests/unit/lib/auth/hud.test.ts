@@ -103,7 +103,7 @@ describe('authorizeHud', () => {
     });
   });
 
-  it('allows the raw admin role even when fresh MFA is unavailable', async () => {
+  it('allows fresh read identity even when admin MFA expired', async () => {
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: false,
@@ -113,7 +113,7 @@ describe('authorizeHud', () => {
 
     const { authorizeHud } = await import('@/lib/auth/hud');
 
-    await expect(authorizeHud(null)).resolves.toEqual({
+    await expect(authorizeHud(null, { session: 'fresh' })).resolves.toEqual({
       ok: true,
       mode: 'admin',
     });
