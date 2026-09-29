@@ -85,7 +85,6 @@ const ALLOWED_PATH_FRAGMENTS = [
 const GRANDFATHERED_PATH_FRAGMENTS = [
   '/app/api/unsubscribe/claim-invites/route.ts',
   '/components/marketing/homepage-v2/HomepageV2Route.tsx',
-  '/components/features/dashboard/molecules/phone-mockup-preview/PhoneMockupPreview.tsx',
   '/components/features/dashboard/release-tasks/ReleaseTaskChecklist.tsx',
   '/components/features/demo/ProductDemoCarousel.tsx',
   '/components/features/home/phone-showcase-primitives.tsx',
