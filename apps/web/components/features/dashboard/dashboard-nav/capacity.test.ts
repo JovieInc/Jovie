@@ -55,6 +55,7 @@ describe('partitionCustomerNavigation', () => {
       'library',
     ]);
     expect(partition.more.map(item => item.id)).toEqual([
+      'links',
       'contacts',
       'calendar',
       'tasks',

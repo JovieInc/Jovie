@@ -21,6 +21,7 @@ const CANONICAL_LABELS = [
   'Inbox',
   'New Chat',
   'Library',
+  'Links',
   'Contacts',
   'Calendar',
   'Tasks',
@@ -30,6 +31,7 @@ const CANONICAL_HREFS = [
   APP_ROUTES.DASHBOARD,
   APP_ROUTES.CHAT,
   APP_ROUTES.LIBRARY,
+  APP_ROUTES.LINKS,
   APP_ROUTES.CONTACTS,
   APP_ROUTES.CALENDAR,
   APP_ROUTES.TASKS,
@@ -120,7 +122,7 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
     });
     await expect(expanded).toBeVisible();
     const expandedLinks = expanded.getByRole('link');
-    await expect(expandedLinks).toHaveCount(8);
+    await expect(expandedLinks).toHaveCount(9);
     expect(await linkContract(expandedLinks)).toEqual([
       ...CANONICAL_LABELS.map((label, index) => ({
         label,

@@ -15,6 +15,7 @@ const CANONICAL_NAVIGATION = [
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
   ['chat', 'New Chat', APP_ROUTES.CHAT],
   ['library', 'Library', APP_ROUTES.LIBRARY],
+  ['links', 'Links', APP_ROUTES.LINKS],
   ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
   ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
   ['tasks', 'Tasks', APP_ROUTES.TASKS],
@@ -31,8 +32,9 @@ function toContract(
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps the canonical primary six in the DESIGN.md order', () => {
+  it('keeps the canonical primary seven in the DESIGN.md order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
+    expect(APP_ROUTES.LINKS).toBe('/app/links');
     expect(primaryNavigation.find(item => item.id === 'chat')?.tone).toBe(
       'primary'
     );

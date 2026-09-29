@@ -22,6 +22,7 @@ export const NAVIGATION_ITEM_IDS = [
   'inbox',
   'chat',
   'library',
+  'links',
   'contacts',
   'calendar',
   'tasks',
@@ -34,6 +35,7 @@ export const NAVIGATION_ROUTE_BUCKETS = [
   'inbox',
   'chat',
   'library',
+  'links',
   'contacts',
   'calendar',
   'tasks',
@@ -247,6 +249,12 @@ export function bucketNavigationRoute(value: string): NavigationRouteBucket {
     isPathWithin(pathname, APP_ROUTES.DASHBOARD_RELEASES)
   ) {
     return 'library';
+  }
+  if (
+    isPathWithin(pathname, APP_ROUTES.LINKS) ||
+    isPathWithin(pathname, APP_ROUTES.DASHBOARD_LINKS)
+  ) {
+    return 'links';
   }
   if (
     isPathWithin(pathname, APP_ROUTES.CONTACTS) ||

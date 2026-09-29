@@ -46,6 +46,7 @@ const EXPANDED_LABELS = [
   'Inbox',
   'New Chat',
   'Library',
+  'Links',
   'Contacts',
   'Calendar',
   'Tasks',
@@ -123,22 +124,23 @@ describe('DashboardMobileTabs', () => {
     });
     const links = within(menu).getAllByRole('link');
 
-    expect(links.slice(0, 7).map(link => link.textContent?.trim())).toEqual(
+    expect(links.slice(0, 8).map(link => link.textContent?.trim())).toEqual(
       EXPANDED_LABELS
     );
-    expect(links.slice(0, 7).map(link => link.getAttribute('href'))).toEqual([
+    expect(links.slice(0, 8).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.DASHBOARD,
       APP_ROUTES.CHAT,
       APP_ROUTES.LIBRARY,
+      APP_ROUTES.LINKS,
       APP_ROUTES.CONTACTS,
       APP_ROUTES.CALENDAR,
       APP_ROUTES.TASKS,
       APP_ROUTES.PROFILES,
     ]);
-    expect(links.at(7)).toHaveTextContent('Public Profile');
-    expect(links.at(7)).toHaveAttribute('href', '/timwhite');
-    expect(links.at(8)).toHaveTextContent('Settings');
-    expect(links.at(8)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+    expect(links.at(8)).toHaveTextContent('Public Profile');
+    expect(links.at(8)).toHaveAttribute('href', '/timwhite');
+    expect(links.at(9)).toHaveTextContent('Settings');
+    expect(links.at(9)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
 
     for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
       expect(within(menu).queryByRole('link', { name: label })).toBeNull();

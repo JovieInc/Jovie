@@ -17,6 +17,7 @@ export const APP_ROUTES = {
   LEGACY_DASHBOARD: '/app/dashboard',
   /** Legacy earnings path. Keep for old bookmarks; use EARNINGS for canonical entry. */
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
+  /** Legacy links path. Keep for old bookmarks; use LINKS for navigation. */
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
   /** Legacy audience path. Keep as a redirect source only. */
@@ -45,6 +46,8 @@ export const APP_ROUTES = {
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   LIBRARY: '/app/library',
+  /** Canonical user-facing smart-link workspace (JOV-7160). */
+  LINKS: '/app/links',
   /** Legacy Tracks path. Keep as a redirect source only — Tracks folded into Library (JOV-4846). */
   LEGACY_TRACKS: '/app/tracks',
   TASKS: '/app/tasks',

@@ -8,6 +8,7 @@ import {
   IdCard,
   Inbox,
   Library,
+  Link2,
   Lock,
   MailCheck,
   Music,
@@ -60,6 +61,16 @@ export const libraryNavItem: NavItem = {
   iconName: 'Music',
   tier: 'core',
   description: 'Browse releases, audio, video, images, and files',
+};
+
+export const linksNavItem: NavItem = {
+  name: 'Links',
+  href: APP_ROUTES.LINKS,
+  id: 'links',
+  icon: Link2,
+  iconName: 'Link2',
+  tier: 'core',
+  description: 'Jovie links: share, redirect, and measure performance',
 };
 
 export const contactsNavItem: NavItem = {
@@ -120,10 +131,10 @@ export const artistNavigation = [
 
 /**
  * Founder-approved canonical customer shell IA (DESIGN.md "App IA & Page
- * Scaffold"), realigned in JOV-4866: one ordered tuple — Inbox, Chat,
- * Library, Contacts, Calendar, Tasks — shared by desktop, mobile, and the
- * route coverage test. Presence (`/app/profiles`) is contextual and lives in
- * `artistNavigation`.
+ * Scaffold"), realigned in JOV-4866 and extended in JOV-7160: one ordered
+ * tuple — Inbox, Chat, Library, Links, Contacts, Calendar, Tasks — shared by
+ * desktop, mobile, and the route coverage test. Presence (`/app/profiles`)
+ * is contextual and lives in `artistNavigation`.
  *
  * Capacity (JOV-4515): every entry here is `core` and must fit the desktop
  * primary rail. Mark new trial destinations `experimental` so they overflow
@@ -134,6 +145,7 @@ export const primaryNavigation = [
   inboxNavItem,
   chatNavItem,
   libraryNavItem,
+  linksNavItem,
   contactsNavItem,
   calendarNavItem,
   tasksNavItem,
