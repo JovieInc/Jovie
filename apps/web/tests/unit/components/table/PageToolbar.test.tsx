@@ -173,13 +173,15 @@ describe('PageToolbar buttons', () => {
         active
         role='tab'
         tabIndex={0}
+        ariaControls='releases-panel'
       />
     );
 
     const tab = screen.getByRole('tab', { name: 'Releases' });
     expect(tab).toHaveAttribute('id', 'releases-tab');
     expect(tab).toHaveAttribute('aria-selected', 'true');
-    expect(tab).toHaveAttribute('aria-pressed', 'true');
+    expect(tab).not.toHaveAttribute('aria-pressed');
+    expect(tab).toHaveAttribute('aria-controls', 'releases-panel');
     expect(tab).toHaveAttribute('tabIndex', '0');
   });
 

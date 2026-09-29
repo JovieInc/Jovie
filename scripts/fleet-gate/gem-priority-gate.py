@@ -595,6 +595,33 @@ def observe_lease(guard_bin: str) -> dict[str, Any]:
 
 
 def observe_production(url: str) -> dict[str, Any]:
+    def dependencies(final_url: str, value: object) -> dict[str, Any]:
+        alias_ok = (
+            isinstance(value, dict)
+            and final_url.rstrip("/") == url.rstrip("/")
+        )
+        checks = value.get("checks") if isinstance(value, dict) else None
+        database = checks.get("database") if isinstance(checks, dict) else None
+        database_ok = database.get("ok") if isinstance(database, dict) else None
+        return {
+            "vercel-alias": {
+                "status": "green" if alias_ok else "red",
+                "detail": "canonical alias resolved without redirect"
+                if alias_ok
+                else f"canonical alias redirected to {final_url}",
+            },
+            "database": {
+                "status": "green"
+                if database_ok is True
+                else "red"
+                if database_ok is False
+                else "unknown",
+                "detail": database.get("error")
+                if isinstance(database, dict) and database.get("error")
+                else "deploy health database check",
+            },
+        }
+
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured health URL
             if response.status < 200 or response.status >= 300:
@@ -615,13 +642,19 @@ def observe_production(url: str) -> dict[str, Any]:
             "status": "green" if reported_status in ("healthy", "ok") else "red",
             "url": url,
             "reportedStatus": reported_status,
+            "dependencies": dependencies(final_url, value),
         }
     except urllib.error.HTTPError as error:
+        try:
+            value = json.loads(error.read().decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            value = None
         return {
             "status": "red",
             "url": url,
             "httpStatus": error.code,
             "error": "production-observation-http-error",
+            "dependencies": dependencies(error.geturl(), value),
         }
     except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError) as error:
         return {

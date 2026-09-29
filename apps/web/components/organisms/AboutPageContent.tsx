@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import {
   FaqSection,
   MarketingContainer,
@@ -37,17 +38,31 @@ export function AboutPageContent() {
         </MarketingHero>
       </div>
 
-      <MarketingContainer width='prose' className='pb-16'>
-        <section>
-          <h2 className='text-2xl font-semibold text-primary-token'>
-            {ABOUT_COPY.origin.heading}
-          </h2>
-          <div className='mt-6 space-y-5 text-base leading-relaxed text-secondary-token'>
-            {ABOUT_COPY.origin.paragraphs.map(paragraph => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-            <p className='text-primary-token'>{ABOUT_COPY.origin.signoff}</p>
+      <MarketingContainer width='page' className='pb-16'>
+        <section className='flex flex-col items-start gap-10 lg:flex-row lg:gap-16'>
+          <div className='min-w-0 max-w-prose flex-1'>
+            <h2 className='text-2xl font-semibold text-primary-token'>
+              {ABOUT_COPY.origin.heading}
+            </h2>
+            <div className='mt-6 space-y-5 text-base leading-relaxed text-secondary-token'>
+              {ABOUT_COPY.origin.paragraphs.map(paragraph => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
           </div>
+          <figure className='w-full overflow-hidden rounded-3xl border border-subtle bg-surface-1/20 lg:w-72 lg:shrink-0'>
+            <Image
+              alt='Tim White, founder of Jovie'
+              className='aspect-square h-auto w-full object-cover'
+              height={640}
+              sizes='(min-width: 1024px) 18rem, 70vw'
+              src='/images/avatars/tim-white.jpg'
+              width={640}
+            />
+            <figcaption className='px-5 py-4 text-sm text-secondary-token'>
+              {ABOUT_COPY.origin.signoff}
+            </figcaption>
+          </figure>
         </section>
       </MarketingContainer>
 

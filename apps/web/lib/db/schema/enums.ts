@@ -292,6 +292,21 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'failed',
 ]);
 
+// Canonical customer lifecycle stages (JOV-6888). One ordered funnel shared by
+// leads, waitlist entries, creator profiles, and users.
+export const contactLifecycleStageEnum = pgEnum('contact_lifecycle_stage', [
+  'suggested',
+  'approved',
+  'outreach',
+  'profile_created',
+  'certified',
+  'signed_up',
+  'claimed',
+  'activated',
+  'paying',
+  'churned',
+]);
+
 // User status lifecycle enum - single source of truth for user state
 export const userStatusLifecycleEnum = pgEnum('user_status_lifecycle', [
   'waitlist_pending',
@@ -758,6 +773,7 @@ export const referralCommissionStatusEnum = pgEnum(
 export const connectorProviderEnum = pgEnum('connector_provider', [
   'google_calendar',
   'gmail',
+  'spotify',
   'youtube',
 ]);
 

@@ -10,7 +10,7 @@ export function HomepageClose() {
   const { close } = HOMEPAGE_LAUNCH_COPY.certified;
 
   function focusProfileSearch() {
-    document.getElementById('homepage-name-search')?.focus();
+    document.getElementById('homepage-claim-handle')?.focus();
   }
 
   return (

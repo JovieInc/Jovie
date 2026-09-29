@@ -9,9 +9,12 @@ import {
   CircleAlert,
   Cookie,
   CreditCard,
+  Eye,
+  EyeOff,
   FileCheck2,
   HelpCircle,
   Keyboard,
+  Lock,
   LogOut,
   MessageSquare,
   Monitor,
@@ -34,6 +37,11 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import {
+  isMoneyHidden,
+  lockWorkspace,
+  setMoneyHidden,
+} from '@/lib/workspace-lock/workspace-lock';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
@@ -80,6 +88,7 @@ interface BuildDropdownItemsParams {
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
   isElectronRuntime: boolean;
+  moneyHidden: boolean;
   desktopUpdate?: {
     state: DesktopUpdateViewState;
     openModal: () => void;
@@ -87,6 +96,13 @@ interface BuildDropdownItemsParams {
 }
 
 const USER_MENU_CONTENT_CLASS = 'w-80 max-w-[calc(100vw-1rem)]';
+/**
+ * JOV-7130: the shared `max-h-96` cap clipped Sign out below an inner scroll
+ * once the menu grew (Lock Workspace, Hide money). Use all the room Radix
+ * measures above the trigger so every core control stays visible.
+ */
+export const USER_MENU_MAX_HEIGHT =
+  'var(--radix-dropdown-menu-content-available-height)';
 const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
 
 const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
@@ -162,6 +178,7 @@ function buildDropdownItems({
   setIsFeedbackOpen,
   handleOpenShortcuts,
   isElectronRuntime,
+  moneyHidden,
   desktopUpdate,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const updateItems = desktopUpdate
@@ -387,6 +404,30 @@ function buildDropdownItems({
     });
   }
 
+  // Privacy controls (JOV-6829): quick workspace lock + money visibility.
+  items.push(
+    {
+      type: 'separator',
+      id: 'sep-privacy',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
+    {
+      type: 'action',
+      id: 'lock-workspace',
+      label: 'Lock Workspace',
+      icon: Lock,
+      onClick: () => lockWorkspace(),
+      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} L`,
+    },
+    {
+      type: 'action',
+      id: 'toggle-money',
+      label: moneyHidden ? 'Show money' : 'Hide money',
+      icon: moneyHidden ? Eye : EyeOff,
+      onClick: () => setMoneyHidden(!moneyHidden),
+    }
+  );
+
   // Add feedback, version info, and sign out.
   // Version is now shown to all users (moved from admin-only sidebar footer).
   items.push(
@@ -460,6 +501,7 @@ export function UserButton({
   const isElectronRuntime = useIsElectronRuntime();
   const desktopUpdate = useDesktopUpdateContext();
   const { mutateAsync: submitFeedback } = useFeedbackMutation();
+  const [moneyHidden, setMoneyHiddenState] = useState(false);
   const [iosAlphaAccess, setIOSAlphaAccess] = useState<{
     hasAccess: boolean;
     installUrl: string | null;
@@ -515,6 +557,10 @@ export function UserButton({
     window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
     setIsMenuOpen(false);
   }, [setIsMenuOpen]);
+
+  useEffect(() => {
+    setMoneyHiddenState(isMoneyHidden());
+  }, []);
 
   useEffect(() => {
     if (!isElectronRuntime || !isLoaded || !user) {
@@ -574,6 +620,7 @@ export function UserButton({
             onOpenChange={setIsMenuOpen}
             disabled
             contentClassName={USER_MENU_CONTENT_CLASS}
+            maxHeight={USER_MENU_MAX_HEIGHT}
           />
         </div>
       );
@@ -623,6 +670,7 @@ export function UserButton({
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,
     isElectronRuntime,
+    moneyHidden,
     desktopUpdate,
   });
 
@@ -704,6 +752,7 @@ export function UserButton({
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
         contentClassName={USER_MENU_CONTENT_CLASS}
+        maxHeight={USER_MENU_MAX_HEIGHT}
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

@@ -42,4 +42,18 @@ describe('TableCell', () => {
     expect(cell).toHaveClass('text-secondary-token');
     expect(cell).not.toHaveClass('text-primary-token');
   });
+
+  it('clips extra copy inside the fixed row-height budget', () => {
+    renderInTable(
+      <TableCell>
+        A deliberately long value that must not expand the table row
+      </TableCell>
+    );
+
+    const content = screen
+      .getByRole('cell')
+      .querySelector('[data-table-cell-content="stable"]');
+    expect(content).toHaveClass('h-8', 'max-h-8', 'overflow-hidden');
+    expect(content).toHaveClass('whitespace-nowrap', 'text-ellipsis');
+  });
 });

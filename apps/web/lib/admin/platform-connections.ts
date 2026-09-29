@@ -1,19 +1,16 @@
 import 'server-only';
 
-import { and, eq, isNull, lte, or } from 'drizzle-orm';
+import { and, desc, eq, isNull, lte, or } from 'drizzle-orm';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import { loadFreshSpotifyAccessToken } from '@/lib/connectors/spotify/access-token';
+import { getSpotifyAccountProfile } from '@/lib/connectors/spotify/provider';
 import { db } from '@/lib/db';
 import { adminSystemSettings } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
+import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import {
-  SPOTIFY_API_BASE,
-  SPOTIFY_DEFAULT_TIMEOUT_MS,
-} from '@/lib/spotify/env';
-import {
-  REQUIRED_PLAYLIST_SPOTIFY_SCOPES,
-  SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS,
-} from '@/lib/spotify/system-account';
+import { REQUIRED_PLAYLIST_SPOTIFY_SCOPES } from '@/lib/spotify/system-account';
 
 export const PLAYLIST_INTERVAL_UNITS = ['hours', 'days', 'weeks'] as const;
 export type PlaylistIntervalUnit = (typeof PLAYLIST_INTERVAL_UNITS)[number];
@@ -59,17 +56,6 @@ export interface SetPlaylistEngineSettingsInput {
 export interface SetPlaylistSpotifyInput {
   readonly clerkUserId: string;
   readonly updatedByUserId: string;
-}
-
-export interface SpotifyExternalAccount {
-  readonly provider?: unknown;
-  readonly approvedScopes?: unknown;
-  readonly scope?: unknown;
-  readonly scopes?: unknown;
-  readonly emailAddress?: unknown;
-  readonly username?: unknown;
-  readonly name?: unknown;
-  readonly firstName?: unknown;
 }
 
 function isIntervalUnit(value: string): value is PlaylistIntervalUnit {
@@ -191,76 +177,54 @@ async function getAppUserId(userId: string): Promise<string | null> {
   return user?.id ?? null;
 }
 
-function listScopes(value: unknown): string[] {
-  if (Array.isArray(value))
-    return value.filter((item): item is string => typeof item === 'string');
-  if (typeof value === 'string') return value.split(/[,\s]+/).filter(Boolean);
-  return [];
-}
+/**
+ * Canonical Spotify connection lookup — reads the shared `connector_accounts`
+ * primitive (provider `spotify`) instead of the retired Clerk external-account
+ * path. The same row powers artist integrations on Jovie and the company
+ * publisher on Ovie; only the owning user differs.
+ */
+export async function getSpotifyConnectorAccount(userId: string) {
+  const [account] = await db
+    .select({
+      id: connectorAccounts.id,
+      status: connectorAccounts.status,
+      scopes: connectorAccounts.scopes,
+      providerAccountId: connectorAccounts.providerAccountId,
+      updatedAt: connectorAccounts.updatedAt,
+    })
+    .from(connectorAccounts)
+    .where(
+      and(
+        eq(connectorAccounts.userId, userId),
+        eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.spotify)
+      )
+    )
+    .orderBy(desc(connectorAccounts.updatedAt))
+    .limit(1);
 
-export function readExternalAccountScopes(account: unknown): string[] {
-  if (!account || typeof account !== 'object') return [];
-  const record = account as Record<string, unknown>;
-  return [
-    ...listScopes(record.approvedScopes),
-    ...listScopes(record.scope),
-    ...listScopes(record.scopes),
-  ];
-}
-
-export function readAccountLabel(account: unknown): string | null {
-  if (!account || typeof account !== 'object') return null;
-  const record = account as Record<string, unknown>;
-  for (const key of ['emailAddress', 'username', 'name', 'firstName']) {
-    const value = record[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return null;
-}
-
-export function isSpotifyAccount(
-  account: unknown
-): account is SpotifyExternalAccount {
-  if (!account || typeof account !== 'object') return false;
-  const provider = (account as Record<string, unknown>).provider;
-  if (typeof provider !== 'string') return false;
-  return (SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS as readonly string[]).includes(
-    provider
-  );
-}
-
-async function getSpotifyExternalAccount(
-  _clerkUserId: string
-): Promise<SpotifyExternalAccount | null> {
-  return null;
-}
-
-async function getSpotifyToken(_clerkUserId: string): Promise<string> {
-  throw new Error(
-    'Spotify OAuth token is unavailable after Better Auth cutover. Reconnect Spotify with the new provider path.'
-  );
+  return account ?? null;
 }
 
 export async function validatePlaylistSpotifyAccount(
-  clerkUserId: string
+  userId: string
 ): Promise<PlaylistSpotifyStatus> {
-  const account = await getSpotifyExternalAccount(clerkUserId);
-  if (!account) {
+  const account = await getSpotifyConnectorAccount(userId);
+  if (!account || account.status === 'disabled') {
     return {
       connected: false,
       healthy: false,
       source: 'missing',
-      clerkUserId,
+      clerkUserId: userId,
       accountLabel: null,
       approvedScopes: [],
       missingScopes: [...REQUIRED_PLAYLIST_SPOTIFY_SCOPES],
       updatedAt: null,
       updatedByUserId: null,
-      error: 'Spotify is not connected to this admin account.',
+      error: 'Spotify is not connected to this account.',
     };
   }
 
-  const approvedScopes = readExternalAccountScopes(account);
+  const approvedScopes = [...account.scopes];
   const missingScopes = REQUIRED_PLAYLIST_SPOTIFY_SCOPES.filter(
     scope => !approvedScopes.includes(scope)
   );
@@ -270,36 +234,43 @@ export async function validatePlaylistSpotifyAccount(
       connected: true,
       healthy: false,
       source: 'database',
-      clerkUserId,
-      accountLabel: readAccountLabel(account),
+      clerkUserId: userId,
+      accountLabel: account.providerAccountId,
       approvedScopes,
       missingScopes,
-      updatedAt: null,
+      updatedAt: account.updatedAt,
       updatedByUserId: null,
       error: 'Spotify is connected but missing required playlist scopes.',
     };
   }
 
   try {
-    const token = await getSpotifyToken(clerkUserId);
-    const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(SPOTIFY_DEFAULT_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Spotify profile check failed with ${response.status}.`);
+    const token = await loadFreshSpotifyAccessToken(account.id);
+    if (!token) {
+      return {
+        connected: true,
+        healthy: false,
+        source: 'database',
+        clerkUserId: userId,
+        accountLabel: account.providerAccountId,
+        approvedScopes,
+        missingScopes: [],
+        updatedAt: account.updatedAt,
+        updatedByUserId: null,
+        error: 'Spotify token is unavailable. Reconnect Spotify.',
+      };
     }
+    const profile = await getSpotifyAccountProfile({ accessToken: token });
 
     return {
       connected: true,
       healthy: true,
       source: 'database',
-      clerkUserId,
-      accountLabel: readAccountLabel(account),
+      clerkUserId: userId,
+      accountLabel: profile.label,
       approvedScopes,
       missingScopes: [],
-      updatedAt: null,
+      updatedAt: account.updatedAt,
       updatedByUserId: null,
       error: null,
     };
@@ -308,18 +279,18 @@ export async function validatePlaylistSpotifyAccount(
       '[Admin Platform Connections] Spotify validation failed',
       error,
       {
-        clerkUserId,
+        clerkUserId: userId,
       }
     );
     return {
       connected: true,
       healthy: false,
       source: 'database',
-      clerkUserId,
-      accountLabel: readAccountLabel(account),
+      clerkUserId: userId,
+      accountLabel: account.providerAccountId,
       approvedScopes,
       missingScopes: [],
-      updatedAt: null,
+      updatedAt: account.updatedAt,
       updatedByUserId: null,
       error:
         error instanceof Error ? error.message : 'Spotify health check failed.',

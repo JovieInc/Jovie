@@ -592,6 +592,40 @@ describe('production marker attempt state', () => {
     });
   });
 
+  it('binds a starvation-lease marker only to a proven descendant controller head', () => {
+    const head = 'b'.repeat(40);
+    const marker = primaryMarker('completed', 'success');
+    marker.attemptRun.head_sha = head;
+    for (const attemptJob of marker.attemptJobs) attemptJob.head_sha = head;
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_marker_attempt',
+    });
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [marker], descendantHeads: [head] })
+      )
+    ).toMatchObject({ state: 'verified', controllerAttempt: 1 });
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [marker], descendantHeads: ['c'.repeat(40)] })
+      )
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_marker_attempt',
+    });
+    for (const descendantHeads of [[sha], ['not-a-sha'], 'b'.repeat(40)]) {
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({ markers: [marker], descendantHeads })
+        )
+      ).toMatchObject({ state: 'manual', reason: 'invalid_context' });
+    }
+  });
+
   it('rejects marker payload, artifact, run, and attempt mismatches', () => {
     const marker = primaryMarker('completed', 'cancelled');
     marker.payload.controllerRun = String(controllerRun + 1);

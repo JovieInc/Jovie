@@ -29,4 +29,24 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    title: 'Claim your handle',
+    handleInput: 'artisthandle',
+    isHydrated: true,
+    handleValidation: {
+      available: true,
+      checking: false,
+      error: null,
+      clientValid: true,
+      suggestions: [],
+    },
+    stateError: null,
+    isSubmitting: false,
+    isTransitioning: false,
+    ctaDisabledReason: null,
+    inputRef: { current: null },
+    onHandleChange: () => {},
+    onSubmit: () => {},
+  },
+};

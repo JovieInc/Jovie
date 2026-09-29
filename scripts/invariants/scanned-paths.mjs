@@ -33,6 +33,7 @@ import {
   ESLINT_CONFIG_PATH,
   RUNTIME_ROOTS,
 } from './latency-sensitive-execution-paths.mjs';
+import { CONTRACT_SOURCES as OVERLAY_LAYER_CONTRACT_SOURCES } from './overlay-layer-contract.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -59,6 +60,8 @@ export const INVARIANT_SCANNED_PATHS = Object.freeze(
       // JOV-INV-032 ios-web-no-scroll-jank.
       ...PUBLIC_SURFACE_ROOTS,
       SCROLL_JANK_ESLINT_CONFIG_PATH,
+      // JOV-INV-039 overlay layer order and primitive bindings.
+      ...OVERLAY_LAYER_CONTRACT_SOURCES,
       // JOV-INV-033 Done-sprint source locks.
       ...SEED_DONE_INVARIANTS.flatMap(entry => entry.files),
       // JOV-INV-038 founder design invariants (marketing/app surfaces).

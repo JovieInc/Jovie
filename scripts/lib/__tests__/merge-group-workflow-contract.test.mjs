@@ -849,8 +849,23 @@ describe('merge_group workflow contract', () => {
     );
     expect(aggregate).not.toContain('ci-pr-vercel-preview');
     expect(aggregate).not.toContain('ci-a11y');
-    expect(aggregate).not.toContain('neon-db');
+    expect(aggregate).toContain('neon-db');
+    expect(aggregate).toContain(
+      '"$RUN_NEON" == "true" && "$DATABASE_CERTIFICATION_RESULT" != "success"'
+    );
     expect(aggregate).not.toContain('deploy-staging');
+
+    const databaseCertification = getJobBlock(CI_WORKFLOW, 'neon-db');
+    expect(databaseCertification).toContain(
+      "github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')"
+    );
+    expect(databaseCertification).toMatch(
+      /continue-on-error: true[\s\S]*run test:integration[\s\S]*steps\.integration-tests\.outcome[\s\S]*steps\.migration-upgrade\.outcome/
+    );
+    expect(databaseCertification).toContain("DB_CERTIFICATION: 'true'");
+    expect(databaseCertification).toContain(
+      'Reject inert database test evidence'
+    );
 
     for (const job of [
       'ci-risk-classifier',
@@ -973,7 +988,7 @@ describe('merge_group workflow contract', () => {
       "github.event_name == 'merge_group'"
     );
     expect(aggregate).toContain(
-      'Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon.'
+      'Only risk-selected database changes provision expiring Neon; preview/A11y evidence remains explicit opt-in or post-merge.'
     );
 
     for (const jobId of ['ci-promptfoo-evals', 'ci-golden-eval-set']) {
@@ -1357,6 +1372,68 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('classifies the pull_request head diff when the merge result is tree-identical to base (JOV-6820)', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const pullRequestBranch = detectStep.slice(
+      detectStep.indexOf(
+        'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
+      )
+    );
+    const emptyCheckIdx = pullRequestBranch.indexOf(
+      'if [[ -z "${CHANGED_FILES//[$\'\\t\\r\\n\' ]/}" ]]; then'
+    );
+    // The fallback diffs merge-base(origin/<base>, PR head)..PR head.
+    const headFallbackIdx = pullRequestBranch.indexOf(
+      '"origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")'
+    );
+    expect(pullRequestBranch).toContain(
+      'CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"'
+    );
+    const hardFailIdx = pullRequestBranch.indexOf(
+      'refusing a false docs-only classification'
+    );
+    expect(headFallbackIdx).toBeGreaterThan(emptyCheckIdx);
+    expect(hardFailIdx).toBeGreaterThan(headFallbackIdx);
+    expect(pullRequestBranch).toContain(
+      'git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"'
+    );
+  });
+
+  it('keeps every run block under GitHub max expression length', () => {
+    // GitHub refuses to load a workflow when a single run: block exceeds 21000
+    // chars ("Exceeded max expression length"), which silently drops every
+    // pull_request lane for the branch.
+    const lines = CI_WORKFLOW.split('\n');
+    for (let i = 0; i < lines.length; i += 1) {
+      const start = /^(\s*)run: \|/.exec(lines[i]);
+      if (!start) continue;
+      const indent = start[1].length;
+      const block = [];
+      let j = i + 1;
+      while (
+        j < lines.length &&
+        (/^\s*$/.test(lines[j]) || /^(\s*)/.exec(lines[j])[1].length > indent)
+      ) {
+        block.push(lines[j]);
+        j += 1;
+      }
+      const base = Math.min(
+        ...block.filter(l => l.trim()).map(l => /^(\s*)/.exec(l)[1].length)
+      );
+      const length = block.reduce(
+        (n, l) => n + Math.max(l.length - base, 0) + 1,
+        0
+      );
+      expect(
+        length,
+        `run block starting at ci.yml:${i + 1} exceeds GitHub limit`
+      ).toBeLessThanOrEqual(21000);
+    }
+  });
+
   it('materializes an empty path artifact for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(
@@ -1477,7 +1554,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
     expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
     expect(pathChanges).toContain(
-      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+      'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
     );
     expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(pathChanges).not.toContain(
@@ -1854,6 +1931,20 @@ ${selectedGateScript}`,
     expect(envLines(build).length).toBeGreaterThan(0);
     expect(envLines(build)).toEqual(envLines(ciBuild));
 
+    // The homepage visual compare restores the same entry, so it builds with
+    // the same NEXT_* env and task hash. NEXT_DISABLE_TOOLBAR is the one extra:
+    // turbo does not hash it and the homepage baselines render without the
+    // cookie banner it disables. No DATABASE_URL/VERCEL_ENV pass-through.
+    const visualBuild = stepIn(
+      getJobBlock(CI_WORKFLOW, 'ci-visual-snapshot-compare'),
+      'Build homepage for rendered snapshot compare'
+    );
+    expect(envLines(visualBuild)).toEqual([
+      ...envLines(build),
+      "          NEXT_DISABLE_TOOLBAR: '1'",
+    ]);
+    expect(visualBuild).not.toMatch(/^ {10}(DATABASE_URL|VERCEL_ENV):/m);
+
     // Size/symlink guard and a single trusted-main save of the primary key.
     const measure = stepIn(
       warm,
@@ -2187,7 +2278,7 @@ ${selectedGateScript}`,
     expect(coalesce).not.toContain('secrets: inherit');
   });
 
-  it('keeps merge groups out of manual evidence and deployment jobs', () => {
+  it('keeps merge groups out of non-database manual evidence and deployment jobs', () => {
     expect(getJobBlock(CI_WORKFLOW, 'neon-db')).not.toContain(
       "github.event_name == 'push'"
     );

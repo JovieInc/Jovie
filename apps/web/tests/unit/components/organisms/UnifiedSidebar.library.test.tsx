@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
@@ -69,20 +69,12 @@ vi.mock('@/components/organisms/user-button', () => ({
   },
 }));
 
-vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
-  SidebarUpgradeBanner: () => <div data-testid='sidebar-upgrade-banner' />,
-}));
-
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   UpdateAvailablePill: () => (
     <button type='button' data-testid='update-available-pill'>
       Update
     </button>
   ),
-}));
-
-vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
-  SidebarInstallBanner: () => <div data-testid='sidebar-install-banner' />,
 }));
 
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
@@ -363,7 +355,9 @@ describe('UnifiedSidebar library route', () => {
       section: 'dashboard',
     });
 
-    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -410,7 +404,9 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Switch Workspace' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie' })
+    ).toBeInTheDocument();
   });
 
   it('shows OV as the active admin workspace without changing header height', () => {
@@ -462,9 +458,9 @@ describe('UnifiedSidebar library route', () => {
     ).toBeInTheDocument();
   });
 
-  it('marks only the exact Ops destination current', () => {
+  it('marks only the exact Operations destination current', () => {
     renderUnifiedSidebar({
-      pathname: APP_ROUTES.ADMIN_OPS,
+      pathname: APP_ROUTES.ADMIN_OPERATIONS,
       section: 'ov',
     });
 
@@ -474,12 +470,14 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(operatorNavigation).getByRole('link', { name: 'Chat' })
     ).not.toHaveAttribute('aria-current');
-    expect(
-      within(operatorNavigation).getByRole('link', { name: 'Ops' })
-    ).toHaveAttribute('aria-current', 'page');
+    const operationsLink = within(operatorNavigation).getByRole('link', {
+      name: 'Operations',
+    });
+    expect(operationsLink).toHaveAttribute('href', APP_ROUTES.ADMIN_OPERATIONS);
     expect(
       operatorNavigation.querySelectorAll('[aria-current="page"]')
     ).toHaveLength(1);
+    expect(operationsLink).toHaveAttribute('aria-current', 'page');
   });
 
   it('keeps Jovie-mode admin routes on the same customer navigation contract', () => {

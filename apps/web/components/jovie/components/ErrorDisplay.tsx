@@ -12,6 +12,7 @@ interface ErrorDisplayProps {
   readonly onRetry: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+  readonly presentation?: 'default' | 'operator';
 }
 
 export function ErrorDisplay({
@@ -19,6 +20,7 @@ export function ErrorDisplay({
   onRetry,
   isLoading,
   isSubmitting,
+  presentation = 'default',
 }: ErrorDisplayProps) {
   const ErrorIcon = chatError.type === 'network' ? WifiOff : AlertCircle;
   const [copied, setCopied] = useState(false);
@@ -53,7 +55,14 @@ export function ErrorDisplay({
     chatError.type === 'tool' || chatError.suppressComposerPause === true;
   const headline = isToolScopedFailure
     ? 'Action could not finish'
-    : 'Message paused';
+    : presentation === 'operator'
+      ? 'Summer Didn’t Finish That Reply'
+      : 'Message paused';
+  const detail =
+    presentation === 'operator' &&
+    chatError.message === 'We encountered a temporary issue. Please try again.'
+      ? 'Your briefing is still current. Retry this message or ask something else.'
+      : chatError.message;
 
   return (
     <div
@@ -71,9 +80,7 @@ export function ErrorDisplay({
             <p className='text-app font-medium leading-5 text-primary-token'>
               {headline}
             </p>
-            <p className='text-xs leading-5 text-secondary-token'>
-              {chatError.message}
-            </p>
+            <p className='text-xs leading-5 text-secondary-token'>{detail}</p>
             <p className='text-xs leading-5 text-tertiary-token'>
               {getNextStepMessage(chatError.type, chatError.errorCode)}
             </p>

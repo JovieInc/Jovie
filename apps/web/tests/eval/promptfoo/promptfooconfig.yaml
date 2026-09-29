@@ -3868,7 +3868,7 @@ tests:
     vars:
       input: "I have about 3,000 fans and my single is announced."
       target: onboarding-state-contract
-      stateCase: latest-signal-instant-access
+      stateCase: latest-signal-needs-more-info
       turnCount: 1
       signals:
         - releaseStage: pre_announce
@@ -3880,9 +3880,9 @@ tests:
         releaseStage: announced_unreleased
         audienceBand: 500_to_5k
       expectedDecision:
-        kind: instant_access
-        rationale: audience_500_to_5k_with_active_release_announced_unreleased
-        score: 70
+        kind: needs_more_info
+        rationale: insufficient_signal
+        score: 10
     assert:
       - type: javascript
         value: file://assertions.cjs:assertOnboardingStateNoSpend

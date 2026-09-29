@@ -9,7 +9,7 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({ main }: { readonly main: ReactNode }) => <>{main}</>,
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarProvider: ({ children }: { readonly children: ReactNode }) => (
     <>{children}</>
   ),
@@ -55,4 +55,16 @@ describe('onboarding sign-in placement', () => {
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
+
+  it.each(['prompt_handoff', 'spotify_handoff'] as const)(
+    'keeps the %s intro free of verification theater (JOV-3379)',
+    mode => {
+      const { container } = render(<OnboardingChatEmptyIntro mode={mode} />);
+
+      expect(container.textContent ?? '').not.toMatch(
+        /verif|browser check|human/i
+      );
+      expect(screen.getByText('Your message is on its way.')).toBeTruthy();
+    }
+  );
 });

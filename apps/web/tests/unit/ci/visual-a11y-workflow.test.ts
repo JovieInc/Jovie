@@ -323,6 +323,44 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(compareJob).not.toContain('secrets.');
   });
 
+  it('serves the homepage compare where its build-time public URLs point', () => {
+    const compareJob = getJobBlock(
+      readFileSync(workflowPath, 'utf8'),
+      'ci-visual-snapshot-compare'
+    );
+    const step = (name: string) => {
+      const start = compareJob.indexOf(`      - name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = compareJob.indexOf('\n      - ', start + 1);
+      return compareJob.slice(start, next === -1 ? undefined : next);
+    };
+    const build = step('Build homepage for rendered snapshot compare');
+    const render = step('Render and compare homepage snapshots');
+    const origin = 'http://localhost:3230';
+
+    // Warmer-identical public env keeps the restored Turbopack entry valid.
+    for (const block of [build, render]) {
+      expect(block).toContain(`NEXT_PUBLIC_APP_URL: ${origin}`);
+      expect(block).toContain(`NEXT_PUBLIC_BETTER_AUTH_URL: ${origin}`);
+      expect(block).toContain(
+        'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk'
+      );
+    }
+    expect(build).not.toMatch(/^\s+(DATABASE_URL|VERCEL_ENV):/m);
+    // The root layout reads this at prerender; the baselines have no cookie
+    // banner or dev chrome.
+    expect(build).toContain("NEXT_DISABLE_TOOLBAR: '1'");
+    expect(build).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
+
+    // Server, readiness probe, and Playwright all use that same origin.
+    expect(render).toContain(
+      'PORT=3230 node .next/standalone/apps/web/server.js'
+    );
+    expect(render).toContain(`curl -sf ${origin} `);
+    expect(render).toContain(`BASE_URL: ${origin}`);
+    expect(render).not.toContain('3100');
+  });
+
   it('scopes chat visual interactions to the active visible composer', () => {
     const chatVisualSpec = readFileSync(chatVisualSpecPath, 'utf8');
 

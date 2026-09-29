@@ -593,3 +593,45 @@
 .homepage-identity-hero__device {
   width: min(70vw, 18rem);
 }
+
+/* ── Claim hero: identity + link claim (Pen STAGING Cyuz2 / xm2iz, 2026-09-28).
+   The rules above for .homepage-identity-hero* are retired with the old hero
+   and removed in the follow-up cleanup PR. ─────────────────────────────── */
+
+/* This hero's split shell breaks into two columns at md (768), a whole
+   breakpoint earlier than the shared marketing H1 ramp expects (that ramp
+   steps up to its medium size at the same 768 boundary, sized for a
+   full-width single column). In the half-width copy column here, "Be
+   understood." doesn't fit on one line at the medium size, wraps to a
+   third line, and the shared two-line clamp truncates it to "Be...". Hold
+   the headline at its mobile size through the medium window instead — the
+   same size step the shared ramp itself uses below 768, so this isn't a
+   new size, just this hero keeping it one window longer. The 1280+ step
+   (a wide-enough column again) is untouched (Pen x4j9f, 768 split). This
+   file stays outside the deprecated --linear-* namespace (see the
+   "tokenized" test below), so the value is written out rather than
+   aliased to that ramp's own token. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .homepage-claim-hero .marketing-h1-linear {
+    font-size: 2.375rem;
+  }
+}
+
+.homepage-claim-hero .product-claim-card__status {
+  font-size: var(--text-2xs, 0.6875rem);
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.homepage-claim-hero .product-claim-card__path {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 4.6vw, 3.25rem);
+  font-weight: 510;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+.homepage-claim-hero .product-claim-card__handle-input::placeholder {
+  color: var(--color-text-tertiary-token);
+}

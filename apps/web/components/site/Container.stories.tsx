@@ -29,6 +29,7 @@ const SIZE_LABELS = {
 } as const;
 
 export const Default: Story = {
+  args: { children: null },
   render: () => (
     <div className='bg-base py-8 text-primary-token'>
       <Container>
@@ -44,6 +45,7 @@ export const Default: Story = {
 };
 
 export const SizeMatrix: Story = {
+  args: { children: null },
   render: () => (
     <div className='space-y-4 bg-base py-8 text-primary-token'>
       {(Object.keys(SIZE_LABELS) as Array<keyof typeof SIZE_LABELS>).map(

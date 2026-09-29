@@ -1855,7 +1855,7 @@ describe('automation-verify affected scope', () => {
       plan.selectedTests.filter(file =>
         file.startsWith('apps/web/tests/unit/home/')
       )
-    ).toHaveLength(17);
+    ).toHaveLength(15);
   });
 
   it('selects the homepage System B style guards for homepage component changes', () => {

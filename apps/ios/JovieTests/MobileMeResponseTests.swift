@@ -246,4 +246,71 @@ struct MobileMeResponseTests {
     )
     #expect(item("Card", url: "https://cdn.jov.ie/cards/local.png").stillImageURL == nil)
   }
+
+  @Test func appleWalletFlowCoversLoadingFailureRetryAndDuplicateRequests() {
+    var state = AppleWalletFlowState.available
+
+    let firstRequest = state.beginRequest()
+    #expect(firstRequest)
+    #expect(state == .loading)
+    let duplicateRequest = state.beginRequest()
+    #expect(!duplicateRequest)
+
+    state.requestFailed()
+    #expect(state == .failed)
+    let retryRequest = state.beginRequest()
+    #expect(retryRequest)
+  }
+
+  @Test func appleWalletAvailabilityKeepsServerAndDeviceFailuresTruthful() {
+    #expect(
+      AppleWalletControlAvailability(
+        serverAvailable: false,
+        deviceCanAddPasses: true
+      ) == .serverUnavailable
+    )
+    #expect(
+      AppleWalletControlAvailability(
+        serverAvailable: true,
+        deviceCanAddPasses: false
+      ) == .deviceUnsupported
+    )
+    #expect(
+      AppleWalletControlAvailability(
+        serverAvailable: true,
+        deviceCanAddPasses: true
+      ) == .available
+    )
+  }
+
+  @Test func appleWalletFlowNeverTreatsCancellationAsInstallation() {
+    var state = AppleWalletFlowState.loading
+    state.preparedPass(isInstalled: false)
+    #expect(state == .presenting)
+    let presentingRequest = state.beginRequest()
+    #expect(!presentingRequest)
+
+    state.presentationFinished(isInstalled: false)
+    #expect(state == .available)
+    let retryAfterCancel = state.beginRequest()
+    #expect(retryAfterCancel)
+  }
+
+  @Test func appleWalletFlowCoversInstalledAndUnavailableControllerPaths() {
+    var state = AppleWalletFlowState.loading
+    state.preparedPass(isInstalled: true)
+    #expect(state == .installed)
+    let installedRequest = state.beginRequest()
+    #expect(!installedRequest)
+
+    state = .loading
+    state.preparedPass(isInstalled: false, controllerAvailable: false)
+    #expect(state == .controllerUnavailable)
+    let unavailableRequest = state.beginRequest()
+    #expect(unavailableRequest)
+
+    state.preparedPass(isInstalled: false)
+    state.presentationFinished(isInstalled: true)
+    #expect(state == .installed)
+  }
 }

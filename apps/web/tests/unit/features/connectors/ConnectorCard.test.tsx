@@ -161,6 +161,19 @@ describe('ConnectorCard', () => {
     expect(detail).toHaveTextContent('Connection failed. Try again.');
   });
 
+  it('renders the Spotify social icon for the spotify provider', () => {
+    const { container } = render(
+      <ConnectorCard provider='spotify' status='connected' />
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'Spotify status: Connected' })
+    ).toBeInTheDocument();
+    const iconSlot = container.querySelector('div.mt-0\\.5');
+    expect(iconSlot?.querySelector('svg[fill="currentColor"]')).not.toBeNull();
+    expect(iconSlot?.querySelector('.lucide')).toBeNull();
+  });
+
   it('marks syncing as busy without changing the disconnect contract', () => {
     const onDisconnect = vi.fn();
     const { container } = render(

@@ -9,7 +9,6 @@ import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditor
 import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
-import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
@@ -187,7 +186,6 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
       <SignupFunnelBeacon surface='homepage' />
       {children}
-      <HomepageNoScriptContent />
     </>
   );
 }

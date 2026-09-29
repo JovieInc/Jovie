@@ -16,6 +16,6 @@ export const EnterFullscreen: Story = {};
 
 export const ExitFullscreen: Story = {
   args: {
-    action: 'exit',
+    action: 'close',
   },
 };

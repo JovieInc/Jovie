@@ -225,7 +225,7 @@ const mockArtist: Artist = {
 const mockContacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,
@@ -604,14 +604,17 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveTextContent(`jov.ie/${mockArtist.handle}`);
     // Location lives in About, not in the identity header.
     expect(within(identity).queryByText('Los Angeles')).toBeNull();
-    const listen = within(identity).getByTestId('profile-identity-listen');
-    expect(listen).toHaveClass('h-11');
-    expect(listen).toHaveAttribute('href', `/${mockArtist.handle}/listen`);
-    expect(listen.firstElementChild).toHaveClass(
-      'profile-glass-pill',
-      'profile-glass-pill--flat',
-      'h-7'
-    );
+    // Get Updates is the only identity action; songs carry their own Listen.
+    expect(
+      within(identity).queryByTestId('profile-identity-listen')
+    ).toBeNull();
+    const getUpdates = within(identity).getByRole('button', {
+      name: 'Get Updates',
+    });
+    expect(getUpdates.parentElement).toHaveClass('h-11');
+    expect(
+      getUpdates.parentElement?.querySelector('.profile-glass-pill')
+    ).toHaveClass('profile-glass-pill', 'profile-glass-pill--flat', 'h-7');
     expect(
       within(screen.getByTestId('profile-identity-social-row')).getByRole(
         'link'
@@ -619,7 +622,14 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveClass('h-11', 'w-11');
   });
 
-  it('opens Music from the identity Listen action without a page load', async () => {
+  it('opens the existing subscribe flow from the identity Get Updates action', async () => {
+    const revealNotifications = vi.fn();
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: { readonly onRegisterReveal?: (reveal: () => void) => void }) => {
+        props.onRegisterReveal?.(revealNotifications);
+        return null;
+      }
+    );
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -629,18 +639,33 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('profile-identity-listen'));
+    // The hero CTA mounts once the visitor assignment resolves; the reveal is
+    // registered at mount, so clicks afterwards hit the reveal path.
+    await waitFor(() => {
+      expect(mockProfileInlineNotificationsCTA).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Get Updates' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'listen'
-      );
+      expect(revealNotifications).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByTestId('profile-identity-listen')).toHaveAttribute(
-      'aria-current',
-      'page'
+  });
+
+  it('shows no Get Updates action when the profile cannot take fans', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        allowFanCapture={false}
+      />
     );
+
+    expect(
+      screen.queryByRole('button', { name: 'Get Updates' })
+    ).not.toBeInTheDocument();
   });
 
   it('scopes the mobile overflow contract to the active home surface slot', () => {
@@ -751,6 +776,16 @@ describe('ProfileCompactTemplate', () => {
     const drawer = await screen.findByRole('dialog', { name: 'Credits' });
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
+
+    // The desktop surface slot owns a sheet container that anchors modal
+    // drawers to the desktop shell (route DOM certification, JOV-6915).
+    const sheetContainer = document.querySelector('[data-sheet-container]');
+    expect(sheetContainer).not.toBeNull();
+    expect(
+      sheetContainer?.querySelector(
+        '[data-testid="mock-profile-desktop-surface"]'
+      )
+    ).not.toBeNull();
   });
 
   it('hides the release credits menu entry when every credit group is empty', () => {
@@ -1291,6 +1326,36 @@ describe('ProfileCompactTemplate', () => {
         })
       );
     });
+
+    pushStateSpy.mockRestore();
+  });
+
+  it('does not push a source-less URL before the source param hydrates', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    expect(window.location.search).toBe('?source=qr');
+    for (const call of pushStateSpy.mock.calls) {
+      expect(String(call[2])).toContain('source=qr');
+    }
 
     pushStateSpy.mockRestore();
   });

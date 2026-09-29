@@ -780,7 +780,7 @@ export function OnboardingChat({
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
         setVerificationRequested(true);
-        onTurnstileRequired?.('Verify you are human to send');
+        onTurnstileRequired?.('One quick check before we send');
         return;
       }
       lastAttemptedMessageRef.current = text;
@@ -931,7 +931,7 @@ export function OnboardingChat({
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
         setVerificationRequested(true);
-        onTurnstileRequired?.('Verify you are human to send');
+        onTurnstileRequired?.('One quick check before we send');
       }
       return;
     }

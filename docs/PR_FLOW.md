@@ -198,8 +198,16 @@ selecting both iOS and Mac needs two macOS jobs, leaving one reserve at two
 groups. The five self-hosted Linux runners do not provide capacity for these
 hosted product lanes.
 
+On 2026-09-25 a ruleset admin raised live `max_entries_to_build` to GitHub's
+10-group ceiling (`updated_at` 2026-09-25T22:20Z, during the production-freeze
+incident window). Source-of-record synced to the applied live value under
+JOV-6815; the live-parity check keeps accepting any lower build count so a
+rollback to the JOV-6107 bound stays green. Re-evaluate against measured
+runner saturation — ten full groups (~190 hosted jobs) exceeds both capacity
+figures above — and return live to `2` if deep queues starve required CI.
+
 Source preflight accepts integer build counts from one through the reviewed
-ceiling of two and records the actual count and any difference from the target.
+ceiling of ten and records the actual count and any difference from the target.
 This permits source-first rollout and a one-field rollback without blocking
 normal admission.
 

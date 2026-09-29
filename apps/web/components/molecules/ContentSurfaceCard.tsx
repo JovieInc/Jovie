@@ -26,9 +26,6 @@ const contentSurfaceCardVariants = cva(
   }
 );
 
-/** @deprecated Use `contentSurfaceCardVariants` instead for new code. */
-export const CONTENT_SURFACE_CARD_CLASSNAME = contentSurfaceCardVariants();
-
 export interface ContentSurfaceCardProps
   extends Omit<ComponentPropsWithoutRef<'div'>, 'children'>,
     VariantProps<typeof contentSurfaceCardVariants> {

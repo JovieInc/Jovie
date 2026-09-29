@@ -46,6 +46,7 @@ import {
   createContext,
   type MouseEvent,
   memo,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useCallback,
   useContext,
@@ -74,7 +75,7 @@ import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-sh
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
-import { EntityHeaderCard } from '@/components/molecules/drawer';
+import { EntityHeader } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
@@ -735,6 +736,30 @@ function LibraryStageTabs({
   readonly stage: (typeof STAGE_TABS)[number];
   readonly onStage: (stage: (typeof STAGE_TABS)[number]) => void;
 }) {
+  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const tabs = Array.from(
+      event.currentTarget
+        .closest('[role="tablist"]')
+        ?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []
+    );
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    const nextIndex =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : event.key === 'ArrowRight'
+            ? (currentIndex + 1) % tabs.length
+            : event.key === 'ArrowLeft'
+              ? (currentIndex - 1 + tabs.length) % tabs.length
+              : -1;
+    const nextTab = tabs[nextIndex];
+    if (!nextTab) return;
+    event.preventDefault();
+    nextTab.focus();
+    nextTab.click();
+  };
+
   return (
     <div
       role='tablist'
@@ -750,6 +775,8 @@ function LibraryStageTabs({
           active={stage === tab}
           role='tab'
           tabIndex={stage === tab ? 0 : -1}
+          ariaControls='library-catalog-panel'
+          onKeyDown={handleTabKeyDown}
           onClick={() => onStage(tab)}
           className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
         />
@@ -1464,28 +1491,6 @@ function LibraryToolbar({
             />
           ) : null}
           <ViewToggle view={view} onView={onView} />
-          {onImportYouTube ? (
-            <Button
-              type='button'
-              size='sm'
-              variant='secondary'
-              disabled={isImportingYouTube || youtubeImportDisabled}
-              onClick={onImportYouTube}
-              data-youtube-connected={youtubeConnected ? 'true' : 'false'}
-              className='shrink-0'
-            >
-              {isImportingYouTube
-                ? 'Importing...'
-                : youtubeConnected
-                  ? 'Import YouTube'
-                  : 'Connect YouTube'}
-            </Button>
-          ) : null}
-          <LibraryFirstAction
-            canSyncSpotify={canSyncSpotify}
-            isSyncing={isSyncingSpotify}
-            onSyncSpotify={onSyncSpotify}
-          />
         </>
       }
     />
@@ -2238,8 +2243,8 @@ function AssetDrawer({
       tabsAriaLabel='Inspector tabs'
       objectHeader={
         current ? (
-          <EntityHeaderCard
-            image={
+          <EntityHeader
+            thumbnail={
               <div className='h-12 w-12 shrink-0 overflow-hidden'>
                 <LibraryMediaThumbnail asset={current} size='drawer' />
               </div>
@@ -3360,6 +3365,9 @@ export function LibrarySurface({
     >
       <NavigationDestinationReady destination='library' />
       <div
+        id='library-catalog-panel'
+        role='tabpanel'
+        aria-labelledby={`library-stage-${stage}-tab`}
         data-testid='library-content-frame'
         className='flex h-full min-h-0 flex-1 overflow-hidden'
       >

@@ -45,7 +45,7 @@
 - `text-aware-contrast` — Every text and control over imagery, including header Log in and the primary CTA, passes contrast in the rendered composition; the art direction reserves that contrast instead of a post-hoc overlay.
 - `product-page-shows-product` — Every product page demonstrates the real product UI, callouts never overlap unintentionally, and no section below the hero ships as unstyled text.
 - `one-hero-per-story` — A page has one hero; adjacent sections never restate the same introduction.
-- `virtual-model-passport` — A virtual model ID is a defined person, not a prompt. Its passport fixes height, proportions, body type, hair, eyes, facial geometry and identifying traits; styling and shoot layers vary but identity never drifts; comp cards show headshot, three-quarter, full-body front and profile before campaign renders; models never name or resemble real people.
+- `virtual-model-passport` — A marketing character ID is a defined person, not a prompt. Its passport fixes height, proportions, body type, hair, eyes, facial geometry and identifying traits. Casting boards use neutral comp-card framing and reject street or editorial selection; full-body views never crop heads. Selection passes premium aspirational quality and ICP resonance independently, then checks mouth, face, hair, build and presence for sibling duplication. An approved persona brief precedes generation. Character, wardrobe, environment, props, activity, camera, light, shadow and reflections form one physically coherent, aspirational commercial world; realistic never means average. Group scenes prioritize ICP fit and non-sensitive individuality without demographic tokenism or repeated high-signal styling. Models never name or resemble real people.
 
 ## Canonical Tailwind Utilities
 
@@ -58,7 +58,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (273 contract tokens; 533 total in CSS)
+## Design Tokens (275 contract tokens; 535 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -211,6 +211,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-audio-compact-height`: 64px
 - `--app-shell-border`: rgba(0, 0, 0, 0.05)
 - `--app-shell-card-shadow`: none
+- `--app-shell-content-inset`: var(--app-shell-gap)
 - `--app-shell-content-max-form`: 50rem
 - `--app-shell-content-max-reading`: 56rem
 - `--app-shell-content-max-wide`: 84rem
@@ -229,6 +230,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-radius`: 12px
 - `--app-shell-radius-item`: 8px
 - `--app-shell-radius-menu`: 8px
+- `--app-shell-radius-nested`: calc( var(--app-shell-radius) - var(--app-shell-gap) )
 - `--app-shell-shadow`: 0 14px 30px rgba(0, 0, 0, 0.045)
 - `--app-shell-sidebar-accent-active-rgb`: 236 238 241
 - `--app-shell-sidebar-accent-rgb`: 242 243 245
@@ -279,15 +281,15 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 ### Typography Scale
 
 - `--text-2xl`: 1.5rem
-- `--text-2xs`: 0.6875rem
-- `--text-3xl`: 1.875rem
+- `--text-2xs`: 0.75rem
+- `--text-3xl`: 2rem
 - `--text-3xs`: 0.625rem
-- `--text-4xl`: 2.25rem
+- `--text-4xl`: 2.5rem
 - `--text-5xl`: 3rem
-- `--text-app`: 0.8125rem
+- `--text-app`: 0.75rem
 - `--text-base`: 1rem
-- `--text-lg`: 1.125rem
-- `--text-mid`: 0.9375rem
+- `--text-lg`: 1rem
+- `--text-mid`: 0.875rem
 - `--text-sm`: 0.875rem
 - `--text-xl`: 1.25rem
 - `--text-xs`: 0.75rem
@@ -381,7 +383,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--ease-subtle`: var(--ds-motion-subtle-easing)
 - `--page-pad`: clamp(16px, 4vw, 32px)
 
-## Shared UI Components (38 atom primitives)
+## Shared UI Components (39 atom primitives)
 
 Import from `@jovie/ui` — do not recreate local atom copies.
 
@@ -419,6 +421,7 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 - **Skeleton** — `packages/ui/atoms/skeleton.tsx`
 - **Spinner** — `packages/ui/atoms/spinner.tsx`
 - **StackableBadgeGroup** — `packages/ui/atoms/stackable-badge-group.tsx`
+- **StatusGlyph** — `packages/ui/atoms/status-glyph.tsx`
 - **Switch** — `packages/ui/atoms/switch.tsx`
 - **Textarea** — `packages/ui/atoms/textarea.tsx`
 - **Tooltip** — `packages/ui/atoms/tooltip.tsx`

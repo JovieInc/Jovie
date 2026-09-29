@@ -52,6 +52,23 @@ const operationalTaskSchema = z.object({
   retryAt: z.string().nullable(),
   sourceRevision: z.string().max(128).nullable(),
   updatedAt: z.string().nullable(),
+  pullRequest: z
+    .object({
+      number: z.number().int().positive(),
+      url: z.string().url().startsWith('https://').nullable(),
+      branch: z.string().max(160).nullable(),
+      agent: z.enum(['devin', 'codex']).nullable(),
+      isDraft: z.boolean(),
+      checks: z.object({
+        rollup: z.enum(['success', 'failure', 'pending', 'unknown']),
+        failing: z.array(z.string().max(120)).max(20),
+      }),
+      queuePosition: z.number().int().positive().nullable(),
+      queueState: z.string().max(32).nullable(),
+      createdAt: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 const operationalTaskFeedSchema = z.object({

@@ -25,6 +25,16 @@ const noDirectStripeClientRule = require('./eslint-rules/no-direct-stripe-client
 const { plugin: shadcn } = require('@shadcn/lint');
 const shadcnNoRestyleBaseline = require('./tests/unit/design-system/shadcn-no-restyle.baseline.json');
 const shadcnNoRestyleOptions = require('./eslint-rules/shadcn-no-restyle.options.json');
+const retiredDesignSystemModules = require('./data/designSystem/retired-modules.json');
+
+// Retired DS forks/shims (CI gate: tests/unit/design-system/retired-modules.test.ts).
+const retiredDesignSystemImportPaths =
+  retiredDesignSystemModules.modules.flatMap(entry =>
+    entry.specifiers.map(name => ({
+      name,
+      message: `Retired design-system module. Use ${entry.replacement} instead. ${entry.reason}`,
+    }))
+  );
 
 const shadcnNoRestyleBaselineFiles = Object.keys(
   shadcnNoRestyleBaseline.files
@@ -116,6 +126,7 @@ const baseConfig = {
             message:
               "Use DropdownMenu components from '@jovie/ui' instead of local atoms.",
           },
+          ...retiredDesignSystemImportPaths,
           // Block barrel imports (index.ts) for better build performance
           {
             name: '@/components/atoms',

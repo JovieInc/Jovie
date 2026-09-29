@@ -15,6 +15,7 @@ import {
 } from './harness-contract.mjs';
 import { validateIosWebNoScrollJank } from './ios-web-no-scroll-jank.mjs';
 import { validateLatencySensitiveExecution } from './latency-sensitive-execution.mjs';
+import { validateOverlayLayerContract } from './overlay-layer-contract.mjs';
 import { validatePerformanceFactory } from './performance-factory.mjs';
 import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
 import { validateQualityRatchet } from './quality-ratchet.mjs';
@@ -36,6 +37,9 @@ import {
 // to its exact revision and reports uncovered objects and missing layers.
 // JOV-INV-038 is composed here so every invariant run checks the founder
 // design invariants against the deterministic marketing/app surface gates.
+// JOV-INV-039 is composed here so every invariant run checks the overlay
+// layer order and primitive bindings. Its raw z-index ratchet runs in the
+// web lane (pnpm design:overlay-layers:check) because it walks all web source.
 
 import {
   readInvariantRegistry,
@@ -75,6 +79,9 @@ const assuranceErrors = validateAssuranceMatrixPolicy(registry);
 const deliveryModelErrors = validateDeliveryModelPolicy(registry);
 const sonarRepairErrors = validateSonarRepairContract(registry);
 const designSurfaceErrors = validateDesignSurfaces(undefined, { registry });
+const overlayLayerErrors = validateOverlayLayerContract(undefined, {
+  registry,
+});
 // JOV-6475 composes the writing-surface coverage registry the same way: it
 // validates that every named delivery surface maps to a contract and owner.
 const writingErrors = validateWritingSurfaces(readWritingSurfacesRegistry());
@@ -92,6 +99,7 @@ const errors = [
   ...deliveryModelErrors.map(error => `delivery-model: ${error}`),
   ...sonarRepairErrors.map(error => `sonar-repair: ${error}`),
   ...designSurfaceErrors.map(error => `design-surfaces: ${error}`),
+  ...overlayLayerErrors.map(error => `overlay-layer-contract: ${error}`),
   ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
 

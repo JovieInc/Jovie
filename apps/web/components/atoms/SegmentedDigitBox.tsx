@@ -63,7 +63,7 @@ export function SegmentedDigitBox({
           ? 'border-(--profile-pearl-border) bg-(--profile-pearl-bg-hover) ring-2 ring-[rgb(var(--focus-ring))]/18 shadow-[0_14px_30px_rgba(15,17,24,0.12)]'
           : 'hover:bg-(--profile-pearl-bg-hover)',
         error &&
-          'border-red-500/55 bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,rgba(127,29,29,0.12))] ring-2 ring-red-500/14',
+          'border-error/55 bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,rgba(127,29,29,0.12))] ring-2 ring-error/14',
         disabled && 'opacity-50 cursor-not-allowed',
         'active:bg-(--profile-pearl-bg-hover)'
       )}

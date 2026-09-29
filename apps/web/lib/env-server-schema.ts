@@ -46,6 +46,7 @@ export const ServerEnvSchema = z.object({
   NEXT_PUBLIC_BUILD_SHA: z.string().optional(),
   NEXT_PUBLIC_SENTRY_RELEASE: z.string().optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+  VERCEL_DEPLOYMENT_ID: z.string().optional(),
   VERCEL_DEPLOYMENT_TIME: z.string().optional(),
   VERCEL_URL: z
     .string()
@@ -376,6 +377,7 @@ export const ServerEnvSchema = z.object({
   GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Base URL for the YouTube OAuth redirect URI, e.g. https://jov.ie/api/connectors/youtube */
   YOUTUBE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
+  SPOTIFY_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
   GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
   /** Days of Gmail history to scan for booking signals (default: 30) */
@@ -483,6 +485,7 @@ export const ENV_KEYS = [
   'NEXT_PUBLIC_BUILD_SHA',
   'NEXT_PUBLIC_SENTRY_RELEASE',
   'VERCEL_GIT_COMMIT_SHA',
+  'VERCEL_DEPLOYMENT_ID',
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',
   'VERCEL_BRANCH_URL',
@@ -685,6 +688,7 @@ export const ENV_KEYS = [
   'GOOGLE_OAUTH_CLIENT_SECRET',
   'GOOGLE_OAUTH_REDIRECT_URI_BASE',
   'YOUTUBE_OAUTH_REDIRECT_URI_BASE',
+  'SPOTIFY_OAUTH_REDIRECT_URI_BASE',
   'GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS',
   'GMAIL_HISTORY_WINDOW_DAYS',
   'AI_CONNECTORS_DAILY_TOKEN_BUDGET',

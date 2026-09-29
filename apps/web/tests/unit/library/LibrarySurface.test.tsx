@@ -317,6 +317,32 @@ describe('LibrarySurface', () => {
     expect(onImportYouTube).toHaveBeenCalledOnce();
   });
 
+  it('keeps provider actions under the single Add menu', async () => {
+    const user = userEvent.setup();
+
+    renderLibrary([buildAsset()], {
+      canSyncSpotify: true,
+      onImportYouTube: vi.fn(),
+      youtubeConnected: true,
+    });
+
+    expect(
+      screen.queryByRole('button', { name: 'Import YouTube' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Sync from Spotify' })
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(
+      screen.getByRole('menuitem', { name: 'Import YouTube' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Sync from Spotify' })
+    ).toBeInTheDocument();
+  });
+
   const baseMatchMedia = window.matchMedia;
   const baseScrollYDescriptor = Object.getOwnPropertyDescriptor(
     globalThis,
@@ -1711,6 +1737,22 @@ describe('LibrarySurface', () => {
 
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+  });
+
+  it('moves focus and selection through the lifecycle tabs with the keyboard', () => {
+    renderLibrary([buildAsset()]);
+
+    const allTab = screen.getByRole('tab', { name: 'All' });
+    const ideasTab = screen.getByRole('tab', { name: 'Ideas' });
+    const panel = screen.getByRole('tabpanel');
+
+    allTab.focus();
+    fireEvent.keyDown(allTab, { key: 'ArrowRight' });
+
+    expect(ideasTab).toHaveFocus();
+    expect(ideasTab).toHaveAttribute('aria-selected', 'true');
+    expect(ideasTab).not.toHaveAttribute('aria-pressed');
+    expect(panel).toHaveAttribute('aria-labelledby', ideasTab.id);
   });
 
   it('surfaces quick-apply filter suggestions next to the filter button, hidden while the filter dropdown is open', () => {

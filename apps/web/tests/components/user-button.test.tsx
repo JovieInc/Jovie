@@ -258,6 +258,22 @@ describe('UserButton billing actions', () => {
     expect(await screen.findByText('Settings')).toBeVisible();
   });
 
+  it('keeps Sign out reachable: the account menu is never capped below the viewport (JOV-7130)', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
+      isLoading: false,
+      error: null,
+    } as any);
+    render(<UserButton calm showUserInfo profileHref='/adele' />);
+    await userEvent.click(screen.getByText('Adele Adkins'));
+    const signOut = await screen.findByRole('menuitem', { name: /sign out/i });
+    const menu = signOut.closest('[role="menu"]') as HTMLElement;
+    // The shared max-h-96 cap hid Sign out under an inner scroll once the menu grew.
+    expect(menu.style.maxHeight).toBe(
+      'var(--radix-dropdown-menu-content-available-height)'
+    );
+  });
+
   it('shows web build diagnostics in the account menu', async () => {
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.9.1');
     vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abc1234');
@@ -914,7 +930,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
 
     const separators = screen.getAllByRole('separator');
-    expect(separators).toHaveLength(4);
+    expect(separators).toHaveLength(5);
     for (const separator of separators) {
       expect(separator).toHaveClass('h-2', 'border-0');
     }

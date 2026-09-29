@@ -104,6 +104,76 @@ describe('ToolPartsRenderer library opportunities', () => {
   });
 });
 
+describe('ToolPartsRenderer ops data cards', () => {
+  it('renders a summer.ops-card.v1 payload as an ops data card', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          {
+            type: 'dynamic-tool',
+            toolName: 'summer_ops_snapshot',
+            toolCallId: 'tool-ops-card',
+            state: 'output-available',
+            input: {},
+            output: {
+              success: true,
+              summary: 'Shipping read complete.',
+              card: {
+                schema: 'summer.ops-card.v1',
+                kind: 'shipping',
+                title: 'Shipping lanes',
+                state: 'fresh',
+                observedAt: '2026-09-27T09:00:00.000Z',
+                source: 'ubuntu-operational-truth',
+                facts: [{ label: 'Merge queue', value: '3' }],
+                series: {
+                  label: 'Live counts',
+                  points: [{ label: 'Queued', value: 3 }],
+                },
+              },
+            },
+          },
+        ]}
+      />
+    );
+
+    const card = screen.getByTestId('chat-ops-data-card');
+    expect(card).toHaveAttribute('data-card-kind', 'shipping');
+    expect(screen.getByText('Shipping lanes')).toBeInTheDocument();
+    expect(screen.getByText('Shipping read complete.')).toBeInTheDocument();
+    expect(screen.getByText('Merge queue')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-ops-data-card-chart')).toHaveTextContent(
+      'Queued'
+    );
+  });
+
+  it('falls back to a status row when the ops card payload is malformed', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          {
+            type: 'dynamic-tool',
+            toolName: 'summer_ops_snapshot',
+            toolCallId: 'tool-ops-card-bad',
+            state: 'output-available',
+            input: {},
+            output: {
+              success: true,
+              summary: 'Shipping read complete.',
+              card: { schema: 'summer.ops-card.v1', kind: 'shipping' },
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.queryByTestId('chat-ops-data-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tool-status-row')).toBeInTheDocument();
+  });
+});
+
 describe('ToolPartsRenderer locked tool output', () => {
   it('renders the upgrade state through the client-safe lock contract', () => {
     render(

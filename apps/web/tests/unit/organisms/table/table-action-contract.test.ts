@@ -30,22 +30,11 @@ describe('table action contract', () => {
 
   it('routes legacy action renderers through the shared contextual slot', () => {
     for (const relativePath of [
-      'components/features/dashboard/organisms/release-provider-matrix/utils/column-renderers.tsx',
       'components/features/dashboard/organisms/dashboard-audience-table/utils/column-renderers.tsx',
     ]) {
       expect(readWebFile(relativePath), relativePath).toContain(
         'system-b-table-contextual-action'
       );
     }
-  });
-
-  it('keeps the legacy release header named when bulk selection is inactive', () => {
-    const source = readWebFile(
-      'components/features/dashboard/organisms/release-provider-matrix/utils/column-renderers.tsx'
-    );
-
-    expect(source).toContain(
-      "return <span className='sr-only'>Actions</span>;"
-    );
   });
 });

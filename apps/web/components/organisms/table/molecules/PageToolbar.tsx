@@ -166,9 +166,11 @@ interface PageToolbarTabButtonProps {
   readonly icon?: ReactNode;
   readonly active?: boolean;
   readonly onClick?: () => void;
+  readonly onKeyDown?: ComponentProps<typeof Button>['onKeyDown'];
   readonly className?: string;
   readonly ariaPressed?: boolean;
-  readonly role?: string;
+  readonly ariaControls?: string;
+  readonly role?: ComponentProps<typeof Button>['role'];
   readonly tabIndex?: number;
 }
 
@@ -178,8 +180,10 @@ export function PageToolbarTabButton({
   icon,
   active = false,
   onClick,
+  onKeyDown,
   className,
   ariaPressed,
+  ariaControls,
   role,
   tabIndex,
 }: PageToolbarTabButtonProps) {
@@ -192,12 +196,14 @@ export function PageToolbarTabButton({
       role={role}
       tabIndex={tabIndex}
       onClick={onClick}
+      onKeyDown={onKeyDown}
       className={cn(
         PAGE_TOOLBAR_TAB_BUTTON_CLASS,
         active && PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
         className
       )}
-      aria-pressed={ariaPressed ?? active}
+      aria-controls={ariaControls}
+      aria-pressed={role === 'tab' ? undefined : (ariaPressed ?? active)}
       aria-selected={role === 'tab' ? active : undefined}
     >
       {icon}
