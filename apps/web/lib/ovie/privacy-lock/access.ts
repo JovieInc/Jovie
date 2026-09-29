@@ -49,13 +49,15 @@ export async function getOvieOperatorEntitlements(options?: {
   purpose?: 'read';
 }) {
   const auth = await getFreshAuth();
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
-  if (!auth.userId || !auth.sessionId || !(await isAdmin(auth.userId)))
+  if (!auth.userId || !auth.sessionId || !(await isAdmin(auth.userId))) {
+    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
     return { ...entitlements, isAdmin: false };
+  }
   await assertOviePrivacyUnlocked({
     userId: auth.userId,
     sessionId: auth.sessionId,
   });
+  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
   return {
     ...entitlements,
     isAdmin: options?.purpose === 'read' ? true : entitlements.isAdmin,

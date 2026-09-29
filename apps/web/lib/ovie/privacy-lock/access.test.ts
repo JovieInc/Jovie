@@ -86,6 +86,8 @@ describe('Ovie optional privacy and independent action authorization', () => {
     expect(
       (await getOvieOperatorEntitlements({ purpose: 'read' })).isAdmin
     ).toBe(false);
+    expect(m.ent).toHaveBeenCalledWith({ session: 'fresh' });
+    expect(m.privacy).not.toHaveBeenCalled();
   });
   it('read scope respects locked privacy', async () => {
     m.privacy.mockRejectedValue(
@@ -94,5 +96,25 @@ describe('Ovie optional privacy and independent action authorization', () => {
     await expect(
       getOvieOperatorEntitlements({ purpose: 'read' })
     ).rejects.toMatchObject({ code: 'PRIVACY_UNLOCK_REQUIRED' });
+    expect(m.ent).not.toHaveBeenCalled();
+  });
+  it('checks admin privacy before loading private entitlement data', async () => {
+    await getOvieOperatorEntitlements();
+    expect(m.auth.mock.invocationCallOrder[0]).toBeLessThan(
+      m.role.mock.invocationCallOrder[0]
+    );
+    expect(m.role.mock.invocationCallOrder[0]).toBeLessThan(
+      m.privacy.mock.invocationCallOrder[0]
+    );
+    expect(m.privacy.mock.invocationCallOrder[0]).toBeLessThan(
+      m.ent.mock.invocationCallOrder[0]
+    );
+  });
+  it('does not load entitlement data when the privacy store fails', async () => {
+    m.privacy.mockRejectedValue(Error('Privacy storage unavailable'));
+    await expect(getOvieOperatorEntitlements()).rejects.toThrow(
+      'Privacy storage unavailable'
+    );
+    expect(m.ent).not.toHaveBeenCalled();
   });
 });
