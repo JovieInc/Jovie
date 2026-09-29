@@ -17,7 +17,7 @@ import {
  * are red.
  *
  * Detector (source contract, fail closed): the empty-chat column is composed
- * in `components/jovie/JovieChat.tsx` — the prompt-suggest slot, the
+ * in `components/jovie/JovieChat.tsx` — the greeting layer, the
  * starter-action slot, and the composer all dock into the single 45rem
  * content shell (`CHAT_CONTENT_SHELL_CLASSNAME`). A column layer that sets
  * its own arbitrary max-width (`max-w-[...]`) re-creates the Exhibit A
@@ -31,7 +31,7 @@ import {
 
 const COMPOSITION_ROOT = join(WEB_ROOT, 'components', 'jovie', 'JovieChat.tsx');
 const EMPTY_STATE_SLOTS = [
-  'chat-empty-state-soft-suggestions-slot',
+  'ChatEmptyStateGreeting',
   'chat-empty-state-action-card-slot',
   'chat-empty-state-viewport',
 ];
