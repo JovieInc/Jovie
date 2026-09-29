@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AskJovieWidget } from './AskJovieWidget';
 
@@ -30,6 +31,21 @@ const openWidget = () =>
 describe('AskJovieWidget', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('opens from the keyboard without sending a question or message', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch(() => Promise.resolve({}));
+    render(WIDGET);
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie about Test Artist' })
+    ).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(
+      screen.getByRole('dialog', { name: 'Ask Jovie about Test Artist' })
+    ).toBeVisible();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('opens the dialog with a greeting and suggested questions', () => {
