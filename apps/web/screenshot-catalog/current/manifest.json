@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T17:58:38.693Z",
-    "gitSha": "d4667621f799e3ec89b3c16bb05f9c927d906e07",
+    "capturedAt": "2026-09-29T23:31:03.050Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "artist-profile-hero-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T21:22:34.647Z",
-    "gitSha": "4b0439022d669bc9d6f8cd2e282a04678991bf7f",
+    "capturedAt": "2026-09-29T23:32:50.401Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T22:20:01.512Z",
-    "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
+    "capturedAt": "2026-09-29T23:33:18.200Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -192,8 +192,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T22:20:28.484Z",
-    "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
+    "capturedAt": "2026-09-29T23:33:45.154Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T22:21:19.664Z",
-    "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
+    "capturedAt": "2026-09-29T23:34:36.352Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-09-29T22:23:21.656Z",
-    "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
+    "capturedAt": "2026-09-29T23:36:39.752Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-09-29T22:23:41.780Z",
-    "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
+    "capturedAt": "2026-09-29T23:36:59.968Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T21:26:41.081Z",
-    "gitSha": "4b0439022d669bc9d6f8cd2e282a04678991bf7f",
+    "capturedAt": "2026-09-29T23:37:04.204Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-09-29T22:23:54.434Z",
-    "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
+    "capturedAt": "2026-09-29T23:37:12.911Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "settings-profile-desktop.png"
   },
   {
@@ -742,8 +742,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T22:23:59.144Z",
-    "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
+    "capturedAt": "2026-09-29T23:37:17.769Z",
+    "gitSha": "0d212e11080f11c2cf164ca858116f45fb9c048e",
     "imagePath": "settings-links-desktop.png"
   },
   {
