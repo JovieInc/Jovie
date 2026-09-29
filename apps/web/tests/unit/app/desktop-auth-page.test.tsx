@@ -12,6 +12,14 @@ const copyDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
 const closeDesktopAuthWindowMock = vi.fn().mockResolvedValue({ ok: true });
 const redeemDesktopAuthReturnCodeMock = vi.fn().mockResolvedValue({ ok: true });
 const supportsDesktopAuthReturnCodeMock = vi.fn(() => true);
+const completeDesktopPasskeySignInMock = vi
+  .fn()
+  .mockResolvedValue({ ok: true });
+const signInPasskeyMock = vi.fn().mockResolvedValue({ data: {}, error: null });
+
+vi.mock('@/lib/auth/client', () => ({
+  authClient: { signIn: { passkey: () => signInPasskeyMock() } },
+}));
 const isElectronRuntimeMock = vi.fn(() => true);
 const searchParamsState = { value: '' };
 
@@ -27,6 +35,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   redeemDesktopAuthReturnCode: (returnCode: string) =>
     redeemDesktopAuthReturnCodeMock(returnCode),
   supportsDesktopAuthReturnCode: () => supportsDesktopAuthReturnCodeMock(),
+  completeDesktopPasskeySignIn: () => completeDesktopPasskeySignInMock(),
   // JOV-3595: DesktopAuthClient clears the shell boot watchdog on mount
   useDesktopAppBootSignal: vi.fn(),
   notifyDesktopAppBooted: vi.fn(),
@@ -434,6 +443,73 @@ describe('DesktopAuthPage', () => {
     expect(
       screen.getByRole('button', { name: 'Scan With Phone' })
     ).toBeInTheDocument();
+  });
+
+  it('signs in with Touch ID in the app when this Mac enrolled', async () => {
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} touchIdHint />);
+
+    const touchId = screen.getByRole('button', {
+      name: 'Sign In With Touch ID',
+    });
+    await act(async () => {
+      fireEvent.click(touchId);
+    });
+
+    expect(signInPasskeyMock).toHaveBeenCalledTimes(1);
+    expect(completeDesktopPasskeySignInMock).toHaveBeenCalledTimes(1);
+    expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Waiting for Touch ID...'
+    );
+  });
+
+  it('falls back to the browser when Touch ID does not sign in', async () => {
+    signInPasskeyMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'NotAllowedError' },
+    });
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} touchIdHint />);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Sign In With Touch ID' })
+      );
+    });
+
+    expect(completeDesktopPasskeySignInMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Touch ID did not sign you in. Continue in the browser instead.'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Continue in Browser' })
+    ).toBeEnabled();
+  });
+
+  it('keeps the Touch ID row in code mode and hides it without the hint', async () => {
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+    const { unmount } = render(
+      <DesktopAuthClient authUrlParam={getAuthUrlParam()} touchIdHint />
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enter A Code' })
+    );
+    expect(
+      screen.getByRole('button', { name: 'Sign In With Touch ID' })
+    ).toBeInTheDocument();
+    unmount();
+
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+    expect(
+      screen.queryByRole('button', { name: 'Sign In With Touch ID' })
+    ).toBeNull();
   });
 
   it('copies the validated sign-in link and reports copy failures', async () => {

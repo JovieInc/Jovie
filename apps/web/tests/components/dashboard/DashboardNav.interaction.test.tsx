@@ -10,6 +10,7 @@ import {
   mockToastInfo,
   mockUseChatConversationsQuery,
   mockUsePathname,
+  mockUseSearchParams,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -25,9 +26,10 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
 const PRIMARY_LABELS = [
   'Inbox',
   'New Chat',
-  'Library',
-  'Contacts',
+  'Home',
   'Presence',
+  'Links',
+  'Audience',
 ] as const;
 
 describe('DashboardNav interactions', () => {
@@ -76,14 +78,14 @@ describe('DashboardNav interactions', () => {
     const user = userEvent.setup();
     renderDashboardNav({ renderFn: render });
 
-    const libraryLink = screen.getByRole('link', { name: 'Library' });
-    libraryLink.addEventListener('click', event => event.preventDefault());
-    await user.click(libraryLink);
+    const linksLink = screen.getByRole('link', { name: 'Links' });
+    linksLink.addEventListener('click', event => event.preventDefault());
+    await user.click(linksLink);
 
     expect(mockStartNavigationTelemetry).toHaveBeenCalledExactlyOnceWith({
-      itemId: 'library',
+      itemId: 'links',
       sourcePathname: APP_ROUTES.CHAT,
-      destinationHref: APP_ROUTES.LIBRARY,
+      destinationHref: APP_ROUTES.CHAT_PROFILE_PANEL,
       inputMethod: 'pointer',
       context: {
         isElectron: false,
@@ -93,16 +95,25 @@ describe('DashboardNav interactions', () => {
     });
   });
 
-  it('does not duplicate sidebar Search or removed primary destinations', () => {
+  it('keeps entity categories and retired workflows out of root navigation', () => {
     renderDashboardNav({ renderFn: render });
 
-    for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
+    for (const label of [
+      'Calendar',
+      'Contacts',
+      'Events',
+      'Library',
+      'Products',
+      'Releases',
+      'Tasks',
+      'Videos',
+    ]) {
       expect(screen.queryByRole('link', { name: label })).toBeNull();
       expect(screen.queryByRole('button', { name: label })).toBeNull();
     }
   });
 
-  it('routes Presence through the artist navigation without a duplicate avatar button', () => {
+  it('routes Presence through root navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
       overrides: {
@@ -126,13 +137,17 @@ describe('DashboardNav interactions', () => {
     expect(mockOpenPreviewPanel).not.toHaveBeenCalled();
   });
 
-  it('keeps Library active throughout a canonical release workspace', () => {
-    mockUsePathname.mockReturnValue('/app/releases/release-123/tasks');
+  it('marks Links active only inside the identity panel context', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('panel=profile'));
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Links' })).toHaveAttribute(
       'aria-current',
       'page'
+    );
+    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute(
+      'aria-current'
     );
   });
 
@@ -229,12 +244,35 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Contacts' }));
+    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Presence' }));
     expect(prefetchForRouteMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
 
     expect(prefetchForRouteMock).toHaveBeenCalledWith(
-      'contacts',
+      'presence',
+      expect.anything(),
+      'profile_123'
+    );
+  });
+
+  it('does not warm removed entity roots without an interaction', async () => {
+    vi.useFakeTimers();
+    renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(prefetchForRouteMock).not.toHaveBeenCalledWith(
+      'library',
       expect.anything(),
       'profile_123'
     );
@@ -245,12 +283,12 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({ renderFn: render });
 
-    const calendarLink = screen.getByRole('link', { name: 'Contacts' });
-    expect(calendarLink).toHaveAttribute('href', APP_ROUTES.CONTACTS);
-    await user.click(calendarLink);
+    const linksLink = screen.getByRole('link', { name: 'Links' });
+    expect(linksLink).toHaveAttribute('href', APP_ROUTES.CHAT_PROFILE_PANEL);
+    await user.click(linksLink);
 
     expect(mockToastInfo).toHaveBeenCalledWith(
-      'Contacts is not available in demo mode'
+      'Links is not available in demo mode'
     );
   });
 });

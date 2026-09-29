@@ -707,23 +707,26 @@ duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 The authenticated product has one shell and one reviewed default navigation.
 `apps/web/components/features/dashboard/dashboard-nav/config.ts` is the code
-source of truth; this table records the founder-approved six entries rendered
-by the canonical customer shell. Settings and OV operator tools are contextual
-or mutually exclusive surfaces, not additions to this primary six-item IA.
+source of truth; this table records the founder-approved root, utilities, and
+contextual model rendered by the canonical customer shell. Settings and OV operator tools are contextual
+or mutually exclusive surfaces, not additions to the four-item root IA.
 
 | Group | Item | Canonical destination | Behavior |
 |-------|------|-----------------------|----------|
-| Primary | Inbox | `/app` | Opens the opportunity and work queue |
-| Primary | Chat | `/app/chat` | Starts or resumes the conversation workspace |
-| Primary | Library | `/app/library` | Opens releases, audio, video, images, and files |
-| Primary | Contacts | `/app/contacts` | Opens the artist contact workspace |
-| Primary | Calendar | `/app/calendar` | Opens release dates, events, and calendar moments |
-| Primary | Tasks | `/app/tasks` | Opens the task workspace |
-| Contextual | Presence | `/app/presence` | Published output for the active identity, rendered in the artist group (`artistNavigation`), never the primary rail |
+| Primary | Home | `/app` | Opens the opportunity and work queue without exposing its internal entity model |
+| Primary | Presence | `/app/presence` | Monitors identity across DSPs, social networks, and public surfaces |
+| Primary | Links | `/app/chat?panel=profile` | Opens the identity context where public links and attached entity views are managed |
+| Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace |
+| Utility | Inbox | `/app` | Compact shell action for pending opportunities and runtime attention |
+| Utility | New Chat | `/app/chat` | Compact shell action that starts a conversation |
+| Contextual | Events, Products, Releases, Videos, and other entities | Existing workspace routes and entity rails | Materialize only when relevant data or an in-context action exists; never become permanent root rows by default |
 
 Any permanent IA change must update `primaryNavigation`, its exact structure
 test, this table, and the route coverage test in the same change. Desktop and
 mobile navigation derive from the same ordered item identities.
+
+One data model supports many contextual views. Users navigate by the job they
+are completing; they do not need to understand Jovie's internal entity graph.
 
 ### Five Page Types
 
@@ -756,6 +759,9 @@ shift.
   or command-palette popup.
 - Release rows and other entity rows open the right detail rail; task workflows
   that are true multi-step workspaces retain their reviewed canonical route.
+- Library, Calendar, Tasks, Releases, and other entity/workflow routes remain
+  reachable from contextual links, search, Home, or chat after root-nav
+  consolidation; removal from the root never implies route deletion.
 - Reuse the canonical `EmptyState` family. New bespoke `*EmptyState.tsx`
   components are blocked; compose an existing primitive or add a state variant.
 
@@ -763,8 +769,9 @@ shift.
 
 | Date | Decision | Operating trigger |
 |------|----------|-------------------|
+| 2026-09-29 | **EVENT: Job-level root IA.** The canonical customer root is Home, Presence, Links, Audience. Events, Products, Releases, Videos, and other entity types remain contextual views behind Links/identity and relevant workflows. | **Ship now:** keep the four-item root calm for sparse and data-rich accounts alike. **Re-evaluate when:** an entity type has sustained usage plus substantial actions or automation that form a first-class workflow. **Then:** graduate it only through an explicit IA decision with registry, route-coverage, desktop, and mobile evidence. |
 | 2026-07-22 | **EVENT: One authenticated app shell.** Header, sidebar, content frame, and right rail are one system; routes may not introduce a parallel shell. | Ship now: extend the shared shell. Re-evaluate only for a mutually exclusive security boundary that cannot share authenticated navigation. Then: document that boundary before introducing another shell. |
-| 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox and Inbox is the first canonical customer navigation entry. | Ship now: keep `/app` as Inbox. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
+| 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox; JOV-7159 later names this root destination Home while retaining the route and outcome. | Ship now: keep `/app` as Home. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
 
 ## Component Patterns
 
