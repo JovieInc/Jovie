@@ -979,6 +979,18 @@ sizes. App/UI headings (H1-H4 inside the product) stay Title Case. In JSX,
 mark intentional marketing sentence-case headlines with
 `{/* ui-casing-allow: marketing display headline */}`.
 
+**Recovery/disclosure exception (Tim, 2026-09-28):** error-recovery UI copy —
+titles, retry/dismiss/return actions, and disclosure toggles (a "Show/Hide
+details" `<summary>` or button) — uses sentence case, not the default Title
+Case for buttons and labels. This follows the shape of
+`RECOVERY_COPY` in `apps/web/components/features/feedback/recovery-contract.ts`
+("Something went wrong", "Try again", "Error details"): every consumer that
+composes or extends those labels (e.g. `` `Show ${RECOVERY_COPY.detailsLabel}` ``,
+a "Return to Jovie" fallback action) must keep the full rendered label in
+sentence case, not just the shared fragment. Mark instances the linter flags
+with `// ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)` (or
+the JSX-comment form for a text child).
+
 **Utility:** Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data.
 
 ---

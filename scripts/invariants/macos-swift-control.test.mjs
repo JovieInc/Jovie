@@ -58,6 +58,11 @@ function macosTopLevelDirs() {
         entry.name !== 'node_modules'
     )
     .map(entry => entry.name)
+    .filter(
+      name =>
+        walkFiles(join('apps/macos', name), abs => abs.endsWith('.swift'))
+          .length > 0
+    )
     .sort();
 }
 
