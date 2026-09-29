@@ -383,10 +383,9 @@ describe('serialization', () => {
 
 describe('normalizeRuleStatement', () => {
   it('ignores case, punctuation, and stopwords', () => {
-    expect(
-      normalizeRuleStatement('Elements SHOULD align to the grid!') ===
-        normalizeRuleStatement('elements align grid')
-    ).toBe(true);
+    expect(normalizeRuleStatement('Elements SHOULD align to the grid!')).toBe(
+      normalizeRuleStatement('elements align grid')
+    );
   });
 });
 

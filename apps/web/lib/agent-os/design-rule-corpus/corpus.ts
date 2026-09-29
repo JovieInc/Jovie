@@ -177,6 +177,37 @@ export interface RuleConflict {
   readonly reason: 'declared' | 'negation-overlap';
 }
 
+function hasNegation(tokens: Set<string>): boolean {
+  return [...tokens].some(t => NEGATION_TOKENS.has(t));
+}
+
+function detectNegationOverlaps(rules: DesignRule[]): RuleConflict[] {
+  const conflicts: RuleConflict[] = [];
+  for (let i = 0; i < rules.length; i += 1) {
+    const left = rules[i];
+    const leftTokens = tokenSet(left.normalizedStatement);
+    for (let j = i + 1; j < rules.length; j += 1) {
+      const right = rules[j];
+      if (
+        left.domain !== right.domain ||
+        left.hierarchyLevel !== right.hierarchyLevel
+      ) {
+        continue;
+      }
+      const rightTokens = tokenSet(right.normalizedStatement);
+      if (jaccard(leftTokens, rightTokens) < 0.5) continue;
+      if (hasNegation(leftTokens) !== hasNegation(rightTokens)) {
+        conflicts.push({
+          leftId: left.id,
+          rightId: right.id,
+          reason: 'negation-overlap',
+        });
+      }
+    }
+  }
+  return conflicts;
+}
+
 /**
  * Detects contradictions between candidates instead of silently merging
  * them: explicit conflictingRuleIds links, plus same-domain rules whose
@@ -189,7 +220,9 @@ export function detectRuleConflicts(
   const conflicts: RuleConflict[] = [];
   const seen = new Set<string>();
   const push = (conflict: RuleConflict) => {
-    const key = [conflict.leftId, conflict.rightId].sort().join('|');
+    const key = [conflict.leftId, conflict.rightId]
+      .sort((a, b) => a.localeCompare(b))
+      .join('|');
     if (!seen.has(key)) {
       seen.add(key);
       conflicts.push(conflict);
@@ -202,29 +235,8 @@ export function detectRuleConflicts(
       }
     }
   }
-  for (let i = 0; i < rules.length; i += 1) {
-    for (let j = i + 1; j < rules.length; j += 1) {
-      const left = rules[i];
-      const right = rules[j];
-      if (
-        left.domain !== right.domain ||
-        left.hierarchyLevel !== right.hierarchyLevel
-      ) {
-        continue;
-      }
-      const leftTokens = tokenSet(left.normalizedStatement);
-      const rightTokens = tokenSet(right.normalizedStatement);
-      if (jaccard(leftTokens, rightTokens) < 0.5) continue;
-      const leftNegated = [...leftTokens].some(t => NEGATION_TOKENS.has(t));
-      const rightNegated = [...rightTokens].some(t => NEGATION_TOKENS.has(t));
-      if (leftNegated !== rightNegated) {
-        push({
-          leftId: left.id,
-          rightId: right.id,
-          reason: 'negation-overlap',
-        });
-      }
-    }
+  for (const conflict of detectNegationOverlaps(rules)) {
+    push(conflict);
   }
   return conflicts;
 }
