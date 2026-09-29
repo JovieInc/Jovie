@@ -559,6 +559,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Promptfoo Evals (deterministic)',
   'CI / Golden Eval Set (deterministic)',
   'Golden Eval Set (deterministic)',
+  'CI / Database Certification (isolated Neon)',
+  'Database Certification (isolated Neon)',
   // Harness evidence jobs (must stay aggregated under PR Ready / never pin solo)
   'CI / Lighthouse (public routes manual)',
   'Lighthouse (public routes manual)',
