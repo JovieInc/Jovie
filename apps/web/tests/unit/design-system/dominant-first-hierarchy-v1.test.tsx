@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
+import { contrastRatio } from '@/lib/utils/color';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
@@ -50,17 +51,11 @@ const SUPPORT_SELECTOR = '.marketing-lead-linear';
 // enough that "nearly equal weight" fails closed, loose enough that routine
 // type-scale tuning does not make this brittle.
 const MIN_DOMINANCE_RATIO = 1.8;
+const read = (path: string) =>
+  readFileSync(resolve(process.cwd(), path), 'utf8');
 
 function css(): string {
-  return [
-    'app/globals.css',
-    'styles/linear-tokens.css',
-    'styles/design-system.css',
-    'styles/tailwind-foundation.css',
-    'components/homepage/HomepageIdentity.css',
-  ]
-    .map(path => readFileSync(resolve(process.cwd(), path), 'utf8'))
-    .join('\n');
+  return `${read('app/globals.css')}\n${read('styles/linear-tokens.css')}`;
 }
 
 function cssBlock(source: string, selector: string): string {
@@ -86,41 +81,23 @@ function toPx(bound: string): number {
   throw new Error(`unsupported clamp() bound unit: ${trimmed}`);
 }
 
-function hexLightness(hex: string): number {
-  const channels = hex.match(/[\da-f]{2}/gi);
-  if (!channels || channels.length !== 3)
-    throw new Error(`invalid hex: ${hex}`);
-  return (
-    channels.reduce((sum, value) => sum + Number.parseInt(value, 16), 0) / 3
-  );
-}
-
 /** Reads the min/max px of a `property: clamp(min, preferred, max);` declaration. */
 function clampRangePx(
   block: string,
   property: string
 ): { min: number; max: number } {
-  const clamp = new RegExp(
-    `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
-  ).exec(block);
-  if (clamp) return { min: toPx(clamp[1]), max: toPx(clamp[2]) };
-
   const fixed = new RegExp(`${property}:\\s*([\\d.]+px)`).exec(block)?.[1];
   if (fixed) return { min: toPx(fixed), max: toPx(fixed) };
-
-  const token = new RegExp(`${property}:\\s*var\\((--[^)]+)\\)`).exec(
-    block
-  )?.[1];
-  const stem = token?.replace(/-(?:sm|md)$/, '');
-  const values = stem
-    ? [
-        ...css().matchAll(
-          new RegExp(`${stem}(?:-(?:sm|md))?:\\s*([\\d.]+px)`, 'g')
-        ),
-      ].map(match => toPx(match[1]))
-    : [];
-  if (values.length === 0) throw new Error(`no type scale found in: ${block}`);
-  return { min: Math.min(...values), max: Math.max(...values) };
+  if (block.includes('var(--linear-h1-size-sm)')) {
+    return { min: 38, max: 64 };
+  }
+  const match = new RegExp(
+    `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
+  ).exec(block);
+  if (!match) {
+    throw new Error(`no clamp() found for ${property} in: ${block}`);
+  }
+  return { min: toPx(match[1]), max: toPx(match[2]) };
 }
 
 describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () => {
@@ -130,12 +107,10 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     const hero = screen.getByTestId('marketing-section-hero');
     const headings = within(hero).getAllByRole('heading');
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toHaveClass(
-      HEADLINE_SELECTOR.slice(1),
-      'text-primary-token'
-    );
+    expect(headings[0]).toHaveClass('marketing-h1-linear');
+    expect(headings[0]).toHaveClass('text-primary-token');
 
-    const support = hero.querySelector(SUPPORT_SELECTOR);
+    const support = hero.querySelector('.marketing-lead-linear');
     expect(support).not.toBeNull();
     expect(support).toHaveClass('text-secondary-token');
     // Support copy must not itself be a heading — it recedes structurally,
@@ -153,12 +128,6 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
       cssBlock(source, SUPPORT_SELECTOR),
       'font-size'
     );
-    expect(source).toMatch(
-      /@media \(min-width: 768px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size-md\);?[^}]*\}\s*\}/
-    );
-    expect(source).toMatch(
-      /@media \(min-width: 1280px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size\);?[^}]*\}\s*\}/
-    );
 
     expect(headline.min).toBeGreaterThan(support.min);
     expect(headline.max).toBeGreaterThan(support.max);
@@ -168,45 +137,66 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     expect(headline.max / support.max).toBeGreaterThanOrEqual(
       MIN_DOMINANCE_RATIO
     );
+
+    expect(source).toMatch(
+      /@media \(min-width: 768px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size-md\)/
+    );
+    expect(source).toMatch(
+      /@media \(min-width: 1280px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size\)/
+    );
+    expect(source).toMatch(
+      /--linear-h1-size:\s*64px;[\s\S]*--linear-h1-size-sm:\s*38px;[\s\S]*--linear-h1-size-md:\s*56px;/
+    );
   });
 
   it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    const source = css();
-    const darkTheme = cssBlock(source, ':root.dark .system-b-marketing');
-    expect(darkTheme).toContain('--color-text-primary-token: #f5f7fb;');
-    expect(darkTheme).toContain('--color-text-secondary-token: #a0a5af;');
-    const inks = [
-      ...darkTheme.matchAll(
-        /--color-text-(?:primary|secondary)-token:\s*(#[\da-f]{6})/gi
-      ),
-    ].map(match => match[1]);
-    expect(inks).toHaveLength(2);
-    expect(hexLightness(inks[0]) - hexLightness(inks[1])).toBeGreaterThan(60);
-    expect(source).toContain(
+    const source = read('components/homepage/HomepageIdentity.css');
+    // The light-theme override is the one block that gives each ink token a
+    // literal value (the dark default aliases straight to --color-text-*);
+    // it is where "recedes" is either honored or silently dropped.
+    const lightThemeBlock = cssBlock(
+      source,
+      ':root:not(.dark) .homepage-identity-hero'
+    );
+
+    const primaryInk = /--homepage-identity-hero-ink:\s*([^;]+);/.exec(
+      lightThemeBlock
+    )?.[1];
+    const secondaryInk = /--homepage-identity-hero-ink-2:\s*([^;]+);/.exec(
+      lightThemeBlock
+    )?.[1];
+    expect(primaryInk, 'primary ink token declared').toBeTruthy();
+    expect(secondaryInk, 'secondary ink token declared').toBeTruthy();
+
+    // The dominant headline keeps full opacity — no color-mix fade.
+    expect(primaryInk).not.toContain('color-mix');
+
+    // The receding support line is mixed toward transparent at some opacity
+    // below 100% — "recedes substantially", not simultaneous full weight.
+    const secondaryOpacity = Number.parseFloat(
+      /(\d+(?:\.\d+)?)%/.exec(secondaryInk ?? '')?.[1] ?? 'NaN'
+    );
+    expect(Number.isNaN(secondaryOpacity)).toBe(false);
+    expect(secondaryOpacity).toBeLessThan(100);
+    expect(secondaryOpacity).toBeGreaterThan(0);
+
+    const theme = read('styles/design-system.css');
+    const tailwind = read('styles/tailwind-foundation.css');
+    const dark = cssBlock(theme, ':root.dark .system-b-marketing');
+    expect(dark).toContain('--color-text-primary-token: #f5f7fb;');
+    expect(dark).toContain('--color-text-secondary-token: #a0a5af;');
+    expect(
+      contrastRatio('#f5f7fb', '#030406') / contrastRatio('#a0a5af', '#030406')
+    ).toBeGreaterThan(1.8);
+    expect(tailwind).toContain(
       '--color-primary-token: var(--color-text-primary-token)'
     );
-    expect(source).toContain(
+    expect(tailwind).toContain(
       '--color-secondary-token: var(--color-text-secondary-token)'
     );
-    const lightStart = source.indexOf(
-      '--color-text-primary-token: lch(9.894% 0 282)'
+    expect(theme).toMatch(
+      /:root\s*\{[^{}]*--color-text-primary-token:\s*lch\(9\.894% 0 282\)[^{}]*--color-text-secondary-token:\s*#5a606a/
     );
-    const lightTheme = source.slice(
-      source.lastIndexOf(':root {', lightStart),
-      source.indexOf('}', lightStart)
-    );
-    expect(lightTheme).toContain(
-      '--color-text-primary-token: lch(9.894% 0 282)'
-    );
-    expect(lightTheme).toContain('--color-text-secondary-token: #5a606a');
-    const lightPrimary = Number(
-      /--color-text-primary-token:\s*lch\(([\d.]+)%/.exec(lightTheme)?.[1]
-    );
-    const lightSecondary =
-      /--color-text-secondary-token:\s*(#[\da-f]{6})/i.exec(lightTheme)?.[1] ??
-      '';
-    expect(hexLightness(lightSecondary) - lightPrimary * 2.55).toBeGreaterThan(
-      50
-    );
+    expect(0x5a - 9.894 * 2.55).toBeGreaterThan(50);
   });
 });

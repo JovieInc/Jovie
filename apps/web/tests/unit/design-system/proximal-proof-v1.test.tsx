@@ -4,9 +4,14 @@
 // promise being made on that route, not generic proof inserted mechanically."
 //
 // Representative surface: the canonical homepage hero
-// (apps/web/components/homepage/HomepageIdentityHero.tsx). Its identity claim
-// is supported by an explicitly illustrative claimed-page preview and the
-// jov.ie/you form in the same hero, not by generic or distant proof.
+// (apps/web/components/homepage/HomepageIdentityHero.tsx). Its former doc
+// comment names the contract this evaluator supersedes: "Tim White's real
+// jov.ie/tim profile as first-party proof (JOV-6946)" rendered inside the
+// same hero section as the identity claim — not a generic testimonial dropped
+// in a separate, distant section. This renders the real component tree and
+// asserts the proof sits in the same immediate DOM container as the claim it
+// backs, and that the proof is a named, route-specific identity rather than
+// a placeholder.
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
