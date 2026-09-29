@@ -127,7 +127,8 @@ const PROFILE_MOBILE_SCREENS = [
   },
   {
     id: 'notifications',
-    path: '/testartist?mode=subscribe',
+    // Fan capture requires an owned profile; testartist is deliberately unclaimed.
+    path: `/${TEST_PROFILES.DUALIPA}?mode=subscribe`,
     rootSelector: '[data-testid="profile-compact-surface"]',
     readySelectors: [
       '[data-testid="profile-mobile-notifications-step-email"]',
@@ -1500,7 +1501,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
 
         const response = await smokeNavigate(
           flowPage,
-          '/testartist?mode=subscribe',
+          `/${TEST_PROFILES.DUALIPA}?mode=subscribe`,
           {
             timeout: 120_000,
           }
