@@ -75,11 +75,17 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
     steps:
       - name: Generate Jovie Bot token
         # GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
         # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
         # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
+        # Dependabot-triggered pull_request runs receive an empty secrets context;
+        # like fork PRs, those must skip instead of failing — the hourly triage
+        # job enables auto-merge with full secrets.
+        if: env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -93,6 +99,10 @@ jobs:
           BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::notice::No Jovie Bot token available in this event context (e.g. Dependabot-triggered runs have an empty secrets context); the hourly triage sweep will enable auto-merge."
+            exit 0
+          fi
           if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
             echo "::notice::Fork PR — GITHUB_TOKEN is read-only on pull_request events from forks; skipping auto-merge enable."
             exit 0
