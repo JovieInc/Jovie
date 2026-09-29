@@ -109,7 +109,7 @@ export interface FollowupLedgerEvent {
 const MAX_BODY_SENTENCES = 12;
 const MAX_FOLLOWUP_ATTEMPTS = 2;
 const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
+const EMAIL = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/u;
 const PRIVATE_TOKEN_HINT = /[?&](?:t|token|key|sig|signature)=/iu;
 const FABRICATED_PRESSURE =
   /\b(?:act now|limited time|last chance|only \d+ (?:spots|seats|allocations)|exclusive offer|just for you|as discussed|great catching up|per our conversation)\b/iu;
@@ -145,7 +145,7 @@ function hash(value: string): string {
 }
 
 function sentenceCount(text: string): number {
-  const matches = text.match(/[.!?]+(?:\s|$)/gu);
+  const matches = text.match(/[.!?]+(?=\s|$)/gu);
   return matches ? matches.length : 0;
 }
 
@@ -226,22 +226,11 @@ function composePayload(input: {
   };
 }
 
-/**
- * Prepares one personalized draft for the operator review queue. The result
- * is a draft only — composing it sends nothing and consumes no approval.
- */
-export function prepareInvestorFollowupDraft(input: {
-  readonly question: InvestorQuestionRecord;
-  readonly answer: CanonicalAnswer;
-  readonly claimUses: readonly { claimId: string; revisionId: string }[];
-  readonly recipient: FollowupRecipient;
-  readonly sender: FollowupSender;
-  readonly link?: FollowupLink | null;
-  /** The single relevant next step offered to the investor. */
-  readonly nextStep: string;
-  readonly now: string;
-}): FollowupEmailDraft {
-  const { question, answer, recipient, sender } = input;
+function assertFollowupParties(
+  question: InvestorQuestionRecord,
+  recipient: FollowupRecipient,
+  sender: FollowupSender
+): void {
   if (
     !question.questionId.trim() ||
     !isIso(question.askedAt) ||
@@ -264,17 +253,17 @@ export function prepareInvestorFollowupDraft(input: {
       'Follow-ups require an identified authorized sender.'
     );
   }
-  if (answer.review.state !== 'approved') {
-    throw new InvestorFollowupError(
-      'answer_not_approved',
-      'Follow-ups can only cite an approved canonical answer revision.'
-    );
-  }
+}
+
+function assertClaimRevisions(
+  answer: CanonicalAnswer,
+  claimUses: readonly { claimId: string; revisionId: string }[]
+): void {
   const currentClaims = new Map(
     answer.claims.map(claim => [claim.claimId, claim.revisionId] as const)
   );
   const seen = new Set<string>();
-  for (const use of input.claimUses) {
+  for (const use of claimUses) {
     if (seen.has(use.claimId)) {
       throw new InvestorFollowupError(
         'claim_revision_mismatch',
@@ -289,17 +278,82 @@ export function prepareInvestorFollowupDraft(input: {
       );
     }
   }
-  const link = input.link ?? null;
-  if (link) {
-    if (link.scope === 'public-article') {
-      assertPublicUrlHygiene(link.url, recipient, question);
-    } else if (!link.accessExpiresAt || !isIso(link.accessExpiresAt)) {
-      throw new InvestorFollowupError(
-        'link_invalid',
-        'Private memo links require an explicit access expiry.'
-      );
-    }
+}
+
+function assertLinkContract(
+  link: FollowupLink | null,
+  recipient: FollowupRecipient,
+  question: InvestorQuestionRecord
+): void {
+  if (!link) {
+    return;
   }
+  if (link.scope === 'public-article') {
+    assertPublicUrlHygiene(link.url, recipient, question);
+  } else if (!link.accessExpiresAt || !isIso(link.accessExpiresAt)) {
+    throw new InvestorFollowupError(
+      'link_invalid',
+      'Private memo links require an explicit access expiry.'
+    );
+  }
+}
+
+function assertPayloadContract(
+  payload: FollowupRenderedPayload,
+  answer: CanonicalAnswer
+): void {
+  if (
+    sentenceCount(payload.bodyText) > MAX_BODY_SENTENCES ||
+    !payload.bodyText.includes(answer.directAnswer.trim())
+  ) {
+    throw new InvestorFollowupError(
+      'payload_invalid',
+      'Follow-ups must directly answer the concern in a few sentences and stay useful without a click.'
+    );
+  }
+  if (FABRICATED_PRESSURE.test(payloadText(payload))) {
+    throw new InvestorFollowupError(
+      'payload_invalid',
+      'Follow-ups cannot fabricate urgency, familiarity, or scarcity.'
+    );
+  }
+  const blocking = lintCopy(payloadText(payload), {
+    register: 'founder-tim',
+  }).blocking[0];
+  if (blocking) {
+    throw new InvestorFollowupError(
+      'payload_invalid',
+      `Copy check failed (${blocking.rule}): ${blocking.message}`
+    );
+  }
+}
+
+/**
+ * Prepares one personalized draft for the operator review queue. The result
+ * is a draft only — composing it sends nothing and consumes no approval.
+ */
+export function prepareInvestorFollowupDraft(input: {
+  readonly question: InvestorQuestionRecord;
+  readonly answer: CanonicalAnswer;
+  readonly claimUses: readonly { claimId: string; revisionId: string }[];
+  readonly recipient: FollowupRecipient;
+  readonly sender: FollowupSender;
+  readonly link?: FollowupLink | null;
+  /** The single relevant next step offered to the investor. */
+  readonly nextStep: string;
+  readonly now: string;
+}): FollowupEmailDraft {
+  const { question, answer, recipient, sender } = input;
+  assertFollowupParties(question, recipient, sender);
+  if (answer.review.state !== 'approved') {
+    throw new InvestorFollowupError(
+      'answer_not_approved',
+      'Follow-ups can only cite an approved canonical answer revision.'
+    );
+  }
+  assertClaimRevisions(answer, input.claimUses);
+  const link = input.link ?? null;
+  assertLinkContract(link, recipient, question);
   const nextStep = input.nextStep.trim();
   if (!nextStep || nextStep.includes('\n')) {
     throw new InvestorFollowupError(
@@ -319,29 +373,7 @@ export function prepareInvestorFollowupDraft(input: {
     link,
     nextStep,
   });
-  if (
-    sentenceCount(payload.bodyText) > MAX_BODY_SENTENCES ||
-    !payload.bodyText.includes(answer.directAnswer.trim())
-  ) {
-    throw new InvestorFollowupError(
-      'payload_invalid',
-      'Follow-ups must directly answer the concern in a few sentences and stay useful without a click.'
-    );
-  }
-  if (FABRICATED_PRESSURE.test(payloadText(payload))) {
-    throw new InvestorFollowupError(
-      'payload_invalid',
-      'Follow-ups cannot fabricate urgency, familiarity, or scarcity.'
-    );
-  }
-  for (const finding of lintCopy(payloadText(payload), {
-    register: 'founder-tim',
-  }).blocking) {
-    throw new InvestorFollowupError(
-      'payload_invalid',
-      `Copy check failed (${finding.rule}): ${finding.message}`
-    );
-  }
+  assertPayloadContract(payload, answer);
   const payloadHash = hash(payloadText(payload));
   return {
     draftId: `followup-${payloadHash.slice(0, 16)}`,
