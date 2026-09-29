@@ -79,6 +79,13 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
   'web.artists': '/artists',
+  // JOV-7127: unlike web.artists, these revenue-sensitive dynamic routes have
+  // no no-DB fallback branch on the real production path, so the producer
+  // captures a reserved, env-gated fixture route instead — see
+  // apps/web/app/[username]/[slug]/_lib/screen-cert-fixture.ts.
+  'web.smartlink-release': '/jovie-screen-fixture/screen-cert-release',
+  'web.smartlink-track':
+    '/jovie-screen-fixture/screen-cert-release/screen-cert-track',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
