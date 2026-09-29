@@ -157,13 +157,27 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
         <TableRoot className='w-full border-collapse'>
           <TableHead>
             <tr className={presets.tableHeaderRow}>
-              <th className={presets.tableHeaderCell}>Jovie link</th>
-              <th className={presets.tableHeaderCell}>Entity</th>
-              <th className={presets.tableHeaderCell}>Type</th>
-              <th className={presets.tableHeaderCell}>Destination</th>
-              <th className={presets.tableHeaderCell}>Status</th>
-              <th className={presets.tableHeaderCell}>Clicks</th>
-              <th className={presets.tableHeaderCell}>Campaign</th>
+              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
+                Jovie link
+              </th>
+              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
+                Entity
+              </th>
+              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
+                Type
+              </th>
+              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
+                Destination
+              </th>
+              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
+                Status
+              </th>
+              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
+                Clicks
+              </th>
+              <th className={cn(presets.tableHeaderCell, 'whitespace-nowrap')}>
+                Campaign
+              </th>
             </tr>
           </TableHead>
           <TableBody>
