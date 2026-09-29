@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
+
 import { LoaderCircle } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';

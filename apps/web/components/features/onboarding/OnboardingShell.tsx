@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
+
 import { Skeleton } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
