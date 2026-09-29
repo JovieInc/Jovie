@@ -541,7 +541,7 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   );
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(
-    page.getByText(/Create your account|Add an email to keep going/)
+    page.getByText(/Create your account|Add an email to save your profile/)
   ).toBeVisible();
   await expect(page.getByText(/dev toolbar|local test user/i)).toHaveCount(0);
 
