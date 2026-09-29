@@ -211,6 +211,8 @@
     "typecheck:web:fast": "pnpm --filter @jovie/web run typecheck -- --pretty false",
     "typecheck:web:tests": "pnpm --filter @jovie/web run typecheck:tests",
     "typecheck:web:tests:update": "pnpm --filter @jovie/web run typecheck:tests:update",
+    "typecheck:web:stories": "pnpm --filter @jovie/web run typecheck:stories",
+    "typecheck:web:stories:update": "pnpm --filter @jovie/web run typecheck:stories:update",
     "test:web:surface-receipt": "node scripts/web-test-surface-receipt.mjs",
     "typecheck:scripts": "node scripts/typecheck-scripts.mjs",
     "typecheck:scripts:update": "node scripts/typecheck-scripts.mjs --update-baseline",

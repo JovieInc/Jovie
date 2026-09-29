@@ -53,6 +53,9 @@ export { affectsWebTestTypecheck };
 export const WEB_TESTS_TYPECHECK_COMMAND =
   'pnpm --filter=@jovie/web run typecheck:tests';
 
+export const WEB_STORIES_TYPECHECK_COMMAND =
+  'pnpm --filter=@jovie/web run typecheck:stories';
+
 export const DELIVERY_CONTROLLER_COVERAGE_ARGS = Object.freeze([
   '--test',
   '--experimental-test-coverage',
@@ -450,6 +453,12 @@ const LANES = [
     run: runWebTestsTypecheck,
   },
   {
+    id: 'web-stories-typecheck',
+    name: 'Web Stories Typecheck (shrink-only baseline)',
+    nextLocalCommand: WEB_STORIES_TYPECHECK_COMMAND,
+    run: runWebStoriesTypecheck,
+  },
+  {
     id: 'scripts-typecheck',
     name: 'Scripts Typecheck (shrink-only baseline)',
     nextLocalCommand: 'pnpm run typecheck:scripts',
@@ -551,7 +560,11 @@ const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
  * selector to retain the historical all-lanes behavior.
  */
 export const LANE_GROUPS = Object.freeze({
-  typecheck: Object.freeze(['typecheck', 'web-tests-typecheck']),
+  typecheck: Object.freeze([
+    'typecheck',
+    'web-tests-typecheck',
+    'web-stories-typecheck',
+  ]),
   remaining: Object.freeze([
     'biome',
     'eslint-server-boundaries',
@@ -1317,6 +1330,48 @@ function runWebTestsTypecheck() {
   // Own lock so it overlaps app tsc instead of queueing behind it.
   return shellAsync(
     `TYPECHECK_SINGLEFLIGHT_DIR=.cache/typecheck-singleflight-tests ${WEB_TESTS_TYPECHECK_COMMAND}`
+  );
+}
+
+function runWebStoriesTypecheck() {
+  // Storybook story fixtures (*.stories.tsx) were excluded from
+  // tsconfig.typecheck.json and never checked anywhere in CI — a story could
+  // ship a fixture missing a required ViewModel field with no red signal
+  // (guardrail gap, JOV-6975). Shrink-only baseline: same preselection as
+  // web-tests-typecheck, since any .stories.tsx or component-source .tsx
+  // change already satisfies affectsWebTestTypecheck.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (
+    event === 'pull_request' &&
+    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
+  ) {
+    return {
+      code: 0,
+      output:
+        'No TypeScript graph files changed (ci-path-changes preselection)\n',
+      skipped: true,
+    };
+  }
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Web stories typecheck skipped (no product files changed)\n',
+      skipped: true,
+    };
+  }
+  if (event === 'pull_request') {
+    const files = listAllChangedFiles();
+    if (files && !files.some(file => affectsWebTestTypecheck(file))) {
+      return {
+        code: 0,
+        output: 'No web stories typecheck inputs changed\n',
+        skipped: true,
+      };
+    }
+  }
+  // Own lock so it overlaps the app and test tsc runs instead of queueing.
+  return shellAsync(
+    `TYPECHECK_SINGLEFLIGHT_DIR=.cache/typecheck-singleflight-stories ${WEB_STORIES_TYPECHECK_COMMAND}`
   );
 }
 
