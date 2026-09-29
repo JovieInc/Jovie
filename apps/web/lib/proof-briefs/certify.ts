@@ -1,5 +1,6 @@
 import type {
   BriefAudience,
+  BriefHighlight,
   Certification,
   CertificationFinding,
   DisclosureScope,
@@ -47,8 +48,20 @@ export function disclosureAllowed(
  * nontechnical reader must not lean on these; approved or generated wording
  * containing them fails `understandable`.
  */
-const JARGON =
-  /\b(primitives?|pipeline|normalized?|refactor(?:ed|ing)?|infra(?:structure)?|sdk|api|orm|schema|middleware|heuristic|deterministic|idempotent|observability|denormalized|shard(?:ing)?|rollup|etl|webhook|backfill|migration|codec|serializer|abstraction|instantiated|leveraged|synergy|utiliz(?:e|ed|ation))\b/i;
+const JARGON_PATTERNS: readonly RegExp[] = [
+  /\b(primitives?|pipeline|normalized?|refactor(?:ed|ing)?|infra(?:structure)?|sdk|api|orm|schema)\b/i,
+  /\b(middleware|heuristic|deterministic|idempotent|observability|denormalized|shard(?:ing)?|rollup|etl)\b/i,
+  /\b(webhook|backfill|migration|codec|serializer|abstraction|instantiated)\b/i,
+  /\b(leveraged|synergy|utiliz(?:e|ed|ation))\b/i,
+];
+
+function findJargon(wording: string): RegExpExecArray | null {
+  for (const pattern of JARGON_PATTERNS) {
+    const hit = pattern.exec(wording);
+    if (hit) return hit;
+  }
+  return null;
+}
 
 /**
  * Causal language. Only `direct` attribution may use it, and only when the
@@ -173,7 +186,7 @@ function checkMeaningful(
 function checkUnderstandable(brief: ProofBrief): CertificationFinding[] {
   const findings: CertificationFinding[] = [];
   for (const h of [brief.hero, ...brief.supporting]) {
-    const jargon = h.wording.match(JARGON);
+    const jargon = findJargon(h.wording);
     if (jargon) {
       findings.push({
         check: 'understandable',
@@ -192,6 +205,76 @@ function checkUnderstandable(brief: ProofBrief): CertificationFinding[] {
   return findings;
 }
 
+function checkCausalWording(
+  h: BriefHighlight,
+  causal: RegExpExecArray
+): CertificationFinding[] {
+  const findings: CertificationFinding[] = [];
+  if (h.attribution !== 'direct') {
+    findings.push({
+      check: 'no-overclaim',
+      severity: 'fail',
+      detail: `${h.eventId}: causal wording '${causal[0]}' with attribution '${h.attribution}'`,
+    });
+  }
+  if (!h.changed) {
+    findings.push({
+      check: 'no-overclaim',
+      severity: 'fail',
+      detail: `${h.eventId}: causal wording '${causal[0]}' but evidence records no outcome`,
+    });
+  }
+  return findings;
+}
+
+function checkHardClaims(
+  h: BriefHighlight,
+  ev: ProofEvent | undefined
+): CertificationFinding[] {
+  const findings: CertificationFinding[] = [];
+  for (const hard of HARD_CLAIMS) {
+    if (
+      hard.pattern.test(h.wording) &&
+      !ev?.metric?.predicate.includes(hard.predicateIncludes)
+    ) {
+      findings.push({
+        check: 'no-overclaim',
+        severity: 'fail',
+        detail: `${h.eventId}: ${hard.label} claim not backed by metric predicate`,
+      });
+    }
+  }
+  return findings;
+}
+
+function checkMetricNumbers(
+  h: BriefHighlight,
+  ev: ProofEvent | undefined
+): CertificationFinding[] {
+  if (!ev?.metric || !/\d/.exec(h.wording)) return [];
+  // Strip duration windows ('over 7d') so window digits aren't claims.
+  const stripped = h.wording.replace(
+    /\b\d+\s*(?:d|day|days|h|hr|w|mo)\b/gi,
+    ''
+  );
+  const numbers = stripped.match(/\d[\d,.]*%?/g) ?? [];
+  const known = [ev.metric.before, ev.metric.after, ev.metric.value]
+    .filter((n): n is number => n !== undefined)
+    .map(String);
+  const findings: CertificationFinding[] = [];
+  for (const num of numbers) {
+    const normalized = num.replace(/%$/, '');
+    if (!known.includes(normalized)) {
+      findings.push({
+        check: 'no-overclaim',
+        severity: 'fail',
+        detail: `${h.eventId}: number '${num}' not in evidence metric`,
+      });
+    }
+  }
+  return findings;
+}
+
 function checkNoOverclaim(
   brief: ProofBrief,
   events: readonly ProofEvent[]
@@ -200,54 +283,11 @@ function checkNoOverclaim(
   const byId = new Map(events.map(e => [e.id, e]));
   for (const h of [brief.hero, ...brief.supporting]) {
     const ev = byId.get(h.eventId);
-    const causal = h.wording.match(CAUSAL);
-    if (causal && h.attribution !== 'direct') {
-      findings.push({
-        check: 'no-overclaim',
-        severity: 'fail',
-        detail: `${h.eventId}: causal wording '${causal[0]}' with attribution '${h.attribution}'`,
-      });
+    const causal = CAUSAL.exec(h.wording);
+    if (causal) {
+      findings.push(...checkCausalWording(h, causal));
     }
-    if (causal && !h.changed) {
-      findings.push({
-        check: 'no-overclaim',
-        severity: 'fail',
-        detail: `${h.eventId}: causal wording '${causal[0]}' but evidence records no outcome`,
-      });
-    }
-    for (const hard of HARD_CLAIMS) {
-      if (
-        hard.pattern.test(h.wording) &&
-        !ev?.metric?.predicate.includes(hard.predicateIncludes)
-      ) {
-        findings.push({
-          check: 'no-overclaim',
-          severity: 'fail',
-          detail: `${h.eventId}: ${hard.label} claim not backed by metric predicate`,
-        });
-      }
-    }
-    if (ev?.metric && h.wording.match(/\d/)) {
-      // Strip duration windows ('over 7d') so window digits aren't claims.
-      const stripped = h.wording.replace(
-        /\b\d+\s*(?:d|day|days|h|hr|w|mo)\b/gi,
-        ''
-      );
-      const numbers = stripped.match(/\d[\d,.]*%?/g) ?? [];
-      const known = [ev.metric.before, ev.metric.after, ev.metric.value]
-        .filter((n): n is number => n !== undefined)
-        .map(n => String(n));
-      for (const num of numbers) {
-        const normalized = num.replace(/%$/, '');
-        if (!known.some(k => k === normalized)) {
-          findings.push({
-            check: 'no-overclaim',
-            severity: 'fail',
-            detail: `${h.eventId}: number '${num}' not in evidence metric`,
-          });
-        }
-      }
-    }
+    findings.push(...checkHardClaims(h, ev), ...checkMetricNumbers(h, ev));
   }
   return findings;
 }
@@ -317,16 +357,13 @@ function checkNoFiller(
   return findings;
 }
 
-function checkNoMaterialOmission(
+function checkOutrankedOmissions(
   brief: ProofBrief,
-  events: readonly ProofEvent[]
+  events: readonly ProofEvent[],
+  selectedIds: ReadonlySet<string>,
+  heroRel: number
 ): CertificationFinding[] {
   const findings: CertificationFinding[] = [];
-  const byId = new Map(events.map(e => [e.id, e]));
-  const selectedIds = new Set(brief.evidence.map(e => e.id));
-  const hero = byId.get(brief.hero.eventId);
-  const heroRel = hero?.audienceRelevance[brief.audience] ?? 0;
-
   for (const ev of events) {
     if (selectedIds.has(ev.id)) continue;
     if (
@@ -346,14 +383,16 @@ function checkNoMaterialOmission(
       });
     }
   }
+  return findings;
+}
 
-  // A stale/contradicted event on the same metric predicate as a selected
-  // event materially changes how the recipient reads the number.
-  const selectedPredicates = new Set(
-    [brief.hero, ...brief.supporting]
-      .map(h => byId.get(h.eventId)?.metric?.predicate)
-      .filter((p): p is string => p !== undefined)
-  );
+function checkConflictingOmissions(
+  brief: ProofBrief,
+  events: readonly ProofEvent[],
+  selectedIds: ReadonlySet<string>,
+  selectedPredicates: ReadonlySet<string>
+): CertificationFinding[] {
+  const findings: CertificationFinding[] = [];
   for (const ev of events) {
     if (selectedIds.has(ev.id)) continue;
     if (ev.subjectEntityId !== brief.subjectEntityId) continue;
@@ -367,6 +406,33 @@ function checkNoMaterialOmission(
     }
   }
   return findings;
+}
+
+function checkNoMaterialOmission(
+  brief: ProofBrief,
+  events: readonly ProofEvent[]
+): CertificationFinding[] {
+  const byId = new Map(events.map(e => [e.id, e]));
+  const selectedIds = new Set(brief.evidence.map(e => e.id));
+  const heroRel =
+    byId.get(brief.hero.eventId)?.audienceRelevance[brief.audience] ?? 0;
+
+  // A stale/contradicted event on the same metric predicate as a selected
+  // event materially changes how the recipient reads the number.
+  const selectedPredicates = new Set(
+    [brief.hero, ...brief.supporting]
+      .map(h => byId.get(h.eventId)?.metric?.predicate)
+      .filter((p): p is string => p !== undefined)
+  );
+  return [
+    ...checkOutrankedOmissions(brief, events, selectedIds, heroRel),
+    ...checkConflictingOmissions(
+      brief,
+      events,
+      selectedIds,
+      selectedPredicates
+    ),
+  ];
 }
 
 function checkDisclosure(

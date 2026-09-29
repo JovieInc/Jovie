@@ -1,10 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-  certify,
-  disclosureAllowed,
-  isEligible,
-  maxDisclosureForAudience,
-} from './certify';
+import { certify, isEligible, maxDisclosureForAudience } from './certify';
 import type {
   BriefHighlight,
   BriefRequest,
@@ -40,7 +35,9 @@ function generateWording(event: ProofEvent): string {
   const m = event.metric;
   if (m?.before !== undefined && m?.after !== undefined) {
     const direction = m.after < m.before ? 'fell' : 'rose';
-    const unit = m.unit === '%' ? '%' : m.unit ? ` ${m.unit}` : '';
+    let unit = '';
+    if (m.unit === '%') unit = '%';
+    else if (m.unit) unit = ` ${m.unit}`;
     const window = m.window ? ` over ${m.window}` : '';
     return `${capitalize(event.did)}. ${m.label} ${direction} from ${formatNumber(m.before)} to ${formatNumber(m.after)}${unit}${window}.`;
   }
@@ -70,8 +67,11 @@ function stableStringify(value: unknown): string {
   if (value !== null && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
       .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`;
+      .sort(([a], [b]) => a.localeCompare(b));
+    const body = entries
+      .map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`)
+      .join(',');
+    return `{${body}}`;
   }
   return JSON.stringify(value);
 }
@@ -165,7 +165,7 @@ export function composeProofBrief(
     hero: toHighlight(hero),
     supporting: supporting.map(toHighlight),
     evidence: selected.map(e => ({ id: e.id, revision: e.revision })),
-    limitations: [...limitations].sort(),
+    limitations: [...limitations].sort((a, b) => a.localeCompare(b)),
     freshestAsOf: selected.reduce(
       (min, e) => (e.observedAt < min ? e.observedAt : min),
       hero.observedAt
@@ -189,4 +189,4 @@ export function briefHashMatches(brief: ProofBrief): boolean {
   return briefContentHash(content) === contentHash;
 }
 
-export { disclosureAllowed };
+export { disclosureAllowed } from './certify';
