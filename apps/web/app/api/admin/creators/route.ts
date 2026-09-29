@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(request: Request) {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
+  const entitlements = await getOvieOperatorEntitlements();
 
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(

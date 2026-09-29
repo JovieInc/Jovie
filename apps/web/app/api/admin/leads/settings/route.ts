@@ -105,7 +105,7 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
  * GET /api/admin/leads/settings — Return pipeline settings.
  */
 export async function GET() {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
+  const entitlements = await getOvieOperatorEntitlements();
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

@@ -127,7 +127,7 @@ function isMissingLeadSchemaColumnError(error: unknown): boolean {
  * GET /api/admin/outreach — List outreach leads by queue.
  */
 export async function GET(request: NextRequest) {
-  const authError = await requireAdminAccess('cookie', 'read');
+  const authError = await requireAdminAccess('fresh');
   if (authError) {
     return authError;
   }

@@ -10,7 +10,6 @@ import {
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { cacheQuery } from '@/lib/db/cache';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leads } from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
@@ -111,11 +110,9 @@ async function insertLeadWithLegacyFallback(seed: {
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
 export async function GET(request: NextRequest) {
-  const entitlements = await cacheQuery(
-    'entitlements:admin-leads',
-    () => getOvieOperatorEntitlements({ purpose: 'read' }),
-    { ttlSeconds: 300 }
-  );
+  // Claim tokens require privileged proof; authorization must never be cached
+  // across explicit relock or session revocation.
+  const entitlements = await getOvieOperatorEntitlements();
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

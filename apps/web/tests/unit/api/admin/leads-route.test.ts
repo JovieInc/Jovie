@@ -75,6 +75,25 @@ vi.mock('@/lib/error-tracking', () => ({
 import { GET } from '@/app/api/admin/leads/route';
 
 describe('GET /api/admin/leads', () => {
+  it('rechecks privileged authorization after a prior successful request', async () => {
+    mockListOffset.mockResolvedValue([]);
+    mockCountWhere.mockResolvedValue([{ count: 0 }]);
+    const request = new Request('https://jov.ie/api/admin/leads') as any;
+    Object.defineProperty(request, 'nextUrl', { value: new URL(request.url) });
+    mockGetCurrentUserEntitlements.mockResolvedValueOnce({
+      isAuthenticated: true,
+      isAdmin: true,
+    });
+    expect((await GET(request)).status).toBe(200);
+    mockGetCurrentUserEntitlements.mockResolvedValueOnce({
+      isAuthenticated: true,
+      isAdmin: false,
+    });
+    expect((await GET(request)).status).toBe(403);
+    expect(mockGetCurrentUserEntitlements).toHaveBeenCalledTimes(2);
+    expect(mockGetCurrentUserEntitlements).toHaveBeenLastCalledWith();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 
