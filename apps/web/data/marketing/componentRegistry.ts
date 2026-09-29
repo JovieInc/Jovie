@@ -368,6 +368,12 @@ const SECTION_RESOLUTIONS = {
       {
         variantId: 'editorial',
         componentPath:
+          'apps/web/components/homepage/HomepageIdentitySections.tsx',
+        rootBinding: "data-testid='marketing-section-feature-split'",
+      },
+      {
+        variantId: 'editorial',
+        componentPath:
           'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         rootBinding: "data-testid='marketing-section-feature-split'",
       },
@@ -465,6 +471,11 @@ const SECTION_RESOLUTIONS = {
         variantId: 'final-dual-path',
         componentPath: 'apps/web/components/site/MarketingTerminalCta.tsx',
         rootBinding: 'data-pen-contract={penContractId}',
+      },
+      {
+        variantId: 'editorial-search',
+        componentPath: 'apps/web/components/homepage/HomepageIdentityClose.tsx',
+        rootBinding: "data-marketing-variant='editorial-search'",
       },
       {
         variantId: 'editorial-search',

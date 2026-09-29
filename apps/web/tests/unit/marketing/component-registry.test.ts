@@ -1469,7 +1469,9 @@ describe('production occurrence structural source bindings', () => {
 it('binds every nonterminal acquisition occurrence to its declared variant owner', () => {
   for (const url of ['/', '/youtube-thumbnails']) {
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === url)!;
-    expect(route.bindingEvidence.status).toBe('unverified');
+    expect(route.bindingEvidence.status).toBe(
+      url === '/' ? 'verified' : 'unverified'
+    );
     for (const binding of route.renderedSections) {
       expect(binding.kind).toBe('approved-section');
       if (binding.kind !== 'approved-section')

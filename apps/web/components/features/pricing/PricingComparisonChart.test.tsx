@@ -23,6 +23,15 @@ describe('PricingComparisonChart', () => {
       name: 'Feature comparison for selected plan',
     });
 
+    for (const table of [desktopTable, mobileTable]) {
+      expect(
+        within(table).getByRole('columnheader', { name: 'Feature' })
+      ).toHaveAttribute('scope', 'col');
+      for (const header of table.querySelectorAll('thead th')) {
+        expect(header).toHaveAccessibleName();
+      }
+    }
+
     expect(within(desktopTable).getByText('Free')).toBeInTheDocument();
     expect(within(desktopTable).getByText('Pro')).toBeInTheDocument();
     expect(within(mobileTable).getByText('Pro')).toBeInTheDocument();

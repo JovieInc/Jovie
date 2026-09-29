@@ -173,7 +173,12 @@ export function PricingComparisonChart() {
           <caption className='sr-only'>Feature comparison by plan</caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
-              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
+              <th
+                scope='col'
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap'
+              >
+                <span className='sr-only'>Feature</span>
+              </th>
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
                 <div className='system-b-pricing-plan-name'>
                   {freeClaim.displayName}
@@ -224,7 +229,12 @@ export function PricingComparisonChart() {
           </caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
-              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
+              <th
+                scope='col'
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap'
+              >
+                <span className='sr-only'>Feature</span>
+              </th>
               <th
                 className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'
                 data-selected={selectedPlan === 'pro' ? 'true' : undefined}

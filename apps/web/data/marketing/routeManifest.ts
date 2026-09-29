@@ -255,22 +255,29 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       // The unsupported adoption strip is intentionally omitted until it has
       // an attributable permission or adoption receipt.
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'apps/web/components/homepage/HomepageIdentitySections.tsx',
         'feature-split',
         'editorial',
-        'relationships'
+        'presence'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageIdentitySections.tsx',
+        'feature-split',
+        'editorial',
+        'structure'
       ),
       approvedBinding(
-        'apps/web/components/homepage/HomepageClose.tsx',
+        'apps/web/components/homepage/HomepageIdentityClose.tsx',
         'cta',
         'editorial-search'
       ),
     ],
     bindingEvidence: {
-      status: 'unverified',
-      source: 'source history #17063, #17185, #17353; pinned 12b203f9',
+      status: 'verified',
+      source:
+        'JOV-6220 source owner reconciliation 2026-09-29; HomepageIdentityHero and HomepageIdentitySections render tests',
       notes:
-        'Locked relationships beat (real jov.ie/tim pay and updates captures, JOV-6946) plus the changelog preview and close actions are inventoried. The changelog preview is a route-local feed backed by published CHANGELOG.md entries and remains outside the recipe section registry. The unsupported adoption strip is omitted. Exact mounted validation remains pending and Pen identity is explicitly unknown. No render or visual admission.',
+        'Identity v3 supersedes the legacy relationships/changelog composition (Tim 2026-09-28). Source inventory only; exact deployed mounted-section, visual, and outcome receipts remain separate. Pen identity is unknown.',
     },
     status: 'active',
     specVersion: '1.3.0',

@@ -59,6 +59,12 @@ describe('HomepageIdentityHero', () => {
     render(<HomepageIdentityHero headingId='home-hero-heading' />);
 
     const hero = screen.getByTestId('marketing-section-hero');
+    expect(hero.tagName).toBe('SECTION');
+    expect(hero).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/homepage/HomepageIdentityHero.tsx'
+    );
+    expect(hero).toHaveAttribute('data-marketing-variant', 'split-claim-card');
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent('Be found.Be understood.');
     expect(hero).toHaveAttribute('aria-labelledby', heading.id);

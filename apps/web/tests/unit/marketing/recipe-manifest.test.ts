@@ -1535,19 +1535,21 @@ describe('marketing adversarial-review invariants', () => {
 
 // Source inventory checks only. Mounted identity remains the route-health gate.
 describe('current acquisition source inventory (JOV-4065)', () => {
-  it('retains the locked homepage beats and their actual outer-section owners', async () => {
-    const { HOMEPAGE_LAUNCH_COPY } = await import('@/data/homepageLaunchCopy');
+  it('retains the current identity homepage beats and their actual outer-section owners', async () => {
+    const { HOMEPAGE_IDENTITY_COPY } = await import(
+      '@/data/homepageIdentityCopy'
+    );
     const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === '/')!;
     const bindings = entry.renderedSections.filter(
       binding => binding.kind === 'approved-section'
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
-    const rows = HOMEPAGE_LAUNCH_COPY.certified.sections;
+    const rows = HOMEPAGE_IDENTITY_COPY.sections;
     expect(bindings.slice(1, -1).map(binding => binding.occurrenceId)).toEqual(
       rows.map(row => row.id)
     );
-    // Pen My0zu (JOV-6946): one relationships beat.
-    expect(rows.map(row => row.id)).toEqual(['relationships']);
+    // Latest founder direction replaces the legacy relationships/changelog page.
+    expect(rows.map(row => row.id)).toEqual(['presence', 'structure']);
     expect(bindings.map(binding => binding.sectionId)).toEqual([
       'hero',
       ...rows.map(() => 'feature-split'),
@@ -1556,12 +1558,12 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     expect(bindings.map(binding => binding.componentPath)).toEqual([
       'apps/web/components/homepage/HomepageIdentityHero.tsx',
       ...Array(rows.length).fill(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx'
+        'apps/web/components/homepage/HomepageIdentitySections.tsx'
       ),
-      'apps/web/components/homepage/HomepageClose.tsx',
+      'apps/web/components/homepage/HomepageIdentityClose.tsx',
     ]);
-    // Source inventory must not clear incomplete root/variant registration.
-    expect(entry.bindingEvidence.status).toBe('unverified');
+    // Source inventory is separate from deployed mounted and visual certification.
+    expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
       'split-claim-card',
       ...rows.map(() => 'editorial'),
