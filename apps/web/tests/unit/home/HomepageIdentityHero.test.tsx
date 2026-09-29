@@ -110,6 +110,28 @@ describe('HomepageIdentityHero', () => {
     expect(document.querySelectorAll('video, canvas')).toHaveLength(0);
   });
 
+  it('keeps the claim card narrow and the role on one line at 768 (JOV-7126)', () => {
+    render(<HomepageIdentityHero />);
+
+    // Pen x4j9f (768 split): the claim card is ~340px (max-w-85), not the
+    // wider max-w-120 the split shell's half-width column at 768 can't fit
+    // alongside the headline. whitespace-nowrap keeps "Founder, Jovie" from
+    // wrapping when that column gets tight. Real layout/line-wrap coverage
+    // lives in the Playwright regression at tests/e2e/homepage.spec.ts,
+    // since jsdom does not lay out text.
+    const card = screen.getByTestId('homepage-claim-card');
+    expect(card.className).toContain('max-w-85');
+    expect(card.className).not.toContain('max-w-120');
+
+    const role = screen.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.role);
+    expect(role.className).toContain('whitespace-nowrap');
+
+    const source = css();
+    expect(source).toMatch(
+      /@media\s*\(min-width:\s*768px\)\s*and\s*\(max-width:\s*1279px\)/
+    );
+  });
+
   it('keeps hero copy generic and free of em dashes', () => {
     const { hero, seo } = HOMEPAGE_IDENTITY_COPY;
     const copy = [

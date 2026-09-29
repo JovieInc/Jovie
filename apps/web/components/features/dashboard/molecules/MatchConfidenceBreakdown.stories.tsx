@@ -6,6 +6,10 @@ const meta = {
   component: MatchConfidenceBreakdown,
   parameters: {
     layout: 'centered',
+    // label/score/weight/description aren't props of MatchConfidenceBreakdown
+    // itself — the required-props scanner also picks up the internal, non-
+    // exported ScoreRowProps interface in the same file.
+    jovie: { uncoveredProps: ['label', 'score', 'weight', 'description'] },
   },
   render: args => (
     <div className='w-80'>

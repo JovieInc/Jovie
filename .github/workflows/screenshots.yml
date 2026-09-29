@@ -16,6 +16,9 @@ on:
       - '.github/scripts/guard-playwright-artifacts.mjs'
       - '.github/workflows/screenshots.yml'
       - 'apps/web/app/artists/**'
+      - 'apps/web/app/hud/**'
+      - 'apps/web/lib/admin/roles.ts'
+      - 'apps/web/lib/auth/gate.ts'
       - 'apps/web/app/(marketing)/**'
       - 'apps/web/app/(home)/**'
       - 'apps/web/app/(dynamic)/**'
@@ -71,6 +74,7 @@ jobs:
       artists-artifact-id: ${{ steps.artists-proof.outputs.artifact-id }}
       smartlink-release-artifact-id: ${{ steps.smartlink-release-proof.outputs.artifact-id }}
       smartlink-track-artifact-id: ${{ steps.smartlink-track-proof.outputs.artifact-id }}
+      hud-isolated-artifact-id: ${{ steps.hud-isolated-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
     defaults:
       run:
@@ -84,6 +88,11 @@ jobs:
       E2E_USE_TEST_AUTH_BYPASS: '1'
       E2E_CLERK_USER_ID: user_test
       PUBLIC_NOAUTH_SMOKE: '1'
+      # JOV-7126: server-only — never inlined client-side, so it cannot
+      # change the marketing catalog's rendered bytes. Read by
+      # lib/admin/roles.ts and lib/auth/gate.ts; see the hud-isolated
+      # capture step below for why this must be job-level env.
+      E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -305,6 +314,22 @@ jobs:
           public-images: true
           diagnostic-paths: true
 
+      # JOV-7126: first exact-head producer for an authenticated app-shell
+      # screen. E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH (job env, so the
+      # already-running production server above has it too — a later
+      # step's env cannot reach a server that's already started) lets the
+      # dev-test-auth bypass mint a synthetic admin persona against this
+      # job's noop DATABASE_URL. lib/admin/roles.ts and lib/auth/gate.ts
+      # trust it only for this exact bypass session, so the spec renders
+      # the real apps/web/app/hud/page.tsx source (isolated ?fs=1 chrome;
+      # plain /hud rewrites onto the app-shell-wrapped web.ov-hud-shell
+      # screen instead). This isolated layout never mounts
+      # DashboardShellContent, so it is the one authenticated app-shell
+      # screen that also does not hit the passkey/Touch ID admin step-up
+      # lock (lib/admin/mfa.ts) — every other admin screen under
+      # apps/web/app/app/(shell)/admin/ stays unregistered as a producer
+      # until a human decides how to handle that lock for a producer job.
+
       # web.smartlink-release and web.smartlink-track (JOV-7127) are
       # revenue-sensitive dynamic routes with no no-DB fallback on the real
       # production path, so they capture a reserved, env-gated fixture route
@@ -410,6 +435,58 @@ jobs:
             apps/web/test-results/screen-browser-proof-smartlink-track/screen-proof.json
             apps/web/test-results/screen-browser-proof-smartlink-track/screenshots/desktop.png
             apps/web/test-results/screen-browser-proof-smartlink-track/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+      - name: Capture hud-isolated screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/hud-isolated-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-hud-isolated
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-hud-isolated-measurements.json
+
+      - name: Bind hud-isolated proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.hud-isolated \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-hud-isolated \
+            --measurements=apps/web/test-results/screen-browser-proof-hud-isolated-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-hud-isolated/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload hud-isolated screen proof
+        id: hud-isolated-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-hud-isolated
+          path: |
+            apps/web/test-results/screen-browser-proof-hud-isolated/screen-proof.json
+            apps/web/test-results/screen-browser-proof-hud-isolated/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-hud-isolated/screenshots/mobile.png
           if-no-files-found: error
           retention-days: 14
           allow-images: true
@@ -690,6 +767,10 @@ jobs:
             --artifact-id=${{ needs.generate.outputs.smartlink-track-artifact-id }} \
             --screen-id=web.smartlink-track \
             --receipt-out=.artifacts/screen-certification/smartlink-track.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.hud-isolated-artifact-id }} \
+            --screen-id=web.hud-isolated \
+            --receipt-out=.artifacts/screen-certification/hud-isolated.json || STATUS=$?
           exit "$STATUS"
 
       - name: Upload screen certification receipts

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   ATOM_MOLECULE_INVENTORY_RATCHET,
   COMPARATIVE_DELIBERATE_RED_FIXTURES,
@@ -31,12 +31,15 @@ const redFor = baselineId =>
     fixture => fixture.baselineId === baselineId
   );
 
-// The first case pays a cold monorepo-wide atom/molecule inventory scan plus a
-// git trusted-base resolution (~10s); the default 5s timeout flakes under CI
-// load even though later cases reuse the module-level caches.
-describe('component comparative quality bar', {
-  timeout: 30_000,
-}, () => {
+// The inventory walk and trusted-base git resolution are module-cached but
+// cost seconds on a cold filesystem; paying them inside one test pushes it
+// over the per-test timeout on CI. Warm both caches up front instead.
+beforeAll(() => {
+  discoverAtomMoleculeInventory();
+  resolveTrustedBaseEnrollment();
+}, 60_000);
+
+describe('component comparative quality bar', () => {
   it('extends the approved Shadcn outcome batch without a second contradictory registry', () => {
     const approved = new Map(
       OUTCOME_INVENTORY.entries.map(entry => [entry.id, entry])
