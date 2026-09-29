@@ -49,6 +49,7 @@ import {
   DESKTOP_AUTH_HANDBACK_PATH,
   redeemDesktopReturnCode,
 } from './desktop-auth-handback';
+import { startDesktopAuthLoopbackServer } from './desktop-auth-loopback';
 import {
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
@@ -338,6 +339,10 @@ let desktopBrowserAuthRouteState = emptyDesktopBrowserAuthRouteState();
 // A return code and a late deep link can deliver the same exchange code; the
 // second must not surface a fresh "no pending flow" handoff after success.
 let lastCompletedAuthCode: string | null = null;
+// RFC 8252 section 7.3 loopback listener port, live for the app lifetime.
+// A request only completes a flow while one is pending — the flow nonce and
+// PKCE verifier still gate the handoff.
+let authLoopbackPort: number | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 // webContents ids still showing the web build that preceded the current one.
@@ -715,6 +720,12 @@ function createCentralDesktopAuthRoute(
   authUrl.searchParams.set(DESKTOP_AUTH_FLOW_PARAM, pkce.flowNonce);
   // This build can redeem a typed return code (desktop-auth-handback.ts).
   authUrl.searchParams.set('desktop_return_code', '1');
+  // And it runs a pending-flow loopback listener (desktop-auth-loopback.ts):
+  // /auth/native-return hands the completion straight to it when jovie://
+  // cannot reach the app.
+  if (authLoopbackPort) {
+    authUrl.searchParams.set('desktop_loopback', String(authLoopbackPort));
+  }
   return {
     authUrl: `${authUrl.pathname}${authUrl.search}`,
     pendingPkce: pkce,
@@ -1055,10 +1066,19 @@ function surfaceNoPendingAuthFlow(): void {
   });
 }
 
+type DesktopAuthCompletionOutcome =
+  | 'completed'
+  // The loopback request and the deep link can deliver the same code; the
+  // second arrival is still a successful sign-in, not a fresh handoff.
+  | 'duplicate'
+  | 'no-pending-flow'
+  | 'pkce-expired'
+  | 'flow-mismatch';
+
 function handleAuthCompletion(
   completion: NonNullable<ReturnType<typeof parseDesktopAuthReturnDeepLink>>
-): void {
-  if (completion.code === lastCompletedAuthCode) return;
+): DesktopAuthCompletionOutcome {
+  if (completion.code === lastCompletedAuthCode) return 'duplicate';
 
   const binding = bindPendingDesktopAuthCompletion(
     desktopBrowserAuthRouteState.pendingPkce,
@@ -1077,7 +1097,9 @@ function handleAuthCompletion(
     }
     // 'flow-mismatch' (a forged-but-well-formed deep link) must NOT clear the
     // legitimate in-flight login — leave the pending PKCE state untouched.
-    return;
+    return binding.reason === 'invalid-params'
+      ? 'flow-mismatch'
+      : binding.reason;
   }
 
   clearPendingDesktopAuthFlow();
@@ -1091,10 +1113,11 @@ function handleAuthCompletion(
 
   if (app.isReady()) {
     loadAuthCompletion(nativeCompletion);
-    return;
+    return 'completed';
   }
 
   pendingAuthCompletion = nativeCompletion;
+  return 'completed';
 }
 
 function loadReturnedRoute(route: string): void {
@@ -3210,6 +3233,26 @@ app.whenReady().then(async () => {
 
   registerAuthReturnProtocol();
   refreshApplicationMenu();
+
+  // RFC 8252 section 7.3 loopback return for browser sign-in. One listener
+  // for the app lifetime; a request only binds while a flow is pending, so
+  // an idle port completes nothing. If bind fails the deep link and the
+  // return code still cover the handback.
+  void startDesktopAuthLoopbackServer({
+    onComplete: completion => {
+      const outcome = handleAuthCompletion(completion);
+      // The deep link and the loopback request can deliver the same code; a
+      // late duplicate still means the user signed in.
+      return outcome === 'completed' || outcome === 'duplicate'
+        ? 'completed'
+        : 'unmatched';
+    },
+  }).then(server => {
+    authLoopbackPort = server?.port ?? null;
+    if (!server) {
+      reportDesktopSecurityEvent('auth-loopback-unavailable');
+    }
+  });
 
   if (nightlyUpdateLaunch) {
     if (process.platform === 'darwin' && app.dock) {

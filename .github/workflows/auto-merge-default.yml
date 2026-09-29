@@ -99,7 +99,10 @@ jobs:
         # Jovie Bot private key is empty and this mint fails hard (JOV-4782). The
         # dependabot lane is owned by dependabot-auto-merge.yml plus the hourly
         # triage --enable-missing sweep, which run with full secrets.
-        if: github.actor != 'dependabot[bot]' && env.JOVIE_BOT_PRIVATE_KEY != ''
+        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -108,14 +111,13 @@ jobs:
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          ACTOR: ${{ github.actor }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [[ "$ACTOR" == "dependabot[bot]" ]]; then
-            echo "::notice::Dependabot pull_request context has no Jovie Bot secret (JOV-4782); dependabot-auto-merge.yml and the hourly triage sweep own this lane. Skipping."
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::notice::No token available (fork or Dependabot PR) — dependabot-auto-merge.yml and the hourly triage sweep enable auto-merge; skipping."
             exit 0
           fi
           if [[ -z "${GH_TOKEN:-}" ]]; then
