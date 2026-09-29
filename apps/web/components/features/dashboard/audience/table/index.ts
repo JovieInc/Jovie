@@ -43,8 +43,6 @@ export {
   type AudienceVisitsCellProps,
 } from '@/components/organisms/table';
 
-export type { AudienceMemberRowProps } from './molecules/AudienceMemberRow';
-export { AudienceMemberRow } from './molecules/AudienceMemberRow';
 export type { AudienceSubscriberRowProps } from './molecules/AudienceSubscriberRow';
 export { AudienceSubscriberRow } from './molecules/AudienceSubscriberRow';
 export type {
