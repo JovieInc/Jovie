@@ -439,7 +439,7 @@ describe('Navigation config', () => {
     const presenceItem = primaryNavigation.find(item => item.id === 'presence');
     expect(presenceItem).toMatchObject({
       name: 'Presence',
-      href: APP_ROUTES.PROFILES,
+      href: APP_ROUTES.PRESENCE,
     });
   });
 });
