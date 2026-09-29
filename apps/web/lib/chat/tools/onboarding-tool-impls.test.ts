@@ -51,6 +51,36 @@ const assistantMessage = {
 } satisfies UIMessage;
 
 describe('onboarding tool state rehydration', () => {
+  it('restores the first public profile link so non-artists can reserve (JOV-3379)', () => {
+    const state = createOnboardingTurnState({
+      sessionId: 'session-social',
+      turnCount: 2,
+      accessControlled: true,
+      messages: [
+        {
+          id: 'assistant-social',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'proposeSocialLink',
+              toolCallId: 'tool-social',
+              state: 'output-available',
+              input: { url: 'https://averychen.design' },
+              output: {
+                action: 'propose_social_link',
+                url: 'https://averychen.design',
+              },
+            },
+          ],
+        } satisfies UIMessage,
+      ],
+    });
+
+    expect(state.spotifyArtistId).toBeNull();
+    expect(state.publicProfileUrl).toBe('https://averychen.design');
+  });
+
   it('restores selected Spotify artist and interview signal from prior tool parts', () => {
     const state = createOnboardingTurnState({
       sessionId: 'session-1',
@@ -135,7 +165,7 @@ describe('proposeNextStep controlled access', () => {
 
     expect(result.decision).toMatchObject({
       kind: 'needs_more_info',
-      rationale: 'confirmed_artist_required_for_waitlist',
+      rationale: 'public_profile_required_for_waitlist',
     });
   });
 

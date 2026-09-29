@@ -65,6 +65,11 @@ export interface OnboardingTurnState {
   accessControlled: boolean;
   /** Set when confirmSpotifyArtist is called. */
   spotifyArtistId: string | null;
+  /**
+   * First public profile link the visitor gave (propose_social_link). Under
+   * limited access it qualifies non-artists for Reserve (Tim 2026-09-29).
+   */
+  publicProfileUrl: string | null;
   /** Set after confirmSpotifyArtist enrichment. */
   spotifyArtistName: string | null;
   spotifyImageUrl: string | null;
@@ -190,6 +195,7 @@ export function createOnboardingTurnState(input: {
     sessionId: input.sessionId,
     accessControlled: input.accessControlled ?? false,
     spotifyArtistId: null,
+    publicProfileUrl: null,
     spotifyArtistName: null,
     spotifyImageUrl: null,
     spotifyGenres: [],
@@ -215,6 +221,13 @@ export function deriveOnboardingTurnStateFromMessages(
     for (const part of getToolParts(message)) {
       if (isRecord(part.output)) {
         restoreArtistFromOutput(state, part.output);
+        if (
+          part.output.action === 'propose_social_link' &&
+          typeof part.output.url === 'string' &&
+          !state.publicProfileUrl
+        ) {
+          state.publicProfileUrl = part.output.url;
+        }
       }
       restoreInterviewSignal(state, part);
     }
@@ -493,16 +506,18 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
         const decision = decideOnboardingAccess({
           accessControlled: state.accessControlled,
           spotifyArtistId: state.spotifyArtistId,
+          publicProfileUrl: state.publicProfileUrl,
           spotifyFollowers: state.spotifyFollowers,
           metrics: state.artistMetrics,
           signals: state.signals,
           turnCount: state.turnCount,
         });
-        if (decision.rationale === 'confirmed_artist_required_for_waitlist') {
+        if (decision.rationale === 'public_profile_required_for_waitlist') {
           return {
             action: 'propose_next_step' as const,
             decision,
-            summary: 'More artist information is required before saving.',
+            summary:
+              'Ask where people find them today (a Spotify artist or any public profile link) before reserving.',
           };
         }
         const payload: NextStepCardPayload = {

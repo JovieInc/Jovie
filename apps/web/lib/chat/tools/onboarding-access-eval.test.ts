@@ -184,7 +184,19 @@ describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
         accessControlled: true,
         spotifyArtistId: null,
       }).rationale
-    ).toBe('confirmed_artist_required_for_waitlist');
+    ).toBe('public_profile_required_for_waitlist');
+  });
+
+  it('reserves non-artists who share any public profile link (Tim 2026-09-29)', () => {
+    const decision = decideOnboardingAccess({
+      ...base,
+      accessControlled: true,
+      spotifyArtistId: null,
+      spotifyFollowers: null,
+      publicProfileUrl: 'https://averychen.design',
+    });
+    expect(decision.kind).toBe('waitlist');
+    expect(decision.rationale).toBe('controlled_access_gate_enabled');
   });
 
   it('evaluates verified Spotify data when the gate is off', () => {
