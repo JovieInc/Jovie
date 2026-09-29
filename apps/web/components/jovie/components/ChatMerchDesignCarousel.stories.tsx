@@ -122,5 +122,8 @@ export const MockupFailed: Story = {
 };
 
 export const Loading: Story = {
+  args: {
+    result: makeResult([]),
+  },
   render: () => <ChatMerchDesignCarouselLoading />,
 };
