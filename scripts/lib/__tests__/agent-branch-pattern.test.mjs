@@ -128,24 +128,28 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
     expect(text).toMatch(/cancel-in-progress:\s*true/);
   });
 
-  it('CodeQL runs on main push + schedule only (not every PR)', () => {
+  it('CodeQL runs on main changes or manual dispatch (not every PR)', () => {
     const text = readFileSync(
       `${repoRoot}/.github/workflows/codeql.yml`,
       'utf8'
     );
     expect(text).toMatch(/branches:\s*\[['"]main['"]\]/);
-    expect(text).toMatch(/schedule:/);
+    expect(text).toMatch(/workflow_dispatch:/);
+    expect(text).not.toMatch(/schedule:/);
     expect(text).not.toMatch(/^\s*pull_request(_target)?:/m);
     expect(text).toMatch(/cancel-in-progress:\s*true/);
   });
 
-  it('SonarCloud is nightly/manual only (not every PR)', () => {
+  it('SonarCloud consumes exact coverage evidence or manual dispatch', () => {
     const text = readFileSync(
       `${repoRoot}/.github/workflows/sonarcloud.yml`,
       'utf8'
     );
-    expect(text).toMatch(/schedule:/);
+    expect(text).toMatch(/workflow_run:/);
+    expect(text).toMatch(/workflows:\s*\[Test Coverage Audit\]/);
+    expect(text).toMatch(/types:\s*\[completed\]/);
     expect(text).toMatch(/workflow_dispatch:/);
+    expect(text).not.toMatch(/schedule:/);
     expect(text).not.toMatch(/^\s*pull_request(_target)?:/m);
     expect(text).toMatch(/cancel-in-progress:\s*true/);
   });

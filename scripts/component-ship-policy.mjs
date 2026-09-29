@@ -462,16 +462,43 @@ export function measureAllRoots(repoRoot = REPO_ROOT) {
 }
 
 /**
- * Extract required (non-optional) prop names from a component source.
+ * Find the interface/type block(s) that describe a component's own props.
  * Heuristic static parse — not a full TS checker.
+ *
+ * When `primaryNames` (the file's exported component name(s)) is given,
+ * prefers an exact `${Name}Props` interface/type for one of those names —
+ * this is what actually declares the story's required-prop and state-matrix
+ * surface. Without an exact match (or when no names are given), falls back
+ * to the old broad behavior: every interface/type whose name contains
+ * "Props" anywhere in the file, which can also pick up an unrelated,
+ * non-exported helper's own `*Props` interface in the same file (JOV-6773
+ * false positives on MatchConfidenceBreakdown's internal ScoreRowProps,
+ * SettingsAdPixelsSection's internal PlatformSectionProps, etc).
+ * @returns {string[]} matched interface/type body text, one per block.
  */
-export function extractRequiredPropNames(sourceText) {
-  const props = new Set();
-  // Match interface/type blocks that look like *Props
-  const blockRe = /(?:interface|type)\s+\w*Props\w*\s*(?:=\s*)?\{([\s\S]*?)\}/g;
+export function findComponentPropsBlocks(sourceText, primaryNames = []) {
+  const blockRe =
+    /(?:interface|type)\s+(\w*Props\w*)\s*(?:=\s*)?\{([\s\S]*?)\}/g;
+  const exact = [];
+  const broad = [];
   let block;
   while ((block = blockRe.exec(sourceText)) !== null) {
-    const body = block[1];
+    const [, interfaceName, body] = block;
+    broad.push(body);
+    if (primaryNames.includes(interfaceName.replace(/Props$/, ''))) {
+      exact.push(body);
+    }
+  }
+  return exact.length > 0 ? exact : broad;
+}
+
+/**
+ * Extract required (non-optional) prop names from a component source.
+ * See findComponentPropsBlocks for the interface-selection heuristic.
+ */
+export function extractRequiredPropNames(sourceText, primaryNames = []) {
+  const props = new Set();
+  for (const body of findComponentPropsBlocks(sourceText, primaryNames)) {
     for (const line of body.split('\n')) {
       const m = line.match(/^\s*(?:readonly\s+)?([A-Za-z_][\w]*)(\??)\s*:/);
       if (!m) continue;
@@ -581,7 +608,7 @@ export function checkStoryMatchesComponent({
     });
   }
 
-  const requiredProps = extractRequiredPropNames(componentSource);
+  const requiredProps = extractRequiredPropNames(componentSource, primaryNames);
   const allowlist = extractUncoveredPropsAllowlist(storySource);
   const missingProps = requiredProps.filter(prop => {
     if (allowlist.has(prop)) return false;
@@ -595,20 +622,25 @@ export function checkStoryMatchesComponent({
     });
   }
 
-  // Lightweight state matrix: if component exposes these props, require a mention.
+  // Lightweight state matrix: if the component's own props interface
+  // declares one of these, require a mention. Line-anchored (like
+  // extractRequiredPropNames) so a Tailwind variant such as
+  // `disabled:opacity-50` in a className string can't match — a bare
+  // `\bdisabled\b` substring search over the whole file would (JOV-6773).
   const matrixHints = [
     { prop: 'disabled', label: 'disabled' },
     { prop: 'loading', label: 'loading' },
     { prop: 'isLoading', label: 'loading' },
   ];
+  const propsBlocks = findComponentPropsBlocks(componentSource, primaryNames);
   for (const hint of matrixHints) {
-    const hasProp =
-      new RegExp(`\\b${hint.prop}\\??\\s*:`).test(componentSource) ||
-      new RegExp(`\\b${hint.prop}\\b`).test(
-        componentSource.match(
-          /interface[\s\S]*?Props[\s\S]*?\{[\s\S]*?\}/
-        )?.[0] ?? ''
-      );
+    const hasProp = propsBlocks.some(body =>
+      body
+        .split('\n')
+        .some(line =>
+          new RegExp(`^\\s*(?:readonly\\s+)?${hint.prop}\\??\\s*:`).test(line)
+        )
+    );
     if (!hasProp) continue;
     if (allowlist.has(hint.prop)) continue;
     if (!new RegExp(`\\b${escapeRegExp(hint.prop)}\\b`).test(storySource)) {

@@ -74,6 +74,21 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      - name: Install typescript for the component classifier
+        # The audit transitively imports scripts/component-ship-policy.mjs,
+        # which parses .tsx sources through the TypeScript compiler. Keep
+        # this job install-free otherwise: extract just that one package,
+        # at the spec package.json declares, into the root node_modules so
+        # ESM resolution finds it.
+        run: |
+          set -euo pipefail
+          spec=$(node -p "require('./package.json').devDependencies.typescript")
+          mkdir -p node_modules/typescript
+          tarball=$(npm pack "typescript@${spec}" --silent)
+          tar -xzf "$tarball" -C node_modules/typescript --strip-components=1
+          rm "$tarball"
+          node -e "import('typescript').then(m => console.log('typescript', m.default.version))"
+
       - name: Run design governance audit
         id: audit
         # Pure node + git — no pnpm install. Capture the report for the
