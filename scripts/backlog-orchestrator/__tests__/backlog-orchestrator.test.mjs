@@ -2021,6 +2021,77 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(result.admit[0].type, 'issue');
   });
 
+  it('records the displaced candidate and opportunity cost when economics change queue order', async () => {
+    const highLeverage = admissionIssue({
+      identifier: 'JOV-4513',
+      title: 'Prevent broad downstream rework',
+    });
+    const lowerValue = admissionIssue({
+      identifier: 'JOV-4396',
+      title: 'Polish one isolated path',
+    });
+    const economic = (issue, expectedValue, cost, preventionLeverage = 0) => ({
+      ...classification(issue),
+      economic: {
+        expectedValue: {
+          amount: expectedValue,
+          unit: 'normalized-value',
+          confidence: 0.9,
+          sourceRef: `forecast://${issue.identifier}/value`,
+        },
+        preventionLeverage: {
+          amount: preventionLeverage,
+          unit: 'normalized-value',
+          confidence: 0.85,
+          sourceRef: `JOV-7091://${issue.identifier}`,
+        },
+        fullyLoadedCost: {
+          valuationUnit: 'normalized-value',
+          knownLowerBound: cost,
+          expectedTotal: {
+            amount: cost,
+            unit: 'normalized-value',
+          },
+          uncertainty: {
+            confidence: 0.8,
+            missingSourceContracts: [],
+          },
+          sourceContracts: [`cost-receipt://${issue.identifier}`],
+        },
+      },
+    });
+    const result = await admitter.selectNextToAdmit(
+      [economic(highLeverage, 70, 20, 40), economic(lowerValue, 80, 5)],
+      [],
+      {
+        currentlyShipping: 0,
+        fleetGate: greenFleetGate(),
+        now: '2026-09-28T12:00:00.000Z',
+      }
+    );
+
+    assert.equal(result.admit[0].identifier, 'JOV-4513');
+    assert.equal(result.queueRankingReceipt.mode, 'fully-loaded-economic');
+    assert.equal(result.queueRankingReceipt.orderingChanged, true);
+    assert.equal(result.queueRankingReceipt.displacedCandidate, 'JOV-4396');
+    assert.deepEqual(result.queueRankingReceipt.estimatedOpportunityCost, {
+      amount: 75,
+      unit: 'normalized-value',
+      sourceRefs: [
+        'JOV-7091://JOV-4396',
+        'cost-receipt://JOV-4396',
+        'forecast://JOV-4396/value',
+      ],
+      confidence: 0.8,
+    });
+    const receipt = admitter.buildAdmissionReceipt(highLeverage, {
+      now: '2026-09-28T12:00:00.000Z',
+      queueRankingReceipt: result.queueRankingReceipt,
+    });
+    assert.match(receipt, /"displacedCandidate":"JOV-4396"/);
+    assert.match(receipt, /"amount":75/);
+  });
+
   it('admits founder-assigned work without a human ownership hold', async () => {
     const protectedIssue = admissionIssue({
       identifier: 'JOV-4513',

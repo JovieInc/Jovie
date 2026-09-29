@@ -1,8 +1,4 @@
 export {
-  AdminBraggingRightsSection,
-  AdminBraggingRightsSectionSkeleton,
-} from './AdminBraggingRightsSection';
-export {
   AdminConversionFunnelSection,
   AdminConversionFunnelSectionSkeleton,
 } from './AdminConversionFunnelSection';

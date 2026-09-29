@@ -56,6 +56,25 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.blog': '/blog',
   'web.changelog': '/changelog',
   'web.waitlist': '/waitlist',
+  // JOV-7110 registry-gap sweep: these routes were already captured by
+  // marketing-routes.spec.ts (they're active MARKETING_ROUTE_MANIFEST
+  // entries under (marketing)/ or waitlist/) but had no SCREEN_REGISTRY
+  // entry, so a source change to any of them could never certify.
+  // web.artists is intentionally NOT here: `apps/web/app/artists/page.tsx`
+  // sits outside the (home)/(marketing)/(profile-admission)/waitlist roots
+  // that MARKETING_ROUTE_MANIFEST covers (enforced by
+  // apps/web/tests/contracts/global-page-contract.test.ts's filesystem
+  // scan), so it needs its own SCREEN_PROOF_ROUTES-style producer — see
+  // JOV-7110 follow-up.
+  'web.artist-profiles': '/artist-profiles',
+  'web.artist-profile': '/artist-profile',
+  'web.artist-notifications': '/artist-notifications',
+  'web.voice': '/voice',
+  'web.instant-merch': '/instant-merch',
+  'web.youtube-thumbnails': '/youtube-thumbnails',
+  'web.demo-video': '/demo/video',
+  'web.demovideo': '/demovideo',
+  'web.waitlist-invite': '/waitlist/invite',
 });
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
@@ -143,6 +162,15 @@ web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desk
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
 web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
 web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
+web.artist-profiles|web|marketing-artist-profiles|apps/web/app/(marketing)/artist-profiles/|desktop,mobile
+web.artist-profile|web|marketing-artist-profile|apps/web/app/(marketing)/artist-profile/page.tsx|desktop,mobile
+web.artist-notifications|web|marketing-artist-notifications|apps/web/app/(marketing)/artist-notifications/page.tsx|desktop,mobile
+web.voice|web|marketing-voice|apps/web/app/(marketing)/voice/page.tsx|desktop,mobile
+web.instant-merch|web|marketing-instant-merch|apps/web/app/(marketing)/instant-merch/|desktop,mobile
+web.youtube-thumbnails|web|marketing-youtube-thumbnails|apps/web/app/(marketing)/youtube-thumbnails/|desktop,mobile
+web.demo-video|web|marketing-demo-video|apps/web/app/(marketing)/demo/video/page.tsx|desktop,mobile
+web.demovideo|web|marketing-demovideo|apps/web/app/(marketing)/demovideo/page.tsx|desktop,mobile
+web.waitlist-invite|web|marketing-waitlist-invite|apps/web/app/waitlist/invite/page.tsx|desktop,mobile
 web.legal-shell|web|legal-shell|apps/web/app/(dynamic)/legal/layout.tsx|desktop,mobile
 web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|desktop,mobile
 web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile

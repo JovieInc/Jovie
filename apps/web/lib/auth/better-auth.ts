@@ -41,6 +41,7 @@ import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
 import { resolveOvieWebOrigin } from './ovie-web-origin';
+import { resolvePasskeyRpId } from './passkey-rp-id';
 import { provisionAppUser } from './provision';
 import {
   AUTH_RATE_LIMIT_RULES,
@@ -342,7 +343,7 @@ function buildPlugins() {
       storeToken: 'hashed',
     }),
     // Admin second factor (JOV-4806): Touch ID / platform passkeys.
-    passkey({ rpName: 'Jovie' }),
+    passkey({ rpName: 'Jovie', rpID: resolvePasskeyRpId(env) }),
     adminPasskeyStepUp(),
     // nextCookies MUST stay last so Set-Cookie propagates through Next.js
     // server actions (better-auth docs + plan).
