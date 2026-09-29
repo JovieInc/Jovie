@@ -508,13 +508,10 @@ describe('diff gate', () => {
     });
 
     it('does not require a story for a tested design-studio component', () => {
-      const sourceRel =
-        'apps/web/components/design-studio/StudioWidget.tsx';
-      const testRel =
-        'apps/web/components/design-studio/StudioWidget.test.tsx';
+      const sourceRel = 'apps/web/components/design-studio/StudioWidget.tsx';
+      const testRel = 'apps/web/components/design-studio/StudioWidget.test.tsx';
       const root = fixtureRepo({
-        [sourceRel]:
-          'export function StudioWidget() { return null }\n',
+        [sourceRel]: 'export function StudioWidget() { return null }\n',
         [testRel]:
           "import { render } from '@testing-library/react';\n" +
           "import { StudioWidget } from './StudioWidget';\n" +
@@ -532,8 +529,7 @@ describe('diff gate', () => {
     });
 
     it('still requires a test for a design-studio component (only the story is exempt)', () => {
-      const sourceRel =
-        'apps/web/components/design-studio/StudioWidget.tsx';
+      const sourceRel = 'apps/web/components/design-studio/StudioWidget.tsx';
       const root = fixtureRepo({
         [sourceRel]: 'export function StudioWidget() { return null }\n',
       });
