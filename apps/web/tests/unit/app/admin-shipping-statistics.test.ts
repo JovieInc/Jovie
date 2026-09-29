@@ -18,10 +18,12 @@ vi.mock('@/components/features/admin/ShippingVelocityChart', () => ({
 
 import {
   pipelineRows,
+  SHIPPING_STATE_REFETCH_MS,
   ShippingStatistics,
 } from '@/app/app/(shell)/admin/shipping/ShippingStatistics';
 import { unknownProjection } from '@/lib/ovie/shipping-state';
 import { parseShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import { SHIPPING_STATE_FRESHNESS_MS } from '@/lib/ovie/shipping-state/contract';
 
 const OBSERVED_AT = new Date(Date.now() - 1_000).toISOString();
 const FRESH_UNTIL = new Date(Date.now() + 10_000).toISOString();
@@ -201,6 +203,28 @@ describe('ShippingStatistics states', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     fetchMock.mockRestore();
+  }, 15_000);
+
+  it('refetches inside the freshness window so live counts never age into stale (Ovie)', async () => {
+    expect(SHIPPING_STATE_REFETCH_MS).toBeLessThan(SHIPPING_STATE_FRESHNESS_MS);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(
+        async () =>
+          new Response(JSON.stringify(projectionWithCounts()), { status: 200 })
+      );
+    try {
+      renderStatistics();
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(SHIPPING_STATE_REFETCH_MS + 100);
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2)
+      );
+    } finally {
+      fetchMock.mockRestore();
+      vi.useRealTimers();
+    }
   }, 15_000);
 
   it('keeps stale receipts visible as context while withholding stale counts', async () => {
