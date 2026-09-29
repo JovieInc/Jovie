@@ -173,12 +173,12 @@ export function OnboardingShell({
         contentClassName='overflow-hidden!'
         main={
           <div
-            className='relative flex min-h-0 flex-1'
+            className='relative flex min-h-0 flex-1 flex-col'
             data-onboarding-session={sessionLabel}
           >
             {!isSignedIn ? (
               <div
-                className='absolute right-3 top-3 z-30 sm:right-4 sm:top-4'
+                className='flex min-h-11 shrink-0 items-center justify-end px-3 sm:px-4'
                 data-testid='onboarding-sign-in-header'
               >
                 <Link

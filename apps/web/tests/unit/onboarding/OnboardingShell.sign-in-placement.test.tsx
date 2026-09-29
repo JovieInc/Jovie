@@ -31,11 +31,16 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
 }));
 
 describe('onboarding sign-in placement', () => {
-  it('anchors the quiet sign-in link in an absolute top-right header slot', () => {
+  it('keeps the quiet sign-in link in flow above chat messages', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     const header = screen.getByTestId('onboarding-sign-in-header');
-    expect(header).toHaveClass('absolute', 'right-3', 'top-3');
+    const chat = screen.getByTestId('onboarding-chat');
+    expect(header).toHaveClass('flex', 'shrink-0', 'justify-end');
+    expect(header).not.toHaveClass('absolute');
+    expect(
+      header.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
       APP_ROUTES.SIGNIN
