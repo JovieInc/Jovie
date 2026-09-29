@@ -67,7 +67,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       {
         id: 'email',
         kind: 'email',
-        title: 'Alex was emailed: "Quiet Year — out now."',
+        title: 'Alex was emailed: "Quiet Year is out now."',
       },
       {
         id: 'click',
