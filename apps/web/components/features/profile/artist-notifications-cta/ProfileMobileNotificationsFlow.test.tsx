@@ -62,6 +62,23 @@ function renderFlow(
 }
 
 describe('ProfileMobileNotificationsFlow', () => {
+  it.each(['overlay', 'modal'] as const)(
+    'names the %s dialog for the artist whose updates are being requested',
+    presentation => {
+      renderFlow({ presentation, step: 'email' });
+
+      expect(
+        screen.getByRole('dialog', { name: 'Get Updates from Tim White' })
+      ).toHaveAttribute('aria-modal', 'true');
+    }
+  );
+
+  it('keeps the inline flow outside modal dialog semantics', () => {
+    renderFlow({ presentation: 'inline', step: 'email' });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('labels the event preference with the generalized Events copy', () => {
     renderFlow();
 
