@@ -6,6 +6,7 @@ import {
   auditCoverageViaReceipts,
   checkChangedComponents,
   hasRealLegacyTestEvidence,
+  isStoryRequirementExempt,
   resolveRenderedEvaluationSection,
   runComponentShipGate,
 } from '../../component-ship-gate.mjs';
@@ -475,6 +476,73 @@ describe('diff gate', () => {
     expect(result.issues.map(issue => issue.rule)).toEqual(
       expect.arrayContaining(['missing-test', 'missing-story'])
     );
+  });
+
+  describe('design-studio story exemption (JOV-6773)', () => {
+    it('exempts only the components/design-studio/ prefix, not lookalikes', () => {
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/design-studio/SectionVariantPreview.tsx'
+        )
+      ).toBe(true);
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/design-studio/nested/Foo.tsx'
+        )
+      ).toBe(true);
+
+      // Not a real match for the exempt prefix -- must not be over-exempted.
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/design-studio-marketing/Foo.tsx'
+        )
+      ).toBe(false);
+      expect(
+        isStoryRequirementExempt(
+          'apps/web/components/features/design-studio/Foo.tsx'
+        )
+      ).toBe(false);
+      expect(
+        isStoryRequirementExempt('apps/web/components/atoms/Badge.tsx')
+      ).toBe(false);
+    });
+
+    it('does not require a story for a tested design-studio component', () => {
+      const sourceRel =
+        'apps/web/components/design-studio/StudioWidget.tsx';
+      const testRel =
+        'apps/web/components/design-studio/StudioWidget.test.tsx';
+      const root = fixtureRepo({
+        [sourceRel]:
+          'export function StudioWidget() { return null }\n',
+        [testRel]:
+          "import { render } from '@testing-library/react';\n" +
+          "import { StudioWidget } from './StudioWidget';\n" +
+          'render(<StudioWidget />);\n',
+      });
+
+      const result = checkChangedComponents([sourceRel, testRel], {
+        repoRoot: root,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
+        false
+      );
+    });
+
+    it('still requires a test for a design-studio component (only the story is exempt)', () => {
+      const sourceRel =
+        'apps/web/components/design-studio/StudioWidget.tsx';
+      const root = fixtureRepo({
+        [sourceRel]: 'export function StudioWidget() { return null }\n',
+      });
+
+      const result = checkChangedComponents([sourceRel], { repoRoot: root });
+
+      expect(result.ok).toBe(false);
+      expect(result.issues.map(issue => issue.rule)).toEqual(['missing-test']);
+    });
   });
 
   it('accepts a changed feature component only with touched real test and story evidence', () => {
