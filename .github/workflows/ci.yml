@@ -653,10 +653,8 @@ jobs:
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(cat "$PATH_DIFF_DIR/files.txt")
             if [[ "${IS_NOOP:-}" == "true" ]]; then
-              # Path Changes succeeds with every optional lane disabled, while
-              # merge-group admission, ci-fast, secret, migration, and PR Ready
-              # still validate the exact combined head. The typed no-op output
-              # lets only unit and build/layout skip their expensive work.
+              # Typed no-op: Path Changes passes with all optional lanes off;
+              # merge-group gates still validate the exact combined head.
               PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
               mkdir -p "$PRODUCT_LANE_DIR"
               : > "$PRODUCT_LANE_DIR/changed-paths.txt"
@@ -669,8 +667,8 @@ jobs:
               emit_ci_lanes none
               exit 0
             fi
-            # Compatibility for the one landing where the trusted base resolver
-            # predates explicit SHA metadata. Future bases emit these directly.
+            # Compat for the landing where the trusted base resolver predates
+            # explicit SHA metadata; future bases emit these directly.
             if [[ -z "$PATH_DIFF_BASE_SHA" ]]; then
               if [[ "$SOURCE" == "event_base" ]]; then
                 PATH_DIFF_BASE_SHA="$MERGE_GROUP_BASE_SHA"
@@ -691,10 +689,10 @@ jobs:
             echo "path_diff_base_sha=$PATH_DIFF_BASE_SHA" >> "$GITHUB_OUTPUT"
             CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"
             CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"
+            CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # Fail closed on base resolution: a failed fetch used to leave an
-            # empty CHANGED_FILES list that looked like docs-only and skip-
-            # cascaded ci-fast / unit leaves while risk still ran.
+            # Fail closed on base resolution: an empty CHANGED_FILES list must
+            # not look docs-only and skip-cascade required lanes.
             git fetch --no-tags origin "${{ github.base_ref }}"
             if ! git rev-parse --verify "origin/${{ github.base_ref }}" >/dev/null 2>&1; then
               echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
@@ -702,10 +700,19 @@ jobs:
             fi
             CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"
             CLASSIFICATION_HEAD_REF="HEAD"
+            CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
             TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
             git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
+            if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
+              # Merge tree-identical to base; classify merge-base..head (JOV-6820).
+              PULL_REQUEST_HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+              git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"
+              CLASSIFICATION_BASE_REF=$(git merge-base "origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")
+              CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"
+              CHANGED_FILES=$(git diff --no-renames --name-only "$CLASSIFICATION_BASE_REF" "$CLASSIFICATION_HEAD_REF")
+            fi
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
               exit 1
@@ -734,6 +741,7 @@ jobs:
             git cat-file -e "${PUSH_BASE_SHA}^{commit}"
             CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"
             CLASSIFICATION_HEAD_REF="HEAD"
+            CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
             TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
             git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
               > "$TRUSTED_CI_REPO_LANES"
@@ -747,7 +755,7 @@ jobs:
           mkdir -p "$PRODUCT_LANE_DIR"
           printf '%s\n' "$CHANGED_FILES" > "$PRODUCT_LANE_DIR/changed-paths.txt"
           TRUSTED_PRODUCT_LANE_CLASSIFIER="$PRODUCT_LANE_DIR/product-lane-classifier.mjs"
-          git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs" \
+          git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs" \
             > "$TRUSTED_PRODUCT_LANE_CLASSIFIER"
           node "$TRUSTED_PRODUCT_LANE_CLASSIFIER" \
             --files-from "$PRODUCT_LANE_DIR/changed-paths.txt" \
@@ -884,11 +892,7 @@ jobs:
             echo "run_e2e=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Launch-gate golden path (JOV-3758). Mirrors docs/launch/LAUNCH_GATES.md's
-          # path list: onboarding routes/components/libs, auth signup/signin entrypoints,
-          # dashboard shell/releases flows, billing/checkout API routes used by the golden
-          # path, golden-path Playwright specs + helpers, and launch-gate CI/Lighthouse/perf
-          # config. Docs-only changes never reach here (handled by the docs-only guard above).
+          # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
           LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/signin/|apps/web/app/signup/|apps/web/app/sign-in/|apps/web/app/sign-up/|apps/web/app/app/\(shell\)/dashboard/|apps/web/app/app/\(shell\)/layout\.tsx|apps/web/components/features/dashboard/|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/\.lighthouserc\.onboarding\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
@@ -904,8 +908,7 @@ jobs:
             echo "run_drizzle=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Isolated DB certification selects database, authz, migration, harness, and dependency inputs.
-          # Jobs that create ephemeral Neon branches must check this flag before doing so.
+          # Isolated DB certification: database, authz, migration, harness, dependency inputs.
           NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
             echo "run_neon=true" >> "$GITHUB_OUTPUT"
