@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/features/onboarding/ChatProposeNextStepCard.test.tsx
 import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
