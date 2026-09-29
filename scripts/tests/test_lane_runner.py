@@ -117,6 +117,12 @@ class PromptTest(unittest.TestCase):
         self.assertIn("Do not run gstack", prompt)
         self.assertIn("gh pr create --draft", prompt)
 
+    def test_contract_states_reviewable_diff_cap_for_every_run(self):
+        for labels in ([], ["area:auth"]):
+            prompt = lane.render_prompt(issue(labels=labels), "codex/jov-1", "")
+            self.assertIn(f"at or under {lane.MAX_REVIEWABLE_LINES} lines", prompt)
+            self.assertIn("ship one coherent slice per PR", prompt)
+
     def test_sensitive_contract_names_guarded_gates_and_red_lines(self):
         prompt = lane.render_prompt(issue(labels=["area:auth"]), "codex/jov-1", "")
         for needle in ("500 lines", "Migration Guard", "security scan", "boundary", "llm-review",
