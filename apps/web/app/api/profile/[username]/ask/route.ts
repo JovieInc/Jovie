@@ -122,35 +122,57 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return json({ success: false, error: 'Invalid request' }, 400);
   }
 
-  const { context: ctx, creatorProfileId } =
-    await loadAskJovieContext(username);
-  if (!ctx || !creatorProfileId) {
-    return json({ success: false, error: 'Profile not found' }, 404);
-  }
+  try {
+    const { context: ctx, creatorProfileId } =
+      await loadAskJovieContext(username);
+    if (!ctx || !creatorProfileId) {
+      return json({ success: false, error: 'Profile not found' }, 404);
+    }
 
-  const payload = parsed.data;
+    const payload = parsed.data;
 
-  if (payload.action === 'question') {
-    const result = answerProfileQuestion(payload.question, ctx);
-    if (result.kind === 'unknown') {
-      // Persist the unanswered question so the owner sees demand signals.
+    if (payload.action === 'question') {
+      const result = answerProfileQuestion(payload.question, ctx);
+      if (result.kind === 'unknown') {
+        // Persist the unanswered question so the owner sees demand signals.
+        await persistInquiry({
+          creatorProfileId,
+          kind: 'question',
+          category: 'other',
+          message: payload.question,
+          context: { surface: 'ask_jovie' },
+        });
+        return json({ answered: false });
+      }
+      return json({ answered: true, text: result.text });
+    }
+
+    if (payload.action === 'message') {
+      const email = payload.email
+        ? normalizeSubscriptionEmail(payload.email)
+        : null;
+      if (payload.email && !email) {
+        return json(
+          { success: false, error: 'Please enter a valid email address.' },
+          400
+        );
+      }
       await persistInquiry({
         creatorProfileId,
-        kind: 'question',
-        category: 'other',
-        message: payload.question,
+        kind: 'message',
+        category: payload.category,
+        message: payload.message,
+        visitorName: payload.name?.trim() || null,
+        visitorEmail: email,
+        originatingQuestion: payload.question ?? null,
         context: { surface: 'ask_jovie' },
       });
-      return json({ answered: false });
+      return json({ success: true });
     }
-    return json({ answered: true, text: result.text });
-  }
 
-  if (payload.action === 'message') {
-    const email = payload.email
-      ? normalizeSubscriptionEmail(payload.email)
-      : null;
-    if (payload.email && !email) {
+    // action === 'intent' — structured audience capture: contact + intent.
+    const email = normalizeSubscriptionEmail(payload.email);
+    if (!email) {
       return json(
         { success: false, error: 'Please enter a valid email address.' },
         400
@@ -158,34 +180,28 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     await persistInquiry({
       creatorProfileId,
-      kind: 'message',
-      category: payload.category,
-      message: payload.message,
+      kind: 'intent',
+      category: payload.intent,
+      message: `Requested ${payload.intent.replaceAll('_', ' ')}`,
       visitorName: payload.name?.trim() || null,
       visitorEmail: email,
-      originatingQuestion: payload.question ?? null,
+      visitorCity: payload.city?.trim() || null,
       context: { surface: 'ask_jovie' },
     });
     return json({ success: true });
-  }
-
-  // action === 'intent' — structured audience capture: contact + intent.
-  const email = normalizeSubscriptionEmail(payload.email);
-  if (!email) {
+  } catch (error) {
+    logger.error('[Ask Jovie] Request failed', {
+      error: error instanceof Error ? error.message : String(error),
+      username,
+      route: '/api/profile/[username]/ask',
+    });
+    void captureError('Ask Jovie request failed', error, {
+      route: '/api/profile/[username]/ask',
+      username,
+    });
     return json(
-      { success: false, error: 'Please enter a valid email address.' },
-      400
+      { success: false, error: 'Something went wrong. Please try again.' },
+      500
     );
   }
-  await persistInquiry({
-    creatorProfileId,
-    kind: 'intent',
-    category: payload.intent,
-    message: `Requested ${payload.intent.replaceAll('_', ' ')}`,
-    visitorName: payload.name?.trim() || null,
-    visitorEmail: email,
-    visitorCity: payload.city?.trim() || null,
-    context: { surface: 'ask_jovie' },
-  });
-  return json({ success: true });
 }

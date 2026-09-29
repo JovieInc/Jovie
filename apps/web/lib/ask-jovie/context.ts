@@ -3,6 +3,7 @@ import 'server-only';
 import { getProfileAndLinks } from '@/app/[username]/_lib/public-profile-loader';
 import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
+import { toISOStringOrNull, toISOStringSafe } from '@/lib/utils/date';
 import type { AskJovieProfileContext } from './answer';
 
 export interface AskJovieProfileLoad {
@@ -39,18 +40,19 @@ export async function loadAskJovieContext(
       releases: releases.map(release => ({
         title: release.title,
         releaseType: release.releaseType,
-        releaseDate: release.releaseDate,
+        releaseDate: toISOStringOrNull(release.releaseDate),
         slug: release.slug,
       })),
       latestRelease: result.latestRelease
         ? {
             ...result.latestRelease,
-            releaseDate:
-              result.latestRelease.releaseDate?.toISOString() ?? null,
+            // unstable_cache JSON round-trips Dates into strings — normalize
+            // defensively so a warm cache never yields a bare string here.
+            releaseDate: toISOStringOrNull(result.latestRelease.releaseDate),
           }
         : null,
       tourDates: tourDates.map(show => ({
-        startDate: show.startDate,
+        startDate: toISOStringSafe(show.startDate),
         venueName: show.venueName,
         city: show.city,
         region: show.region,

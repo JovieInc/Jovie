@@ -1590,6 +1590,198 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('classifies every JOV-7110 registry-gap source at its registered screen id', () => {
+    const cases = [
+      ['apps/web/app/artists/page.tsx', 'web.artists'],
+      [
+        'apps/web/app/(marketing)/artist-profiles/page.tsx',
+        'web.artist-profiles',
+      ],
+      [
+        'apps/web/app/(marketing)/artist-profiles/artist-profile-modes.ts',
+        'web.artist-profiles',
+      ],
+      [
+        'apps/web/app/(marketing)/artist-profile/page.tsx',
+        'web.artist-profile',
+      ],
+      [
+        'apps/web/app/(marketing)/artist-notifications/page.tsx',
+        'web.artist-notifications',
+      ],
+      ['apps/web/app/(marketing)/voice/page.tsx', 'web.voice'],
+      ['apps/web/app/(marketing)/instant-merch/page.tsx', 'web.instant-merch'],
+      [
+        'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+        'web.instant-merch',
+      ],
+      [
+        'apps/web/app/(marketing)/youtube-thumbnails/page.tsx',
+        'web.youtube-thumbnails',
+      ],
+      [
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        'web.youtube-thumbnails',
+      ],
+      ['apps/web/app/(marketing)/demo/video/page.tsx', 'web.demo-video'],
+      ['apps/web/app/(marketing)/demovideo/page.tsx', 'web.demovideo'],
+      ['apps/web/app/waitlist/invite/page.tsx', 'web.waitlist-invite'],
+    ];
+    for (const [path, expectedId] of cases) {
+      const classified = classifyScreenPath(path);
+      assert.equal(
+        classified.kind,
+        'registered',
+        `${path} should classify as registered`
+      );
+      assert.equal(
+        classified.entry?.id,
+        expectedId,
+        `${path} should register to ${expectedId}`
+      );
+    }
+  });
+
+  it('leaves web.artists unbound from the marketing manifest (out of manifest scope)', () => {
+    // web.artists (apps/web/app/artists/page.tsx) sits outside the
+    // (home)/(marketing)/(profile-admission)/waitlist roots that
+    // MARKETING_ROUTE_MANIFEST covers, and
+    // tests/contracts/global-page-contract.test.ts asserts the manifest's
+    // glob list matches exactly what its filesystem scan of those roots
+    // finds. Binding web.artists to a manifest route (even an exempt one)
+    // breaks that completeness contract, so this screen needs its own
+    // SCREEN_PROOF_ROUTES-style producer (JOV-7110 follow-up) rather than
+    // SCREEN_MARKETING_ROUTES.
+    assert.equal(SCREEN_MARKETING_ROUTES['web.artists'], undefined);
+  });
+
+  it('keeps every JOV-7110 registry-gap screen bound to the manifest route it is already captured at', () => {
+    const cases = [
+      ['web.voice', '/voice', 'apps/web/app/(marketing)/voice/page.tsx'],
+      [
+        'web.instant-merch',
+        '/instant-merch',
+        'apps/web/app/(marketing)/instant-merch/page.tsx',
+      ],
+    ];
+    for (const [screenId, route, sourcePath] of cases) {
+      const root = mkdtempSync(join(tmpdir(), 'screen-registry-gap-'));
+      const priorPath = process.env.PATH;
+      const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+      const priorArtifact = process.env.SCREEN_CERT_ARTIFACT_ID;
+      try {
+        const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+          cwd: ROOT,
+          encoding: 'utf8',
+        }).stdout.trim();
+        const image = readFileSync(
+          join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+        );
+        const now = Date.now();
+        const iso = offset => new Date(now + offset).toISOString();
+        const receiptFor = viewport => ({
+          schemaVersion: MARKETING_EVIDENCE_SCHEMA,
+          buildMode: 'production',
+          capturedAt: iso(-60_000),
+          coverageId: `web-marketing-route-${screenId}-${viewport}`,
+          documentStatus: 200,
+          finalPath: route,
+          route,
+          fixturePath: route,
+          qualityChecks: [...REQUIRED_MARKETING_QUALITY_CHECKS],
+          routeDisposition: 'active-verified',
+          screenshotSha256: createHash('sha256').update(image).digest('hex'),
+          sourcePath,
+          sourceGitSha: head,
+          stateMatrix: ['anonymous-default'],
+          viewport,
+        });
+        for (const viewport of ['desktop', 'mobile']) {
+          const dir = join(root, `screen-${viewport}`);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(
+            join(dir, 'receipt.json'),
+            JSON.stringify(receiptFor(viewport))
+          );
+          writeFileSync(join(dir, 'marketing-route.png'), image);
+        }
+        writeProofZip(root, [
+          'screen-desktop/receipt.json',
+          'screen-desktop/marketing-route.png',
+          'screen-mobile/receipt.json',
+          'screen-mobile/marketing-route.png',
+        ]);
+        const zip = readFileSync(join(root, 'proof.zip'));
+        const records = {
+          artifact: {
+            id: 42,
+            name: marketingArtifactName(head),
+            expired: false,
+            digest: sha256(zip),
+            created_at: iso(-30_000),
+            workflow_run: { id: 77 },
+          },
+          run: {
+            id: 77,
+            run_attempt: 3,
+            repository: { full_name: 'JovieInc/Jovie' },
+            head_branch: 'main',
+            head_sha: head,
+            path: '.github/workflows/screenshots.yml',
+            event: 'push',
+            conclusion: 'success',
+          },
+          jobs: {
+            jobs: [
+              {
+                id: 99,
+                name: 'Generate Screenshots',
+                run_id: 77,
+                run_attempt: 3,
+                head_sha: head,
+                conclusion: 'success',
+                started_at: iso(-90_000),
+                completed_at: iso(-10_000),
+              },
+            ],
+          },
+        };
+        writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+        const gh = join(root, 'gh');
+        writeFileSync(
+          gh,
+          `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+        );
+        chmodSync(gh, 0o755);
+        process.env.PATH = `${root}:${priorPath}`;
+        process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+        process.env.SCREEN_CERT_ARTIFACT_ID = '42';
+        const result = runScreenCertification({
+          headSha: head,
+          changedFiles: [sourcePath],
+          artifactId: 42,
+        });
+        assert.equal(
+          result.ok,
+          true,
+          `${screenId}: ${result.receipt.issues.join('\n')}`
+        );
+        assert.equal(result.receipt.certified, true);
+        assert.equal(result.receipt.changedScreens[0]?.id, screenId);
+        assert.equal(result.receipt.changedScreens[0]?.verdict, 'pass');
+      } finally {
+        process.env.PATH = priorPath;
+        if (priorDiffBase === undefined)
+          delete process.env.SCREEN_CERT_DIFF_BASE;
+        else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+        if (priorArtifact === undefined)
+          delete process.env.SCREEN_CERT_ARTIFACT_ID;
+        else process.env.SCREEN_CERT_ARTIFACT_ID = priorArtifact;
+        rmSync(root, { force: true, recursive: true });
+      }
+    }
+  });
+
   it('fails marketing capture evidence with specific reasons: forged, stale, wrong-build, incomplete, unavailable', () => {
     const root = mkdtempSync(join(tmpdir(), 'screen-marketing-fail-'));
     const priorPath = process.env.PATH;

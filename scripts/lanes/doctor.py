@@ -24,8 +24,9 @@ COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
 # Workers spawning but no agent run starting or ending: the 2026-09-28 spawn-exit deadlock
 # (every worker exited on claim), which looked busy to every other rule.
-NO_WORK_S = 60 * 60
+NO_WORK_S = 5 * 60
 PROVIDER_IDLE_S = 5 * 60
+ESCALATION_S = 10 * 60
 POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
@@ -40,6 +41,10 @@ AGED_PR_S = 7 * 24 * 3600
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def epoch_iso(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def read_json(path: Path, default):
@@ -186,11 +191,28 @@ def _locked(path: Path) -> bool:
         return True
 
 
-def codex_idle_with_qualified_work(obs: dict) -> bool:
-    codex = obs.get("codex") or {}
-    capacity = (obs.get("capacityByProvider") or {}).get("codex") or {}
-    pool = (obs.get("poolByProvider") or {}).get("codex")
-    return bool(pool and codex.get("available") and capacity.get("slots") and not capacity.get("running"))
+def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
+    """The tick attempted recovery, but no worker owns any configured slot."""
+    capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
+    pool = (obs.get("poolByProvider") or {}).get(provider)
+    tick = obs.get("tick") or {}
+    account_ready = provider != "codex" or bool((obs.get("codex") or {}).get("available"))
+    return bool(pool and account_ready and capacity.get("slots") and not capacity.get("running")
+                and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
+
+
+def provider_idle_since(obs: dict, previous: dict) -> dict[str, float]:
+    """Preserve the first failed restart tick independently for every provider family."""
+    started = dict(previous.get("providerIdleSince") or {})
+    legacy_codex = previous.get("codexIdleSince")
+    if legacy_codex and "codex" not in started:
+        started["codex"] = legacy_codex
+    for provider in (obs.get("capacityByProvider") or {}):
+        if provider_idle_with_qualified_work(obs, provider):
+            started.setdefault(provider, obs["now"])
+        else:
+            started.pop(provider, None)
+    return started
 
 
 # ---------------------------------------------------------------- judgement
@@ -223,13 +245,15 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if pool and spawned and not obs.get("worktrees", 1) and (obs.get("lastWorkAge") or NO_WORK_S + 1) > NO_WORK_S:
         alerts["spawn-exit"] = (f"{spawned} workers spawn each tick but no agent run started or ended in "
                                 f"{NO_WORK_S // 60}m with {pool} issues waiting; workers exit on claim")
-    codex_capacity = (obs.get("capacityByProvider") or {}).get("codex") or {}
-    codex_pool = (obs.get("poolByProvider") or {}).get("codex")
-    idle_since = (previous or {}).get("codexIdleSince")
-    if (codex_idle_with_qualified_work(obs) and idle_since and obs["now"] - idle_since >= PROVIDER_IDLE_S):
-        alerts["provider-idle:codex"] = (f"codex has {len(codex['available'])} available account(s), "
-                                         f"{codex_pool} compatible issue(s), and 0/{codex_capacity['slots']} workers "
-                                         f"running for more than {PROVIDER_IDLE_S // 60}m")
+    for provider, idle_since in ((previous or {}).get("providerIdleSince") or {}).items():
+        if not provider_idle_with_qualified_work(obs, provider) or obs["now"] - idle_since < PROVIDER_IDLE_S:
+            continue
+        capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
+        pool_for_provider = (obs.get("poolByProvider") or {}).get(provider)
+        accounts = f", {len(codex['available'])} available account(s)" if provider == "codex" else ""
+        alerts[f"provider-idle:{provider}"] = (f"{provider} has {pool_for_provider} compatible issue(s){accounts}, "
+                                               f"but 0/{capacity['slots']} workers after dispatch retried for "
+                                               f"{PROVIDER_IDLE_S // 60}m")
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
@@ -261,6 +285,71 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     return alerts
 
 
+def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_name: str) -> dict[str, dict]:
+    """Typed, generation-deduped evidence for every actionable doctor condition."""
+    prior = previous.get("conditions") or {}
+    receipts: dict[str, dict] = {}
+    now = float(obs["now"])
+    critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical")
+    actions = {
+        "tick-error": "retry-dispatch-tick",
+        "linear-down": "retry-linear-read-and-publish-independent-receipt",
+        "spawn-exit": "dispatch-provider-workers",
+        "hud-stale": "restart-hud-service",
+        "orphan-prs": "reconcile-pr-ownership",
+    }
+    resources = {
+        "linear-down": ["linear", "pool"],
+        "pool-empty": ["linear-pool"],
+        "tick-error": ["dispatch-tick"],
+        "spawn-exit": ["dispatch-tick", "worker-pool"],
+        "hud-stale": ["tty1-hud", "status-feed"],
+        "no-landing": ["shipping-throughput"],
+    }
+    for key, evidence in alerts.items():
+        old = prior.get(key) or {}
+        continuing = old.get("state") == "active"
+        generation = int(old.get("generation") or 0) + (0 if continuing else 1)
+        provider = key.split(":", 1)[1] if ":" in key else None
+        first = (float(old["firstObservedEpoch"]) if continuing and old.get("firstObservedEpoch") is not None
+                 else float((previous.get("providerIdleSince") or {}).get(provider, now)))
+        source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
+        freshness = (obs.get("hudBeatAge") if key == "hud-stale" else
+                     obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)
+        action = ("dispatch-provider-workers" if key.startswith("provider-idle:") else
+                  "retry-provider-health-probe" if key.startswith("provider-down:") else
+                  actions.get(key, "reconcile-control-plane-condition"))
+        affected = resources.get(key) or ([provider] if provider else [key])
+        receipts[key] = {
+            "schema": "jovie.control-plane-liveness-condition/v1",
+            "idempotencyKey": f"{host_name}:{key}:{generation}",
+            "condition": key,
+            "generation": generation,
+            "state": "active",
+            "severity": "critical" if key in critical or key.startswith(("provider-idle:", "provider-down:")) else "degraded",
+            "owner": "symphony-lanes-doctor",
+            "owningInvariant": "JOV-6004",
+            "affectedResources": affected,
+            "firstObservedAt": epoch_iso(first),
+            "firstObservedEpoch": first,
+            "source": {"producer": "scripts/lanes/doctor.py", "status": source_status,
+                       "observedAt": epoch_iso(now), "freshnessSeconds": freshness},
+            "deadlineAt": epoch_iso(first + ESCALATION_S),
+            "recovery": {"action": action, "outcome": "failed" if key.startswith("provider-idle:") or key == "spawn-exit" else "retrying"},
+            "nextAction": "wake-summer-via-linear-or-independent-status-feed",
+            "terminalOutcome": None,
+            "evidence": evidence,
+        }
+    for key, old in prior.items():
+        if key in alerts or old.get("state") != "active":
+            if key not in receipts:
+                receipts[key] = old
+            continue
+        receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(now),
+                         "nextAction": "none", "terminalOutcome": "health-proven"}
+    return receipts
+
+
 # ---------------------------------------------------------------- Linear actions
 
 class Tracker:
@@ -288,7 +377,8 @@ class Tracker:
         if found:
             return found
         try:
-            priority = 1 if key.startswith("provider-idle:") else 2
+            priority = 1 if key.startswith(("provider-idle:", "provider-down:")) or key in (
+                "linear-down", "spawn-exit", "tick-error") else 2
             team = self.linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}', {})["teams"]["nodes"][0]
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
@@ -303,6 +393,24 @@ class Tracker:
             return data["issueCreate"]["issue"]["id"]
         except Exception:
             return None
+
+    def contradict_invariant(self, event: dict) -> None:
+        """Reopen the liveness owner only when a new typed generation contradicts its proof."""
+        try:
+            data = self.linear.gql(
+                'query($n:Float!){issues(filter:{team:{key:{eq:"JOV"}},number:{eq:$n}})'
+                '{nodes{id state{type}}}}', {"n": 6004.0})
+            owner = data["issues"]["nodes"][0]
+            if owner["state"]["type"] == "completed":
+                self.linear.move(owner["id"], "Triage")
+            self.linear.comment(
+                owner["id"],
+                f"🤖 liveness contradiction `{event['idempotencyKey']}`: {event['evidence']}\n\n"
+                f"First observed: {event['firstObservedAt']}; deadline: {event['deadlineAt']}; "
+                f"next: `{event['nextAction']}`.",
+            )
+        except Exception:
+            pass
 
     def reopen(self, issue_id: str, text: str) -> None:
         try:
@@ -319,7 +427,8 @@ class Tracker:
             pass
 
 
-def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float) -> dict:
+def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
+              conditions: dict[str, dict] | None = None) -> dict:
     """Carry issue ids across ticks; open/reopen/close through the tracker; return the new doctor.json."""
     issues = dict(previous.get("issues", {}))      # key -> {"id", "closedAt"}
     for key, text in alerts.items():
@@ -327,21 +436,37 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
         if entry and entry.get("closedAt") is None and entry.get("id"):
             continue  # still open
         if entry and entry.get("closedAt") is None and not entry.get("id"):
-            issues[key] = {"id": tracker.open(key, text) if tracker else None, "closedAt": None}  # retry a failed open
+            issue_id = tracker.open(key, text) if tracker else None
+            issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
+            contradict = getattr(tracker, "contradict_invariant", None) if issue_id else None
+            if contradict and conditions and key in conditions:
+                contradict(conditions[key])
             continue
         if entry and now - float(entry.get("closedAt") or 0) < COOL_OFF_S and entry.get("id"):
             if tracker:
                 tracker.reopen(entry["id"], text)
+                contradict = getattr(tracker, "contradict_invariant", None)
+                if contradict and conditions and key in conditions:
+                    contradict(conditions[key])
             issues[key] = {"id": entry["id"], "closedAt": None}
             continue
         issue_id = tracker.open(key, text) if tracker else None
         issues[key] = {"id": issue_id, "closedAt": None}
+        if tracker and issue_id and conditions and key in conditions:
+            contradict = getattr(tracker, "contradict_invariant", None)
+            if contradict:
+                contradict(conditions[key])
     for key, entry in issues.items():
         if key not in alerts and entry.get("closedAt") is None:
             if tracker and entry.get("id"):
                 tracker.close(entry["id"])
             entry["closedAt"] = now
-    return {"at": now_iso(), "alerts": alerts, "issues": issues}
+    receipts = {}
+    for key, event in (conditions or {}).items():
+        escalation = ("cleared" if event.get("state") == "resolved" else
+                      "requested" if (issues.get(key) or {}).get("id") else "pending")
+        receipts[key] = {**event, "summerEscalation": {"transport": "linear", "outcome": escalation}}
+    return {"at": epoch_iso(now), "alerts": alerts, "issues": issues, "conditions": receipts}
 
 
 # ---------------------------------------------------------------- status feed
@@ -376,7 +501,8 @@ def fetch_slo(host, lane) -> dict | None:
     return record.get("snapshot")
 
 
-def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict | None = None) -> dict:
+def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict | None = None,
+                conditions: dict[str, dict] | None = None) -> dict:
     """The few numbers Summer and other agents need, in one small JSON."""
     counts = {}
     for path in (host.state / "slots").glob("*.lock"):
@@ -420,7 +546,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "idle": sum(c["slots"] - c["running"] for c in counts.values()),
             "pool": obs.get("pool"), "lastLandingAgeS": obs.get("lastLandingAge"),
             "codexAvailable": len((obs.get("codex") or {}).get("available") or []),
-            "alerts": alerts, "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
+            "alerts": alerts, "conditions": conditions or {},
+            "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "prs": (obs.get("reconcile") or {}).get("counts") or {}, "_idleQualifiedSince": next_idle_since,
@@ -478,19 +605,19 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]
     else:
         previous["poolEmptySince"] = None
-    if codex_idle_with_qualified_work(obs):
-        previous["codexIdleSince"] = previous.get("codexIdleSince") or obs["now"]
-    else:
-        previous["codexIdleSince"] = None
+    previous["providerIdleSince"] = provider_idle_since(obs, previous)
+    previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     alerts = judge(obs, previous)
+    conditions = condition_receipts(alerts, previous, obs, lane.HOST)
     if tracker is None and not os.environ.get("LANES_SELFTEST"):
         try:
             tracker = Tracker(lane.Linear(host.linear_env), lane.HOST)
         except Exception:
             tracker = None
-    result = reconcile(alerts, previous, tracker, obs["now"])
+    result = reconcile(alerts, previous, tracker, obs["now"], conditions)
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["codexIdleSince"] = previous["codexIdleSince"]
+    result["providerIdleSince"] = previous["providerIdleSince"]
     result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
     if not os.environ.get("LANES_SELFTEST"):
         try:
@@ -498,7 +625,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:
             obs["slo"] = obs.get("slo")
         try:
-            feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous)
+            feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous, result["conditions"])
             result["idleQualifiedSince"] = feed.pop("_idleQualifiedSince", {})
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
