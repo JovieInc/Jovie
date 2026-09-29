@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateDesktopSidebarContract } from './desktop-sidebar-contract.mjs';
 
 const ovieRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -167,14 +168,6 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
         text.includes('!isDesktop') && text.includes('SidebarCollapseButton'),
       'desktop sidebar must not render a second collapse control',
     ],
-    authShellToggle: [
-      'apps/web/components/organisms/AuthShell.tsx',
-      text =>
-        /sidebarTrigger\s*=\s*[^;]*isElectronRuntime\(\)\s*\?[^;]*null/.test(
-          text.replaceAll(/\s+/g, ' ')
-        ),
-      'AuthShell must not pass a second left-sidebar toggle to the header in Electron (JOV-7207)',
-    ],
     titlebar: [
       'apps/web/components/atoms/DesktopTitlebar.tsx',
       text =>
@@ -184,6 +177,16 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
       'desktop titlebar must preserve the native traffic-light geometry and use the canonical rail toggle',
     ],
   };
+
+  const desktopSources = await Promise.all([
+    source(repoRoot, 'apps/web/components/organisms/AuthShell.tsx'),
+    source(
+      repoRoot,
+      'apps/web/components/features/dashboard/organisms/DashboardHeader.tsx'
+    ),
+    source(repoRoot, 'apps/web/app/globals.css'),
+  ]);
+  violations.push(...validateDesktopSidebarContract(...desktopSources));
 
   for (const [file, predicate, message] of Object.values(required)) {
     const contents = await source(repoRoot, file);
