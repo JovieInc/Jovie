@@ -1120,7 +1120,15 @@ class FallbackSeatPathTests(unittest.TestCase):
                 )
 
     def test_registry_path_scans_default_candidates(self):
-        found = MODULE._fallback_registry_path(None)
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ) as env:
+                env.pop("GEM_MODEL_REGISTRY", None)
+                # Keep the host's installed Symphony bundle out of the scan so
+                # the assertion is hermetic on machines that have it deployed.
+                with mock.patch.object(
+                    pathlib.Path, "home", return_value=pathlib.Path(tmp)
+                ):
+                    found = MODULE._fallback_registry_path(None)
         script_dir = pathlib.Path(MODULE.__file__).resolve().parent
         expected = script_dir / "config" / "model-registry.json"
         if expected.is_file():
