@@ -41,6 +41,10 @@ export function DashboardMobileTabs({
   const { signOut } = useAuthSafe();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentNavigationHref = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const isElectron = useIsElectronRuntime();
   const { profileHref } = useProfileData(true);
@@ -104,12 +108,12 @@ export function DashboardMobileTabs({
     ) =>
       startNavigationTelemetry({
         itemId: item.id,
-        sourcePathname: pathname,
+        sourcePathname: currentNavigationHref,
         destinationHref: item.href,
         inputMethod,
         context: telemetryContext,
       }),
-    [pathname, telemetryContext]
+    [currentNavigationHref, telemetryContext]
   );
 
   const handleExpandedItemsVisible = useCallback(

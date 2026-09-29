@@ -146,6 +146,29 @@ describe('DashboardMobileTabs', () => {
     }
   });
 
+  it('closes More when a query-backed destination keeps the same pathname', async () => {
+    mockPathname.mockReturnValue(APP_ROUTES.CONTACTS);
+    mockSearchParams.mockReturnValue(new URLSearchParams());
+    const user = userEvent.setup();
+    render(<DashboardMobileTabs />);
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const audienceLink = screen.getByRole('link', { name: 'Audience' });
+    audienceLink.addEventListener('click', event => event.preventDefault());
+    await user.click(audienceLink);
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Expanded Navigation Menu' })
+    ).not.toBeInTheDocument();
+    expect(mockStartNavigationTelemetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'audience',
+        sourcePathname: APP_ROUTES.CONTACTS,
+        destinationHref: APP_ROUTES.CONTACTS_AUDIENCE,
+      })
+    );
+  });
+
   it('supports keyboard open and Escape close without moving the tab row', async () => {
     const user = userEvent.setup();
     render(<DashboardMobileTabs />);

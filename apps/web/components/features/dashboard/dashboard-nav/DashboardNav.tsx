@@ -61,6 +61,10 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentNavigationHref = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
   // Persisted navigation state is a client-only enhancement. Reading it during
@@ -230,7 +234,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       return;
     startNavigationTelemetry({
       itemId: item.id,
-      sourcePathname: pathname,
+      sourcePathname: currentNavigationHref,
       destinationHref: item.href,
       inputMethod: navigationInputMethodFromClick(event.detail),
       context: telemetryContext,
@@ -243,7 +247,8 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       const isNewThreadItem =
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
       const isActive = isNewThreadItem
-        ? normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT
+        ? normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+          searchParams.get('panel') !== 'profile'
         : isNavigationItemActive(item, pathname, searchParams);
       const shortcut = NAV_SHORTCUTS[item.id];
 
@@ -269,7 +274,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
               : inputMethod =>
                   startNavigationTelemetry({
                     itemId: isInSettings ? 'settings' : item.id,
-                    sourcePathname: pathname,
+                    sourcePathname: currentNavigationHref,
                     destinationHref: item.href,
                     inputMethod,
                     context: telemetryContext,
@@ -282,6 +287,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       );
     },
     [
+      currentNavigationHref,
       pathname,
       handleDemoNavClick,
       handlePrefetch,
