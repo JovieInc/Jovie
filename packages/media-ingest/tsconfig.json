@@ -8,6 +8,6 @@
     "noEmit": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["media-ingest/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules"]
 }

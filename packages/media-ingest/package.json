@@ -3,16 +3,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./media-ingest/index.ts"
+    ".": "./src/index.ts"
   },
   "bin": {
-    "media-ingest": "./media-ingest/cli.ts"
+    "media-ingest": "./src/cli.ts"
   },
   "engines": {
     "node": ">=24.21.0 <25"
   },
   "scripts": {
-    "lint": "biome check media-ingest",
+    "lint": "biome check src",
     "test": "vitest run",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit"
