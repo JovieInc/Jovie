@@ -287,6 +287,32 @@ describe('Tooltip', () => {
       expect(content.className).toContain('motion-reduce:animate-none');
     });
 
+    it('defaults to the neutral tooltip surface (tone="default")', () => {
+      render(<TestTooltip open={true} />);
+      const content = screen.getByTestId('tooltip-content');
+      expect(content.className).toContain('bg-surface-tooltip');
+      expect(content.className).not.toContain('bg-error-subtle');
+    });
+
+    it('applies the shared error tokens for tone="danger" (JOV-6773)', () => {
+      render(
+        <TooltipProvider>
+          <Tooltip open={true}>
+            <TooltipTrigger>
+              <button type='button'>Trigger</button>
+            </TooltipTrigger>
+            <TooltipContent tone='danger'>Invalid email</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+      const content = screen.getByTestId('tooltip-content');
+      expect(content.className).toContain('border-error/30');
+      expect(content.className).toContain('bg-error-subtle');
+      expect(content.className).toContain('text-error');
+      expect(content.className).not.toContain('bg-surface-tooltip');
+      expect(content.className).not.toMatch(/\bred-\d/);
+    });
+
     it('merges custom className', () => {
       render(
         <TooltipProvider>

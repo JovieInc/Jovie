@@ -6,6 +6,8 @@
  * becomes now, zero, healthy, or blank.
  */
 
+import type { CapacityHorizon } from './capacity';
+
 export const SHIPPING_STATE_SCHEMA = 'ovie.shipping-state.v1' as const;
 export const SHIPPING_STATE_PRODUCER_ID = 'ubuntu-operational-truth' as const;
 export const SHIPPING_STATE_PRODUCER_VERSION = '1' as const;
@@ -347,6 +349,7 @@ export type DeliveryLanes = {
   readonly alerts: readonly string[];
   readonly heldByReason: Readonly<Record<string, number>>;
   readonly failedByReason: Readonly<Record<string, number>>;
+  readonly capacity: CapacityHorizon | null;
   readonly publishedAt: string | null;
   /** The feed's own `at` is older than the lanes semantic window. */
   readonly stale: boolean;
@@ -495,6 +498,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       alerts: [],
       heldByReason: {},
       failedByReason: {},
+      capacity: null,
       publishedAt: null,
       stale: false,
     },

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   profilePrimaryPillClassName,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFormSkeleton,
   SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
 } from './shared';
@@ -36,6 +38,25 @@ export const Composer: StoryObj<typeof SubscriptionPearlComposer> = {
         isResending={false}
         onResend={() => undefined}
       />
+    </div>
+  ),
+};
+
+/** Desktop error tooltip — the `-error` token, not raw red-* (JOV-6773). */
+export const DesktopErrorIndicator: StoryObj<typeof SubscriptionPearlComposer> =
+  {
+    render: () => (
+      <div className='flex h-16 items-center'>
+        <SubscriptionDesktopErrorIndicator error='Enter a valid email' />
+      </div>
+    ),
+  };
+
+/** Loading placeholder shown while checking subscription status. */
+export const FormSkeleton: StoryObj<typeof SubscriptionPearlComposer> = {
+  render: () => (
+    <div className='w-80'>
+      <SubscriptionFormSkeleton />
     </div>
   ),
 };
