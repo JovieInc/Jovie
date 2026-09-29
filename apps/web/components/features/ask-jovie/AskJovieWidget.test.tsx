@@ -32,6 +32,14 @@ describe('AskJovieWidget', () => {
     vi.unstubAllGlobals();
   });
 
+  it('tags the launcher so phone CSS can lift it above the profile dock (JOV-7114)', () => {
+    render(WIDGET);
+
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie about Test Artist' })
+    ).toHaveAttribute('data-ask-jovie-launcher');
+  });
+
   it('opens the dialog with a greeting and suggested questions', () => {
     render(WIDGET);
     openWidget();

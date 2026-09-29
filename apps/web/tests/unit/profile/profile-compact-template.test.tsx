@@ -457,6 +457,25 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
+  it('passes the proof claim to the phone claim bar (JOV-7114)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        proofClaim
+        showClaimFooter
+        claimFooterHref='/start?campaign=proof-to-claim'
+        claimFooterLabel='Claim yours'
+      />
+    );
+
+    expect(
+      await screen.findByTestId('profile-proof-claim-bar-cta')
+    ).toHaveAttribute('href', '/start?campaign=proof-to-claim');
+  });
+
   it('hides the floating back control on the public profile root first landing', async () => {
     render(
       <ProfileCompactTemplate

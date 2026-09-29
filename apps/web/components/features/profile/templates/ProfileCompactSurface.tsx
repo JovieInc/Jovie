@@ -1,7 +1,7 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
-import { ChevronLeft, MoreHorizontal } from 'lucide-react';
+import { ArrowRight, ChevronLeft, MoreHorizontal } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   type MouseEvent,
@@ -27,6 +27,7 @@ import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader'
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import { ProofClaimCtaLink } from '@/features/profile/ProofClaimCtaLink';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
@@ -163,6 +164,11 @@ function getNewestPublicRelease(
 }
 
 interface ProfileCompactSurfaceProps {
+  /** Proof profiles only: phone claim bar above the dock (JOV-7114). */
+  readonly proofClaimCta?: {
+    readonly href: string;
+    readonly label: string;
+  } | null;
   /** Opens the release credits sheet from the overflow menu. */
   readonly onOpenReleaseCredits?: () => void;
   readonly renderMode?: ProfileRenderMode;
@@ -278,6 +284,7 @@ function resolveActivePrimaryTab(params: {
 }
 
 export function ProfileCompactSurface({
+  proofClaimCta = null,
   renderMode = 'interactive',
   presentation = 'standalone',
   onOpenReleaseCredits,
@@ -861,6 +868,29 @@ export function ProfileCompactSurface({
             showAlerts={allowFanCapture}
             isMenuOpen={isMenuActive}
             onTabSelect={handleTabSelect}
+            aboveNav={
+              proofClaimCta ? (
+                <div
+                  className='pointer-events-auto mb-2 md:hidden'
+                  data-testid='profile-proof-claim-bar'
+                >
+                  <ProofClaimCtaLink
+                    href={proofClaimCta.href}
+                    label={proofClaimCta.label}
+                    testId='profile-proof-claim-bar-cta'
+                    className='flex h-11 w-full items-center justify-between rounded-full border border-(--profile-dock-border) bg-(--profile-dock-solid-bg) px-4 text-sm font-medium text-white/88 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+                  >
+                    <span>
+                      <span className='text-white/55'>jov.ie/</span>you
+                    </span>
+                    <span className='inline-flex items-center gap-1.5'>
+                      {proofClaimCta.label}
+                      <ArrowRight className='size-4' aria-hidden='true' />
+                    </span>
+                  </ProofClaimCtaLink>
+                </div>
+              ) : null
+            }
           />
         ) : null}
       </div>
