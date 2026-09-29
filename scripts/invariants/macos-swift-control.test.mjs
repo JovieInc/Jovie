@@ -51,7 +51,13 @@ function walkFiles(relDir, predicate) {
 
 function macosTopLevelDirs() {
   return readdirSync(join(ROOT, 'apps/macos'), { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+    .filter(
+      entry =>
+        entry.isDirectory() &&
+        !entry.name.startsWith('.') &&
+        entry.name !== 'node_modules' &&
+        existsSync(join(ROOT, 'apps/macos', entry.name, 'Package.swift'))
+    )
     .map(entry => entry.name)
     .sort();
 }
