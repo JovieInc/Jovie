@@ -143,9 +143,12 @@ export function buildQualitySaturationPlan(input) {
       left.id.localeCompare(right.id)
   );
   const recommendedPasses = rankedPasses.slice(0, capacity.maxParallelism);
-  const qualityFrontier = QUALITY_SATURATION_STAGES.findLast(stage =>
-    recommendedPasses.some(pass => pass.stage === stage)
+  const recommendedStages = new Set(
+    recommendedPasses.map(pass => pass.stage)
   );
+  const qualityFrontier = [...QUALITY_SATURATION_STAGES]
+    .reverse()
+    .find(stage => recommendedStages.has(stage));
   return {
     schema: QUALITY_SATURATION_PLAN_SCHEMA,
     object: input.object,
