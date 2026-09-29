@@ -78,6 +78,7 @@ export function GET() {
       version,
       deployedAt: env.VERCEL_DEPLOYMENT_TIME || Date.now(),
       commitSha: resolveCommitSha(),
+      deploymentId: env.VERCEL_DEPLOYMENT_ID,
       environment,
     },
     {

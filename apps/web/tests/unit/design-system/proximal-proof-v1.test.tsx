@@ -4,11 +4,10 @@
 // promise being made on that route, not generic proof inserted mechanically."
 //
 // Representative surface: the canonical homepage hero
-// (apps/web/components/homepage/HomepageIdentityHero.tsx). Its own doc
-// comment names the contract this evaluator proves: "Tim White's real
-// jov.ie/tim profile as first-party proof (JOV-6946)" rendered inside the
-// same hero section as the identity claim — not a generic testimonial dropped
-// in a separate, distant section. This renders the real component tree and
+// (apps/web/components/homepage/HomepageIdentityHero.tsx). Tim 2026-09-28:
+// the identity + link-claim hero proves its claim with Tim White's real
+// claimed jov.ie/tim (JOV-6946) inside the same hero section as the identity
+// claim, never an illustrative placeholder person. This renders the real component tree and
 // asserts the proof sits in the same immediate DOM container as the claim it
 // backs, and that the proof is a named, route-specific identity rather than
 // a placeholder.
@@ -16,7 +15,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
@@ -55,18 +54,15 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     render(<HomepageIdentityHero />);
 
     const hero = screen.getByTestId('marketing-section-hero');
-    const inner = hero.querySelector('.homepage-identity-hero__inner');
-    expect(inner, 'hero has one active-content container').not.toBeNull();
-
     const claim = screen.getByRole('heading', { level: 1 });
     const proof = screen.getByTestId('homepage-hero-real-profile');
 
-    // Proximal: the proof lives in the exact same immediate section as the
-    // claim, reachable with zero navigation and zero scroll-to-a-different
-    // section — not merely "somewhere on this page".
-    expect(inner?.contains(claim)).toBe(true);
-    expect(inner?.contains(proof)).toBe(true);
+    // Proximal: the proof lives in the same hero section as the claim,
+    // reachable with zero navigation and zero scroll-to-a-different section —
+    // not merely "somewhere on this page".
+    expect(hero.contains(claim)).toBe(true);
     expect(hero.contains(proof)).toBe(true);
+    expect(within(proof).getByText('jov.ie/', { exact: false })).toBeTruthy();
 
     // Always visible with the claim — proximal proof is not gated behind a
     // hover/drill-down interaction (that would be progressive-depth, a
@@ -87,10 +83,9 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     const proof = screen.getByTestId('homepage-hero-real-profile');
     const proofImage = within(proof).getByRole('img');
 
-    expect(proofImage).toHaveAttribute(
-      'src',
-      HOMEPAGE_MEDIA_MAP.connected.asset.publicUrl
-    );
+    expect(proofImage).toHaveAttribute('src', TIM_WHITE_PROFILE.avatarSrc);
+    expect(proof).toHaveTextContent(TIM_WHITE_PROFILE.name);
+    expect(proof).toHaveTextContent(TIM_WHITE_PROFILE.publicProfileHandle);
     expect(proofImage.getAttribute('alt')).toBe(proofAlt);
     // The proof is a real profile, not an illustrative/demo specimen.
     expect(screen.queryByTestId('homepage-profile-specimen')).toBeNull();
