@@ -1,6 +1,7 @@
 import {
   assertProofBriefRenderable,
   type CertifiedProofBrief,
+  proofBriefBrand,
 } from './contract';
 
 /**
@@ -15,7 +16,7 @@ export function renderProofBriefText(
   assertProofBriefRenderable(brief, { now: options.now });
 
   const lines: string[] = [
-    "Here's what Jovie did for you in the last 7 days.",
+    proofBriefBrand(brief).intro,
     `${brief.subject} | ${brief.window.label}`,
     '',
     brief.hero.sentence,

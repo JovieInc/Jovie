@@ -7,7 +7,10 @@ import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBanner
 import { OperatorBannerWrapper } from '@/features/admin/OperatorBannerWrapper';
 import { WorkspaceLockScreen } from '@/features/workspace-lock/WorkspaceLockScreen';
 import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
-import { shouldRenderOperatorChrome } from '@/lib/app-shell/workspaces';
+import {
+  shouldLockOperatorWorkspace,
+  shouldRenderOperatorChrome,
+} from '@/lib/app-shell/workspaces';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { AppFlagProvider } from '@/lib/flags/client';
@@ -96,9 +99,14 @@ export async function DashboardShellContent({
   const needsAdminStepUp =
     showOperatorChrome &&
     !(await hasRecentAdminMfaReverification(await getCachedAuth()));
-  const workspaceLocked =
-    needsAdminStepUp ||
-    isWorkspaceLockCookieValue(cookieStore.get(WORKSPACE_LOCK_COOKIE)?.value);
+  const workspaceLocked = shouldLockOperatorWorkspace({
+    mode,
+    isAdmin: dashboardData.isAdmin,
+    needsAdminStepUp,
+    hasLegacyLockCookie: isWorkspaceLockCookieValue(
+      cookieStore.get(WORKSPACE_LOCK_COOKIE)?.value
+    ),
+  });
   const moneyHidden = isMoneyHiddenCookieValue(
     cookieStore.get(MONEY_HIDDEN_COOKIE)?.value
   );
@@ -127,6 +135,7 @@ export async function DashboardShellContent({
         <ProfileCompletionRedirect />
         <AuthShellWrapper
           mode={mode}
+          isWorkspaceLocked={workspaceLocked}
           persistSidebarCollapsed={setSidebarCollapsed}
           sidebarDefaultOpen={sidebarDefaultOpen}
           previewPanelDefaultOpen={!useEssentialShell}

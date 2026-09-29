@@ -112,16 +112,20 @@ function createMissingWaitlistSettingsError() {
   );
 }
 
+// Reuse the real module and reset its cache through the public invalidator.
+// Reloading the entire DB dependency graph is unrelated to per-case isolation.
+const settingsModule = await import('@/lib/waitlist/settings');
+
 describe('isWaitlistGateEnabled', () => {
   let isWaitlistGateEnabled: typeof import('@/lib/waitlist/settings').isWaitlistGateEnabled;
 
   beforeEach(async () => {
-    vi.resetModules();
+    await settingsModule.invalidateWaitlistGateCache();
     mockDbSelect.mockClear();
     mockDbInsert.mockClear();
     mockDbUpdate.mockClear();
 
-    const mod = await import('@/lib/waitlist/settings');
+    const mod = settingsModule;
     isWaitlistGateEnabled = mod.isWaitlistGateEnabled;
   });
 
@@ -167,7 +171,7 @@ describe('isWaitlistGateEnabled', () => {
     expect(mockDbSelect).toHaveBeenCalledTimes(1);
 
     // Invalidate cache and change DB mock to return true
-    const mod = await import('@/lib/waitlist/settings');
+    const mod = settingsModule;
     await mod.invalidateWaitlistGateCache();
     setupDbSelectMock(createMockSettings({ gateEnabled: true }));
 
@@ -183,12 +187,12 @@ describe('tryReserveAutoAcceptSlot', () => {
   let getWaitlistSettings: typeof import('@/lib/waitlist/settings').getWaitlistSettings;
 
   beforeEach(async () => {
-    vi.resetModules();
+    await settingsModule.invalidateWaitlistGateCache();
     mockDbSelect.mockClear();
     mockDbInsert.mockClear();
     mockDbUpdate.mockClear();
 
-    const mod = await import('@/lib/waitlist/settings');
+    const mod = settingsModule;
     tryReserveAutoAcceptSlot = mod.tryReserveAutoAcceptSlot;
     getWaitlistSettings = mod.getWaitlistSettings;
   });
@@ -338,12 +342,12 @@ describe('updateWaitlistSettings invalidates cache', () => {
   let invalidateWaitlistGateCache: typeof import('@/lib/waitlist/settings').invalidateWaitlistGateCache;
 
   beforeEach(async () => {
-    vi.resetModules();
+    await settingsModule.invalidateWaitlistGateCache();
     mockDbSelect.mockClear();
     mockDbInsert.mockClear();
     mockDbUpdate.mockClear();
 
-    const mod = await import('@/lib/waitlist/settings');
+    const mod = settingsModule;
     updateWaitlistSettings = mod.updateWaitlistSettings;
     invalidateWaitlistGateCache = mod.invalidateWaitlistGateCache;
 
@@ -381,13 +385,13 @@ describe('migration-drift fail-soft (JOV-3353)', () => {
   let isMissingWaitlistSettingsTableError: typeof import('@/lib/waitlist/settings').isMissingWaitlistSettingsTableError;
 
   beforeEach(async () => {
-    vi.resetModules();
+    await settingsModule.invalidateWaitlistGateCache();
     mockDbSelect.mockClear();
     mockDbInsert.mockClear();
     mockDbUpdate.mockClear();
     vi.mocked(captureWarning).mockClear();
 
-    const mod = await import('@/lib/waitlist/settings');
+    const mod = settingsModule;
     isWaitlistGateEnabled = mod.isWaitlistGateEnabled;
     getWaitlistSettings = mod.getWaitlistSettings;
     isMissingWaitlistSettingsTableError =
@@ -467,14 +471,14 @@ describe('withRetry scoping (JOV-6137)', () => {
   let getWaitlistSettings: typeof import('@/lib/waitlist/settings').getWaitlistSettings;
 
   beforeEach(async () => {
-    vi.resetModules();
+    await settingsModule.invalidateWaitlistGateCache();
     mockDbSelect.mockClear();
     mockDbInsert.mockClear();
     mockDbUpdate.mockClear();
     vi.mocked(captureWarning).mockClear();
     // withRetry's terminal catch captures NON-retryable terminal errors via
     // Sentry.captureException (correct behavior exercised by earlier suites in
-    // this file). vi.resetModules() does not reset vi.mock call history, so
+    // this file). Cache invalidation does not reset vi.mock call history, so
     // clear the Sentry mock here to keep this suite's double-log assertions
     // scoped to their own test activity (JOV-6137).
     const { captureException: captureExceptionMock } = await import(
@@ -482,7 +486,7 @@ describe('withRetry scoping (JOV-6137)', () => {
     );
     vi.mocked(captureExceptionMock).mockClear();
 
-    const mod = await import('@/lib/waitlist/settings');
+    const mod = settingsModule;
     getWaitlistSettings = mod.getWaitlistSettings;
   });
 
