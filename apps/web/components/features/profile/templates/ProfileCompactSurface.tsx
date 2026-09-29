@@ -315,7 +315,6 @@ export function ProfileCompactSurface({
   onDrawerViewChange,
   onBack,
   onOpenMenu,
-  onPlayClick,
   profileHref,
   isSubscribed = false,
   contentPrefs = DEFAULT_CONTENT_PREFS,
@@ -745,8 +744,9 @@ export function ProfileCompactSurface({
               // overflow-y-auto, overflow-x computes to auto (CSS Overflow 3),
               // so the region clips at its own padding box. The parent column
               // already pads by --page-pad, which puts that clip under the
-              // side padding. Home needs the catalog carousel to peek to the
-              // surface edge (JOV-3377). Music uses the same bleed so the
+              // side padding. Home keeps the bleed so the single editorial
+              // card clips at the surface edge (JOV-3377, JOV-7123). Music
+              // uses the same bleed so the
               // release rows stay inside the inset, and locks the cross axis
               // so a vertical drag cannot pan the leftover overflow (JOV-6573).
               (isHomeMode || isMusicMode) && '-mx-(--page-pad) px-(--page-pad)',
@@ -754,7 +754,7 @@ export function ProfileCompactSurface({
               'min-h-0 flex-1',
               isHomeMode && 'profile-home-content-scroll',
               // Home mode: the scroll region becomes a flex column so the
-              // carousel rail can flex into the full remaining height
+              // home rail can flex into the full remaining height
               // (percentage heights fail against flexed parents).
               isHomeMode && 'flex flex-col',
               // Exactly one stable reservation. The navigation material floats
@@ -799,14 +799,10 @@ export function ProfileCompactSurface({
                 artist={artist}
                 latestRelease={homeLatestRelease}
                 profileSettings={homeProfileSettings}
-                featuredPlaylistFallback={featuredPlaylistFallback}
                 tourDates={tourDates}
                 hasPlayableDestinations={mergedDSPs.length > 0}
                 captureEnabled={allowFanCapture}
                 renderMode={renderMode}
-                onPlayClick={onPlayClick}
-                onAlertsClick={openNotifications}
-                showAlertsCard={canGetUpdates}
                 isSubscribed={homeAlertsSubscribed}
                 profilePacAssignment={profilePacAssignment}
                 viewerLocation={viewerLocation}

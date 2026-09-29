@@ -70,17 +70,17 @@ import {
 } from './pac-machine';
 
 /**
- * Primary Action Card — the featured first card of the profile home carousel
- * that resolves per visitor state (spec #13060/#13061).
+ * Primary Action Card — the featured editorial card on the profile home
+ * surface that resolves per visitor state (spec #13060/#13061, JOV-7123).
  *
  * Card anatomy: art zone (release/state artwork, square) on top, content zone
  * below (context label / subject / action / status). The prompt state swaps
  * the content zone to the capture form INSIDE the same fixed card box.
  *
- * Zero-CLS contract: the card lives inside the carousel's reserved geometry
+ * Zero-CLS contract: the card occupies the home rail's reserved geometry
  * (`.profile-entity-card`, portrait or compact landscape), so state transitions
  * never move any element outside the card — no height animation, no
- * ResizeObserver, content below the carousel never shifts.
+ * ResizeObserver, content below the card never shifts.
  */
 
 export interface ProfilePacRelease {
@@ -140,7 +140,7 @@ interface ProfilePacCardProps {
   /**
    * `featured` renders the Pen D14lo6 mode card (eyebrow, centered art,
    * title, artist, full-width neutral CTA) on the rotating accent below.
-   * `rail` (default) is the compact carousel card.
+   * `rail` (default) is the compact card anatomy.
    */
   readonly presentation?: 'rail' | 'featured';
   /** Rotating background accent for the featured presentation. */

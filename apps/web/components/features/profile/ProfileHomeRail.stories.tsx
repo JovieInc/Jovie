@@ -9,10 +9,8 @@ const meta: Meta<typeof ProfileHomeRail> = {
     layout: 'fullscreen',
     jovie: {
       uncoveredProps: [
-        'featuredPlaylistFallback',
         'captureEnabled',
-        'onPlayClick',
-        'onAlertsClick',
+        'previewActionLabel',
         'profilePacAssignment',
         'viewerLocation',
         'resolveNearbyTour',
@@ -49,10 +47,10 @@ const meta: Meta<typeof ProfileHomeRail> = {
 
 export default meta;
 
-export const HighlightsCarousel: StoryObj<typeof ProfileHomeRail> = {};
+export const FeaturedCard: StoryObj<typeof ProfileHomeRail> = {};
 
-export const NoAlertsCard: StoryObj<typeof ProfileHomeRail> = {
+export const Subscribed: StoryObj<typeof ProfileHomeRail> = {
   args: {
-    showAlertsCard: false,
+    isSubscribed: true,
   },
 };

@@ -78,9 +78,9 @@ async function collectVisibleButtonLabels(page: Page): Promise<string[]> {
       const element = node as HTMLElement;
       const style = window.getComputedStyle(element);
       const rect = element.getBoundingClientRect();
-      // JOV-4764: carousel items can have non-zero geometry while translated
-      // outside the viewport. Only controls a visitor can see simultaneously
-      // count toward the JOV-4433 duplicate-CTA runtime assertion.
+      // JOV-4764/JOV-7123: only controls a visitor can see simultaneously
+      // count toward the JOV-4433 duplicate-CTA runtime assertion — keep the
+      // viewport-intersection guard so off-screen surfaces never false-trip it.
       const intersectsViewport =
         rect.bottom > 0 &&
         rect.right > 0 &&

@@ -64,19 +64,15 @@ vi.mock(
 
 vi.mock('@/features/profile/ProfileHomeRail', () => ({
   ProfileHomeRail: ({
-    showAlertsCard,
     featuredAccent,
   }: {
-    readonly showAlertsCard?: boolean;
     readonly featuredAccent?: { accent: string; strength: string };
   }) => (
     <div
       data-testid='mock-profile-home-rail'
       data-featured-accent={featuredAccent?.accent}
       data-featured-strength={featuredAccent?.strength}
-    >
-      {showAlertsCard ? <div data-testid='profile-home-alerts-row' /> : null}
-    </div>
+    />
   ),
 }));
 
@@ -318,21 +314,22 @@ describe('ProfileCompactSurface', () => {
     ).toBeNull();
   });
 
-  // JOV-6198: fan-capture gates the Get updates action, not the destination
-  // set. The home alerts row must disappear when fan capture is off while
-  // the primary tab panel keeps rendering.
-  it('hides the home alerts card when fan capture is disabled', () => {
+  // JOV-6198/JOV-7123: fan-capture gates the Get Updates action on the
+  // identity header — there is no separate alerts card on the home surface.
+  it('hides the home Get Updates action when fan capture is disabled', () => {
     renderSurface({ allowFanCapture: false });
 
     expect(
-      screen.queryByTestId('profile-home-alerts-row')
+      screen.queryByTestId('profile-identity-get-updates')
     ).not.toBeInTheDocument();
   });
 
-  it('shows the home alerts card when fan capture is enabled', () => {
+  it('shows the home Get Updates action when fan capture is enabled', () => {
     renderSurface({ allowFanCapture: true });
 
-    expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-identity-get-updates')
+    ).toBeInTheDocument();
   });
 
   it('leads the identity header with Get Updates and opens the subscribe flow', () => {
