@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   AudiencePanelProvider,
@@ -9,19 +10,19 @@ function AudiencePanelDemo() {
   return (
     <div className='flex items-center gap-2'>
       {(['contact', 'analytics', 'ai-crawlers'] as const).map(panel => (
-        <button
+        <Button
           key={panel}
-          type='button'
+          size='sm'
+          variant='outline'
           onClick={() => toggle(panel)}
-          className='rounded-full border border-subtle px-3 py-1 text-app'
           aria-pressed={mode === panel}
         >
           {panel}
-        </button>
+        </Button>
       ))}
-      <button type='button' onClick={close} className='text-app underline'>
+      <Button size='sm' variant='link' onClick={close}>
         Close
-      </button>
+      </Button>
       <span className='text-app text-tertiary-token'>
         active: {mode ?? 'none'}
       </span>
