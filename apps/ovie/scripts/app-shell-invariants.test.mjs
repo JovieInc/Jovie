@@ -10,8 +10,11 @@ describe('Ovie app-shell certification', () => {
 
     expect(result.violations).toEqual([]);
     expect(result.routes.length).toBeGreaterThanOrEqual(42);
+    // Wiki pages wrap requireCurrentAdminPageAccess (JOV-3527/admin-page-access
+    // coverage) instead of a bare re-export, matching admin/hud/page.tsx's
+    // own delegate pattern one route over — both classify as operator-shell.
     expect(result.routes).toContainEqual(
-      expect.objectContaining({ route: '/hud/wiki', owner: 'shell-adapter' })
+      expect.objectContaining({ route: '/hud/wiki', owner: 'operator-shell' })
     );
     expect(result.routes).toContainEqual(
       expect.objectContaining({

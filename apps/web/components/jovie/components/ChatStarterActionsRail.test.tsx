@@ -118,7 +118,7 @@ describe('ChatStarterActionsRail', () => {
     });
     expect(more).toHaveClass('focus-visible:ring-2');
     // JOV-6774: onto the canonical @jovie/ui Button, not a hand-rolled tag.
-    expect(more).toHaveAttribute('data-variant', 'ghost');
+    expect(more).toHaveAttribute('data-variant', 'tertiary');
     expect(more.parentElement).toHaveClass('sm:hidden', 'min-h-11');
     expect(screen.getByText('1 of 3')).toHaveClass('tabular-nums');
 

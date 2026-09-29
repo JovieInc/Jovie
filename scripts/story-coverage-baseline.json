@@ -23,10 +23,10 @@
       "uncovered": 6
     },
     "apps/web/components/molecules": {
-      "percent": 51.3,
-      "covered": 59,
-      "total": 115,
-      "uncovered": 56
+      "percent": 98.43,
+      "covered": 125,
+      "total": 127,
+      "uncovered": 2
     },
     "apps/web/components/organisms": {
       "percent": 39.56,
