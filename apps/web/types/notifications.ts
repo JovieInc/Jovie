@@ -75,6 +75,8 @@ export interface NotificationMessage {
   replyTo?: string;
   headers?: Record<string, string>;
   ctaUrl?: string;
+  pushTitle?: string;
+  pushBody?: string;
   channels?: NotificationDeliveryChannel[];
   metadata?: Record<string, unknown>;
   respectUserPreferences?: boolean;
