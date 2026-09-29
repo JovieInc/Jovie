@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   buildFounderRuleReviewQueue,
@@ -17,9 +16,8 @@ import {
   serializeDesignRuleCorpus,
 } from '@/lib/agent-os/design-rule-corpus/corpus';
 import {
-  getDesignRuleCandidatesPath,
   ingestDesignRuleSeedCorpus,
-  parseDesignRuleCandidatesJsonl,
+  loadDesignRuleCandidateSeeds,
 } from '@/lib/agent-os/design-rule-corpus/seed';
 import {
   DESIGN_RULE_DOMAINS,
@@ -417,8 +415,8 @@ describe('queryDesignRules', () => {
 });
 
 describe('seed corpus', () => {
-  it('ingests at least 200 unique atomic candidates across every domain', () => {
-    const { corpus, added, duplicates } = ingestDesignRuleSeedCorpus(
+  it('ingests at least 200 unique atomic candidates across every domain', async () => {
+    const { corpus, added, duplicates } = await ingestDesignRuleSeedCorpus(
       createDesignRuleCorpus(T0)
     );
     expect(added.length).toBeGreaterThanOrEqual(200);
@@ -433,10 +431,8 @@ describe('seed corpus', () => {
     }
   });
 
-  it('every seed candidate is atomic with provenance', () => {
-    const seeds = parseDesignRuleCandidatesJsonl(
-      readFileSync(getDesignRuleCandidatesPath(), 'utf8')
-    );
+  it('every seed candidate is atomic with provenance', async () => {
+    const seeds = await loadDesignRuleCandidateSeeds();
     for (const seed of seeds) {
       expect(seed.sources.length).toBeGreaterThanOrEqual(1);
       expect(seed.statement.split(' ').length).toBeLessThanOrEqual(60);

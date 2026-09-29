@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 
 import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 
@@ -25,10 +25,10 @@ export function parseDesignRuleCandidatesJsonl(
     .map(line => DesignRuleCandidateSchema.parse(JSON.parse(line)));
 }
 
-export function loadDesignRuleCandidateSeeds(
+export async function loadDesignRuleCandidateSeeds(
   path: string = getDesignRuleCandidatesPath()
-): readonly DesignRuleCandidate[] {
-  return parseDesignRuleCandidatesJsonl(readFileSync(path, 'utf8'));
+): Promise<readonly DesignRuleCandidate[]> {
+  return parseDesignRuleCandidatesJsonl(await readFile(path, 'utf8'));
 }
 
 /**
@@ -36,9 +36,9 @@ export function loadDesignRuleCandidateSeeds(
  * creates candidates — nothing here is Jovie policy until a founder decision
  * and adversarial hardening promote it.
  */
-export function ingestDesignRuleSeedCorpus(
+export async function ingestDesignRuleSeedCorpus(
   corpus: Parameters<typeof ingestRuleCandidates>[0],
   path: string = getDesignRuleCandidatesPath()
-): IngestResult {
-  return ingestRuleCandidates(corpus, loadDesignRuleCandidateSeeds(path));
+): Promise<IngestResult> {
+  return ingestRuleCandidates(corpus, await loadDesignRuleCandidateSeeds(path));
 }
