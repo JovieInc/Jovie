@@ -35,10 +35,10 @@
       "uncovered": 56
     },
     "apps/web/components/marketing": {
-      "percent": 59.15,
-      "covered": 42,
+      "percent": 97.18,
+      "covered": 69,
       "total": 71,
-      "uncovered": 29
+      "uncovered": 2
     },
     "apps/web/components/site": {
       "percent": 100,
