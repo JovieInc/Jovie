@@ -1,5 +1,3 @@
-export type { AudienceMemberRowProps } from './AudienceMemberRow';
-export { AudienceMemberRow } from './AudienceMemberRow';
 export type {
   AudienceTableHeaderProps,
   BulkAction,
