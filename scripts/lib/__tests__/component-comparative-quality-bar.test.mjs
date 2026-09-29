@@ -31,7 +31,12 @@ const redFor = baselineId =>
     fixture => fixture.baselineId === baselineId
   );
 
-describe('component comparative quality bar', () => {
+// The first case pays a cold monorepo-wide atom/molecule inventory scan plus a
+// git trusted-base resolution (~10s); the default 5s timeout flakes under CI
+// load even though later cases reuse the module-level caches.
+describe('component comparative quality bar', {
+  timeout: 30_000,
+}, () => {
   it('extends the approved Shadcn outcome batch without a second contradictory registry', () => {
     const approved = new Map(
       OUTCOME_INVENTORY.entries.map(entry => [entry.id, entry])
