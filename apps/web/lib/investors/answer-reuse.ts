@@ -1,8 +1,15 @@
 import { type CopyRegister, lintCopy } from '@jovie/copy';
+import {
+  getCapabilityRecord,
+  isFeatureUsable,
+} from '@/data/marketing/featureAvailability';
 import type {
+  AnswerClaimAssertion,
   AnswerDerivativeContent,
   AnswerReusePack,
   AnswerReuseValidationIssue,
+  AnswerReuseValidationOptions,
+  CanonicalAnswerClaim,
   DerivativeChannel,
   DistributionApprovals,
   DistributionDecision,
@@ -14,6 +21,17 @@ export { applyAnswerSourceChange } from './answer-reuse-invalidation';
 export type * from './answer-reuse-types';
 
 const STABLE_BLOG_PATH = /^\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const CAPABILITY_EVIDENCE_REF =
+  /featureAvailability\.ts#([a-z0-9]+(?:-[a-z0-9]+)*)$/u;
+const UNPROVEN_ASSERTIONS: readonly AnswerClaimAssertion[] = [
+  'hypothesis',
+  'plan',
+  'forecast',
+];
+const FACTUAL_ASSERTIONS: readonly AnswerClaimAssertion[] = [
+  'observed-fact',
+  'founder-attested',
+];
 const RANKING_PROMISE =
   /\b(?:will|guaranteed? to|guarantees?)\s+rank\b|\brank(?:s|ing)?\s+(?:first|higher|at the top)\b/iu;
 
@@ -57,10 +75,151 @@ function issue(
   issues.push({ derivativeId, code, path, message });
 }
 
+/**
+ * JOV-5024: every canonical claim carries exact wording, assertion type,
+ * subject, evidence references, as-of date, review receipt, freshness policy,
+ * limitations, and disclosure scope. Unproven assertions can never carry
+ * demonstrated-performance evidence quality, and availability claims are
+ * resolved against the shared JOV-6216 capability contract (fail closed).
+ */
+function validateCanonicalClaim(
+  claim: CanonicalAnswerClaim,
+  index: number,
+  issues: AnswerReuseValidationIssue[]
+): void {
+  const path = `sourceAnswer.claims.${index}`;
+  if (
+    !claim.assertion ||
+    !claim.subject.trim() ||
+    !claim.reviewedBy.trim() ||
+    !isIsoDate(claim.asOf) ||
+    !isIsoDate(claim.reviewedAt)
+  ) {
+    issue(
+      issues,
+      undefined,
+      'invalid-claim-record',
+      path,
+      'Claims require an assertion type, subject, as-of date, and a dated accountable reviewer.'
+    );
+  }
+  if (claim.expiresAt !== undefined) {
+    if (!isIsoDate(claim.expiresAt) || claim.expiresAt <= claim.asOf) {
+      issue(
+        issues,
+        undefined,
+        'invalid-claim-expiry',
+        `${path}.expiresAt`,
+        'Claim freshness windows must be real dates after the as-of date.'
+      );
+    }
+  }
+  if (
+    UNPROVEN_ASSERTIONS.includes(claim.assertion) &&
+    claim.evidenceQuality !== 'hypothesis'
+  ) {
+    issue(
+      issues,
+      undefined,
+      'unproven-claim-quality',
+      `${path}.evidenceQuality`,
+      'Hypotheses, plans, and forecasts can never be published as demonstrated performance.'
+    );
+  }
+  if (claim.assertion === 'forecast' && !claim.expiresAt) {
+    issue(
+      issues,
+      undefined,
+      'forecast-freshness',
+      `${path}.expiresAt`,
+      'Forecasts require an explicit freshness window.'
+    );
+  }
+  if (
+    (UNPROVEN_ASSERTIONS.includes(claim.assertion) ||
+      claim.kind === 'measured-outcome') &&
+    claim.limitations.length === 0
+  ) {
+    issue(
+      issues,
+      undefined,
+      'claim-limitations',
+      `${path}.limitations`,
+      'Unproven and measured claims must state their limitations.'
+    );
+  }
+  if (claim.kind === 'measured-outcome') {
+    if (
+      !claim.cohort ||
+      !claim.cohort.label.trim() ||
+      !Number.isInteger(claim.cohort.sampleSize) ||
+      claim.cohort.sampleSize < 1
+    ) {
+      issue(
+        issues,
+        undefined,
+        'measured-claim-cohort',
+        `${path}.cohort`,
+        'Measured claims must keep their cohort label and sample size attached.'
+      );
+    }
+  }
+  if (claim.kind === 'current-availability') {
+    const capabilityIds = claim.evidenceRefs
+      .map(ref => CAPABILITY_EVIDENCE_REF.exec(ref)?.[1])
+      .filter((id): id is string => Boolean(id));
+    if (capabilityIds.length === 0) {
+      issue(
+        issues,
+        undefined,
+        'capability-evidence-required',
+        `${path}.evidenceRefs`,
+        'Availability claims must bind a featureAvailability capability id.'
+      );
+    }
+    for (const capabilityId of capabilityIds) {
+      const record = getCapabilityRecord(capabilityId);
+      if (!record) {
+        issue(
+          issues,
+          undefined,
+          'unknown-capability',
+          `${path}.evidenceRefs`,
+          `Availability claim references unknown capability '${capabilityId}'.`
+        );
+        continue;
+      }
+      if (claim.disclosure === 'public' && record.publication !== 'public') {
+        issue(
+          issues,
+          undefined,
+          'unpublished-capability-claim',
+          path,
+          `Capability '${capabilityId}' is not cleared for public publication.`
+        );
+      }
+      if (
+        !isFeatureUsable(record) &&
+        FACTUAL_ASSERTIONS.includes(claim.assertion)
+      ) {
+        issue(
+          issues,
+          undefined,
+          'unavailable-capability-fact',
+          path,
+          `Capability '${capabilityId}' is not usable; it cannot be claimed as an observed fact.`
+        );
+      }
+    }
+  }
+}
+
 export function validateAnswerReusePack(
-  pack: AnswerReusePack
+  pack: AnswerReusePack,
+  options: AnswerReuseValidationOptions = {}
 ): readonly AnswerReuseValidationIssue[] {
   const issues: AnswerReuseValidationIssue[] = [];
+  const evaluatedAt = options.evaluatedAt;
   const { sourceAnswer } = pack;
   const claims = new Map(
     sourceAnswer.claims.map(claim => [claim.claimId, claim] as const)
@@ -102,6 +261,7 @@ export function validateAnswerReusePack(
         'Canonical and verified claims require evidence references.'
       );
     }
+    validateCanonicalClaim(claim, index, issues);
   }
 
   if (
@@ -224,17 +384,28 @@ export function validateAnswerReusePack(
           `claimUses.${index}`,
           'Claim use must bind an exact current source claim revision.'
         );
-      } else if (
-        derivative.disclosure === 'public' &&
-        claim.disclosure !== 'public'
-      ) {
-        issue(
-          issues,
-          id,
-          'private-claim',
-          `claimUses.${index}`,
-          'A private or internal claim cannot enter a public derivative.'
-        );
+      } else {
+        if (
+          derivative.disclosure === 'public' &&
+          claim.disclosure !== 'public'
+        ) {
+          issue(
+            issues,
+            id,
+            'private-claim',
+            `claimUses.${index}`,
+            'A private or internal claim cannot enter a public derivative.'
+          );
+        }
+        if (evaluatedAt && claim.expiresAt && claim.expiresAt < evaluatedAt) {
+          issue(
+            issues,
+            id,
+            'expired-claim-evidence',
+            `claimUses.${index}`,
+            'Claim evidence is past its freshness window and must be re-reviewed.'
+          );
+        }
       }
       if (seenClaims.has(claimUse.claimId)) {
         issue(
@@ -428,9 +599,10 @@ export function validateAnswerReusePack(
  * discovery owners. It does not write a route, publish copy, or send anything.
  */
 export function buildPublicDiscoveryProjection(
-  pack: AnswerReusePack
+  pack: AnswerReusePack,
+  options: AnswerReuseValidationOptions = {}
 ): PublicDiscoveryProjection {
-  const issues = validateAnswerReusePack(pack);
+  const issues = validateAnswerReusePack(pack, options);
   const sourceIssues = issues.filter(candidate => !candidate.derivativeId);
   const claimMap = new Map(
     pack.sourceAnswer.claims.map(claim => [claim.claimId, claim] as const)

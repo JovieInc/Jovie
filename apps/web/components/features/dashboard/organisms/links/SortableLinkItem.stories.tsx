@@ -44,6 +44,10 @@ const meta = {
   title: 'Dashboard/Organisms/Links/SortableLinkItem',
   parameters: {
     layout: 'centered',
+    // `disabled` isn't a SortableLinkItemProps field (no such prop exists) —
+    // the story-state-matrix scanner picks up the unrelated `disabled:
+    // !draggable` menu-item literal inside the component body.
+    jovie: { uncoveredProps: ['disabled'] },
   },
   render: args => (
     <div className='w-96'>

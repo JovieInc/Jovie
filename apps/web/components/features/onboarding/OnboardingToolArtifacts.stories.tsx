@@ -6,6 +6,8 @@ const meta = {
   component: OnboardingSpotifyArtistPickerCard,
   parameters: {
     layout: 'centered',
+    // No story variant exercises the disabled state yet.
+    jovie: { uncoveredProps: ['disabled'] },
   },
   args: {
     onSelectArtist: () => {},

@@ -38,6 +38,7 @@
 #   skipped with a notice rather than a guaranteed red check.
 
 name: Auto-Merge Default
+# clock-class: temporal-resource
 
 on:
   pull_request:

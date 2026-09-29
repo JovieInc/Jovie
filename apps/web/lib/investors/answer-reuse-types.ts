@@ -35,14 +35,47 @@ export type ReleaseState =
   | 'correction-required'
   | 'removed';
 
+/**
+ * JOV-5024 claim type: what kind of assertion the exact wording makes.
+ * `observed-fact` is measured or directly verifiable; `founder-attested` is a
+ * founder-provided account; `hypothesis`, `plan`, and `forecast` are unproven
+ * and can never be presented as demonstrated performance.
+ */
+export type AnswerClaimAssertion =
+  | 'observed-fact'
+  | 'founder-attested'
+  | 'hypothesis'
+  | 'plan'
+  | 'forecast';
+
+/** Measured claims keep their sample size and denominator attached. */
+export interface AnswerClaimCohort {
+  readonly label: string;
+  readonly sampleSize: number;
+  readonly denominator?: string;
+}
+
 export interface CanonicalAnswerClaim {
   readonly claimId: string;
   readonly revisionId: string;
   readonly kind: AnswerClaimKind;
+  readonly assertion: AnswerClaimAssertion;
+  /** The specific subject the claim is about — never a generalized market. */
+  readonly subject: string;
   readonly statement: string;
   readonly disclosure: DisclosureScope;
   readonly evidenceQuality: 'canonical' | 'verified' | 'hypothesis';
   readonly evidenceRefs: readonly string[];
+  /** Date the underlying evidence was observed. */
+  readonly asOf: string;
+  /** Accountable reviewer for this exact wording and evidence. */
+  readonly reviewedBy: string;
+  readonly reviewedAt: string;
+  /** Freshness window end; after this the claim is withdrawn from new use. */
+  readonly expiresAt?: string;
+  readonly limitations: readonly string[];
+  /** Required for measured-outcome claims. */
+  readonly cohort?: AnswerClaimCohort;
   readonly revisedAt: string;
 }
 
@@ -164,6 +197,15 @@ export interface AnswerReuseValidationIssue {
   readonly code: string;
   readonly path: string;
   readonly message: string;
+}
+
+export interface AnswerReuseValidationOptions {
+  /**
+   * Explicit evaluation instant for freshness/expiry checks. Callers pass a
+   * real timestamp (e.g. deploy or test time); the validator never reads the
+   * clock itself.
+   */
+  readonly evaluatedAt?: string;
 }
 
 export interface PublicDiscoveryProjection {

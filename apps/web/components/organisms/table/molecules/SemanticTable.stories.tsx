@@ -13,6 +13,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  args: { children: null },
   render: () => (
     <TableRoot className='w-96 text-sm text-primary-token'>
       <TableHead>

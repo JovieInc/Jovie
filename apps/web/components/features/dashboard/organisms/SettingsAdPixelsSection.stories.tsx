@@ -86,6 +86,29 @@ const meta = {
   component: SettingsAdPixelsSection,
   parameters: {
     layout: 'padded',
+    // These aren't props of SettingsAdPixelsSection itself (only `isPro` is)
+    // — the required-props scanner also picks up the internal, non-exported
+    // PlatformSectionProps interface used by a helper in the same file.
+    jovie: {
+      uncoveredProps: [
+        'platform',
+        'platformKey',
+        'description',
+        'pixelIdLabel',
+        'pixelIdPlaceholder',
+        'pixelIdName',
+        'pixelIdValue',
+        'tokenLabel',
+        'tokenPlaceholder',
+        'tokenName',
+        'tokenValue',
+        'helpUrl',
+        'helpText',
+        'onPixelIdChange',
+        'onTokenChange',
+        'isConfigured',
+      ],
+    },
   },
   args: {
     isPro: true,

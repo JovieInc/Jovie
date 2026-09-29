@@ -12,6 +12,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  args: { children: null },
   render: () => (
     <MarketingPageShell className='bg-base text-primary-token'>
       <MarketingContainer width='page' className='py-16'>
