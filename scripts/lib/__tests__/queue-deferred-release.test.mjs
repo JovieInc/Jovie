@@ -48,16 +48,10 @@ describe('retired queue release and retained fleet refresh', () => {
     // CI and Production Controller are direct upstream semantic inputs.
     // Marker Recovery dispatches the gate after durable bytes so it remains
     // within GitHub's workflow_run chain cap.
-    const upstream = fleetGateRefreshWorkflow.match(
-      /workflow_run:\s*\n(?:\s*#[^\n]*\n)*\s*workflows:\s*\[([^\]]+)\]/
-    )?.[1];
-    expect(upstream).toBe('CI, Production Controller');
+    expect(fleetGateRefreshWorkflow).not.toContain('workflow_run:');
     expect(fleetGateRefreshWorkflow).toContain('pull_request_target:');
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
-    expect(fleetGateRefreshWorkflow).toContain(
-      "github.event.workflow_run.conclusion != 'cancelled'"
-    );
     expect(fleetGateRefreshWorkflow).toContain(
       'github.event.pull_request.merged != true'
     );

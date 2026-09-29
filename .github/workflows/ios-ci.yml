@@ -55,6 +55,7 @@ jobs:
         run: |
           node --test apps/ios/scripts/write-configuration.test.mjs \
           apps/ios/scripts/run-xcodebuild.test.mjs \
+          apps/ios/scripts/validate-wallet-release-env.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
           apps/ios/scripts/validate-testflight-artifact.test.mjs \
           apps/ios/scripts/settings-style-guard.test.mjs

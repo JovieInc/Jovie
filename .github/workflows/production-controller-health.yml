@@ -6,13 +6,6 @@ name: Production Controller Health
 # revisit-trigger: Remove when the Production Controller heals interrupted deployed markers in-band instead of via a dispatched recovery run.
 
 on:
-  # Production Controller completion is the primary reconciliation signal.
-  # Marker Recovery dispatches Fleet Gate Refresh directly after durable bytes;
-  # keeping it out of this trigger also prevents duplicate CI replays.
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
   # polling-exception: GitHub may drop a workflow_run delivery. This once-daily
   # audit is a safety net only, owned by Gem/GitHub, with 24h maximum staleness.
   # Revisit when GitHub exposes durable delivery receipts for workflow_run.

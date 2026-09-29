@@ -234,7 +234,7 @@ export const DATA_CLASSES: DataClass[] = [
     title: 'Notification subscriptions and consent',
     purpose:
       'Fan opt-ins for releases/notifications (email, phone, OTP state) and ' +
-      'recipient channel preferences.',
+      'recipient channel preferences, including encrypted iOS push registrations.',
     owner: 'app/notifications',
     classification: 'personal-data',
     tables: [
@@ -242,13 +242,24 @@ export const DATA_CLASSES: DataClass[] = [
       'notification_contacts',
       'sms_subscribe_intents',
       'recipient_preferences',
+      'ios_push_devices',
     ],
     retention:
       'notification_subscriptions rows are deleted after the analytics ' +
-      'retention window; SMS intents are cleaned by the sms-intents cron.',
-    deletion: ['retention-cron'],
+      'retention window; SMS intents are cleaned by the sms-intents cron; ' +
+      'iOS registrations are removed on sign-out, account deletion, or invalid-token response.',
+    deletion: [
+      'account-delete-route',
+      'fk-cascade',
+      'retention-cron',
+      'vendor',
+    ],
     export: ['none'],
-    vendors: ['Twilio (sms delivery)', 'Resend (email delivery)'],
+    vendors: [
+      'Apple Push Notification service',
+      'Twilio (sms delivery)',
+      'Resend (email delivery)',
+    ],
   },
   {
     id: 'tips',
