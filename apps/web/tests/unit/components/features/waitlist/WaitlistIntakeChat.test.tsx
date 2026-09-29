@@ -41,10 +41,13 @@ describe('WaitlistIntakeChat', () => {
     await userEvent.type(input, 'k');
     await userEvent.click(screen.getByRole('button', { name: /send answer/i }));
 
-    expect(
-      screen.getByText(/real answer|short acks|real handle/i)
-    ).toBeInTheDocument();
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/real answer|short acks|real handle/i);
     expect(fetchMock).not.toHaveBeenCalled();
+
+    // JOV-6773: the validation error renders on the error token, not raw red-*.
+    expect(alert.className).toContain('text-error');
+    expect(alert.className).not.toMatch(/\bred-\d/);
   });
 
   it('surfaces rate-limited intake responses from non-OK submissions', async () => {
