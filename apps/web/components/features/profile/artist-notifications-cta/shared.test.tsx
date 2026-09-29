@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import * as sharedModule from './shared';
 import {
   profilePrimaryPillClassName,
   profileSecondaryPillClassName,
@@ -52,6 +53,10 @@ describe('shared public-profile CTA primitives', () => {
     expect(tooltip.className).toContain('text-error');
     expect(tooltip.className).not.toMatch(/\bred-\d/);
     expect(tooltip).toHaveTextContent('Enter a valid email');
+  });
+
+  it('no longer exports the dead raw-red subscriptionErrorTextClassName (JOV-6773)', () => {
+    expect('subscriptionErrorTextClassName' in sharedModule).toBe(false);
   });
 
   it('renders the form skeleton as a full-rounded bar without an arbitrary radius override', () => {
