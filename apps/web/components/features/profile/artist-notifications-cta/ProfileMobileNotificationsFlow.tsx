@@ -12,7 +12,6 @@ import {
   Shirt,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
@@ -86,11 +85,6 @@ interface ProfileMobileNotificationsFlowProps {
   readonly onArtistEmailToggle?: (value: boolean) => void;
   readonly onPreferencesSubmit: () => void;
 }
-
-const FLOW_TRANSITION = {
-  duration: 0.42,
-  ease: [0.22, 1, 0.36, 1] as const,
-};
 
 const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
   email:
@@ -285,7 +279,7 @@ function LabeledInput({
         onChange={event => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className='h-12 w-full touch-manipulation rounded-3xl border border-white/10 bg-white/[0.03] px-4 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        className='h-12 w-full touch-manipulation rounded-3xl border border-white/10 bg-white/[0.03] px-4 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
       />
     </label>
   );
@@ -345,7 +339,7 @@ function InlineCaptureField({
           }}
           disabled={isSubmitting}
           aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
-          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-white/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
         />
         <button
           type='button'
@@ -876,19 +870,13 @@ export function ProfileMobileNotificationsFlow({
           )}
         </header>
 
-        <AnimatePresence mode='wait'>
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 18 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -18 }}
-            transition={FLOW_TRANSITION}
-            className='flex min-h-0 flex-1 flex-col'
-            data-testid={`profile-mobile-notifications-step-${step}`}
-          >
-            {screen}
-          </motion.div>
-        </AnimatePresence>
+        <div
+          key={step}
+          className='flex min-h-0 flex-1 flex-col'
+          data-testid={`profile-mobile-notifications-step-${step}`}
+        >
+          {screen}
+        </div>
       </div>
     </>
   );
