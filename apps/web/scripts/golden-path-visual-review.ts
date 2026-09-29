@@ -4,7 +4,9 @@
  * Two independent reviewers judge each keyframe captured by the real-auth
  * Golden Path lane:
  *  - A: an economical vision model through the allowlisted AI Gateway, with a
- *       strict user-blocking rubric (never taste or polish).
+ *       strict user-blocking rubric (never taste or polish). Each keyframe is
+ *       sampled twice and flagged when either sample finds a blocker: single
+ *       samples missed real blockers across runs (JOV-5489 calibration).
  *  - B: the deterministic in-page layout audit recorded with the keyframe.
  * A suspected blocker only fails the gate once an independent second review flags
  * the same keyframe again. Model outages or unparseable answers are recorded
@@ -16,8 +18,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
-export const RUBRIC_VERSION = 'golden-path-user-blocking/v1';
+export const RUBRIC_VERSION = 'golden-path-user-blocking/v2';
 export const REVIEW_MODEL = 'zai/glm-5.3-flash';
+export const MODEL_SAMPLES = 2;
 const VERDICT_SCHEMA = 'jovie.golden-path-visual-review/v1';
 
 export interface KeyframeRecord {
@@ -52,6 +55,7 @@ export interface KeyframeVerdict {
     readonly warnings: readonly string[];
   };
   readonly model: ModelVerdict;
+  readonly modelSamples?: readonly ModelVerdict[];
   readonly suspected: boolean;
 }
 
@@ -77,13 +81,35 @@ export function reviewLayout(record: KeyframeRecord) {
 
 export const RUBRIC_PROMPT = `You review one screenshot from a real user journey on a production web app.
 Flag ONLY user-blocking visual defects:
-1. layout: overlapping or clipped text/controls, content cut off, elements drawn on top of each other;
+1. layout: overlapping or clipped text/controls, content cut off, elements drawn on top of each other.
+   A button, card or text cut off by a fixed bar, dock, toolbar or panel is a layout blocker,
+   also at the bottom edge of the screen and inside a device or phone preview;
 2. blank: a blank, error or crash screen, or a spinner/skeleton standing in for the main content;
 3. contrast: primary text that is unreadable;
 4. content: garbage shown to users (undefined, NaN, null, [object Object], lorem ipsum, raw translation keys);
 5. action: the primary action is missing or visibly unusable.
 Do NOT flag taste, brand, spacing preferences, empty-but-valid states or minor polish.
 Reply with ONLY this JSON: {"verdict":"pass"|"blocker","findings":["<category>: <what and where>"]}`;
+
+/** Any blocker sample wins; otherwise any pass; unknown only if every sample was unknown. */
+export function mergeModelVerdicts(
+  samples: readonly ModelVerdict[]
+): ModelVerdict {
+  const findings = [
+    ...new Set(
+      samples.flatMap(v => (v.verdict === 'blocker' ? v.findings : []))
+    ),
+  ];
+  if (findings.length > 0) return { verdict: 'blocker', findings };
+  if (samples.some(v => v.verdict === 'pass'))
+    return { verdict: 'pass', findings: [] };
+  return {
+    verdict: 'unknown',
+    reason:
+      samples.map(v => (v.verdict === 'unknown' ? v.reason : '')).join('; ') ||
+      'no samples',
+  };
+}
 
 /** Parses the model reply; anything malformed is `unknown`, never a pass. */
 export function parseModelVerdict(
@@ -241,14 +267,20 @@ export async function main(
   const verdicts: KeyframeVerdict[] = [];
   for (const record of records) {
     const layout = reviewLayout(record);
-    const model = await reviewWithModel({
-      png: readFileSync(join(values.dir, record.file)),
-      stepId: record.id,
-      path: pathOf(record.url),
-      apiKey: env.AI_GATEWAY_API_KEY,
-      baseUrl,
-      ...(fetchImpl ? { fetchImpl } : {}),
-    });
+    const png = readFileSync(join(values.dir, record.file));
+    const modelSamples: ModelVerdict[] = [];
+    for (let i = 0; i < MODEL_SAMPLES; i += 1)
+      modelSamples.push(
+        await reviewWithModel({
+          png,
+          stepId: record.id,
+          path: pathOf(record.url),
+          apiKey: env.AI_GATEWAY_API_KEY,
+          baseUrl,
+          ...(fetchImpl ? { fetchImpl } : {}),
+        })
+      );
+    const model = mergeModelVerdicts(modelSamples);
     const suspected = layout.blockers.length > 0 || model.verdict === 'blocker';
     verdicts.push({
       id: record.id,
@@ -256,6 +288,7 @@ export async function main(
       path: pathOf(record.url),
       layout,
       model,
+      modelSamples,
       suspected,
     });
     console.log(
