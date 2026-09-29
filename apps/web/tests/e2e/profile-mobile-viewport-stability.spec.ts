@@ -795,7 +795,7 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
 test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
   test('public surface renders one featured card — no carousel — across the strict viewport matrix', async ({
     page,
-  }) => {
+  }, testInfo) => {
     const viewports = [
       { label: 'compact 320', width: 320, height: 568 },
       { label: 'iPhone mini', width: 375, height: 812 },
@@ -820,6 +820,11 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
         SMOKE_TIMEOUTS.NAVIGATION
       );
       await settleLayout(page);
+
+      await expect(
+        page.locator('[data-visitor-assignment-resolved]').first()
+      ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
+      await expect(page.getByTestId('profile-pac')).toBeVisible();
 
       // JOV-7123: the editorial card replaces the highlights carousel — the
       // home surface must not mount a second card track at all.
@@ -901,6 +906,11 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
               }
             : null,
         };
+      });
+
+      await testInfo.attach(`featured-card-${viewport.label}-geometry`, {
+        body: JSON.stringify(geometry, null, 2),
+        contentType: 'application/json',
       });
 
       expect(
@@ -1369,6 +1379,9 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
 
     // WebKit models Safari's default macOS keyboard policy: Option+Tab moves
     // through every control, while plain Tab may leave focus on the document.
+    await expect(
+      page.locator('[data-visitor-assignment-resolved]').first()
+    ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
     const focusNextKey = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     let focusedCard = false;
     for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -1390,7 +1403,7 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
         focusVisible: active?.matches(':focus-visible') ?? false,
       };
     });
-    expect(cardFocus.label).toBe('Listen');
+    expect(cardFocus.label).toBe('Listen now');
     expect(cardFocus.height).toBeGreaterThanOrEqual(44);
     expect(cardFocus.focusVisible).toBe(true);
 
@@ -1406,7 +1419,10 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/calvin-demo\?mode=tour$/);
     await expect(
-      page.getByRole('heading', { name: 'Events', exact: true })
+      page.getByRole('region', { name: 'Events', exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'No upcoming events', exact: true })
     ).toBeVisible();
   });
 });
