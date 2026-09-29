@@ -83,12 +83,13 @@ jobs:
         # GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
         # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
         # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
-        # Secrets are absent on pull_request runs from forks and dependabot[bot]; those PRs
-        # are covered by dependabot-auto-merge.yml (pull_request_target) and the hourly
-        # triage sweep's --enable-missing, so this step is skipped instead of failing.
+        # Secrets are absent on pull_request runs from forks and Dependabot-authored PRs,
+        # including when a human reopens one. Those PRs are covered by
+        # dependabot-auto-merge.yml (pull_request_target) and the hourly triage sweep's
+        # --enable-missing, so this step is skipped instead of failing.
         if: >-
           github.event.pull_request.head.repo.full_name == github.repository &&
-          github.actor != 'dependabot[bot]'
+          github.event.pull_request.user.login != 'dependabot[bot]'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
