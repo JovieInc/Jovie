@@ -114,6 +114,17 @@ Each dispatch tick checks for queued jobs and starts one detached `reason_lane.p
 Budgets and models live in `reason.json` (jobs/day, research/day, context cap, per-job spend cap).
 Operator: `python3 reason_lane.py run JOV-123` runs one job now.
 
+Recurring business questions run a bounded keyword-first, semantic-fallback GBrain lookup before
+any reason/research budget is spent. The result is explicit: applicable precedents, `no sufficiently
+applicable precedent`, or a visible retrieval failure that blocks the expensive route. The decision
+receipt separates sourced precedent, internal evidence, inference, and new learning, and requires an
+explicit answer to what is materially different about Jovie's case.
+
+The same minute tick schedules `yc_corpus.py refresh` at most daily. Each run rotates through at most
+40 public YC Library/blog/YouTube records, respects robots, writes metadata plus bounded excerpts into
+the existing GBrain store, and content-hash skips unchanged source and derived-playbook pages. Refresh
+health is recorded under `ycCorpus` in `tick.json`; it never silently converts an outage into a miss.
+
 ## Nothing fails silently
 
 `doctor.py` runs at the end of every dispatch tick. It judges the tick receipt

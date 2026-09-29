@@ -80,6 +80,81 @@ const approvedVariantBinding = (
 ): RenderedSectionBinding =>
   approvedBinding(componentPath, sectionId, variantId, occurrenceId);
 
+/**
+ * Product evidence kind (JOV-6917, invariant `product-page-shows-product`):
+ * the canonical product UI a product route must render.
+ * - `framed-screenshot`: a captured product frame (e.g. ProductScreenshotFrame
+ *   or an approved screenshot-registry image in a device/frame treatment).
+ * - `interactive-mockup`: the real interactive product primitive mounted on
+ *   the page (claim form, smart-link dial, merch design carousel, paste form,
+ *   demo visual, notification cards).
+ * - `annotated-callout`: an annotated callout from the callout family.
+ */
+export type ProductEvidenceKind =
+  | 'framed-screenshot'
+  | 'interactive-mockup'
+  | 'annotated-callout';
+
+export interface ProductEvidenceDeclaration {
+  readonly kind: ProductEvidenceKind;
+  /**
+   * Source file that renders the evidence (the landing component or the
+   * evidence component itself). Must exist on disk.
+   */
+  readonly componentPath: string;
+  /**
+   * `data-testid` the rendered page must expose inside the hero section
+   * (desktop above-the-fold) or the first two top-level sections (mobile).
+   */
+  readonly testId: string;
+}
+
+/**
+ * Recipes whose routes are product pages: they exist to demonstrate a real
+ * product capability, so every bound route must declare and render product
+ * evidence. Enforced by tests/unit/marketing/product-evidence-contract.
+ */
+export const PRODUCT_ROUTE_RECIPES: readonly RecipeId[] = [
+  'artist-lp',
+  'feature',
+];
+
+/**
+ * Whether a manifest entry is a product route that must render product
+ * evidence. Aliases are included — they serve the same product surface.
+ */
+export function isProductRouteEntry(
+  entry: Pick<RouteManifestEntry, 'recipeId' | 'status' | 'exempt'>
+): boolean {
+  return (
+    entry.status === 'active' &&
+    !entry.exempt &&
+    entry.recipeId !== undefined &&
+    PRODUCT_ROUTE_RECIPES.includes(entry.recipeId)
+  );
+}
+
+/**
+ * Declaration gate: returns a problem string when a product route declares
+ * no product evidence or an invalid one; null when the declaration is
+ * well-formed. Rendered-DOM enforcement lives in the contract test.
+ */
+export function productEvidenceDeclarationIssue(
+  entry: Pick<RouteManifestEntry, 'glob' | 'productEvidence'>
+): string | null {
+  const evidence = entry.productEvidence;
+  if (!evidence) {
+    return `${entry.glob} is a product route with no productEvidence declaration`;
+  }
+  if (!evidence.componentPath.trim()) {
+    return `${entry.glob} productEvidence.componentPath is empty`;
+  }
+  if (!evidence.testId.trim()) {
+    return `${entry.glob} productEvidence.testId is empty`;
+  }
+  return null;
+}
+
 /** A route entry — either bound to a recipe or exempt with a sanctioned reason. */
 export interface RouteManifestEntry {
   /** Route glob relative to apps/web/app/ (e.g. '(marketing)/about/page.tsx', '(home)/page.tsx'). */
@@ -131,6 +206,14 @@ export interface RouteManifestEntry {
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
   };
+  /**
+   * Product evidence (JOV-6917): the canonical product-evidence component
+   * this route must render. Required on product routes
+   * (`isProductRouteEntry`); the product-evidence contract test renders the
+   * page and fails when the declared `testId` is absent from the hero or the
+   * first two top-level sections.
+   */
+  readonly productEvidence?: ProductEvidenceDeclaration;
   /** noindex flag — true if the route is noindex today (e.g. /ai, /demo/video). */
   readonly noindex?: boolean;
   /** Alias-of — when this route is an alias of another (e.g. /artist-profile → /artist-profiles). */
@@ -282,6 +365,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-profiles',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath:
+        'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
+      testId: 'artist-profile-hero-product',
+    },
   },
   {
     glob: '(marketing)/artist-profile/page.tsx',
@@ -309,6 +398,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-profile',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath:
+        'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
+      testId: 'artist-profile-hero-product',
+    },
     aliasOf: '/artist-profiles',
   },
   {
@@ -337,6 +432,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.3.0',
     url: '/solutions/artists',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath:
+        'apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx',
+      testId: 'artist-profile-hero-product',
+    },
   },
   {
     glob: '(marketing)/artist-notifications/page.tsx',
@@ -359,6 +460,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/artist-notifications',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
+      testId: 'artist-notifications-card-stage',
+    },
   },
   {
     glob: '(marketing)/download/page.tsx',
@@ -379,6 +486,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/download',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath: 'apps/web/app/(marketing)/download/page.tsx',
+      testId: 'download-desktop-screenshot',
+    },
   },
   {
     glob: '(marketing)/pay/page.tsx',
@@ -400,6 +512,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/pay',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/home/claim-handle/ClaimHandleForm.tsx',
+      testId: 'claim-handle-form',
+    },
     healthCheck: {
       path: '/pay',
       expected: 'page',
@@ -423,6 +541,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/voice',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/features/landing/VoiceDemoVisual.tsx',
+      testId: 'voice-demo-visual',
+    },
     noindex: true,
   },
   {
@@ -439,11 +562,17 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'verified',
       source: 'route audit 2026-08-01',
       notes:
-        'Uses the authenticated chat merch creation flow; product concepts are illustrative and not proof claims.',
+        'Hero mounts the real chat merch review surface (ChatMerchDesignCarousel) with representative concepts that are illustrative and not proof claims; selection hands off into the authenticated merch conversation.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/instant-merch',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+      testId: 'chat-merch-option-card',
+    },
   },
   {
     glob: '(marketing)/youtube-thumbnails/page.tsx',
@@ -479,6 +608,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.3.0',
     url: '/youtube-thumbnails',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailPasteForm.tsx',
+      testId: 'youtube-thumbnails-paste-form',
+    },
   },
   {
     glob: '(marketing)/product/page.tsx',
@@ -496,6 +631,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.3.0',
     url: '/product',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/app/(marketing)/product/ProductLanding.tsx',
+      testId: 'product-claim-card',
+    },
     healthCheck: {
       path: '/product',
       expected: 'page',
@@ -542,6 +682,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.3.0',
     url: '/card',
+    productEvidence: {
+      kind: 'framed-screenshot',
+      componentPath: 'apps/web/components/marketing/ProductScreenshotFrame.tsx',
+      testId: 'product-screenshot-frame-public-profile-mobile',
+    },
     healthCheck: {
       path: '/card',
       expected: 'page',
@@ -567,6 +712,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.3.0',
     url: '/smart-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/app/(marketing)/smart-links/SmartLinksDemo.tsx',
+      testId: 'smart-links-demo',
+    },
   },
   {
     glob: '(marketing)/launch/page.tsx',

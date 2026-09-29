@@ -152,6 +152,14 @@ const config: StorybookConfig = {
           replacement: require.resolve('./composer-catalog-actions-mock.ts'),
         },
         {
+          find: '@/app/app/(shell)/dashboard/releases/catalog-task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions/dashboard-data',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
