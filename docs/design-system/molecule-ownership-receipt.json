@@ -119,7 +119,6 @@
         "apps/web/components/features/admin/outreach/OutreachKpis.tsx",
         "apps/web/components/features/admin/outreach/ReviewQueuePanel.tsx",
         "apps/web/components/features/admin/table/AdminTableHeader.tsx",
-        "apps/web/components/features/dashboard/organisms/contact-mode/ContactMode.tsx",
         "apps/web/components/features/demo/DemoSettingsPanel.tsx",
         "apps/web/components/features/profile/ProfileRedirectSurface.tsx",
         "apps/web/components/organisms/AccountDashboard.tsx",
