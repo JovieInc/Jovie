@@ -503,7 +503,7 @@ const LANES = [
     id: 'merge-group-guards',
     name: 'Merge-group unit guards',
     nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts',
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
     run: runMergeGroupGuards,
   },
   {
@@ -1551,10 +1551,12 @@ function runProfileAdmission() {
 }
 
 /**
- * Repo-wide source guards (design-system ratchets, metrics layer) plus the
- * PR's own changed unit tests. The full Unit Tests shards run only in merge
- * groups, so without this a PR that trips a guard or breaks its own test is
- * green on PR CI and fails every merge group behind it (JOV-5301, JOV-6904).
+ * Repo-wide source guards (design-system ratchets, metrics layer, the locked
+ * Pen marketing chrome contract) plus the PR's own changed unit tests. The
+ * full Unit Tests shards run only in merge groups, so without this a PR that
+ * trips a guard or breaks its own test is green on PR CI and fails every
+ * merge group behind it (JOV-5301, JOV-6904; locked-pen-chrome-contract
+ * poisoned a batch on #19266).
  */
 function runMergeGroupGuards() {
   const event = process.env.GITHUB_EVENT_NAME || '';
