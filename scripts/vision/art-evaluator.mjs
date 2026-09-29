@@ -42,7 +42,7 @@ import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const VISION_EVAL_SCHEMA = 'jovie-vision-art-eval/v1';
-export const PASSPORT_SCHEMA = 'jovie-virtual-model-passport/v1';
+export const PASSPORT_SCHEMA = 'jovie-marketing-character-system/v2';
 const REGISTRY_PATH = fileURLToPath(
   new URL('../../canon/virtual-models.json', import.meta.url)
 );
@@ -132,8 +132,8 @@ export function resolvePassport(registry, modelId) {
   if (!model) throw new Error(`unknown virtual model: ${modelId}`);
   if (registry.removed?.includes(modelId))
     throw new Error(`virtual model ${modelId} is removed`);
-  if (model.status !== 'approved')
-    throw new Error(`virtual model ${modelId} is not approved`);
+  if (model.status !== 'active')
+    throw new Error(`virtual model ${modelId} is not active`);
   return model;
 }
 
