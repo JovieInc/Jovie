@@ -477,7 +477,8 @@ export function measureAllRoots(repoRoot = REPO_ROOT) {
  * @returns {string[]} matched interface/type body text, one per block.
  */
 export function findComponentPropsBlocks(sourceText, primaryNames = []) {
-  const blockRe = /(?:interface|type)\s+(\w*Props\w*)\s*(?:=\s*)?\{([\s\S]*?)\}/g;
+  const blockRe =
+    /(?:interface|type)\s+(\w*Props\w*)\s*(?:=\s*)?\{([\s\S]*?)\}/g;
   const exact = [];
   const broad = [];
   let block;
