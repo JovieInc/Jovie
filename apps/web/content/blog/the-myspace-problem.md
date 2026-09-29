@@ -74,7 +74,7 @@ Pretty pages get admired. Clear pages get clicked.
 
 This is the modern version of the MySpace problem.
 
-I spent 15 years in music marketing. Worked with Armada, Universal, artists like Tory Lanez. Drove tens of millions of streams. Ran digital campaigns at scale for brands like Google and the NFL. All of that taught me one thing: artists shouldn’t be doing this work.
+I spent 15 years in music marketing. Worked with Armada, Universal, and recording artists at every level. Drove tens of millions of streams. Ran digital campaigns at scale for brands like Google and the NFL. All of that taught me one thing: artists shouldn’t be doing this work.
 
 Musicians should be making music. Not learning CSS. Not debating whether their CTA button should be blue or green. Not manually updating tour dates across six platforms. Not running their own A/B tests to figure out which headline gets the most clicks.
 

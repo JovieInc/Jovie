@@ -27,7 +27,7 @@ import {
   resolveSummerEveCallerOrigin,
   SummerPinInvalidError,
 } from './summer-production-pin';
-import { fetchSummerShadow } from './summer-shadow-client';
+import { fetchSummerShadow, getEveShadowOrigin } from './summer-shadow-client';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -120,6 +120,27 @@ describe('Summer production OIDC transport', () => {
       fetchSummerShadow('/ovie/v1/summer-shadow/events')
     ).rejects.toThrow('invalid_eve_protection_bypass_secret');
     expect(boundedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the stable production domain as the shadow origin', () => {
+    expect(getEveShadowOrigin()).toBe('https://summer.jov.ie');
+  });
+
+  it('merges caller headers given as Headers or tuples', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    await fetchSummerShadow('/ovie/v1/summer-shadow/events', {
+      headers: new Headers({ 'x-caller': 'from-headers-instance' }),
+    });
+    await fetchSummerShadow('/ovie/v1/summer-shadow/events', {
+      headers: [['x-caller', 'from-tuples']],
+    });
+    const calls = vi.mocked(boundedFetch).mock.calls;
+    const first = calls[0]?.[1]?.headers as Record<string, string>;
+    const second = calls[1]?.[1]?.headers as Record<string, string>;
+    expect(first['x-caller']).toBe('from-headers-instance');
+    expect(first.authorization).toBe('Bearer test-oidc');
+    expect(second['x-caller']).toBe('from-tuples');
+    expect(second.authorization).toBe('Bearer test-oidc');
   });
 
   it('returns 503 and rethrows unexpected pin failures before OIDC', async () => {

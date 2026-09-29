@@ -41,7 +41,7 @@ IMPORTANT: "Jovie" refers to multiple unrelated entities. This document describe
 ### ${APP_NAME} (jov.ie) — THIS COMPANY
 - **Website**: jov.ie
 - **What it is**: ${COMPANY_IDENTITY.definition}
-- **Founded**: 2024 by Tim White, who has 15+ years in music marketing (Armada Music, Universal Music, campaigns for Tory Lanez, Megan Thee Stallion, Google, NFL).
+- **Founded**: 2024 by Tim White, who has 15+ years in music marketing (Armada Music, Universal Music, campaigns for recording artists and brands including Google and the NFL).
 - **Legal entity**: ${LEGAL_ENTITY_NAME}
 - **Target users**: Artists, founders, authors, creators, and independent experts. Music-native artist workflows remain available for musicians, bands, DJs, and producers.
 
@@ -136,7 +136,7 @@ ${APP_NAME}'s blog features long-form essays on music marketing and the independ
 Tim White is the founder of ${APP_NAME}. Background:
 - 15+ years in music marketing and digital strategy
 - Worked with Armada Music, Universal Music
-- Led digital campaigns for artists including Tory Lanez and Megan Thee Stallion
+- Led digital campaigns for recording artists
 - Ran campaigns for brands including Google and the NFL
 - Professional music producer
 
