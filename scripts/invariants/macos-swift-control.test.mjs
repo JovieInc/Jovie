@@ -91,6 +91,11 @@ describe('Mac Swift-control invariants (JOV-5359)', () => {
   });
 
   it('keeps MenuMonitor as the only macOS Swift target and without a webview', () => {
+    // The invariant is about Swift targets, not every top-level directory:
+    // apps/macos/media-ingest (JOV-5370) is a plain TypeScript CLI with no
+    // Package.swift, so it must not trip this check. Scoping to dirs with
+    // Package.swift means no hardcoded list needs editing when the next
+    // non-Swift tool is added here.
     assert.deepEqual(macosSwiftTargetDirs(), ['MenuMonitor']);
     const macosSwift = walkFiles(
       'apps/macos',
