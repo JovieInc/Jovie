@@ -113,6 +113,19 @@ class RenderTest(unittest.TestCase):
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
         self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
 
+    def test_capacity_horizon_is_show_only_and_renders_source_gaps(self):
+        value = model()
+        value["local"]["doctor"]["capacity"] = {
+            "schema": "jovie.capacity-horizon/v1", "incidents": [], "topBlocker": "drain evidence stale",
+            "leases": [{"alias": "alpha", "usableRemaining": 48, "bankedCount": 2, "mode": "fast",
+                        "event": {"label": "natural reset", "countdownSeconds": 600},
+                        "forecast": {"projectedUnused": None}, "route": {"selectedJob": "JOV-9"},
+                        "freshness": {"status": "stale"}}]}
+        text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
+        self.assertIn("CAPACITY HORIZON", text)
+        self.assertIn("alpha 48% · banked 2 · natural reset 10m · drain ? @ ? · unused ? · coverage 0 · FAST · JOV-9 · stale", text)
+        self.assertIn("show-only", text)
+
     def test_pipeline_attention_and_backlog_rows(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("#18724 devin  JOV-6544", text)

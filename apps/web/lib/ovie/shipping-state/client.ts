@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type CapacityHorizon, capacityHorizonSchema } from './capacity';
 import {
   DELIVERY_MERGE_REPOS,
   type DeliverySummary,
@@ -139,6 +140,11 @@ const sourceObservationSchema = z.object({
     .default(NOT_MEASURED_DURATIONS),
 });
 
+export function parseCapacityHorizon(value: unknown): CapacityHorizon | null {
+  const parsed = capacityHorizonSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 const deliveryLanesSchema = z.object({
   running: countMeasurementSchema,
   slots: countMeasurementSchema,
@@ -156,6 +162,7 @@ const deliveryLanesSchema = z.object({
   alerts: z.array(z.string().max(160)),
   heldByReason: z.record(z.string(), z.number().int().nonnegative()),
   failedByReason: z.record(z.string(), z.number().int().nonnegative()),
+  capacity: capacityHorizonSchema.nullable().optional().default(null),
   publishedAt: z.string().nullable(),
   stale: z.boolean(),
 });

@@ -91,12 +91,15 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         accounts = {"error": str(error)[:80], "accounts": {}, "available": []}
     try:
         linear = lane.Linear(host.linear_env)
-        pool_by_provider = {name: len(linear.lane_issues(name)) for name, spec in lane.load_providers().items()
-                            if spec.get("enabled", True)}
+        qualified_by_provider = {name: linear.lane_issues(name) for name, spec in lane.load_providers().items()
+                                 if spec.get("enabled", True)}
+        pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
+        qualified_jobs = {name: [issue.identifier for issue in issues]
+                          for name, issues in qualified_by_provider.items()}
         pool = sum(pool_by_provider.values())
         linear_error = None
     except Exception as error:
-        pool, pool_by_provider, linear_error = None, {}, f"{type(error).__name__}: {error}"[:100]
+        pool, pool_by_provider, qualified_jobs, linear_error = None, {}, {}, f"{type(error).__name__}: {error}"[:100]
     github = None
     merged, merged_error = [], None
     try:
@@ -133,6 +136,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "busy": len([p for p in (state / "slots").glob("*.lock") if not p.name.startswith("gate.") and _locked(p)]),
         "capacityByProvider": capacity_by_provider,
         "codex": accounts, "pool": pool, "poolByProvider": pool_by_provider,
+        "qualifiedJobsByProvider": qualified_jobs,
         "linearError": linear_error, "githubRemaining": github,
         "merged24h": merged, "mergedAttributionError": merged_error,
         "diskFreePct": round(100 * disk.free / disk.total, 1),
@@ -541,6 +545,17 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             metric["accountIdleSecondsWhileQualifiedWorkExists"] = max(0, int((obs.get("now") or time.time()) - started))
         else:
             metric["accountIdleSecondsWhileQualifiedWorkExists"] = None if obs.get("linearError") else 0
+    idle_start = ((previous or {}).get("providerIdleSince", {}).get("codex") or
+                  (previous or {}).get("idleQualifiedSince", {}).get("codex"))
+    projector = getattr(lane, "capacity_horizon", None)
+    capacity = projector(obs.get("codex") or {}, obs.get("_allReceipts") or [],
+                         (obs.get("qualifiedJobsByProvider") or {}).get("codex") or [],
+                         max(0, int((obs.get("now") or time.time()) - idle_start)) if idle_start else 0,
+                         obs.get("now")) if projector else {
+                             "schema": "jovie.capacity-horizon/v1", "generatedAt": now_iso(), "leases": [],
+                             "outcomes": {key: 0 for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")},
+                             "incidents": [], "topBlocker": "capacity projector unavailable",
+                             "founderJudgmentRequired": False, "controls": "show-only"}
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(c["slots"] - c["running"] for c in counts.values()),
@@ -550,6 +565,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
+            "capacity": capacity,
             "prs": (obs.get("reconcile") or {}).get("counts") or {}, "_idleQualifiedSince": next_idle_since,
             "orphan_prs": (obs.get("reconcile") or {}).get("orphans") or [],
             "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
@@ -627,6 +643,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         try:
             feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous, result["conditions"])
             result["idleQualifiedSince"] = feed.pop("_idleQualifiedSince", {})
+            result["capacity"] = feed["capacity"]
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]
