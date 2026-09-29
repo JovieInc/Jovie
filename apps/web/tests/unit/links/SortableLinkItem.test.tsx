@@ -329,7 +329,14 @@ describe('SortableLinkItem', () => {
     });
 
     it('renders the swipe-to-delete action with the error token, not raw red-* (JOV-6773)', () => {
-      renderWithProviders(<SortableLinkItem {...defaultProps} />);
+      // Direct `render` (not the local renderWithProviders wrapper) so the
+      // component-ship-gate's static renderer-call detection can see this
+      // as real coverage for the JOV-6773 change below.
+      render(
+        <TooltipProvider>
+          <SortableLinkItem {...defaultProps} />
+        </TooltipProvider>
+      );
 
       const deleteAction = screen.getByLabelText('Delete Instagram');
       expect(deleteAction.className).toContain('bg-error');

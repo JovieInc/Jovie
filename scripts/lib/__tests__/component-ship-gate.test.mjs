@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  hasRealLegacyTestEvidence,
   resolveRenderedEvaluationSection,
   runComponentShipGate,
 } from '../../component-ship-gate.mjs';
@@ -742,6 +743,55 @@ function coverageViaResult({
     repoRoot: root,
   });
 }
+
+describe('legacy test evidence resolution (JOV-6773)', () => {
+  const sourceRel =
+    'apps/web/components/features/dashboard/organisms/Foo.tsx';
+  const testRel = 'apps/web/tests/unit/dashboard/Foo.test.tsx';
+  const componentSource = "export function Foo() { return null; }\n";
+
+  it('resolves a @/features/* import shortcut to its components/features source', () => {
+    // tsconfig.json maps `@/features/*` to `./components/features/*`, one
+    // segment shorter than the generic `@/*` -> `apps/web/*` mapping this
+    // resolver otherwise applies, and several apps/web tests use the
+    // shortcut instead of the fully-qualified `@/components/features/*`.
+    const testSource = [
+      "import { render } from '@testing-library/react';",
+      "import { Foo } from '@/features/dashboard/organisms/Foo';",
+      'render(<Foo />);',
+    ].join('\n');
+
+    expect(
+      hasRealLegacyTestEvidence({
+        testSource,
+        testRel,
+        sourceRel,
+        componentSource,
+      })
+    ).toBe(true);
+  });
+
+  it('recognizes tests/utils/fast-render wrappers as real render calls', () => {
+    // fastRender/renderWithClerk/renderWithNextJs/renderWithHeadlessUi each
+    // just call @testing-library/react's real `render` with a fixed
+    // `wrapper` (apps/web/tests/utils/fast-render.ts) — a JSX argument
+    // reaching one is exactly as real as reaching `render` directly.
+    const testSource = [
+      "import { fastRender } from '@/tests/utils/fast-render';",
+      "import { Foo } from '@/components/features/dashboard/organisms/Foo';",
+      'fastRender(<Foo />);',
+    ].join('\n');
+
+    expect(
+      hasRealLegacyTestEvidence({
+        testSource,
+        testRel,
+        sourceRel,
+        componentSource,
+      })
+    ).toBe(true);
+  });
+});
 
 describe('coverage-via executable evidence', () => {
   const viaImport = "import { ViaPanel } from '@/components/atoms/ViaPanel';";

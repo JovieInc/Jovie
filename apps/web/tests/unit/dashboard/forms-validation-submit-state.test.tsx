@@ -24,7 +24,11 @@ const {
         appleMusicUrl: '',
         youtubeUrl: '',
       },
-      additionalLinks: [],
+      additionalLinks: [] as Array<{
+        id: string;
+        platform: string;
+        url: string;
+      }>,
       connectedDspInfo: {},
       updatePrimaryField: vi.fn(),
       schedulePrimaryNormalize: vi.fn(),
