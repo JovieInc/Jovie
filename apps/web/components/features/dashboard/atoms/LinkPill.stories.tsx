@@ -46,19 +46,40 @@ const meta = {
 } satisfies Meta<typeof LinkPill>;
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<typeof ControlledLinkPill>;
 
-export const Connected: Story = {};
+export const Connected: Story = {
+  args: {
+    platformIcon: 'spotify',
+    platformName: 'Spotify',
+    primaryText: 'Spotify',
+    secondaryText: 'artist.spotify.com/12345',
+    state: 'connected',
+    menuItems: MENU_ITEMS,
+    menuId: 'link-pill-story',
+  },
+};
 
 export const ErrorState: Story = {
   args: {
+    platformIcon: 'spotify',
+    platformName: 'Spotify',
+    primaryText: 'Spotify',
     state: 'error',
     secondaryText: 'Link is broken',
+    menuItems: MENU_ITEMS,
+    menuId: 'link-pill-story',
   },
 };
 
 export const NoMenuItems: Story = {
   args: {
+    platformIcon: 'spotify',
+    platformName: 'Spotify',
+    primaryText: 'Spotify',
+    secondaryText: 'artist.spotify.com/12345',
+    state: 'connected',
     menuItems: [],
+    menuId: 'link-pill-story',
   },
 };
