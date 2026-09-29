@@ -65,16 +65,23 @@ const paths = value =>
 const equal = (left, right) =>
   left?.length === right?.length &&
   left.every((value, index) => value === right[index]);
+// JOV-7126: a proof route can carry a query string (e.g. `/hud?fs=1`, the
+// isolated-chrome mode of a screen whose default route renders something
+// else entirely). `expectedRoute` is parsed the same way so a bare route
+// (every other screen) still requires an exactly empty search string —
+// this only widens what an exact, caller-declared query can additionally
+// match, never what an empty one does.
 const validLocalFinalUrl = (value, expectedRoute) => {
   if (typeof value !== 'string' || typeof expectedRoute !== 'string')
     return false;
   try {
     const url = new URL(value);
+    const expected = new URL(expectedRoute, 'http://localhost');
     return (
       url.protocol === 'http:' &&
       ['localhost', '127.0.0.1'].includes(url.hostname) &&
-      url.pathname === expectedRoute &&
-      url.search === '' &&
+      url.pathname === expected.pathname &&
+      url.search === expected.search &&
       url.hash === ''
     );
   } catch {

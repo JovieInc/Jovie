@@ -1372,6 +1372,68 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('classifies the pull_request head diff when the merge result is tree-identical to base (JOV-6820)', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const pullRequestBranch = detectStep.slice(
+      detectStep.indexOf(
+        'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
+      )
+    );
+    const emptyCheckIdx = pullRequestBranch.indexOf(
+      'if [[ -z "${CHANGED_FILES//[$\'\\t\\r\\n\' ]/}" ]]; then'
+    );
+    // The fallback diffs merge-base(origin/<base>, PR head)..PR head.
+    const headFallbackIdx = pullRequestBranch.indexOf(
+      '"origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")'
+    );
+    expect(pullRequestBranch).toContain(
+      'CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"'
+    );
+    const hardFailIdx = pullRequestBranch.indexOf(
+      'refusing a false docs-only classification'
+    );
+    expect(headFallbackIdx).toBeGreaterThan(emptyCheckIdx);
+    expect(hardFailIdx).toBeGreaterThan(headFallbackIdx);
+    expect(pullRequestBranch).toContain(
+      'git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"'
+    );
+  });
+
+  it('keeps every run block under GitHub max expression length', () => {
+    // GitHub refuses to load a workflow when a single run: block exceeds 21000
+    // chars ("Exceeded max expression length"), which silently drops every
+    // pull_request lane for the branch.
+    const lines = CI_WORKFLOW.split('\n');
+    for (let i = 0; i < lines.length; i += 1) {
+      const start = /^(\s*)run: \|/.exec(lines[i]);
+      if (!start) continue;
+      const indent = start[1].length;
+      const block = [];
+      let j = i + 1;
+      while (
+        j < lines.length &&
+        (/^\s*$/.test(lines[j]) || /^(\s*)/.exec(lines[j])[1].length > indent)
+      ) {
+        block.push(lines[j]);
+        j += 1;
+      }
+      const base = Math.min(
+        ...block.filter(l => l.trim()).map(l => /^(\s*)/.exec(l)[1].length)
+      );
+      const length = block.reduce(
+        (n, l) => n + Math.max(l.length - base, 0) + 1,
+        0
+      );
+      expect(
+        length,
+        `run block starting at ci.yml:${i + 1} exceeds GitHub limit`
+      ).toBeLessThanOrEqual(21000);
+    }
+  });
+
   it('materializes an empty path artifact for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(
@@ -1492,7 +1554,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
     expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
     expect(pathChanges).toContain(
-      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+      'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
     );
     expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(pathChanges).not.toContain(
