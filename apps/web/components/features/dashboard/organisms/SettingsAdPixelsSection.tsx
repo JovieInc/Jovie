@@ -173,7 +173,7 @@ function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
     degraded: { dot: '\u25CF', color: 'text-yellow-500', label: 'Degraded' },
     unhealthy: {
       dot: '\u25CF',
-      color: 'text-red-500',
+      color: 'text-error',
       label: 'Check Credentials',
     },
     inactive: {
@@ -251,7 +251,7 @@ function TestEventButton({
         </span>
       )}
       {status === 'error' && errorMessage && (
-        <span role='alert' className='text-2xs font-caption text-red-500'>
+        <span role='alert' className='text-2xs font-caption text-error'>
           {errorMessage}
         </span>
       )}

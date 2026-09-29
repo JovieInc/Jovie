@@ -744,10 +744,11 @@ describe('DevToolbar', () => {
       expect(screen.getByText('v1.0.0')).toBeInTheDocument();
     });
 
-    it('applies red styling for production env', () => {
+    it('applies the error token for production env (JOV-6773)', () => {
       renderToolbar({ env: 'production' });
       const badge = screen.getByText('production');
-      expect(badge.className).toContain('text-red-400');
+      expect(badge.className).toContain('text-error');
+      expect(badge.className).not.toMatch(/\bred-\d/);
     });
 
     it('applies yellow styling for preview env', () => {

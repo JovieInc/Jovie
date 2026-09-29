@@ -124,6 +124,7 @@ describe('dashboard form validation consolidation', () => {
     mockMusicLinksFormState.loading = false;
     mockMusicLinksFormState.success = false;
     mockMusicLinksFormState.error = undefined;
+    mockMusicLinksFormState.additionalLinks = [];
   });
 
   it('renders ProfileForm submit progress through the Button loading contract', () => {
@@ -183,6 +184,22 @@ describe('dashboard form validation consolidation', () => {
     expect(container.querySelector('[data-slot="form-status"]')).toHaveClass(
       'min-h-5'
     );
+  });
+
+  it('renders the additional-link remove affordance with the error token, not raw red-* (JOV-6773)', () => {
+    mockMusicLinksFormState.additionalLinks = [
+      {
+        id: 'link-1',
+        platform: 'soundcloud',
+        url: 'https://soundcloud.com/test',
+      },
+    ];
+
+    render(<DashboardListenNowForm artist={artist} onUpdate={vi.fn()} />);
+
+    const removeButton = screen.getByLabelText(/^Remove /);
+    expect(removeButton.className).toContain('hover:text-error');
+    expect(removeButton.className).not.toMatch(/\bred-\d/);
   });
 
   it('renders legacy ListenNowForm submit progress through Button loading', () => {

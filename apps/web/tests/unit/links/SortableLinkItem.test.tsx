@@ -328,6 +328,14 @@ describe('SortableLinkItem', () => {
       expect(mockOnRemove).toHaveBeenCalledWith(5);
     });
 
+    it('renders the swipe-to-delete action with the error token, not raw red-* (JOV-6773)', () => {
+      renderWithProviders(<SortableLinkItem {...defaultProps} />);
+
+      const deleteAction = screen.getByLabelText('Delete Instagram');
+      expect(deleteAction.className).toContain('bg-error');
+      expect(deleteAction.className).not.toMatch(/\bred-\d/);
+    });
+
     it('should call onAnyMenuOpen when menu is opened', () => {
       renderWithProviders(<SortableLinkItem {...defaultProps} />);
 
