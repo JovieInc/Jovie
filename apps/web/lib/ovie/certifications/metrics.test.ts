@@ -103,7 +103,7 @@ describe('computeCertificationMetrics', () => {
     expect(result.lanes.jov.founderBlockingMinutes).toBe(90);
   });
 
-  it('rates founder cards per day over the reporting window', () => {
+  it('rates founder cards per day over the reporting interval', () => {
     const result = input({
       subjects: [subject()],
       founderCards: [
@@ -119,7 +119,7 @@ describe('computeCertificationMetrics', () => {
           product: 'jov',
           createdAt: '2026-09-20T00:00:00.000Z',
         },
-        // Outside the window: excluded.
+        // Outside the interval: excluded.
         {
           id: 'c3',
           subjectId: 'sub-1',
@@ -152,7 +152,7 @@ describe('computeCertificationMetrics', () => {
       ],
     });
     expect(result.lanes.jov.silencePromotionRegretPer100).toEqual({
-      value: (2 / 3) * 100,
+      value: 66.7, // computeRatePercent rounds to one decimal
       sampleSize: 3,
     });
   });

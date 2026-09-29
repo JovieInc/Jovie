@@ -18,6 +18,7 @@ import {
   type DogfoodReceipt,
   evaluateDogfoodReliability,
 } from '@/lib/agent-os/dogfood-receipt';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 
 export const CERTIFICATION_METRICS_CONTRACT =
   'jovie.certification-metrics/v1' as const;
@@ -261,7 +262,8 @@ function rate(numerator: number, denominator: number): MetricValue {
 
 function per100(numerator: number, denominator: number): MetricValue {
   if (denominator === 0) return metric(null, 0);
-  return metric((numerator / denominator) * 100, denominator);
+  // Canonical per-100 rate derivation (analytics-metrics-layer guard).
+  return metric(computeRatePercent(numerator, denominator), denominator);
 }
 
 function percentile(sorted: readonly number[], p: number): number | null {
