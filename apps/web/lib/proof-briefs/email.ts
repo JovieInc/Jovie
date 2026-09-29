@@ -1,6 +1,7 @@
 import {
   assertProofBriefRenderable,
   type CertifiedProofBrief,
+  proofBriefBrand,
   proofBriefProvenance,
 } from './contract';
 
@@ -31,12 +32,13 @@ export function renderProofBriefEmail(
 ): ProofBriefEmail {
   assertProofBriefRenderable(brief, { now: options.now });
 
+  const brand = proofBriefBrand(brief);
   const subject = brief.hero.value
     ? `${brief.hero.value} ${brief.hero.label ?? 'results'} | ${brief.window.label}`
-    : `Your Jovie recap | ${brief.window.label}`;
+    : `Your ${brand.recapNoun} | ${brief.window.label}`;
 
   const textLines: string[] = [
-    "Here's what Jovie did for you in the last 7 days.",
+    brand.intro,
     `${brief.subject} | ${brief.window.label}`,
     '',
     brief.hero.sentence,
@@ -70,8 +72,8 @@ export function renderProofBriefEmail(
     : '';
 
   const html = `<div style="font-family:'Satoshi',Helvetica,Arial,sans-serif;background:#000000;color:#F5F5F7;padding:32px;">
-  <p style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#86868B;margin:0 0 16px;">Your week with Jovie | ${escapeHtml(brief.window.label)}</p>
-  <p style="font-size:16px;color:#86868B;margin:0 0 8px;">Here's what Jovie did for you in the last 7 days.</p>
+  <p style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#86868B;margin:0 0 16px;">${escapeHtml(brand.eyebrow)} | ${escapeHtml(brief.window.label)}</p>
+  <p style="font-size:16px;color:#86868B;margin:0 0 8px;">${escapeHtml(brand.intro)}</p>
   <p style="font-size:14px;color:#86868B;margin:0 0 20px;">${escapeHtml(brief.subject)}</p>
   ${brief.hero.value ? `<p style="font-size:48px;font-weight:700;letter-spacing:-0.02em;margin:0;">${escapeHtml(brief.hero.value)}</p>` : ''}
   <p style="font-size:20px;font-weight:600;margin:8px 0 24px;">${escapeHtml(brief.hero.sentence)}</p>
