@@ -21,8 +21,9 @@ describe('ArtistNotificationsHero', () => {
       })
     ).toHaveAttribute('href', ARTIST_NOTIFICATIONS_COPY.hero.primaryCtaHref);
 
+    const cardStage = screen.getByTestId('artist-notifications-card-stage');
     for (const card of ARTIST_NOTIFICATIONS_COPY.hero.floatingCards) {
-      expect(screen.getByText(card.title)).toBeInTheDocument();
+      expect(cardStage).toHaveTextContent(card.title);
     }
   });
 

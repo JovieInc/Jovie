@@ -63,8 +63,9 @@ describe('ClaimHandleForm', () => {
   test('renders form element', () => {
     render(<ClaimHandleForm />);
 
-    const form = document.querySelector('form');
+    const form = screen.getByTestId('claim-handle-form');
     expect(form).toBeInTheDocument();
+    expect(form.tagName).toBe('FORM');
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     expect(input).toBeInTheDocument();
