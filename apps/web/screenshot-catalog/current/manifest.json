@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-28T17:30:50.166Z",
-    "gitSha": "7a2c24addbdf74223c2e39de1ef2e0722ec3173f",
+    "capturedAt": "2026-09-29T01:32:03.048Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-28T19:57:55.281Z",
-    "gitSha": "1eeb7e4fce494e4245c8cf119c44766707415ccd",
+    "capturedAt": "2026-09-29T01:33:23.146Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T00:20:58.487Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:33:50.910Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T00:22:16.598Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:35:08.934Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-09-29T00:24:12.883Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:37:05.638Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-09-29T00:24:20.317Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:37:13.007Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-09-29T00:24:40.512Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:37:33.106Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T00:24:44.606Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:37:37.262Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-09-29T00:24:49.049Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:37:41.837Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-09-29T00:24:53.226Z",
-    "gitSha": "17962094476a85acaa509b9a6bb5001128af8f00",
+    "capturedAt": "2026-09-29T01:37:46.189Z",
+    "gitSha": "adb4ccebb6ab06e659d1c0c49da94d76b8d0033d",
     "imagePath": "settings-profile-desktop.png"
   },
   {
