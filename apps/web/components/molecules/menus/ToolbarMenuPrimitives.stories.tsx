@@ -1,4 +1,5 @@
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -18,7 +19,9 @@ const meta = {
     Story => (
       <DropdownMenu defaultOpen>
         <DropdownMenuTrigger asChild>
-          <button type='button'>Open</button>
+          <Button variant='outline' size='sm'>
+            Open
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className='w-48'>
           <Story />

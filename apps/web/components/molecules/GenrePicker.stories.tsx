@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { GenrePicker } from './GenrePicker';
@@ -12,12 +13,9 @@ const meta = {
     selected: [],
     onChange: fn(),
     trigger: (
-      <button
-        type='button'
-        className='rounded-md border border-subtle bg-surface-0 px-3 py-1.5 text-sm text-primary-token'
-      >
+      <Button variant='outline' size='sm'>
         Choose genres
-      </button>
+      </Button>
     ),
   },
 } satisfies Meta<typeof GenrePicker>;
