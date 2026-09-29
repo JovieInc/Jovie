@@ -15,4 +15,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    state: {
+      x: 120,
+      y: 80,
+      items: [
+        { label: 'Rename', onSelect: () => {} },
+        { kind: 'separator' },
+        { label: 'Delete', onSelect: () => {}, tone: 'danger' },
+      ],
+    },
+    onClose: () => {},
+  },
+};

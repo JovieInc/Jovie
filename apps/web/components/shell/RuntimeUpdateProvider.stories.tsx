@@ -13,8 +13,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  render: () => (
-    <RuntimeUpdateProvider>
+  args: {
+    children: (
       <div className='space-y-2 p-4'>
         <p className='text-sm font-semibold text-primary-token'>
           Shell content stays mounted inside the provider.
@@ -24,6 +24,7 @@ export const Default: Story = {
           display.
         </p>
       </div>
-    </RuntimeUpdateProvider>
-  ),
+    ),
+  },
+  render: args => <RuntimeUpdateProvider {...args} />,
 };
