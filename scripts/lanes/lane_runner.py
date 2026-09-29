@@ -53,6 +53,12 @@ SENSITIVE_LABELS = frozenset({
 EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked", "reasoning-job"})
 HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked", "reasoning-job"})
 SENSITIVE_PROVIDER = "codex"
+# JOV-6896: codex lanes are implementation-only. Review work bills the leased ChatGPT
+# accounts without producing code, so a codex slot never claims a review-only task kind
+# (adopting/gating another lane's PR) and its worker never posts PR review comments.
+# Coverage is unchanged: CI is the merge gate and sentry/sonar review every PR.
+IMPLEMENTATION_ONLY_PROVIDERS = frozenset({"codex"})
+REVIEW_ONLY_KINDS = frozenset({"adopt", "gate"})
 SENSITIVE_REVIEWABLE_LINES = 500
 SENSITIVE_RED_LINES = re.compile(
     r"\b(?:rotate|rotation|revoke|revocation)\b.{0,40}\b(?:secret|credential|token|key)s?\b|"
@@ -368,10 +374,21 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
 
 # ---------------------------------------------------------------- prompt
 
-def render_prompt(issue: Issue, branch: str, context_pack: str) -> str:
+def provider_may_run(provider: str, kind: str) -> bool:
+    """Review-only task kinds (adopt/gate claims) never run on implementation-only lanes."""
+    return not (provider in IMPLEMENTATION_ONLY_PROVIDERS and kind in REVIEW_ONLY_KINDS)
+
+
+def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | None = None) -> str:
     sensitive_contract = []
+    if provider in IMPLEMENTATION_ONLY_PROVIDERS:
+        sensitive_contract += [
+            "- This lane is implementation-only: never post PR reviews or review comments",
+            "  (`gh pr review`, `gh api .../reviews`, inline review threads). Reviewers are",
+            "  CI, sentry and sonar; fix what they report instead of reviewing others' PRs.",
+        ]
     if issue_is_sensitive(issue):
-        sensitive_contract = [
+        sensitive_contract += [
             "- Guarded sensitive-surface run: keep the reviewable diff at or below 500 lines and",
             "  one issue. Do not rotate secrets/credentials or change live billing pricing.",
             "- The lane will require the existing Migration Guard, security scan, affected boundary",
@@ -712,7 +729,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             sh(["git", "worktree", "add", "-q", "-b", branch, str(worktree), "origin/main"], cwd=host.repo, log=log)
             # Always installed: the gate's checks need it even when the provider works remotely.
             sh(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=worktree, timeout=1800, log=log)
-            prompt = render_prompt(issue, branch, context_pack(issue))
+            prompt = render_prompt(issue, branch, context_pack(issue), provider=name)
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
             started = time.time()
@@ -1309,6 +1326,10 @@ def unverified_pr(prs: list[dict], verified: dict) -> dict | None:
 
 
 def adopt_pr(host: Host, name: str, pr: dict) -> dict:
+    if not provider_may_run(name, "adopt"):
+        return {"schema": "jovie-lane-run/v1", "provider": name, "kind": "adopt", "pr": pr["number"],
+                "verdict": "skipped", "reasons": ["implementation-only-lane:no-review-tasks"],
+                "startedAt": now_iso(), "endedAt": now_iso()}
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-adopt-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -1613,7 +1634,7 @@ def worker(host: Host, name: str) -> int:
         requeue_verified(host, prs)
         escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
         red = pr_events.claim_event_pr(host, THIS, name, events) or claim_red_pr(host, name, candidates)
-        adopt = None if red else claim_adoptable_pr(host, name, prs)
+        adopt = None if red or not provider_may_run(name, "adopt") else claim_adoptable_pr(host, name, prs)
         issue = None
         sweep_lane_prs(host, name, linear)
         in_flight = None if red or adopt or over_budget(name, lane_prs(name, fields=LIGHT_PR_FIELDS),
