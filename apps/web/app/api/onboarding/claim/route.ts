@@ -207,7 +207,38 @@ async function resolveClaimHandoff(params: {
   }
 
   if (isWaitlistPendingStatus(waitlist.status)) {
-    return { profile: null, waitlist, waitlistIntakeRequired: false };
+    // Hold jov.ie/<handle> while the decision is pending: write a hidden,
+    // unclaimed profile row linked to the waitlist entry. Approval later
+    // flips it public through the normal materialize path.
+    let profile: ClaimedProfilePayload | null = null;
+    try {
+      profile = await materializeClaimedOnboardingProfile({
+        userId: params.appUserId,
+        conversationId: params.conversationId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        visibility: 'reserved',
+        waitlistEntryId: waitlist.entryId,
+      });
+    } catch (error) {
+      // Ownership violations still fail closed.
+      if (isOnboardingOwnershipError(error)) throw error;
+      // A failed reservation must not strand the durable waitlist receipt —
+      // the claim retry re-attempts the hold. Profile stays null so the UI
+      // never claims a handle it could not reserve.
+      logger.warn('[onboarding/claim] waitlist handle reservation failed', {
+        waitlistEntryId: waitlist.entryId,
+      });
+      await captureError(
+        'Onboarding waitlist handle reservation failed',
+        error,
+        {
+          route: '/api/onboarding/claim',
+          method: 'POST',
+        }
+      );
+    }
+    return { profile, waitlist, waitlistIntakeRequired: false };
   }
   if (!isWaitlistApprovedStatus(waitlist.status)) {
     throw new WaitlistPersistenceError(

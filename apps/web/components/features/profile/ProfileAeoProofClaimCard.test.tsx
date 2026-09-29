@@ -26,4 +26,19 @@ describe('ProfileAeoProofClaimCard', () => {
     expect(screen.queryByText(/Claim artist profile/i)).toBeNull();
     expect(screen.queryByText(/unclaimed/i)).toBeNull();
   });
+
+  it('keeps the CTA left-aligned so the bottom-right consent card never covers it (JOV-7114)', () => {
+    render(
+      <ProfileAeoProofClaimCard
+        artistName='Tim White'
+        href='/start'
+        label='Claim yours'
+        note='Limited · Reserve your name'
+      />
+    );
+
+    const row = screen.getByTestId('profile-aeo-claim-cta').parentElement;
+    expect(row).toHaveClass('items-start');
+    expect(row?.className).not.toMatch(/justify-between/);
+  });
 });
