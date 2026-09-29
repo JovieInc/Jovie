@@ -4,6 +4,7 @@ import {
   fillControlledInputUntilEnabled,
   resolveBypassFallbackUserId,
   setTestAuthBypassSession,
+  signInUser,
 } from '../../helpers/auth';
 
 describe('fillControlledInputUntilEnabled', () => {
@@ -40,6 +41,49 @@ describe('resolveBypassFallbackUserId', () => {
     );
     expect(creatorId).not.toMatch(/^ba_dev_/);
     expect(creatorId).toBe(resolveBypassFallbackUserId('creator-ready'));
+  });
+});
+
+describe('signInUser test-auth bypass navigation', () => {
+  it('gives the enter navigation its own budget beyond the 45s suite navigationTimeout (JOV-7206)', async () => {
+    const originalBypass = process.env.E2E_USE_TEST_AUTH_BYPASS;
+    const originalBaseUrl = process.env.BASE_URL;
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    delete process.env.BASE_URL;
+
+    const goto = vi.fn(async () => ({ status: () => 303 }));
+    const readyLocator = { isVisible: () => Promise.resolve(true) };
+    const page = {
+      goto,
+      url: () => 'http://localhost:3100/app',
+      waitForURL: () => Promise.resolve(),
+      locator: () => ({ first: () => readyLocator }),
+    } as unknown as Page;
+
+    try {
+      await signInUser(page);
+    } finally {
+      if (originalBypass === undefined) {
+        delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+      } else {
+        process.env.E2E_USE_TEST_AUTH_BYPASS = originalBypass;
+      }
+      if (originalBaseUrl === undefined) {
+        delete process.env.BASE_URL;
+      } else {
+        process.env.BASE_URL = originalBaseUrl;
+      }
+    }
+
+    expect(goto).toHaveBeenCalledWith(
+      'http://localhost:3100/api/dev/test-auth/enter?persona=creator&redirect=/app',
+      expect.objectContaining({
+        waitUntil: 'domcontentloaded',
+        timeout: expect.any(Number),
+      })
+    );
+    const { timeout } = goto.mock.calls[0][1] as { timeout: number };
+    expect(timeout).toBeGreaterThan(45_000);
   });
 });
 
