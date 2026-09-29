@@ -159,15 +159,28 @@ test('emits exact-head hud-isolated desktop and mobile evidence', async ({
     // public-profile/platform-connections screens) — rely on the testid
     // visibility waits below instead.
 
-    const root = page.locator('main.hud-kiosk-viewport');
+    // JOV-7126 follow-up: this producer authenticates via the
+    // dev-test-auth `persona=admin` bypass, not a signed kiosk token, so
+    // app/hud/page.tsx's `tokenOk` branch (main.hud-kiosk-viewport) never
+    // renders here — only its admin-shell branch (<AdminPage
+    // testId="hud-admin-page">) does. That was true from this spec's first
+    // commit; it was unreachable through the #19390-#19500 rewrite/hostname
+    // bugs, which is why nothing caught it sooner.
+    const root = page.getByTestId('hud-admin-page');
     await expect(root).toBeVisible();
     await expect(page.getByTestId('hud-bottom-marker')).toBeVisible();
 
-    // Keyboard-reachability check only — never click (navigates away from
-    // fs=1) and never press Escape (HudFullscreenControl's exit shortcut).
-    const exitControl = page.getByRole('button', { name: 'Exit fullscreen' });
-    await exitControl.focus();
-    await expect(exitControl).toBeFocused();
+    // Keyboard-reachability check only — never click (this would enter
+    // real browser fullscreen, which the capture step below cannot
+    // screenshot correctly) and never press Escape.
+    // HudFullscreenControl (components/features/admin/hud/HudFullscreenControl.tsx)
+    // starts with isFullscreen=false, so its accessible name is
+    // "Fullscreen" until a real fullscreenchange event fires — this control
+    // toggles into "Exit fullscreen" only after that, which this test
+    // deliberately never triggers.
+    const fullscreenControl = page.getByRole('button', { name: 'Fullscreen' });
+    await fullscreenControl.focus();
+    await expect(fullscreenControl).toBeFocused();
 
     await page.evaluate(async () => {
       await document.fonts.ready;
@@ -180,7 +193,7 @@ test('emits exact-head hud-isolated desktop and mobile evidence', async ({
     });
 
     const accessibility = await new AxeBuilder({ page })
-      .include('main.hud-kiosk-viewport')
+      .include('[data-testid="hud-admin-page"]')
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();
     expect(accessibility.violations).toEqual([]);
