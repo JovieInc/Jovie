@@ -9,6 +9,10 @@
 #   FLEET_GATE_DRY_RUN       1 to pass --dry-run (no persisted receipt)
 #   FLEET_GATE_EVALUATE_JSON optional fixture for tests (skips live observe)
 #   FLEET_GATE_CONSUMER      fleet (default) or deployment
+#   FLEET_GATE_SURFACE       exact consumer surface
+#   FLEET_GATE_MUTATION      requested mutation
+#   FLEET_GATE_RISK_LANE     JOV-5937 lane (not_applicable/low/medium/high/unknown)
+#   FLEET_GATE_HEALTH_SIGNALS_JSON additional typed dependency observations
 #   EXPECTED_SHA             when set, receipt main.sha must match
 #   FLEET_GATE_RECEIPT       output path (default $RUNNER_TEMP/jovie-fleet-gate.json)
 #   GITHUB_OUTPUT            optional Actions output file
@@ -24,6 +28,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 gate="$repo_root/scripts/fleet-gate/gem-priority-gate.py"
 receipt="${FLEET_GATE_RECEIPT:-${RUNNER_TEMP:-/tmp}/jovie-fleet-gate.json}"
 consumer="${FLEET_GATE_CONSUMER:-fleet}"
+surface="${FLEET_GATE_SURFACE:-fleet-control}"
+mutation="${FLEET_GATE_MUTATION:-refresh-fleet-admission}"
+risk_lane="${FLEET_GATE_RISK_LANE:-not_applicable}"
+health_signals="${FLEET_GATE_HEALTH_SIGNALS_JSON:-[]}"
 mkdir -p "$(dirname "$receipt")"
 
 case "$consumer" in
@@ -59,7 +67,7 @@ fi
 
 set +e
 "${args[@]}" >"$receipt"
-gate_rc=$?
+observer_rc=$?
 set -e
 
 jq -e '
@@ -117,18 +125,34 @@ if [[ "$consumer" == "deployment" ]]; then
   }
 fi
 
-if [[ "$gate_rc" -ne 0 && "$gate_rc" -ne 2 ]]; then
-  echo "::error::Fleet gate exited unexpectedly: $gate_rc" >&2
+if [[ "$observer_rc" -ne 0 && "$observer_rc" -ne 2 ]]; then
+  echo "::error::Fleet gate exited unexpectedly: $observer_rc" >&2
   exit 2
 fi
 
 admission="${receipt}.admission.json"
-if ! python3 "$repo_root/scripts/fleet-gate/fleet_admission_receipt.py" <"$receipt" >"$admission"; then
+request="${receipt}.request.json"
+revision="${EXPECTED_SHA:-$(jq -r '.signals.main.sha' "$receipt")}"
+jq -n \
+  --arg consumer "$consumer" \
+  --arg surface "$surface" \
+  --arg repository "${GEM_PRIORITY_GATE_REPO:-JovieInc/Jovie}" \
+  --arg revision "$revision" \
+  --arg mutation "$mutation" \
+  --arg riskLane "$risk_lane" \
+  --argjson healthSignals "$health_signals" \
+  '{consumer: $consumer, surface: $surface, repository: $repository, revision: $revision, mutation: $mutation, riskLane: $riskLane, healthSignals: $healthSignals}' \
+  >"$request" || { echo '::error::Fleet admission request is malformed.' >&2; exit 2; }
+if ! python3 "$repo_root/scripts/fleet-gate/fleet_admission_receipt.py" --request "$request" <"$receipt" >"$admission"; then
   echo '::error::Fleet gate admission projection failed.' >&2
   exit 2
 fi
 jq -e '
   .schema == "jovie-fleet-gate/v1" and
+  .scopedAdmission.schema == "jovie-fleet-admission/v2" and
+  (.scopedAdmission.allowed | type == "boolean") and
+  (.scopedAdmission.relevantBlockers | type == "array") and
+  (.scopedAdmission.unrelatedDegradations | type == "array") and
   (.signals.closureHealth | has("classifications") | not) and
   (.signals.closureHealth | has("changedFileEvidence") | not) and
   (.signals.closureHealth | has("duplicateIssueLanes") | not) and
@@ -138,6 +162,11 @@ jq -e '
   exit 2
 }
 
+scoped_allowed="$(jq -r '.scopedAdmission.allowed' "$admission")"
+scoped_mode="$(jq -r '.scopedAdmission.allowedMode' "$admission")"
+scoped_reason="$(jq -r '.scopedAdmission.reason' "$admission")"
+gate_rc=2
+[[ "$scoped_allowed" == "true" ]] && gate_rc=0
 work_allowed=false
 new_issue_intake_allowed=false
 promotion_allowed=false
@@ -146,6 +175,11 @@ deployment_allowed=false
 [[ "$(jq -r '.workAdmission.newIssueLeaseAllowed' "$receipt")" == "true" ]] && new_issue_intake_allowed=true
 [[ "$(jq -r '.promotionAdmission.allowed' "$receipt")" == "true" ]] && promotion_allowed=true
 [[ "$(jq -r '.deploymentAdmission.allowed // false' "$receipt")" == "true" ]] && deployment_allowed=true
+if [[ "$consumer" == "fleet" ]]; then
+  work_allowed="$scoped_allowed"
+else
+  deployment_allowed="$scoped_allowed"
+fi
 promotion_mode="$(jq -r '.promotionMode // "blocked"' "$receipt")"
 state="$(jq -r '.state' "$receipt")"
 observed_at="$(jq -r '.observedAt // empty' "$receipt")"
@@ -168,23 +202,7 @@ capacity_max_concurrent="$(jq -r '.concurrency.gem.maxConcurrent // 0' "$receipt
 capacity_reason="$(jq -r '.concurrency.gem.reason // "unknown"' "$receipt")"
 new_mutation_allowed="$(jq -r '.concurrency.gem.newMutationAllowed // false' "$receipt")"
 
-mode=blocked
-if [[ "$consumer" == "deployment" ]]; then
-  if [[ "$gate_rc" -eq 0 && "$deployment_allowed" == "true" ]]; then
-    mode=normal
-  elif [[ "$(jq -r '.signals.main.status' "$receipt")" == "green" &&
-    "$(jq -r '.signals.production.status' "$receipt")" == "red" &&
-    "$(jq -r '.isolatedPromotionAdmission.allowed' "$receipt")" == "true" ]]; then
-    mode=isolated-only
-  elif [[ "$(jq -r '.signals.main.status' "$receipt")" == "red" &&
-    "$(jq -r '.signals.integrity.status' "$receipt")" =~ ^(clear|resolved)$ ]]; then
-    mode=draft-only
-  fi
-elif [[ "$state" == "GREEN" && "$promotion_allowed" == "true" ]]; then
-  mode=normal
-elif [[ "$promotion_mode" != "null" && -n "$promotion_mode" ]]; then
-  mode="$promotion_mode"
-fi
+mode="$scoped_mode"
 
 if [[ "$work_allowed" == "true" ]]; then
   work_out=true
@@ -222,7 +240,11 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     echo "| --- | --- |"
     echo "| state | $state |"
     echo "| promotion_mode | $promotion_mode |"
-    echo "| consumer_mode | $mode |"
+    echo "| consumer_surface | $surface |"
+    echo "| requested_mutation | $mutation |"
+    echo "| risk_lane | $risk_lane |"
+    echo "| allowed_mode | $mode |"
+    echo "| decision_reason | $scoped_reason |"
     echo "| receipt_age_seconds | ${receipt_age_seconds:-unknown} |"
     echo "| capacity_accepted | $capacity_accepted |"
     echo "| capacity_max_concurrent | $capacity_max_concurrent |"

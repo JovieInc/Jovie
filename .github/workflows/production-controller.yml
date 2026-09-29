@@ -228,6 +228,7 @@ jobs:
     outputs:
       deployment_allowed: ${{ steps.policy.outputs.deployment_allowed }}
       mode: ${{ steps.policy.outputs.mode }}
+      admission_receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
     steps:
       - name: Generate read-only Jovie Bot token
         id: app-token
@@ -235,6 +236,7 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
           permission-contents: read
           permission-pull-requests: read
       - name: Checkout exact main policy
@@ -242,6 +244,23 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
+      - name: Resolve exact CI risk lane
+        id: risk
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="ci-risk-classification-${SOURCE_RUN_ID}-${SOURCE_RUN_ATTEMPT}"
+          root="$RUNNER_TEMP/ci-risk"
+          risk_lane=unknown
+          if gh run download "$SOURCE_RUN_ID" --name "$artifact" --dir "$root"; then
+            risk_lane="$(jq -r '.riskLevel // "unknown"' "$root/ci-risk-classification.json")"
+          fi
+          [[ "$risk_lane" =~ ^(low|medium|high)$ ]] || risk_lane=unknown
+          echo "risk_lane=$risk_lane" >> "$GITHUB_OUTPUT"
       - name: Require fresh exact-main deployment authority
         id: policy
         uses: ./.github/actions/evaluate-fleet-gate
@@ -250,6 +269,9 @@ jobs:
           dry-run: 'false'
           consumer: deployment
           expected-sha: ${{ github.event.workflow_run.head_sha }}
+          surface: production-web
+          mutation: promote-staged-web-release
+          risk-lane: ${{ steps.risk.outputs.risk_lane }}
 
   authorize-production:
     name: Authorize exact main CI evidence
@@ -280,6 +302,20 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Bind scoped fleet admission to the release lineage
+        env:
+          ADMISSION_RECEIPT_B64: ${{ needs.fleet-promotion.outputs.admission_receipt_b64 }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ADMISSION_RECEIPT_B64" | base64 --decode > "$RUNNER_TEMP/fleet-admission.json"
+          jq -e --arg sha "$EXPECTED_SHA" '
+            .scopedAdmission.schema == "jovie-fleet-admission/v2" and
+            .scopedAdmission.revision == $sha and
+            .scopedAdmission.surface == "production-web" and
+            .scopedAdmission.allowed == true
+          ' "$RUNNER_TEMP/fleet-admission.json" >/dev/null
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
@@ -672,7 +708,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/production-lane-range.json
+          path: |
+            ${{ runner.temp }}/production-lane-range.json
+            ${{ runner.temp }}/fleet-admission.json
           if-no-files-found: error
           retention-days: 30
 
@@ -986,6 +1024,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
@@ -993,6 +1032,11 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: ${{ needs.authorize-production.outputs.authorized == 'true' }}
+        with:
+          name: production-lane-range-${{ needs.authorize-production.outputs.expected_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-lineage
       - name: Resolve current main before final verification
         id: current
         env:
@@ -1198,7 +1242,8 @@ jobs:
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
               --arg terminal_reason "skipped_no_web" \
-              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason}' \
+              --slurpfile fleet "$RUNNER_TEMP/release-lineage/fleet-admission.json" \
+              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             echo "verified=true" >> "$GITHUB_OUTPUT"
             echo "Web release skipped by the sealed product-lane receipt."
@@ -1231,7 +1276,8 @@ jobs:
               --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg lanes "$SELECTED_LANES" \
               --arg terminal_reason "$terminal_reason" \
-              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason}' \
+              --slurpfile fleet "$RUNNER_TEMP/release-lineage/fleet-admission.json" \
+              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."
