@@ -9,7 +9,6 @@ import {
   isLyricsShellRoute,
   isOvShellRoute,
   isPresenceShellRoute,
-  isProfileShellRoute,
   isReleasesShellRoute,
   isSettingsShellRoute,
   isTasksShellRoute,
@@ -181,13 +180,6 @@ describe('remaining route-shaped shell skeleton matchers', () => {
     expect(isAdminShellRoute(APP_ROUTES.SETTINGS_ADMIN)).toBe(false);
   });
 
-  it('matches the canonical profiles workspace only', () => {
-    expect(isProfileShellRoute(APP_ROUTES.PROFILES)).toBe(true);
-    expect(isProfileShellRoute(APP_ROUTES.DASHBOARD_PROFILE)).toBe(false);
-    expect(isProfileShellRoute(`${APP_ROUTES.DASHBOARD}/profile`)).toBe(false);
-    expect(isProfileShellRoute(APP_ROUTES.SETTINGS_ARTIST_PROFILE)).toBe(false);
-  });
-
   it('matches canonical and legacy tour workspaces without claiming touring settings', () => {
     expect(isTouringShellRoute(APP_ROUTES.TOUR_DATES)).toBe(true);
     expect(isTouringShellRoute(APP_ROUTES.DASHBOARD_TOUR_DATES)).toBe(true);
@@ -201,6 +193,7 @@ describe('resolveDashboardSegmentSkeletonVariant', () => {
     [APP_ROUTES.ADMIN_ACTIVITY, 'admin'],
     [APP_ROUTES.INSIGHTS, 'insights'],
     [`${APP_ROUTES.LEGACY_DASHBOARD}/insights`, 'insights'],
+    [APP_ROUTES.PRESENCE, 'profile'],
     [APP_ROUTES.PROFILES, 'profile'],
     [APP_ROUTES.DASHBOARD_PROFILE, 'default'],
     [APP_ROUTES.TOUR_DATES, 'tour'],
@@ -226,8 +219,22 @@ describe('isPresenceShellRoute', () => {
     expect(isPresenceShellRoute(APP_ROUTES.PRESENCE)).toBe(true);
   });
 
+  it('keeps legacy Presence bookmarks in the same route family', () => {
+    expect(isPresenceShellRoute(APP_ROUTES.PROFILES)).toBe(true);
+    expect(
+      isPresenceShellRoute(`${APP_ROUTES.LEGACY_DASHBOARD}/presence`)
+    ).toBe(true);
+  });
+
   it('matches nested presence subroutes', () => {
     expect(isPresenceShellRoute(`${APP_ROUTES.PRESENCE}/platforms`)).toBe(true);
+  });
+
+  it('does not claim identity settings as the Presence workspace', () => {
+    expect(isPresenceShellRoute(APP_ROUTES.DASHBOARD_PROFILE)).toBe(false);
+    expect(isPresenceShellRoute(APP_ROUTES.SETTINGS_ARTIST_PROFILE)).toBe(
+      false
+    );
   });
 });
 

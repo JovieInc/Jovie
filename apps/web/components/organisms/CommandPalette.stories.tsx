@@ -2,7 +2,10 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  DashboardDataContext,
+  type DashboardDataContextValue,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -69,6 +72,12 @@ const storyDashboardData: DashboardData = {
   },
 };
 
+const storyDashboardDataContext: DashboardDataContextValue = {
+  ...storyDashboardData,
+  identities: storyDashboardData.creatorProfiles,
+  activeIdentity: storyDashboardData.selectedProfile,
+};
+
 function OpenPaletteOnMount() {
   const { openCommandPalette } = useHeaderActions();
   useEffect(() => {
@@ -89,7 +98,7 @@ function PaletteHeaderSlot() {
 function CommandPaletteStorySurface() {
   return (
     <QueryClientProvider client={storyQueryClient}>
-      <DashboardDataContext.Provider value={storyDashboardData}>
+      <DashboardDataContext.Provider value={storyDashboardDataContext}>
         <HeaderActionsProvider>
           <div className='flex h-[44rem] w-[min(64rem,100vw)] flex-col overflow-hidden bg-(--app-shell-content-surface)'>
             <PaletteHeaderSlot />

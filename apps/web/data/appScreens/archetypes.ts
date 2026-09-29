@@ -116,7 +116,7 @@ export const DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE = Object.fromEntries([
     'settings',
     '/app/settings/account,/app/settings/analytics,/app/settings/artist-profile,/app/settings/audience,/app/settings/billing,/app/settings/connectors,/app/settings/contacts,/app/settings/data-privacy,/app/settings/referral,/app/settings/retargeting-ads,/app/settings/touring,/app/settings/usage,/app/admin/investors/settings'
   ),
-  ...routes('profile', '/app/profiles'),
+  ...routes('profile', '/app/presence'),
   ...routes(
     'feed-list',
     '/app/calendar,/app/chats,/app/contacts,/app/library,/app/tasks,/app/tour-dates,/app/admin/activity,/app/admin/certifications,/app/admin/features,/app/admin/investors,/app/admin/investors/links,/app/admin/people,/app/admin/platform-connections,/app/admin/playlists,/app/admin/presence,/app/admin/screenshots'
@@ -187,8 +187,8 @@ export const APP_SCREEN_ARCHETYPE_REGISTRY = [
   defineArchetype('profile', {
     allowedRecipeIds: ['recipe.app-standard'],
     requiredSlots: ['identity', 'sections', 'primaryAction'],
-    representativeScreenId: 'screen.profiles',
-    representativeStoryId: 'app-screens-profiles--reference',
+    representativeScreenId: 'screen.presence',
+    representativeStoryId: 'app-screens-presence--reference',
   }),
   defineArchetype('opportunity-decision', {
     requiredSlots: ['items', 'decisionActions', 'status'],

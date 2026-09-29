@@ -1,9 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
-const { getAppFlagValueMock, redirectMock } = vi.hoisted(() => ({
+const {
+  getAppFlagValueMock,
+  loadAppShellRouteContextMock,
+  loadProfilesWorkspaceDataMock,
+  redirectMock,
+  requireAppShellDashboardUserIdMock,
+} = vi.hoisted(() => ({
   getAppFlagValueMock: vi.fn(),
+  loadAppShellRouteContextMock: vi.fn(),
+  loadProfilesWorkspaceDataMock: vi.fn(),
   redirectMock: vi.fn(),
+  requireAppShellDashboardUserIdMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -14,24 +23,69 @@ vi.mock('@/lib/flags/server', () => ({
   getAppFlagValue: getAppFlagValueMock,
 }));
 
-describe('presence redirect routes', () => {
+vi.mock('@/app/app/(shell)/app-shell-route-context', () => ({
+  loadAppShellRouteContext: loadAppShellRouteContextMock,
+  requireAppShellDashboardUserId: requireAppShellDashboardUserIdMock,
+}));
+
+vi.mock('@/app/app/(shell)/profiles/data', () => ({
+  loadProfilesWorkspaceData: loadProfilesWorkspaceDataMock,
+}));
+
+vi.mock('@/app/app/(shell)/profiles/ProfilesWorkspace', () => ({
+  ProfilesWorkspace: () => null,
+}));
+
+describe('Presence route separation', () => {
   afterEach(() => {
-    redirectMock.mockClear();
-    getAppFlagValueMock.mockReset();
+    vi.clearAllMocks();
   });
 
-  it('redirects the canonical presence route to the unified profiles workspace', async () => {
-    getAppFlagValueMock.mockResolvedValue(true);
+  it('renders Presence from the active identity context', async () => {
+    loadAppShellRouteContextMock.mockResolvedValue({
+      ok: true,
+      userId: 'clerk-user',
+      dashboardData: { user: { id: 'database-user' } },
+      activeIdentityId: 'identity-1',
+      profileId: 'identity-1',
+    });
+    requireAppShellDashboardUserIdMock.mockReturnValue('database-user');
+    loadProfilesWorkspaceDataMock.mockResolvedValue({
+      profileId: 'identity-1',
+    });
     const { default: PresencePage } = await import(
       '../../../app/app/(shell)/presence/page'
     );
 
-    await PresencePage();
+    const result = (await PresencePage()) as {
+      readonly props: {
+        readonly data: { readonly profileId: string };
+      };
+    };
 
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PROFILES);
+    expect(loadAppShellRouteContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({ route: APP_ROUTES.PRESENCE })
+    );
+    expect(loadProfilesWorkspaceDataMock).toHaveBeenCalledWith({
+      clerkUserId: 'clerk-user',
+      databaseUserId: 'database-user',
+      profileId: 'identity-1',
+    });
+    expect(result.props.data.profileId).toBe('identity-1');
   });
 
-  it('redirects the legacy dashboard presence route to the same destination', async () => {
+  it('redirects the legacy profiles route to Presence', async () => {
+    getAppFlagValueMock.mockResolvedValue(true);
+    const { default: ProfilesPage } = await import(
+      '../../../app/app/(shell)/profiles/page'
+    );
+
+    await ProfilesPage();
+
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
+  });
+
+  it('redirects the legacy dashboard presence route to Presence', async () => {
     getAppFlagValueMock.mockResolvedValue(true);
     const { default: LegacyPresencePage } = await import(
       '../../../app/app/(shell)/dashboard/presence/page'
@@ -39,18 +93,18 @@ describe('presence redirect routes', () => {
 
     await LegacyPresencePage();
 
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PROFILES);
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
   });
 
-  it('keeps both legacy routes on the ungated settings fallback', async () => {
+  it('keeps both compatibility routes on the ungated settings fallback', async () => {
     getAppFlagValueMock.mockResolvedValue(false);
-    const [{ default: PresencePage }, { default: LegacyPresencePage }] =
+    const [{ default: ProfilesPage }, { default: LegacyPresencePage }] =
       await Promise.all([
-        import('../../../app/app/(shell)/presence/page'),
+        import('../../../app/app/(shell)/profiles/page'),
         import('../../../app/app/(shell)/dashboard/presence/page'),
       ]);
 
-    await PresencePage();
+    await ProfilesPage();
     await LegacyPresencePage();
 
     expect(redirectMock).toHaveBeenNthCalledWith(

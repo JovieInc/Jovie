@@ -2543,10 +2543,17 @@ ${selectedGateScript}`,
     const enableStep = getStepBlock(enable, 'Enable auto-merge');
     const enableScript = getStepRunScript(enable, 'Enable auto-merge');
 
+    // Dependabot pull_request runs receive an empty secrets context, so the
+    // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable; the hourly
+    // triage sweep enables auto-merge with full secrets.
     expect(tokenStep).toContain(`        if: >-
           github.event.pull_request.head.repo.full_name == github.repository &&
-          github.event.pull_request.user.login != 'dependabot[bot]'
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token`);
+    expect(enable).toContain(
+      '      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+    );
     expect(tokenStep).not.toContain("github.actor != 'dependabot[bot]'");
     expect(enableStep).toContain(
       'GH_TOKEN: ${{ steps.app-token.outputs.token }}'

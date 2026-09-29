@@ -135,7 +135,7 @@ export function getPaidSuccessPrimaryHref(input: {
 }): string {
   if (input.isOnboardingUpgrade) return APP_ROUTES.DASHBOARD;
   return isArtistVisibilityPlan(input.plan)
-    ? APP_ROUTES.PROFILES
+    ? APP_ROUTES.PRESENCE
     : APP_ROUTES.CHAT;
 }
 
