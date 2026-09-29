@@ -864,6 +864,86 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('keeps the smartlink screen-fixture producer identity synchronized with the trusted resolver (JOV-7127)', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.smartlink-release'],
+      '/jovie-screen-fixture/screen-cert-release'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.smartlink-track'],
+      '/jovie-screen-fixture/screen-cert-release/screen-cert-track'
+    );
+    // Every SCREEN_PROOF_ROUTES-style producer gets its own dedicated
+    // artifact name so single-screen producers never collide inside one
+    // workflow run's artifact namespace.
+    assert.equal(
+      screenProofArtifactName('web.smartlink-release'),
+      `${PRODUCER.artifact}-smartlink-release`
+    );
+    assert.equal(
+      screenProofArtifactName('web.smartlink-track'),
+      `${PRODUCER.artifact}-smartlink-track`
+    );
+    assert.notEqual(
+      screenProofArtifactName('web.smartlink-release'),
+      screenProofArtifactName('web.smartlink-track')
+    );
+
+    assert.match(workflow, /--screen=web\.smartlink-release/);
+    assert.match(
+      workflow,
+      new RegExp(`name: ${screenProofArtifactName('web.smartlink-release')}`)
+    );
+    assert.match(workflow, /--screen-id=web\.smartlink-release/);
+    assert.match(
+      workflow,
+      /smartlink-release-artifact-id: \$\{\{ steps\.smartlink-release-proof\.outputs\.artifact-id \}\}/
+    );
+
+    assert.match(workflow, /--screen=web\.smartlink-track/);
+    assert.match(
+      workflow,
+      new RegExp(`name: ${screenProofArtifactName('web.smartlink-track')}`)
+    );
+    assert.match(workflow, /--screen-id=web\.smartlink-track/);
+    assert.match(
+      workflow,
+      /smartlink-track-artifact-id: \$\{\{ steps\.smartlink-track-proof\.outputs\.artifact-id \}\}/
+    );
+
+    const releaseSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/smartlink-release-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.match(
+      releaseSpec,
+      new RegExp(
+        `const smartlinkReleaseRoute = '${SCREEN_PROOF_ROUTES['web.smartlink-release']}'`
+      )
+    );
+
+    const trackSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/smartlink-track-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.match(
+      trackSpec,
+      new RegExp(
+        `const smartlinkTrackRoute =\\s*\\n\\s*'${SCREEN_PROOF_ROUTES['web.smartlink-track'].replace(/\//g, '\\/')}'`
+      )
+    );
+  });
+
   it('keeps the /hud isolated producer identity synchronized with the trusted resolver (JOV-7126)', () => {
     const workflow = readFileSync(
       join(ROOT, '.github/workflows/screenshots.yml'),
@@ -2684,8 +2764,11 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers the engineering publication surface for changed-surface certification', () => {
-    const source = 'apps/web/app/(marketing)/engineering/';
+  it('registers the engineering publication index as its own screen for changed-surface certification (JOV-7110)', () => {
+    // JOV-7110: web.engineering-publication used to bundle both the /engineering
+    // index and the /engineering/preview gallery as one screen, but the schema
+    // binds exactly one manifest route per screen. Split into two ids below;
+    // this one owns only the sources that render /engineering.
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.engineering-publication'
     );
@@ -2694,9 +2777,16 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       id: 'web.engineering-publication',
       platform: 'web',
       owner: 'engineering-publication',
-      sources: [source],
+      sources: [
+        'apps/web/app/(marketing)/engineering/page.tsx',
+        'apps/web/app/(marketing)/engineering/[slug]/page.tsx',
+      ],
       viewports: ['desktop', 'mobile'],
     });
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.engineering-publication'],
+      '/engineering'
+    );
 
     const result = evaluateChangedScreens({
       changedFiles: [
@@ -2705,6 +2795,39 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           path: 'apps/web/app/(marketing)/engineering/[slug]/page.tsx',
           status: 'A',
         },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.engineering-publication',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the engineering preview gallery as its own screen for changed-surface certification (JOV-7110)', () => {
+    const source = 'apps/web/app/(marketing)/engineering/preview/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.engineering-preview'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.engineering-preview',
+      platform: 'web',
+      owner: 'engineering-preview',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.engineering-preview'],
+      '/engineering/preview'
+    );
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
         {
           path: 'apps/web/app/(marketing)/engineering/preview/page.tsx',
           status: 'A',
@@ -2719,7 +2842,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.issues, []);
     assert.deepEqual(result.changedScreens, [
       {
-        id: 'web.engineering-publication',
+        id: 'web.engineering-preview',
         verdict: 'evidence-required',
         findings: [],
       },
