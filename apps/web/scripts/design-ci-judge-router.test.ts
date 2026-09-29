@@ -5,12 +5,15 @@
 // with the global `URL` constructor; under jsdom that global is jsdom's own
 // URL polyfill, not Node's, and `fileURLToPath` rejects it ("must be of
 // scheme file"). The Node environment keeps the real global `URL`.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildCells,
   buildDesignCiJudgeMatrix,
+  computeArtifactHash,
   enumerateInvariantRows,
   enumerateUnits,
+  fingerprintCells,
+  persistCells,
   REPO_ROOT,
   routeFromEnforcementConsumers,
   routeFromRuleClassification,
@@ -254,5 +257,186 @@ describe('design-ci-judge-router: PR1 never fabricates a result', () => {
     expect(
       knownRoutes.every(c => c.insufficientReason === 'not-yet-evaluated')
     ).toBe(true);
+  });
+});
+
+describe('design-ci-judge-router: fingerprinting', () => {
+  it('hashes a single-file unit deterministically and stably', async () => {
+    const units = await enumerateUnits();
+    const homepage = units.find(u => u.id === 'screen:web.homepage');
+    if (!homepage) throw new Error('fixture unit screen:web.homepage missing');
+    const first = await computeArtifactHash(homepage, REPO_ROOT);
+    const second = await computeArtifactHash(homepage, REPO_ROOT);
+    expect(first).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(first).toBe(second);
+  });
+
+  it('hashes a directory-source unit without throwing (EISDIR regression)', async () => {
+    const units = await enumerateUnits();
+    // web.engineering-preview's source is a directory
+    // (apps/web/app/(marketing)/engineering/preview/), not a file — this
+    // unit exists specifically to prove computeArtifactHash handles that.
+    const preview = units.find(u => u.id === 'screen:web.engineering-preview');
+    if (!preview)
+      throw new Error('fixture unit screen:web.engineering-preview missing');
+    await expect(computeArtifactHash(preview, REPO_ROOT)).resolves.toMatch(
+      /^sha256:[0-9a-f]{64}$/
+    );
+  });
+
+  it('fingerprints every applicable cell in the real matrix without throwing', async () => {
+    const matrix = await buildDesignCiJudgeMatrix();
+    const fingerprinted = await fingerprintCells(matrix, REPO_ROOT);
+    expect(fingerprinted).toHaveLength(matrix.cells.length);
+    for (const cell of fingerprinted) {
+      expect(cell.artifactHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(cell.rubricFingerprint).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(cell.inputFingerprint).toMatch(/^sha256:[0-9a-f]{64}$/);
+    }
+  });
+
+  it('gives two units with different sources different artifact hashes', async () => {
+    const matrix = await buildDesignCiJudgeMatrix();
+    const fingerprinted = await fingerprintCells(matrix, REPO_ROOT);
+    const byUnit = new Map(fingerprinted.map(c => [c.unitId, c.artifactHash]));
+    const homepage = byUnit.get('screen:web.homepage');
+    const pricing = byUnit.get('screen:web.marketing-pricing');
+    expect(homepage).toBeDefined();
+    expect(pricing).toBeDefined();
+    expect(homepage).not.toBe(pricing);
+  });
+
+  it('changing the route changes the inputFingerprint even with the same artifact/rubric', async () => {
+    const matrix = await buildDesignCiJudgeMatrix();
+    const fingerprinted = await fingerprintCells(matrix, REPO_ROOT);
+    const sample = fingerprinted[0];
+    const flipped = await fingerprintCells(
+      {
+        ...matrix,
+        cells: [
+          {
+            ...sample,
+            route: sample.route === 'visual' ? 'deterministic' : 'visual',
+          },
+        ],
+      },
+      REPO_ROOT
+    );
+    expect(flipped[0].artifactHash).toBe(sample.artifactHash);
+    expect(flipped[0].rubricFingerprint).toBe(sample.rubricFingerprint);
+    expect(flipped[0].inputFingerprint).not.toBe(sample.inputFingerprint);
+  });
+});
+
+describe('design-ci-judge-router: --persist fails closed', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const oneCell = [
+    {
+      rowId: 'JOV-INV-039',
+      unitId: 'screen:web.homepage',
+      route: 'deterministic' as const,
+      state: 'insufficient' as const,
+      insufficientReason: 'not-yet-evaluated' as const,
+      evidence: ['scripts/invariants/overlay-layer-contract.mjs'],
+      artifactHash: `sha256:${'a'.repeat(64)}`,
+      rubricFingerprint: `sha256:${'b'.repeat(64)}`,
+      inputFingerprint: `sha256:${'c'.repeat(64)}`,
+    },
+  ];
+
+  it('deliberate red: refuses to persist without a cron secret, and never calls fetch', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    await expect(
+      persistCells(oneCell, {
+        baseUrl: 'http://localhost:3999',
+        cronSecret: undefined,
+      })
+    ).rejects.toThrow(/CRON_SECRET is not set/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('deliberate red: a network failure fails closed, not silently skipped', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('connection refused'))
+    );
+    await expect(
+      persistCells(oneCell, {
+        baseUrl: 'http://localhost:3999',
+        cronSecret: 'secret',
+      })
+    ).rejects.toThrow(/could not reach/);
+  });
+
+  it('deliberate red: a non-2xx response fails closed with the response body surfaced', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response('{"error":"rejected"}', { status: 422 })
+        )
+    );
+    await expect(
+      persistCells(oneCell, {
+        baseUrl: 'http://localhost:3999',
+        cronSecret: 'secret',
+      })
+    ).rejects.toThrow(/422/);
+  });
+
+  it('sends the cron-secret bearer token and reports written/skipped counts on success', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ written: ['x'], skippedUnchanged: [] }), {
+        status: 200,
+      })
+    );
+    vi.stubGlobal('fetch', fetchSpy);
+    const result = await persistCells(oneCell, {
+      baseUrl: 'http://localhost:3999',
+      cronSecret: 'my-secret',
+    });
+    expect(result).toEqual({ written: 1, skippedUnchanged: 0 });
+    const [, init] = fetchSpy.mock.calls[0] as [URL, RequestInit];
+    expect((init.headers as Record<string, string>).authorization).toBe(
+      'Bearer my-secret'
+    );
+  });
+
+  it('sums written/skipped across multiple batches', async () => {
+    const manyCells = Array.from({ length: 250 }, (_, i) => ({
+      ...oneCell[0],
+      rowId: `FIXTURE-${i}`,
+      unitId: `screen:fixture-${i}`,
+      inputFingerprint: `sha256:${String(i).padStart(64, '0')}`,
+    }));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            written: Array.from({ length: 200 }, (_, i) => `w${i}`),
+            skippedUnchanged: [],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ written: [], skippedUnchanged: ['s0'] }),
+          { status: 200 }
+        )
+      );
+    vi.stubGlobal('fetch', fetchSpy);
+    const result = await persistCells(manyCells, {
+      baseUrl: 'http://localhost:3999',
+      cronSecret: 'secret',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ written: 200, skippedUnchanged: 1 });
   });
 });
