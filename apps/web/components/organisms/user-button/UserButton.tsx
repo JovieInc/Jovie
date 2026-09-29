@@ -96,6 +96,13 @@ interface BuildDropdownItemsParams {
 }
 
 const USER_MENU_CONTENT_CLASS = 'w-80 max-w-[calc(100vw-1rem)]';
+/**
+ * JOV-7130: the shared `max-h-96` cap clipped Sign out below an inner scroll
+ * once the menu grew (Lock Workspace, Hide money). Use all the room Radix
+ * measures above the trigger so every core control stays visible.
+ */
+export const USER_MENU_MAX_HEIGHT =
+  'var(--radix-dropdown-menu-content-available-height)';
 const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
 
 const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
@@ -613,6 +620,7 @@ export function UserButton({
             onOpenChange={setIsMenuOpen}
             disabled
             contentClassName={USER_MENU_CONTENT_CLASS}
+            maxHeight={USER_MENU_MAX_HEIGHT}
           />
         </div>
       );
@@ -744,6 +752,7 @@ export function UserButton({
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
         contentClassName={USER_MENU_CONTENT_CLASS}
+        maxHeight={USER_MENU_MAX_HEIGHT}
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

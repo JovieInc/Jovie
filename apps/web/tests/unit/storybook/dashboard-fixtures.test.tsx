@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { useQueryState } from 'nuqs';
 import { describe, expect, it } from 'vitest';
 import {
   createDashboardQueryClient,
@@ -8,6 +9,7 @@ import {
   DashboardStoryProviders,
   DEFAULT_DASHBOARD_DATA,
   withDashboardProviders,
+  withNuqsTestingAdapter,
   withOnboardingDashboardProviders,
 } from '@/.storybook/dashboard-fixtures';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -107,5 +109,25 @@ describe('dashboard-fixtures', () => {
     );
 
     expect(screen.getByTestId('needs-onboarding').textContent).toBe('true');
+  });
+
+  it('withNuqsTestingAdapter lets a component read/write nuqs query state', () => {
+    function NuqsProbe() {
+      const [sort] = useQueryState('sort', { defaultValue: 'lastSeen' });
+      return <span data-testid='sort'>{sort}</span>;
+    }
+
+    render(
+      <>
+        {withNuqsTestingAdapter(
+          () => (
+            <NuqsProbe />
+          ),
+          {} as never
+        )}
+      </>
+    );
+
+    expect(screen.getByTestId('sort').textContent).toBe('lastSeen');
   });
 });

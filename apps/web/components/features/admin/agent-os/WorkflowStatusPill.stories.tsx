@@ -16,6 +16,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AllRunStatuses: Story = {
+  args: { status: 'running' },
   render: () => (
     <div className='flex flex-wrap gap-2'>
       {(
@@ -38,6 +39,7 @@ export const AllRunStatuses: Story = {
 export const AllVerificationGateStatuses: StoryObj<
   typeof VerificationStatusPill
 > = {
+  args: { status: 'passed' },
   render: () => (
     <div className='flex flex-wrap gap-2'>
       {(

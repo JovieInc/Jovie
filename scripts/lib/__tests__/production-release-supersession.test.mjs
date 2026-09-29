@@ -303,6 +303,11 @@ function finalizeExpressions(overrides = {}) {
 function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
   const fixture = makeFixture('controller-finalize-');
   const marker = join(fixture.root, 'production-generation-verified.json');
+  mkdirSync(join(fixture.root, 'release-lineage'), { recursive: true });
+  writeFileSync(
+    join(fixture.root, 'release-lineage/fleet-admission.json'),
+    JSON.stringify({ scopedAdmission: { revision: EXPECTED_SHA } })
+  );
   stubCommand(
     fixture.bin,
     'gh',
@@ -521,6 +526,7 @@ describe('production release supersession execution', () => {
     expect(superseded.outputs.verified).toBe('true');
     expect(superseded.marker).toMatchObject({
       deploymentId: DEPLOYMENT_ID,
+      fleetAdmission: { revision: EXPECTED_SHA },
       sha: EXPECTED_SHA,
       terminalReason: 'skipped_superseded',
     });

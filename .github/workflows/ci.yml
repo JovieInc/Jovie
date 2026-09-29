@@ -1563,9 +1563,9 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.cache/tsbuildinfo*
-          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-${{ github.sha }}
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-${{ github.sha }}
           restore-keys: |
-            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
             jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Record restored web tsc state
         id: web-tsbuildinfo-restored
@@ -6101,10 +6101,11 @@ jobs:
           fi
         env:
           # JOV-5489: deterministic keyframes (PNG evidence; video is refused by
-          # the artifact secret guard) and a reviewer-only gateway key.
+          # the artifact secret guard) and a reviewer-only gateway key
+          # (AI Gateway key jovie-golden-path-review, $10 monthly budget).
           GOLDEN_PATH_KEYFRAME_DIR: ${{ github.workspace }}/apps/web/test-results/golden-path-keyframes/first
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
-          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}
+          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}

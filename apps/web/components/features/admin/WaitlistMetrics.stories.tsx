@@ -9,6 +9,7 @@ const meta = {
   },
   args: {
     metrics: {
+      total: 1842,
       waitlisted: 1842,
       invited: 620,
       signedUp: 411,
