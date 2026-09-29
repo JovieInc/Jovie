@@ -1,7 +1,11 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ access: vi.fn(), data: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  access: vi.fn(),
+  data: vi.fn(),
+  effect: vi.fn(),
+}));
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
   getOvieOperatorEntitlements: mocks.access,
 }));
@@ -137,6 +141,10 @@ const cases = [
 describe('admin privacy boundary enforcement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', mocks.effect);
+    mocks.effect.mockRejectedValue(
+      Error('External action reached before authorization')
+    );
     mocks.access.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: false,
@@ -167,6 +175,7 @@ describe('admin privacy boundary enforcement', () => {
       expect([401, 403]).toContain(response.status);
       expect(mocks.access).toHaveBeenCalled();
       expect(mocks.data).not.toHaveBeenCalled();
+      expect(mocks.effect).not.toHaveBeenCalled();
       const scope = mocks.access.mock.calls.at(-1)?.[0];
       if (
         method !== 'GET' ||
