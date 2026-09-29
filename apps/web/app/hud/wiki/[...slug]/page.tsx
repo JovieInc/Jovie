@@ -1,10 +1,12 @@
 import { forbidden, notFound, unauthorized } from 'next/navigation';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { ShellPageTitle } from '@/components/features/admin/layout/ShellPageTitle';
 import { WikiPageArticle } from '@/components/features/admin/wiki/WikiPageArticle';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getPage } from '@/lib/wiki/gbrain-client';
 
 interface Props {
-  params: Promise<{ slug: string[] }>;
+  readonly params: Promise<{ slug: string[] }>;
 }
 
 export default async function WikiPageView({ params }: Props) {
@@ -19,8 +21,11 @@ export default async function WikiPageView({ params }: Props) {
   if (!page || !page.compiled_truth) notFound();
 
   return (
-    <div className='mx-auto max-w-4xl px-4 py-8'>
-      <WikiPageArticle page={page} />
-    </div>
+    <AdminPage title={page.title} testId='admin-wiki-article-page'>
+      <ShellPageTitle title={page.title} />
+      <div className='mx-auto w-full max-w-4xl'>
+        <WikiPageArticle page={page} />
+      </div>
+    </AdminPage>
   );
 }

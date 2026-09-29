@@ -136,6 +136,14 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
         },
         {
+          // lib/docs/getMarkdownDocument imports node:fs at module scope
+          // (the file-based getMarkdownDocument path), which crashes the
+          // browser Vite build. createMarkdownDocument is isomorphic, so the
+          // mock keeps the same remark pipeline without the fs reads.
+          find: '@/lib/docs/getMarkdownDocument',
+          replacement: require.resolve('./markdown-document-mock.ts'),
+        },
+        {
           find: '@/lib/releases/release-matrix-loader',
           replacement: require.resolve('./composer-catalog-actions-mock.ts'),
         },
