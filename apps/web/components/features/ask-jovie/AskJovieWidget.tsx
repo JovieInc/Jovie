@@ -348,20 +348,20 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
   return (
     <>
       {!open && (
-        <Button
+        <CircleIconButton
           type='button'
-          variant='secondary'
+          variant='surface'
+          size='lg'
           onClick={openWidget}
-          aria-label={`Ask Jovie about ${artistName}`}
+          ariaLabel={`Ask Jovie about ${artistName}`}
           data-ask-jovie-launcher=''
           className={cn(
-            'group fixed right-4 bottom-4',
+            'fixed right-4 top-[calc(env(safe-area-inset-top)+var(--space-16))] md:top-auto md:bottom-4',
             PROFILE_Z.DRAWER_CONTENT
           )}
         >
           <JovieIcon size={22} className='shrink-0' />
-          <span className='hidden group-hover:inline'>Ask Jovie</span>
-        </Button>
+        </CircleIconButton>
       )}
 
       {open && (

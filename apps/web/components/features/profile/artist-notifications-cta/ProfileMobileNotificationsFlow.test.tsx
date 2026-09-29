@@ -5,6 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
 import { ProfileMobileNotificationsFlow } from './ProfileMobileNotificationsFlow';
 
+// Exercise the actual initial frame; the global Motion stub drops its wrapper.
+vi.unmock('motion/react');
+
 function renderFlow(
   overrides: Partial<Parameters<typeof ProfileMobileNotificationsFlow>[0]> = {}
 ) {
@@ -77,6 +80,16 @@ describe('ProfileMobileNotificationsFlow', () => {
     renderFlow({ presentation: 'inline', step: 'email' });
 
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('makes the capture screen immediately visible without a sliding transition', () => {
+    renderFlow({ step: 'email' });
+
+    const captureStep = screen.getByTestId(
+      'profile-mobile-notifications-step-email'
+    );
+    expect(captureStep).toBeVisible();
+    expect(getComputedStyle(captureStep).transform).not.toContain('translate');
   });
 
   it('labels the event preference with the generalized Events copy', () => {
