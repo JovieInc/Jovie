@@ -42,12 +42,11 @@ export function WorkspaceLockScreen() {
       data-workspace-lock='true'
       className='flex h-full min-h-1/2 w-full flex-col items-center justify-center gap-4 px-6'
     >
-      <div
+      <Fingerprint
         aria-hidden='true'
-        className='flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-1 text-destructive'
-      >
-        <Fingerprint className='h-8 w-8' />
-      </div>
+        data-testid='workspace-lock-glyph'
+        className='h-8 w-8 text-tertiary-token opacity-60'
+      />
       <Button
         variant='tertiary'
         type='button'
@@ -57,7 +56,7 @@ export function WorkspaceLockScreen() {
         {status === 'working' ? 'Waiting for passkey…' : 'Unlock to continue'}
       </Button>
       {message ? (
-        <p role='alert' className='text-sm text-destructive'>
+        <p role='alert' className='text-xs text-secondary-token'>
           {message}
         </p>
       ) : null}

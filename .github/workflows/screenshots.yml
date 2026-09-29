@@ -69,6 +69,8 @@ jobs:
       marketing-artifact-id: ${{ steps.marketing-captures.outputs.artifact-id }}
       profile-artifact-id: ${{ steps.profile-proof.outputs.artifact-id }}
       artists-artifact-id: ${{ steps.artists-proof.outputs.artifact-id }}
+      smartlink-release-artifact-id: ${{ steps.smartlink-release-proof.outputs.artifact-id }}
+      smartlink-track-artifact-id: ${{ steps.smartlink-track-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
     defaults:
       run:
@@ -297,6 +299,117 @@ jobs:
             apps/web/test-results/screen-browser-proof-artists/screen-proof.json
             apps/web/test-results/screen-browser-proof-artists/screenshots/desktop.png
             apps/web/test-results/screen-browser-proof-artists/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      # web.smartlink-release and web.smartlink-track (JOV-7127) are
+      # revenue-sensitive dynamic routes with no no-DB fallback on the real
+      # production path, so they capture a reserved, env-gated fixture route
+      # that renders the exact registered page component — see
+      # apps/web/app/[username]/[slug]/_lib/screen-cert-fixture.ts.
+      - name: Capture smartlink-release screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/smartlink-release-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-smartlink-release
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-smartlink-release-measurements.json
+
+      - name: Bind smartlink-release proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.smartlink-release \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-smartlink-release \
+            --measurements=apps/web/test-results/screen-browser-proof-smartlink-release-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-smartlink-release/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload smartlink-release screen proof
+        id: smartlink-release-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-smartlink-release
+          path: |
+            apps/web/test-results/screen-browser-proof-smartlink-release/screen-proof.json
+            apps/web/test-results/screen-browser-proof-smartlink-release/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-smartlink-release/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Capture smartlink-track screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/smartlink-track-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-smartlink-track
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-smartlink-track-measurements.json
+
+      - name: Bind smartlink-track proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.smartlink-track \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-smartlink-track \
+            --measurements=apps/web/test-results/screen-browser-proof-smartlink-track-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-smartlink-track/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload smartlink-track screen proof
+        id: smartlink-track-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-smartlink-track
+          path: |
+            apps/web/test-results/screen-browser-proof-smartlink-track/screen-proof.json
+            apps/web/test-results/screen-browser-proof-smartlink-track/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-smartlink-track/screenshots/mobile.png
           if-no-files-found: error
           retention-days: 14
           allow-images: true
@@ -569,6 +682,14 @@ jobs:
             --artifact-id=${{ needs.generate.outputs.artists-artifact-id }} \
             --screen-id=web.artists \
             --receipt-out=.artifacts/screen-certification/artists.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.smartlink-release-artifact-id }} \
+            --screen-id=web.smartlink-release \
+            --receipt-out=.artifacts/screen-certification/smartlink-release.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.smartlink-track-artifact-id }} \
+            --screen-id=web.smartlink-track \
+            --receipt-out=.artifacts/screen-certification/smartlink-track.json || STATUS=$?
           exit "$STATUS"
 
       - name: Upload screen certification receipts
