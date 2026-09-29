@@ -58,11 +58,6 @@ export {
   PublicSurfaceShell,
   PublicSurfaceStage,
 } from './public-surface';
-export type {
-  HandleValidationState,
-  SmartHandleInputProps,
-} from './SmartHandleInput';
-export { SmartHandleInput } from './SmartHandleInput';
 export { SocialBar } from './SocialBar';
 export type {
   UserButtonProps,
