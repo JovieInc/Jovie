@@ -68,7 +68,7 @@ export const Empty: StoryObj<typeof meta> = {
   args: {
     artist: {
       ...PROFILE_STORY_ARTIST,
-      tagline: null,
+      tagline: undefined,
       location: null,
       hometown: null,
       active_since_year: null,

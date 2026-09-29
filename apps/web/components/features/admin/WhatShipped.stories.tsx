@@ -7,7 +7,8 @@ import { WhatShipped } from './WhatShipped';
 const shipped: WhatShippedResponse = {
   generatedAt: '2026-09-05T14:50:00.000Z',
   available: true,
-  observation: 'fresh',
+  observation: 'ok',
+  errorMessage: null,
   items: [
     {
       number: 17279,

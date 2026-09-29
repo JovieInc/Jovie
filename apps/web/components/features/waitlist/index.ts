@@ -9,6 +9,5 @@ export {
   SOCIAL_PLATFORM_OPTIONS,
   WAITLIST_STORAGE_KEYS,
 } from './types';
-export { WaitlistAdditionalInfoStep } from './WaitlistAdditionalInfoStep';
 export { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 export { WaitlistSuccessView } from './WaitlistSuccessView';

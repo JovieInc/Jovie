@@ -57,36 +57,55 @@ vi.mock('@jovie/ui', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
-const { usePixelSettingsQueryMock, pixelQueryState, refetch, savePixels } =
-  vi.hoisted(() => {
-    const mockPixelSettings = {
-      pixels: {
-        facebookPixelId: '1234567890123456',
-        googleMeasurementId: 'G-ABCD1234EF',
-        tiktokPixelId: null,
-        enabled: true,
-        facebookEnabled: true,
-        googleEnabled: true,
-        tiktokEnabled: false,
-      },
-      hasTokens: {
-        facebook: true,
-        google: true,
-        tiktok: false,
-      },
-    };
+const {
+  usePixelSettingsQueryMock,
+  pixelQueryState,
+  pixelHealthState,
+  refetch,
+  savePixels,
+} = vi.hoisted(() => {
+  const mockPixelSettings = {
+    pixels: {
+      facebookPixelId: '1234567890123456',
+      googleMeasurementId: 'G-ABCD1234EF',
+      tiktokPixelId: null,
+      enabled: true,
+      facebookEnabled: true,
+      googleEnabled: true,
+      tiktokEnabled: false,
+    },
+    hasTokens: {
+      facebook: true,
+      google: true,
+      tiktok: false,
+    },
+  };
 
-    return {
-      pixelQueryState: {
-        data: mockPixelSettings,
-        isLoading: false,
-        isError: false,
+  return {
+    pixelQueryState: {
+      data: mockPixelSettings,
+      isLoading: false,
+      isError: false,
+    },
+    refetch: vi.fn(),
+    savePixels: vi.fn(),
+    usePixelSettingsQueryMock: vi.fn(),
+    pixelHealthState: {
+      data: null as null | {
+        platforms: Record<
+          string,
+          {
+            status: 'healthy' | 'degraded' | 'unhealthy' | 'inactive';
+            totalSent: number;
+            totalFailed: number;
+            lastSuccessAt: string | null;
+          }
+        >;
+        aggregate: { totalEventsThisWeek: number; overallSuccessRate: number };
       },
-      refetch: vi.fn(),
-      savePixels: vi.fn(),
-      usePixelSettingsQueryMock: vi.fn(),
-    };
-  });
+    },
+  };
+});
 
 usePixelSettingsQueryMock.mockImplementation(() => ({
   ...pixelQueryState,
@@ -129,7 +148,7 @@ vi.mock('@/lib/queries', () => ({
   }),
   usePixelSettingsQuery: usePixelSettingsQueryMock,
   usePixelHealthQuery: () => ({
-    data: null,
+    data: pixelHealthState.data,
     isLoading: false,
     isError: false,
   }),
@@ -151,6 +170,7 @@ describe('SettingsAdPixelsSection', () => {
     };
     pixelQueryState.isLoading = false;
     pixelQueryState.isError = false;
+    pixelHealthState.data = null;
     refetch.mockReset();
     savePixels.mockReset();
     savePixels.mockResolvedValue({});
@@ -344,8 +364,31 @@ describe('SettingsAdPixelsSection', () => {
 
     getAllByRole('button', { name: 'Test' })[0]?.click();
 
-    expect(await findByRole('alert')).toHaveTextContent(
-      'Pixel credentials rejected'
-    );
+    const alert = await findByRole('alert');
+    expect(alert).toHaveTextContent('Pixel credentials rejected');
+
+    // JOV-6773: the test-event failure renders on the error token, not raw red-*.
+    expect(alert.className).toContain('text-error');
+    expect(alert.className).not.toMatch(/\bred-\d/);
+  });
+
+  it('renders an unhealthy platform indicator with the error token, not raw red-* (JOV-6773)', () => {
+    pixelHealthState.data = {
+      platforms: {
+        facebook: {
+          status: 'unhealthy',
+          totalSent: 12,
+          totalFailed: 9,
+          lastSuccessAt: null,
+        },
+      },
+      aggregate: { totalEventsThisWeek: 0, overallSuccessRate: 0 },
+    };
+
+    const { getByText } = fastRender(<SettingsAdPixelsSection isPro />);
+
+    const indicator = getByText('Check Credentials');
+    expect(indicator.className).toContain('text-error');
+    expect(indicator.className).not.toMatch(/\bred-\d/);
   });
 });

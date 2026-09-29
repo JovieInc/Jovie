@@ -470,7 +470,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
                     <InlineIconButton
                       onClick={() => removeAdditionalLink(index)}
-                      className='shrink-0 rounded-full p-1 text-tertiary-token hover:text-red-500'
+                      className='shrink-0 rounded-full p-1 text-tertiary-token hover:text-error'
                       aria-label={`Remove ${meta?.name || link.platform}`}
                     >
                       <Trash2 className='h-4 w-4' />

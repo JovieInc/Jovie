@@ -161,11 +161,27 @@ function withoutTsxExtension(value) {
   return normalizeRepoPath(value).replace(/\.(?:tsx?|jsx?)$/i, '');
 }
 
+// tsconfig.json path shortcuts that drop the `components/` segment the
+// generic `@/*` -> `apps/web/*` mapping below would otherwise keep. Checked
+// longest-prefix-first so a more specific shortcut wins over the generic one.
+const ALIAS_PREFIX_REMAPS = [
+  ['@/atoms/', 'apps/web/components/atoms/'],
+  ['@/molecules/', 'apps/web/components/molecules/'],
+  ['@/organisms/', 'apps/web/components/organisms/'],
+  ['@/features/', 'apps/web/components/features/'],
+];
+
 function moduleResolvesToSource({ moduleSpecifier, importerRel, sourceRel }) {
   const sourceWithoutExtension = withoutTsxExtension(sourceRel);
   let candidate;
 
-  if (moduleSpecifier.startsWith('@/')) {
+  const aliasRemap = ALIAS_PREFIX_REMAPS.find(([prefix]) =>
+    moduleSpecifier.startsWith(prefix)
+  );
+  if (aliasRemap) {
+    const [prefix, replacement] = aliasRemap;
+    candidate = `${replacement}${moduleSpecifier.slice(prefix.length)}`;
+  } else if (moduleSpecifier.startsWith('@/')) {
     candidate = `apps/web/${moduleSpecifier.slice(2)}`;
   } else if (moduleSpecifier.startsWith('.')) {
     candidate = join(dirname(importerRel), moduleSpecifier);
@@ -568,6 +584,19 @@ const RUNTIME_COMPONENT_RENDERER_MODULES = new Map([
     ]),
   ],
   ['react-test-renderer', new Set(['create'])],
+  // Thin @testing-library/react `render()` wrappers used across apps/web's
+  // test suite (tests/utils/fast-render.ts) — each just calls the real
+  // `render` with a fixed `wrapper`, so a JSX argument reaching one of these
+  // is exactly as real as reaching `render` directly.
+  [
+    '@/tests/utils/fast-render',
+    new Set([
+      'fastRender',
+      'renderWithClerk',
+      'renderWithNextJs',
+      'renderWithHeadlessUi',
+    ]),
+  ],
 ]);
 
 const RUNTIME_COMPONENT_ELEMENT_FACTORY_MODULES = new Map([

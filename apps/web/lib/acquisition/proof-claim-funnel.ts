@@ -14,7 +14,6 @@
  */
 
 import { APP_ROUTES } from '@/constants/routes';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -116,15 +115,10 @@ function withProofClaimParams(href: string): string {
   return `${url.pathname}${url.search}`;
 }
 
-export function buildProofClaimHref(waitlistEnabled: boolean): string {
-  if (waitlistEnabled) {
-    const waitlist = new URL(PUBLIC_WAITLIST_URL, 'https://jov.ie');
-    return withProofClaimParams(
-      `${APP_ROUTES.WAITLIST}${waitlist.search ? waitlist.search : ''}`
-    );
-  }
-
-  return withProofClaimParams(`${APP_ROUTES.SIGNUP}?plan=pro&interval=month`);
+// Every claim enters the /start qualify chat (Tim 2026-09-28, JOV-3379); the
+// chat admits (sign up, then Pro) or reserves the name while access is limited.
+export function buildProofClaimHref(): string {
+  return withProofClaimParams(APP_ROUTES.START);
 }
 
 export function resolveProofClaimCta(
@@ -133,10 +127,10 @@ export function resolveProofClaimCta(
   const offer = getProofClaimOffer();
   if (waitlistEnabled) {
     return {
-      label: 'Request access',
-      href: buildProofClaimHref(true),
-      note: 'Limited · Request access',
-      support: 'Limited prelaunch access. We will email when you are in.',
+      label: 'Claim yours',
+      href: buildProofClaimHref(),
+      note: 'Limited · Reserve your name',
+      support: 'Limited access. Reserve your name now.',
       limited: true,
       offer,
     };
@@ -144,7 +138,7 @@ export function resolveProofClaimCta(
 
   return {
     label: 'Get yours',
-    href: buildProofClaimHref(false),
+    href: buildProofClaimHref(),
     note: `${offer.product} · $${offer.monthlyUsd}/mo`,
     support: `${offer.product} is $${offer.monthlyUsd}/mo.`,
     limited: false,

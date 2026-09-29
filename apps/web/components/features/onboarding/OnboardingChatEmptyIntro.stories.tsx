@@ -1,14 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { OnboardingChatEmptyIntro } from './OnboardingChatEmptyIntro';
 
-function ComposerFixture() {
-  return (
-    <div className='flex min-h-14 w-full items-center rounded-2xl border border-subtle bg-surface-0 px-4 text-sm text-secondary-token shadow-card'>
-      Artist, release, or link...
-    </div>
-  );
-}
-
 const meta: Meta<typeof OnboardingChatEmptyIntro> = {
   title: 'Onboarding/Public Start Entry',
   component: OnboardingChatEmptyIntro,
@@ -22,10 +14,6 @@ const meta: Meta<typeof OnboardingChatEmptyIntro> = {
       </div>
     ),
   ],
-  args: {
-    composer: <ComposerFixture />,
-    onSelectSuggestion: () => undefined,
-  },
 };
 
 export default meta;
