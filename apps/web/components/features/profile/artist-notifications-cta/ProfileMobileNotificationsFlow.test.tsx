@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
@@ -65,5 +67,18 @@ describe('ProfileMobileNotificationsFlow', () => {
 
     expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
     expect(screen.queryByText('Shows')).toBeNull();
+  });
+
+  it('renders alert text with the error token, not raw red-* (JOV-6773)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\bred-\d/);
+    expect(source).toContain('text-error');
   });
 });

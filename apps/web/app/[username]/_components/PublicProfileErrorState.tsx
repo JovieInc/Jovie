@@ -24,7 +24,7 @@ export function PublicProfileErrorState({
       >
         <div className='flex gap-3'>
           <span
-            className='mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-500/40 bg-red-500/15 text-red-200 shadow-inner dark:border-red-700/60 dark:bg-red-900/40'
+            className='mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-error/40 bg-error/15 text-error-foreground shadow-inner dark:border-error/60 dark:bg-error/40'
             aria-hidden='true'
           >
             <svg
@@ -50,20 +50,20 @@ export function PublicProfileErrorState({
             >
               Profile Is Temporarily Unavailable
             </h1>
-            <p className='mt-1.5 text-sm leading-snug text-red-100/90 dark:text-red-100/80'>
+            <p className='mt-1.5 text-sm leading-snug text-error-foreground/90 dark:text-error-foreground/80'>
               We could not load this profile right now, so please refresh or try
               again in a few minutes.
             </p>
             <div className='mt-4 flex flex-col gap-2 sm:flex-row'>
               <Link
                 href={retryHref}
-                className='inline-flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-red-950 dark:bg-white dark:text-black'
+                className='inline-flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-error-subtle)] dark:bg-white dark:text-black'
               >
                 Try Again
               </Link>
               <Link
                 href='/'
-                className='inline-flex min-h-11 items-center justify-center rounded-full border border-red-100/20 px-4 text-sm font-semibold text-red-50 transition-colors hover:bg-red-100/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-red-950'
+                className='inline-flex min-h-11 items-center justify-center rounded-full border border-error-foreground/20 px-4 text-sm font-semibold text-error-foreground transition-colors hover:bg-error-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-error-subtle)]'
               >
                 Go Home
               </Link>
