@@ -17,7 +17,11 @@ import {
 } from './ownership-inventory.mjs';
 import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
-import { rankQueueCandidates, scoreIssue } from './scorer.mjs';
+import {
+  assessPreventionLeverage,
+  rankQueueCandidates,
+  scoreIssue,
+} from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
 export const SYMPHONY_LABEL = 'symphony';
@@ -1014,14 +1018,24 @@ export async function selectNextToAdmit(
       preAdmission: decision.preAdmission,
     })
   );
-  const candidates = evaluations
+  const eligible = evaluations
     .filter(({ decision }) => decision.eligible)
-    .map(({ classification }) => ({
-      ...classification,
-      type: 'issue',
-      issue: issueForClassification(classification),
-      score: scoreIssue(classification).score,
-    }));
+    .map(({ classification }) => classification);
+  // JOV-7091: evaluate upstream prevention leverage against the rest of the
+  // eligible queue before scoring. Weak evidence leaves `prevention` null, so
+  // a mislabeled invariant earns no automatic priority.
+  for (const classification of eligible) {
+    classification.prevention = assessPreventionLeverage(
+      classification,
+      eligible
+    );
+  }
+  const candidates = eligible.map(classification => ({
+    ...classification,
+    type: 'issue',
+    issue: issueForClassification(classification),
+    score: scoreIssue(classification).score,
+  }));
 
   if (candidates.length === 0) {
     return {
