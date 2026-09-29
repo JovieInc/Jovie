@@ -21,6 +21,7 @@ vi.mock('@/lib/spotify', () => ({
 }));
 
 import {
+  confirmSelectedArtist,
   decideFallbackTurn,
   handleFromArtistName,
   parseArtistSelection,
@@ -478,5 +479,59 @@ describe('resolveGuardedStep', () => {
         state: stateFor(messages),
       })
     ).toBe('handle');
+  });
+});
+
+describe('confirmSelectedArtist (JOV-7134, LLM path)', () => {
+  const PICKED = '4Uwpa6zW3zzCSQvooQNksm';
+  const picked = (id: string): UIMessage => ({
+    id: 'u-pick',
+    role: 'user',
+    parts: [{ type: 'text', text: 'Selected: Tim White' }],
+    metadata: { spotifyArtistId: id },
+  });
+
+  beforeEach(() => {
+    hoisted.getSpotifyArtistMock.mockReset();
+  });
+
+  it('confirms the picker selection by its real id and hands the model the result', async () => {
+    hoisted.getSpotifyArtistMock.mockResolvedValue({
+      id: PICKED,
+      name: 'Tim White',
+      images: [{ url: 'https://i.scdn.co/image/tim' }],
+      genres: [],
+      popularity: 12,
+      followers: { total: 9_900 },
+    });
+    const state = createOnboardingTurnState({ sessionId: 's', turnCount: 2 });
+    const confirmation = await confirmSelectedArtist([picked(PICKED)], state);
+
+    expect(hoisted.getSpotifyArtistMock).toHaveBeenCalledWith(PICKED);
+    expect(state.spotifyArtistId).toBe(PICKED);
+    expect(state.spotifyFollowers).toBe(9_900);
+    const part = confirmation?.historyMessage.parts[0] as {
+      type: string;
+      state: string;
+      output: { artist: { followers: number } };
+    };
+    expect(part.type).toBe('tool-confirmSpotifyArtist');
+    expect(part.state).toBe('output-available');
+    expect(part.output.artist.followers).toBe(9_900);
+    expect(confirmation?.chunks.map(chunk => chunk.type)).toEqual([
+      'tool-input-available',
+      'tool-output-available',
+    ]);
+  });
+
+  it('ignores malformed ids, repeat picks, and turns without a selection', async () => {
+    const state = createOnboardingTurnState({ sessionId: 's', turnCount: 2 });
+    expect(
+      await confirmSelectedArtist([picked('Tim White')], state)
+    ).toBeNull();
+    expect(await confirmSelectedArtist([user('hi')], state)).toBeNull();
+    state.spotifyArtistId = PICKED;
+    expect(await confirmSelectedArtist([picked(PICKED)], state)).toBeNull();
+    expect(hoisted.getSpotifyArtistMock).not.toHaveBeenCalled();
   });
 });

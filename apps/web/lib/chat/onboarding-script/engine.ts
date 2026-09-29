@@ -1,5 +1,6 @@
 import 'server-only';
-import type { UIMessage } from 'ai';
+import { randomUUID } from 'node:crypto';
+import type { UIMessage, UIMessageChunk } from 'ai';
 import {
   type AccessDecision,
   evaluateAccessSignal,
@@ -738,4 +739,60 @@ export async function decideFallbackTurn(
       : null
     : null;
   return decisionTurn(input, existingDecisionKind, pick);
+}
+
+const SPOTIFY_ARTIST_ID = /^[0-9A-Za-z]{22}$/;
+
+interface ServerArtistConfirmation {
+  readonly historyMessage: UIMessage;
+  readonly chunks: readonly UIMessageChunk[];
+}
+
+/**
+ * JOV-7134: when the latest user message is a picker selection, confirm it
+ * server-side from the real id (never a model-supplied one). Returns the
+ * completed tool call as a history message for the model and as stream
+ * chunks for the client, or null when there is no new valid selection.
+ */
+export async function confirmSelectedArtist(
+  messages: readonly UIMessage[],
+  state: OnboardingTurnState
+): Promise<ServerArtistConfirmation | null> {
+  const latestUser =
+    [...messages].reverse().find(message => message.role === 'user') ?? null;
+  const spotifyArtistId = parseArtistSelection(latestUser);
+  if (
+    !spotifyArtistId ||
+    !SPOTIFY_ARTIST_ID.test(spotifyArtistId) ||
+    state.spotifyArtistId === spotifyArtistId
+  ) {
+    return null;
+  }
+  const output = await buildConfirmSpotifyArtistOutput(spotifyArtistId, state);
+  const toolCallId = randomUUID();
+  const input = { spotifyArtistId };
+  return {
+    historyMessage: {
+      id: `server-artist-confirmation-${toolCallId}`,
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-confirmSpotifyArtist',
+          toolCallId,
+          state: 'output-available',
+          input,
+          output,
+        } as UIMessage['parts'][number],
+      ],
+    },
+    chunks: [
+      {
+        type: 'tool-input-available',
+        toolCallId,
+        toolName: 'confirmSpotifyArtist',
+        input,
+      } as UIMessageChunk,
+      { type: 'tool-output-available', toolCallId, output } as UIMessageChunk,
+    ],
+  };
 }
