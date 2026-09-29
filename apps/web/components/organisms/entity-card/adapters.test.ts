@@ -6,6 +6,7 @@ import {
   chatEntityMentionToEntityCard,
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
+  contactToEntityCard,
   merchToEntityCard,
   releaseToEntityCard,
   showToEntityCard,
@@ -40,7 +41,7 @@ describe('merchToEntityCard', () => {
     expect(model.price?.display).toBe('$45.00');
     expect(model.price?.profit).toBe('$11.87');
     expect(model.status).toEqual({ label: 'Live', tone: 'live' });
-    expect(model.cta).toEqual({ label: 'Buy', href: '/tim/merch/m1' });
+    expect(model.cta).toEqual({ label: 'Shop', href: '/tim/merch/m1' });
   });
 
   it('falls back to the first mockup when no primary image', () => {
@@ -57,6 +58,34 @@ describe('merchToEntityCard', () => {
       { handle: 'tim' }
     );
     expect(model.status).toBeNull();
+  });
+});
+
+describe('contactToEntityCard', () => {
+  it('maps public business identity without exposing contact channels', () => {
+    const model = contactToEntityCard(
+      {
+        id: 'contact_1',
+        roleLabel: 'Booking',
+        contactName: 'Morgan Lee',
+        companyLabel: 'Northstar Talent',
+      },
+      { handle: 'luna vale', ctaLabel: 'Continue Inquiry' }
+    );
+
+    expect(model).toMatchObject({
+      id: 'contact_1',
+      kind: 'person',
+      href: '/luna%20vale?mode=contact',
+      title: 'Morgan Lee',
+      meta: 'Booking · Northstar Talent',
+      cta: {
+        label: 'Continue Inquiry',
+        href: '/luna%20vale?mode=contact',
+      },
+    });
+    expect(JSON.stringify(model)).not.toContain('email');
+    expect(JSON.stringify(model)).not.toContain('phone');
   });
 });
 
