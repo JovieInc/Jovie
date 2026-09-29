@@ -110,6 +110,76 @@ const delivery = {
   },
   summer: { availability: 'up' },
 };
+/** One capacity-horizon lease row, shaped per lib/ovie/shipping-state/capacity.ts. */
+const capacityLease = {
+  leaseId: 'codex:lane-a',
+  alias: 'lane-a',
+  provider: 'codex',
+  sourcePresent: true,
+  available: true,
+  subscriptionStatus: 'active' as const,
+  compatibility: { cli: '2.1', harness: '1.0', models: [], restrictions: [] },
+  concurrency: 2,
+  usableRemaining: 40,
+  bankedCount: 0,
+  event: {
+    kind: 'natural-reset' as const,
+    label: 'reset',
+    at: null,
+    countdownSeconds: 3_600,
+  },
+  forecast: {
+    schema: 'jovie.drain-forecast/v1' as const,
+    completionP50At: null,
+    completionP90At: null,
+    sustainablePercentPerHour: 5,
+    burstPercentPerHour: 8,
+    usableBeforeUnavailability: 10,
+    projectedUnused: 2,
+    qualifiedWork: [],
+    bottleneck: null,
+  },
+  route: {
+    schema: 'jovie.capacity-route-receipt/v1' as const,
+    selectedJob: 'JOV-1234',
+    selectedRoute: 'lane-a',
+    selectedLeaseId: 'codex:lane-a',
+    alternativesConsidered: ['lane-b'],
+    marginalValue: 1,
+    expectedCertifiedOutcome: 'ship',
+    drainMode: 'normal' as const,
+    modeTrigger: 'least-recently-used',
+    reason: 'least-recently-used available compatible lease',
+    replanConditions: ['lane-a exhausted'],
+    sourceGaps: [],
+  },
+  mode: 'normal' as const,
+  outcomes: {
+    useful: 1,
+    certified: 1,
+    duplicate: 0,
+    retry: 0,
+    failed: 0,
+    unknown: 0,
+  },
+  freshness: { observedAt: null, status: 'fresh' as const, confidence: 'high' },
+};
+const deliveryWithCapacityLease = {
+  ...delivery,
+  lanes: {
+    ...delivery.lanes,
+    capacity: {
+      schema: 'jovie.capacity-horizon/v1' as const,
+      generatedAt: new Date(NOW).toISOString(),
+      leases: [capacityLease],
+      outcomes: capacityLease.outcomes,
+      incidents: [],
+      topBlocker: null,
+      founderJudgmentRequired: false,
+      controls: 'show-only' as const,
+    },
+  },
+};
 const projection = {
   schema: SHIPPING_STATE_SCHEMA,
   projectionId: 'proj-1',
@@ -144,6 +214,10 @@ const projection = {
     productionVerified: { state: 'measured', value: true },
     exactLiveBuild: { state: 'measured', value: true },
   },
+};
+const projectionWithCapacityLease = {
+  ...projection,
+  delivery: deliveryWithCapacityLease,
 };
 
 function cockpitWithTask(title: string) {
@@ -548,5 +622,40 @@ describe('OvieShippingStateCard', () => {
       machines: 0,
       operationalFeeds: 0,
     });
+  });
+
+  it('keeps the capacity-lease Linear link out of the reason disclosure toggle', async () => {
+    // Regression for a WCAG 4.1.2 "nested-interactive" axe violation: an <a>
+    // rendered inside a <summary> (itself a native toggle). The Linear link
+    // and the reason disclosure must be siblings, not nested.
+    fetchMock.mockResolvedValue(jsonResponse(200, projectionWithCapacityLease));
+    const { container } = render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+
+    const link = await screen.findByRole('link', { name: 'JOV-1234' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://linear.app/jovie/issue/JOV-1234'
+    );
+
+    const summary = container.querySelector('summary');
+    expect(summary).not.toBeNull();
+    expect(summary?.querySelector('a')).toBeNull();
+    expect(link.closest('summary')).toBeNull();
+
+    // <details> is flow/block content a <p> cannot validly contain.
+    expect(summary?.closest('details')?.closest('p')).toBeNull();
+
+    // The decorative marker replacing the list-none disclosure triangle
+    // stays out of the accessible name.
+    const marker = summary?.querySelector('[aria-hidden="true"]');
+    expect(marker).not.toBeNull();
+    expect(marker?.getAttribute('aria-hidden')).toBe('true');
+    expect(summary?.textContent).toContain(
+      'least-recently-used available compatible lease'
+    );
   });
 });
