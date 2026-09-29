@@ -117,6 +117,20 @@ jobs:
         run: pnpm run build
 
       - name: Start production server
+        env:
+          # JOV-7126 follow-up: unset (or 0.0.0.0), the standalone server.js
+          # bind address leaks into request.nextUrl.hostname for every
+          # request it serves — Next.js derives that URL from the server's
+          # own configured hostname, not the incoming Host header. The
+          # dev-test-auth bypass's loopback trust check
+          # (isLocalDevelopmentAutomationHostname in
+          # lib/security/development-only.ts) only recognizes real loopback
+          # names (localhost, 127.0.0.1, ::1, *.localhost) and correctly
+          # rejects "0.0.0.0" as untrustworthy, so every producer that goes
+          # through that bypass — currently only hud-isolated — got a 403
+          # rather than a synthetic admin session. `next start` reads the
+          # same env var, so this covers both server commands below.
+          HOSTNAME: localhost
         run: |
           if [ -f .next/standalone/apps/web/server.js ]; then
             SERVER_COMMAND=(node .next/standalone/apps/web/server.js)

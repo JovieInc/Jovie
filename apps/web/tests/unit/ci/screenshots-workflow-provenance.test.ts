@@ -290,6 +290,25 @@ describe('Product Screenshots provenance cleanliness', () => {
     );
   });
 
+  it('pins the production server to a loopback hostname', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const start = getStepBlock(workflow, 'Start production server');
+
+    // request.nextUrl.hostname reflects the server's own configured
+    // hostname (Next.js passes it straight into startServer()), not the
+    // incoming Host header — an unset/0.0.0.0 bind address makes every
+    // request look like it came from "0.0.0.0", which
+    // isLocalDevelopmentAutomationHostname (lib/security/development-only.ts)
+    // correctly refuses to trust as a loopback client. That silently 403'd
+    // the dev-test-auth bypass hud-isolated depends on. `next start` reads
+    // the same HOSTNAME env var, so one job-env value covers both server
+    // commands this step can run.
+    expect(start).toContain('HOSTNAME: localhost');
+    expect(start).not.toMatch(
+      /HOSTNAME:\s*(0\.0\.0\.0|'0\.0\.0\.0'|"0\.0\.0\.0")/
+    );
+  });
+
   it('still emits a blocked receipt when screenshot generation fails', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const certifyJob = workflow.slice(workflow.indexOf('\n  certify:'));
