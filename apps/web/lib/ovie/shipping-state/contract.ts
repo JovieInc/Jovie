@@ -24,7 +24,9 @@ export const SHIPPING_SOURCE_IDS = [
   'github-merges',
   'exact-sha-ci',
   'production-controller',
+  'staging-controller',
   'live-build-info',
+  'staging-build-info',
   'summer-runtime',
 ] as const;
 
@@ -43,7 +45,9 @@ export const SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS = {
   'github-merges': null,
   'exact-sha-ci': null,
   'production-controller': null,
+  'staging-controller': null,
   'live-build-info': null,
+  'staging-build-info': null,
   'summer-runtime': null,
 } as const satisfies Record<ShippingSourceId, number | null>;
 
@@ -54,7 +58,9 @@ export const SHIPPING_SOURCE_SCHEMAS = {
   'github-merges': 'github-merge-counts/v1',
   'exact-sha-ci': 'github-actions-run/v1',
   'production-controller': 'jovie-controller-snapshot/v1',
+  'staging-controller': 'jovie-staging-generation/v1',
   'live-build-info': 'jovie-build-info/v1',
+  'staging-build-info': 'jovie-build-info/v1',
   'summer-runtime': 'summer-runtime-health/v1',
 } as const satisfies Record<ShippingSourceId, string>;
 
@@ -65,7 +71,9 @@ export const SHIPPING_SOURCE_PRODUCERS = {
   'github-merges': 'github-search',
   'exact-sha-ci': 'github-actions-ci',
   'production-controller': 'production-controller',
+  'staging-controller': 'staging-controller',
   'live-build-info': 'live-build-info',
+  'staging-build-info': 'staging-build-info',
   'summer-runtime': 'summer-runtime',
 } as const satisfies Record<ShippingSourceId, string>;
 
@@ -371,6 +379,20 @@ export type DeliveryProduction = {
   readonly behindMain: CountMeasurement;
 };
 
+/** The exact main HEAD a controller generation certified, when one exists. */
+export type DeliveryCertifiedHead = {
+  readonly sha: string | null;
+  readonly certifiedAt: string | null;
+};
+
+/** The standing staging environment, same receipt shape as production. */
+export type DeliveryStaging = {
+  readonly sha: string | null;
+  readonly version: string | null;
+  readonly deployedAt: string | null;
+  readonly behindMain: CountMeasurement;
+};
+
 export type DeliverySummer = {
   readonly availability: 'up' | 'down' | 'degraded' | null;
 };
@@ -385,7 +407,9 @@ export type DeliverySummary = {
   readonly merges: DeliveryMerges;
   readonly mergeQueueDepth: CountMeasurement;
   readonly inFlight: CountMeasurement;
+  readonly certifiedHead: DeliveryCertifiedHead;
   readonly production: DeliveryProduction;
+  readonly staging: DeliveryStaging;
   readonly summer: DeliverySummer;
 };
 
@@ -515,7 +539,14 @@ export function emptyDeliverySummary(): DeliverySummary {
     },
     mergeQueueDepth: NOT_MEASURED_COUNT,
     inFlight: NOT_MEASURED_COUNT,
+    certifiedHead: { sha: null, certifiedAt: null },
     production: {
+      sha: null,
+      version: null,
+      deployedAt: null,
+      behindMain: NOT_MEASURED_COUNT,
+    },
+    staging: {
       sha: null,
       version: null,
       deployedAt: null,
