@@ -1170,14 +1170,17 @@ async function writeDesktopPasskeyState(
 // Touch ID sign-in (JOV-6727, docs/macos/desktop-auth.md). Only a signed
 // build that embeds the Developer ID provisioning profile may use the
 // keychain-access-groups entitlement; without it, stay off.
-function configureDesktopWebAuthn(): void {
+async function configureDesktopWebAuthn(): Promise<void> {
   const config = resolveDesktopWebAuthnConfig({
     platform: process.platform,
     isPackaged: app.isPackaged,
     appEnv: APP_ENV,
-    hasEmbeddedProvisioningProfile: fs.existsSync(
-      path.join(process.resourcesPath, '..', 'embedded.provisionprofile')
-    ),
+    hasEmbeddedProvisioningProfile: await fs.promises
+      .access(path.join(process.resourcesPath, '..', 'embedded.provisionprofile'))
+      .then(
+        () => true,
+        () => false
+      ),
   });
   if (!config) return;
 
@@ -1186,7 +1189,7 @@ function configureDesktopWebAuthn(): void {
     desktopPasskeyAvailable = true;
     try {
       desktopPasskeyState = parseDesktopPasskeyState(
-        fs.readFileSync(DESKTOP_PASSKEY_STATE_FILE, 'utf8')
+        await fs.promises.readFile(DESKTOP_PASSKEY_STATE_FILE, 'utf8')
       );
     } catch {
       // No state yet: not enrolled, never asked.
@@ -3378,7 +3381,7 @@ app.whenReady().then(async () => {
     return;
   }
 
-  configureDesktopWebAuthn();
+  await configureDesktopWebAuthn();
 
   const appIconPath = getAppIconPath();
   if (process.platform === 'darwin' && appIconPath && app.dock) {
