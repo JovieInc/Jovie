@@ -184,7 +184,12 @@ export default async function AppShellLayout({
                 href: APP_ROUTES.DASHBOARD,
                 variant: 'primary',
               },
-              { label: 'Return To Jovie', href: '/', variant: 'secondary' },
+              {
+                // ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)
+                label: 'Return to Jovie',
+                href: '/',
+                variant: 'secondary',
+              },
             ]}
             testId='dashboard-error'
           />

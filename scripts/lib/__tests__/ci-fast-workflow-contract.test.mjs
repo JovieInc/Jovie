@@ -630,6 +630,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts',
       'structural',
       'typecheck',
+      'web-stories-typecheck',
       'web-tests-typecheck',
     ]);
     expect(validateLaneGroups(LANE_GROUPS)).toBe(true);
@@ -725,6 +726,10 @@ describe('ci-fast bounded parallel workflow', () => {
           id: 'web-tests-typecheck',
           status: 'skipped',
         }),
+        expect.objectContaining({
+          id: 'web-stories-typecheck',
+          status: 'skipped',
+        }),
       ]);
       for (const lane of payload.lanes) {
         expect(lane.logExcerpt).toContain('ci-path-changes preselection');
@@ -734,15 +739,15 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('overlaps the two typecheck lanes, each under its own singleflight lock', () => {
+  it('overlaps the three typecheck lanes, each under its own singleflight lock', () => {
     const repo = mkdtempSync(join(tmpdir(), 'ci-fast-overlap-'));
     const binDir = join(repo, 'bin');
     try {
       mkdirSync(binDir);
-      // Each call waits for the other to start; a serial runner exits 9.
+      // Each call waits for the others to start; a serial runner exits 9.
       writeFileSync(
         join(binDir, 'pnpm'),
-        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 3 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
+        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 4 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
       );
       chmodSync(join(binDir, 'pnpm'), 0o755);
       const result = spawnSync(
@@ -769,6 +774,7 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(lanes.map(lane => [lane.id, lane.logExcerpt])).toEqual([
         ['typecheck', 'dir='],
         ['web-tests-typecheck', 'dir=.cache/typecheck-singleflight-tests'],
+        ['web-stories-typecheck', 'dir=.cache/typecheck-singleflight-stories'],
       ]);
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -919,6 +925,10 @@ describe('ci-fast bounded parallel workflow', () => {
           id: 'web-tests-typecheck',
           status: 'failure',
         }),
+        expect.objectContaining({
+          id: 'web-stories-typecheck',
+          status: 'failure',
+        }),
       ]);
       for (const lane of payload.lanes) {
         expect(lane.logExcerpt).toMatch(/pnpm.*not found/i);
@@ -970,7 +980,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
     expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
     const configHash =
-      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json')";
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json')";
     expect(restore).toContain(
       `key: jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
     );
@@ -1048,7 +1058,7 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toHaveLength(2);
     const order = [
       'Restore web tsc incremental state',
-      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n',
+      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n          pnpm --filter @jovie/web run typecheck:stories\n',
       'uses: actions/cache/save@',
       'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}',
     ].map(marker => warm.indexOf(marker));
@@ -1142,6 +1152,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts',
       'typecheck',
       'web-tests-typecheck',
+      'web-stories-typecheck',
       'scripts-typecheck',
       'guardrails',
       'design-system-source-ratchet',
@@ -1159,6 +1170,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
       'typecheck',
       'web-tests-typecheck',
+      'web-stories-typecheck',
     ]);
     expect(selectLanes('remaining').map(lane => lane.id)).toEqual(
       LANE_GROUPS.remaining
@@ -1177,6 +1189,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
       'web-tests-typecheck': 'pnpm --filter=@jovie/web run typecheck:tests',
+      'web-stories-typecheck': 'pnpm --filter=@jovie/web run typecheck:stories',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',

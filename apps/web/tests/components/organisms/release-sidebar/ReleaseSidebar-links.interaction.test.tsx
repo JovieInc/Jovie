@@ -339,15 +339,6 @@ vi.mock('@/components/molecules/drawer', () => ({
   ),
 }));
 
-// Mock sub-components that are not under test — useReleaseHeaderParts hook
-vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  useReleaseHeaderParts: () => ({
-    headerLabel: '',
-    primaryActions: [],
-    overflowActions: [],
-  }),
-}));
-
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
 }));
@@ -460,15 +451,6 @@ vi.mock('@/constants/routes', () => ({
   buildReleaseTasksRoute: (releaseId: string) =>
     `/app/releases/${releaseId}/tasks`,
 }));
-
-vi.mock(
-  '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
-  () => ({
-    ReleaseSmartLinkSection: () => (
-      <div data-testid='smart-link-section'>Smart Link Content</div>
-    ),
-  })
-);
 
 vi.mock(
   '@/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics',
