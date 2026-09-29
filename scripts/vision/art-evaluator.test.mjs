@@ -284,7 +284,11 @@ test('subscription transport routes codex with -i images and claude with Read on
       stderr: '',
     };
   };
-  const transport = subscriptionVisionTransport({ spawnImpl });
+  const transport = subscriptionVisionTransport({
+    spawnImpl: /** @type {typeof import('node:child_process').spawnSync} */ (
+      spawnImpl
+    ),
+  });
 
   await transport({
     model: 'openai/gpt-5.5',
@@ -317,7 +321,9 @@ test('subscription transport routes codex with -i images and claude with Read on
 
 test('subscription transport rejects raw-key and gateway lanes', async () => {
   const transport = subscriptionVisionTransport({
-    spawnImpl: () => ({ status: 0, stdout: '', stderr: '' }),
+    spawnImpl: /** @type {typeof import('node:child_process').spawnSync} */ (
+      /** @type {unknown} */ (() => ({ status: 0, stdout: '', stderr: '' }))
+    ),
   });
   await assert.rejects(
     transport({ model: 'zai/glm-5.3', system: 's', prompt: 'p', images: [] }),
