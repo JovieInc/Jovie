@@ -616,8 +616,3 @@
 .homepage-claim-hero .product-claim-card__handle-input::placeholder {
   color: var(--color-text-tertiary-token);
 }
-
-/* The Pen portrait sits right of centre; keep the face in the avatar crop. */
-.homepage-claim-hero__portrait {
-  object-position: 74% 32%;
-}

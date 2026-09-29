@@ -92,18 +92,16 @@ describe('HomepageIdentityHero', () => {
     }
   });
 
-  it('labels the claimed-page preview as illustrative and shows no product screenshot', () => {
+  it('proves the claim with the real jov.ie/tim profile and shows no product screenshot', () => {
     render(<HomepageIdentityHero />);
 
-    const card = screen.getByTestId('homepage-claim-card');
-    expect(
-      within(card).getByText('Illustrative profile · Ready to claim')
-    ).toBeInTheDocument();
-    expect(within(card).getByRole('img')).toHaveAttribute(
+    const proof = screen.getByTestId('homepage-hero-real-profile');
+    expect(within(proof).getByRole('img')).toHaveAttribute(
       'alt',
-      HOMEPAGE_IDENTITY_COPY.hero.preview.portraitAlt
+      HOMEPAGE_IDENTITY_COPY.hero.proofAlt
     );
-    expect(screen.queryByTestId('homepage-hero-real-profile')).toBeNull();
+    expect(proof).toHaveTextContent('Tim White');
+    expect(screen.queryByText(/Avery|Illustrative/)).toBeNull();
     expect(document.querySelectorAll('video, canvas')).toHaveLength(0);
   });
 

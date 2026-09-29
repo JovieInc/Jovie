@@ -34,7 +34,7 @@ describe('homepage hero contract (JOV-5864)', () => {
       pageSource.indexOf('function HomepageUnlockedSections()')
     );
     // The page mounts no media; the hero owns exactly the Pen texture photo
-    // and the illustrative preview portrait (Pen STAGING Cyuz2).
+    // plus Tim White's real avatar as proof (JOV-6946).
     expect(heroSource).not.toMatch(/<(?:picture|img|video|canvas)\b/i);
     expect(readHeroCss()).not.toMatch(/\b(?:url|image-set)\s*\(/i);
     expect(componentSource).not.toMatch(/<(?:picture|img|video|canvas)\b/);
@@ -42,10 +42,7 @@ describe('homepage hero contract (JOV-5864)', () => {
       [...componentSource.matchAll(/'\/assets\/generated\/[^']+'/g)].map(
         match => match[0]
       )
-    ).toEqual([
-      "'/assets/generated/homepage-hero-technical-texture-v1.webp'",
-      "'/assets/generated/homepage-identity-portrait-v1.webp'",
-    ]);
+    ).toEqual(["'/assets/generated/homepage-hero-technical-texture-v1.webp'"]);
     expect(componentSource).not.toContain('HOMEPAGE_MEDIA_MAP');
   });
 

@@ -7,6 +7,7 @@ import {
   MarketingSurfaceCard,
 } from '@/components/marketing';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { HomepageCertifiedExposure } from './HomepageCertifiedExposure';
 import './HomepageIdentity.css';
 
@@ -23,13 +24,11 @@ const HERO_TEXTURE = {
   height: 900,
 } as const;
 
-const PREVIEW_PORTRAIT = '/assets/generated/homepage-identity-portrait-v1.webp';
-
 /**
  * Homepage identity + link-claim hero (Pen STAGING Cyuz2 / xm2iz, Tim
- * 2026-09-28): one headline, one support line, and an illustrative claimed
- * page whose only action is claiming jov.ie/you. No product screenshot and
- * nothing single-ICP on the homepage.
+ * 2026-09-28): one headline, one support line, and Tim White's real claimed
+ * jov.ie/tim as proximal first-party proof (JOV-6946, JOV-INV-038) beside the
+ * only action, claiming jov.ie/you. No product screenshot, nothing single-ICP.
  */
 export function HomepageIdentityHero({
   copy = HOMEPAGE_IDENTITY_COPY.hero,
@@ -77,27 +76,32 @@ export function HomepageIdentityHero({
           className='product-claim-card w-full max-w-120'
           contentClassName='flex flex-col gap-4 px-5 py-5 sm:gap-5 sm:px-9 sm:py-10'
         >
-          <div className='hidden items-center gap-4 sm:flex'>
-            <Image
-              alt={preview.portraitAlt}
-              className='homepage-claim-hero__portrait size-14 shrink-0 rounded-full object-cover'
-              height={112}
-              priority
-              src={PREVIEW_PORTRAIT}
-              width={112}
-            />
-            <p className='product-claim-card__status text-secondary-token'>
-              {preview.label}
+          <div
+            className='flex flex-col gap-4'
+            data-testid='homepage-hero-real-profile'
+          >
+            <div className='flex items-center gap-4'>
+              <Image
+                alt={copy.proofAlt}
+                className='size-12 shrink-0 rounded-full object-cover sm:size-14'
+                height={112}
+                priority
+                src={TIM_WHITE_PROFILE.avatarSrc}
+                width={112}
+              />
+              <div className='min-w-0'>
+                <p className='text-base text-primary-token'>{preview.name}</p>
+                <p className='text-sm text-tertiary-token'>{preview.role}</p>
+              </div>
+              <p className='product-claim-card__status ml-auto text-secondary-token'>
+                {preview.label}
+              </p>
+            </div>
+            <p className='product-claim-card__path text-primary-token'>
+              <span className='text-tertiary-token'>{claim.domain}</span>
+              <span>{TIM_WHITE_PROFILE.publicProfileHandle}</span>
             </p>
           </div>
-          <p className='product-claim-card__path text-primary-token'>
-            <span className='text-tertiary-token'>{claim.domain}</span>
-            <span>{preview.handle}</span>
-          </p>
-          <p className='hidden text-base text-secondary-token sm:block'>
-            {preview.name} · {preview.role}
-          </p>
-          <p className='text-sm text-tertiary-token'>{preview.note}</p>
           <div className='w-full' data-testid='homepage-editorial-hero-search'>
             <ProductClaimHandleForm
               domain={claim.domain}

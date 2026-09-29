@@ -44,57 +44,33 @@ vi.mock('next/image', () => ({
   },
 }));
 
-const HEADLINE_SELECTOR = '.homepage-identity-hero__headline';
-const SUPPORT_SELECTOR = '.homepage-identity-hero__support';
-// A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
-// enough that "nearly equal weight" fails closed, loose enough that routine
-// type-scale tuning does not make this brittle.
 const MIN_DOMINANCE_RATIO = 1.8;
 
-function css(): string {
-  return readFileSync(
-    resolve(process.cwd(), 'components/homepage/HomepageIdentity.css'),
-    'utf8'
+function read(rel: string): string {
+  return readFileSync(resolve(process.cwd(), rel), 'utf8');
+}
+
+function tokenPx(name: string): number {
+  const match = new RegExp(`--${name}:\\s*([\\d.]+)px;`).exec(
+    read('styles/linear-tokens.css')
   );
+  if (!match) throw new Error(`token not found: --${name}`);
+  return Number.parseFloat(match[1]);
 }
 
-function cssBlock(source: string, selector: string): string {
-  const start = source.indexOf(`${selector} {`);
-  if (start === -1) {
-    throw new Error(`selector not found in HomepageIdentity.css: ${selector}`);
-  }
-  const end = source.indexOf('}', start);
-  if (end === -1) {
-    throw new Error(
-      `unterminated rule for ${selector} in HomepageIdentity.css`
-    );
-  }
-  return source.slice(start, end);
+function leadPx(): number {
+  const source = read('app/globals.css');
+  const block = source.slice(
+    source.indexOf('.marketing-lead-linear {'),
+    source.indexOf('}', source.indexOf('.marketing-lead-linear {'))
+  );
+  const match = /font-size:\s*([\d.]+)px;/.exec(block);
+  if (!match) throw new Error('marketing-lead-linear font-size not in px');
+  return Number.parseFloat(match[1]);
 }
 
-function toPx(bound: string): number {
-  const trimmed = bound.trim();
-  const rem = /^([\d.]+)rem$/.exec(trimmed);
-  if (rem) return Number.parseFloat(rem[1]) * 16;
-  const px = /^([\d.]+)px$/.exec(trimmed);
-  if (px) return Number.parseFloat(px[1]);
-  throw new Error(`unsupported clamp() bound unit: ${trimmed}`);
-}
-
-/** Reads the min/max px of a `property: clamp(min, preferred, max);` declaration. */
-function clampRangePx(
-  block: string,
-  property: string
-): { min: number; max: number } {
-  const match = new RegExp(
-    `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
-  ).exec(block);
-  if (!match) {
-    throw new Error(`no clamp() found for ${property} in: ${block}`);
-  }
-  return { min: toPx(match[1]), max: toPx(match[2]) };
-}
-
+// Identity + link-claim hero (Tim 2026-09-28) composes the shared marketing
+// type scale: H1 = .marketing-h1-linear, support = .marketing-lead-linear.
 describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () => {
   it('renders exactly one dominant heading and a structurally secondary support line', () => {
     render(<HomepageIdentityHero />);
@@ -102,65 +78,31 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     const hero = screen.getByTestId('marketing-section-hero');
     const headings = within(hero).getAllByRole('heading');
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toHaveClass('homepage-identity-hero__headline');
+    expect(headings[0]).toHaveClass('marketing-h1-linear');
 
-    const support = hero.querySelector(SUPPORT_SELECTOR);
+    const support = hero.querySelector('.marketing-lead-linear');
     expect(support).not.toBeNull();
-    // Support copy must not itself be a heading — it recedes structurally,
-    // it does not compete as a second thing to perceive first.
+    // Support copy must not itself be a heading — it recedes structurally.
     expect(support?.tagName.toLowerCase()).not.toMatch(/^h[1-6]$/);
   });
 
   it('sizes the headline substantially larger than the support line at every viewport', () => {
-    const source = css();
-    const headline = clampRangePx(
-      cssBlock(source, HEADLINE_SELECTOR),
-      'font-size'
-    );
-    const support = clampRangePx(
-      cssBlock(source, SUPPORT_SELECTOR),
-      'font-size'
-    );
-
-    expect(headline.min).toBeGreaterThan(support.min);
-    expect(headline.max).toBeGreaterThan(support.max);
-    expect(headline.min / support.min).toBeGreaterThanOrEqual(
-      MIN_DOMINANCE_RATIO
-    );
-    expect(headline.max / support.max).toBeGreaterThanOrEqual(
-      MIN_DOMINANCE_RATIO
-    );
+    const support = leadPx();
+    for (const token of ['linear-h1-size-sm', 'linear-h1-size']) {
+      expect(tokenPx(token) / support).toBeGreaterThanOrEqual(
+        MIN_DOMINANCE_RATIO
+      );
+    }
   });
 
-  it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    const source = css();
-    // The light-theme override is the one block that gives each ink token a
-    // literal value (the dark default aliases straight to --color-text-*);
-    // it is where "recedes" is either honored or silently dropped.
-    const lightThemeBlock = cssBlock(
-      source,
-      ':root:not(.dark) .homepage-identity-hero'
+  it('keeps the headline at full ink while the support line recedes via a lighter ink token', () => {
+    render(<HomepageIdentityHero />);
+    const hero = screen.getByTestId('marketing-section-hero');
+    expect(within(hero).getByRole('heading', { level: 1 })).toHaveClass(
+      'text-primary-token'
     );
-
-    const primaryInk = /--homepage-identity-hero-ink:\s*([^;]+);/.exec(
-      lightThemeBlock
-    )?.[1];
-    const secondaryInk = /--homepage-identity-hero-ink-2:\s*([^;]+);/.exec(
-      lightThemeBlock
-    )?.[1];
-    expect(primaryInk, 'primary ink token declared').toBeTruthy();
-    expect(secondaryInk, 'secondary ink token declared').toBeTruthy();
-
-    // The dominant headline keeps full opacity — no color-mix fade.
-    expect(primaryInk).not.toContain('color-mix');
-
-    // The receding support line is mixed toward transparent at some opacity
-    // below 100% — "recedes substantially", not simultaneous full weight.
-    const secondaryOpacity = Number.parseFloat(
-      /(\d+(?:\.\d+)?)%/.exec(secondaryInk ?? '')?.[1] ?? 'NaN'
-    );
-    expect(Number.isNaN(secondaryOpacity)).toBe(false);
-    expect(secondaryOpacity).toBeLessThan(100);
-    expect(secondaryOpacity).toBeGreaterThan(0);
+    const support = hero.querySelector('.marketing-lead-linear');
+    expect(support).toHaveClass('text-secondary-token');
+    expect(support).not.toHaveClass('text-primary-token');
   });
 });
