@@ -22,6 +22,22 @@ describe('ArtistProfileModeSwitcher', () => {
     expect(source).toContain('useReducedMotion');
   });
 
+  it('reserves the panel slot at the tallest mode so tabs never reflow vertically', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain('-sizer');
+    expect(source).toContain("aria-hidden='true'");
+    expect(source).toContain('col-start-1 row-start-1');
+    expect(source).toContain('min-h-20');
+    expect(source).toContain('slideDirection');
+  });
+
   it('keeps the adjacent Storybook receipt bound to both mode-switcher layouts', () => {
     expect(storyMeta.component).toBe(ArtistProfileModeSwitcher);
     expect(Intro.args?.adaptive).toBe(ARTIST_PROFILE_COPY.adaptive);

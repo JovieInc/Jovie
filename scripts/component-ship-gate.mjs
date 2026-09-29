@@ -58,6 +58,21 @@ const CANONICAL_MARKETING_STORIES = Object.freeze([
 ]);
 const TEST_FILE_RE = /\.(?:test|spec)\.[jt]sx?$/i;
 
+// Named exemption from the story requirement below, and ONLY the story
+// requirement -- the test requirement still applies in full. Design-studio
+// components are internal tooling, not the product system, and
+// storybook-story-quality-guard.mjs's `no-design-studio-product-stories`
+// rule (see the "Design-studio section stories are not the product system"
+// check there) unconditionally bans any .stories.tsx under this exact
+// prefix. Without this exemption the two gates contradict each other for
+// every file here: this gate demands a story that the other gate then
+// rejects (JOV-6773).
+const STORY_REQUIREMENT_EXEMPT_PREFIX = 'apps/web/components/design-studio/';
+
+export function isStoryRequirementExempt(sourceRel) {
+  return sourceRel.startsWith(STORY_REQUIREMENT_EXEMPT_PREFIX);
+}
+
 function parseArgs(argv) {
   const flags = {
     diffBase: null,
@@ -1780,11 +1795,13 @@ export function checkChangedComponents(
     const storyRel = adjacentStoryRel ?? centralStory?.storyRel ?? null;
 
     if (!storyRel) {
-      issues.push({
-        path: sourceRel,
-        rule: 'missing-story',
-        detail: `No adjacent ${base}.stories.tsx or verified canonical marketing story`,
-      });
+      if (!isStoryRequirementExempt(sourceRel)) {
+        issues.push({
+          path: sourceRel,
+          rule: 'missing-story',
+          detail: `No adjacent ${base}.stories.tsx or verified canonical marketing story`,
+        });
+      }
       continue;
     }
 

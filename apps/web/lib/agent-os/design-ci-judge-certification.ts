@@ -8,7 +8,7 @@ import {
 } from './certification-cas';
 
 /**
- * Persistence for the JOV-6944 Design CI judge matrix. One key, one ledger,
+ * JOV-INV-040: persistence for the JOV-6944 Design CI judge matrix. One key, one ledger,
  * same CAS mechanics as `MarketingCertificationStore` — reuses
  * `jovie.certification/v1`'s generic persistence primitive
  * (`mutateCertificationRecord`/`CertificationRecordBackend`), not a
@@ -186,10 +186,7 @@ export class DesignCiJudgeCertificationStore {
         const nextCells = { ...ledger.cells };
         for (const input of inputs) {
           const existing = nextCells[input.cellId];
-          if (
-            existing &&
-            existing.inputFingerprint === input.inputFingerprint
-          ) {
+          if (existing?.inputFingerprint === input.inputFingerprint) {
             skippedUnchanged.push(input.cellId);
             continue;
           }
