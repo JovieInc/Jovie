@@ -9,7 +9,7 @@
  * detection, not the frame-level playability guarantees audio requires.
  */
 
-import { head } from '@vercel/blob';
+import { inspectOwnedBlob } from '@/lib/blob-inspection';
 import {
   type FileFormatDefinition,
   type FileUploadSurface,
@@ -135,34 +135,25 @@ async function verifyFileBlobInternal(input: {
   if (!declaredFormat)
     reject('file.blob_mismatch', 'The declared file type is not supported.');
 
-  const metadata = await head(input.blobPathname);
-  if (
-    !metadata.pathname.startsWith(expectedPrefix) ||
-    metadata.pathname !== input.blobPathname ||
-    !metadata.url
-  ) {
-    reject(
-      'file.blob_ownership',
-      'File upload must belong to the authenticated user.'
-    );
-  }
-  if (
-    !Number.isSafeInteger(metadata.size) ||
-    metadata.size <= 0 ||
-    metadata.size > input.maxSizeBytes
-  ) {
-    reject(
-      'file.blob_metadata',
-      'The stored file size is invalid or exceeds the upload limit.'
-    );
-  }
-
-  const response = await fetch(metadata.url, {
-    headers: { Range: `bytes=0-${MAX_BYTES_TO_INSPECT - 1}` },
+  const metadata = await inspectOwnedBlob({
+    blobPathname: input.blobPathname,
+    expectedPathPrefix: expectedPrefix,
+    maxSizeBytes: input.maxSizeBytes,
+    maxBytesToInspect: MAX_BYTES_TO_INSPECT,
+    onOwnershipError: () =>
+      reject(
+        'file.blob_ownership',
+        'File upload must belong to the authenticated user.'
+      ),
+    onInvalidSize: () =>
+      reject(
+        'file.blob_metadata',
+        'The stored file size is invalid or exceeds the upload limit.'
+      ),
+    onUnreadable: () =>
+      reject('file.blob_metadata', 'The stored file could not be read.'),
   });
-  if (!response.ok)
-    reject('file.blob_metadata', 'The stored file could not be read.');
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  const bytes = metadata.bytes;
 
   if (!UNSNIFFABLE_FORMAT_IDS.has(declaredFormat.id)) {
     const sniffed = sniffFileBytes(bytes);
