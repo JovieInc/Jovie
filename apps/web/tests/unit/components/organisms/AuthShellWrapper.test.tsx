@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  DashboardDataContext,
+  type DashboardDataContextValue,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useFounderDoor } from '@/contexts/FounderDoorContext';
 
 // Short-circuit heavy import chains that this test doesn't exercise.
@@ -420,7 +422,9 @@ describe('AuthShellWrapper', () => {
 
   it('exposes founder-door context so entitled Cmd+O can toggle', () => {
     render(
-      <DashboardDataContext.Provider value={{ isAdmin: true } as DashboardData}>
+      <DashboardDataContext.Provider
+        value={{ isAdmin: true } as unknown as DashboardDataContextValue}
+      >
         <AuthShellWrapper>
           <FounderDoorProbe />
         </AuthShellWrapper>

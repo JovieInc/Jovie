@@ -456,7 +456,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
-  it('uses the canonical empty state with a direct artist-profile action', () => {
+  it('uses the canonical empty state with a direct identity action', () => {
     renderWorkspace(null);
 
     expect(screen.getByTestId('profiles-workspace-empty-state')).toHaveClass(
@@ -464,10 +464,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'min-h-75'
     );
     expect(
-      screen.getByRole('heading', { name: 'No Artist Profile Selected' })
+      screen.getByRole('heading', { name: 'No Identity Selected' })
     ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
     expect(
-      screen.getByRole('link', { name: 'Set Up Artist Profile' })
+      screen.getByRole('link', { name: 'Set Up Identity' })
     ).toHaveAttribute('href', '/app/settings/artist-profile');
   });
 
@@ -905,7 +905,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'aria-pressed',
       'true'
     );
-    expect(navigationMock.replace).toHaveBeenCalledWith('/app/profiles');
+    expect(navigationMock.replace).toHaveBeenCalledWith('/app/presence');
     expect(navigationMock.replace).not.toHaveBeenCalledWith(
       '/app/settings/connectors'
     );

@@ -1121,7 +1121,7 @@ export function ProfilesWorkspace({
     setPendingCandidate(null);
     setIsAddConnectionOpen(false);
     setFilter('suggested');
-    router.replace(APP_ROUTES.PROFILES);
+    router.replace(APP_ROUTES.PRESENCE);
   }, [router, searchParams]);
   useEffect(() => {
     const target = pendingSuggestionFocusTargetRef.current;
@@ -1529,11 +1529,11 @@ export function ProfilesWorkspace({
       >
         <EmptyState
           icon={<UserRound className='h-5 w-5' aria-hidden />}
-          heading='No Artist Profile Selected'
-          description='Set up an artist profile to monitor its presence.'
+          heading='No Identity Selected'
+          description='Set up an identity to manage its presence.'
           presentation='workspace'
           action={{
-            label: 'Set Up Artist Profile',
+            label: 'Set Up Identity',
             href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
           }}
           testId='profiles-workspace-empty-state'
