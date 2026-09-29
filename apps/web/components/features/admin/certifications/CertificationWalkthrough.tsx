@@ -292,7 +292,7 @@ export function CertificationWalkthrough({
                 <p
                   role='status'
                   aria-live='polite'
-                  className='mt-1.5 min-h-4 text-2xs leading-4 text-destructive'
+                  className='mt-1.5 min-h-4 text-2xs leading-4 text-error'
                 >
                   {dictationError}
                 </p>

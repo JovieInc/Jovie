@@ -68,6 +68,7 @@ function latestRailProps() {
   return panel.props as {
     row: { id: string } | null;
     onDecide: (kind: string, notes: string | null) => Promise<void>;
+    onWalkthrough?: () => void;
     decisionError: string | null;
   };
 }
@@ -188,6 +189,28 @@ describe('OvieCertificationsWorkspace', () => {
       actionId: expect.any(String),
     });
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Certified');
+  });
+
+  it('opens the walkthrough from the rail and certifies through the same digest-bound path', async () => {
+    const inventory = fixtureInventory();
+    mockQuery({ data: inventory });
+    mocks.mutateAsync.mockResolvedValue({ row: inventory.rows[0] });
+    render(<OvieCertificationsWorkspace />);
+
+    fireEvent.click(screen.getByText('Flow signup-golden-path'));
+    act(() => latestRailProps().onWalkthrough?.());
+
+    expect(screen.getByTestId('certification-walkthrough')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
+    });
+    expect(mocks.mutateAsync).toHaveBeenCalledWith({
+      rowId: 'flows:signup-golden-path',
+      evidenceDigest: inventory.rows[0]?.decision.evidenceDigest,
+      decision: 'approved',
+      notes: null,
+      actionId: expect.any(String),
+    });
   });
 
   it('keeps the rail open and surfaces the server reason when a decision fails', async () => {
