@@ -593,3 +593,26 @@
 .homepage-identity-hero__device {
   width: min(70vw, 18rem);
 }
+
+/* ── Claim hero: identity + link claim (Pen STAGING Cyuz2 / xm2iz, 2026-09-28).
+   The rules above for .homepage-identity-hero* are retired with the old hero
+   and removed in the follow-up cleanup PR. ─────────────────────────────── */
+
+.homepage-claim-hero .product-claim-card__status {
+  font-size: var(--text-2xs, 0.6875rem);
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.homepage-claim-hero .product-claim-card__path {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 4.6vw, 3.25rem);
+  font-weight: 510;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+.homepage-claim-hero .product-claim-card__handle-input::placeholder {
+  color: var(--color-text-tertiary-token);
+}

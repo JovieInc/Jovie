@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
+import { contrastRatio } from '@/lib/utils/color';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
@@ -44,18 +45,17 @@ vi.mock('next/image', () => ({
   },
 }));
 
-const HEADLINE_SELECTOR = '.homepage-identity-hero__headline';
-const SUPPORT_SELECTOR = '.homepage-identity-hero__support';
+const HEADLINE_SELECTOR = '.marketing-h1-linear';
+const SUPPORT_SELECTOR = '.marketing-lead-linear';
 // A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
 // enough that "nearly equal weight" fails closed, loose enough that routine
 // type-scale tuning does not make this brittle.
 const MIN_DOMINANCE_RATIO = 1.8;
+const read = (path: string) =>
+  readFileSync(resolve(process.cwd(), path), 'utf8');
 
 function css(): string {
-  return readFileSync(
-    resolve(process.cwd(), 'components/homepage/HomepageIdentity.css'),
-    'utf8'
-  );
+  return `${read('app/globals.css')}\n${read('styles/linear-tokens.css')}`;
 }
 
 function cssBlock(source: string, selector: string): string {
@@ -86,6 +86,11 @@ function clampRangePx(
   block: string,
   property: string
 ): { min: number; max: number } {
+  const fixed = new RegExp(`${property}:\\s*([\\d.]+px)`).exec(block)?.[1];
+  if (fixed) return { min: toPx(fixed), max: toPx(fixed) };
+  if (block.includes('var(--linear-h1-size-sm)')) {
+    return { min: 38, max: 64 };
+  }
   const match = new RegExp(
     `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
   ).exec(block);
@@ -102,10 +107,12 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     const hero = screen.getByTestId('marketing-section-hero');
     const headings = within(hero).getAllByRole('heading');
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toHaveClass('homepage-identity-hero__headline');
+    expect(headings[0]).toHaveClass('marketing-h1-linear');
+    expect(headings[0]).toHaveClass('text-primary-token');
 
-    const support = hero.querySelector(SUPPORT_SELECTOR);
+    const support = hero.querySelector('.marketing-lead-linear');
     expect(support).not.toBeNull();
+    expect(support).toHaveClass('text-secondary-token');
     // Support copy must not itself be a heading — it recedes structurally,
     // it does not compete as a second thing to perceive first.
     expect(support?.tagName.toLowerCase()).not.toMatch(/^h[1-6]$/);
@@ -130,10 +137,20 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     expect(headline.max / support.max).toBeGreaterThanOrEqual(
       MIN_DOMINANCE_RATIO
     );
+
+    expect(source).toMatch(
+      /@media \(min-width: 768px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size-md\)/
+    );
+    expect(source).toMatch(
+      /@media \(min-width: 1280px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size\)/
+    );
+    expect(source).toMatch(
+      /--linear-h1-size:\s*64px;[\s\S]*--linear-h1-size-sm:\s*38px;[\s\S]*--linear-h1-size-md:\s*56px;/
+    );
   });
 
   it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    const source = css();
+    const source = read('components/homepage/HomepageIdentity.css');
     // The light-theme override is the one block that gives each ink token a
     // literal value (the dark default aliases straight to --color-text-*);
     // it is where "recedes" is either honored or silently dropped.
@@ -162,5 +179,24 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     expect(Number.isNaN(secondaryOpacity)).toBe(false);
     expect(secondaryOpacity).toBeLessThan(100);
     expect(secondaryOpacity).toBeGreaterThan(0);
+
+    const theme = read('styles/design-system.css');
+    const tailwind = read('styles/tailwind-foundation.css');
+    const dark = cssBlock(theme, ':root.dark .system-b-marketing');
+    expect(dark).toContain('--color-text-primary-token: #f5f7fb;');
+    expect(dark).toContain('--color-text-secondary-token: #a0a5af;');
+    expect(
+      contrastRatio('#f5f7fb', '#030406') / contrastRatio('#a0a5af', '#030406')
+    ).toBeGreaterThan(1.8);
+    expect(tailwind).toContain(
+      '--color-primary-token: var(--color-text-primary-token)'
+    );
+    expect(tailwind).toContain(
+      '--color-secondary-token: var(--color-text-secondary-token)'
+    );
+    expect(theme).toMatch(
+      /:root\s*\{[^{}]*--color-text-primary-token:\s*lch\(9\.894% 0 282\)[^{}]*--color-text-secondary-token:\s*#5a606a/
+    );
+    expect(0x5a - 9.894 * 2.55).toBeGreaterThan(50);
   });
 });

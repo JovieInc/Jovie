@@ -6,22 +6,30 @@
  */
 export const HOMEPAGE_IDENTITY_COPY = {
   seo: {
-    title: 'Jovie | Your living identity on the internet',
+    title: 'Jovie | Be found. Be understood.',
     description:
-      'Your work, your links, your next chapter. Together in your Jovie profile.',
+      'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.',
   },
   hero: {
-    headline: 'Your living identity on the internet.',
+    kicker: 'Jovie',
+    headline: 'Be found. Be understood.',
     subhead:
-      'Your work, your links, your next chapter. Together in your Jovie profile.',
-    // Certified conversion (JOV-5085): the hero action is always the name
-    // search, even while the waitlist gate is on.
-    search: {
-      placeholder: 'Search your name',
-      action: 'Find me',
+      'Claim your name. Jovie finds what the web says about you and makes you easy to reach, for people and for agents.',
+    // Homepage conversion (EVENT 2026-09-28, Tim: link claim replaces the
+    // JOV-5085 name search): claim jov.ie/you, then /start with the handle.
+    claim: {
+      domain: 'jov.ie/',
+      placeholder: 'you',
+      action: 'Claim',
     },
-    // Real first-party proof (JOV-6946): the hero shows Tim White's live
-    // jov.ie/tim profile, never a fictional placeholder person.
+    // Real first-party proof (JOV-6946, JOV-INV-038 proximal proof): the
+    // claim card shows Tim White's real claimed jov.ie/tim, never a
+    // fictional placeholder person (Tim 2026-09-28).
+    preview: {
+      label: 'Claimed',
+      name: 'Tim White',
+      role: 'Founder, Jovie',
+    },
     proofAlt: 'Tim White’s Jovie profile at jov.ie/tim',
   },
   // Presence and structure chapters, then the close.
@@ -59,6 +67,5 @@ export const HOMEPAGE_IDENTITY_COPY = {
   ],
   close: {
     headline: 'Make it your Jovie profile.',
-    action: 'Find your profile',
   },
 } as const;
