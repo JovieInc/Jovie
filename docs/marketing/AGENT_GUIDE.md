@@ -248,6 +248,15 @@ recoloring or a fake grade. Product screenshots, customer evidence,
 documentary material, album art, merch artwork, and artist retouching remain
 truthful source material rather than palette-controlled set pieces.
 
+Generated imagery that includes a Jovie marketing character must also embed
+`MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT`; independent visual review
+uses the matching `MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT`. Both project
+the casting, persona, ICP, individuality, scene-coherence, and physical-world
+rules from `canon/virtual-models.json` through
+`apps/web/data/marketing/characterSystem.ts`. Run
+`auditMarketingCharacterGenerationBrief` before generation; a prompt cannot
+substitute for the required structured persona and physics brief.
+
 Only one candidate may reach Taste. It needs one digest-bound passing receipt
 for every gate in `MARKETING_TASTE_GATE_IDS`, including independent visual
 review, product truth, design-system fidelity, responsive accessibility, and
