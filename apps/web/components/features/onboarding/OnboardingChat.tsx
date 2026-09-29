@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
+
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import type { ReactNode } from 'react';
