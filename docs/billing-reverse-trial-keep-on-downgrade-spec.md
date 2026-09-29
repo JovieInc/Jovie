@@ -378,7 +378,7 @@ follow-up**.)
 | `apps/web/app/api/billing/status/route.ts` (or a `resolveTrialExpiry` helper) | Invoke the best-effort, audited lazy flip when `plan==='trial' && trialEndsAt<=now` | G1.1 |
 | `apps/web/lib/stripe/customer-sync/update-status.ts` | Persist `trialConvertedAt` idempotently off the fresh-read `currentUser.plan==='trial'`; support `'trial_expired'` event; never clear trial-history columns | G1.1, G3 |
 | `apps/web/app/onboarding/actions/activate-trial.ts` | Guarded WHERE (§4.5); fix the lying doc comment | G2 |
-| `apps/web/lib/queries/usePlanGate.ts` + paywall UI (`SidebarUpgradeBanner` / dashboard) | Render "trial ended" prompt off the **existing** `nudgeState` (`recently_lapsed`/`stale_lapsed`); no new flag; layout-shift-safe | G1.2 |
+| `apps/web/lib/queries/usePlanGate.ts` + dashboard paywall UI (`SmartLinkGateBanner`) | Render "trial ended" prompt off the **existing** `nudgeState` (`recently_lapsed`/`stale_lapsed`); no new flag; layout-shift-safe | G1.2 |
 | `apps/web/lib/entitlements/registry.ts` | **No new entitlements.** (The §5.1 test reads `ENTITLEMENT_REGISTRY.free` directly.) | — |
 | Tests | §5.1 registry-equality + no-DELETE/no-clear matrix; §4.6 eligibility-by-entitlement; trial-expiry transition; `activateTrial` guard; over-cap contact retention | both |
 

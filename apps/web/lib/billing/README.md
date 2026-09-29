@@ -23,7 +23,7 @@ never_trialed | trial_honeymoon | trial_late | trial_last_day
 recently_lapsed | stale_lapsed | pro_paid | max_paid
 ```
 
-Banner copy and CTAs are mapped per state in `apps/web/components/.../SidebarUpgradeBanner.tsx` via `buildVariant()`. To add a trigger: extend `NudgeState`, update `deriveNudgeState()` thresholds, and add the matching `BannerVariant` case.
+The surviving state-aware upgrade copy is mapped in `apps/web/components/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner.tsx` via `getUnreleasedCopy()`. To add a trigger: extend `NudgeState`, update `deriveNudgeState()` thresholds, and update each `nudgeState` consumer with matching tests.
 
 ## Reconciliation
 
