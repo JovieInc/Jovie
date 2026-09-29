@@ -355,10 +355,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
           onClick={openWidget}
           ariaLabel={`Ask Jovie about ${artistName}`}
           data-ask-jovie-launcher=''
-          className={cn(
-            'fixed right-4 top-[calc(env(safe-area-inset-top)+var(--space-16))] md:top-auto md:bottom-4',
-            PROFILE_Z.DRAWER_CONTENT
-          )}
+          className={cn('fixed right-4 bottom-4', PROFILE_Z.DRAWER_CONTENT)}
         >
           <JovieIcon size={22} className='shrink-0' />
         </CircleIconButton>

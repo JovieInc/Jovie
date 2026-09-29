@@ -789,14 +789,12 @@
     transform: translateX(-50%);
   }
 
-  /* The Ask Jovie launcher floats above the profile dock (50px) and, on
-     proof profiles, the claim bar above it (52px), never on top (JOV-7114). */
+  /* The canonical launcher occupies the clear upper-right rail. Keep its
+     placement here with the profile dock and proof claim-bar geometry so it
+     cannot intercept either the navigation or the featured action. */
   [data-ask-jovie-launcher] {
-    bottom: calc(env(safe-area-inset-bottom) + 62px);
-  }
-
-  body:has([data-testid="profile-proof-claim-bar"]) [data-ask-jovie-launcher] {
-    bottom: calc(env(safe-area-inset-bottom) + 114px);
+    top: calc(env(safe-area-inset-top) + var(--space-16));
+    bottom: auto;
   }
 
   /* The proof claim bar rides inside the dock; content clears both. */
