@@ -6,7 +6,9 @@ import { getDashboardContacts } from '@/lib/contacts/queries';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { isScreenCertAppShellFixtureProfile } from '@/lib/screen-cert/app-shell-fixture-gate';
 import { logger } from '@/lib/utils/logger';
+import { SCREEN_CERT_CONTACTS_FIXTURE } from './_lib/screen-cert-fixture';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -29,6 +31,17 @@ export async function GET(request: Request) {
         { error: 'Missing profileId' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
+    }
+
+    // Screen-cert fixture (contacts producer, ./_lib/screen-cert-fixture.ts):
+    // serve before withDbSessionTx, which has no noop-DB fallback of its
+    // own. Reservation is exact-profile-id and fails closed off
+    // VERCEL_ENV==='production' (isRenderFixtureEnabled), so this never
+    // widens who reads fixture data instead of the real DB join below.
+    if (isScreenCertAppShellFixtureProfile(profileId)) {
+      return NextResponse.json(SCREEN_CERT_CONTACTS_FIXTURE, {
+        headers: NO_STORE_HEADERS,
+      });
     }
 
     const contacts = await withDbSessionTx(

@@ -64,7 +64,7 @@ test.describe('Profile Notifications Hosts', () => {
         await expect(
           page
             .getByTestId('profile-home-alerts-row')
-            .or(page.getByTestId('profile-home-alerts-fallback-card'))
+            .or(page.getByTestId('profile-identity-get-updates'))
             .first()
         ).toBeVisible();
         return;
@@ -72,7 +72,7 @@ test.describe('Profile Notifications Hosts', () => {
 
       const trigger = page
         .getByTestId('profile-home-alerts-row')
-        .or(page.getByTestId('profile-home-alerts-fallback-card'))
+        .or(page.getByTestId('profile-identity-get-updates'))
         .first();
       await expect(trigger).toBeVisible();
 

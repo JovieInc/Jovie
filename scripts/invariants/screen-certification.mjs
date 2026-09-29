@@ -105,6 +105,20 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   // out of scope for this producer until a human decides how (or whether)
   // to give it one.
   'web.hud-isolated': '/hud?fs=1',
+  // web.tasks and web.contacts are authenticated app-shell screens gated by
+  // a real session (redirect to sign-in with none) plus, for tasks, a
+  // Pro-plan entitlement whose billing lookup has no noop-DB fallback. Both
+  // capture the real routes directly — unlike the smartlink fixture, there
+  // is no separate reserved URL — because the visual-capture synthetic
+  // dashboard fallback already resolves any bypass session's profile to one
+  // reserved id once E2E_FAST_ONBOARDING is set (createE2EDashboardCoreData,
+  // apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts). Both
+  // getTasks()/getTask() (task-actions.ts) and GET /api/dashboard/contacts
+  // (route.ts) serve a typed fixture instead of the database only for that
+  // exact reserved profile id, additionally gated by isRenderFixtureEnabled()
+  // — see apps/web/lib/screen-cert/app-shell-fixture-gate.ts.
+  'web.tasks': '/app/tasks',
+  'web.contacts': '/app/contacts',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
@@ -223,7 +237,8 @@ web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.dashboard-presence|web|dashboard-presence|apps/web/app/app/(shell)/dashboard/presence/page.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
-web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx|desktop,mobile
+web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx,apps/web/app/api/dashboard/contacts/route.ts,apps/web/app/api/dashboard/contacts/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
+web.tasks|web|tasks|apps/web/app/app/(shell)/tasks/page.tsx,apps/web/app/app/(shell)/tasks/TasksRoute.tsx,apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts,apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
 web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mobile
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
