@@ -167,12 +167,21 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
         text.includes('!isDesktop') && text.includes('SidebarCollapseButton'),
       'desktop sidebar must not render a second collapse control',
     ],
+    authShellToggle: [
+      'apps/web/components/organisms/AuthShell.tsx',
+      text =>
+        /sidebarTrigger\s*=\s*[^;]*isElectronRuntime\(\)\s*\?[^;]*null/.test(
+          text.replaceAll(/\s+/g, ' ')
+        ),
+      'AuthShell must not pass a second left-sidebar toggle to the header in Electron (JOV-7207)',
+    ],
     titlebar: [
       'apps/web/components/atoms/DesktopTitlebar.tsx',
       text =>
         text.includes("data-electron-titlebar='true'") &&
-        text.includes('traffic'),
-      'desktop titlebar must preserve the native traffic-light geometry',
+        text.includes('traffic') &&
+        text.includes('RailToggleButton'),
+      'desktop titlebar must preserve the native traffic-light geometry and use the canonical rail toggle',
     ],
   };
 
