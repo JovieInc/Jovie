@@ -3,8 +3,12 @@ import { z } from 'zod';
 import {
   ASK_JOVIE_INTENTS,
   ASK_JOVIE_MESSAGE_CATEGORIES,
+  ASK_JOVIE_QUESTION_INTENTS,
   answerProfileQuestion,
+  classifyAskJovieQuestion,
+  contextNeedsForAskJovieIntent,
 } from '@/lib/ask-jovie/answer';
+import { cacheAskJovieAnswer } from '@/lib/ask-jovie/cache';
 import { loadAskJovieContext } from '@/lib/ask-jovie/context';
 import { db } from '@/lib/db';
 import { profileInquiries } from '@/lib/db/schema/profile-inquiries';
@@ -57,10 +61,28 @@ const intentSchema = z.object({
   city: z.string().max(120).optional(),
 });
 
+const outcomeSchema = z.object({
+  action: z.literal('outcome'),
+  intent: z.enum(ASK_JOVIE_QUESTION_INTENTS),
+  outcome: z.enum([
+    'listen',
+    'tickets',
+    'shop',
+    'watch',
+    'view',
+    'message',
+    'subscribe',
+  ]),
+  entityType: z.enum(['music', 'show', 'merch', 'video', 'person', 'alerts']),
+  entityId: z.string().min(1).max(200),
+  sourceRevision: z.string().min(1).max(120),
+});
+
 const askSchema = z.discriminatedUnion('action', [
   questionSchema,
   messageSchema,
   intentSchema,
+  outcomeSchema,
 ]);
 
 interface RouteContext {
@@ -97,12 +119,13 @@ const TOO_MANY = {
 } as const;
 
 export async function POST(request: NextRequest, context: RouteContext) {
+  const startedAt = Date.now();
   const clientIp = getClientIP(request);
-  const [general, askLimit] = await Promise.all([
+  const [general, visitorLimit] = await Promise.all([
     generalLimiter.limit(clientIp),
     askLimiter.limit(clientIp),
   ]);
-  if (!general.success || !askLimit.success) {
+  if (!general.success || !visitorLimit.success) {
     return json(TOO_MANY, 429);
   }
 
@@ -123,16 +146,28 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { context: ctx, creatorProfileId } =
-      await loadAskJovieContext(username);
+    const payload = parsed.data;
+    const questionIntent =
+      payload.action === 'question'
+        ? classifyAskJovieQuestion(payload.question)
+        : null;
+    const { context: ctx, creatorProfileId } = await loadAskJovieContext(
+      username,
+      questionIntent ? contextNeedsForAskJovieIntent(questionIntent) : {}
+    );
     if (!ctx || !creatorProfileId) {
       return json({ success: false, error: 'Profile not found' }, 404);
     }
 
-    const payload = parsed.data;
-
     if (payload.action === 'question') {
-      const result = answerProfileQuestion(payload.question, ctx);
+      const candidate = answerProfileQuestion(
+        payload.question,
+        ctx,
+        questionIntent ?? 'unknown'
+      );
+      const { answer: result, cacheStatus } =
+        await cacheAskJovieAnswer(candidate);
+      const latencyMs = Date.now() - startedAt;
       if (result.kind === 'unknown') {
         // Persist the unanswered question so the owner sees demand signals.
         await persistInquiry({
@@ -140,11 +175,52 @@ export async function POST(request: NextRequest, context: RouteContext) {
           kind: 'question',
           category: 'other',
           message: payload.question,
-          context: { surface: 'ask_jovie' },
+          context: {
+            surface: 'ask_jovie',
+            normalizedIntent: 'unknown',
+            answerable: false,
+            sourceRevision: result.provenance.sourceRevision,
+            routing: result.routing,
+            cacheStatus,
+            latencyMs,
+          },
         });
-        return json({ answered: false });
+        return json({
+          answered: false,
+          intent: result.intent,
+          provenance: result.provenance,
+          telemetry: { ...result.routing, cacheStatus, latencyMs },
+        });
       }
-      return json({ answered: true, text: result.text });
+      const entity = result.card;
+      await persistInquiry({
+        creatorProfileId,
+        kind: 'question',
+        category: result.intent,
+        // Store the normalized job, not the visitor's raw transcript.
+        message: `Asked about ${result.intent.replaceAll('_', ' ')}`,
+        context: {
+          surface: 'ask_jovie',
+          normalizedIntent: result.intent,
+          answerable: true,
+          entityType: entity?.kind ?? null,
+          entityId: entity?.id ?? null,
+          renderedAction: entity?.cta?.label ?? null,
+          sourceRevision: result.provenance.sourceRevision,
+          routing: result.routing,
+          cacheStatus,
+          latencyMs,
+        },
+      });
+      return json({
+        answered: true,
+        text: result.text,
+        intent: result.intent,
+        card: result.card,
+        followUp: result.followUp,
+        provenance: result.provenance,
+        telemetry: { ...result.routing, cacheStatus, latencyMs },
+      });
     }
 
     if (payload.action === 'message') {
@@ -166,6 +242,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
         visitorEmail: email,
         originatingQuestion: payload.question ?? null,
         context: { surface: 'ask_jovie' },
+      });
+      return json({ success: true });
+    }
+
+    if (payload.action === 'outcome') {
+      await persistInquiry({
+        creatorProfileId,
+        kind: 'intent',
+        category: `outcome:${payload.outcome}`,
+        message: `Chose ${payload.outcome}`,
+        context: {
+          surface: 'ask_jovie',
+          normalizedIntent: payload.intent,
+          outcome: payload.outcome,
+          entityType: payload.entityType,
+          entityId: payload.entityId,
+          sourceRevision: payload.sourceRevision,
+        },
       });
       return json({ success: true });
     }

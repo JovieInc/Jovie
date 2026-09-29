@@ -12,7 +12,13 @@ import {
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { JovieIcon } from '@/components/atoms/JovieIcon';
 import { FilterChip } from '@/components/molecules/filters';
+import { EntityCard } from '@/components/organisms/entity-card';
+import type {
+  EntityCardModel,
+  EntityKind,
+} from '@/components/organisms/entity-card/types';
 import { track } from '@/lib/analytics';
+import type { AskJovieQuestionIntent } from '@/lib/ask-jovie/answer';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 
@@ -23,10 +29,19 @@ interface AskJovieWidgetProps {
   readonly artistName: string;
 }
 
+type FollowIntent = 'new_release_alerts' | 'local_show_alerts';
+
 type ChatMessage = {
   readonly id: number;
   readonly role: 'visitor' | 'jovie';
   readonly text: string;
+  readonly card?: EntityCardModel;
+  readonly followUp?: {
+    readonly intent: FollowIntent;
+    readonly label: string;
+  };
+  readonly normalizedIntent?: AskJovieQuestionIntent;
+  readonly sourceRevision?: string;
 };
 
 type MessageCategory =
@@ -37,8 +52,34 @@ type MessageCategory =
   | 'business'
   | 'other';
 
-type FollowIntent = 'new_release_alerts' | 'local_show_alerts';
 type Flow = 'escalate' | FollowIntent;
+
+type CardOutcome =
+  | 'listen'
+  | 'tickets'
+  | 'shop'
+  | 'watch'
+  | 'view'
+  | 'message'
+  | 'subscribe';
+
+const CARD_OUTCOMES: Partial<Record<EntityKind, CardOutcome>> = {
+  music: 'listen',
+  show: 'tickets',
+  merch: 'shop',
+  video: 'watch',
+  alerts: 'subscribe',
+};
+
+function outcomeForMessage(message: ChatMessage): CardOutcome | undefined {
+  if (!message.card) return undefined;
+  if (message.normalizedIntent === 'business') return 'message';
+  if (message.normalizedIntent === 'official_links') return 'view';
+  if (message.card.kind === 'show' && message.card.cta?.label === 'Notify Me') {
+    return 'subscribe';
+  }
+  return CARD_OUTCOMES[message.card.kind];
+}
 
 const CATEGORY_LABELS: ReadonlyArray<{ id: MessageCategory; label: string }> = [
   { id: 'fan_mail', label: 'Fan Message' },
@@ -92,11 +133,11 @@ function CardAction({
 }
 
 let nextMessageId = 1;
-const makeMessage = (role: ChatMessage['role'], text: string): ChatMessage => ({
-  id: nextMessageId++,
-  role,
-  text,
-});
+const makeMessage = (
+  role: ChatMessage['role'],
+  text: string,
+  details: Omit<ChatMessage, 'id' | 'role' | 'text'> = {}
+): ChatMessage => ({ id: nextMessageId++, role, text, ...details });
 
 /**
  * Ask Jovie — conversational identity surface on a public profile.
@@ -133,6 +174,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          keepalive: body.action === 'outcome',
         }
       );
       return res.json().catch(() => ({}));
@@ -140,7 +182,33 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
     [username]
   );
 
-  const reply = (text: string) => pushMessages(makeMessage('jovie', text));
+  const reply = (
+    text: string,
+    details: Omit<ChatMessage, 'id' | 'role' | 'text'> = {}
+  ) => pushMessages(makeMessage('jovie', text, details));
+
+  const recordCardOutcome = useCallback(
+    (message: ChatMessage) => {
+      const { card, normalizedIntent, sourceRevision } = message;
+      const outcome = outcomeForMessage(message);
+      if (!card || !outcome || !normalizedIntent || !sourceRevision) return;
+      track('ask_jovie_entity_action', {
+        username,
+        intent: normalizedIntent,
+        entityType: card.kind,
+        outcome,
+      });
+      void post({
+        action: 'outcome',
+        intent: normalizedIntent,
+        outcome,
+        entityType: card.kind,
+        entityId: card.id,
+        sourceRevision,
+      }).catch(() => {});
+    },
+    [post, username]
+  );
 
   const openWidget = () => {
     setOpen(true);
@@ -167,7 +235,12 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
       const data = await post({ action: 'question', question: trimmed });
       if (data.answered && typeof data.text === 'string') {
         track('ask_jovie_answered', { username });
-        reply(data.text);
+        reply(data.text, {
+          card: data.card,
+          followUp: data.followUp,
+          normalizedIntent: data.intent,
+          sourceRevision: data.provenance?.sourceRevision,
+        });
       } else {
         track('ask_jovie_unanswered', { username });
         setUnansweredQuestion(trimmed);
@@ -323,19 +396,39 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
             className='flex-1 space-y-2 overflow-y-auto px-4 py-3'
             ref={listRef}
           >
-            {messages.map(msg => (
-              <div
-                key={msg.id}
-                className={cn(
-                  'max-w-4/5 rounded-2xl px-3 py-2 text-sm leading-snug text-primary-token',
-                  msg.role === 'visitor'
-                    ? 'ml-auto bg-surface-2'
-                    : 'mr-auto bg-surface-1'
-                )}
-              >
-                {msg.text}
-              </div>
-            ))}
+            {messages.map(msg =>
+              msg.role === 'visitor' ? (
+                <div
+                  key={msg.id}
+                  className='ml-auto max-w-4/5 rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-primary-token'
+                >
+                  {msg.text}
+                </div>
+              ) : (
+                <div key={msg.id} className='mr-auto max-w-4/5 space-y-2'>
+                  <div className='rounded-2xl bg-surface-1 px-3 py-2 text-sm leading-snug text-primary-token'>
+                    {msg.text}
+                  </div>
+                  {msg.card ? (
+                    <EntityCard
+                      model={msg.card}
+                      treatment='compact'
+                      className='w-full'
+                      dataTestId={`ask-jovie-${msg.card.kind}-card`}
+                      onClick={() => recordCardOutcome(msg)}
+                    />
+                  ) : null}
+                  {msg.followUp ? (
+                    <FilterChip
+                      pressed={false}
+                      onClick={() => startIntent(msg.followUp!.intent)}
+                    >
+                      {msg.followUp.label}
+                    </FilterChip>
+                  ) : null}
+                </div>
+              )
+            )}
             {pending && (
               <div className='mr-auto rounded-2xl bg-surface-1 px-3 py-2 text-sm text-tertiary-token'>
                 …

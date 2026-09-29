@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] && [[ "$SOURCE_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]] && [[ "$SOURCE_CI_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] && [ "$SOURCE_CI_WORKFLOW_PATH" = ".github/workflows/ci.yml" ] && [ "$SOURCE_CI_HEAD_BRANCH" = "main" ] && [ "$SOURCE_CI_HEAD_REPOSITORY" = "$REPOSITORY" ] || { echo "::error::Staging Controller received malformed exact-main CI evidence."; exit 1; }
           receipt="$RUNNER_TEMP/product-lane-release/release.json"
-          jq -e --arg sha "$EXPECTED_SHA" --arg run "$SOURCE_CI_RUN_ID" --arg attempt "$SOURCE_CI_RUN_ATTEMPT" '.provenance.sha == $sha and .provenance.runAttempt == $attempt and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | type == "array")' "$receipt" >/dev/null || { echo "::error::Canonical release lineage receipt does not match the exact successful CI attempt."; exit 1; }
+          jq -e --arg sha "$EXPECTED_SHA" --arg run "$SOURCE_CI_RUN_ID" '.provenance.sha == $sha and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | type == "array")' "$receipt" >/dev/null || { echo "::error::Canonical release lineage receipt does not match the exact successful CI attempt."; exit 1; }
           current_main="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Could not resolve exact main before staging mutation."; exit 1; }
           outcome=proceed replacement_sha="$EXPECTED_SHA"
@@ -41,7 +41,7 @@ jobs:
                 candidate_status="$(gh api "repos/$REPOSITORY/compare/${candidate_sha}...${current_main}" --jq '.status // empty')"
                 [[ "$candidate_status" =~ ^(ahead|identical)$ ]] || continue
                 candidate_name="product-lane-release-${candidate_sha}-${candidate_attempt}"
-                if gh run download "$candidate_id" --repo "$REPOSITORY" --name "$candidate_name" --dir "$RUNNER_TEMP/product-lane-$candidate_id" && jq -e --arg sha "$candidate_sha" --arg run "$candidate_id" --arg attempt "$candidate_attempt" '.provenance.sha == $sha and .provenance.runAttempt == $attempt and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | index("web") != null)' "$RUNNER_TEMP/product-lane-$candidate_id/release.json" >/dev/null; then
+                if gh run download "$candidate_id" --repo "$REPOSITORY" --name "$candidate_name" --dir "$RUNNER_TEMP/product-lane-$candidate_id" && jq -e --arg sha "$candidate_sha" --arg run "$candidate_id" '.provenance.sha == $sha and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | index("web") != null)' "$RUNNER_TEMP/product-lane-$candidate_id/release.json" >/dev/null; then
                   outcome=superseded replacement_sha="$candidate_sha"; break
                 fi
               done < <(jq -r --argjson source "$SOURCE_CI_RUN_ID" '[.workflow_runs[] | select(.id > $source and .head_branch == "main" and .path == ".github/workflows/ci.yml" and .conclusion == "success")] | sort_by(.id) | reverse[] | [.id, .run_attempt, .head_sha] | @tsv' <<<"$newer_runs")

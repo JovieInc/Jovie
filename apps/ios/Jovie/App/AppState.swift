@@ -23,6 +23,18 @@ extension AppStateRepository {
 extension MeRepository: AppStateRepository {}
 
 @MainActor
+protocol PushNotificationCoordinating {
+  func activate() async
+  func deactivate() async
+}
+
+@MainActor
+struct NoopPushNotificationCoordinator: PushNotificationCoordinating {
+  func activate() async {}
+  func deactivate() async {}
+}
+
+@MainActor
 @Observable
 final class AppState {
   let configuration: AppConfiguration
@@ -37,6 +49,7 @@ final class AppState {
 
   private let repository: AppStateRepository
   private let sessionRevoker: NativeSessionRevoking
+  private let pushNotifications: PushNotificationCoordinating
   private let chatCache: ChatCache
   private let audienceHighlightsCache: AudienceHighlightsCache
   private let actionLoopCache: ActionLoopCache
@@ -52,6 +65,7 @@ final class AppState {
     repository: AppStateRepository,
     brightnessManager: BrightnessControlling,
     sessionRevoker: NativeSessionRevoking? = nil,
+    pushNotifications: PushNotificationCoordinating? = nil,
     chatCache: ChatCache? = nil,
     audienceHighlightsCache: AudienceHighlightsCache? = nil,
     actionLoopCache: ActionLoopCache? = nil
@@ -61,6 +75,7 @@ final class AppState {
     self.repository = repository
     self.brightnessManager = brightnessManager
     self.sessionRevoker = sessionRevoker ?? NativeSessionRevoker(baseURL: configuration.apiBaseURL)
+    self.pushNotifications = pushNotifications ?? NoopPushNotificationCoordinator()
     self.chatCache = chatCache ?? ChatCache()
     self.audienceHighlightsCache = audienceHighlightsCache ?? AudienceHighlightsCache()
     self.actionLoopCache = actionLoopCache ?? ActionLoopCache()
@@ -151,9 +166,13 @@ final class AppState {
       return
     }
 
+    let previousUserID = activeUserID
     activeUserID = userID
 
     guard let userID else {
+      if previousUserID != nil {
+        await pushNotifications.deactivate()
+      }
       Observability.clearUser()
       loadingUserID = nil
       route = .signedOut
@@ -164,6 +183,10 @@ final class AppState {
     }
 
     Observability.setUser(id: userID)
+    let pushNotifications = pushNotifications
+    Task {
+      await pushNotifications.activate()
+    }
     loadingUserID = userID
     defer {
       if loadingUserID == userID {
@@ -282,6 +305,7 @@ final class AppState {
   }
 
   func signOut() async {
+    await pushNotifications.deactivate()
     let revocation = await sessionRevoker.revokeCurrentSession()
     if case let .failed(statusCode) = revocation {
       MobileAuthDiagnostics.record(
@@ -300,6 +324,7 @@ final class AppState {
   /// A terminal authenticated request has already proven the local session unusable.
   /// Return to native sign-in without attempting another remote revocation with that token.
   func handleExpiredSession() async {
+    await pushNotifications.deactivate()
     NativeSessionTokenStore.clear()
     await resetToSignedOut()
   }

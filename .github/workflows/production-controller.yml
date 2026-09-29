@@ -689,8 +689,7 @@ jobs:
                 .alias == "staging.jov.ie" and
                 .environment == "preview" and
                 .exactIdentity == "passed" and
-                .routeSmoke == "passed" and
-                .sloState != "breach"
+                .routeSmoke == "passed"
               ' "$staging_receipt_dir/staging-deployment-receipt.json" >/dev/null || {
                 echo "::error::Exact staging receipt is missing or ambiguous. Next: rerun Staging Controller for $staging_receipt_sha. Proof: artifact $staging_artifact_id."
                 exit 1

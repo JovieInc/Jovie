@@ -126,6 +126,12 @@ export const ServerEnvSchema = z.object({
   APPLE_WALLET_AUTH_TOKEN_SECRET: z.string().min(32).optional(),
   APPLE_WALLET_APNS_PRODUCTION: z.enum(['true', 'false']).optional(),
 
+  // Jovie iOS remote notifications (APNs token authentication)
+  JOVIE_IOS_APNS_KEY_ID: z.string().optional(),
+  JOVIE_IOS_APNS_TEAM_ID: z.string().optional(),
+  JOVIE_IOS_APNS_PRIVATE_KEY: z.string().optional(),
+  JOVIE_IOS_APNS_TOPIC: z.string().optional(),
+
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
 
@@ -524,6 +530,10 @@ export const ENV_KEYS = [
   'APPLE_WALLET_WWDR_CERT_PEM',
   'APPLE_WALLET_AUTH_TOKEN_SECRET',
   'APPLE_WALLET_APNS_PRODUCTION',
+  'JOVIE_IOS_APNS_KEY_ID',
+  'JOVIE_IOS_APNS_TEAM_ID',
+  'JOVIE_IOS_APNS_PRIVATE_KEY',
+  'JOVIE_IOS_APNS_TOPIC',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
   'BLOB_STORE_ID',
