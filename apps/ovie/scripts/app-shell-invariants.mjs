@@ -182,7 +182,8 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
   }
 
   const identitySurfaces = [
-    'apps/web/app/app/(shell)/admin/ingest/AdminIngestPageClient.tsx',
+    // AdminIngestPageClient.tsx was deleted as orphaned dead code (JOV-6778,
+    // #19321): admin/ingest now redirects and never renders it.
     'apps/web/app/app/(shell)/admin/platform-connections/PlatformConnectionsClient.tsx',
   ];
   for (const file of identitySurfaces) {
