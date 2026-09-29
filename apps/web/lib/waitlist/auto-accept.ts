@@ -7,6 +7,7 @@ import {
   eq,
   gt,
   inArray,
+  isNotNull,
   isNull,
   lte,
   or,
@@ -24,6 +25,10 @@ import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
+import {
+  countOpenCohortLearnings,
+  MAX_OPEN_COHORT_LEARNINGS,
+} from '@/lib/waitlist/cohort-learnings';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 import {
   getWaitlistSettings,
@@ -39,6 +44,8 @@ export interface WaitlistAutoAcceptResult {
   skipped: number;
   failed: number;
   capacityRemaining: number;
+  /** Set when the learning throttle held this run closed. */
+  pausedReason?: 'open_learnings' | 'learnings_unavailable';
 }
 
 function getCutoffDate(days: number, now: Date): Date {
@@ -128,6 +135,22 @@ export async function runWaitlistAutoAccept(
     };
   }
 
+  // Resolve the current cohort's learnings before admitting the next one.
+  // Unknown counts fail closed.
+  const openLearnings = await countOpenCohortLearnings();
+  if (openLearnings === null || openLearnings >= MAX_OPEN_COHORT_LEARNINGS) {
+    return {
+      enabled: settings.autoAcceptEnabled,
+      scanned: 0,
+      approved: 0,
+      skipped: 0,
+      failed: 0,
+      capacityRemaining,
+      pausedReason:
+        openLearnings === null ? 'learnings_unavailable' : 'open_learnings',
+    };
+  }
+
   const cutoff = getCutoffDate(settings.autoAcceptAfterDays, now);
   const limit = Math.min(options.maxCandidates ?? 10_000, 10_000);
 
@@ -141,7 +164,10 @@ export async function runWaitlistAutoAccept(
       and(
         eq(waitlistEntries.canonical, true),
         inArray(waitlistEntries.status, AUTO_ACCEPT_ELIGIBLE_STATUSES),
-        lte(waitlistEntries.waitlistedAt, cutoff)
+        lte(waitlistEntries.waitlistedAt, cutoff),
+        // ICP: artists (a confirmed Spotify profile) admit first; everyone
+        // else keeps their reservation until an operator admits them.
+        isNotNull(waitlistEntries.spotifyUrl)
       )
     )
     .orderBy(asc(waitlistEntries.waitlistedAt), asc(waitlistEntries.createdAt))
