@@ -2,10 +2,12 @@
 
 // @coverage-via apps/web/tests/unit/components/atoms/DesktopTitlebar.test.tsx
 
-import { ChevronLeft, ChevronRight, PanelLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useContext } from 'react';
+import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
+import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 import {
   type DesktopBuildIdentity,
   useDesktopBuildIdentity,
@@ -145,15 +147,14 @@ export function DesktopTitlebar() {
   const sidebarCtx = useContext(SidebarContext);
   const sidebarOpen = sidebarCtx?.state === 'open';
   const toggleSidebar = sidebarCtx?.toggleSidebar;
-  const sidebarToggleLabel = sidebarOpen
-    ? 'Collapse sidebar'
-    : 'Expand sidebar';
+  const isMobile = sidebarCtx?.isMobile === true;
 
   return (
     <div
       data-electron-titlebar='true'
-      data-main-header-inset={
-        !sidebarOpen || sidebarCtx?.isMobile ? 'true' : undefined
+      data-main-header-inset={!sidebarOpen || isMobile ? 'true' : undefined}
+      data-electron-collapsed-rail={
+        !sidebarOpen && !isMobile ? 'icon' : undefined
       }
       data-testid='electron-titlebar-row'
       data-electron-drag-region='true'
@@ -169,24 +170,20 @@ export function DesktopTitlebar() {
             className='w-(--electron-traffic-light-safe-width) shrink-0'
             aria-hidden='true'
           />
-          {/* Single canonical sidebar toggle for Electron. */}
-          <button
-            type='button'
-            onClick={toggleSidebar}
+          {/* Single canonical sidebar toggle for Electron: the same rail
+              control primitive the header uses in the browser. Buttons are
+              no-drag via the Electron drag-region CSS. */}
+          <RailToggleButton
+            side='left'
+            open={sidebarOpen}
+            openLabel='Collapse sidebar'
+            closedLabel='Expand sidebar'
+            onToggle={() => toggleSidebar?.()}
             disabled={!toggleSidebar}
-            aria-label={sidebarToggleLabel}
-            data-testid='electron-sidebar-toggle'
-            className={cn(
-              'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tertiary-token',
-              'transition-colors duration-subtle',
-              'hover:bg-white/[0.06] hover:text-primary-token',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-              'disabled:pointer-events-none disabled:opacity-30'
-            )}
-            style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
-          >
-            <PanelLeft className='h-3.5 w-3.5' strokeWidth={2} />
-          </button>
+            shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
+            dataTestId='electron-sidebar-toggle'
+            iconTestId='electron-sidebar-toggle-icon'
+          />
           <div
             data-testid='electron-nav-pill'
             className='flex shrink-0 items-center gap-0.5'
