@@ -88,6 +88,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
     steps:
       - name: Generate Jovie Bot token
         # GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
@@ -99,7 +101,8 @@ jobs:
         # triage --enable-missing sweep, which run with full secrets.
         if: >-
           github.event.pull_request.head.repo.full_name == github.repository &&
-          github.event.pull_request.user.login != 'dependabot[bot]'
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -115,6 +118,10 @@ jobs:
           set -euo pipefail
           if [[ -z "$GH_TOKEN" ]]; then
             echo "::notice::No token available (fork or Dependabot PR) — dependabot-auto-merge.yml and the hourly triage sweep enable auto-merge; skipping."
+            exit 0
+          fi
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::notice::No Jovie Bot token available in this event context (empty secrets context); the hourly triage sweep will enable auto-merge."
             exit 0
           fi
           if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then

@@ -662,6 +662,108 @@ class GapTest(unittest.TestCase):
         events.reconcile(self.host, fake_lane(no_linear), lambda: (_ for _ in ()).throw(OSError("x")), NOW, force=True)
         self.assertEqual(len(no_linear.made("gh", "pr", "close")), 1, "closing never waits on Linear")
 
+    def hold_ctx(self, events_list, notes=(), committed="2033-05-18T00:00:00Z", oid="h"):
+        """A canned hold_context GraphQL reply: labeled events, comments, last commit."""
+        return {"data": {"repository": {"pullRequest": {
+            "timelineItems": {"nodes": [{"createdAt": at, "label": {"name": label},
+                                         "actor": {"login": actor}} for at, label, actor in events_list]},
+            "comments": {"nodes": [{"createdAt": at, "author": {"login": who}, "body": body}
+                                   for at, who, body in notes]},
+            "commits": {"nodes": [{"commit": {"oid": oid, "committedDate": committed}}]}}}}}
+
+    def test_a_clean_held_pr_whose_hold_outlived_its_cause_is_flagged(self):
+        """JOV-7066: stale when the hold is >24h old, the PR reads CLEAN and no note of
+        Tim's explains it. Tim's holds, fresh holds and unreadable contexts stand."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        old, fresh = "2033-05-16T00:00:00Z", "2033-05-18T01:00:00Z"
+        clean_held = pr(merge="CLEAN", labels=["hold"])
+
+        def flagged(ctx, target=clean_held):
+            return events.stale_hold(target["number"], target, now, Shell({("gh", "api", "graphql"): ctx}))
+
+        row = flagged(self.hold_ctx([(old, "hold", "jovie-lanes[bot]")]))
+        self.assertEqual((row["pr"], row["head"], row["labeler"], row["timHold"]),
+                         (5, "h1", "jovie-lanes[bot]", False))
+        self.assertGreater(row["holdAgeH"], 24)
+        self.assertTrue(row["auto"], "an automation hold on a head that moved lifts in strict mode")
+        self.assertIsNone(flagged(self.hold_ctx([(fresh, "hold", "jovie-lanes[bot]")])),
+                          "a hold inside the 24h window is still settling")
+        self.assertIsNone(flagged(self.hold_ctx([(old, "hold", "itstimwhite")])),
+                          "Tim applied it: his holds (product/spend/taste) never auto-flag")
+        self.assertIsNone(flagged(self.hold_ctx([(old, "hold", "jovie-lanes[bot]")],
+                                                notes=[(old, "itstimwhite", "holding this for the pricing pass")])),
+                          "a Tim-authored hold note keeps it held")
+        self.assertIsNone(flagged(self.hold_ctx([])), "a label event we cannot see is not stale")
+        self.assertIsNone(flagged((1, "")), "an unreadable hold is never flagged")
+
+    def test_a_stale_hold_naming_a_non_check_blocker_alerts_but_never_auto_lifts(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ctx = self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")],
+                            notes=[("2033-05-16T00:05:00Z", "jovie-lanes[bot]",
+                                    "held: waits on dependency #17541 qualification pass")])
+        row = events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                Shell({("gh", "api", "graphql"): ctx}))
+        self.assertTrue(row["nonCheckBlocker"])
+        self.assertFalse(row["auto"], "a named non-check blocker is a human gate")
+        self.assertIn("non-check blocker", events.stale_hold_alert(row))
+        self.assertIn("h1", events.stale_hold_alert(row))
+        same_head = self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")],
+                                  committed="2033-05-15T00:00:00Z")
+        row = events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                Shell({("gh", "api", "graphql"): same_head}))
+        self.assertFalse(row["auto"], "the head never moved past the hold")
+
+    def test_reconcile_alerts_once_per_stale_hold_episode(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        held_node = {**self.node(5, mergeStateStatus="CLEAN", labels=[{"name": "hold"},
+                                                                   {"name": events.POISON_LABEL}]),
+                     "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+                     "labels": {"nodes": [{"name": "hold"}, {"name": events.POISON_LABEL}]}}
+
+        def route(args):
+            query = next((a for a in args if a.startswith("query=")), "")
+            if "timelineItems" in query:
+                return self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")])
+            return {"data": {"repository": {"pullRequests": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [held_node]}}}}
+
+        shell = Shell({("gh", "api", "graphql"): route})
+        record = events.reconcile(self.host, fake_lane(shell), lambda: None, now)
+        self.assertEqual([row["pr"] for row in record["staleHolds"]], [5])
+        comments = shell.made("gh", "pr", "comment")
+        self.assertEqual(len(comments), 1)
+        self.assertIn("h", comments[0][comments[0].index("--body") + 1])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], "alert mode never lifts a hold")
+        second = Shell({("gh", "api", "graphql"): route})
+        events.reconcile(self.host, fake_lane(second), lambda: None, now + 3600)
+        self.assertEqual(second.made("gh", "pr", "comment"), [], "one alert per stale episode")
+
+    def test_strict_mode_lifts_an_automation_hold_whose_head_moved(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        held_node = {**self.node(5, mergeStateStatus="CLEAN", labels=[{"name": "hold"}]),
+                     "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+                     "labels": {"nodes": [{"name": "hold"}]}}
+
+        def route(args):
+            query = next((a for a in args if a.startswith("query=")), "")
+            if "timelineItems" in query:
+                return self.hold_ctx([("2033-05-16T00:00:00Z", "hold", "jovie-lanes[bot]")])
+            return {"data": {"repository": {"pullRequests": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [held_node]}}}}
+
+        saved = os.environ.get("LANES_STALE_HOLD_UNHOLD")
+        os.environ["LANES_STALE_HOLD_UNHOLD"] = "1"
+        try:
+            shell = Shell({("gh", "api", "graphql"): route})
+            events.reconcile(self.host, fake_lane(shell), lambda: None, now)
+        finally:
+            if saved is None:
+                os.environ.pop("LANES_STALE_HOLD_UNHOLD", None)
+            else:
+                os.environ["LANES_STALE_HOLD_UNHOLD"] = saved
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
+                         [["gh", "api", "-X", "DELETE", f"repos/{runner.REPO_SLUG}/issues/5/labels/hold"]])
+
     def test_open_prs_are_read_page_by_page(self):
         pages = iter([
             {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"},

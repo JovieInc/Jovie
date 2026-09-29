@@ -1543,7 +1543,6 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
     assert "Graphite" not in dependabot
     assert "scripts/native-merge-intent.mjs" in dependabot
     assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
-    assert "workflow_run.workflow_id == 178737329" in dependabot
     adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
         encoding="utf-8"
     )
@@ -1561,9 +1560,7 @@ def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
 
     assert "ref: ${{ github.sha }}" in step
     assert "persist-credentials: false" in step
-    assert "github.event.workflow_run.workflow_id == 178737329" in workflow
-    assert "github.event.workflow_run.event == 'pull_request'" in workflow
-    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "\n  workflow_run:" not in workflow
     assert "actions/download-artifact" not in workflow
     assert "      actions: read" in workflow
     for entrypoint in (
@@ -1608,14 +1605,13 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
     assert "schedule:" not in trigger
-    assert "workflows: [CI, Production Controller]" in trigger
+    assert "workflow_run:" not in trigger
     assert "opened" in trigger
     assert "edited" in trigger
     assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "group: fleet-gate-event-refresh" in workflow
     assert "cancel-in-progress: false" in workflow
-    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert "github.event.pull_request.merged != true" in block
     assert "github.event.label.name == 'hold'" in block
     assert "github.event.label.name == 'gated'" in block

@@ -9,29 +9,19 @@ on:
   repository_dispatch:
     types: [delivery-control-failure]
   workflow_run:
-    workflows:
-      - PR Size Guard
-      - CI
-      - Production Controller
+    workflows: [Production Controller]
     types: [completed]
 
 permissions:
   contents: read
 
 # No workflow concurrency group: GitHub keeps only one pending run per group
-# and cancels the older pending one, so a burst of failed runs (including the
-# job-skipped successes, which still enter the group) silently dropped repair
-# receipts. The delivery-state-machine writer lock serializes the durable
-# write; each receipt holds it for about a second.
+# and cancels the older pending one, so a burst of terminal controller events
+# can silently drop receipts. The delivery-state-machine writer lock serializes
+# the durable write; each receipt holds it for about a second.
 
 jobs:
   receipt:
-    # Successful queue runs already carry their own exact-head receipt. Every
-    # non-success terminal run must become a repair task. Repository dispatch
-    # and repository dispatch are explicit ingress paths.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion != 'success'
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
     steps:

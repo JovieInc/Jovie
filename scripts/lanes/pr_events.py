@@ -358,6 +358,94 @@ def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
     return True
 
 
+# JOV-7066: a hold on a PR that reads CLEAN outlives its cause — the lanes skip held PRs,
+# so after a poison storm nobody re-evaluates them (the 2026-09-28 review found 8). Tim's
+# holds (product/spend/taste) and notes naming a non-check blocker stand regardless.
+TIM_LOGINS = frozenset({"itstimwhite"})
+STALE_HOLD_S = 24 * 3600
+NON_CHECK_BLOCKER = re.compile(
+    r"(?i)dependenc|blocked\s+(?:by|on)|qualification|pricing|red[ -]?line|spend|taste")
+
+HOLD_CONTEXT_QUERY = ('{repository(owner:"%s",name:"%s"){pullRequest(number:%d){'
+                      "timelineItems(last:30,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{"
+                      "createdAt label{name} actor{login}}}}"
+                      "comments(last:30){nodes{createdAt author{login} body}}"
+                      "commits(last:1){nodes{commit{oid committedDate}}}}}}")
+
+
+def hold_context(number: int, sh=run) -> dict | None:
+    """The hold's provenance for one PR: every hold/poison label application (when, by whom),
+    recent comments that may explain it, and the current head's commit time. None when the
+    read fails — an unreadable hold is never flagged."""
+    owner, name = REPO.split("/")
+    result = sh(["gh", "api", "graphql", "-f", f"query={HOLD_CONTEXT_QUERY % (owner, name, number)}"])
+    if result.returncode != 0:
+        return None
+    try:
+        node = json.loads(result.stdout)["data"]["repository"]["pullRequest"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    events = []
+    for item in (node.get("timelineItems") or {}).get("nodes") or []:
+        label = str((item.get("label") or {}).get("name") or "")
+        at = iso_ts(item.get("createdAt"))
+        if at is not None and (label.lower() in HOLD_LABELS or label == POISON_LABEL):
+            events.append({"label": label, "at": at, "actor": str((item.get("actor") or {}).get("login") or "")})
+    notes = [{"at": iso_ts(n.get("createdAt")), "author": str((n.get("author") or {}).get("login") or ""),
+              "body": str(n.get("body") or "")}
+             for n in (node.get("comments") or {}).get("nodes") or []]
+    commits = (node.get("commits") or {}).get("nodes") or [{}]
+    commit = (commits[0] or {}).get("commit") or {}
+    return {"events": events, "notes": notes,
+            "headOid": commit.get("oid"), "headCommittedAt": iso_ts(commit.get("committedDate"))}
+
+
+def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
+    """JOV-7066: a held PR reading CLEAN whose hold outlived its cause — applied more than
+    24 h ago with no Tim-authored hold note. Tim's holds and notes naming a non-check
+    blocker (a dependency, a qualification pass, a pricing red line) are human gates, not
+    storm leftovers: no row, no alert. The row's `auto` marks the stricter mode's subset:
+    the hold came from automation and the head moved after it."""
+    ctx = hold_context(number, sh)
+    if not ctx or not ctx["events"]:
+        return None
+    event = max(ctx["events"], key=lambda e: e["at"])
+    hold_at = event["at"]
+    if now - hold_at <= STALE_HOLD_S:
+        return None
+    notes = [n for n in ctx["notes"] if n["at"] is None or n["at"] >= hold_at - 3600]
+    if event["actor"] in TIM_LOGINS or any(n["author"] in TIM_LOGINS for n in notes):
+        return None  # Tim's hold or Tim's hold note: stays, silently
+    blocker = any(NON_CHECK_BLOCKER.search(n["body"]) for n in notes)
+    automation = event["actor"].endswith("[bot]")
+    moved = ctx["headCommittedAt"] is not None and ctx["headCommittedAt"] > hold_at
+    return {"pr": number, "head": pr.get("headRefOid"), "holdAgeH": round((now - hold_at) / 3600, 1),
+            "labeler": event["actor"] or "unknown", "timHold": False, "nonCheckBlocker": blocker,
+            "auto": bool(automation and moved and not blocker)}
+
+
+def stale_hold_alert(row: dict) -> str:
+    tail = ("its notes name a non-check blocker, so a human still owns the call."
+            if row["nonCheckBlocker"] else
+            "re-evaluate: lift the hold so the queue takes it, or restate the blocker.")
+    return (f"🤖 lanes: held {row['holdAgeH']}h while `mergeStateStatus=CLEAN` (hold applied by "
+            f"`{row['labeler']}`, no Tim-authored hold note) — the hold may have outlived its "
+            f"cause. Head `{row['head']}`. {tail}")
+
+
+def stale_holds(prs: list[dict], now: float, sh=run) -> list[dict]:
+    """CLEAN PRs carrying a hold label whose hold went stale, oldest hold first."""
+    rows = []
+    for pr in prs:
+        labels = {label.lower() for label in label_names(pr)}
+        if pr.get("mergeStateStatus") != "CLEAN" or not (labels & HOLD_LABELS):
+            continue
+        row = stale_hold(pr["number"], pr, now, sh)
+        if row:
+            rows.append(row)
+    return sorted(rows, key=lambda row: -row["holdAgeH"])
+
+
 def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -> list[tuple[int, str]]:
     disabled = disabled_lanes() if disabled is None else disabled
     added = []
@@ -846,6 +934,26 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         for name in ("fix-attempts.json", "synced.json"):
             lane.update_json(host.state / name, drop)
     by_number = {pr["number"]: pr for pr in prs}
+    # JOV-7066: held PRs whose hold outlived its cause get one alert per stale episode; the
+    # opt-in stricter mode lifts automation holds whose head already moved past the hold.
+    announced = {row.get("pr") for row in previous.get("staleHolds") or []}
+    stale = stale_holds(prs, now, lane.sh)
+    auto_unhold = os.environ.get("LANES_STALE_HOLD_UNHOLD", "").lower() in ("1", "true", "yes")
+    for row in stale:
+        if row["pr"] in announced:
+            continue
+        if auto_unhold and row["auto"]:
+            for name in (label for label in label_names(by_number[row["pr"]])
+                         if label.lower() in HOLD_LABELS or label == POISON_LABEL):
+                lane.sh(["gh", "api", "-X", "DELETE",
+                         f"repos/{lane.REPO_SLUG}/issues/{row['pr']}/labels/{name}"])
+            lane.sh(["gh", "pr", "comment", str(row["pr"]), "--repo", lane.REPO_SLUG, "--body",
+                     f"🤖 lanes: the automation hold went stale — CLEAN for >24h and the head moved "
+                     f"past it (head `{row['head']}`), so `hold`/`{POISON_LABEL}` are removed and the "
+                     "queue can take this PR. Re-hold with a note if it should still wait."])
+        else:
+            lane.sh(["gh", "pr", "comment", str(row["pr"]), "--repo", lane.REPO_SLUG, "--body",
+                     stale_hold_alert(row)])
     linear = None
     for number, why in plan["close"]:
         if linear is None:
@@ -859,7 +967,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
             lane.sh(["gh", "pr", "close", str(number), "--repo", lane.REPO_SLUG, "--comment", f"🤖 lanes: closing this {why}."])
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": plan["label"],
               "closed": [number for number, _ in plan["close"]], "orphans": plan["orphans"],
-              "depHolds": plan["depHolds"], "dispositions": plan["dispositions"]}
+              "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
     return record
 
