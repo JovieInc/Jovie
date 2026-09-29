@@ -4,6 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import { collectBrowserErrors } from '../visual-qa/route-quality';
+import { createAppShellDegradedTolerance } from './_lib/app-shell-degraded-tolerance';
 
 type ScreenProofWindow = Window & {
   __screenProofCls?: number;
@@ -42,47 +43,16 @@ const enterUrl = `/api/dev/test-auth/enter?persona=creator&redirect=${encodeURIC
 // on the person's name rather than the full combined string.
 const SELECTED_CONTACT_NAME = 'Priya Anand';
 
-// Specific, unrelated app-shell chrome paths that degrade against the noop
-// DB (verified locally) — none has a noop-DB fallback of its own, and none
-// is gated by this producer's reserved-profile fixture:
-// - /api/analytics/navigation: a 503 is this app's own "service
-//   unavailable" convention for a degraded analytics beacon.
-// - /api/chat/conversations: the assistant panel's conversation list
-//   genuinely 500s (an uncaught exception, not a controlled response).
-// Plus a background RSC refetch of this exact proof route (React Query
-// revalidation / the sidebar's hover-prefetch touching the same query
-// key), which can also 500 — not the initial render this test already
-// asserted on before this check runs.
-// Scoped to exactly these paths and statuses, not a blanket allowance, so
-// a real failure from this producer's own fixtured endpoint
-// (GET /api/dashboard/contacts) still fails this proof.
-const EXPECTED_DEGRADED_RESPONSES = new Map<string, number>([
-  ['/api/analytics/navigation', 503],
-  ['/api/chat/conversations', 500],
-]);
-
-function isExpectedDegradedResponse(entry: string): boolean {
-  const match = /^(\d{3}) (\S+)$/.exec(entry);
-  if (!match) return false;
-  const status = Number(match[1]);
-  const pathname = (() => {
-    try {
-      return new URL(match[2]).pathname;
-    } catch {
-      return '';
-    }
-  })();
-  if (pathname === proofRoute) return status === 500;
-  return EXPECTED_DEGRADED_RESPONSES.get(pathname) === status;
-}
-
-function isExpectedDegradedConsoleError(entry: string): boolean {
-  return /the server responded with a status of (500|503)\b/.test(entry);
-}
-
-function isExpectedDegradedRequestFailure(entry: string): boolean {
-  return entry.endsWith(' net::ERR_ABORTED');
-}
+// Shared with tasks-screen-proof.spec.ts — both mount the full
+// authenticated app shell and see the same unrelated chrome-widget
+// degradation. See app-shell-degraded-tolerance.ts for the rationale and
+// exact allowlist; a real failure from this producer's own fixtured
+// endpoint (GET /api/dashboard/contacts) still fails this proof.
+const {
+  isExpectedDegradedResponse,
+  isExpectedDegradedConsoleError,
+  isExpectedDegradedRequestFailure,
+} = createAppShellDegradedTolerance(proofRoute);
 
 const viewports = [
   { id: 'desktop', width: 1440, height: 900 },

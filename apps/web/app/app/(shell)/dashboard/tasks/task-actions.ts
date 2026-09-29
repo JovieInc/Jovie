@@ -440,6 +440,10 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
   // own. See screen-cert-fixture.ts and app-shell-fixture-gate.ts.
   const profileId = await requireProfileId();
   if (isScreenCertAppShellFixtureProfile(profileId)) {
+    // The fixture ignores `filters`: TasksRoute's own prefetch only ever
+    // calls this with DEFAULT_TASK_WORKSPACE_FILTERS (limit only, no
+    // status/search/cursor), so a filtered result is never observed by
+    // the producer this fixture serves.
     return SCREEN_CERT_TASKS_FIXTURE;
   }
   await requireTasksWorkspaceAccess();
