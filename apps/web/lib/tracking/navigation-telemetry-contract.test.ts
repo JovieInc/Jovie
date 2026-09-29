@@ -46,7 +46,42 @@ describe('navigation telemetry contract', () => {
 
   it('maps unknown item IDs to the only allowed unknown bucket', () => {
     expect(allowlistNavigationItemId('library')).toBe('library');
+    expect(allowlistNavigationItemId('links')).toBe('links');
+    expect(allowlistNavigationItemId('audience')).toBe('audience');
     expect(allowlistNavigationItemId('artist-123-secret')).toBe('unknown');
+  });
+
+  it('maps job-level items to their contextual route buckets', () => {
+    for (const payload of [
+      {
+        ...VALID_PAYLOAD,
+        item_id: 'home',
+        source_route: 'chat',
+        destination_route: 'inbox',
+      },
+      {
+        ...VALID_PAYLOAD,
+        item_id: 'links',
+        source_route: 'inbox',
+        destination_route: 'chat',
+      },
+      {
+        ...VALID_PAYLOAD,
+        item_id: 'audience',
+        source_route: 'inbox',
+        destination_route: 'contacts',
+      },
+      {
+        ...VALID_PAYLOAD,
+        item_id: 'presence',
+        source_route: 'inbox',
+        destination_route: 'other_app',
+      },
+    ] as const) {
+      expect(navigationTelemetryPayloadSchema.safeParse(payload).success).toBe(
+        true
+      );
+    }
   });
 
   it('uses inclusive bounded latency thresholds and published upper bounds', () => {

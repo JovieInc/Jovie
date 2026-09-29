@@ -28,7 +28,11 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/chats': 'Canonical chat index reached from the sidebar link',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/library':
-    'Canonical library page for releases, merch, images, videos, and audio',
+    'Contextual asset workspace reached from identity, search, and entity links',
+  '/app/calendar':
+    'Contextual moments workspace reached from event and release links',
+  '/app/tasks':
+    'Contextual workflow reached from Home, chat, and entity actions',
   '/app/audience':
     'Retained customer workspace reachable by direct links and shortcuts after primary navigation consolidation',
   '/app/tour-dates':

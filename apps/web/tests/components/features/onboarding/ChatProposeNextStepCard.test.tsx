@@ -41,6 +41,7 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
       screen.getByText(/save this request and reserve your name and profile/i)
     ).toBeInTheDocument();
     expect(screen.getByText(/you are not on the list/i)).toBeInTheDocument();
+    expect(screen.getByText(/save your spot/i)).toBeInTheDocument();
     expect(screen.queryByText(/you're on the list/i)).not.toBeInTheDocument();
   });
 

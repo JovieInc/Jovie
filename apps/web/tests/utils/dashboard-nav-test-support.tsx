@@ -17,6 +17,9 @@ type ChatConversationsQueryOptions = {
 };
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
+export const mockUseSearchParams = vi.fn<() => URLSearchParams>(
+  () => new URLSearchParams()
+);
 export const mockUseChatConversationsQuery = vi.fn(
   (_options?: ChatConversationsQueryOptions) => ({
     data: undefined,
@@ -33,6 +36,7 @@ export const mockTrackNavigationImpressions = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
+  useSearchParams: () => mockUseSearchParams(),
   useParams: () => ({}),
   useRouter: () => ({
     push: (...args: unknown[]) => mockRouterPush(...args),
@@ -159,6 +163,8 @@ export function resetDashboardNavTestMocks() {
   localStorage.clear();
   mockUsePathname.mockReset();
   mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
+  mockUseSearchParams.mockReset();
+  mockUseSearchParams.mockReturnValue(new URLSearchParams());
   mockUseChatConversationsQuery.mockReset();
   mockUseChatConversationsQuery.mockReturnValue({ data: undefined });
   mockToastInfo.mockReset();

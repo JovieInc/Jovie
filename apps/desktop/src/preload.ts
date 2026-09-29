@@ -13,6 +13,10 @@ const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL =
   'redeem-desktop-auth-return-code';
+const GET_DESKTOP_PASSKEY_STATE_CHANNEL = 'get-desktop-passkey-state';
+const SET_DESKTOP_PASSKEY_STATE_CHANNEL = 'set-desktop-passkey-state';
+const COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL =
+  'complete-desktop-passkey-sign-in';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
@@ -159,6 +163,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke(
       REDEEM_DESKTOP_AUTH_RETURN_CODE_CHANNEL,
       returnCode
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
+  getDesktopPasskeyState: () => {
+    return ipcRenderer.invoke(GET_DESKTOP_PASSKEY_STATE_CHANNEL) as Promise<{
+      available: boolean;
+      enrolled: boolean;
+      dismissed: boolean;
+    }>;
+  },
+  setDesktopPasskeyState: (update: 'enrolled' | 'dismissed' | 'reset') => {
+    return ipcRenderer.invoke(SET_DESKTOP_PASSKEY_STATE_CHANNEL, update) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
+  completeDesktopPasskeySignIn: () => {
+    return ipcRenderer.invoke(
+      COMPLETE_DESKTOP_PASSKEY_SIGN_IN_CHANNEL
     ) as Promise<{
       ok: boolean;
       reason?: string;

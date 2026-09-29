@@ -32,7 +32,7 @@ describe('WaitlistSuccessView', () => {
     ).toBeVisible();
     expect(
       screen.getByText(
-        'Request saved. Return via /start when a spot opens — typically within a few days of capacity.'
+        "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens."
       )
     ).toBeVisible();
     expect(screen.getByTestId('waitlist-next-steps').children).toHaveLength(3);
@@ -60,7 +60,7 @@ describe('WaitlistSuccessView', () => {
 
     expect(
       screen.getByText(
-        'Request saved. Return via /start when a spot opens — typically within a few days of capacity.'
+        "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens."
       )
     ).toBeVisible();
     expect(screen.queryByText(/jov\.ie\//)).toBeNull();

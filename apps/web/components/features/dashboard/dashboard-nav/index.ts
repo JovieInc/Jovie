@@ -7,6 +7,7 @@ export type {
 export {
   artistNavigation,
   artistSettingsNavigation,
+  audienceNavItem,
   CUSTOMER_NAV_CAPACITY,
   calendarNavItem,
   chatNavItem,
@@ -14,18 +15,24 @@ export {
   customerNavVisibleCap,
   desktopMoreNavigation,
   desktopPrimaryNavigation,
+  homeNavItem,
   inboxNavItem,
   libraryNavItem,
+  linksNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   partitionCustomerNavigation,
+  presenceNavItem,
   primaryNavigation,
   settingsNavItem,
   settingsNavigation,
   userSettingsNavigation,
 } from './config';
 export { DashboardNav } from './DashboardNav';
-export { isLibraryNavigationRoute } from './navigation-state';
+export {
+  isLibraryNavigationRoute,
+  isNavigationItemActive,
+} from './navigation-state';
 export type {
   CustomerNavTier,
   DashboardNavProps,

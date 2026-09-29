@@ -86,8 +86,8 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
       reservedHandle
         ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved — we'll email you the moment your spot opens.`
         : hasEmail
-          ? "Request saved. We'll email you when a spot opens — typically within a few days of capacity."
-          : 'Request saved. Return via /start when a spot opens — typically within a few days of capacity.',
+          ? "We're opening Jovie in waves. Your request is saved, and we'll email you the moment your spot opens."
+          : "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens.",
     icon: Clock3,
     showNextSteps: true,
   },

@@ -175,10 +175,42 @@ html[data-desktop-runtime="electron"]
   background: transparent;
 }
 
+/* JOV-7207: reserve only the window controls' overlap into the header row,
+   measured in the header's own coordinate system. The header already begins
+   inside the shell gap + collapsed icon rail + gap, so adding the full root
+   reservation double-counted that offset and left a dead span before the
+   title. */
 html[data-desktop-runtime="electron"]
-  [data-app-shell-frame="true"]:has([data-main-header-inset="true"])
+  [data-app-shell-frame="true"]:has([data-electron-collapsed-rail="icon"])
+  [data-top-spacing-owner="shell-header"] {
+  padding-left: calc(
+    var(--electron-controls-width) -
+    (2 * var(--app-shell-gap)) -
+    var(--electron-sidebar-collapsed-width)
+  );
+}
+
+/* No rail beneath the controls (narrow window / drawer state): the header
+   starts at the content edge, so only the shell padding is already counted. */
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:has(
+    [data-main-header-inset="true"]:not([data-electron-collapsed-rail])
+  )
   [data-top-spacing-owner="shell-header"] {
   padding-left: var(--electron-controls-width);
+}
+
+@media (min-width: 1024px) {
+  html[data-desktop-runtime="electron"]
+    [data-app-shell-frame="true"]:has(
+      [data-main-header-inset="true"]:not([data-electron-collapsed-rail])
+    )
+    [data-top-spacing-owner="shell-header"] {
+    padding-left: calc(
+      var(--electron-controls-width) -
+      (2 * var(--app-shell-gap))
+    );
+  }
 }
 
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
