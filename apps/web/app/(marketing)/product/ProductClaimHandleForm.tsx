@@ -79,7 +79,7 @@ export function ProductClaimHandleForm({
           <label htmlFor={inputId} className='sr-only'>
             Choose Your Handle
           </label>
-          <span className='shrink-0 select-none text-base text-tertiary-token'>
+          <span className='shrink-0 select-none text-base text-secondary-token'>
             {domain}
           </span>
           <input
