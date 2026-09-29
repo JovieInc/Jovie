@@ -870,7 +870,7 @@ jobs:
             echo "run_chat_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          PROMPTFOO_EVAL_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/lib/chat/|apps/web/app/api/chat/|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)'
+          PROMPTFOO_EVAL_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/lib/chat/|apps/web/app/api/chat/|apps/web/data/onboarding-script-promotions/|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)'
           if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_EVAL_PATTERN"; then
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
             echo "run_golden_eval_set=true" >> "$GITHUB_OUTPUT"

@@ -2,6 +2,7 @@
 
 import { validateAssuranceMatrixPolicy } from './assurance-matrix.mjs';
 import { validateDeliveryModelPolicy } from './delivery-model.mjs';
+import { evaluateDesignCiJudgeRouterContract } from './design-ci-judge-router-contract.mjs';
 import {
   designSurfacesCertification,
   formatCertificationSummary,
@@ -40,6 +41,9 @@ import {
 // JOV-INV-039 is composed here so every invariant run checks the overlay
 // layer order and primitive bindings. Its raw z-index ratchet runs in the
 // web lane (pnpm design:overlay-layers:check) because it walks all web source.
+// JOV-INV-040 is composed here as a structural wiring check only: the
+// Design CI judge router itself is TypeScript under apps/web/scripts and
+// runs via `pnpm design-ci:judge-matrix`, not from this plain-node process.
 
 import {
   readInvariantRegistry,
@@ -82,6 +86,7 @@ const designSurfaceErrors = validateDesignSurfaces(undefined, { registry });
 const overlayLayerErrors = validateOverlayLayerContract(undefined, {
   registry,
 });
+const designCiJudgeRouterErrors = evaluateDesignCiJudgeRouterContract();
 // JOV-6475 composes the writing-surface coverage registry the same way: it
 // validates that every named delivery surface maps to a contract and owner.
 const writingErrors = validateWritingSurfaces(readWritingSurfacesRegistry());
@@ -100,6 +105,7 @@ const errors = [
   ...sonarRepairErrors.map(error => `sonar-repair: ${error}`),
   ...designSurfaceErrors.map(error => `design-surfaces: ${error}`),
   ...overlayLayerErrors.map(error => `overlay-layer-contract: ${error}`),
+  ...designCiJudgeRouterErrors.map(error => `design-ci-judge-router: ${error}`),
   ...writingErrors.map(error => `writing-surfaces: ${error}`),
 ];
 

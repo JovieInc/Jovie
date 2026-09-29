@@ -113,6 +113,25 @@ describe('CertificationDetailRail', () => {
     );
   });
 
+  it('launches the walkthrough only when a decision can land', () => {
+    const onWalkthrough = vi.fn();
+    renderRail({ onWalkthrough });
+    fireEvent.click(screen.getByTestId('certification-walkthrough-action'));
+    expect(onWalkthrough).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the walkthrough action for items that cannot be decided', () => {
+    renderRail({
+      onWalkthrough: vi.fn(),
+      row: fixtureRow('claim', {
+        packet: fixturePacket('claim', {
+          visualProof: [fixtureReceipt('visual_proof', 'v', 'failed')],
+        }),
+      }),
+    });
+    expect(screen.queryByTestId('certification-walkthrough-action')).toBeNull();
+  });
+
   it('locks actions while a decision is pending', () => {
     renderRail({ pendingDecision: 'approved' });
     expect(screen.getByRole('button', { name: /Certify/ })).toBeDisabled();

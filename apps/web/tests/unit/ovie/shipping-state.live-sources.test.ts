@@ -45,6 +45,23 @@ const LANES_FEED = {
   diskFreePct: 29,
   held_by_reason: { 'gate-check-failed': 10, 'missing-test': 2 },
   failed_by_reason: { legacy: 28 },
+  capacity: {
+    schema: 'jovie.capacity-horizon/v1',
+    generatedAt: '2026-09-27T01:59:00Z',
+    leases: [],
+    outcomes: {
+      useful: 0,
+      certified: 0,
+      duplicate: 0,
+      retry: 0,
+      failed: 0,
+      unknown: 0,
+    },
+    incidents: [],
+    topBlocker: null,
+    founderJudgmentRequired: false,
+    controls: 'show-only',
+  },
 };
 
 function json(body: unknown, status = 200) {
@@ -124,6 +141,7 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
           alerts: ['61 harness-failed runs in 24h'],
           heldByReason: { 'gate-check-failed': 10, 'missing-test': 2 },
           failedByReason: { legacy: 28 },
+          capacity: LANES_FEED.capacity,
           lanes: [
             { name: 'devin', running: 4, slots: 4 },
             { name: 'hyperagent', running: 0, slots: 2 },

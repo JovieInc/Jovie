@@ -530,6 +530,58 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(len(self.ledger()), 1)
 
 
+class CapacityHorizonTest(unittest.TestCase):
+    def test_one_receipt_covers_deadlines_routes_value_gaps_and_idle_incident(self):
+        now = 1_000.0
+
+        def account(remaining=50, deadline=None, *, credits=None, access=None, payment=False, available=True, observed="1970-01-01T00:16:40Z"):
+            lease = {
+                "provider": "openai", "planType": "pro", "usableCapacityRemaining": {"primary": {"remainingPercent": remaining}},
+                "compatibility": {"cli": "codex", "harness": "symphony"},
+                "nextNaturalResetAt": deadline, "earliestAccessLossAt": access,
+                "credits": {"availableCount": len(credits or []), "details": credits or []},
+                "subscription": {"paymentFailure": payment}, "usableBeforeUnavailability": 20,
+                "throughput": {"estimatedDrainTimeS": 600, "sustainablePercentPerHour": 12,
+                               "concurrency": 2, "fresh": True, "confidence": "observed"},
+                "sources": {"capacity": {"observedAt": observed}},
+            }
+            return {"available": available, "capacityLease": lease}
+
+        accounts = {
+            "private@example.com": account(deadline=2000),
+            "banked": account(deadline=2100, credits=[{"kind": "bankedReset"}, {"kind": "bankedReset"}]),
+            "grace": account(deadline=4000, access=1500, payment=True),
+            "promo": account(deadline=4000, credits=[{"kind": "promotional", "capacityLossAt": 1200}]),
+            "inaccessible": account(deadline=1300, available=False),
+            "unknown": account(deadline=None),
+            "stale": account(deadline=1100, observed="1969-12-31T20:00:00Z"),
+        }
+        route = {"schema": "jovie.capacity-route-receipt/v1", "selectedJob": "JOV-9",
+                 "selectedRoute": "codex", "selectedLeaseId": "codex:private@example.com",
+                 "alternativesConsidered": [], "marginalValue": None,
+                 "expectedCertifiedOutcome": "draft-pr-passing-repository-gate", "drainMode": "fast",
+                 "modeTrigger": "deadline-risk", "reason": "highest compatible value",
+                 "replanConditions": ["forecast-change"], "sourceGaps": []}
+        horizon = lane.capacity_horizon(
+            {"accounts": accounts}, [{"capacityRouteReceipt": route, "verdict": "landing"}],
+            ["JOV-9"], idle_seconds=301, now=now)
+
+        self.assertEqual((horizon["schema"], horizon["controls"]),
+                         ("jovie.capacity-horizon/v1", "show-only"))
+        self.assertEqual({row["event"]["kind"] for row in horizon["leases"]},
+                         {"natural-reset", "access-loss", "promo-expiry", "unknown"})
+        self.assertIn("payment grace ends", [row["event"]["label"] for row in horizon["leases"]])
+        self.assertNotIn("private@example.com", json.dumps(horizon))
+        selected = next(row for row in horizon["leases"] if row["route"])
+        self.assertEqual((selected["mode"], selected["forecast"]["projectedUnused"],
+                          selected["outcomes"]["certified"], selected["subscriptionStatus"],
+                          selected["forecast"]["sustainablePercentPerHour"]), ("fast", 30, 1, "active", 12))
+        self.assertEqual([row["kind"] for row in horizon["incidents"]].count("idle-with-qualified-work"), 1)
+        self.assertEqual([row["kind"] for row in horizon["incidents"]].count("source-contract"), 1)
+        stale = next(row for row in horizon["leases"] if row["freshness"]["status"] == "stale")
+        self.assertIsNone(stale["event"]["countdownSeconds"])
+
+
 class AttributionAndThroughputTest(unittest.TestCase):
     def test_receipts_outrank_branch_prefixes_and_preserve_distinct_roles(self):
         merged = {"number": 9, "headRefName": "codex/manual-looking", "createdAt": "2026-09-28T10:00:00Z",

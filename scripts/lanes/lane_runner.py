@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -277,6 +278,130 @@ def provider_throughput(receipts: list[dict], provider_names=(), merged_prs: lis
     return {"schema": "jovie-provider-throughput/v1", "windowHours": 24,
             "providers": metrics, "landedByAttribution": dict(sorted(landed_categories.items())),
             "landedByOrigin": dict(sorted(landed_origins.items()))}
+
+
+def capacity_horizon(codex_status: dict, receipts: list[dict], qualified_work=(),
+                     idle_seconds: int = 0, now: float | None = None) -> dict:
+    """One show-only receipt consumed unchanged by Ovi and the Gem HUD."""
+    now = time.time() if now is None else now
+    qualified = [str(job) for job in qualified_work if re.fullmatch(r"JOV-\d+", str(job))][:20]
+    routes = {}
+    for receipt in receipts:
+        route = receipt.get("capacityRouteReceipt") or {}
+        if route.get("schema") == "jovie.capacity-route-receipt/v1" and route.get("selectedLeaseId"):
+            routes[route["selectedLeaseId"]] = (route, receipt)
+
+    leases, source_incidents = [], []
+    for account, account_status in (codex_status.get("accounts") or {}).items():
+        lease = account_status.get("capacityLease") or {}
+        lease_id = lease.get("leaseId") or f"codex:{account}"
+        safe_alias = account if re.fullmatch(r"[A-Za-z0-9_-]{1,32}", account) else \
+            f"codex-{hashlib.sha256(account.encode()).hexdigest()[:8]}"
+        public_lease_id = f"codex:{safe_alias}"
+        windows = [row for row in (lease.get("usableCapacityRemaining") or {}).values()
+                   if isinstance(row, dict) and isinstance(row.get("remainingPercent"), (int, float))]
+        remaining = min((row["remainingPercent"] for row in windows), default=None)
+        candidates = []
+        if isinstance(lease.get("nextNaturalResetAt"), (int, float)):
+            candidates.append((lease["nextNaturalResetAt"], "natural-reset", "natural reset"))
+        if isinstance(lease.get("earliestAccessLossAt"), (int, float)):
+            payment = (lease.get("subscription") or {}).get("paymentFailure")
+            candidates.append((lease["earliestAccessLossAt"], "access-loss",
+                               "payment grace ends" if payment else "access loss"))
+        for credit in (lease.get("credits") or {}).get("details") or []:
+            expiry = credit.get("capacityLossAt") or credit.get("redemptionDeadline")
+            if isinstance(expiry, (int, float)):
+                promo = credit.get("kind") == "promotional"
+                candidates.append((expiry, "promo-expiry" if promo else "banked-expiry",
+                                   "hard promo expiry" if promo else "banked expiry"))
+        deadline, event_kind, event_label = min(candidates, default=(None, "unknown", "semantics unknown"))
+        throughput = lease.get("throughput") or {}
+        drain_seconds = throughput.get("estimatedDrainTimeS")
+        subscription, compatibility = lease.get("subscription") or {}, lease.get("compatibility") or {}
+        plan = lease.get("planType")
+        subscription_status = "payment-grace" if subscription.get("paymentFailure") else "ending" if subscription.get("canceledAtPeriodEnd") else "active" if plan not in (None, "free", "unknown") else "inactive" if plan == "free" else "unknown"
+        usable = lease.get("usableBeforeUnavailability")
+        unused = round(max(0, remaining - usable), 1) \
+            if isinstance(remaining, (int, float)) and isinstance(usable, (int, float)) else None
+        route, execution = routes.get(lease_id, ({}, {}))
+        public_route = ({"schema": route.get("schema"), "selectedJob": route.get("selectedJob"),
+                         "selectedRoute": route.get("selectedRoute"), "selectedLeaseId": public_lease_id,
+                         "alternativesConsidered": [value for value in (route.get("alternativesConsidered") or [])
+                                                    if re.fullmatch(r"[A-Za-z0-9:_-]{1,64}", str(value))],
+                         "marginalValue": route.get("marginalValue"),
+                         "expectedCertifiedOutcome": route.get("expectedCertifiedOutcome"),
+                         "drainMode": route.get("drainMode"), "modeTrigger": route.get("modeTrigger"),
+                         "reason": route.get("reason"), "replanConditions": route.get("replanConditions", []),
+                         "sourceGaps": route.get("sourceGaps", [])} if route else None)
+        verdict = execution.get("verdict")
+        outcomes = {key: 0 for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")}
+        if verdict in ("landing", "verified-not-queued"):
+            outcomes["certified"] = 1
+        elif verdict == "duplicate-active":
+            outcomes["duplicate"] = 1
+        elif execution.get("kind") == "fix-red":
+            outcomes["retry"] = 1
+        elif verdict in ("failed", "provider-error", "fix-no-change"):
+            outcomes["failed"] = 1
+        elif execution.get("pr"):
+            outcomes["useful"] = 1
+        elif execution:
+            outcomes["unknown"] = 1
+        freshness = ((lease.get("sources") or {}).get("capacity") or {}).get("observedAt")
+        try: observed = datetime.fromisoformat(freshness.replace("Z", "+00:00")).timestamp()
+        except (AttributeError, ValueError): observed = None
+        freshness_status = "unknown" if observed is None else "contradictory" if observed > now + 60 else "stale" if now - observed > 7200 else "fresh"
+        bottleneck = ("capacity source missing" if not lease else
+                      f"capacity source {freshness_status}" if freshness_status != "fresh" else
+                      "deadline semantics unknown" if deadline is None else
+                      "drain evidence stale or missing" if not throughput.get("fresh") else
+                      "compatible qualified work not observed" if not qualified else
+                      "projected unused capacity" if unused else None)
+        leases.append({
+            "leaseId": public_lease_id, "alias": safe_alias, "sourcePresent": bool(lease),
+            "available": bool(account_status.get("available")),
+            "provider": lease.get("provider") or "openai", "usableRemaining": remaining,
+            "subscriptionStatus": subscription_status,
+            "compatibility": {"cli": compatibility.get("cli"), "harness": compatibility.get("harness"),
+                              "models": compatibility.get("models") or [], "restrictions": compatibility.get("restrictions") or []},
+            "concurrency": throughput.get("concurrency"),
+            "bankedCount": (lease.get("credits") or {}).get("availableCount"),
+            "event": {"kind": event_kind, "label": event_label,
+                      "at": datetime.fromtimestamp(deadline, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                      if deadline is not None else None,
+                      "countdownSeconds": max(0, int(deadline - now)) if deadline is not None and freshness_status == "fresh" else None},
+            "forecast": {"schema": "jovie.drain-forecast/v1",
+                         "completionP50At": datetime.fromtimestamp(now + drain_seconds, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                         if isinstance(drain_seconds, (int, float)) else None,
+                         "completionP90At": None, "sustainablePercentPerHour": throughput.get("sustainablePercentPerHour"),
+                         "burstPercentPerHour": throughput.get("burstPercentPerHour"),
+                         "usableBeforeUnavailability": usable, "projectedUnused": unused,
+                         "qualifiedWork": qualified, "bottleneck": bottleneck},
+            "route": public_route, "mode": route.get("drainMode", "unknown"),
+            "outcomes": outcomes,
+            "freshness": {"observedAt": freshness, "status": freshness_status,
+                          "confidence": throughput.get("confidence", "unknown")},
+        })
+        if deadline is not None and deadline - now <= 7200 and freshness_status in ("stale", "contradictory"):
+            source_incidents.append({"schema": "jovie.capacity-expiry-incident/v1", "incidentId": f"{public_lease_id}:source:{deadline}", "leaseId": public_lease_id, "kind": "source-contract", "unusedAmount": unused, "hardConstraint": "stale-or-contradictory-input", "staleOrMissingInput": True, "idleIntervalSeconds": 0, "rootCause": f"capacity source {freshness_status} near deadline", "remediationOwner": "symphony-lanes", "jobEvidence": qualified})
+    leases.sort(key=lambda row: (row["event"]["at"] is None, row["event"]["at"] or "", row["leaseId"]))
+    incidents = source_incidents
+    available = [row for row in leases if row["sourcePresent"] and row["available"]]
+    if idle_seconds >= 300 and qualified and available:
+        row = available[0]
+        incidents.append({"schema": "jovie.capacity-expiry-incident/v1",
+                          "incidentId": f"{row['leaseId']}:idle:{row['event']['at'] or 'unknown-generation'}",
+                          "leaseId": row["leaseId"], "kind": "idle-with-qualified-work",
+                          "unusedAmount": row["forecast"]["projectedUnused"], "hardConstraint": "symphony-idle",
+                          "staleOrMissingInput": row["freshness"]["status"] != "fresh",
+                          "idleIntervalSeconds": idle_seconds, "rootCause": "usable lease and qualified work coexist without a worker",
+                          "remediationOwner": "symphony-lanes", "jobEvidence": qualified})
+    top = incidents[0]["rootCause"] if incidents else next(
+        (row["forecast"]["bottleneck"] for row in leases if row["forecast"]["bottleneck"]), None)
+    totals = {key: sum(row["outcomes"][key] for row in leases) for key in ("useful", "certified", "duplicate", "retry", "failed", "unknown")}
+    return {"schema": "jovie.capacity-horizon/v1", "generatedAt": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "leases": leases,
+            "outcomes": totals, "incidents": incidents, "topBlocker": top, "founderJudgmentRequired": False,
+            "controls": "show-only"}
 
 
 def execution_coordination(sha: str) -> dict:
@@ -788,6 +913,18 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     evidence = read_provider_evidence(provider_evidence)
     if evidence:
         receipt["providerEvidence"] = evidence
+        leased = next((row for row in reversed(evidence) if row.get("event") == "account-leased"), None)
+        if leased:
+            receipt["capacityRouteReceipt"] = {
+                "schema": "jovie.capacity-route-receipt/v1", "selectedJob": issue.identifier,
+                "selectedRoute": name, "selectedLeaseId": f"codex:{leased['account']}",
+                "alternativesConsidered": [], "marginalValue": None,
+                "expectedCertifiedOutcome": "draft-pr-passing-repository-gate", "drainMode": "normal",
+                "modeTrigger": "routine-qualified-work-dispatch",
+                "reason": "least-recently-used available compatible account lease",
+                "replanConditions": ["rate-limit", "usage-limit", "authentication-failure"],
+                "sourceGaps": ["allocator alternatives and marginal value not recorded"],
+            }
     receipt["endedAt"] = now_iso()
     verdict = receipt.get("verdict")
     receipt["result"] = {"verdict": verdict, "commit": receipt.get("headSha"), "pr": receipt.get("pr"),
