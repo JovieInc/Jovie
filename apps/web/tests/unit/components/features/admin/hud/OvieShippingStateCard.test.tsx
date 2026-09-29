@@ -231,6 +231,7 @@ describe('OvieShippingStateCard', () => {
       )
     ).toBeTruthy();
     expect(screen.getByText('61 harness-failed runs in 24h')).toBeTruthy();
+    expect(screen.getByText('Capacity source gap')).toBeTruthy();
     for (const label of LABELS) {
       expect(screen.getByText(label)).toBeTruthy();
     }

@@ -1,3 +1,4 @@
+import { parseCapacityHorizon } from './client';
 import {
   DELIVERY_MERGE_REPOS,
   type DeliveryLane,
@@ -841,6 +842,7 @@ export function parseLanesStatus(
     alerts,
     heldByReason: countRecord(payload.held_by_reason),
     failedByReason: countRecord(payload.failed_by_reason),
+    capacity: parseCapacityHorizon(payload.capacity),
     publishedAt,
     stale: false,
   };
