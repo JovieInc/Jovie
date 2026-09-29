@@ -993,6 +993,11 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
         ['[data-testid="profile-pac"]'],
         SMOKE_TIMEOUTS.NAVIGATION
       );
+      await expect(page.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-visitor-assignment-resolved',
+        'true'
+      );
+      await expect(page.getByTestId('profile-compact-surface')).toBeVisible();
       await settleLayout(page);
 
       const readGeometry = () =>
