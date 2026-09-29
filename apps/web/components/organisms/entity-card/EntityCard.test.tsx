@@ -136,6 +136,11 @@ describe('EntityCard', () => {
     expect(screen.getByText('Jul')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    // JOV-INV-019 image-contrast: the pill sits on the card's own gradient
+    // artStyle background, so the date text needs a guaranteed-opaque well
+    // (bg-surface-0) underneath it, not a translucent one.
+    const dayPill = screen.getByText('4').closest('div');
+    expect(dayPill).toHaveClass('bg-surface-0');
   });
 
   it('renders a plain container when there is no href or cta target', () => {

@@ -619,6 +619,23 @@ class GapTest(unittest.TestCase):
         self.assertEqual(rows[3]["state"], "hold:hold")
         self.assertEqual(rows[4]["state"], "draft")
 
+    def test_stale_draft_disposition_names_the_real_next_step(self):
+        """JOV-7132: a draft idle past the 48h SLO is not "inside the SLO". Non-agent
+        branches are never closed by the sweep; young agent drafts close at the 7d SLO."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        prs = [
+            self.node(30, isDraft=True, headRefName="feat/jov-6507-thing",
+                      createdAt="2033-05-10T00:00:00Z", updatedAt="2033-05-14T00:00:00Z"),
+            self.node(31, isDraft=True, headRefName="codex/wip",
+                      createdAt="2033-05-15T00:00:00Z", updatedAt="2033-05-15T00:00:00Z"),
+        ]
+        plan = events.reconcile_plan(prs, {}, set(), 2, now)
+        rows = {row["pr"]: row for row in plan["dispositions"]}
+        self.assertEqual(rows[30]["state"], "draft")
+        self.assertEqual(rows[30]["reason"], "past the 48h stale SLO")
+        self.assertIn("never closes non-agent drafts", rows[30]["next"])
+        self.assertEqual(rows[31]["next"], "closes as abandoned at the 7d age SLO")
+
     def test_reconcile_applies_the_plan_on_its_own_cadence(self):
         page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [
             {**self.node(1, mergeStateStatus="DIRTY"), "commits": {"nodes": [{"commit": {"statusCheckRollup": None}}]},

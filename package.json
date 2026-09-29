@@ -209,6 +209,7 @@
     "clean": "node scripts/turbo-local.mjs clean && rm -rf node_modules",
     "prepare": "if [ -e .git ]; then bash scripts/hooks/configure-git-hooks.sh; fi",
     "next:proxy-guard": "pnpm --filter=@jovie/web run next:proxy-guard",
+    "design-ci:judge-matrix": "pnpm --filter=@jovie/web run design-ci:judge-matrix",
     "typecheck:web:fast": "pnpm --filter @jovie/web run typecheck -- --pretty false",
     "typecheck:web:tests": "pnpm --filter @jovie/web run typecheck:tests",
     "typecheck:web:tests:update": "pnpm --filter @jovie/web run typecheck:tests:update",
