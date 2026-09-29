@@ -12,6 +12,7 @@ import {
 } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
@@ -63,11 +64,27 @@ export interface AuthGateResult {
   };
 }
 
+/**
+ * PR visual review (JOV-5387) signals this lane via the build-time
+ * NEXT_PUBLIC_E2E_MODE flag. The screen-certification producer job
+ * (JOV-7126) is a second secretless-capture caller that authenticates a
+ * server-only synthetic persona instead — it must not need to flip a
+ * client-inlined flag (which would also change the marketing screenshot
+ * catalog's rendered bytes) just to unblock its own admin-gated routes.
+ * `isVisualCaptureSyntheticAuthEnabled()` is server-only and already scopes
+ * exactly this "no reachable DB" contract for admin/roles.ts and
+ * auth/ban-check.ts, so it is accepted here as an equivalent signal.
+ */
 function canUseE2ETestAuthFallback(): boolean {
+  if (
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' ||
+    process.env.VERCEL_ENV === 'preview'
+  ) {
+    return false;
+  }
   return (
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
-    process.env.VERCEL_ENV !== 'preview'
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    isVisualCaptureSyntheticAuthEnabled()
   );
 }
 

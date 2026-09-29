@@ -79,6 +79,19 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
   'web.artists': '/artists',
+  // JOV-7126: `?fs=1` is the *only* way to reach this screen's registered
+  // source (apps/web/app/hud/page.tsx). Plain `/hud` is rewritten
+  // (next.config.js beforeFiles, `missing: [fs=1, kiosk, mode=kiosk]`) onto
+  // the app-shell-wrapped `web.ov-hud-shell` screen instead. The isolated
+  // layout (apps/web/app/hud/layout.tsx) also never renders
+  // DashboardShellContent, so this route is the one authenticated app-shell
+  // screen that does not hit the passkey/Touch ID admin step-up lock
+  // (lib/admin/mfa.ts hasRecentAdminMfaReverification) — that lock fails
+  // closed by design and correctly has no synthetic-capture bypass, which is
+  // why every other admin screen under apps/web/app/app/(shell)/admin/ is
+  // out of scope for this producer until a human decides how (or whether)
+  // to give it one.
+  'web.hud-isolated': '/hud?fs=1',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
