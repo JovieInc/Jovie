@@ -36,6 +36,9 @@
 # - Triage does not depend on the enable job; it is a separate scheduled run.
 # - Fork PRs: `pull_request` grants a read-only GITHUB_TOKEN, so enable is
 #   skipped with a notice rather than a guaranteed red check.
+# - Dependabot PRs: repo secrets (incl. JOVIE_BOT_PRIVATE_KEY) are withheld on
+#   `pull_request` events, so the app-token step is skipped; enable falls back
+#   to dependabot-auto-merge.yml and the hourly triage sweep.
 
 name: Auto-Merge Default
 # clock-class: temporal-resource
@@ -80,6 +83,12 @@ jobs:
         # GitHub starts no workflows for events GITHUB_TOKEN creates, and auto-merge enqueues
         # as the actor that enabled it, so GITHUB_TOKEN-enabled PRs built merge groups with no
         # CI that sat at the queue head (#18873, #18960, #19048 on 2026-09-28).
+        # Secrets are absent on pull_request runs from forks and dependabot[bot]; those PRs
+        # are covered by dependabot-auto-merge.yml (pull_request_target) and the hourly
+        # triage sweep's --enable-missing, so this step is skipped instead of failing.
+        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -93,6 +102,10 @@ jobs:
           BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::notice::No token available (fork or Dependabot PR) — dependabot-auto-merge.yml and the hourly triage sweep enable auto-merge; skipping."
+            exit 0
+          fi
           if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
             echo "::notice::Fork PR — GITHUB_TOKEN is read-only on pull_request events from forks; skipping auto-merge enable."
             exit 0
