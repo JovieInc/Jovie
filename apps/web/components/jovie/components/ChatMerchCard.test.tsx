@@ -186,10 +186,11 @@ describe('ChatMerchCard', () => {
         'Draft card is in Library as a draft until Printful and pricing checks pass.'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('Open Library')).toHaveAttribute(
-      'href',
-      '/app/library?view=merch'
-    );
+    const openLibrary = screen.getByText('Open Library');
+    expect(openLibrary).toHaveAttribute('href', '/app/library?view=merch');
+    // JOV-6774: canonical --color-border-focus token, not legacy --linear-*.
+    expect(openLibrary.className).toContain('--color-border-focus');
+    expect(openLibrary.className).not.toContain('linear-border');
   });
 
   it('submits same-design alternative item prompts from the saved card', () => {

@@ -96,6 +96,14 @@ class SelectionTest(unittest.TestCase):
         self.assertIsNone(lane.pick_issue([sensitive], {}, provider="devin"))
         self.assertEqual(lane.pick_issue([sensitive], {}, provider="codex").identifier, "JOV-9")
 
+    def test_codex_lane_never_runs_review_only_tasks(self):
+        # JOV-6896: codex bills review turns; adopt/gate claims go to other lanes.
+        for kind in lane.REVIEW_ONLY_KINDS:
+            self.assertFalse(lane.provider_may_run("codex", kind), kind)
+            self.assertTrue(lane.provider_may_run("devin", kind), kind)
+        self.assertTrue(lane.provider_may_run("codex", "issue"))
+        self.assertTrue(lane.provider_may_run("codex", "fix-red"))
+
     def test_guarded_lane_still_rejects_red_lines(self):
         secret = issue("JOV-9", labels=["infra"])
         secret.title = "Rotate production credentials"
@@ -122,6 +130,15 @@ class PromptTest(unittest.TestCase):
             prompt = lane.render_prompt(issue(labels=labels), "codex/jov-1", "")
             self.assertIn(f"at or under {lane.MAX_REVIEWABLE_LINES} lines", prompt)
             self.assertIn("ship one coherent slice per PR", prompt)
+
+    def test_codex_contract_forbids_posting_pr_reviews(self):
+        prompt = lane.render_prompt(issue(), "codex/jov-1", "", provider="codex")
+        self.assertIn("implementation-only", prompt)
+        self.assertIn("gh pr review", prompt)
+        self.assertNotIn("implementation-only", lane.render_prompt(issue(), "devin/jov-1", "", provider="devin"))
+        sensitive = lane.render_prompt(issue(labels=["area:auth"]), "codex/jov-1", "", provider="codex")
+        self.assertIn("implementation-only", sensitive)
+        self.assertIn("llm-review", sensitive)
 
     def test_sensitive_contract_names_guarded_gates_and_red_lines(self):
         prompt = lane.render_prompt(issue(labels=["area:auth"]), "codex/jov-1", "")

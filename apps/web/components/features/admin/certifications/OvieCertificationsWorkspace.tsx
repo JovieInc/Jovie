@@ -464,7 +464,6 @@ export function OvieCertificationsWorkspace() {
       data-testid='ovie-certifications-page'
       contentClassName='min-h-0'
     >
-      <h1 className='sr-only'>Certifications</h1>
       <div className='flex h-full min-h-0 flex-col'>
         <AdminTableSubheader
           className='border-b border-(--app-shell-frame-seam)'

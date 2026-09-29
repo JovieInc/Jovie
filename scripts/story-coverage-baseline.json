@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
   "direction": "lock_up",
-  "updatedAt": "2026-09-28T23:52:00.000Z",
+  "updatedAt": "2026-09-29T01:13:34.297Z",
   "note": "Coverage % and uncovered floors may only improve. Run `pnpm story-coverage:update` after adding stories. New components without stories fail even if % holds.",
   "roots": {
     "packages/ui/atoms": {
       "percent": 100,
-      "covered": 38,
-      "total": 38,
+      "covered": 39,
+      "total": 39,
       "uncovered": 0
     },
     "packages/ui": {
@@ -23,34 +23,34 @@
       "uncovered": 6
     },
     "apps/web/components/molecules": {
-      "percent": 51.3,
-      "covered": 59,
-      "total": 115,
-      "uncovered": 56
+      "percent": 99.21,
+      "covered": 125,
+      "total": 126,
+      "uncovered": 1
     },
     "apps/web/components/organisms": {
-      "percent": 39.56,
-      "covered": 72,
-      "total": 182,
-      "uncovered": 110
+      "percent": 70.21,
+      "covered": 132,
+      "total": 188,
+      "uncovered": 56
     },
     "apps/web/components/marketing": {
-      "percent": 34.43,
-      "covered": 21,
-      "total": 61,
-      "uncovered": 40
+      "percent": 59.15,
+      "covered": 42,
+      "total": 71,
+      "uncovered": 29
     },
     "apps/web/components/site": {
       "percent": 100,
-      "covered": 13,
-      "total": 13,
+      "covered": 16,
+      "total": 16,
       "uncovered": 0
     },
     "apps/web/components": {
-      "percent": 17.95,
-      "covered": 247,
-      "total": 1376,
-      "uncovered": 1129
+      "percent": 58.79,
+      "covered": 846,
+      "total": 1439,
+      "uncovered": 593
     }
   }
 }

@@ -11,7 +11,7 @@ import React, {
   useState,
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -90,7 +90,7 @@ export interface UnifiedTableProps<TData extends RowData> {
 
   /**
    * Estimated row height for virtualization
-   * @default 32
+   * @default 40
    */
   readonly rowHeight?: number;
 
@@ -406,7 +406,7 @@ export function UnifiedTable<TData extends RowData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 32,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
   overscan = 5,
   renderRow,
   getRowId,
@@ -735,7 +735,7 @@ export function UnifiedTable<TData extends RowData>({
     return (
       <div
         ref={setTableContainerRef}
-        className={cn('overflow-auto', containerClassName)}
+        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
         <table className={tableClassName} style={{ minWidth }}>
@@ -761,7 +761,7 @@ export function UnifiedTable<TData extends RowData>({
     return (
       <div
         ref={setTableContainerRef}
-        className={cn('overflow-auto', containerClassName)}
+        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
         <table className={tableClassName} style={{ minWidth }}>
@@ -786,7 +786,7 @@ export function UnifiedTable<TData extends RowData>({
     return (
       <div
         ref={setTableContainerRef}
-        className={cn('overflow-auto', containerClassName)}
+        className={cn('w-full min-w-0 overflow-auto', containerClassName)}
       >
         {sortStatusNode}
         <table className={tableClassName} style={{ minWidth }}>
@@ -812,7 +812,7 @@ export function UnifiedTable<TData extends RowData>({
   return (
     <div
       ref={setTableContainerRef}
-      className={cn('overflow-auto', containerClassName)}
+      className={cn('w-full min-w-0 overflow-auto', containerClassName)}
     >
       {sortStatusNode}
       <table className={tableClassName} style={{ minWidth }}>

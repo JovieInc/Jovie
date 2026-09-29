@@ -461,6 +461,9 @@ describe('POST reject (real handler)', () => {
     dbMockState.updateSetCalls.length = 0;
     dbMockState.updateError = null;
     dbMockState.insertError = null;
+    dbMockState.selectResultQueue.push([
+      { kind: 'calendar_booking', status: 'pending' },
+    ]);
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockRecordInboxDecision.mockResolvedValue({ id: 'feedback-1' });
   });
@@ -527,6 +530,7 @@ describe('POST reject (real handler)', () => {
 
   it('second reject: 409 already-decided', async () => {
     dbMockState.updateReturningQueue.push([]); // CAS missed
+    dbMockState.selectResultQueue.push([{ status: 'approved' }]);
 
     const response = await rejectPOST(
       makeRejectRequest(),

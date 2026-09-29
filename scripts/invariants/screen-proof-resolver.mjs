@@ -97,6 +97,25 @@ export function marketingArtifactName(headSha) {
     ? `marketing-route-screenshots-${headSha.toLowerCase()}`
     : null;
 }
+/**
+ * Non-marketing (`SCREEN_PROOF_ROUTES`-style) screen-proof artifacts are
+ * named per screen so two dedicated single-screen producers never collide
+ * inside one workflow run's artifact namespace. `web.public-profile` keeps
+ * the original bare `PRODUCER.artifact` name — it predates this per-screen
+ * scheme and already has landed workflow history and receipts bound to it.
+ * @param {unknown} screenId
+ * @returns {string | null} the exact trusted artifact name, or null when
+ *   `screenId` cannot be turned into one
+ */
+export function screenProofArtifactName(screenId) {
+  if (screenId === 'web.public-profile') return PRODUCER.artifact;
+  if (typeof screenId !== 'string') return null;
+  const dot = screenId.indexOf('.');
+  if (dot === -1 || dot === screenId.length - 1) return null;
+  const suffix = screenId.slice(dot + 1);
+  if (!/^[a-z0-9-]+$/.test(suffix)) return null;
+  return `${PRODUCER.artifact}-${suffix}`;
+}
 function run(command, args, binary = false) {
   const result = spawnSync(command, args, {
     encoding: binary ? undefined : 'utf8',
@@ -354,7 +373,8 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
         item.head_sha?.toLowerCase() === context.headSha.toLowerCase()
     );
     const trustedName =
-      artifact.name === PRODUCER.artifact || artifact.name === marketingName;
+      artifact.name === marketingName ||
+      artifact.name === screenProofArtifactName(context.screenId);
     const currentRunId = Number(process.env.GITHUB_RUN_ID);
     const currentAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
     const completedRun = workflowRun.conclusion === 'success';

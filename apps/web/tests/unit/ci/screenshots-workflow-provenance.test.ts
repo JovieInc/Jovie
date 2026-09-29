@@ -200,6 +200,45 @@ describe('Product Screenshots provenance cleanliness', () => {
     ).toBeLessThan(stepIndex(workflow, 'Certify exact screen captures'));
   });
 
+  it('emits and certifies a source-bound /artists browser proof', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture /artists screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind /artists proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload /artists screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/artists/**'");
+    expect(workflow).toContain(
+      'artists-artifact-id: ${{ steps.artists-proof.outputs.artifact-id }}'
+    );
+    expect(capture).toContain('artists-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.artists');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    expect(bind).toContain('if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]');
+    expect(bind).toContain('Could not resolve the current producer job ID.');
+    expect(bind).toContain('exit 1');
+    expect(upload).toContain('name: screen-browser-proof-artists');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.artists');
+    expect(certify).toContain('needs.generate.outputs.artists-artifact-id');
+    expect(
+      stepIndex(workflow, 'Capture public-profile screen proof')
+    ).toBeLessThan(stepIndex(workflow, 'Capture /artists screen proof'));
+    expect(stepIndex(workflow, 'Upload /artists screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Certify exact screen captures')
+    );
+    expect(stepIndex(workflow, 'Upload /artists screen proof')).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
   it('still emits a blocked receipt when screenshot generation fails', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const certifyJob = workflow.slice(workflow.indexOf('\n  certify:'));

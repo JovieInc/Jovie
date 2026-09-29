@@ -51,19 +51,21 @@ export default async function ArtistsPage({
 function renderFallback() {
   return (
     <StandaloneProductPage width='lg' centered>
-      <ContentSurfaceCard surface='details' className='overflow-hidden'>
-        <ContentSectionHeader
-          density='compact'
-          headingLevel='h1'
-          title='Profiles are loading'
-          subtitle='Please check back shortly once the connection is available.'
-        />
-        <div className='px-5 py-8 text-center sm:px-6'>
-          <p className='text-app leading-5 text-secondary-token'>
-            Public creator data is temporarily unavailable.
-          </p>
-        </div>
-      </ContentSurfaceCard>
+      <div data-testid='artists-directory'>
+        <ContentSurfaceCard surface='details' className='overflow-hidden'>
+          <ContentSectionHeader
+            density='compact'
+            headingLevel='h1'
+            title='Profiles are loading'
+            subtitle='Please check back shortly once the connection is available.'
+          />
+          <div className='px-5 py-8 text-center sm:px-6'>
+            <p className='text-app leading-5 text-secondary-token'>
+              Public creator data is temporarily unavailable.
+            </p>
+          </div>
+        </ContentSurfaceCard>
+      </div>
     </StandaloneProductPage>
   );
 }
