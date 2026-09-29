@@ -1,7 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const poolMocks = vi.hoisted(() => {
+  const query = vi.fn().mockResolvedValue({ rows: [] });
+  const end = vi.fn().mockResolvedValue(undefined);
+  return { query, end };
+});
+
+vi.mock('@neondatabase/serverless', () => {
+  class MockPool {
+    query = poolMocks.query;
+    end = poolMocks.end;
+  }
+  return {
+    neonConfig: { webSocketConstructor: undefined },
+    Pool: MockPool,
+  };
+});
+
 import {
   computeMigrationDrift,
   planLedgerRepair,
+  repairLedger,
 } from '@/scripts/verify-db-migrations';
 
 const journal = [
@@ -10,6 +29,11 @@ const journal = [
 ];
 
 describe('migration drift verifier', () => {
+  beforeEach(() => {
+    poolMocks.query.mockClear();
+    poolMocks.end.mockClear();
+  });
+
   it('accepts the immutable journal and matching prior-release ledger', () => {
     expect(
       computeMigrationDrift(journal, [
@@ -54,5 +78,38 @@ describe('migration drift verifier', () => {
 
     expect(plan.deleteRows).toEqual([]);
     expect(plan.insertRows).toEqual([]);
+  });
+
+  it('repairs the ledger with journal-hash inserts, then closes the pool', async () => {
+    const drift = computeMigrationDrift(journal, [
+      { hash: 'baseline-hash', created_at: 1 },
+      { hash: 'rewritten-hash', created_at: 2 },
+    ]);
+
+    await repairLedger('postgres://ephemeral', journal, drift);
+
+    expect(poolMocks.query.mock.calls).toEqual([
+      [
+        'DELETE FROM drizzle.__drizzle_migrations WHERE hash = $1',
+        ['rewritten-hash'],
+      ],
+      [
+        'INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)',
+        ['guard-hash', 2],
+      ],
+    ]);
+    expect(poolMocks.end).toHaveBeenCalledOnce();
+  });
+
+  it('still closes the pool when the plan has no writes', async () => {
+    const drift = computeMigrationDrift(journal, [
+      { hash: 'baseline-hash', created_at: 1 },
+      { hash: 'guard-hash', created_at: 2 },
+    ]);
+
+    await repairLedger('postgres://ephemeral', journal, drift);
+
+    expect(poolMocks.query).not.toHaveBeenCalled();
+    expect(poolMocks.end).toHaveBeenCalledOnce();
   });
 });

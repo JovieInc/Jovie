@@ -180,7 +180,7 @@ function printReport(report: DriftReport): void {
  * repair; this only rewrites drizzle.__drizzle_migrations bookkeeping — it
  * never touches schema and must never run against a shared database.
  */
-async function repairLedger(
+export async function repairLedger(
   databaseUrl: string,
   journal: (JournalEntry & { hash: string })[],
   report: DriftReport
