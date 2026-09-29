@@ -842,15 +842,29 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
               "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"}
-    claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
-                                      {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
-                                       "model": spec.get("model"), "tool": "lane_runner", "accountPool": name},
-                                      policy, {"triggerId": run_id, "correlationId": issue.identifier,
-                                               "causationId": issue.id}, coordination=coordination)
-    receipt["execution"] = claimed
-    if not claimed["admitted"]:
+    try:
+        claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
+                                          {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
+                                           "model": spec.get("model"), "tool": "lane_runner", "accountPool": name},
+                                          policy, {"triggerId": run_id, "correlationId": issue.identifier,
+                                                   "causationId": issue.id}, coordination=coordination)
+    except Exception as error:
+        # A claim that never lands used to kill the worker before any receipt existed:
+        # the issue it already moved to In Progress stranded there, nothing reached the
+        # ledger, and the doctor only saw spawn-exit (JOV-7191). A failed receipt feeds
+        # the normal verdict path, which returns the issue to Todo.
+        receipt.update(verdict="failed", reasons=[f"claim-error:{type(error).__name__}:{error}"[:300]])
+    else:
+        receipt["execution"] = claimed
+    if not receipt.get("verdict") and not claimed["admitted"]:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
-                       reasons=[claimed["reason"]], endedAt=now_iso())
+                       reasons=[claimed["reason"]])
+    if receipt.get("verdict"):
+        verdict = receipt["verdict"]
+        receipt.update(endedAt=now_iso(),
+                       result={"verdict": verdict, "commit": None, "pr": None, "prUrl": None})
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
         return receipt
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
@@ -1367,18 +1381,29 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
                                        {"repository": REPO_SLUG, "pr": pr["number"], "failure": failure},
                                        {"headSha": pr["headRefOid"]})
     coordination = execution_coordination(pr["headRefOid"])
-    claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
-                                      {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
-                                       "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
-                                      {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
-                                       "spend": MAX_FIX_ATTEMPTS, "mutations": MAX_FIX_ATTEMPTS * 2,
-                                       "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
-                                      {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
-                                       "causationId": pr["headRefOid"]}, coordination=coordination)
-    receipt["execution"] = claimed
-    if not claimed["admitted"]:
+    try:
+        claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
+                                          {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
+                                           "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
+                                          {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
+                                           "spend": MAX_FIX_ATTEMPTS, "mutations": MAX_FIX_ATTEMPTS * 2,
+                                           "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
+                                          {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
+                                           "causationId": pr["headRefOid"]}, coordination=coordination)
+    except Exception as error:
+        # Same contract as run_issue (JOV-7191): a claim failure must leave a ledger
+        # receipt instead of a worker exit the doctor can only see as spawn-exit.
+        receipt.update(verdict="failed", reasons=[f"claim-error:{type(error).__name__}:{error}"[:300]])
+    else:
+        receipt["execution"] = claimed
+    if not receipt.get("verdict") and not claimed["admitted"]:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
-                       reasons=[claimed["reason"]], endedAt=now_iso())
+                       reasons=[claimed["reason"]])
+    if receipt.get("verdict"):
+        receipt.update(endedAt=now_iso(),
+                       result={"verdict": receipt["verdict"], "commit": None, "pr": pr["number"]})
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
         return receipt
     with open(runs / f"{run_id}.log", "w") as log:
         try:

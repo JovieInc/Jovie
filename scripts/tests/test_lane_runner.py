@@ -550,6 +550,34 @@ class RunIssueTest(unittest.TestCase):
         self.assertIn("harness-error:ValueError", receipt["reasons"][0])
         self.assertEqual(len(self.ledger()), 1)
 
+    def test_a_claim_crash_still_leaves_a_failed_receipt(self):
+        # JOV-7191: a coordinator error used to kill the worker before any receipt
+        # existed, so every spawned worker looked like spawn-exit to the doctor.
+        real_claim = lane.execution_attempt.claim
+
+        def crash(*a, **k):
+            raise RuntimeError("coordinator down")
+        lane.execution_attempt.claim = crash
+        try:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        finally:
+            lane.execution_attempt.claim = real_claim
+        self.assertEqual(receipt["verdict"], "failed")
+        self.assertIn("claim-error:RuntimeError:coordinator down", receipt["reasons"][0])
+        self.assertEqual(self.ledger()[0]["runId"], receipt["runId"])
+
+    def test_an_unadmitted_claim_still_leaves_a_receipt(self):
+        real_claim = lane.execution_attempt.claim
+        lane.execution_attempt.claim = lambda *a, **k: {"admitted": False, "reason": "duplicate_active"}
+        try:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        finally:
+            lane.execution_attempt.claim = real_claim
+        self.assertEqual((receipt["verdict"], receipt["reasons"]), ("duplicate-active", ["duplicate_active"]))
+        self.assertEqual(self.ledger()[0]["runId"], receipt["runId"])
+        self.assertEqual(receipt["result"], {"verdict": "duplicate-active", "commit": None,
+                                           "pr": None, "prUrl": None})
+
 
 class CapacityHorizonTest(unittest.TestCase):
     def test_one_receipt_covers_deadlines_routes_value_gaps_and_idle_incident(self):
