@@ -460,13 +460,19 @@
   }
 }
 
-:where(.profile-aeo-content) {
-  --profile-aeo-text: var(--color-text-tooltip);
+:where(
+  .profile-aeo-content,
+  [data-testid="profile-mobile-notifications-flow"]
+) {
   --profile-aeo-muted: color-mix(
     in oklab,
     var(--color-text-tooltip) 70%,
     transparent
   );
+}
+
+:where(.profile-aeo-content) {
+  --profile-aeo-text: var(--color-text-tooltip);
   --profile-aeo-border: color-mix(
     in oklab,
     var(--color-text-tooltip) 14%,
@@ -1910,6 +1916,67 @@
   border-radius: var(--profile-card-radius);
   background: var(--profile-mode-card-bg);
   color: var(--profile-mode-card-fg);
+}
+
+/* Pen D14lo6 / tkdyb: retain the reserved card height, then compact the art
+   and spacing when the home region is shorter so the action clears the dock. */
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"] {
+  height: calc(var(--spacing) * 80);
+  min-height: calc(var(--spacing) * 52);
+  container: profile-featured-card / size;
+}
+
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"]
+  > .profile-mode-card {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 767px) {
+  [data-testid="profile-compact-surface"]:not(
+      [data-profile-overflow-mode="scroll"]
+    )
+    [data-testid="profile-home-rail"]
+    > [data-presentation="featured"] {
+    height: min(calc(var(--spacing) * 80), 100%);
+  }
+}
+
+@container profile-featured-card (height < 20rem) {
+  .profile-mode-card {
+    padding: var(--space-3);
+  }
+  .profile-mode-card > div:first-child {
+    min-height: var(--space-4);
+  }
+  .profile-mode-card > div:has(> [data-testid="profile-pac-featured-art"]) {
+    margin-top: var(--space-1);
+  }
+  [data-testid="profile-pac-featured-art"] {
+    width: var(--space-12);
+    height: var(--space-12);
+  }
+  .profile-mode-card > div:last-child {
+    padding-top: var(--space-1);
+  }
+  .profile-mode-card h2 {
+    line-height: var(--space-7);
+  }
+  .profile-mode-card p {
+    margin-top: 0;
+    line-height: var(--space-5);
+  }
+  .profile-mode-card [aria-live="polite"] {
+    min-height: 0;
+  }
 }
 
 :where(.profile-mode-card)::before {
