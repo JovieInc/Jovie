@@ -221,6 +221,33 @@ describe('linear sync on merge', () => {
     expect(decision.comment).toContain('Did not mark JOV-5853 Done');
   });
 
+  it('does not close proof-gated liveness owner JOV-6004 from a merge', () => {
+    expect(COMMISSIONING_PARENT_ALLOWLIST.has('JOV-6004')).toBe(true);
+    const decision = decideLinearCloseOnMerge({
+      issue: {
+        id: 'issue-6004',
+        identifier: 'JOV-6004',
+        labels: [],
+        children: [],
+        hasChildren: false,
+      },
+      pullRequests: [],
+      mergingPull: {
+        number: 19317,
+        url: 'https://github.com/JovieInc/Jovie/pull/19317',
+        sha: 'merged-but-not-runtime-proven',
+      },
+    });
+
+    expect(decision.action).toBe('skip');
+    expect(decision.blockingNumbers).toEqual([]);
+    expect(decision.comment).toContain(
+      'JOV-6004 is a commissioning or parent issue'
+    );
+    expect(decision.comment).toContain('allowlist');
+    expect(decision.comment).toContain('Did not mark JOV-6004 Done');
+  });
+
   it('holds a parent by commissioning label or sub-issues without the allowlist', () => {
     const labeled = decideLinearCloseOnMerge({
       issue: {

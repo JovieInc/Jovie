@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
+import { DesktopReleaseIdentity } from '@/components/atoms/DesktopTitlebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
@@ -95,6 +96,13 @@ interface BuildDropdownItemsParams {
 }
 
 const USER_MENU_CONTENT_CLASS = 'w-80 max-w-[calc(100vw-1rem)]';
+/**
+ * JOV-7130: the shared `max-h-96` cap clipped Sign out below an inner scroll
+ * once the menu grew (Lock Workspace, Hide money). Use all the room Radix
+ * measures above the trigger so every core control stays visible.
+ */
+export const USER_MENU_MAX_HEIGHT =
+  'var(--radix-dropdown-menu-content-available-height)';
 const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
 
 const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
@@ -444,11 +452,20 @@ function buildDropdownItems({
       type: 'custom',
       id: 'version',
       render: () => (
-        <div className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'>
-          Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {process.env.NEXT_PUBLIC_BUILD_SHA
-            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-            : ''}
+        <div
+          className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'
+          data-testid='app-build-diagnostics'
+        >
+          {isElectronRuntime ? (
+            <DesktopReleaseIdentity />
+          ) : (
+            <span>
+              Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+              {process.env.NEXT_PUBLIC_BUILD_SHA
+                ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+                : ''}
+            </span>
+          )}
         </div>
       ),
     },
@@ -603,6 +620,7 @@ export function UserButton({
             onOpenChange={setIsMenuOpen}
             disabled
             contentClassName={USER_MENU_CONTENT_CLASS}
+            maxHeight={USER_MENU_MAX_HEIGHT}
           />
         </div>
       );
@@ -734,6 +752,7 @@ export function UserButton({
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
         contentClassName={USER_MENU_CONTENT_CLASS}
+        maxHeight={USER_MENU_MAX_HEIGHT}
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

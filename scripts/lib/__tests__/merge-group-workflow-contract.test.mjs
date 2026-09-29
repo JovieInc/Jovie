@@ -849,8 +849,23 @@ describe('merge_group workflow contract', () => {
     );
     expect(aggregate).not.toContain('ci-pr-vercel-preview');
     expect(aggregate).not.toContain('ci-a11y');
-    expect(aggregate).not.toContain('neon-db');
+    expect(aggregate).toContain('neon-db');
+    expect(aggregate).toContain(
+      '"$RUN_NEON" == "true" && "$DATABASE_CERTIFICATION_RESULT" != "success"'
+    );
     expect(aggregate).not.toContain('deploy-staging');
+
+    const databaseCertification = getJobBlock(CI_WORKFLOW, 'neon-db');
+    expect(databaseCertification).toContain(
+      "github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')"
+    );
+    expect(databaseCertification).toMatch(
+      /continue-on-error: true[\s\S]*run test:integration[\s\S]*steps\.integration-tests\.outcome[\s\S]*steps\.migration-upgrade\.outcome/
+    );
+    expect(databaseCertification).toContain("DB_CERTIFICATION: 'true'");
+    expect(databaseCertification).toContain(
+      'Reject inert database test evidence'
+    );
 
     for (const job of [
       'ci-risk-classifier',
@@ -973,7 +988,7 @@ describe('merge_group workflow contract', () => {
       "github.event_name == 'merge_group'"
     );
     expect(aggregate).toContain(
-      'Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon.'
+      'Only risk-selected database changes provision expiring Neon; preview/A11y evidence remains explicit opt-in or post-merge.'
     );
 
     for (const jobId of ['ci-promptfoo-evals', 'ci-golden-eval-set']) {
@@ -1854,6 +1869,20 @@ ${selectedGateScript}`,
     expect(envLines(build).length).toBeGreaterThan(0);
     expect(envLines(build)).toEqual(envLines(ciBuild));
 
+    // The homepage visual compare restores the same entry, so it builds with
+    // the same NEXT_* env and task hash. NEXT_DISABLE_TOOLBAR is the one extra:
+    // turbo does not hash it and the homepage baselines render without the
+    // cookie banner it disables. No DATABASE_URL/VERCEL_ENV pass-through.
+    const visualBuild = stepIn(
+      getJobBlock(CI_WORKFLOW, 'ci-visual-snapshot-compare'),
+      'Build homepage for rendered snapshot compare'
+    );
+    expect(envLines(visualBuild)).toEqual([
+      ...envLines(build),
+      "          NEXT_DISABLE_TOOLBAR: '1'",
+    ]);
+    expect(visualBuild).not.toMatch(/^ {10}(DATABASE_URL|VERCEL_ENV):/m);
+
     // Size/symlink guard and a single trusted-main save of the primary key.
     const measure = stepIn(
       warm,
@@ -2187,7 +2216,7 @@ ${selectedGateScript}`,
     expect(coalesce).not.toContain('secrets: inherit');
   });
 
-  it('keeps merge groups out of manual evidence and deployment jobs', () => {
+  it('keeps merge groups out of non-database manual evidence and deployment jobs', () => {
     expect(getJobBlock(CI_WORKFLOW, 'neon-db')).not.toContain(
       "github.event_name == 'push'"
     );

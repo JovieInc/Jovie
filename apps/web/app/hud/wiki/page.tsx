@@ -1,4 +1,6 @@
 import { forbidden, unauthorized } from 'next/navigation';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { ShellPageTitle } from '@/components/features/admin/layout/ShellPageTitle';
 import { WikiNamespaceSection } from '@/components/features/admin/wiki/WikiNamespaceSection';
 import { WikiSearchForm } from '@/components/features/admin/wiki/WikiSearchForm';
 import { WikiSearchResults } from '@/components/features/admin/wiki/WikiSearchResults';
@@ -8,7 +10,7 @@ import { listPages, searchPages } from '@/lib/wiki/gbrain-client';
 import { groupByNamespace } from '@/lib/wiki/namespace';
 
 interface Props {
-  searchParams: Promise<{ q?: string }>;
+  readonly searchParams: Promise<{ q?: string }>;
 }
 
 export default async function WikiIndexPage({ searchParams }: Props) {
@@ -24,20 +26,22 @@ export default async function WikiIndexPage({ searchParams }: Props) {
   const noBackend = hasQuery ? false : pages.length === 0;
 
   return (
-    <div className='mx-auto max-w-4xl px-4 py-8'>
-      <h1 className='mb-6 text-2xl font-bold tracking-tight'>Company Wiki</h1>
-      <WikiSearchForm initialQuery={q} />
-      {noBackend ? (
-        <WikiUnavailableNotice />
-      ) : hasQuery ? (
-        <WikiSearchResults results={pages} query={q || ''} />
-      ) : (
-        <div className='mt-6 space-y-8'>
-          {groupByNamespace(pages).map(group => (
-            <WikiNamespaceSection key={group.namespace} group={group} />
-          ))}
-        </div>
-      )}
-    </div>
+    <AdminPage title='Company Wiki' testId='admin-wiki-page'>
+      <ShellPageTitle title='Company Wiki' />
+      <div className='mx-auto w-full max-w-4xl'>
+        <WikiSearchForm initialQuery={q} />
+        {noBackend ? (
+          <WikiUnavailableNotice />
+        ) : hasQuery ? (
+          <WikiSearchResults results={pages} query={q || ''} />
+        ) : (
+          <div className='mt-6 space-y-8'>
+            {groupByNamespace(pages).map(group => (
+              <WikiNamespaceSection key={group.namespace} group={group} />
+            ))}
+          </div>
+        )}
+      </div>
+    </AdminPage>
   );
 }

@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { DESKTOP_CONTENT_GRID_ANCHOR } from './chat-empty-starters';
 import { resolveChatEmptyStateAffordance } from './chat-empty-state-contract';
+import { CHAT_CONTENT_SHELL_CLASSNAME } from './chat-layout';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
 import { ChatEmptyStateWelcome } from './components/ChatEmptyStateComposerRegion';
 import { ChatEmptyStateOpportunityCards } from './components/ChatEmptyStateOpportunityCards';
@@ -38,6 +39,7 @@ import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatStarterActionsRail } from './components/ChatStarterActionsRail';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import { FeatureIntroHost } from './components/FeatureIntroCard';
+import { OvieEditorialBriefing } from './components/OvieEditorialBriefing';
 import {
   FEATURED_SKILL_SUGGESTIONS,
   SuggestedPrompts,
@@ -95,6 +97,7 @@ export function JovieChat({
   isFirstSession = false,
   isProfileComplete = false,
   chatMode,
+  ovieHomeBriefing,
   actionCards,
   featureIntroCatalog,
   ambientOwnedByShell = false,
@@ -501,10 +504,11 @@ export function JovieChat({
   );
   const conversationInProgress = isLoading || isSubmitting || isStreaming;
   const shouldLoadOpportunityCards =
-    (!conversationExists &&
+    (chatMode !== 'ov' &&
+      !conversationExists &&
       !conversationInProgress &&
       !isLoadingConversation) ||
-    Boolean(deepLinkOpportunityId && !pinnedOpportunity);
+    Boolean(chatMode !== 'ov' && deepLinkOpportunityId && !pinnedOpportunity);
   const { data: pendingOpportunityCards = [] } =
     usePendingOpportunityCardsQuery({
       enabled: shouldLoadOpportunityCards,
@@ -549,6 +553,8 @@ export function JovieChat({
   const showThreadView =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
   const showBottomComposer = showThreadView;
+  const showOvieBriefing =
+    chatMode === 'ov' && ovieHomeBriefing != null && !showThreadView;
   const composerHasIntent =
     composerPickerOpen || Boolean(input.trim()) || chipTray.chips.length > 0;
   const emptyStateAffordance = resolveChatEmptyStateAffordance({
@@ -716,7 +722,9 @@ export function JovieChat({
       // one-chrome-layer-v1: prompt suggests / starter cards XOR status
       // banners — the usage banner yields whenever the empty state is already
       // showing a chrome affordance layer.
-      suppressUsageAlert={!showThreadView && emptyStateAffordance !== 'none'}
+      suppressUsageAlert={
+        showOvieBriefing || (!showThreadView && emptyStateAffordance !== 'none')
+      }
       isRateLimited={isRateLimited}
       showManifest={showManifest}
       manifestCollapsed={manifestCollapsed}
@@ -738,6 +746,7 @@ export function JovieChat({
         onRetry={handleRetry}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
+        chatMode={chatMode}
       />
     ) : null;
 
@@ -821,80 +830,102 @@ export function JovieChat({
             {!showThreadView ? (
               <div
                 className='flex min-h-0 flex-1 flex-col'
-                data-empty-affordance={emptyStateAffordance}
+                data-empty-affordance={
+                  showOvieBriefing ? 'ovie-briefing' : emptyStateAffordance
+                }
                 data-grid-anchor={DESKTOP_CONTENT_GRID_ANCHOR}
                 data-testid='chat-empty-state-viewport'
                 data-top-spacing-owner={CHAT_EMPTY_TOP_SPACING_OWNER}
               >
-                <ChatEmptyStateComposerRegion
-                  stableDocked
-                  showDockedWelcome={
-                    showEmptyWelcome && emptyStateAffordance === 'none'
-                  }
-                  onSelectSample={handleSuggestedPrompt}
-                  above={
-                    showEmptyOpportunityCards ? (
-                      <ChatEmptyStateOpportunityCards
-                        cards={pendingOpportunityCards}
-                        onSelect={handleSelectOpportunityCard}
+                {showOvieBriefing ? (
+                  <ChatEmptyStateComposerRegion
+                    stableDocked
+                    fullBleed
+                    above={
+                      <OvieEditorialBriefing
+                        briefing={ovieHomeBriefing}
+                        onSelectAction={handleSuggestedPrompt}
                       />
-                    ) : showEmptyActionCards ? (
-                      <div
-                        // single-column-one-width-v1: the empty-state column
-                        // inherits the 45rem content shell — no stepped max-w.
-                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
-                        data-testid='chat-empty-state-action-card-slot'
-                      >
-                        {showEmptyWelcome ? (
-                          <ChatEmptyStateWelcome
-                            onSelectSample={handleSuggestedPrompt}
-                          />
-                        ) : null}
-                        <div className='flex w-full min-h-0 flex-1 flex-col items-center justify-center'>
-                          <ChatStarterActionsRail
-                            cards={visibleActionCards}
-                            onAct={handleActOnActionCard}
-                            onDismiss={handleDismissActionCard}
+                    }
+                  >
+                    <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
+                      {composerSurface}
+                      {inlineChatError ? (
+                        <div className='mt-3 w-full'>{inlineChatError}</div>
+                      ) : null}
+                    </div>
+                  </ChatEmptyStateComposerRegion>
+                ) : (
+                  <ChatEmptyStateComposerRegion
+                    stableDocked
+                    showDockedWelcome={
+                      showEmptyWelcome && emptyStateAffordance === 'none'
+                    }
+                    onSelectSample={handleSuggestedPrompt}
+                    above={
+                      showEmptyOpportunityCards ? (
+                        <ChatEmptyStateOpportunityCards
+                          cards={pendingOpportunityCards}
+                          onSelect={handleSelectOpportunityCard}
+                        />
+                      ) : showEmptyActionCards ? (
+                        <div
+                          // single-column-one-width-v1: the empty-state column
+                          // inherits the 45rem content shell — no stepped max-w.
+                          className='mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
+                          data-testid='chat-empty-state-action-card-slot'
+                        >
+                          {showEmptyWelcome ? (
+                            <ChatEmptyStateWelcome
+                              onSelectSample={handleSuggestedPrompt}
+                            />
+                          ) : null}
+                          <div className='flex w-full min-h-0 flex-1 flex-col items-center justify-center'>
+                            <ChatStarterActionsRail
+                              cards={visibleActionCards}
+                              onAct={handleActOnActionCard}
+                              onDismiss={handleDismissActionCard}
+                            />
+                          </div>
+                        </div>
+                      ) : showEmptyPromptRail ? (
+                        <div
+                          // single-column-one-width-v1: same shared column width.
+                          className='mx-auto flex min-h-full w-full flex-col items-center justify-start pb-3'
+                          data-testid='chat-empty-state-soft-suggestions-slot'
+                        >
+                          {showEmptyWelcome ? (
+                            <ChatEmptyStateWelcome
+                              onSelectSample={handleSuggestedPrompt}
+                            />
+                          ) : null}
+                          <SuggestedPrompts
+                            onSelect={handleSuggestedPrompt}
+                            isFirstSession={isFirstSession}
+                            isProfileComplete={isProfileComplete}
+                            layout='rail'
+                            featuredOnly
+                            dimmed={composerPickerOpen}
+                            excludeActionIds={promptRailExcludeActionIds}
                           />
                         </div>
-                      </div>
-                    ) : showEmptyPromptRail ? (
-                      <div
-                        // single-column-one-width-v1: same shared column width.
-                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start pb-3'
-                        data-testid='chat-empty-state-soft-suggestions-slot'
-                      >
-                        {showEmptyWelcome ? (
-                          <ChatEmptyStateWelcome
-                            onSelectSample={handleSuggestedPrompt}
-                          />
-                        ) : null}
-                        <SuggestedPrompts
-                          onSelect={handleSuggestedPrompt}
-                          isFirstSession={isFirstSession}
-                          isProfileComplete={isProfileComplete}
-                          layout='rail'
-                          featuredOnly
-                          dimmed={composerPickerOpen}
-                          excludeActionIds={promptRailExcludeActionIds}
-                        />
-                      </div>
-                    ) : undefined
-                  }
-                >
-                  {!composerHasIntent ? (
-                    <FeatureIntroHost
-                      catalog={featureIntroCatalog}
-                      onHighlightCTA={() => {
-                        inputRef.current?.focus();
-                      }}
-                    />
-                  ) : null}
-                  {composerSurface}
-                  {inlineChatError ? (
-                    <div className='mt-3 w-full'>{inlineChatError}</div>
-                  ) : null}
-                </ChatEmptyStateComposerRegion>
+                      ) : undefined
+                    }
+                  >
+                    {!composerHasIntent ? (
+                      <FeatureIntroHost
+                        catalog={featureIntroCatalog}
+                        onHighlightCTA={() => {
+                          inputRef.current?.focus();
+                        }}
+                      />
+                    ) : null}
+                    {composerSurface}
+                    {inlineChatError ? (
+                      <div className='mt-3 w-full'>{inlineChatError}</div>
+                    ) : null}
+                  </ChatEmptyStateComposerRegion>
+                )}
               </div>
             ) : (
               <>

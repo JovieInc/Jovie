@@ -3,7 +3,7 @@
  *
  * Per the amended charter (E4, DX1), this vitest test rides the existing
  * Unit Tests lane and asserts:
- *   1. route-glob ⇔ manifest bidirectional (every (marketing) + (home) + waitlist route is mapped/exempted)
+ *   1. route-glob ⇔ manifest bidirectional (every (marketing), (home), waitlist, and guarded profile-admission route is mapped/exempted)
  *   2. glob-count floor (catches route-group rename — silent-failure guard)
  *   3. recipeId ∈ registry
  *   4. proven recipes reference a real route (CI refuses proven without reference)
@@ -1563,7 +1563,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     // Source inventory must not clear incomplete root/variant registration.
     expect(entry.bindingEvidence.status).toBe('unverified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
-      'centered-none',
+      'split-claim-card',
       ...rows.map(() => 'editorial'),
       'editorial-search',
     ]);

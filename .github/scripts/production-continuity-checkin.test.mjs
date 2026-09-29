@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildCronCheckInUrl,
+  CheckInDeliveryError,
   main,
   parseArgs,
   sendCheckIn,
@@ -43,11 +44,11 @@ describe('production continuity Sentry check-in', () => {
       check_in_id: CHECK_IN_ID,
       environment: 'production',
       monitor_config: {
-        checkin_margin: 5,
+        checkin_margin: 60,
         failure_issue_threshold: 1,
         max_runtime: 3,
         recovery_threshold: 1,
-        schedule: { type: 'crontab', value: '*/5 * * * *' },
+        schedule: { type: 'interval', unit: 'hour', value: 4 },
         timezone: 'UTC',
       },
       status: 'in_progress',
@@ -84,10 +85,48 @@ describe('production continuity Sentry check-in', () => {
         dsn: DSN,
         fetchImpl: async () => ({ ok: false, status: 429 }),
         monitorSlug: 'jovie-production-continuity-schedule',
+        sleepImpl: async () => {},
         status: 'ok',
       }),
-      /HTTP 429/
+      CheckInDeliveryError
     );
+  });
+
+  it('retries transient transport failures before succeeding', async () => {
+    let calls = 0;
+    const result = await sendCheckIn({
+      checkInId: CHECK_IN_ID,
+      dsn: DSN,
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls === 1) throw new TypeError('fetch failed');
+        if (calls === 2) return { ok: false, status: 503 };
+        return { ok: true, status: 202 };
+      },
+      monitorSlug: 'jovie-production-continuity-schedule',
+      status: 'ok',
+    });
+    assert.equal(result, CHECK_IN_ID);
+    assert.equal(calls, 3);
+  });
+
+  it('does not retry permanent rejections', async () => {
+    let calls = 0;
+    await assert.rejects(
+      sendCheckIn({
+        checkInId: CHECK_IN_ID,
+        dsn: DSN,
+        fetchImpl: async () => {
+          calls += 1;
+          return { ok: false, status: 400 };
+        },
+        monitorSlug: 'jovie-production-continuity-schedule',
+        sleepImpl: async () => {},
+        status: 'ok',
+      }),
+      /HTTP 400/
+    );
+    assert.equal(calls, 1);
   });
 
   it('rejects invalid status, id, and slug values', async () => {
@@ -166,5 +205,43 @@ describe('production continuity Sentry check-in', () => {
     } finally {
       unlinkSync(outputPath);
     }
+  });
+
+  it('degrades delivery outages to a warning but still emits the stable id', async () => {
+    const outputPath = join(tmpdir(), `sentry-checkin-warn-${process.pid}.txt`);
+    writeFileSync(outputPath, '');
+
+    try {
+      await main({
+        argv: ['--status=in_progress'],
+        env: { GITHUB_OUTPUT: outputPath, SENTRY_DSN: DSN },
+        sendCheckInImpl: async () => {
+          throw new CheckInDeliveryError(
+            'Sentry check-in delivery failed: fetch failed'
+          );
+        },
+        uuidFactory: () => CHECK_IN_ID,
+      });
+      assert.equal(
+        readFileSync(outputPath, 'utf8'),
+        `check_in_id=${CHECK_IN_ID}\n`
+      );
+    } finally {
+      unlinkSync(outputPath);
+    }
+  });
+
+  it('keeps configuration errors fatal', async () => {
+    await assert.rejects(
+      main({
+        argv: ['--status=in_progress'],
+        env: { SENTRY_DSN: DSN },
+        sendCheckInImpl: async () => {
+          throw new Error('SENTRY_DSN is required');
+        },
+        uuidFactory: () => CHECK_IN_ID,
+      }),
+      /SENTRY_DSN is required/
+    );
   });
 });

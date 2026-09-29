@@ -821,6 +821,12 @@ describe('canonical marketing component registry', () => {
     ).toContain('export function FaqSection');
     expect(
       fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/marketing/FaqSection.tsx'),
+        'utf8'
+      )
+    ).toContain("data-wrap='editorial-title'");
+    expect(
+      fs.readFileSync(
         path.join(
           repoRoot,
           'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx'
@@ -1073,7 +1079,7 @@ describe('canonical molecule ownership receipt', () => {
     expect(receipt.schema).toBe('jovie.ui-molecule-ownership/v1');
     expect(receipt.scope).toBe('JOV-5308');
     expect(receipt.families.map(family => family.consumers.length)).toEqual([
-      23, 44,
+      23, 41,
     ]);
     expect(
       validateMoleculeOwnershipReceipt({

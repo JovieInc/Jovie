@@ -227,10 +227,10 @@ describe('MarketingHeader', () => {
       'data-presentation',
       'marketing-glass'
     );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
+    expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {

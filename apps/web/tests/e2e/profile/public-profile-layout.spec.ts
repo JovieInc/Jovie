@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
+import { PROFILE_DESKTOP_SURFACE_ENABLED } from '../../../lib/profile/desktop-surface-flag';
 import {
   resetOwnedOutputDirectory,
   resolveFixedOwnedOutputDirectory,
@@ -884,12 +885,19 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       }
 
       await saveApprovalScreenshot(page, viewport);
-      await expect(page).toHaveScreenshot(
-        `tim-public-profile-${viewport.id}.png`,
-        {
-          fullPage: false,
-        }
-      );
+      // Desktop baselines capture the wide ProfileDesktopSurface. With the
+      // surface flagged off (the shipped default, Tim 2026-09-26), desktop
+      // renders the compact profile centered in a phone column, so those
+      // baselines structurally cannot match; geometric assertions above
+      // still cover the compact layout at desktop widths.
+      if (viewport.isMobile || PROFILE_DESKTOP_SURFACE_ENABLED) {
+        await expect(page).toHaveScreenshot(
+          `tim-public-profile-${viewport.id}.png`,
+          {
+            fullPage: false,
+          }
+        );
+      }
     });
   }
 });

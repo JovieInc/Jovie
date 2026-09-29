@@ -40,6 +40,10 @@ describe('AppShellFrame', () => {
     // Founder lock 2026-09-25: one rounded, borderless panel — no border.
     expect(mainContent).not.toHaveClass('lg:border');
     expect(mainContent).not.toHaveClass('lg:border-(--app-shell-border)');
+    const routeContent = mainContent.querySelector(
+      '[data-app-shell-main-content]'
+    );
+    expect(routeContent).toHaveClass('p-(--app-shell-content-inset)');
     expect(mainContent.closest('[data-app-shell-main-plane]')).not.toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );

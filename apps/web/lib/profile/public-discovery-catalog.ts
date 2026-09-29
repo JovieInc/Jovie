@@ -18,6 +18,15 @@ import { publicReleaseEligibilitySqlPredicate } from './public-release-eligibili
  */
 export const ARTISTS_DIRECTORY_PAGE_SIZE = 60;
 
+/**
+ * Upper bound on raw batches scanned per request while filling a page with
+ * eligible profiles. Eligibility (QA handles, placeholder identities,
+ * unpublished profiles) is enforced post-query, so a single LIMIT read can
+ * under-fill a page or emit a nextCursor that resolves to an empty dead-end
+ * page (JOV-6939). The cap keeps worst-case reads bounded.
+ */
+const ARTISTS_DIRECTORY_MAX_RAW_BATCHES = 10;
+
 const directorySortKey = drizzleSql`coalesce(${creatorProfiles.displayName}, '')`;
 
 export interface ArtistsDirectoryCatalogProfile {
@@ -147,34 +156,65 @@ async function queryArtistsDirectoryCatalog(
   }
 
   try {
-    const rows = await selectDirectoryRows()
-      .where(
-        and(
-          PUBLIC_DIRECTORY_PREDICATE,
-          cursor
-            ? drizzleSql`(${directorySortKey}, ${creatorProfiles.id}) > (${cursor.key}, ${cursor.id})`
-            : undefined
-        )
-      )
-      .orderBy(asc(directorySortKey), asc(creatorProfiles.id))
-      .limit(ARTISTS_DIRECTORY_PAGE_SIZE + 1);
+    const eligible: ArtistsDirectoryCatalogProfile[] = [];
+    let rawCursor = cursor;
+    let rawExhausted = false;
+    let lastRawRow: ArtistsDirectoryCatalogRow | undefined;
 
-    const hasMore = rows.length > ARTISTS_DIRECTORY_PAGE_SIZE;
-    const pageRows = hasMore
-      ? rows.slice(0, ARTISTS_DIRECTORY_PAGE_SIZE)
-      : rows;
-    const lastRow = pageRows[pageRows.length - 1];
-    const nextCursor =
-      hasMore && lastRow
-        ? encodeArtistsDirectoryCursor({
-            key: lastRow.displayName ?? '',
-            id: lastRow.id,
-          })
-        : null;
+    for (
+      let batch = 0;
+      batch < ARTISTS_DIRECTORY_MAX_RAW_BATCHES &&
+      eligible.length <= ARTISTS_DIRECTORY_PAGE_SIZE &&
+      !rawExhausted;
+      batch++
+    ) {
+      const rows = await selectDirectoryRows()
+        .where(
+          and(
+            PUBLIC_DIRECTORY_PREDICATE,
+            rawCursor
+              ? drizzleSql`(${directorySortKey}, ${creatorProfiles.id}) > (${rawCursor.key}, ${rawCursor.id})`
+              : undefined
+          )
+        )
+        .orderBy(asc(directorySortKey), asc(creatorProfiles.id))
+        .limit(ARTISTS_DIRECTORY_PAGE_SIZE + 1);
+
+      if (rows.length === 0) {
+        rawExhausted = true;
+        break;
+      }
+
+      lastRawRow = rows[rows.length - 1];
+      rawExhausted = rows.length <= ARTISTS_DIRECTORY_PAGE_SIZE;
+      eligible.push(...toArtistsDirectoryProfiles(rows));
+      rawCursor = {
+        key: lastRawRow.displayName ?? '',
+        id: lastRawRow.id,
+      };
+    }
+
+    const profiles = eligible.slice(0, ARTISTS_DIRECTORY_PAGE_SIZE);
+    // A next page only exists when we have already seen another eligible
+    // profile, or when the raw scan hit the batch cap with rows unread.
+    // Cursor resumes at the last displayed profile (or last scanned raw row)
+    // so unconsumed rows are never skipped.
+    const cursorRow =
+      eligible.length > ARTISTS_DIRECTORY_PAGE_SIZE
+        ? profiles[profiles.length - 1]
+        : rawExhausted
+          ? undefined
+          : lastRawRow;
+    const nextCursor = cursorRow
+      ? encodeArtistsDirectoryCursor({
+          key: cursorRow.displayName ?? '',
+          id: cursorRow.id,
+        })
+      : null;
 
     return {
       status: 'ok',
-      profiles: toArtistsDirectoryProfiles(pageRows),
+      profiles,
       nextCursor,
     };
   } catch (error) {

@@ -416,6 +416,7 @@ describe('ci-fast bounded parallel workflow', () => {
         spotify: 'false',
         kbd: 'false',
         crawler: 'true',
+        overlay: 'false',
       });
 
       const runner = remaining
@@ -435,6 +436,7 @@ describe('ci-fast bounded parallel workflow', () => {
             RUN_SPOTIFY: 'false',
             RUN_KBD: 'false',
             RUN_CRAWLER: 'true',
+            RUN_OVERLAY: 'false',
           },
         }
       );
@@ -445,6 +447,63 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('selects the overlay collision proof when overlay primitives change', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/OVERLAY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'packages/ui/atoms/dialog.tsx',
+      'packages/ui/atoms/dropdown-menu.tsx',
+      'packages/ui/lib/overlay-styles.ts',
+      'apps/web/styles/tailwind-foundation.css',
+      'apps/web/.storybook/stories/overlay-collisions.stories.tsx',
+      'apps/web/tests/e2e/storybook-overlay-collisions.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'packages/ui/atoms/badge.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const runner = remaining
+      .split('id: storybook-browser-test')[1]
+      .split('      - name: Upload Storybook browser evidence')[0];
+    const selection = runner.slice(
+      runner.indexOf('          specs=()'),
+      runner.indexOf('          pnpm exec storybook dev')
+    );
+    const chosen = spawnSync(
+      'bash',
+      ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUN_SPOTIFY: 'false',
+          RUN_KBD: 'false',
+          RUN_CRAWLER: 'false',
+          RUN_OVERLAY: 'true',
+        },
+      }
+    );
+    expect(chosen.status, chosen.stderr).toBe(0);
+    expect(chosen.stdout.trim().split('\n')).toEqual([
+      'tests/e2e/storybook-overlay-collisions.spec.ts',
+    ]);
   });
 
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
@@ -573,6 +632,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'source-guards',
       'structural',
       'typecheck',
+      'web-stories-typecheck',
       'web-tests-typecheck',
     ]);
     expect(validateLaneGroups(LANE_GROUPS)).toBe(true);
@@ -668,6 +728,10 @@ describe('ci-fast bounded parallel workflow', () => {
           id: 'web-tests-typecheck',
           status: 'skipped',
         }),
+        expect.objectContaining({
+          id: 'web-stories-typecheck',
+          status: 'skipped',
+        }),
       ]);
       for (const lane of payload.lanes) {
         expect(lane.logExcerpt).toContain('ci-path-changes preselection');
@@ -677,15 +741,15 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('overlaps the two typecheck lanes, each under its own singleflight lock', () => {
+  it('overlaps the three typecheck lanes, each under its own singleflight lock', () => {
     const repo = mkdtempSync(join(tmpdir(), 'ci-fast-overlap-'));
     const binDir = join(repo, 'bin');
     try {
       mkdirSync(binDir);
-      // Each call waits for the other to start; a serial runner exits 9.
+      // Each call waits for the others to start; a serial runner exits 9.
       writeFileSync(
         join(binDir, 'pnpm'),
-        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 3 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
+        `#!/bin/sh\ntouch "$0.$$"\nfor i in 1 2 3 4 5 6 7 8 9 10; do\n  [ "$(ls "${binDir}" | wc -l)" -ge 4 ] && { echo "dir=$TYPECHECK_SINGLEFLIGHT_DIR"; exit 0; }\n  sleep 0.5\ndone\nexit 9\n`
       );
       chmodSync(join(binDir, 'pnpm'), 0o755);
       const result = spawnSync(
@@ -712,6 +776,7 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(lanes.map(lane => [lane.id, lane.logExcerpt])).toEqual([
         ['typecheck', 'dir='],
         ['web-tests-typecheck', 'dir=.cache/typecheck-singleflight-tests'],
+        ['web-stories-typecheck', 'dir=.cache/typecheck-singleflight-stories'],
       ]);
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -862,6 +927,10 @@ describe('ci-fast bounded parallel workflow', () => {
           id: 'web-tests-typecheck',
           status: 'failure',
         }),
+        expect.objectContaining({
+          id: 'web-stories-typecheck',
+          status: 'failure',
+        }),
       ]);
       for (const lane of payload.lanes) {
         expect(lane.logExcerpt).toMatch(/pnpm.*not found/i);
@@ -913,7 +982,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
     expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
     const configHash =
-      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json')";
+      "hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json')";
     expect(restore).toContain(
       `key: jovie-web-tsbuildinfo-v2-\${{ runner.os }}-\${{ ${configHash} }}-\${{ github.sha }}`
     );
@@ -991,7 +1060,7 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toHaveLength(2);
     const order = [
       'Restore web tsc incremental state',
-      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n',
+      'run: |\n          pnpm --filter @jovie/web run typecheck\n          pnpm --filter @jovie/web run typecheck:tests\n          pnpm --filter @jovie/web run typecheck:stories\n',
       'uses: actions/cache/save@',
       'key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}',
     ].map(marker => warm.indexOf(marker));
@@ -1085,6 +1154,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'shadcn-lint-contracts',
       'typecheck',
       'web-tests-typecheck',
+      'web-stories-typecheck',
       'scripts-typecheck',
       'guardrails',
       'design-system-source-ratchet',
@@ -1103,6 +1173,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
       'typecheck',
       'web-tests-typecheck',
+      'web-stories-typecheck',
     ]);
     expect(selectLanes('remaining').map(lane => lane.id)).toEqual(
       LANE_GROUPS.remaining
@@ -1121,6 +1192,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm --filter=@jovie/web run lint:shadcn-contracts',
       typecheck: 'pnpm run typecheck',
       'web-tests-typecheck': 'pnpm --filter=@jovie/web run typecheck:tests',
+      'web-stories-typecheck': 'pnpm --filter=@jovie/web run typecheck:stories',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
@@ -1129,7 +1201,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
       'ios-fast': 'pnpm run ios:lint',
       'merge-group-guards':
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts',
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx components/providers/QueryProvider.test.tsx --coverage --coverage.include="components/providers/QueryProvider.tsx" --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-profile-admission-coverage" --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       'billing-coverage': BILLING_COVERAGE_COMMAND,

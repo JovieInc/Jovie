@@ -1,9 +1,13 @@
+import { Activity } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import {
   type WorkspaceTabOption,
   WorkspaceTabsSurface,
 } from '@/components/organisms/WorkspaceTabsSurface';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 export interface AdminPageTabsConfig<
@@ -48,9 +52,9 @@ export interface AdminPageProps<
  * Canonical shell for every admin page.
  *
  * Provides:
- * - Description + actions only when needed. Route title lives in the shell
- *   breadcrumb (`DashboardHeader`) — never re-rendered here (avoids the
- *   double-"Ops" regression class).
+ * - Route title lives in the shell breadcrumb (`DashboardHeader`) and actions
+ *   live in the page toolbar. Descriptions remain metadata unless a page has
+ *   a specific disclosure need.
  * - Optional `hero` slot for primary metrics.
  * - Optional `tabs` slot that delegates to `WorkspaceTabsSurface`. The parent
  *   owns the route title in the shell breadcrumb, so the tabs surface renders
@@ -72,8 +76,6 @@ export function AdminPage<
   className,
 }: Readonly<AdminPageProps<TPrimary, TSecondary>>) {
   const tabsHeaderless = Boolean(tabs);
-  // Breadcrumb owns the page title; only surface description + actions here.
-  const showMetaHeader = Boolean(description || actions);
 
   return (
     <PageShell frame='none' contentPadding='none'>
@@ -85,25 +87,23 @@ export function AdminPage<
           )}
           data-testid={testId}
         >
-          {showMetaHeader ? (
-            <div
-              className='flex min-w-0 items-start justify-between gap-2'
-              data-testid='admin-page-meta'
-            >
-              {description ? (
-                <p className='min-w-0 flex-1 text-2xs leading-[15px] text-tertiary-token'>
-                  {description}
-                </p>
-              ) : (
-                <span className='min-w-0 flex-1' aria-hidden='true' />
-              )}
-              {actions ? (
-                <div className='ml-auto flex shrink-0 items-center justify-end gap-1'>
-                  {actions}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          <PageToolbar
+            start={null}
+            end={
+              <>
+                {actions}
+                <Link
+                  href={APP_ROUTES.ADMIN_ACTIVITY}
+                  className='inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-2xs font-medium text-secondary-token transition-colors hover:text-primary-token'
+                  aria-label='Open Company Timeline'
+                >
+                  <Activity className='h-3.5 w-3.5' aria-hidden='true' />
+                  Timeline
+                </Link>
+              </>
+            }
+            data-testid='admin-page-toolbar'
+          />
 
           {hero ? <div data-testid='admin-page-hero'>{hero}</div> : null}
 

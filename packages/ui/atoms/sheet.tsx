@@ -3,12 +3,12 @@
 import * as SheetPrimitive from '@radix-ui/react-dialog';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-
+import { useMenuOriginFocusRestore } from '../lib/overlay-focus';
 import {
   descriptionStyles,
   footerStyles,
   headerStyles,
-  overlayClassName,
+  sheetOverlayClassName,
   sheetSurfaceStyles,
   titleStyles,
 } from '../lib/overlay-styles';
@@ -26,7 +26,7 @@ export const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     ref={ref}
-    className={cn(overlayClassName, className)}
+    className={cn(sheetOverlayClassName, className)}
     data-slot='sheet-overlay'
     data-testid='sheet-overlay'
     {...props}
@@ -104,18 +104,24 @@ export const SheetContent = React.forwardRef<
       overlayProps,
       disablePortal = false,
       testId = 'sheet-content',
+      onCloseAutoFocus,
       ...props
     },
     ref
   ) => {
+    const { contentRef, handleCloseAutoFocus } = useMenuOriginFocusRestore(
+      ref,
+      onCloseAutoFocus
+    );
     const content = (
       <SheetPrimitive.Content
-        ref={ref}
+        ref={contentRef}
         className={cn(sheetVariants({ side }), className)}
         data-side={side}
         data-slot='sheet-content'
         data-testid={testId}
         {...props}
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
         {children}
         {!hideClose && (

@@ -1,5 +1,5 @@
-// Renders the real `/` page module with the v3 dark-launch flag pinned on,
-// then off, so the flip PR only changes a default, never the composition.
+// Renders the real `/` page module with the v3 flag pinned on (the default
+// since 2026-09-28), then off (rollback), so both compositions stay exact.
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,9 +52,9 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     flags.HOMEPAGE_V3_ENABLED = true;
     const { container } = await renderHomePage();
 
-    const ids = [
-      ...container.querySelectorAll('section[data-homepage-testid]'),
-    ].map(section => section.getAttribute('data-homepage-testid'));
+    const ids = [...container.querySelectorAll('[data-homepage-testid]')]
+      .map(section => section.getAttribute('data-homepage-testid'))
+      .filter(id => !id?.startsWith('homepage-possibility-'));
     expect(ids).toEqual([
       'homepage-hero-shell',
       'homepage-section-presence',
@@ -64,18 +64,19 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Your living identity on the internet.',
+        name: 'Be found.Be understood.',
       })
     ).toBeInTheDocument();
 
-    // One certified name search action in hero and close (JOV-5085).
+    // One jov.ie/you claim action in hero and close (Tim 2026-09-28).
     const hero = screen.getByTestId('marketing-section-hero');
     const close = screen.getByTestId('marketing-section-cta');
     for (const region of [hero, close]) {
-      expect(within(region).getByRole('combobox')).toHaveAttribute(
+      expect(within(region).getByRole('textbox')).toHaveAttribute(
         'placeholder',
-        'Search your name'
+        'you'
       );
+      expect(within(region).queryByText('Search your name')).toBeNull();
       expect(within(region).queryAllByRole('link')).toHaveLength(0);
       expect(
         within(region).queryByText('Request access')
@@ -97,7 +98,7 @@ describe('homepage v3 page composition', { timeout: 60_000 }, () => {
     await renderHomePage();
 
     // The identity hero stays live; only the v3 body is gated.
-    expect(screen.getByTestId('homepage-identity-hero-light')).not.toBeNull();
+    expect(screen.getByTestId('homepage-claim-card')).not.toBeNull();
     expect(screen.getByTestId('homepage-story-stack')).not.toBeNull();
     expect(screen.queryByTestId('homepage-identity-story-stack')).toBeNull();
     expect(screen.queryByTestId('homepage-presence-material')).toBeNull();

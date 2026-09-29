@@ -889,6 +889,16 @@ function pathDelta(base, current) {
   };
 }
 
+export function filterMergeParentIdenticalPaths(
+  changedPaths,
+  stagedOids,
+  mergeHeadOids
+) {
+  return changedPaths.filter(
+    path => stagedOids.get(path) !== mergeHeadOids.get(path)
+  );
+}
+
 export function collectGitPaths(args) {
   const diffBaseIndex = args.indexOf('--diff-base');
   const staged = args.includes('--staged');
@@ -912,10 +922,53 @@ export function collectGitPaths(args) {
   const diffArgs = staged
     ? ['diff', '--cached', baseRef, '--name-only', '--diff-filter=ACMR', '-z']
     : ['diff', '--name-only', '--diff-filter=ACMR', '-z', `${baseRef}..HEAD`];
+  let changedPaths = gitPaths(diffArgs);
+  if (staged) {
+    // During a merge the index contains every incoming change from the other
+    // parent; only paths that differ from BOTH parents are real edits (the
+    // conflict resolutions). Drop paths identical to MERGE_HEAD.
+    let mergeHeadOids = null;
+    try {
+      const mergeHead = execFileSync(
+        'git',
+        ['rev-parse', '--verify', '-q', 'MERGE_HEAD'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+      ).trim();
+      if (mergeHead) {
+        mergeHeadOids = new Map();
+        for (const record of gitPaths(['ls-tree', '-r', '-z', mergeHead])) {
+          const separator = record.indexOf('\t');
+          if (separator < 0) continue;
+          const metadata = record.slice(0, separator).split(' ');
+          mergeHeadOids.set(
+            normalizePath(record.slice(separator + 1)),
+            metadata[2]
+          );
+        }
+      }
+    } catch {
+      mergeHeadOids = null;
+    }
+    if (mergeHeadOids) {
+      const stagedOids = new Map();
+      for (const record of gitPaths(['ls-files', '-s', '-z'])) {
+        const separator = record.indexOf('\t');
+        if (separator < 0) continue;
+        const metadata = record.slice(0, separator).split(' ');
+        if (metadata[2] !== '0') continue;
+        stagedOids.set(normalizePath(record.slice(separator + 1)), metadata[1]);
+      }
+      changedPaths = filterMergeParentIdenticalPaths(
+        changedPaths,
+        stagedOids,
+        mergeHeadOids
+      );
+    }
+  }
   return {
     baseRef,
     ...pathDelta(base, current),
-    changedPaths: gitPaths(diffArgs),
+    changedPaths,
     trackedPaths: [...current.keys()],
   };
 }

@@ -104,6 +104,10 @@ describe('EntitySidebarShell', () => {
 
     expect(screen.getByText('Release title')).toBeInTheDocument();
     expect(screen.queryByText('Release details')).not.toBeInTheDocument();
+    expect(screen.getByTestId('entity-header')).toHaveAttribute(
+      'data-layout',
+      'chrome'
+    );
     expect(
       screen.getByTestId('entity-sidebar-entity-header')
     ).toHaveTextContent('Entity header content');

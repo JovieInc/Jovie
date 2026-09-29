@@ -151,7 +151,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
   };
 });
 
-vi.mock('@/components/jovie/components', () => ({
+vi.mock('@/components/jovie/components', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/components/jovie/components')>()),
   ChatInput: () => <div data-testid='chat-input' />,
   ChatMessage: (props: { isThinking?: boolean }) =>
     props.isThinking ? (
@@ -429,6 +430,71 @@ describe('JovieChat styling regressions', () => {
 
     expect(
       container.querySelector('[data-testid="chat-collapsed-failures"]')
+    ).toBeNull();
+  });
+
+  it('renders the Ovie editorial briefing as the empty-state affordance in ov mode', () => {
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [];
+
+    const { container } = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        ovieHomeBriefing={{
+          greeting: 'Good morning, Tim.',
+          updatedLabel: 'Updated Sep 28, 8:00 AM PDT',
+          signal: {
+            id: 'activation.first-user',
+            title: 'The first real user completed onboarding',
+            summary: 'Activation has moved from theory to observed behavior.',
+            currentValue: '1 activated user',
+            delta: '+1 today',
+            target: 'Learn what made the path work',
+            sourceLabel: 'Founder Funnel',
+            nextAction: 'Review the session.',
+            removalEvent: 'The activation lesson is applied.',
+            summerCanAct: true,
+          },
+          actions: [
+            {
+              id: 'activation.first-user:next',
+              label: 'Start The Next Step',
+              prompt: 'Review the first activation with me.',
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(
+      container.querySelector('[data-testid="ovie-editorial-briefing"]')
+    ).toBeTruthy();
+    expect(
+      container
+        .querySelector('[data-testid="chat-empty-state-viewport"]')
+        ?.getAttribute('data-empty-affordance')
+    ).toBe('ovie-briefing');
+    // The briefing owns the empty-state chrome layer — no usage banner stack.
+    expect(container.querySelector('[data-testid="chat-usage"]')).toBeNull();
+  });
+
+  it('never renders the Ovie briefing outside ov mode', () => {
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [];
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(
+      container.querySelector('[data-testid="ovie-editorial-briefing"]')
     ).toBeNull();
   });
 });

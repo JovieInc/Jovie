@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
+import { isSummerOpsCard } from '@/lib/ovie/ops-card';
 import {
   type SummerFailureHop,
   summerFailureText,
@@ -96,6 +97,12 @@ export async function createSummerAssistantStreamResponse(input: {
               success: event.receipt.ok,
               summary: event.receipt.summary,
               receiptId: event.receipt.receiptId,
+              // Structured card payloads ride the tool output so the chat
+              // renderer can draw editorial cards/charts (JOV-6708). Anything
+              // that fails schema validation is dropped, never rendered.
+              ...(isSummerOpsCard(event.receipt.data)
+                ? { card: event.receipt.data }
+                : {}),
               ...(!event.receipt.ok ? { error: event.receipt.summary } : {}),
             },
           });

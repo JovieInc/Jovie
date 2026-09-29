@@ -8,6 +8,13 @@
  * runtime values — those belong in their respective server modules.
  */
 
+// assets
+export type {
+  AdminAssetRow,
+  AdminAssetSort,
+  AdminAssetType,
+} from './assets';
+
 // bragging-rights
 export type { AdminBraggingRights } from './bragging-rights';
 
@@ -23,6 +30,15 @@ export type {
   FounderFunnelStage,
   FounderFunnelTimeRange,
 } from './founder-funnel';
+
+// founder-review-registry
+export type {
+  FounderReviewItem,
+  FounderReviewMedia,
+  FounderReviewReadiness,
+  FounderReviewRegistryKind,
+  FounderReviewScopeLevel,
+} from './founder-review-registry';
 
 // funnel-metrics
 export type { AdminFunnelMetrics } from './funnel-metrics';

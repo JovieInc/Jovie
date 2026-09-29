@@ -604,7 +604,7 @@ export async function waitForHydration(
       () => {
         // Check if React has hydrated (no hydration markers remaining)
         const hasHydrationError =
-          document.body.innerHTML.includes('Hydration failed');
+          document.body?.innerHTML?.includes('Hydration failed') ?? false;
         // Check if document is interactive
         const isReady =
           document.readyState === 'complete' ||

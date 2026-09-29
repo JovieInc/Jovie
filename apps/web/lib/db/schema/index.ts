@@ -247,6 +247,19 @@ export {
   workflowRunOutcomes,
   workflowRuns,
 } from './connectors';
+// Canonical Contacts (customer lifecycle)
+export {
+  type Contact,
+  type ContactStageTransition,
+  contactStageTransitions,
+  contacts,
+  insertContactSchema,
+  insertContactStageTransitionSchema,
+  type NewContact,
+  type NewContactStageTransition,
+  selectContactSchema,
+  selectContactStageTransitionSchema,
+} from './contacts';
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
@@ -430,6 +443,7 @@ export {
   connectorProviderEnum,
   connectorStatusEnum,
   contactChannelEnum,
+  contactLifecycleStageEnum,
   contactRoleEnum,
   contentSlugTypeEnum,
   contextFactKindEnum,
@@ -1040,6 +1054,13 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+export {
+  insertProfileInquirySchema,
+  type NewProfileInquiry,
+  type ProfileInquiry,
+  profileInquiries,
+  selectProfileInquirySchema,
+} from './profile-inquiries';
 // Provider-neutral artist search monitoring and issue evidence
 export {
   type ProfileSearchQuery,

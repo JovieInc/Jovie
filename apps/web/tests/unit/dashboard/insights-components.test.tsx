@@ -2,19 +2,12 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { InsightCard } from '@/features/dashboard/insights/InsightCard';
-import { InsightsBadge } from '@/features/dashboard/insights/InsightsBadge';
-import { InsightsSummaryWidget } from '@/features/dashboard/insights/InsightsSummaryWidget';
-import { useInsightsSummaryQuery } from '@/lib/queries';
 import type { InsightResponse } from '@/types/insights';
 
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: ReactNode; href: string }) => (
     <a href={href}>{children}</a>
   ),
-}));
-
-vi.mock('@/lib/queries', () => ({
-  useInsightsSummaryQuery: vi.fn(),
 }));
 
 vi.mock('@/features/dashboard/insights/InsightCategoryIcon', () => ({
@@ -28,8 +21,6 @@ vi.mock('@/features/dashboard/insights/InsightActions', () => ({
     <div>actions-{insightId}</div>
   ),
 }));
-
-const useInsightsSummaryQueryMock = vi.mocked(useInsightsSummaryQuery);
 
 function createInsight(
   overrides: Partial<InsightResponse> = {}
@@ -53,43 +44,6 @@ function createInsight(
 }
 
 describe('insights surfaces', () => {
-  it('hides the sidebar badge when there are no active insights', () => {
-    useInsightsSummaryQueryMock.mockReturnValue({
-      data: { totalActive: 0, insights: [], lastGeneratedAt: null },
-      isLoading: false,
-    } as never);
-
-    const { container } = render(<InsightsBadge />);
-
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('renders the summary widget with the count and top insight copy', () => {
-    useInsightsSummaryQueryMock.mockReturnValue({
-      data: {
-        totalActive: 2,
-        insights: [createInsight()],
-        lastGeneratedAt: '2026-03-08T00:00:00.000Z',
-      },
-      isLoading: false,
-    } as never);
-
-    render(<InsightsSummaryWidget />);
-
-    expect(screen.getByText('AI Insights')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
-    expect(
-      screen.getByText('Fans in Austin are trending up')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Schedule a show announcement for Austin\./)
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /View all/i })).toHaveAttribute(
-      'href',
-      '/app/insights'
-    );
-  });
-
   it('renders the insight card metadata and action suggestion', () => {
     render(<InsightCard insight={createInsight()} />);
 

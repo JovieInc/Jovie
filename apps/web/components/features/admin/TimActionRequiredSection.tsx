@@ -20,7 +20,7 @@ const FETCH_URL = '/api/admin/hud/tim-actions';
 const PRIORITY_CONFIG: Record<number, { label: string; className: string }> = {
   1: {
     label: 'Urgent',
-    className: 'bg-red-500/15 text-red-400 border border-red-500/20',
+    className: 'bg-error/15 text-error border border-error/20',
   },
   2: {
     label: 'High',
@@ -52,7 +52,7 @@ function DaysOldBadge({ daysOld }: Readonly<{ readonly daysOld: number }>) {
       title={`${daysOld} days old${isOverdue ? ' — overdue' : ''}`}
       className={
         isOverdue
-          ? 'text-2xs font-semibold tabular-nums text-red-400 no-underline'
+          ? 'text-2xs font-semibold tabular-nums text-error no-underline'
           : 'text-2xs tabular-nums text-tertiary-token no-underline'
       }
     >
@@ -229,7 +229,7 @@ export function TimActionRequiredSection() {
             className='h-2 w-2 shrink-0 rounded-full bg-warning'
             aria-hidden='true'
           />
-          <p className='text-xs font-caption text-tertiary-token'>Needs Tim</p>
+          <p className='text-xs font-caption text-tertiary-token'>Needs You</p>
           {!isLoading && visibleIssues.length > 0 ? (
             <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
               {visibleIssues.length}
@@ -328,7 +328,7 @@ function timActionsMessage(
     return data?.errorMessage ?? 'Linear actions are unavailable.';
   }
   if (observation === 'empty') {
-    return 'Nothing needs Tim.';
+    return 'Nothing needs you.';
   }
   return '';
 }

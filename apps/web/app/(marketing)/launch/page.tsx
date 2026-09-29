@@ -507,7 +507,7 @@ export default function LaunchPage() {
           aria-label='Supported Platforms'
         >
           <MarketingContainer width='page'>
-            <ul>
+            <ul data-component='platform-logo-strip'>
               {PLATFORM_LOGOS.map(name => (
                 <li key={name}>{name}</li>
               ))}

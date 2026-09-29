@@ -325,6 +325,7 @@ class ProductionHealthTests(unittest.TestCase):
                 "status": "green",
                 "url": url,
                 "reportedStatus": "healthy",
+                "dependencies": {"vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"}, "database": {"status": "unknown", "detail": "deploy health database check"}},
                 "deployedSha": "a" * 40,
             },
         )
@@ -3943,6 +3944,7 @@ class WorkflowContractTests(unittest.TestCase):
         )
         wrapper = (ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
         self.assertIn('--consumer "$consumer"', wrapper)
+        self.assertIn('--request "$request"', wrapper)
         self.assertIn("fleet | deployment", wrapper)
         self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], wrapper)
 

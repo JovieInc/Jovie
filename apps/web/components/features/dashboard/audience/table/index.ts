@@ -45,8 +45,6 @@ export {
 
 export type { AudienceMemberRowProps } from './molecules/AudienceMemberRow';
 export { AudienceMemberRow } from './molecules/AudienceMemberRow';
-export type { AudienceSubscriberRowProps } from './molecules/AudienceSubscriberRow';
-export { AudienceSubscriberRow } from './molecules/AudienceSubscriberRow';
 export type {
   AudienceTableHeaderProps,
   BulkAction,

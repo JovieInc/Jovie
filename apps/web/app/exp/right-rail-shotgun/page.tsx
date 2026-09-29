@@ -70,7 +70,7 @@ const DSP_GLYPH: Record<DspKey, string> = {
 const DSP_COLOR: Record<DspKey, string> = {
   spotify: 'bg-emerald-500/85',
   apple: 'bg-rose-400/85',
-  youtube: 'bg-red-500/85',
+  youtube: 'bg-brand-youtube/85',
   tidal: 'bg-sky-400/85',
   amazon: 'bg-amber-400/85',
 };

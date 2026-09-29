@@ -162,7 +162,7 @@ describe('getHudEnvExceptions', () => {
   it('loads the checked-in projection with lanes and empty active exceptions', () => {
     const result = getHudEnvExceptions(NOW);
     expect(result.schema).toBe('jovie-preview-env-exceptions/v1');
-    expect(result.updatedBy).toBe('JOV-5941');
+    expect(result.updatedBy).toBe('JOV-4195');
     expect(result.lanes.length).toBeGreaterThan(0);
     expect(result.activeExceptions).toEqual([]);
   });

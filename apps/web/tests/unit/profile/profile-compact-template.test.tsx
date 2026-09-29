@@ -225,7 +225,7 @@ const mockArtist: Artist = {
 const mockContacts = [
   {
     id: 'contact-1',
-    role: 'booking',
+    role: 'bookings',
     roleLabel: 'Booking',
     territorySummary: 'Worldwide',
     territoryCount: 1,
@@ -776,6 +776,16 @@ describe('ProfileCompactTemplate', () => {
     const drawer = await screen.findByRole('dialog', { name: 'Credits' });
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
+
+    // The desktop surface slot owns a sheet container that anchors modal
+    // drawers to the desktop shell (route DOM certification, JOV-6915).
+    const sheetContainer = document.querySelector('[data-sheet-container]');
+    expect(sheetContainer).not.toBeNull();
+    expect(
+      sheetContainer?.querySelector(
+        '[data-testid="mock-profile-desktop-surface"]'
+      )
+    ).not.toBeNull();
   });
 
   it('hides the release credits menu entry when every credit group is empty', () => {
@@ -1316,6 +1326,36 @@ describe('ProfileCompactTemplate', () => {
         })
       );
     });
+
+    pushStateSpy.mockRestore();
+  });
+
+  it('does not push a source-less URL before the source param hydrates', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    expect(window.location.search).toBe('?source=qr');
+    for (const call of pushStateSpy.mock.calls) {
+      expect(String(call[2])).toContain('source=qr');
+    }
 
     pushStateSpy.mockRestore();
   });

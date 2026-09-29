@@ -258,6 +258,74 @@ describe('UserButton billing actions', () => {
     expect(await screen.findByText('Settings')).toBeVisible();
   });
 
+  it('keeps Sign out reachable: the account menu is never capped below the viewport (JOV-7130)', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
+      isLoading: false,
+      error: null,
+    } as any);
+    render(<UserButton calm showUserInfo profileHref='/adele' />);
+    await userEvent.click(screen.getByText('Adele Adkins'));
+    const signOut = await screen.findByRole('menuitem', { name: /sign out/i });
+    const menu = signOut.closest('[role="menu"]') as HTMLElement;
+    // The shared max-h-96 cap hid Sign out under an inner scroll once the menu grew.
+    expect(menu.style.maxHeight).toBe(
+      'var(--radix-dropdown-menu-content-available-height)'
+    );
+  });
+
+  it('shows web build diagnostics in the account menu', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.9.1');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abc1234');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByText('Adele Adkins'));
+
+    const diagnostics = await screen.findByTestId('app-build-diagnostics');
+    expect(diagnostics).toHaveTextContent('Version 26.9.1 (abc1234)');
+    expect(diagnostics).toHaveClass(
+      'min-h-8',
+      'text-2xs',
+      'text-tertiary-token',
+      'select-none'
+    );
+    expect(
+      screen.queryByTestId('electron-release-identity')
+    ).not.toBeInTheDocument();
+    expect(diagnostics.closest('[role="menuitem"]')).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it('shows desktop release identity in account-menu diagnostics', async () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    await flushMicrotasks();
+    await user.click(screen.getByText('Adele Adkins'));
+
+    const diagnostics = await screen.findByTestId('app-build-diagnostics');
+    const desktopIdentity = await screen.findByTestId(
+      'electron-release-identity'
+    );
+    expect(diagnostics).toContainElement(desktopIdentity);
+    expect(desktopIdentity).toHaveTextContent(
+      'Desktop · Version Unknown · Unverified'
+    );
+    expect(screen.queryByText(/^Version /u)).not.toBeInTheDocument();
+  });
+
   it('renders the compact trigger avatar on the canonical app frame size', () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },

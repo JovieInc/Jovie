@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
@@ -114,6 +116,16 @@ describe('MarketingHero source-backed default story', () => {
       outstanding:
         'Active variant-to-route mapping remains owner-stacked and is not proven by this story.',
     });
+  });
+
+  it('excludes the MARKETING_HERO_* fixture exports from the story index', () => {
+    const exclude = marketingHeroMeta.excludeStories;
+    expect(exclude).toEqual(/^MARKETING_HERO_/);
+    const pattern = exclude as RegExp;
+    expect(pattern.test('MARKETING_HERO_DEFAULT_PROPS')).toBe(true);
+    expect(pattern.test('MARKETING_HERO_SOURCE_SHA')).toBe(true);
+    expect(pattern.test('SourceBackedDefault')).toBe(false);
+    expect(pattern.test('LandingActions')).toBe(false);
   });
 
   it('honors the shared root test id in landing mode', () => {
@@ -333,5 +345,20 @@ describe('MarketingHero source-backed default story', () => {
     const hero = screen.getByTestId('photo-landing-hero');
     const img = hero.querySelector('.marketing-hero-photo img');
     expect(img).toHaveStyle({ opacity: '0.2' });
+  });
+});
+
+describe('MarketingHero photo stacking', () => {
+  it('keeps hero copy above the positioned hero photo', () => {
+    // The photo layer is positioned (z-index 0); static copy after it would
+    // paint underneath, which hid the /pricing headline in production.
+    const css = readFileSync(
+      resolve(__dirname, '../../app/globals.css'),
+      'utf8'
+    );
+
+    expect(css).toMatch(
+      /\.marketing-hero-photo ~ \*\s*\{\s*position: relative;\s*z-index: 1;/
+    );
   });
 });

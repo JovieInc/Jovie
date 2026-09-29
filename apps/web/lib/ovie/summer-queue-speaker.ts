@@ -1,5 +1,7 @@
 import { isSummerSafeTool } from '@/lib/ovie/isolation';
 import type { OperatingStore } from '@/lib/ovie/mcp/store';
+import { buildShippingOpsCard } from '@/lib/ovie/ops-card';
+import { getLastKnownShippingState } from '@/lib/ovie/shipping-state';
 import {
   enqueueOvieSummerTurn,
   ovieSummerTurnId,
@@ -13,6 +15,20 @@ import {
 } from '@/lib/ovie/summer-transport';
 
 const SUMMER_RESPONSE_TIMEOUT_MS = 45_000;
+
+/**
+ * Operational read tools get a live card built from the authoritative
+ * shipping-state projection so the founder chat renders editorial cards and
+ * charts instead of a bare status row (JOV-6708). Only measured values are
+ * emitted; a missing projection yields no card rather than invented data.
+ */
+function liveOpsCardData(toolName: string): unknown {
+  if (toolName !== 'inspect_kanban' && toolName !== 'get_org_state') {
+    return undefined;
+  }
+  const projection = getLastKnownShippingState();
+  return projection ? buildShippingOpsCard(projection) : undefined;
+}
 
 let boundStore: OperatingStore | null = null;
 let queueSpeaker: SummerSpeaker | null = null;
@@ -56,6 +72,7 @@ export function createCurrentSummerQueueSpeaker(
               ok: terminal.tool.ok,
               receiptId: terminal.tool.receiptId,
               summary: terminal.tool.summary,
+              data: terminal.tool.data ?? liveOpsCardData(terminal.tool.name),
             };
           }
           return;

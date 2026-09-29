@@ -51,8 +51,9 @@ const FAMILIES = {
   // the legacy forks migrate onto it in follow-ups — a NEW file here means
   // a new fork.
   status: /(?:Status(?:Pill|Badge|Dot)|Glyph)\.tsx$/,
-  // Entity rail headers: Pen has one entity header (odpZ8); code converges
-  // once design decision D6 names the owner (JOV-6777).
+  // Entity rail headers: JOV-6842 folded EntityHeaderCard, DrawerHeader,
+  // AudienceMemberHeader, and ContactDetailHeader onto EntityHeader (Pen
+  // odpZ8, D6). A NEW file matching this means a new fork of rail anatomy.
   entityHeader: /(?:Entity|Drawer|Member|Detail)Header(?:Card)?\.tsx$/,
 } as const;
 type Family = keyof typeof FAMILIES;

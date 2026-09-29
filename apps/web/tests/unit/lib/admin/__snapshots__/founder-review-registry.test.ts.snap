@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`founder review registries > attaches visual media to every feature while admitting only honest ready packets 1`] = `
+[
+  [
+    "Smart link editing and customization",
+    "/product-screenshots/artist-spec-tracked-links-desktop.png",
+  ],
+  [
+    "Release pages with listen links per DSP",
+    "/product-screenshots/release-landing-desktop.png",
+  ],
+  [
+    "Spotify pre-save campaigns",
+    "/product-screenshots/tim-white-profile-presave-phone.png",
+  ],
+  [
+    "Public profile pages",
+    "/product-screenshots/profile-desktop.png",
+  ],
+  [
+    "Subscribe / follow page",
+    "/product-screenshots/tim-white-profile-subscribe-phone.png",
+  ],
+  [
+    "Contact page",
+    "/product-screenshots/tim-white-profile-contact-phone.png",
+  ],
+  [
+    "Tour dates (Bandsintown)",
+    "/product-screenshots/tim-white-profile-tour-phone.png",
+  ],
+  [
+    "Latest release card on profile",
+    "/product-screenshots/tim-white-profile-live-desktop.png",
+  ],
+  [
+    "Advanced analytics and geo insights",
+    "/product-screenshots/artist-spec-geo-insights-desktop.png",
+  ],
+]
+`;
