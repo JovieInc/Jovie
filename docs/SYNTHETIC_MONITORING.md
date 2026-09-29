@@ -55,7 +55,7 @@ The workflow parser treats a missing, empty, or skipped result as failure. The s
 
 ### Web AI Health
 
-The daily `web-ai-health` job calls the bearer-protected production endpoint at `https://jov.ie/api/cron/web-ai-health`. The five probes execute inside the deployed app, so Gateway authentication uses the production project identity rather than a CI-owned model key. SDK retries are disabled: one scheduled run makes exactly five O(1) model calls.
+The daily `web-ai-health` job calls the bearer-protected production endpoint at `https://jov.ie/api/cron/web-ai-health`. The five probes execute inside the deployed app, so Gateway authentication uses the production project identity rather than a CI-owned model key. SDK retries are disabled: one scheduled run makes exactly five O(1) model calls. GLM-5.3 reasoning is always enabled, so these simple probes request low reasoning and reserve up to 1,024 output tokens for reasoning plus final text or JSON.
 
 The redacted `jovie-web-ai-health/v1` receipt records each surface, runtime model, duration, failure cause, and the canonical Gateway allowlist name (`founder-strict-2026-09-17`). It never records prompts, model responses, credentials, user data, or database state. A red run alerts `#alerts-production` and creates or reopens a high-priority Linear bug signal. Forbidden-model, empty-stream, and placeholder-saved failures use distinct cause codes and messages.
 
