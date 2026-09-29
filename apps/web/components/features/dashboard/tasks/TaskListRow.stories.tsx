@@ -13,7 +13,7 @@ const baseTask: TaskView = {
   assigneeKind: 'human',
   assigneeUserId: null,
   agentType: null,
-  agentStatus: 'processing',
+  agentStatus: 'idle',
   agentInput: null,
   agentOutput: null,
   agentError: null,
@@ -28,8 +28,8 @@ const baseTask: TaskView = {
   position: 0,
   sourceTemplateId: null,
   metadata: null,
-  createdAt: '2026-04-01T00:00:00.000Z',
-  updatedAt: '2026-04-01T00:00:00.000Z',
+  createdAt: new Date('2026-04-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-04-01T00:00:00.000Z'),
 };
 
 const meta = {

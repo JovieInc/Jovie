@@ -20,8 +20,8 @@ const meta = {
     title: 'Details',
     children: (
       <>
-        <DrawerPropertyRow label='ISRC'>USRC17607839</DrawerPropertyRow>
-        <DrawerPropertyRow label='UPC'>888880123456</DrawerPropertyRow>
+        <DrawerPropertyRow label='ISRC' value='USRC17607839' />
+        <DrawerPropertyRow label='UPC' value='888880123456' />
       </>
     ),
   },
