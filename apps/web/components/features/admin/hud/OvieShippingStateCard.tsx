@@ -108,29 +108,36 @@ function CapacityLeaseRow({ row }: { readonly row: CapacityHorizonLease }) {
         concurrency · {row.compatibility.cli ?? '?'}+
         {row.compatibility.harness ?? '?'} · {row.freshness.status}
       </p>
-      <details className='mt-0.5 text-2xs text-tertiary-token'>
-        <summary title={reason}>
-          {href ? (
-            <a
-              className='text-accent-blue hover:underline'
-              href={href}
-              target='_blank'
-              rel='noreferrer'
-            >
-              {work}
-            </a>
-          ) : (
-            work
-          )}{' '}
-          · {reason}
-        </summary>
-        <p>
-          alternatives{' '}
-          {row.route?.alternativesConsidered.join(', ') || 'none recorded'} ·
-          replan {row.route?.replanConditions.join(', ') || 'source gap'} · gaps{' '}
-          {row.route?.sourceGaps.join(', ') || 'none'}
-        </p>
-      </details>
+      {/* axe nested-interactive (WCAG 4.1.2): <summary> is itself a native
+          toggle control, so the Linear link must sit outside it rather than
+          nested inside — it's a sibling here instead, and the disclosure
+          only wraps the plain-text reason. */}
+      <p className='mt-0.5 text-2xs text-tertiary-token'>
+        {href ? (
+          <a
+            className='text-accent-blue hover:underline'
+            href={href}
+            target='_blank'
+            rel='noreferrer'
+          >
+            {work}
+          </a>
+        ) : (
+          work
+        )}{' '}
+        ·{' '}
+        <details className='inline'>
+          <summary className='inline cursor-pointer list-none' title={reason}>
+            {reason}
+          </summary>
+          <p>
+            alternatives{' '}
+            {row.route?.alternativesConsidered.join(', ') || 'none recorded'} ·
+            replan {row.route?.replanConditions.join(', ') || 'source gap'} ·
+            gaps {row.route?.sourceGaps.join(', ') || 'none'}
+          </p>
+        </details>
+      </p>
     </div>
   );
 }
