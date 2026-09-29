@@ -1,6 +1,6 @@
 'use client';
 
-import { IconButton } from '@jovie/ui';
+import { Button, IconButton } from '@jovie/ui';
 import {
   Camera,
   Check,
@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Loader2,
   X,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -125,34 +124,24 @@ function CarouselCardHeader({
         )}
         {total > 1 && (
           <div className='flex items-center'>
-            <button
-              type='button'
+            <IconButton
+              variant='ghost'
+              size='sm'
               onClick={onPrev}
               disabled={currentIndex === 0 || isActioning}
-              className={cn(
-                'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
-                'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
-                'hover:bg-surface-0 hover:text-secondary-token',
-                'disabled:opacity-30 disabled:cursor-not-allowed'
-              )}
-              aria-label='Previous Suggestion'
+              ariaLabel='Previous Suggestion'
             >
-              <ChevronLeft className='h-5 w-5' />
-            </button>
-            <button
-              type='button'
+              <ChevronLeft />
+            </IconButton>
+            <IconButton
+              variant='ghost'
+              size='sm'
               onClick={onNext}
               disabled={currentIndex === total - 1 || isActioning}
-              className={cn(
-                'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
-                'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
-                'hover:bg-surface-0 hover:text-secondary-token',
-                'disabled:opacity-30 disabled:cursor-not-allowed'
-              )}
-              aria-label='Next Suggestion'
+              ariaLabel='Next Suggestion'
             >
-              <ChevronRight className='h-5 w-5' />
-            </button>
+              <ChevronRight />
+            </IconButton>
           </div>
         )}
       </div>
@@ -210,7 +199,7 @@ function ProfileReadyCard({
           onClick={onDismiss}
           disabled={isActioning}
           className='absolute right-3 top-3'
-          aria-label='Dismiss'
+          ariaLabel='Dismiss'
         >
           <X className='h-3.5 w-3.5' />
         </IconButton>
@@ -386,42 +375,34 @@ function SuggestionCard({
 
         {/* Action buttons */}
         <div className='flex gap-2'>
-          <button
+          <Button
             type='button'
+            variant='secondary'
+            size='sm'
             onClick={onReject}
             disabled={isActioning}
-            className={cn(
-              'system-b-suggested-profile-action system-b-suggested-profile-action-secondary',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
+            loading={isActioning}
+            className='flex-1'
           >
-            {isActioning ? (
-              <Loader2 className='h-4 w-4 animate-spin' />
-            ) : (
-              <X className='h-4 w-4' />
-            )}
+            <X className='h-4 w-4' />
             {isAvatar ? 'Skip' : isPlaylistFallback ? 'Dismiss' : 'Not me'}
-          </button>
-          <button
+          </Button>
+          <Button
             type='button'
+            variant='primary'
+            size='sm'
             onClick={onConfirm}
             disabled={isActioning}
-            className={cn(
-              'system-b-suggested-profile-action system-b-suggested-profile-action-primary',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
+            loading={isActioning}
+            className='flex-1'
           >
-            {isActioning ? (
-              <Loader2 className='h-4 w-4 animate-spin' />
-            ) : (
-              <Check className='h-4 w-4' />
-            )}
+            <Check className='h-4 w-4' />
             {isAvatar
               ? 'Use photo'
               : isPlaylistFallback
                 ? 'Use Playlist'
                 : "That's me"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DrawerButton } from './DrawerButton';
 import { DrawerInspectorCard } from './DrawerInspectorCard';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 
@@ -46,12 +47,9 @@ export const StartsCollapsed: Story = {
 export const WithActions: Story = {
   args: {
     actions: (
-      <button
-        type='button'
-        className='text-2xs text-secondary-token hover:text-primary-token'
-      >
+      <DrawerButton tone='ghost' size='sm'>
         Edit
-      </button>
+      </DrawerButton>
     ),
   },
 };
