@@ -161,6 +161,27 @@ describe('POST /api/stripe-connect/onboard', () => {
     expect(hoisted.stripeAccountLinksCreate).not.toHaveBeenCalled();
   });
 
+  it('returns 503 when Stripe requires managing-losses acknowledgement', async () => {
+    hoisted.stripeAccountsCreate.mockRejectedValue({
+      type: 'StripeInvalidRequestError',
+      message:
+        'Please review the responsibilities of managing losses for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.',
+    });
+
+    const res = await POST();
+    const body = await res.json();
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Retry-After')).toBe('30');
+    expect(body).toEqual({
+      error: 'Payout setup is temporarily unavailable. Please try again later.',
+      code: 'platform_profile_incomplete',
+    });
+    expect(hoisted.captureWarning).toHaveBeenCalledTimes(1);
+    expect(hoisted.captureError).not.toHaveBeenCalled();
+    expect(hoisted.stripeAccountLinksCreate).not.toHaveBeenCalled();
+  });
+
   it('returns onboarding URL when account creation succeeds', async () => {
     hoisted.stripeAccountsCreate.mockResolvedValue({ id: 'acct_new' });
 
