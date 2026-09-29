@@ -12,7 +12,7 @@ const {
   mockStartNavigationTelemetry,
   mockTrackNavigationImpressions,
 } = vi.hoisted(() => ({
-  mockPathname: vi.fn(() => APP_ROUTES.CHAT),
+  mockPathname: vi.fn<() => string>(() => APP_ROUTES.CHAT),
   mockSearchParams: vi.fn(() => new URLSearchParams()),
   mockSignOut: vi.fn(),
   mockProfileHref: vi.fn(() => '/timwhite'),
