@@ -370,7 +370,7 @@ export function EntityCard({
             // varies with the assigned accent, so the date text needs a
             // guaranteed-opaque well underneath rather than a token bump
             // (JOV-INV-019 image-contrast).
-            <div className='flex flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-2.5 text-primary-token'>
+            <div className='flex flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-3 text-primary-token'>
               <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-primary-token'>
                 {model.datePill.month}
               </span>
