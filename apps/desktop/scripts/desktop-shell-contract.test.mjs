@@ -1229,7 +1229,7 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   );
   assert.match(
     mainSource,
-    /function handleAuthCompletion\([\s\S]{0,200}?if \(completion\.code === lastCompletedAuthCode\) return;/
+    /function handleAuthCompletion\([\s\S]{0,200}?if \(completion\.code === lastCompletedAuthCode\) return 'duplicate';/
   );
   assert.match(
     preloadSource,
