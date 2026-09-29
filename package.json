@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.9.15",
+  "version": "26.9.16",
   "private": true,
   "config": {
     "commitizen": {
@@ -169,6 +169,7 @@
     "format:check": "biome check --formatter-enabled=true --linter-enabled=false .",
     "benchmark:dev": "doppler run --project jovie-web --config dev -- bash scripts/benchmark-dev.sh",
     "desktop:audit": "node scripts/desktop-installed-apps-audit.mjs",
+    "desktop:dogfood": "node apps/desktop/scripts/dogfood-desktop.mjs",
     "turbo:verify-cache": "node scripts/turbo-verify-cache.mjs",
     "biome:ci": "biome ci .",
     "biome:check": "biome check .",

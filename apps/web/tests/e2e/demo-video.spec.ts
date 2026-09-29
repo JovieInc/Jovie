@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const BEST_EFFORT_EXTERNAL_RESOURCE_TYPES = new Set(['font', 'image', 'media']);
@@ -86,9 +87,33 @@ test.use({
   viewport: { width: 1280, height: 900 },
 });
 
+test('product demo video stays absent while certification gate is off', async ({
+  page,
+}) => {
+  expect(FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO).toBe(false);
+
+  for (const route of ['/demo/video', '/demovideo']) {
+    await page.goto(route, { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    await expect(page.getByTestId('demo-video-page')).toHaveCount(0);
+    await expect(
+      page.locator('video[aria-label="Jovie demo video"]')
+    ).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Download demo' })).toHaveCount(
+      0
+    );
+  }
+});
+
 test('demovideo renders a stable non-empty initial visual', async ({
   page,
 }, testInfo) => {
+  test.skip(
+    !FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO,
+    'Product demo certification runs only after the founder gate is enabled.'
+  );
+
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   const failedResponses: string[] = [];
@@ -388,6 +413,11 @@ for (const viewport of MOTION_ACCEPTANCE_VIEWPORTS) {
     test('focus starts no transitions and preserves geometry', async ({
       page,
     }) => {
+      test.skip(
+        !FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO,
+        'Product demo certification runs only after the founder gate is enabled.'
+      );
+
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.goto('/demo/video', { waitUntil: 'domcontentloaded' });
       await waitForHydration(page);
@@ -414,6 +444,11 @@ for (const viewport of MOTION_ACCEPTANCE_VIEWPORTS) {
     test('normal motion keeps visible focus styling without geometry shifts', async ({
       page,
     }) => {
+      test.skip(
+        !FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO,
+        'Product demo certification runs only after the founder gate is enabled.'
+      );
+
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       await page.goto('/demo/video', { waitUntil: 'domcontentloaded' });
       await waitForHydration(page);

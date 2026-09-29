@@ -484,22 +484,48 @@ test.describe('desktop header shares the traffic-light row', () => {
       const heading = page.getByRole('heading', { name: 'New Chat' });
       await expect(toggle).toBeVisible();
       await expect(heading).toBeVisible();
+      // JOV-7207: exactly one visible left-sidebar action across all shell
+      // owners. The desktop window-control group owns it; the page header
+      // must not mount a second control for the same action.
+      await expect(page.locator('[data-rail-toggle="left"]')).toHaveCount(1);
+      const metrics = await page.evaluate(() => {
+        const root = getComputedStyle(document.documentElement);
+        const token = (name: string) => {
+          const parsed = Number.parseFloat(root.getPropertyValue(name).trim());
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const header = document.querySelector(
+          '[data-top-spacing-owner="shell-header"]'
+        )!;
+        const innerRow = header.querySelector('div')!;
+        return {
+          controlsWidth: token('--electron-controls-width'),
+          headerX: header.getBoundingClientRect().x,
+          innerPaddingLeft: Number.parseFloat(
+            getComputedStyle(innerRow).paddingLeft
+          ),
+        };
+      });
       const assertGeometry = async () => {
         const title = (await heading.boundingBox())!;
         const control = (await toggle.boundingBox())!;
-        // Nested content inset sits the page header inside the shell card, so
-        // title vs traffic-light centers may differ by that token (8px today).
-        const contentInsetPx = await page.evaluate(() => {
-          const raw = getComputedStyle(document.documentElement)
-            .getPropertyValue('--app-shell-content-inset')
-            .trim();
-          const parsed = Number.parseFloat(raw);
-          return Number.isFinite(parsed) ? parsed : 8;
-        });
+        const headerX = (await page
+          .getByTestId('dashboard-header')
+          .boundingBox())!.x;
+        // One shared top row: control and title share a centerline (1px
+        // tolerance; no content-inset allowance — the inset no longer
+        // surrounds the header).
         expect(
           Math.abs(title.y + title.height / 2 - control.y - control.height / 2)
-        ).toBeLessThanOrEqual(2 + contentInsetPx);
-        expect(title.x).toBeGreaterThanOrEqual(200);
+        ).toBeLessThanOrEqual(1);
+        // The title starts at the shared safe-area boundary — the controls'
+        // occupied right edge or the header's own origin, whichever is
+        // further right — plus the canonical row padding. Bounded on BOTH
+        // sides so excess dead space fails.
+        const expectedTitleX =
+          Math.max(headerX, metrics.controlsWidth) + metrics.innerPaddingLeft;
+        expect(title.x).toBeGreaterThanOrEqual(expectedTitleX - 1);
+        expect(title.x).toBeLessThanOrEqual(expectedTitleX + 1);
         expect(
           await heading.evaluate(el => el.scrollWidth <= el.clientWidth)
         ).toBe(true);
@@ -518,13 +544,16 @@ test.describe('desktop header shares the traffic-light row', () => {
       if (width > 1024) {
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-label', 'Expand sidebar');
+        // Icon-collapsible rail keeps a 52px mount (--sidebar-width-icon).
         await expect(page.locator('[data-app-shell-sidebar-mount]')).toHaveCSS(
           'width',
-          '0px'
+          '52px'
         );
         await assertGeometry();
-        await toggle.click();
+        // The keyboard shortcut changes the sidebar exactly once.
+        await page.keyboard.press('[');
         await expect(toggle).toHaveAttribute('aria-label', 'Collapse sidebar');
+        await assertGeometry();
       }
     });
   }

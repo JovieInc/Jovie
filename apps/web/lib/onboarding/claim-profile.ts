@@ -39,6 +39,14 @@ export interface MaterializeClaimedOnboardingProfileInput {
   readonly conversationId: string;
   readonly ipAddress: string | null;
   readonly userAgent: string | null;
+  /**
+   * 'public' (default) publishes a claimed, live profile. 'reserved' holds the
+   * handle on a hidden, unclaimed profile so a pending waitlist decision still
+   * protects jov.ie/<handle> until approval flips it public.
+   */
+  readonly visibility?: 'public' | 'reserved';
+  /** Durable waitlist receipt this reservation belongs to (reserved mode). */
+  readonly waitlistEntryId?: string | null;
 }
 
 export interface MaterializeClaimedOnboardingProfileResult {
@@ -204,6 +212,8 @@ interface PersistClaimedProfileInput {
   readonly settings: Record<string, unknown>;
   readonly now: Date;
   readonly spotifyFields: Record<string, unknown>;
+  readonly reserved: boolean;
+  readonly waitlistEntryId: string | null;
 }
 
 async function persistClaimedProfileRow({
@@ -214,6 +224,8 @@ async function persistClaimedProfileRow({
   settings,
   now,
   spotifyFields,
+  reserved,
+  waitlistEntryId,
 }: PersistClaimedProfileInput): Promise<{
   profileId: string;
   status: 'created' | 'updated';
@@ -228,10 +240,18 @@ async function persistClaimedProfileRow({
           existingProfile.displayNameLocked && existingProfile.displayName
             ? existingProfile.displayName
             : displayName,
-        isPublic: true,
-        isClaimed: true,
-        claimedAt: existingProfile.claimedAt ?? now,
-        onboardingCompletedAt: existingProfile.onboardingCompletedAt ?? now,
+        // A reserved refresh must not downgrade a profile that is already
+        // claimed/public, and must not publish a still-pending reservation.
+        ...(reserved
+          ? {}
+          : {
+              isPublic: true,
+              isClaimed: true,
+              claimedAt: existingProfile.claimedAt ?? now,
+              onboardingCompletedAt:
+                existingProfile.onboardingCompletedAt ?? now,
+            }),
+        ...(waitlistEntryId ? { waitlistEntryId } : {}),
         settings,
         updatedAt: now,
         ...spotifyFields,
@@ -249,14 +269,15 @@ async function persistClaimedProfileRow({
     .insert(creatorProfiles)
     .values({
       userId,
+      waitlistEntryId,
       creatorType: 'artist',
       username: handle,
       usernameNormalized: handle,
       displayName,
-      isPublic: true,
-      isClaimed: true,
-      claimedAt: now,
-      onboardingCompletedAt: now,
+      isPublic: !reserved,
+      isClaimed: !reserved,
+      claimedAt: reserved ? null : now,
+      onboardingCompletedAt: reserved ? null : now,
       settings,
       theme: {},
       ingestionStatus: 'idle',
@@ -279,6 +300,8 @@ async function persistClaimedProfileWithHandleRetry({
   settings,
   now,
   spotifyFields,
+  reserved,
+  waitlistEntryId,
 }: {
   readonly userId: string;
   readonly existingProfile: CreatorProfile | null;
@@ -287,6 +310,8 @@ async function persistClaimedProfileWithHandleRetry({
   readonly settings: Record<string, unknown>;
   readonly now: Date;
   readonly spotifyFields: Record<string, unknown>;
+  readonly reserved: boolean;
+  readonly waitlistEntryId: string | null;
 }): Promise<{
   profileId: string;
   handle: string;
@@ -319,6 +344,8 @@ async function persistClaimedProfileWithHandleRetry({
         settings,
         now,
         spotifyFields,
+        reserved,
+        waitlistEntryId,
       });
 
       return { ...result, handle };
@@ -346,7 +373,10 @@ export async function materializeClaimedOnboardingProfile({
   conversationId,
   ipAddress,
   userAgent,
+  visibility = 'public',
+  waitlistEntryId = null,
 }: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
+  const reserved = visibility === 'reserved';
   // Auth first (no DB): refuse anonymous materialize / reserve success.
   const { userId: authenticatedUserId } = requireVerifiedOwnerForReservation({
     userId,
@@ -409,22 +439,29 @@ export async function materializeClaimedOnboardingProfile({
       settings,
       now,
       spotifyFields,
+      reserved,
+      waitlistEntryId,
     });
 
-  await db
-    .update(users)
-    .set({ activeProfileId: profileId, updatedAt: now })
-    .where(eq(users.id, verifiedUserId));
+  // A reserved (waitlist-pending) profile only holds the handle. Publishing
+  // ownership signals — activeProfileId and the owner claim row — happens on
+  // the admitted claim path so nothing treats the reservation as admission.
+  if (!reserved) {
+    await db
+      .update(users)
+      .set({ activeProfileId: profileId, updatedAt: now })
+      .where(eq(users.id, verifiedUserId));
 
-  // "Manage as owner" claim row — only after verified ownership above.
-  await db
-    .insert(userProfileClaims)
-    .values({
-      userId: verifiedUserId,
-      creatorProfileId: profileId,
-      role: 'owner',
-    })
-    .onConflictDoNothing();
+    // "Manage as owner" claim row — only after verified ownership above.
+    await db
+      .insert(userProfileClaims)
+      .values({
+        userId: verifiedUserId,
+        creatorProfileId: profileId,
+        role: 'owner',
+      })
+      .onConflictDoNothing();
+  }
 
   await db
     .update(chatConversations)
@@ -469,6 +506,8 @@ export async function materializeClaimedOnboardingProfile({
     metadata: {
       handle,
       status,
+      visibility: reserved ? 'reserved' : 'public',
+      waitlistEntryId,
       spotifyArtistId: state.artist?.id ?? null,
       spotifyArtistName: state.artist?.name ?? null,
       // Neutral, ownership-verified label (never pre-verify "you" language).
@@ -478,7 +517,9 @@ export async function materializeClaimedOnboardingProfile({
     userAgent,
   });
 
-  await recordFunnelStep({ funnel: 'artist_signup', step: 'claim_complete' });
+  if (!reserved) {
+    await recordFunnelStep({ funnel: 'artist_signup', step: 'claim_complete' });
+  }
 
   return { profileId, handle, status };
 }

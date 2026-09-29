@@ -7,6 +7,7 @@ import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
   getWaitlistAccess,
+  getWaitlistReservedHandle,
   resolveUserState,
 } from '@/lib/auth/gate';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
@@ -84,9 +85,13 @@ export default async function WaitlistPage() {
     ? await getWaitlistAccess(authResult.context.email)
     : null;
   if (access?.entryId && isWaitlistPendingStatus(access.status)) {
+    const reservedHandle = await getWaitlistReservedHandle(access.entryId);
     return (
       <WaitlistRouteWithContract>
-        <WaitlistSuccessView email={authResult.context.email} />
+        <WaitlistSuccessView
+          email={authResult.context.email}
+          reservedHandle={reservedHandle}
+        />
       </WaitlistRouteWithContract>
     );
   }

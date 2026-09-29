@@ -326,7 +326,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'tim-white-profile-alerts-fallback-mobile',
       title: 'Tim White Profile — Alerts Fallback',
       route: '/demo/showcase/tim-white-profile?state=alerts-fallback',
-      waitFor: '[data-testid="profile-home-alerts-fallback-card"]',
+      waitFor: '[data-testid="profile-identity-get-updates"]',
       viewport: 'mobile',
       publicExportPath: 'tim-white-profile-alerts-fallback-phone.png',
     },
