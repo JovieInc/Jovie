@@ -9,6 +9,7 @@ import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-produ
 import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import {
+  logSummerBridgeEvent,
   resolveSummerEveCallerOrigin,
   SummerPinInvalidError,
 } from '@/lib/ovie/summer-production-pin';
@@ -26,6 +27,7 @@ const EVE_BOTTLENECK_PATH = '/ovie/v1/summer-bottleneck/events';
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const MAX_LOGGED_SCHEMA_ISSUES = 20;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const SHA = /^[0-9a-f]{40}$/u;
 const ZERO_SHA = '0'.repeat(40);
@@ -299,9 +301,8 @@ function hasExpectedProductionClaims(token: string): boolean {
   }
 }
 
-function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
-  if (!Number.isFinite(nowMs)) return false;
-  const timestamps = [
+function signalObservedAt(snapshot: UnsignedSnapshot): readonly string[] {
+  return [
     snapshot.observedAt,
     snapshot.signals.closure.observedAt,
     snapshot.signals.queue.observedAt,
@@ -311,10 +312,43 @@ function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
     snapshot.signals.runner.capacitySource.observedAt,
     snapshot.signals.runner.workSource.observedAt,
   ];
-  return timestamps.every(value => {
+}
+
+function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
+  if (!Number.isFinite(nowMs)) return false;
+  return signalObservedAt(snapshot).every(value => {
     const ageMs = nowMs - Date.parse(value);
     return ageMs <= MAX_SIGNAL_AGE_MS && ageMs >= -MAX_CLOCK_SKEW_MS;
   });
+}
+
+/** Zod path and code only. Issue input, message, and pattern can echo values. */
+function summarizeSchemaIssues(
+  issues: readonly { path: readonly PropertyKey[]; code: string }[]
+): { path: string; code: string }[] {
+  return issues.slice(0, MAX_LOGGED_SCHEMA_ISSUES).map(issue => ({
+    path: issue.path.join('.'),
+    code: issue.code,
+  }));
+}
+
+/** Oldest signal age and the freshness thresholds. No snapshot fields. */
+function freshnessLogFields(
+  snapshot: UnsignedSnapshot,
+  nowMs: number
+): {
+  ageSeconds: number;
+  maxAgeSeconds: number;
+  maxClockSkewSeconds: number;
+} {
+  const oldestAgeMs = Math.max(
+    ...signalObservedAt(snapshot).map(value => nowMs - Date.parse(value))
+  );
+  return {
+    ageSeconds: oldestAgeMs / 1000,
+    maxAgeSeconds: MAX_SIGNAL_AGE_MS / 1000,
+    maxClockSkewSeconds: MAX_CLOCK_SKEW_MS / 1000,
+  };
 }
 
 /** Authenticated Jovie-production bridge for one immutable Summer snapshot. */
@@ -342,9 +376,20 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = unsignedSnapshotSchema.safeParse(rawInput);
   if (!parsed.success) {
+    logSummerBridgeEvent({
+      event: 'invalid_bottleneck_snapshot',
+      code: 'invalid_bottleneck_snapshot',
+      issues: summarizeSchemaIssues(parsed.error.issues),
+    });
     return json({ ok: false, code: 'invalid_bottleneck_snapshot' }, 422);
   }
-  if (!isFresh(parsed.data)) {
+  const nowMs = Date.now();
+  if (!isFresh(parsed.data, nowMs)) {
+    logSummerBridgeEvent({
+      event: 'stale_bottleneck_snapshot',
+      code: 'stale_bottleneck_snapshot',
+      ...freshnessLogFields(parsed.data, nowMs),
+    });
     return json({ ok: false, code: 'stale_bottleneck_snapshot' }, 422);
   }
   if (
