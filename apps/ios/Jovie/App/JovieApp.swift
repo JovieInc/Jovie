@@ -74,7 +74,7 @@ final class PushNotificationManager: PushNotificationCoordinating {
     defaults.removeObject(forKey: Self.storedTokenKey)
   }
 
-  static func tokenString(from data: Data) -> String {
+  nonisolated static func tokenString(from data: Data) -> String {
     data.map { String(format: "%02x", $0) }.joined()
   }
 
