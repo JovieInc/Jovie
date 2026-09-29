@@ -912,6 +912,7 @@ export function ProfileMobileNotificationsFlow({
         data-testid='profile-mobile-notifications-flow'
         role='dialog'
         aria-modal='true'
+        aria-label={`Get Updates from ${artistName}`}
         tabIndex={-1}
         style={contentStyle}
       >
@@ -927,6 +928,7 @@ export function ProfileMobileNotificationsFlow({
         data-testid='profile-mobile-notifications-flow'
         role='dialog'
         aria-modal='true'
+        aria-label={`Get Updates from ${artistName}`}
         tabIndex={-1}
         style={contentStyle}
       >
