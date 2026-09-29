@@ -13,6 +13,7 @@ import {
   Menu,
   type MenuItemConstructorOptions,
   net,
+  Notification,
   powerMonitor,
   type Session,
   screen,
@@ -71,6 +72,10 @@ import {
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
+import {
+  parseDesktopNotificationRequest,
+  resolveDesktopNotificationClickAction,
+} from './desktop-notifications';
 import {
   isDesktopCaptureRouteUrl,
   shouldGrantTrustedAudioPermission,
@@ -261,6 +266,7 @@ const LEGACY_AUTH_RETURN_HOST = 'auth-return';
 const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
+const DESKTOP_NOTIFICATION_CHANNEL = 'desktop-notification-show';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
@@ -3345,6 +3351,54 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-payload' };
     }
     menuBarTray.setState(payload as TrayStatePayload);
+    return { ok: true };
+  }
+);
+
+/**
+ * A notification click focuses the window, then deep-links via the same URL
+ * disposition table the navigation guards use (JOV-6716). Blocked targets
+ * degrade to a plain focus; external targets go to the system browser.
+ */
+function routeDesktopNotificationClick(urlString: string | undefined): void {
+  const win =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+  showWindow(win);
+
+  if (!urlString) return;
+  const action = resolveDesktopNotificationClickAction(
+    resolveNavigationUrl(urlString),
+    URL_DISPOSITION_OPTIONS
+  );
+  if (action.kind === 'load-url') {
+    void win.loadURL(action.url);
+  } else if (action.kind === 'profile-preview') {
+    showPublicProfilePreview(action.url);
+  } else if (action.kind === 'open-external') {
+    void openExternalUrl(action.url);
+  }
+}
+
+ipcMain.handle(
+  DESKTOP_NOTIFICATION_CHANNEL,
+  (event: IpcMainInvokeEvent, payload: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    if (!Notification.isSupported()) {
+      return { ok: false, reason: 'unsupported' };
+    }
+    const request = parseDesktopNotificationRequest(payload);
+    if (!request) return { ok: false, reason: 'invalid-payload' };
+
+    const notification = new Notification({
+      title: request.title,
+      body: request.body,
+    });
+    notification.on('click', () =>
+      routeDesktopNotificationClick(request.url)
+    );
+    notification.show();
     return { ok: true };
   }
 );

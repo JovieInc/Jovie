@@ -19,7 +19,6 @@ const lifecycle = [
 ] as const;
 
 const evidenceGaps = [
-  'Certified HEAD and staging revision are not connected to the shipping projection.',
   'Web and client version distribution is not observed by an authoritative source.',
   'Feature flags expose configured state, but user exposure counts and outcomes are not yet measured.',
 ] as const;

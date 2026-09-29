@@ -53,6 +53,8 @@ function deferredResponse() {
 
 const NOW = Date.now();
 const LIVE_SHA = 'ee7401f37e0b324e225751f0d97ce229838ac8b4';
+const CERT_SHA = 'c3e74e00a9d234b8f6a1b2c3d4e5f60718293a4b';
+const STAGE_SHA = 'a1b2c3d4e5f60718293a4bc3e74e00a9d234b8f6';
 const count = (value: number) =>
   value === 0
     ? { state: 'measured-zero', value: 0 }
@@ -90,11 +92,21 @@ const delivery = {
   },
   mergeQueueDepth: count(2),
   inFlight: count(0),
+  certifiedHead: {
+    sha: CERT_SHA,
+    certifiedAt: new Date(NOW - 1_800_000).toISOString(),
+  },
   production: {
     sha: LIVE_SHA,
     version: '26.9.15',
     deployedAt: new Date(NOW - 3_600_000).toISOString(),
     behindMain: count(54),
+  },
+  staging: {
+    sha: STAGE_SHA,
+    version: '26.9.16',
+    deployedAt: new Date(NOW - 1_200_000).toISOString(),
+    behindMain: count(2),
   },
   summer: { availability: 'up' },
 };
@@ -174,6 +186,8 @@ const LABELS = [
   'In Flight',
   'Jovie / LYB / Summer',
   'Merged 7d',
+  'Certified HEAD',
+  'Staging',
   'Production',
   'Behind Main',
   'CI Green',
@@ -221,6 +235,8 @@ describe('OvieShippingStateCard', () => {
     expect(metricValue('In Flight')).toBe('0');
     expect(metricValue('Jovie / LYB / Summer')).toBe('189 / 17 / 26');
     expect(metricValue('Merged 7d')).toBe('862 (+283% WoW)');
+    expect(metricValue('Certified HEAD')).toBe('c3e74e0');
+    expect(metricValue('Staging')).toBe('26.9.16 a1b2c3d');
     expect(metricValue('Production')).toBe('26.9.15 ee7401f');
     expect(metricValue('Behind Main')).toBe('54');
     expect(metricValue('CI Green')).toBe('Yes');
@@ -231,6 +247,7 @@ describe('OvieShippingStateCard', () => {
       )
     ).toBeTruthy();
     expect(screen.getByText('61 harness-failed runs in 24h')).toBeTruthy();
+    expect(screen.getByText('Capacity source gap')).toBeTruthy();
     for (const label of LABELS) {
       expect(screen.getByText(label)).toBeTruthy();
     }

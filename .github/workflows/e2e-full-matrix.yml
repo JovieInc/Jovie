@@ -30,6 +30,14 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  # Pushes land on main far faster than the serial browser matrix can finish,
+  # so only the freshest tip should keep running. Without this group stale
+  # runs are killed externally mid-test, surfacing as job failures and
+  # failure alerts instead of a clean cancellation.
+  group: e2e-full-matrix-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
   e2e-full-matrix:
     name: E2E (Chrome + Firefox)
