@@ -1,7 +1,12 @@
 'use client';
 
 import { Button, ConfirmDialog, Textarea } from '@jovie/ui';
-import { ClipboardCopy, ExternalLink, ShieldCheck } from 'lucide-react';
+import {
+  ClipboardCopy,
+  ExternalLink,
+  MonitorPlay,
+  ShieldCheck,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
@@ -21,6 +26,7 @@ import {
   type OvieCertificationDecisionKind,
   type OvieCertificationRow,
 } from '@/lib/ovie/certifications/types';
+import { canStartWalkthrough } from '@/lib/ovie/certifications/walkthrough';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import {
   CertificationStateGlyph,
@@ -41,6 +47,7 @@ interface CertificationDetailRailProps {
   readonly row: OvieCertificationRow | null;
   readonly onClose: () => void;
   readonly onDecide: CertificationDecisionHandler;
+  readonly onWalkthrough?: () => void;
   readonly pendingDecision: OvieCertificationDecisionKind | null;
   readonly decisionError: string | null;
 }
@@ -236,11 +243,13 @@ function SourceSection({ row }: { readonly row: OvieCertificationRow }) {
 function DecisionFooter({
   row,
   onDecide,
+  onWalkthrough,
   pendingDecision,
   decisionError,
 }: {
   readonly row: OvieCertificationRow;
   readonly onDecide: CertificationDecisionHandler;
+  readonly onWalkthrough?: () => void;
   readonly pendingDecision: OvieCertificationDecisionKind | null;
   readonly decisionError: string | null;
 }) {
@@ -266,6 +275,19 @@ function DecisionFooter({
 
   return (
     <div className='space-y-2' data-testid='certification-decision'>
+      {onWalkthrough && canStartWalkthrough(row) ? (
+        <Button
+          size='sm'
+          variant='secondary'
+          className='w-full'
+          disabled={busy}
+          data-testid='certification-walkthrough-action'
+          onClick={onWalkthrough}
+        >
+          <MonitorPlay className='h-3.5 w-3.5' aria-hidden='true' />
+          Walkthrough
+        </Button>
+      ) : null}
       <label htmlFor={notesId} className='sr-only'>
         Note for the worker
       </label>
@@ -337,6 +359,7 @@ export function CertificationDetailRail({
   row,
   onClose,
   onDecide,
+  onWalkthrough,
   pendingDecision,
   decisionError,
 }: CertificationDetailRailProps) {
@@ -407,6 +430,7 @@ export function CertificationDetailRail({
             key={`${row.id}:${row.decision.evidenceDigest ?? 'none'}`}
             row={row}
             onDecide={onDecide}
+            onWalkthrough={onWalkthrough}
             pendingDecision={pendingDecision}
             decisionError={decisionError}
           />

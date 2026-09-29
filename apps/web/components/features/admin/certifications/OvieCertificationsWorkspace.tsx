@@ -48,6 +48,7 @@ import {
   CertificationStateGlyph,
   CertificationTierGlyph,
 } from './CertificationGlyphs';
+import { CertificationWalkthrough } from './CertificationWalkthrough';
 import {
   CERTIFICATION_STATE_FILTERS,
   CERTIFICATION_STATE_RANK,
@@ -331,6 +332,7 @@ export function OvieCertificationsWorkspace() {
   const [pendingDecision, setPendingDecision] =
     useState<OvieCertificationDecisionKind | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
 
   const inventory = query.data;
   const allRows = useMemo(() => inventory?.rows ?? [], [inventory]);
@@ -408,6 +410,7 @@ export function OvieCertificationsWorkspace() {
         row={selected}
         onClose={() => setSelectedId(null)}
         onDecide={handleDecide}
+        onWalkthrough={() => setWalkthroughOpen(true)}
         pendingDecision={pendingDecision}
         decisionError={decisionError}
       />
@@ -554,6 +557,13 @@ export function OvieCertificationsWorkspace() {
             />
           )}
         </AdminTableShell>
+        <CertificationWalkthrough
+          row={selected}
+          open={walkthroughOpen}
+          onOpenChange={setWalkthroughOpen}
+          onDecide={handleDecide}
+          pendingDecision={pendingDecision}
+        />
       </div>
     </PageShell>
   );
