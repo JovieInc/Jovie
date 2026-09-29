@@ -58,7 +58,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (273 contract tokens; 533 total in CSS)
+## Design Tokens (275 contract tokens; 535 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -211,6 +211,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-audio-compact-height`: 64px
 - `--app-shell-border`: rgba(0, 0, 0, 0.05)
 - `--app-shell-card-shadow`: none
+- `--app-shell-content-inset`: var(--app-shell-gap)
 - `--app-shell-content-max-form`: 50rem
 - `--app-shell-content-max-reading`: 56rem
 - `--app-shell-content-max-wide`: 84rem
@@ -229,6 +230,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-radius`: 12px
 - `--app-shell-radius-item`: 8px
 - `--app-shell-radius-menu`: 8px
+- `--app-shell-radius-nested`: calc( var(--app-shell-radius) - var(--app-shell-gap) )
 - `--app-shell-shadow`: 0 14px 30px rgba(0, 0, 0, 0.045)
 - `--app-shell-sidebar-accent-active-rgb`: 236 238 241
 - `--app-shell-sidebar-accent-rgb`: 242 243 245
@@ -279,15 +281,15 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 ### Typography Scale
 
 - `--text-2xl`: 1.5rem
-- `--text-2xs`: 0.6875rem
-- `--text-3xl`: 1.875rem
+- `--text-2xs`: 0.75rem
+- `--text-3xl`: 2rem
 - `--text-3xs`: 0.625rem
-- `--text-4xl`: 2.25rem
+- `--text-4xl`: 2.5rem
 - `--text-5xl`: 3rem
-- `--text-app`: 0.8125rem
+- `--text-app`: 0.75rem
 - `--text-base`: 1rem
-- `--text-lg`: 1.125rem
-- `--text-mid`: 0.9375rem
+- `--text-lg`: 1rem
+- `--text-mid`: 0.875rem
 - `--text-sm`: 0.875rem
 - `--text-xl`: 1.25rem
 - `--text-xs`: 0.75rem
@@ -381,7 +383,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--ease-subtle`: var(--ds-motion-subtle-easing)
 - `--page-pad`: clamp(16px, 4vw, 32px)
 
-## Shared UI Components (38 atom primitives)
+## Shared UI Components (39 atom primitives)
 
 Import from `@jovie/ui` — do not recreate local atom copies.
 
@@ -419,6 +421,7 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 - **Skeleton** — `packages/ui/atoms/skeleton.tsx`
 - **Spinner** — `packages/ui/atoms/spinner.tsx`
 - **StackableBadgeGroup** — `packages/ui/atoms/stackable-badge-group.tsx`
+- **StatusGlyph** — `packages/ui/atoms/status-glyph.tsx`
 - **Switch** — `packages/ui/atoms/switch.tsx`
 - **Textarea** — `packages/ui/atoms/textarea.tsx`
 - **Tooltip** — `packages/ui/atoms/tooltip.tsx`
