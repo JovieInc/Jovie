@@ -334,6 +334,50 @@ export async function buildConfirmSpotifyArtistOutput(
   };
 }
 
+/** The artist the server already confirmed, rebuilt from turn state. */
+export function echoConfirmedArtist(
+  state: OnboardingTurnState
+): ConfirmSpotifyArtistOutput | UnconfirmedArtistOutput {
+  if (!state.spotifyArtistId) {
+    return {
+      action: 'spotify_artist_unconfirmed',
+      summary:
+        'No artist confirmed yet. Open the picker with searchSpotifyArtist; never guess an id.',
+    };
+  }
+  const metrics = state.artistMetrics;
+  return {
+    action: 'spotify_artist_confirmed',
+    spotifyArtistId: state.spotifyArtistId,
+    artist: state.spotifyArtistName
+      ? {
+          id: state.spotifyArtistId,
+          name: state.spotifyArtistName,
+          url: buildSpotifyArtistUrl(state.spotifyArtistId),
+          imageUrl: state.spotifyImageUrl,
+          followers: state.spotifyFollowers,
+          popularity: state.spotifyPopularity,
+          genres: state.spotifyGenres.slice(0, 3),
+          metrics:
+            metrics ??
+            normalizeArtistMetrics(
+              { followers: state.spotifyFollowers },
+              { source: 'tool_output' }
+            ),
+        }
+      : null,
+    metrics,
+    summary: state.spotifyArtistName
+      ? `${state.spotifyArtistName} is already confirmed.`
+      : 'Spotify artist selected; profile data is unavailable right now.',
+  };
+}
+
+export interface UnconfirmedArtistOutput {
+  readonly action: 'spotify_artist_unconfirmed';
+  readonly summary: string;
+}
+
 export interface CheckoutCardPayload {
   readonly action: 'propose_checkout';
   readonly plan: 'free' | 'pro' | 'max' | null;
@@ -366,8 +410,10 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
     confirmSpotifyArtist: tool({
       description: TOOL_SCHEMAS.confirmSpotifyArtist.description,
       inputSchema: TOOL_SCHEMAS.confirmSpotifyArtist.inputSchema,
-      execute: async ({ spotifyArtistId }) =>
-        buildConfirmSpotifyArtistOutput(spotifyArtistId, state),
+      // JOV-7134: the handler confirms the picker selection server-side from
+      // its real id (metadata the model never sees). The model can only echo
+      // that confirmation; it can never swap in or invent an artist id.
+      execute: async () => echoConfirmedArtist(state),
     }),
 
     checkHandle: tool({

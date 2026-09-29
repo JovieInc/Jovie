@@ -120,7 +120,7 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
       {issues.map(issue => (
         <span
           key={issue.label}
-          className='inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 text-3xs font-medium text-red-600 dark:text-red-400'
+          className='inline-flex items-center gap-0.5 rounded-full bg-error/10 px-1.5 py-0.5 text-3xs font-medium text-error'
           title={issue.label}
         >
           {issue.icon}
@@ -220,7 +220,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
         const count = getValue();
         if (count === 0) {
           return (
-            <span className='inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-2xs font-medium text-red-600 dark:text-red-400'>
+            <span className='inline-flex items-center rounded-full bg-error/10 px-1.5 py-0.5 text-2xs font-medium text-error'>
               0
             </span>
           );

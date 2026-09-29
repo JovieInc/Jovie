@@ -38,7 +38,7 @@ function assignRef<T>(ref: RefTarget<T>, value: T | null) {
 
 /**
  * Restores focus to the originating menu trigger when a modal that was
- * opened from a menu item closes (JOV-INV-036 focus restore).
+ * opened from a menu item closes.
  */
 export function useMenuOriginFocusRestore<T extends HTMLElement>(
   forwardedRef: RefTarget<T>,

@@ -36,6 +36,7 @@ import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShipp
 import { VisualQaReviewPanel } from '@/components/features/admin/hud/VisualQaReviewPanel';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
+import { SummerCardReviewPanel } from '@/components/features/admin/summer-cards';
 import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
 import { WhatShipped } from '@/components/features/admin/WhatShipped';
 import { toast } from '@/components/feedback';
@@ -223,7 +224,7 @@ const DEPLOYMENT_STATE_LABELS: Record<HudDeploymentState, string> = {
 
 const DEPLOYMENT_STATE_DOT_CLASSNAMES: Record<HudDeploymentState, string> = {
   success: 'bg-success',
-  failure: 'bg-destructive',
+  failure: 'bg-error',
   in_progress: 'bg-info',
   unknown: 'bg-tertiary-token',
   not_configured: 'bg-tertiary-token',
@@ -832,6 +833,7 @@ export function HudDashboardClient({
             data-testid={section.testId}
           >
             <DesignProposalReviewPanel />
+            <SummerCardReviewPanel />
             <VisualQaReviewPanel />
           </div>
         );

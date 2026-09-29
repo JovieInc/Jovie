@@ -151,6 +151,7 @@ export function ClaimHandleForm({
       className='w-full'
       noValidate
       aria-busy={checkingAvail || navigating}
+      data-testid='claim-handle-form'
     >
       {/* Input row */}
       <div

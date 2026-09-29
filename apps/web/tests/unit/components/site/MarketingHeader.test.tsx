@@ -191,30 +191,28 @@ describe('MarketingHeader', () => {
     const links = within(flyout as HTMLElement).getAllByRole('link');
     expect(
       links.map(link => [link.textContent, link.getAttribute('href')])
-    ).toEqual([
-      ['Investors', '/investors'],
-      ['Artists', '/solutions/artists'],
-    ]);
-    for (const absent of ['Founders', 'Authors', 'Creators']) {
+    ).toEqual([['Artists', '/solutions/artists']]);
+    for (const absent of ['Founders', 'Authors', 'Creators', 'Investors']) {
       expect(within(flyout as HTMLElement).queryByText(absent)).toBeNull();
     }
     expect(
       flyout?.querySelectorAll('.marketing-glass-header__flyout-arrow')
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(
       flyout?.querySelectorAll('.marketing-glass-header__flyout-description')
     ).toHaveLength(0);
   });
 
-  it('uses the one Request access CTA on the homepage header', () => {
+  it('uses the one Find yourself CTA on the homepage header (JOV-5085)', () => {
     mockUsePathname.mockReturnValue('/');
     render(<MarketingHeader />);
 
-    const ctas = screen.getAllByRole('link', { name: 'Request access' });
+    const ctas = screen.getAllByRole('link', { name: 'Find yourself' });
     expect(ctas.length).toBeGreaterThanOrEqual(1);
     for (const cta of ctas) {
-      expect(cta).toHaveAttribute('href', '/signup');
+      expect(cta).toHaveAttribute('href', '/start');
     }
+    expect(screen.queryByRole('link', { name: 'Request access' })).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -229,10 +227,10 @@ describe('MarketingHeader', () => {
       'data-presentation',
       'marketing-glass'
     );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
+    expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {
@@ -261,9 +259,10 @@ describe('MarketingHeader', () => {
       'href',
       '/product'
     );
-    expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {

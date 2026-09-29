@@ -20,7 +20,7 @@ const FETCH_URL = '/api/admin/hud/tim-actions';
 const PRIORITY_CONFIG: Record<number, { label: string; className: string }> = {
   1: {
     label: 'Urgent',
-    className: 'bg-red-500/15 text-red-400 border border-red-500/20',
+    className: 'bg-error/15 text-error border border-error/20',
   },
   2: {
     label: 'High',
@@ -52,7 +52,7 @@ function DaysOldBadge({ daysOld }: Readonly<{ readonly daysOld: number }>) {
       title={`${daysOld} days old${isOverdue ? ' — overdue' : ''}`}
       className={
         isOverdue
-          ? 'text-2xs font-semibold tabular-nums text-red-400 no-underline'
+          ? 'text-2xs font-semibold tabular-nums text-error no-underline'
           : 'text-2xs tabular-nums text-tertiary-token no-underline'
       }
     >
@@ -124,6 +124,8 @@ export function TimActionRequiredSection() {
   const isInitialLoadRef = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchFailed, setFetchFailed] = useState(false);
+  // 403 = admin step-up lock, not a Linear outage.
+  const [locked, setLocked] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [optimisticallyClosedIds, setOptimisticallyClosedIds] = useState<
     Set<string>
@@ -136,6 +138,7 @@ export function TimActionRequiredSection() {
     }
     try {
       const response = await fetch(FETCH_URL, { signal });
+      setLocked(response.status === 403);
       if (!response.ok) {
         throw new Error(`Fetch failed (${response.status})`);
       }
@@ -226,7 +229,7 @@ export function TimActionRequiredSection() {
             className='h-2 w-2 shrink-0 rounded-full bg-warning'
             aria-hidden='true'
           />
-          <p className='text-xs font-caption text-tertiary-token'>Needs Tim</p>
+          <p className='text-xs font-caption text-tertiary-token'>Needs You</p>
           {!isLoading && visibleIssues.length > 0 ? (
             <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
               {visibleIssues.length}
@@ -258,7 +261,7 @@ export function TimActionRequiredSection() {
         ) : (
           <HudObservationStatus
             state={observation}
-            message={timActionsMessage(observation, data)}
+            message={timActionsMessage(observation, data, locked)}
             freshnessLabel={
               data?.fetchedAt
                 ? `Updated ${formatFetchedAt(data.fetchedAt)}`
@@ -309,8 +312,12 @@ function resolveTimActionsObservation({
 
 function timActionsMessage(
   observation: HudObservationState,
-  data: TimActionsResponse | null
+  data: TimActionsResponse | null,
+  locked = false
 ): string {
+  if (locked && observation === 'unavailable') {
+    return 'Admin data is locked. Unlock with Touch ID, then retry.';
+  }
   if (observation === 'not_configured') {
     return (
       data?.errorMessage ??
@@ -321,7 +328,7 @@ function timActionsMessage(
     return data?.errorMessage ?? 'Linear actions are unavailable.';
   }
   if (observation === 'empty') {
-    return 'Nothing needs Tim.';
+    return 'Nothing needs you.';
   }
   return '';
 }

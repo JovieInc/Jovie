@@ -1,17 +1,29 @@
 import { Head } from 'nextra/components';
 import { getPageMap } from 'nextra/page-map';
-import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import 'nextra-theme-docs/style.css';
 import './globals.css';
+import './help.css';
+import './help-search.css';
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
-import { HelpCenterSearch } from '@/components/HelpCenterSearch';
+import { ArticleFeedback } from '@/components/ArticleFeedback';
+import { ContactSupportLink } from '@/components/ContactSupportLink';
+import { HelpCenterAnalytics } from '@/components/HelpCenterAnalytics';
+import { HelpShell } from '@/components/help/HelpShell';
 import {
   filterNavigationPageMap,
   loadArticleRegistry,
 } from '@/lib/article-registry.mjs';
 import { DOCS_ORIGIN } from '@/lib/help-center-seo.mjs';
-import './help-search.css';
+import { buildHelpNav } from '@/lib/help-nav.mjs';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(DOCS_ORIGIN),
@@ -40,9 +52,15 @@ export default async function RootLayout({
     (article: { route: string }) => article.route
   );
   const pageMap = filterNavigationPageMap(await getPageMap(), primaryRoutes);
+  const nav = buildHelpNav(pageMap);
 
   return (
-    <html lang='en' dir='ltr' suppressHydrationWarning>
+    <html
+      lang='en'
+      dir='ltr'
+      className={inter.variable}
+      suppressHydrationWarning
+    >
       <Head
         backgroundColor={{
           dark: 'rgb(8, 9, 10)',
@@ -54,28 +72,22 @@ export default async function RootLayout({
         }}
       />
       <body>
-        <Layout
-          navbar={
-            <Navbar
-              logo={
-                <span style={{ fontWeight: 700, fontSize: 18 }}>
-                  Jovie Help Center
-                </span>
-              }
-            >
-              <HelpCenterSearch variant='mobile-only' />
-            </Navbar>
-          }
-          pageMap={pageMap}
-          docsRepositoryBase='https://github.com/JovieInc/Jovie/tree/main/apps/docs'
-          editLink='Edit this page on GitHub'
-          footer={
-            <Footer>Copyright {new Date().getFullYear()} Jovie Inc.</Footer>
-          }
-          search={<HelpCenterSearch variant='desktop-only' />}
+        <ThemeProvider
+          attribute='class'
+          defaultTheme='system'
+          enableSystem
+          disableTransitionOnChange
         >
-          {children}
-        </Layout>
+          <HelpShell nav={nav}>
+            {children}
+            <ArticleFeedback />
+            <footer className='help-footer'>
+              Copyright {new Date().getFullYear()} Jovie Inc.{' '}
+              <ContactSupportLink />
+            </footer>
+          </HelpShell>
+          <HelpCenterAnalytics />
+        </ThemeProvider>
       </body>
     </html>
   );

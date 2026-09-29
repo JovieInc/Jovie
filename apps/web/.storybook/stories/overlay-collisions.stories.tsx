@@ -42,7 +42,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 
 /**
- * Overlay collision harness (JOV-INV-036).
+ * Overlay collision harness.
  *
  * Composes the canonical @jovie/ui overlay primitives in the combinations
  * that break in production: a select inside a sheet, a dialog opened from a

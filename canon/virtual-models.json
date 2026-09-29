@@ -1,0 +1,558 @@
+{
+  "schema": "jovie-marketing-character-system/v2",
+  "issue": "JOV-6945",
+  "rule": "virtual-model-passport",
+  "note": "Canonical casting board, identity passports, persona briefs, and generation constraints for fictional Jovie marketing characters. Never name or resemble a real person. Identity is fixed per character; campaign styling and shoots may vary only inside this contract.",
+  "sourceCanon": [
+    {
+      "repository": "JovieInc/BubblegumFactory",
+      "commit": "bd0f91142346f37bba8d94ca422d30e65a0da5d6",
+      "paths": ["CANON.md", "PROMPTS.md"],
+      "integrates": [
+        "clean repeatable founder/studio wardrobe",
+        "premium documentary photography",
+        "locked environment and camera continuity"
+      ]
+    },
+    {
+      "repository": "JovieInc/Ops",
+      "commit": "00cc0721e89831c12a4441a233ab7f385de0b17f",
+      "paths": ["01-canon/02-tim-white.md"],
+      "integrates": [
+        "subject-first visual restraint",
+        "deliberate minimal frames",
+        "expensive without performative luxury"
+      ]
+    }
+  ],
+  "views": ["portrait", "three-quarter", "full-body-front", "profile"],
+  "castingBoard": {
+    "status": "recertified",
+    "recertifiedAt": "2026-09-29",
+    "compCard": {
+      "background": "neutral seamless or simple low-detail studio wall",
+      "lighting": "controlled soft studio light with consistent exposure and white balance",
+      "styling": "minimal; no editorial concept or scene storytelling",
+      "wardrobe": "simple fitted solids with a clean silhouette and no distracting branding",
+      "grooming": "clean and consistent across every view",
+      "framing": [
+        {
+          "view": "portrait",
+          "requirement": "straight or slight three-quarter head-and-shoulders portrait with the complete head in frame"
+        },
+        {
+          "view": "three-quarter",
+          "requirement": "head through mid-thigh with neutral posture and the complete head in frame"
+        },
+        {
+          "view": "full-body-front",
+          "requirement": "complete head-to-toe front view with margin above the head and below both feet; never crop the head"
+        },
+        {
+          "view": "profile",
+          "requirement": "clean head-and-shoulders side profile with the complete head in frame"
+        }
+      ],
+      "reject": [
+        "street or editorial imagery",
+        "environmental storytelling",
+        "dramatic wardrobe, props, or lighting that drives selection",
+        "cropped head or feet in the full-body view"
+      ]
+    },
+    "selectionGates": [
+      {
+        "id": "premium-aspirational-quality",
+        "independent": true,
+        "requirement": "exceptional commercial presence, finish, and memorability at an extremely aspirational bar"
+      },
+      {
+        "id": "icp-resonance",
+        "independent": true,
+        "requirement": "credible resonance with ambitious independent recording artists and creator-operators"
+      }
+    ],
+    "similarityReview": {
+      "method": "machine-assisted controlled-vocabulary Jaccard review followed by visual review",
+      "axes": ["mouth", "face", "hair", "build", "presence"],
+      "nearDuplicateThreshold": 0.6,
+      "visualReview": "passed-with-required-modifications",
+      "reviewedPairs": ["C05:C06"],
+      "requirement": "reject sibling candidates even when only a combination of mouth, face, hair, build, and presence makes them feel duplicated"
+    },
+    "groupScenes": {
+      "priority": ["icp-fit", "individual-distinguishability"],
+      "allowedDifferentiators": [
+        "mouth shape",
+        "facial geometry",
+        "hair silhouette",
+        "build silhouette",
+        "height",
+        "posture",
+        "expression",
+        "wardrobe silhouette",
+        "activity",
+        "prop assignment",
+        "camera blocking"
+      ],
+      "forbiddenDifferentiation": "Do not manufacture demographic variety or use protected characteristics as differentiation tokens.",
+      "uniqueHighSignalStyling": [
+        "hero hair silhouette",
+        "hero wardrobe silhouette",
+        "signature accessory",
+        "high-salience prop",
+        "accent placement"
+      ]
+    }
+  },
+  "generationPolicy": {
+    "personaBriefOrder": "A complete persona brief must be approved before image generation or scene design.",
+    "personaFields": [
+      "role",
+      "scene",
+      "lifestyleContext",
+      "aestheticVocabulary",
+      "likelyEnvironment",
+      "aspiration",
+      "icpTags"
+    ],
+    "worldCoherence": {
+      "requiredParts": [
+        "character",
+        "wardrobe",
+        "environment",
+        "props",
+        "activity",
+        "lighting"
+      ],
+      "requirement": "Every part must imply one specific, coherent world; a generic stock environment is rejected by default."
+    },
+    "nosePiercing": "No septum or bull-ring. If a nose piercing is justified, use one subtle side-nostril stud or ring.",
+    "photography": {
+      "qualityBar": "extremely aspirational premium commercial casting",
+      "realismRule": "Realistic means physically credible, never average, ordinary, or under-cast.",
+      "requirements": [
+        "plausible camera position, focal length, perspective, and depth of field",
+        "an identifiable motivated light source with coherent falloff and exposure",
+        "material-specific texture, roughness, translucency, and specular response",
+        "anatomically plausible pose, contact, weight, scale, and occlusion",
+        "truthful skin texture and local specular response without plastic smoothing"
+      ]
+    },
+    "compositePhysics": {
+      "directionalCoherence": "gaze, pose, travel, gesture, props, fabric, and environmental motion must agree with the scene's declared vectors",
+      "lightCoherence": "light direction, shadow direction and softness, color spill, reflections, and practical sources must describe one physically possible setup",
+      "reflectionCoherence": "every visible reflection or highlight must resolve to a source with matching direction, color, intensity, and material response"
+    }
+  },
+  "boardDecisions": [
+    {
+      "id": "C01",
+      "status": "modify",
+      "face": "approved",
+      "body": "regenerate",
+      "modifications": ["septum removed", "body comp-card views need work"],
+      "campaignEligibility": "blocked-until-body-approved"
+    },
+    {
+      "id": "C02",
+      "status": "keep",
+      "face": "approved",
+      "body": "approved",
+      "modifications": [],
+      "campaignEligibility": "eligible"
+    },
+    {
+      "id": "C03",
+      "status": "keep",
+      "face": "approved",
+      "body": "approved",
+      "modifications": [],
+      "campaignEligibility": "eligible"
+    },
+    {
+      "id": "C04",
+      "status": "modify",
+      "face": "approved",
+      "body": "review-open",
+      "modifications": ["eye color changed to a single pale green"],
+      "campaignEligibility": "blocked-until-body-approved"
+    },
+    {
+      "id": "C05",
+      "status": "modify",
+      "face": "approved",
+      "body": "regenerate",
+      "modifications": [
+        "age read changed from 26 to 22",
+        "body comp-card views need work"
+      ],
+      "campaignEligibility": "blocked-until-body-approved"
+    },
+    {
+      "id": "C06",
+      "status": "keep",
+      "face": "approved",
+      "body": "approved",
+      "modifications": ["mouth differentiated from C05"],
+      "campaignEligibility": "eligible"
+    },
+    {
+      "id": "C07",
+      "status": "kill",
+      "face": "rejected",
+      "body": "rejected",
+      "modifications": [],
+      "campaignEligibility": "removed"
+    },
+    {
+      "id": "C09",
+      "status": "keep",
+      "face": "approved",
+      "body": "approved",
+      "modifications": [],
+      "campaignEligibility": "eligible"
+    },
+    {
+      "id": "C10",
+      "status": "keep",
+      "face": "approved",
+      "body": "approved",
+      "modifications": [],
+      "campaignEligibility": "eligible"
+    },
+    {
+      "id": "C11",
+      "status": "kill",
+      "face": "rejected",
+      "body": "rejected",
+      "modifications": [],
+      "campaignEligibility": "removed"
+    }
+  ],
+  "models": [
+    {
+      "id": "C01",
+      "sex": "woman",
+      "age": 26,
+      "heightCm": 168,
+      "build": "lean athletic, ~18% body fat",
+      "measurementsCm": { "bust": 84, "waist": 61, "hips": 88 },
+      "shoeEu": 38,
+      "hair": "black, chin-length blunt bob, hot-pink underlayer",
+      "eyes": "dark brown, almond, slight upturn",
+      "face": "oval, high cheekbones, small straight nose, full lower lip",
+      "traits": ["stacked silver ear cuffs, left ear", "playful smirk"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "alt-pop",
+        "digital-native creator"
+      ],
+      "persona": {
+        "role": "genre-fluid independent artist",
+        "scene": "future-facing alt-pop",
+        "lifestyleContext": "Los Angeles studio sessions, self-directed releases, and direct fan growth",
+        "aestheticVocabulary": ["graphic", "playful", "future-pop", "precise"],
+        "likelyEnvironment": "minimal creator studio or Bubblegum Factory live room",
+        "aspiration": "turn an unmistakable identity into a durable independent career"
+      },
+      "individuality": {
+        "mouth": ["full-lower-lip", "compact-width", "playful-smirk"],
+        "face": ["oval", "high-cheekbones", "small-straight-nose"],
+        "hair": ["blunt-bob", "chin-length", "color-underlayer"],
+        "build": ["lean-athletic", "compact-frame"],
+        "presence": ["playful", "graphic", "quick-energy"]
+      },
+      "stylingConstraints": [
+        "no septum or bull-ring",
+        "at most one subtle side-nostril piercing if scene-justified"
+      ]
+    },
+    {
+      "id": "C02",
+      "sex": "woman",
+      "age": 27,
+      "heightCm": 175,
+      "build": "lean athletic, ~18% body fat",
+      "measurementsCm": { "bust": 84, "waist": 62, "hips": 90 },
+      "shoeEu": 40,
+      "hair": "black, short sculpted natural cut",
+      "eyes": "deep brown, wide-set",
+      "face": "heart-shaped, high cheekbones, full lips",
+      "traits": ["luminous deep brown skin", "long neck"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "R&B",
+        "performance-led creator"
+      ],
+      "persona": {
+        "role": "vocalist and performance director",
+        "scene": "progressive R&B",
+        "lifestyleContext": "rehearsals, writing rooms, independent release planning, and live performance",
+        "aestheticVocabulary": ["sculptural", "assured", "minimal", "luminous"],
+        "likelyEnvironment": "architectural rehearsal space or premium recording room",
+        "aspiration": "own both the creative direction and commercial scale of the project"
+      },
+      "individuality": {
+        "mouth": ["balanced-full-lips", "broad-calm-rest"],
+        "face": ["heart-shaped", "wide-set-eyes", "high-cheekbones"],
+        "hair": ["sculpted-natural", "short-silhouette"],
+        "build": ["lean-athletic", "tall-frame", "long-neck"],
+        "presence": ["assured", "composed", "performance-command"]
+      },
+      "stylingConstraints": []
+    },
+    {
+      "id": "C03",
+      "sex": "woman",
+      "age": 26,
+      "heightCm": 170,
+      "build": "fit athletic, ~18% body fat, visible core definition",
+      "measurementsCm": { "bust": 86, "waist": 62, "hips": 90 },
+      "shoeEu": 38,
+      "hair": "dark brown, long glossy waves past shoulders",
+      "eyes": "warm brown",
+      "face": "soft oval, full lips, wide smile",
+      "traits": ["warm olive-tan skin", "sunny approachable smile"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "pop songwriter",
+        "audience-builder"
+      ],
+      "persona": {
+        "role": "pop vocalist-songwriter",
+        "scene": "melodic crossover pop",
+        "lifestyleContext": "writing sessions, vocal production, social performance clips, and community building",
+        "aestheticVocabulary": ["warm", "open", "polished", "kinetic"],
+        "likelyEnvironment": "sunlit writing room or clean performance studio",
+        "aspiration": "translate songwriting craft into a recognizable global-facing project"
+      },
+      "individuality": {
+        "mouth": ["wide-smile", "full-lips", "open-expression"],
+        "face": ["soft-oval", "rounded-jaw", "warm-eyes"],
+        "hair": ["long-waves", "glossy", "past-shoulder"],
+        "build": ["fit-athletic", "defined-core", "mid-height-frame"],
+        "presence": ["sunny", "approachable", "kinetic"]
+      },
+      "stylingConstraints": []
+    },
+    {
+      "id": "C04",
+      "sex": "woman",
+      "age": 25,
+      "heightCm": 173,
+      "build": "lean athletic, ~18% body fat",
+      "measurementsCm": { "bust": 84, "waist": 61, "hips": 89 },
+      "shoeEu": 39,
+      "hair": "dark brown, long and straight",
+      "eyes": "pale green",
+      "face": "angular, strong straight brows, defined jaw",
+      "traits": ["small silver hoops", "fearless grounded gaze"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "electronic pop",
+        "producer-performer"
+      ],
+      "persona": {
+        "role": "electronic producer-performer",
+        "scene": "minimal electronic pop",
+        "lifestyleContext": "late studio sessions, sound design, performance preparation, and independent campaign direction",
+        "aestheticVocabulary": [
+          "angular",
+          "controlled",
+          "fearless",
+          "technical"
+        ],
+        "likelyEnvironment": "precision control room or restrained night performance space",
+        "aspiration": "be recognized as both the author of the sound and the face of the project"
+      },
+      "individuality": {
+        "mouth": ["medium-width", "defined-upper-lip", "neutral-rest"],
+        "face": ["angular", "defined-jaw", "straight-brows"],
+        "hair": ["long-straight", "clean-center-line"],
+        "build": ["lean-athletic", "long-line-frame"],
+        "presence": ["fearless", "grounded", "technical"]
+      },
+      "stylingConstraints": []
+    },
+    {
+      "id": "C05",
+      "sex": "woman",
+      "age": 22,
+      "heightCm": 172,
+      "build": "lean, ~18% body fat",
+      "measurementsCm": { "bust": 82, "waist": 60, "hips": 88 },
+      "shoeEu": 39,
+      "hair": "pale ice blonde, long, fading to soft blue ends",
+      "eyes": "grey-blue",
+      "face": "oval, soft jaw, pale luminous skin, narrow cupid's-bow mouth",
+      "traits": ["soft melancholy half-smile", "delicate silver pendant"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "dream-pop",
+        "early-career creator"
+      ],
+      "persona": {
+        "role": "emerging singer-songwriter",
+        "scene": "dream-pop and intimate electronic songwriting",
+        "lifestyleContext": "bedroom demos graduating into premium studio sessions and a first focused release cycle",
+        "aestheticVocabulary": ["ethereal", "delicate", "young", "intimate"],
+        "likelyEnvironment": "softly lit writing nook or minimal vocal booth",
+        "aspiration": "move from promising new voice to a fully realized independent artist"
+      },
+      "individuality": {
+        "mouth": ["narrow-cupids-bow", "delicate-volume", "closed-half-smile"],
+        "face": ["oval", "soft-jaw", "fine-features"],
+        "hair": ["long-straight-wave", "ice-blonde", "soft-blue-ends"],
+        "build": ["lean", "fine-frame"],
+        "presence": ["ethereal", "melancholy", "intimate"]
+      },
+      "stylingConstraints": ["preserve a youthful 21-23 age read"]
+    },
+    {
+      "id": "C06",
+      "sex": "woman",
+      "age": 28,
+      "heightCm": 171,
+      "build": "lean athletic, ~18% body fat",
+      "measurementsCm": { "bust": 85, "waist": 61, "hips": 89 },
+      "shoeEu": 39,
+      "hair": "sandy blonde shag with curtain bangs",
+      "eyes": "sea green",
+      "face": "oval, wide defined cupid's bow, medium lips, strong cheekbones",
+      "traits": ["sun-kissed glow", "direct open smile"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "indie pop",
+        "touring creator"
+      ],
+      "persona": {
+        "role": "touring indie-pop artist",
+        "scene": "guitar-led indie pop",
+        "lifestyleContext": "rehearsal, travel, small-stage performance, and direct fan community",
+        "aestheticVocabulary": ["tactile", "sunlit", "confident", "lived-in"],
+        "likelyEnvironment": "premium rehearsal room or daylight location with specific music context",
+        "aspiration": "scale an intimate live identity without losing authorship or connection"
+      },
+      "individuality": {
+        "mouth": ["wide-cupids-bow", "medium-volume", "direct-open-smile"],
+        "face": ["oval", "strong-cheekbones", "defined-midface"],
+        "hair": ["shag", "curtain-bangs", "sandy-blonde"],
+        "build": ["lean-athletic", "balanced-frame"],
+        "presence": ["confident", "sunlit", "lived-in"]
+      },
+      "stylingConstraints": [
+        "mouth shape and expression must remain distinct from C05"
+      ]
+    },
+    {
+      "id": "C09",
+      "sex": "man",
+      "age": 27,
+      "heightCm": 180,
+      "build": "lean athletic, ~10% body fat",
+      "measurementsCm": { "chest": 96, "waist": 76 },
+      "shoeEu": 43,
+      "hair": "black, tousled medium length",
+      "eyes": "dark brown",
+      "face": "clean sharp features, straight brows",
+      "traits": ["calm cool expression"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "electronic producer",
+        "creator-operator"
+      ],
+      "persona": {
+        "role": "producer-artist and creative operator",
+        "scene": "left-field electronic pop",
+        "lifestyleContext": "production sessions, visual planning, release operations, and selective live performance",
+        "aestheticVocabulary": ["quiet", "sharp", "modern", "self-possessed"],
+        "likelyEnvironment": "minimal production suite or architectural listening room",
+        "aspiration": "build a self-owned catalog whose visual and sonic systems feel equally authored"
+      },
+      "individuality": {
+        "mouth": ["straight-rest", "medium-width", "restrained-expression"],
+        "face": ["sharp", "straight-brows", "clean-jaw"],
+        "hair": ["tousled", "medium-length", "black"],
+        "build": ["lean-athletic", "medium-tall-frame"],
+        "presence": ["calm", "cool", "self-possessed"]
+      },
+      "stylingConstraints": []
+    },
+    {
+      "id": "C10",
+      "sex": "man",
+      "age": 27,
+      "heightCm": 188,
+      "build": "lean athletic, ~10% body fat",
+      "measurementsCm": { "chest": 102, "waist": 78 },
+      "shoeEu": 45,
+      "hair": "black, close-cropped with sharp lineup",
+      "eyes": "dark brown",
+      "face": "strong jaw, bright wide smile",
+      "traits": ["thin silver chain", "performer charisma"],
+      "status": "active",
+      "selectionGates": {
+        "premiumAspirationalQuality": "pass",
+        "icpResonance": "pass"
+      },
+      "icpTags": [
+        "independent recording artist",
+        "rap-pop",
+        "performance-led creator"
+      ],
+      "persona": {
+        "role": "rap-pop performer and show builder",
+        "scene": "high-energy melodic rap and pop",
+        "lifestyleContext": "movement rehearsal, vocal sessions, live show design, and community-driven releases",
+        "aestheticVocabulary": ["magnetic", "clean", "athletic", "expansive"],
+        "likelyEnvironment": "premium movement studio or restrained performance stage",
+        "aspiration": "turn live charisma into an independent audience and repeatable show business"
+      },
+      "individuality": {
+        "mouth": ["bright-wide-smile", "broad-width", "open-expression"],
+        "face": ["strong-jaw", "bright-eyes", "broad-cheek-line"],
+        "hair": ["close-cropped", "sharp-lineup"],
+        "build": ["lean-athletic", "tall-frame", "broad-shoulder-line"],
+        "presence": ["magnetic", "expansive", "performer-charisma"]
+      },
+      "stylingConstraints": []
+    }
+  ],
+  "removed": ["C07", "C08", "C11", "C12"]
+}

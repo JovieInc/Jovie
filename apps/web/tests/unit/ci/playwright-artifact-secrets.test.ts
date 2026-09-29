@@ -64,21 +64,22 @@ function isPlaywrightConfigModule(
   );
 }
 const localTrace = Object.fromEntries(
-  'playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
+  'playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
     .map(value => value.split('='))
 );
 const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-visual-review-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:route-dom-certification-${{ github.sha }}|screenshots.yml:screen-browser-proof|screenshots.yml:screen-browser-proof-artists|screenshots.yml:screen-browser-proof-smartlink-release|screenshots.yml:screen-browser-proof-smartlink-track|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const imageUploads =
-  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:golden-path-visual-review-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|screenshots.yml:screen-browser-proof|screenshots.yml:screen-browser-proof-artists|screenshots.yml:screen-browser-proof-smartlink-release|screenshots.yml:screen-browser-proof-smartlink-track|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const markdownUploads = [
   'ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}',
+  'ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}',
   'ci.yml:storybook-browser-${{ github.sha }}-${{ github.run_attempt }}',
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
   'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
@@ -110,7 +111,7 @@ const producerCounts: Record<string, number> = {
   'postdeploy-probes.yml': 1,
   'production-controller.yml': 1,
   'production-release.yml': 3,
-  'screenshots.yml': 4,
+  'screenshots.yml': 8,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 6,
 };
@@ -949,7 +950,7 @@ describe('Playwright artifact secret boundary', () => {
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(35);
+    ).toBe(40);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
@@ -1117,7 +1118,6 @@ ${fixtureCheckout}
       const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
         .split('\n')
         .filter(line => line.includes('doppler run --'));
-      expect(doppler).toHaveLength(7);
       const guarded = doppler.filter(line => line.includes(guardScriptName));
       expect(guarded).toHaveLength(6);
       expect(
@@ -1131,9 +1131,26 @@ ${fixtureCheckout}
       expect(
         guarded.filter(line => line.trim() === waitlistDopplerCommand)
       ).toHaveLength(1);
-      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual([
+      const expectedNonPlaywrightCommands = [
         expect.stringContaining('scripts/check-signup-readiness.ts'),
-      ]);
+        ...(file === 'synthetic-monitoring.yml'
+          ? [
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+              // JOV-6870: limiter-store probe of /api/health/redis.
+              expect.stringContaining(
+                '--only-secrets=CRON_SECRET --no-fallback'
+              ),
+            ]
+          : []),
+      ];
+      expect(doppler).toHaveLength(
+        guarded.length + expectedNonPlaywrightCommands.length
+      );
+      expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual(
+        expectedNonPlaywrightCommands
+      );
     }
     const screenshots = readFileSync(
       join(workflowsRoot, 'screenshots.yml'),

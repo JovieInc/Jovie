@@ -2,12 +2,13 @@
   "name": "@jovie/ovie",
   "private": true,
   "engines": {
-    "node": ">=22.23.2 <23"
+    "node": ">=24.21.0 <25"
   },
   "scripts": {
     "dev": "node scripts/routes.mjs && next dev --port 3105",
     "build": "node scripts/routes.mjs && NODE_OPTIONS=--max-old-space-size=8192 next build --turbopack",
     "start": "next start --port 3105",
+    "certify:shell": "node scripts/app-shell-invariants.mjs",
     "typecheck": "node scripts/routes.mjs && next typegen && tsc --noEmit",
     "test": "vitest run --coverage",
     "lint": "biome check ."
@@ -27,12 +28,12 @@
     "workflow": "4.8.9"
   },
   "devDependencies": {
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
-    "@vitest/coverage-v8": "5.0.1",
+    "@vitest/coverage-v8": "5.0.2",
     "typescript": "^6.0.3",
-    "vitest": "5.0.1",
+    "vitest": "5.0.2",
     "babel-plugin-react-compiler": "19.1.0-rc.3"
   }
 }

@@ -40,6 +40,21 @@ describe('UnifiedTable keyboard interaction', () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false });
   });
 
+  it('fills the available content width without a route-owned max width', () => {
+    const { container } = render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        enableVirtualization={false}
+      />
+    );
+
+    expect(container.firstElementChild).toHaveClass('w-full', 'min-w-0');
+    expect(container.firstElementChild).not.toHaveClass('max-w-full');
+    expect(container.querySelector('table')).toHaveClass('w-full');
+    expect(container.querySelector('table')).not.toHaveClass('max-w-full');
+  });
+
   it('uses instant scrolling when reduced motion is requested', () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: true });
     const scrollIntoView = vi.fn();
@@ -184,6 +199,32 @@ describe('UnifiedTable keyboard interaction', () => {
     const spinner = screen.getByRole('status', { name: 'Loading More' });
     expect(spinner).toHaveAttribute('data-size', 'sm');
     expect(spinner).toHaveAttribute('data-tone', 'muted');
+  });
+
+  it('keeps the column sort control keyboard-reachable with an announced state', () => {
+    const onSortingChange = vi.fn();
+
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        sorting={[{ id: 'name', desc: false }]}
+        onSortingChange={onSortingChange}
+      />
+    );
+
+    const sortButton = screen.getByRole('button', {
+      name: 'Name: sorted ascending',
+    });
+    expect(sortButton).not.toHaveAttribute('tabindex', '-1');
+
+    sortButton.focus();
+    expect(document.activeElement).toBe(sortButton);
+
+    fireEvent.click(sortButton);
+    expect(onSortingChange).toHaveBeenCalled();
   });
 
   it('applies column meta alignment to rendered body cells', () => {

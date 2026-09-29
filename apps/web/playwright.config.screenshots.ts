@@ -32,7 +32,9 @@ export default defineConfig({
   testMatch: [
     '**/catalog.spec.ts',
     '**/marketing-routes.spec.ts',
+    '**/route-dom-certification.spec.ts',
     '**/public-profile-screen-proof.spec.ts',
+    '**/artists-screen-proof.spec.ts',
     '**/public-export-serving.spec.ts',
   ],
   fullyParallel: false, // Run sequentially for deterministic screenshots

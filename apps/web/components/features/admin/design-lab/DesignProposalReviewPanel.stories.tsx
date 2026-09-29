@@ -1,7 +1,7 @@
 'use client';
 
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useLayoutEffect } from 'react';
 import { DesignProposalReviewPanel } from './DesignProposalReviewPanel';
 
 const pendingResponse = {
@@ -63,7 +63,9 @@ function MockTasteInboxFetch({
   readonly children: ReactNode;
   readonly mode: 'pending' | 'forbidden' | 'loading';
 }>) {
-  useEffect(() => {
+  // Layout effect so the mock is installed before the panel's own useEffect
+  // fetch fires (passive effects run bottom-up after all layout effects).
+  useLayoutEffect(() => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
       const rawUrl =

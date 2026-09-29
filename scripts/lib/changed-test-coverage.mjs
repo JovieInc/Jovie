@@ -17,6 +17,20 @@ const EXCLUDED_SOURCE_PATH =
   /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)|\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\.d\.ts$|\.config(?:\.[^./]+)*\.[cm]?[jt]s$|(?:^|\/)types?(?:\/|\.[cm]?ts$)|(?:^|\/)(?:layout|loading|not-found)\.tsx$|(?:^|\/)scripts\/vitest-wrapper\.mjs$/;
 
 const TEST_FILE_PATH = /^apps\/web\/.*\.(?:test|spec)\.[cm]?[jt]sx?$/;
+/**
+ * Tests that read the source tree (readFileSync/glob) instead of importing
+ * what they check, so neither the import graph nor findReferencingTests can
+ * select them. Before JOV-6834 they first ran in the merge group and were
+ * 44 of 60 sampled merge-group Unit Tests failures (2026-09-26/27); under
+ * ALLGREEN each one rebuilt every entry behind it. Run them on every
+ * applicable source PR.
+ */
+export const SOURCE_SCANNER_TESTS = Object.freeze([
+  'apps/web/tests/unit/design-system/raw-button-ratchet.test.ts',
+  'apps/web/tests/unit/design-system/linear-namespace-ratchet.test.ts',
+  'apps/web/tests/unit/dashboard/contacts-surface-evals.test.tsx',
+  'apps/web/tests/unit/app/surface-elevation-guardrails.test.ts',
+]);
 const RESOLVABLE_EXTENSIONS = [
   '.ts',
   '.tsx',
@@ -347,12 +361,23 @@ export function planChangedLineCoverage({
     files,
     coverageInclude: coverageIncludeFromFiles(files),
     relatedTests: applicable
-      ? findReferencingTests({
-          changedFiles: files,
-          testFiles: providedTestFiles ?? readWebTestFiles(repoRoot),
-        })
+      ? relatedTestsFor(files, providedTestFiles ?? readWebTestFiles(repoRoot))
       : [],
   };
+}
+
+/** Referencing tests plus the source scanners that exist in this tree. */
+function relatedTestsFor(changedFiles, testFiles) {
+  const present = new Set(testFiles.map(({ path }) => path));
+  const scanners = SOURCE_SCANNER_TESTS.filter(path => present.has(path)).map(
+    path => path.slice(WEB_SOURCE_PREFIX.length)
+  );
+  return [
+    ...new Set([
+      ...findReferencingTests({ changedFiles, testFiles }),
+      ...scanners,
+    ]),
+  ].sort();
 }
 
 function statementLocationKey(location, id) {

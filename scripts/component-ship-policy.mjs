@@ -9,6 +9,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '..');
@@ -102,6 +103,190 @@ export function isExcludedBasename(base) {
   if (EXCLUDE_BASENAME_SUFFIXES.some(s => lower.endsWith(s))) return true;
   if (EXCLUDE_BASENAME_PATTERNS.some(re => re.test(base))) return true;
   return false;
+}
+
+const JSX_NODE_KINDS = new Set([
+  ts.SyntaxKind.JsxElement,
+  ts.SyntaxKind.JsxSelfClosingElement,
+  ts.SyntaxKind.JsxFragment,
+]);
+
+/**
+ * Does `expr` resolve to JSX once conditional/logical wrappers are peeled
+ * off? Handles the common `cond ? <A/> : <B/>` and `cond && <A/>` return
+ * shapes, not just a bare JSX literal.
+ */
+function expressionIsJsxIsh(expr) {
+  if (!expr) return false;
+  if (JSX_NODE_KINDS.has(expr.kind)) return true;
+  if (ts.isParenthesizedExpression(expr) || ts.isAsExpression(expr)) {
+    return expressionIsJsxIsh(expr.expression);
+  }
+  if (ts.isConditionalExpression(expr)) {
+    return (
+      expressionIsJsxIsh(expr.whenTrue) || expressionIsJsxIsh(expr.whenFalse)
+    );
+  }
+  if (
+    ts.isBinaryExpression(expr) &&
+    (expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+      expr.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+      expr.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
+  ) {
+    return expressionIsJsxIsh(expr.left) || expressionIsJsxIsh(expr.right);
+  }
+  return false;
+}
+
+/**
+ * Does any function in the file — named or anonymous, exported or a
+ * private helper, `function` keyword or arrow — itself return JSX? A file
+ * can contain JSX syntax (e.g. icon elements assigned to module-level
+ * constants for a menu-item builder) without ever being a component; what
+ * matters is whether some function's own return value is JSX-ish, not
+ * whether JSX text appears anywhere in the file. Checks explicit `return`
+ * statements and an arrow function's implicit expression body.
+ */
+function declaresJsxReturningFunction(sourceFile) {
+  let found = false;
+  function visit(node) {
+    if (found) return;
+    if (ts.isReturnStatement(node) && expressionIsJsxIsh(node.expression)) {
+      found = true;
+      return;
+    }
+    if (
+      ts.isArrowFunction(node) &&
+      !ts.isBlock(node.body) &&
+      expressionIsJsxIsh(node.body)
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return found;
+}
+
+const REACT_HOOK_CALL_RE = /^use[A-Z0-9]/;
+
+/**
+ * Does the file call anything shaped like a React hook (`useEffect(...)`,
+ * `useContext(...)`, `React.useMemo(...)`, a custom `useThing(...)`)? A
+ * renderless side-effect component (`return null`, all its work done via
+ * `useEffect`) or a headless hook module backing its own Storybook demo is
+ * still a real React surface even though it never itself returns JSX.
+ */
+function callsReactHook(sourceFile) {
+  let found = false;
+  function visit(node) {
+    if (found) return;
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const name = ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.name)
+          ? callee.name.text
+          : null;
+      if (name && REACT_HOOK_CALL_RE.test(name)) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return found;
+}
+
+/**
+ * Is this file nothing but `import`/re-export statements (`export { X }
+ * from './y'`, `export type { X } from './y'`, `export * from './y'`)? The
+ * "backwards compatibility" barrels in this codebase have zero JSX and zero
+ * hook calls of their own — the implementation, and its JSX, lives in the
+ * module they forward to.
+ */
+function isDirectivePrologueStatement(statement) {
+  // `'use client'`, `'use server'`, `'use strict'` — a bare string-literal
+  // expression statement, not a real declaration.
+  return (
+    ts.isExpressionStatement(statement) &&
+    ts.isStringLiteral(statement.expression)
+  );
+}
+
+function isPureReexportBarrel(sourceFile) {
+  let hasReexport = false;
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) continue;
+    if (isDirectivePrologueStatement(statement)) continue;
+    if (ts.isExportDeclaration(statement) && statement.moduleSpecifier) {
+      hasReexport = true;
+      continue;
+    }
+    return false;
+  }
+  return hasReexport;
+}
+
+/**
+ * Real structural check (not a hand-maintained name list): is this .tsx
+ * source a React surface worth a Storybook story at all? True when the file
+ * declares a function that returns JSX, calls a React hook (covers
+ * renderless side-effect components and headless-hook modules with their
+ * own demo story), or is a pure re-export barrel forwarding a real
+ * component. False for plain server-only query modules and pure data/menu
+ * builder functions, which have nothing for a story to render. Parses with
+ * the TypeScript compiler (already a project dependency) rather than a
+ * regex, so it isn't fooled by JSX-shaped text in comments or strings.
+ */
+export function sourceHasJsx(source, fileName = 'source.tsx') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ false,
+    ts.ScriptKind.TSX
+  );
+
+  return (
+    declaresJsxReturningFunction(sourceFile) ||
+    callsReactHook(sourceFile) ||
+    isPureReexportBarrel(sourceFile)
+  );
+}
+
+// listComponentsInRoot re-scans a root on every call (multiple coverage
+// roots overlap, and callers like discoverAtomMoleculeInventory() call it
+// repeatedly within one process). Parsing every .tsx file's AST is real
+// work; cache by (path, mtime, size) so a repeat call over an unchanged
+// file is a Map lookup instead of a re-parse.
+const sourceHasJsxCache = new Map();
+
+function sourceHasJsxCached(absPath) {
+  let stat;
+  try {
+    stat = statSync(absPath);
+  } catch {
+    return true; // fail open — matches the directory-walk fail-open style
+  }
+  const cached = sourceHasJsxCache.get(absPath);
+  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+    return cached.result;
+  }
+  let result = true;
+  try {
+    result = sourceHasJsx(readFileSync(absPath, 'utf8'), absPath);
+  } catch {
+    result = true;
+  }
+  sourceHasJsxCache.set(absPath, {
+    mtimeMs: stat.mtimeMs,
+    size: stat.size,
+    result,
+  });
+  return result;
 }
 
 /**
@@ -216,6 +401,11 @@ export function listComponentsInRoot(rootRel, repoRoot = REPO_ROOT) {
           continue;
         }
       }
+      // A .tsx file with zero JSX anywhere isn't a React component (e.g. a
+      // server-only query module or a pure builder function) — nothing for
+      // a story to render. Fail open (keep counting it) if the file can't
+      // be read, matching the fail-open style of the directory walk above.
+      if (!sourceHasJsxCached(src.abs)) continue;
       components.push({
         component: src.base,
         sourceRel,

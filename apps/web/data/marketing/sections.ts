@@ -469,6 +469,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
+        id: 'split-claim-card',
+        layout: 'split',
+        media: 'none',
+        mediaPosition: 'right',
+        alignment: 'left',
+        chooseWhen:
+          'recipe=homepage AND conversion=claim-handle: identity headline left, illustrative jov.ie/you claim card right (Tim 2026-09-28)',
+        exemplar: { route: '/', section: 'hero' },
+        status: 'active',
+      },
+      {
         id: 'centered-none',
         layout: 'centered',
         media: 'none',
@@ -477,16 +488,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
           'recipe=seo OR recipe=blog-landing (interior hero) OR no asset available',
         exemplar: { route: '/about', section: 'hero' },
         status: 'active',
-      },
-      {
-        id: 'centered-video',
-        layout: 'centered',
-        media: 'video',
-        alignment: 'centered',
-        chooseWhen:
-          'recipe=launch AND cinematicMomentBudget=available (max 1/page)',
-        exemplar: { route: '/launch', section: 'hero' },
-        status: 'unproven',
       },
     ],
     defaultVariant: 'centered-none',

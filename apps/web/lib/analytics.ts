@@ -1,5 +1,6 @@
 'use client';
 
+import { forwardAnalyticsEventToFunnel } from '@/lib/analytics/signup-funnel-client';
 import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 
@@ -35,16 +36,39 @@ function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
   }
 }
 
-export function track(event: string, properties?: Record<string, unknown>) {
+/**
+ * Outcome of a client analytics dispatch attempt. The gtag API offers no
+ * delivery acknowledgement, so `dispatched` means the event was handed to
+ * gtag — it is not evidence of durable delivery. Revenue-critical funnel
+ * events are measured by the durable server sink (lib/server-analytics.ts);
+ * this client path is supplemental telemetry only.
+ */
+export type TrackDispatchOutcome =
+  | 'dispatched'
+  | 'skipped_no_transport'
+  | 'dispatch_failed';
+
+export function track(
+  event: string,
+  properties?: Record<string, unknown>
+): TrackDispatchOutcome {
+  // First-party funnel steps carry no identifiers, so they do not wait on the
+  // GA consent gate below.
+  forwardAnalyticsEventToFunnel(event, properties);
   const analyticsWindow = getAnalyticsWindow();
-  if (!analyticsWindow?.gtag) return;
+  if (!analyticsWindow?.gtag) return 'skipped_no_transport';
 
   const envTag = getEnvTag(analyticsWindow.location.hostname);
 
-  analyticsWindow.gtag('event', event, {
-    ...properties,
-    env: envTag,
-  });
+  try {
+    analyticsWindow.gtag('event', event, {
+      ...properties,
+      env: envTag,
+    });
+    return 'dispatched';
+  } catch {
+    return 'dispatch_failed';
+  }
 }
 
 export function page(name?: string, properties?: Record<string, unknown>) {
@@ -89,11 +113,17 @@ export function trackMagicMomentIfReady(params: {
   }
 
   const key = `magic_moment_achieved_${params.profileId}`;
-  if (globalThis.window !== undefined && globalThis.localStorage.getItem(key)) {
-    return false;
+  if (globalThis.window !== undefined) {
+    try {
+      if (globalThis.localStorage.getItem(key)) {
+        return false;
+      }
+    } catch {
+      // Blocked/unavailable storage must not suppress the dispatch attempt.
+    }
   }
 
-  track('magic_moment_achieved', {
+  const outcome = track('magic_moment_achieved', {
     timeToMagicMoment: Date.now() - params.signupTimestamp,
     hasAvatar: params.hasAvatar,
     hasDisplayName: params.hasDisplayName,
@@ -102,8 +132,20 @@ export function trackMagicMomentIfReady(params: {
     enrichmentStatus: params.enrichmentStatus,
   });
 
+  // The marker records only that a dispatch was handed to gtag. A skipped or
+  // failed dispatch leaves no marker so a later load can retry; gtag gives no
+  // delivery acknowledgement, so invocation is never treated as proof of
+  // durable delivery (that lives in the server funnel events).
+  if (outcome !== 'dispatched') {
+    return false;
+  }
+
   if (globalThis.window !== undefined) {
-    globalThis.localStorage.setItem(key, String(Date.now()));
+    try {
+      globalThis.localStorage.setItem(key, String(Date.now()));
+    } catch {
+      // Storage exceptions (private mode, quota) must not break onboarding.
+    }
   }
 
   return true;

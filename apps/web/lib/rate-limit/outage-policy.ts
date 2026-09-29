@@ -83,11 +83,13 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   deployPromote: mandatoryDeny,
   accountDelete: mandatoryDeny,
   publicArtistApi: mandatoryDenyFixed,
+  agentProfileCreate: mandatoryDenyFixed,
   general: mandatoryDenyFixed,
   changelogSubscribe: mandatoryDenyFixed,
   musicBrainzLookup: mandatoryDeny,
 
   claimTokenAccess: advisoryAllow,
+  libraryAssetShareAccess: advisoryAllow,
   publicClick: advisoryAllow,
   aiChat: advisoryAllow,
   avatarUpload: advisoryDeny,

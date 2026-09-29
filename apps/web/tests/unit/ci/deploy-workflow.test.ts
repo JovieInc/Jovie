@@ -908,7 +908,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(classifierJob).toContain(
       'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
     );
-    expect(classifierJob).toContain("node-version: '22'");
+    expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
     // JOV-4446: merge_group uses exact base/head SHA vars; push alone binds event.before.
     expect([classifierJob.includes('fetch-depth: 0'), classifierJob.includes('filter: blob:none'), classifierJob.includes('git cat-file -e "${DIFF_BASE}^{commit}"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "$HEAD_SHA"'), classifierJob.includes('DIFF_BASE="${{ github.event.before }}"'), classifierJob.includes('|| git show')]).toEqual([true, true, true, true, true, false]);
@@ -964,6 +964,10 @@ describe('deploy workflow Vercel env resolution', () => {
     const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
     const migrationJob = getJobBlock(workflow, 'migrate-production');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const stagingOnlineIndexStep = getStepBlock(
+      stagingJob,
+      'DB migrate (staging - online indexes)'
+    );
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const resultJob = getJobBlock(workflow, 'release-result');
     const credentialStep = getStepBlock(
@@ -978,6 +982,10 @@ describe('deploy workflow Vercel env resolution', () => {
       migrationJob,
       'DB migrate (production - Drizzle)'
     );
+    const onlineIndexStep = getStepBlock(
+      migrationJob,
+      'DB migrate (production - online indexes)'
+    );
     const verifyStep = getStepBlock(
       migrationJob,
       'DB verify (production schema check)'
@@ -989,13 +997,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(controllerHeader).toContain('group: production-mutation');
     expect(controllerHeader).toContain('queue: max');
     expect(controllerHeader).toContain('cancel-in-progress: false');
-    for (const prerequisite of [
-      'deploy-staging',
-      'attest-staging-build',
-      'canary-health-gate',
-      'alias-staging',
-      'production-head',
-    ]) {
+    for (const prerequisite of ['production-head']) {
       expect(migrationJob).toContain(prerequisite);
       expect(migrationJob).toContain(
         `needs.${prerequisite}.result == 'success'`
@@ -1004,6 +1006,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrationJob).toContain(
       "needs.production-head.outputs.is_current == 'true'"
     );
+    expect(migrationJob).toContain('inputs.staging_verified');
     expect(migrationJob).toContain('ref: ${{ inputs.expected_sha }}');
     expect(migrationJob).not.toContain('/commits/main');
     expect(migrationJob).not.toContain('migration-head');
@@ -1020,12 +1023,27 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(migrationIndex).toBeGreaterThan(productionHeadIndex);
     expect(stagingJob).toContain('needs: [release-head]');
     expect(stagingJob).not.toContain('migrate-production');
+    expect(stagingJob).toContain('DB migrate (staging - online indexes)');
+    expect(stagingJob.indexOf('staging - Drizzle')).toBeLessThan(
+      stagingJob.indexOf('staging - online indexes')
+    );
+    expect(stagingOnlineIndexStep).toContain('timeout-minutes: 12');
+    expect(stagingOnlineIndexStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}'
+    );
+    expect(stagingOnlineIndexStep).toContain('--config stg');
+    expect(stagingOnlineIndexStep).not.toContain('DOPPLER_TOKEN_PRD');
     expect(promotionJob).toContain('migrate-production');
     expect(promotionJob).toContain(
       "needs.migrate-production.result == 'success'"
     );
 
-    for (const step of [preflightStep, migrateStep, verifyStep]) {
+    for (const step of [
+      preflightStep,
+      migrateStep,
+      onlineIndexStep,
+      verifyStep,
+    ]) {
       expect(step).toContain('DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}');
       expect(step).not.toContain('if:');
       expect(step).toContain('doppler run --project jovie-web --config prd');
@@ -1037,11 +1055,18 @@ describe('deploy workflow Vercel env resolution', () => {
     }
     expect(preflightStep).toContain('scripts/drizzle-migrate-preflight.ts');
     expect(migrateStep).toContain('drizzle:migrate:ci');
+    expect(onlineIndexStep).toContain("ALLOW_ONLINE_INDEX_MIGRATIONS: 'true'");
+    expect(onlineIndexStep).toContain('drizzle:migrate:online-indexes:ci');
+    expect(onlineIndexStep).toContain('timeout-minutes: 12');
+    expect(migrationJob).toContain('timeout-minutes: 30');
     expect(verifyStep).toContain('drizzle:verify:ci');
     expect(migrationJob.indexOf('production preflight')).toBeLessThan(
       migrationJob.indexOf('production - Drizzle')
     );
     expect(migrationJob.indexOf('production - Drizzle')).toBeLessThan(
+      migrationJob.indexOf('production - online indexes')
+    );
+    expect(migrationJob.indexOf('production - online indexes')).toBeLessThan(
       migrationJob.indexOf('production schema check')
     );
     expect(resultJob).toContain(
@@ -1578,7 +1603,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       /\n {6}vercel:\n {8}specifier: 56\.3\.2\n {8}version: 56\.3\.2[(\n]/
     );
     expect(dependabot).toMatch(
-      /- dependency-name: 'vercel'\n\s+versions: \['>=57'\]/
+      /- dependency-name: 'vercel'\n\s+versions: \['>=56\.4'\]/
     );
   });
 
@@ -2565,7 +2590,7 @@ describe('canary health gate workflow', () => {
     const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
     const reassert = getStepBlock(
       receiptJob,
-      'Reassert the exact preview after production settles'
+      'Classify staging generation after mutation'
     );
     const prove = getStepBlock(
       receiptJob,
@@ -2577,23 +2602,19 @@ describe('canary health gate workflow', () => {
     );
     const releaseResult = getJobBlock(release, 'release-result');
 
-    expect(receiptJob).toContain(
-      'needs: [deploy-staging, alias-staging, promote-production, rollback-production]'
-    );
+    expect(receiptJob).toContain('needs: [deploy-staging, alias-staging]');
     expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
     expect(receiptJob).toContain(
       "needs.alias-staging.outputs.is_current == 'true'"
     );
-    expect(reassert).toContain(
-      'vercel alias set "$deployment_url" staging.jov.ie'
-    );
+    expect(reassert).toContain('staging_refresh_outcome=current');
     expect(reassert).toContain(
       'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
     );
+    expect(reassert).toContain('[ "$current_main" = "$EXPECTED_COMMIT_SHA" ]');
     expect(reassert).toContain(
-      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+      'staging_refresh_outcome=superseded_after_mutation'
     );
-    expect(reassert).toContain('needs.deploy-staging.outputs.deploy_url_b64');
     expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
     expect(prove).toContain('EXPECTED_COMMIT_SHA:');
     expect(prove).toContain('--arg url "$deployment_url"');
@@ -2623,15 +2644,13 @@ describe('canary health gate workflow', () => {
     expect(writeReceipt).toContain(
       'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
     );
-    expect(writeReceipt).toContain(
-      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
-    );
+    expect(writeReceipt).toContain('[[ "$current_main" =~ ^[0-9a-f]{40}$ ]]');
     expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
     expect(writeReceipt).toContain(
-      'ROLLBACK_RESULT: ${{ needs.rollback-production.result }}'
+      'STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}'
     );
-    expect(writeReceipt).toContain('rollbackResult: $rollbackResult');
-    expect(writeReceipt).toContain('state: "deployed"');
+    expect(writeReceipt).toContain('sloState: $sloState');
+    expect(writeReceipt).toContain('state: $state');
     expect(writeReceipt).toContain('terminal: true');
     expect(writeReceipt).toContain(
       'privacy: "robots-block-all-and-http-noindex"'
@@ -2643,19 +2662,19 @@ describe('canary health gate workflow', () => {
     expect(receiptJob).not.toContain('vercel rollback');
     expect(releaseResult).toContain('staging-deployment-receipt,');
     expect(releaseResult).toContain(
-      'staging_refresh_outcome="${{ needs.staging-deployment-receipt.outputs.staging_refresh_outcome }}"'
+      "if: ${{ always() && inputs.release_mode == 'production' }}"
     );
     expect(releaseResult).toContain(
-      '[ "${{ needs.staging-deployment-receipt.result }}" != "success" ]'
+      'if [ "${{ inputs.staging_verified }}" != "true" ]; then'
     );
     expect(releaseResult).toContain(
-      '[ "${{ needs.staging-deployment-receipt.outputs.deployed }}" = "true" ]'
+      'Production release lacks the exact staging controller receipt.'
     );
     expect(releaseResult).toContain(
-      'Superseded staging refresh lacked exact pre-promotion staging gates or exact production promotion evidence.'
+      'Pre-production supersession lacks an exact staging receipt.'
     );
     expect(releaseResult).toContain(
-      'Current staging refresh lacked an exact deployed receipt.'
+      'production-head:${{ needs.production-head.result }}'
     );
     expect(release.indexOf('  promote-production:')).toBeLessThan(
       release.indexOf('  staging-deployment-receipt:')
@@ -2827,7 +2846,7 @@ case "$url" in
       printf 'SECRET_SENTINEL' > "$output_path"
     else
       jq -n --arg sha "$sha" --arg environment "$environment" \
-        '{commitSha: $sha, environment: $environment, privateField: "SECRET_SENTINEL"}' > "$output_path"
+        '{commitSha: $sha, deploymentId: $ENV.EXPECTED_DEPLOYMENT_ID, environment: $environment, privateField: "SECRET_SENTINEL"}' > "$output_path"
     fi
     if "$write_meta"; then printf '%s\\n%s' "$status" "$content_type"; fi
     exit "$curl_status"
@@ -2858,7 +2877,7 @@ esac
         );
 
         const expectedSha = '0123456789abcdef0123456789abcdef01234567';
-        const expectedDeploymentId = 'dpl_exact_receipt';
+        const expectedDeploymentId = 'dpl_exactreceipt';
         const result = spawnSync(
           'bash',
           [
@@ -2922,7 +2941,7 @@ esac
             )
           );
           expect(output).toContain(
-            `commitSha=${expectedSha} environment=preview`
+            `commitSha=${expectedSha} deploymentId=${expectedDeploymentId} environment=preview`
           );
         } else if (
           scenario === 'missing-noindex' ||
@@ -5185,8 +5204,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
     expect(evaluator).toContain("default: '5'");
     expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('failingRunAttempt < 2');
-    expect(evaluator).toContain('repair_state_unavailable');
+    expect(evaluator).toContain('attemptEvidenceTrusted');
+    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {

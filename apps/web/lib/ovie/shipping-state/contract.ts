@@ -16,14 +16,14 @@ export const SHIPPING_STATE_CLOCK_SKEW_MS = 60_000;
 export const MAX_ACCEPTED_SOURCE_SEQUENCE_GAP = 10_000;
 
 export const SHIPPING_SOURCE_IDS = [
-  'symphony-runtime',
-  'symphony-task',
-  'lease-guard-capacity',
+  'lanes-status',
+  'lane-pull-requests',
   'github-native-merge-queue',
+  'github-merges',
   'exact-sha-ci',
   'production-controller',
   'live-build-info',
-  'fleet-receipt',
+  'summer-runtime',
 ] as const;
 
 export type ShippingSourceId = (typeof SHIPPING_SOURCE_IDS)[number];
@@ -31,40 +31,40 @@ export type ShippingSourceId = (typeof SHIPPING_SOURCE_IDS)[number];
 /**
  * Producer-event validity is distinct from successful observation freshness.
  * Current GitHub/runtime reads are identity-bound and therefore have no
- * elapsed-time expiry here. Heartbeat and persisted fleet producers retain
- * their own documented semantic windows.
+ * elapsed-time expiry here. The published lanes feed carries its own `at`
+ * and is stale once that is older than ten minutes.
  */
 export const SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS = {
-  'symphony-runtime': 10_000,
-  'symphony-task': null,
-  'lease-guard-capacity': 10 * 60_000,
+  'lanes-status': 10 * 60_000,
+  'lane-pull-requests': null,
   'github-native-merge-queue': null,
+  'github-merges': null,
   'exact-sha-ci': null,
   'production-controller': null,
   'live-build-info': null,
-  'fleet-receipt': 10 * 60_000,
+  'summer-runtime': null,
 } as const satisfies Record<ShippingSourceId, number | null>;
 
 export const SHIPPING_SOURCE_SCHEMAS = {
-  'symphony-runtime': 'symphony-runtime-receipt/v1',
-  'symphony-task': 'symphony-workspace-revision/v1',
-  'lease-guard-capacity': 'symphony-lease-guard-report/v1',
+  'lanes-status': 'symphony-lanes-status/v1',
+  'lane-pull-requests': 'github-lane-pull-requests/v1',
   'github-native-merge-queue': 'github-merge-queue-entry/v1',
+  'github-merges': 'github-merge-counts/v1',
   'exact-sha-ci': 'github-actions-run/v1',
   'production-controller': 'jovie-controller-snapshot/v1',
   'live-build-info': 'jovie-build-info/v1',
-  'fleet-receipt': 'jovie-fleet-gate/v1',
+  'summer-runtime': 'summer-runtime-health/v1',
 } as const satisfies Record<ShippingSourceId, string>;
 
 export const SHIPPING_SOURCE_PRODUCERS = {
-  'symphony-runtime': 'symphony-reconciler',
-  'symphony-task': 'symphony-ui-pilot',
-  'lease-guard-capacity': 'symphony-lease-guard',
+  'lanes-status': 'symphony-lanes',
+  'lane-pull-requests': 'github-pull-requests',
   'github-native-merge-queue': 'github-native-merge-queue',
+  'github-merges': 'github-search',
   'exact-sha-ci': 'github-actions-ci',
   'production-controller': 'production-controller',
   'live-build-info': 'live-build-info',
-  'fleet-receipt': 'gem-priority-gate',
+  'summer-runtime': 'summer-runtime',
 } as const satisfies Record<ShippingSourceId, string>;
 
 export const OBSERVATION_STATES = [
@@ -115,6 +115,30 @@ export type OperationalTaskPriority =
   | 'low'
   | 'none';
 
+/** Rollup of the head-commit check suite for a lane pull request. */
+export type OperationalTaskChecks = {
+  readonly rollup: 'success' | 'failure' | 'pending' | 'unknown';
+  /** Sanitized names of failing check runs / status contexts (bounded). */
+  readonly failing: readonly string[];
+};
+
+/**
+ * GitHub pull-request detail for a lane task. Null when the task came from a
+ * source without PR evidence, or when an older publisher produced the feed.
+ */
+export type OperationalTaskPullRequest = {
+  readonly number: number;
+  readonly url: string | null;
+  readonly branch: string | null;
+  /** Owning agent lane derived from the branch prefix. */
+  readonly agent: 'devin' | 'codex' | null;
+  readonly isDraft: boolean;
+  readonly checks: OperationalTaskChecks;
+  readonly queuePosition: number | null;
+  readonly queueState: string | null;
+  readonly createdAt: string | null;
+};
+
 export type OperationalTask = {
   /** Stable cross-presentation identity. Linear remains the canonical owner. */
   readonly id: `linear:${string}`;
@@ -127,6 +151,7 @@ export type OperationalTask = {
   readonly retryAt: string | null;
   readonly sourceRevision: string | null;
   readonly updatedAt: string | null;
+  readonly pullRequest?: OperationalTaskPullRequest | null;
 };
 
 export type OperationalTaskDelta = {
@@ -141,7 +166,7 @@ export type OperationalTaskFeed = {
   readonly canonicalSource: 'linear';
   readonly cacheMode: 'local-reconciled';
   readonly syncState: OperationalTaskSyncState;
-  readonly sourceId: 'symphony-runtime' | 'symphony-task';
+  readonly sourceId: 'lane-pull-requests';
   readonly observedAt: string | null;
   readonly lastSyncedAt: string | null;
   readonly freshnessDeadline: string | null;
@@ -278,6 +303,11 @@ export type SourceObservation = IdentityFields & {
     readonly running: CountMeasurement;
     readonly retrying: CountMeasurement;
     readonly blocked: CountMeasurement;
+    /**
+     * Terminal (dead-lettered) failures. Distinct from `blocked`: blocked work
+     * is still live and may recover; terminal failures ended without success.
+     * Never aliases another list — absent evidence stays `not-measured`.
+     */
     readonly terminalFailures: CountMeasurement;
     readonly queued: CountMeasurement;
     readonly openPullRequests: CountMeasurement;
@@ -287,7 +317,76 @@ export type SourceObservation = IdentityFields & {
     readonly queueWaitMs: DurationMeasurement;
     readonly runDurationMs: DurationMeasurement;
   };
+  /** The delivery block this source owns, present only for a live read. */
+  readonly delivery: DeliveryPatch | null;
 };
+
+/** Repositories whose merges since Pacific midnight the delivery card reports. */
+export const DELIVERY_MERGE_REPOS = [
+  'Jovie',
+  'LogYourBody',
+  'summer-config',
+] as const;
+
+export type DeliveryMergeRepo = (typeof DELIVERY_MERGE_REPOS)[number];
+
+export type DeliveryLane = {
+  readonly name: string;
+  readonly running: number;
+  readonly slots: number;
+};
+
+export type DeliveryLanes = {
+  readonly running: CountMeasurement;
+  readonly slots: CountMeasurement;
+  readonly idle: CountMeasurement;
+  readonly pool: CountMeasurement;
+  readonly lastLandingAgeSeconds: CountMeasurement;
+  readonly diskFreePct: number | null;
+  readonly lanes: readonly DeliveryLane[];
+  readonly alerts: readonly string[];
+  readonly heldByReason: Readonly<Record<string, number>>;
+  readonly failedByReason: Readonly<Record<string, number>>;
+  readonly publishedAt: string | null;
+  /** The feed's own `at` is older than the lanes semantic window. */
+  readonly stale: boolean;
+};
+
+export type DeliveryMerges = {
+  /** Pacific midnight, the start of "today" for every `today` count. */
+  readonly since: string | null;
+  readonly today: CountMeasurement;
+  readonly byRepo: Readonly<Record<DeliveryMergeRepo, CountMeasurement>>;
+  readonly last7Days: CountMeasurement;
+  readonly prior7Days: CountMeasurement;
+};
+
+export type DeliveryProduction = {
+  readonly sha: string | null;
+  readonly version: string | null;
+  readonly deployedAt: string | null;
+  readonly behindMain: CountMeasurement;
+};
+
+export type DeliverySummer = {
+  readonly availability: 'up' | 'down' | 'degraded' | null;
+};
+
+/**
+ * Flat, per-metric delivery truth for the Ovie card and Mac door. Each block
+ * is owned by exactly one source; a failed source leaves its block
+ * not-measured without touching the others.
+ */
+export type DeliverySummary = {
+  readonly lanes: DeliveryLanes;
+  readonly merges: DeliveryMerges;
+  readonly mergeQueueDepth: CountMeasurement;
+  readonly inFlight: CountMeasurement;
+  readonly production: DeliveryProduction;
+  readonly summer: DeliverySummer;
+};
+
+export type DeliveryPatch = Partial<DeliverySummary>;
 
 export type ShipMeanings = {
   readonly merged: BooleanMeasurement;
@@ -310,6 +409,7 @@ export type ShippingStateProjection = IdentityFields & {
   readonly retrying: CountMeasurement;
   readonly terminalFailures: CountMeasurement;
   readonly capacityAvailable: CountMeasurement;
+  readonly delivery: DeliverySummary;
   /** Shared cache-backed task projection consumed by Ovie and terminal adapters. */
   readonly operationalTasks: OperationalTaskFeed;
 };
@@ -379,5 +479,44 @@ export function emptyDurations(): SourceObservation['durations'] {
   return {
     queueWaitMs: NOT_MEASURED_DURATION,
     runDurationMs: NOT_MEASURED_DURATION,
+  };
+}
+
+export function emptyDeliverySummary(): DeliverySummary {
+  return {
+    lanes: {
+      running: NOT_MEASURED_COUNT,
+      slots: NOT_MEASURED_COUNT,
+      idle: NOT_MEASURED_COUNT,
+      pool: NOT_MEASURED_COUNT,
+      lastLandingAgeSeconds: NOT_MEASURED_COUNT,
+      diskFreePct: null,
+      lanes: [],
+      alerts: [],
+      heldByReason: {},
+      failedByReason: {},
+      publishedAt: null,
+      stale: false,
+    },
+    merges: {
+      since: null,
+      today: NOT_MEASURED_COUNT,
+      byRepo: {
+        Jovie: NOT_MEASURED_COUNT,
+        LogYourBody: NOT_MEASURED_COUNT,
+        'summer-config': NOT_MEASURED_COUNT,
+      },
+      last7Days: NOT_MEASURED_COUNT,
+      prior7Days: NOT_MEASURED_COUNT,
+    },
+    mergeQueueDepth: NOT_MEASURED_COUNT,
+    inFlight: NOT_MEASURED_COUNT,
+    production: {
+      sha: null,
+      version: null,
+      deployedAt: null,
+      behindMain: NOT_MEASURED_COUNT,
+    },
+    summer: { availability: null },
   };
 }

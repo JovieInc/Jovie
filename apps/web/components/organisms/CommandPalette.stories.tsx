@@ -41,10 +41,12 @@ storyQueryClient.setQueryData(queryKeys.chat.capabilities(STORY_PROFILE_ID), {
   },
 });
 
-const storyDashboardData = {
+const storyDashboardData: DashboardData = {
   user: { id: 'story-user' },
   creatorProfiles: [],
-  selectedProfile: { id: STORY_PROFILE_ID },
+  selectedProfile: {
+    id: STORY_PROFILE_ID,
+  } as DashboardData['selectedProfile'],
   needsOnboarding: false,
   sidebarCollapsed: false,
   hasSocialLinks: true,
@@ -52,6 +54,8 @@ const storyDashboardData = {
   isAdmin: false,
   tippingStats: {
     tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
     tipsSubmitted: 0,
     totalReceivedCents: 0,
     monthReceivedCents: 0,
@@ -63,7 +67,7 @@ const storyDashboardData = {
     steps: [],
     profileIsLive: true,
   },
-} as DashboardData;
+};
 
 function OpenPaletteOnMount() {
   const { openCommandPalette } = useHeaderActions();

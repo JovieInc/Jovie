@@ -26,8 +26,11 @@ Per `.claude/rules/testing.md`, **every bug fix needs a regression test** at the
 Complete this section when the PR is a bug fix (`fix:` commits/title, `fix/` branch, or the Bug fix checkbox below):
 
 - [ ] Regression test added or updated (`*.test.*` / `*.spec.*`)
-- [ ] `bug-to-test: satisfied` noted in this PR description
-- [ ] OR `bug-to-test: waived — <reason>` documented (copy-only / config-only fixes only)
+- [ ] `Regression test: <changed test path>` noted in this PR description
+- [ ] OR a bounded exception documents scope, rationale, independent approval,
+      expiry, review trigger, and visible residual count
+
+`bug-to-test: satisfied` text alone and one-line waivers are not evidence.
 
 If this is **not** a bug fix and no new test is required, say so explicitly (for example: `bug-to-test: not applicable — feature work`).
 

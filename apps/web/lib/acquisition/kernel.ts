@@ -4,6 +4,7 @@ import type {
   CertificationEvidenceReceipt,
   CertificationSubject,
 } from '@/lib/agent-os/certification';
+import { stableSerialize } from '@/lib/stable-serialize';
 
 export const ACQUISITION_STATES = [
   'discovered',
@@ -159,7 +160,8 @@ export const ACQUISITION_GAP_MAP: readonly AcquisitionGapEntry[] = [
   'shared|discovery|exists_uncertified|lib/leads/discovery.ts',
   'shared|inbound_intake|exists_uncertified|waitlist + /start',
   'shared|ingestion|exists_production_ready|lib/leads/ingest-lead.ts',
-  'shared|machine_certification|in_flight|kernel.ts + jovie.certification/v1',
+  'shared|preflight_readiness|exists_production_ready|kernel.ts',
+  'shared|machine_certification|in_flight|certification-store.ts + jovie.certification/v1',
   'shared|human_review|exists_uncertified|admin outreach manual_review',
   'shared|manual_send_queue|exists_production_ready|admin outreach DM',
   'shared|event_tracking|exists_uncertified|lib/leads/funnel-events.ts',
@@ -215,11 +217,23 @@ export interface AcquisitionCriterionResult {
   readonly summary: string;
 }
 
-export interface AcquisitionMachineCertification {
+/**
+ * Pre-build field-presence preflight. This is NOT a certification: it only
+ * reports which required inputs were present when the source was observed.
+ * Certifying the built experience is the separate `jovie.certification/v1`
+ * path, which rejects these receipts because they carry no commit binding.
+ */
+export interface AcquisitionPreflightResult {
+  readonly stage: 'preflight_field_presence';
   readonly experimentId: AcquisitionExperimentId;
   readonly rubricId: string;
   readonly passed: boolean;
-  readonly confidence: number;
+  /**
+   * Fraction of required checks passed. This is hard-check coverage, not a
+   * calibrated correctness probability, model quality estimate, human
+   * approval signal, or observed customer value.
+   */
+  readonly checklistCoverage: number;
   readonly criteria: readonly AcquisitionCriterionResult[];
   readonly failures: readonly AcquisitionCriterionResult[];
   readonly receipts: readonly CertificationEvidenceReceipt[];
@@ -234,20 +248,39 @@ function check(
   return { id, passed, severity, summary };
 }
 
+/**
+ * Kernel is imported by non-server-only modules, so receipts get an FNV-1a
+ * content digest instead of node:crypto. It binds each receipt to the exact
+ * observed inputs and criterion outcome; it is not a commit SHA and cannot
+ * satisfy certification admission.
+ */
+function preflightDigest(value: unknown): string {
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of new TextEncoder().encode(stableSerialize(value))) {
+    hash ^= BigInt(byte);
+    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+  }
+  return `fnv1a64:${hash.toString(16).padStart(16, '0')}`;
+}
+
 function finalize(
   experimentId: AcquisitionExperimentId,
+  evidence: unknown,
   criteria: readonly AcquisitionCriterionResult[]
-): AcquisitionMachineCertification {
+): AcquisitionPreflightResult {
+  const rubricId = getAcquisitionExperiment(experimentId).certificationRubricId;
   const failures = criteria.filter(
     item => !item.passed && item.severity === 'fail'
   );
   const required = criteria.filter(item => item.severity === 'fail');
   const passedCount = required.filter(item => item.passed).length;
   return {
+    stage: 'preflight_field_presence',
     experimentId,
-    rubricId: getAcquisitionExperiment(experimentId).certificationRubricId,
+    rubricId,
     passed: failures.length === 0,
-    confidence: required.length === 0 ? 0 : passedCount / required.length,
+    checklistCoverage:
+      required.length === 0 ? 0 : passedCount / required.length,
     criteria,
     failures,
     receipts: criteria.map(item => ({
@@ -255,22 +288,22 @@ function finalize(
       tier: 'invariant_evaluation',
       status: item.passed ? 'passed' : 'failed',
       sourceSha: null,
-      ref: 'acquisition-machine-certification',
-      digest: null,
+      ref: `acquisition-preflight:${rubricId}:${item.id}`,
+      digest: preflightDigest({ experimentId, rubricId, evidence, item }),
       summary: item.summary,
     })),
   };
 }
 
-export function machineCertifyPremadeProfile(
+export function runPremadeProfilePreflight(
   evidence: PremadeProfileEvidence
-): AcquisitionMachineCertification {
+): AcquisitionPreflightResult {
   const named = Boolean(evidence.displayName?.trim());
   const avatar = Boolean(evidence.avatarUrl?.trim());
   const contact = Boolean(
     evidence.contactEmail?.trim() || evidence.instagramHandle?.trim()
   );
-  return finalize(PREMADE_ARTIST_PROFILE_EXPERIMENT_ID, [
+  return finalize(PREMADE_ARTIST_PROFILE_EXPERIMENT_ID, evidence, [
     check('identity', named, named ? 'Named.' : 'No display name.'),
     check('spotify', evidence.hasSpotifyLink, 'Spotify required.'),
     check('avatar', avatar, avatar ? 'Avatar present.' : 'Missing avatar.'),
@@ -286,12 +319,12 @@ export function machineCertifyPremadeProfile(
   ]);
 }
 
-export function machineCertifyYouTubeGrowth(
+export function runYouTubeGrowthPreflight(
   evidence: YouTubeGrowthEvidence
-): AcquisitionMachineCertification {
+): AcquisitionPreflightResult {
   const generated =
     evidence.generatedCount >= 1 && evidence.mode === 'before_after';
-  return finalize(YOUTUBE_GROWTH_EXPERIMENT_ID, [
+  return finalize(YOUTUBE_GROWTH_EXPERIMENT_ID, evidence, [
     check('channel', Boolean(evidence.channelId?.trim()), 'Channel required.'),
     check('videos', evidence.videoCount >= 1, 'Need public videos.'),
     check('generated', generated, 'Need at least one redo.'),
@@ -321,7 +354,12 @@ export interface AcquisitionReviewPacket {
   readonly experimentId: AcquisitionExperimentId;
   readonly state: AcquisitionState;
   readonly expectedBenefit: string;
-  readonly machineCertification: AcquisitionMachineCertification;
+  /**
+   * Input-readiness preflight only. Reaching `certified`/`outreach_ready`
+   * additionally requires a `jovie.certification/v1` post-build certificate
+   * and founder approval through the canonical Ovi inbox.
+   */
+  readonly preflightReadiness: AcquisitionPreflightResult;
   readonly outreachDraft: string;
   readonly productGapIssueKey: string | null;
   readonly actions: typeof ACQUISITION_REVIEW_ACTIONS;
@@ -332,7 +370,7 @@ export function buildAcquisitionReviewPacket(input: {
   readonly state: AcquisitionState;
   readonly displayName: string | null;
   readonly claimOrApplyPath: string;
-  readonly machineCertification: AcquisitionMachineCertification;
+  readonly preflightReadiness: AcquisitionPreflightResult;
   readonly rejection?: AcquisitionRejection | null;
 }): AcquisitionReviewPacket {
   const experiment = getAcquisitionExperiment(input.experimentId);
@@ -341,7 +379,7 @@ export function buildAcquisitionReviewPacket(input: {
     experimentId: input.experimentId,
     state: input.state,
     expectedBenefit: experiment.valueProposition,
-    machineCertification: input.machineCertification,
+    preflightReadiness: input.preflightReadiness,
     outreachDraft: renderOutreachDraft(experiment.outreachDraft, {
       displayName: input.displayName,
       claimLink: input.claimOrApplyPath,

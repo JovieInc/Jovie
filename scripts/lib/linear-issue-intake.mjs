@@ -50,6 +50,79 @@ async function linearGraphql(
   }
 }
 
+/** Post a comment on a Linear issue. */
+export async function addLinearIssueComment({
+  issueId,
+  body,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (!issueId) return { ok: false, reason: 'missing_issue_id' };
+  const result = await linearGraphql(
+    {
+      query: `
+        mutation AddLinearIssueComment($id: String!, $body: String!) {
+          commentCreate(input: { issueId: $id, body: $body }) {
+            success
+            comment { id }
+          }
+        }
+      `,
+      variables: { id: issueId, body },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_comment_create'
+  );
+  if (!result.ok) return result;
+  if (!result.data?.commentCreate?.success) {
+    return {
+      ok: false,
+      reason: 'linear_comment_create_unsuccessful',
+      body: result.raw,
+    };
+  }
+  return { ok: true, id: result.data.commentCreate.comment?.id ?? null };
+}
+
+/** List comments on a Linear issue (body + createdAt, oldest first). */
+export async function listLinearIssueComments({
+  issueId,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (!issueId) return { ok: false, reason: 'missing_issue_id' };
+  const result = await linearGraphql(
+    {
+      query: `
+        query ListLinearIssueComments($id: String!) {
+          issue(id: $id) {
+            comments(first: 100) {
+              nodes { id body createdAt }
+            }
+          }
+        }
+      `,
+      variables: { id: issueId },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_comment_list'
+  );
+  if (!result.ok) return result;
+  const nodes = result.data?.issue?.comments?.nodes ?? [];
+  return {
+    ok: true,
+    comments: nodes.map(node => ({
+      id: node?.id ?? null,
+      body: String(node?.body ?? ''),
+      createdAt: node?.createdAt ?? null,
+    })),
+  };
+}
+
 // Dedup by fingerprint in the title. Linear removed issueSearch.
 export async function upsertLinearIssueByTitleFingerprint({
   fingerprint,
@@ -75,11 +148,15 @@ export async function upsertLinearIssueByTitleFingerprint({
   const found = await linearGraphql(
     {
       query: `
-        query FindIssueByFingerprint($teamId: String!, $fingerprint: String!) {
+        query FindIssueByFingerprint(
+          $teamId: String!
+          $teamFilterId: ID!
+          $fingerprint: String!
+        ) {
           team(id: $teamId) { states { nodes { id name type } } }
           issues(
             filter: {
-              team: { id: { eq: $teamId } }
+              team: { id: { eq: $teamFilterId } }
               title: { contains: $fingerprint }
             }
             first: 25
@@ -88,7 +165,11 @@ export async function upsertLinearIssueByTitleFingerprint({
           }
         }
       `,
-      variables: { teamId: JOVIE_TEAM_ID, fingerprint },
+      variables: {
+        teamId: JOVIE_TEAM_ID,
+        teamFilterId: JOVIE_TEAM_ID,
+        fingerprint,
+      },
       apiKey,
       fetchImpl,
     },

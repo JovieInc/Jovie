@@ -285,7 +285,7 @@ export function PromoDownloadGate({
 
       {/* Error display */}
       {error && (
-        <p className='text-center text-xs text-red-400' role='alert'>
+        <p className='text-center text-xs text-error' role='alert'>
           {error}
         </p>
       )}

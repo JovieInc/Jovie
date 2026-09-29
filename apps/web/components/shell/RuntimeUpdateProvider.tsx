@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, type ReactNode, useContext, useState } from 'react';
+import { DesktopUpdateProvider } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
 import {
   useDesktopUpdate,
   useIsElectronRuntime,
@@ -64,7 +65,7 @@ export function RuntimeUpdateProvider({
     <RuntimeUpdateContext.Provider
       value={{ available, busy, title, description, apply }}
     >
-      {children}
+      <DesktopUpdateProvider>{children}</DesktopUpdateProvider>
     </RuntimeUpdateContext.Provider>
   );
 }

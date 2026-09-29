@@ -12,6 +12,7 @@ import {
   type EntityMentionSegment,
   linkEntityMentions,
 } from '@/lib/profile/entity-mentions';
+import { isPublicArtistMentionHref } from '@/lib/profile/opaque-internal-profile-handle';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
   isPaymentSupportPlatform,
@@ -725,12 +726,17 @@ function buildDescription(params: {
   return description;
 }
 
-interface StructuredCollaboratorParagraph {
+export interface StructuredCollaboratorParagraph {
   readonly text: string;
   readonly segments: readonly EntityMentionSegment[];
 }
 
-function buildStructuredCollaboratorParagraph(
+/**
+ * Selected-credits paragraph built from exact release-credit edges. Exported
+ * so the About destination (JOV-6199) renders the same verified prose as the
+ * AEO description instead of a second implementation.
+ */
+export function buildStructuredCollaboratorParagraph(
   artistName: string,
   artistHandle: string,
   collaborators: readonly StructuredReleaseCollaborator[]
@@ -752,7 +758,11 @@ function buildStructuredCollaboratorParagraph(
 
     const existing = grouped.get(collaborator.artistId) ?? {
       name,
-      href: collaborator.href,
+      // Raw-ID destinations (`/artists/<id>`, `/a_*`) never render as links
+      // (JOV-6612); credit-only collaborators stay plain text.
+      href: isPublicArtistMentionHref(collaborator.href)
+        ? collaborator.href
+        : null,
       releases: [],
     };
     if (
@@ -820,7 +830,7 @@ function buildStructuredCollaboratorParagraph(
   };
 }
 
-function buildOriginFaq(artist: Artist): ProfileAeoFaqItem {
+function buildOriginFaq(artist: Artist): ProfileAeoFaqItem | null {
   const origin = getOrigin(artist);
   const location = cleanText(artist.location);
   const hometown = cleanText(artist.hometown);
@@ -831,7 +841,8 @@ function buildOriginFaq(artist: Artist): ProfileAeoFaqItem {
   } else if (origin) {
     answer = `${artist.name} is from ${origin}.`;
   } else {
-    answer = `${artist.name}'s public Jovie profile does not list a hometown or origin yet; the canonical profile handle is @${artist.handle}.`;
+    // Sparse honesty (JOV-6199): an "unknown" answer is filler — omit the FAQ.
+    return null;
   }
 
   return {
@@ -846,18 +857,19 @@ function buildLatestReleaseFaq(params: {
   readonly latestRelease?: AeoReleaseFact | null;
   readonly releases: readonly PublicRelease[];
   readonly socialLinks: readonly LegacySocialLink[];
-}): ProfileAeoFaqItem {
+}): ProfileAeoFaqItem | null {
   const { artist, latestRelease, releases, socialLinks } = params;
-  const releaseDate = formatDate(latestRelease?.releaseDate);
-  const releaseType = formatReleaseType(latestRelease?.releaseType);
+  if (!latestRelease?.title) {
+    // Sparse honesty (JOV-6199): no release fact means no release answer —
+    // omit the FAQ instead of publishing "does not list a release yet".
+    return null;
+  }
+  const releaseDate = formatDate(latestRelease.releaseDate);
+  const releaseType = formatReleaseType(latestRelease.releaseType);
   const source = getReleaseSource(artist, latestRelease, socialLinks);
-  const listedReleaseCount = latestRelease?.title
-    ? Math.max(releases.length, 1)
-    : releases.length;
+  const listedReleaseCount = Math.max(releases.length, 1);
   const releasedOn = releaseDate ? ` released on ${releaseDate}` : '';
-  const answer = latestRelease?.title
-    ? `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releasedOn}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`
-    : `${artist.name}'s public Jovie profile does not list a release yet. Use the profile's listening links for current music updates.`;
+  const answer = `${artist.name}'s latest listed release is "${latestRelease.title}", a ${releaseType}${releasedOn}. The public catalog currently lists ${pluralize(listedReleaseCount, 'release')}.`;
 
   return {
     question: `What is ${artist.name}'s latest release?`,

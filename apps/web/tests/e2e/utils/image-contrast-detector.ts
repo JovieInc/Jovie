@@ -1,0 +1,423 @@
+import type { Page } from '@playwright/test';
+import sharp from 'sharp';
+
+// Invariant consumer: JOV-INV-019 `text-aware-contrast` (JOV-6916).
+// Unlike the token-pair ratchet (scripts/lint-contrast-ratchet.mjs), this
+// inspects RENDERED pixels: for every text node and interactive control whose
+// box overlaps a painted image layer (hero photo, editorial card, CSS
+// background image), the glyph ink is hidden and the pixels behind the glyph
+// box are sampled. WCAG AA is enforced against the worst-case percentile of
+// the sampled background luminance, so art direction must reserve contrast
+// rather than rely on a post-hoc overlay.
+
+export const IMAGE_CONTRAST_CERTIFICATION_SCHEMA =
+  'jovie-image-contrast/v1' as const;
+
+const HIDE_ATTRIBUTE = 'data-image-contrast-hide';
+
+export interface ImageContrastReceipt {
+  readonly element: string;
+  readonly text: string;
+  readonly box: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly foreground: string;
+  readonly foregroundLuminance: number;
+  readonly backgroundLuminance: {
+    readonly p10: number;
+    readonly p50: number;
+    readonly p90: number;
+  };
+  readonly worstContrastRatio: number;
+  readonly requiredRatio: number;
+  readonly largeText: boolean;
+  readonly pass: boolean;
+}
+
+export interface ImageContrastFinding {
+  readonly kind: 'image-contrast';
+  readonly message: string;
+  readonly elements: readonly string[];
+  readonly measurements?: Readonly<Record<string, number>>;
+}
+
+export interface ImageContrastSnapshot {
+  readonly schemaVersion: typeof IMAGE_CONTRAST_CERTIFICATION_SCHEMA;
+  readonly findings: readonly ImageContrastFinding[];
+  readonly receipts: readonly ImageContrastReceipt[];
+  readonly inspectedAt: string;
+}
+
+interface CandidateRecord {
+  readonly index: number;
+  readonly element: string;
+  readonly text: string;
+  readonly box: { x: number; y: number; width: number; height: number };
+  readonly color: string;
+  readonly fontSize: number;
+  readonly fontWeight: number;
+}
+
+interface PageScan {
+  readonly candidates: readonly CandidateRecord[];
+  readonly deviceScaleFactor: number;
+}
+
+function relativeLuminance(r: number, g: number, b: number): number {
+  const channel = (value: number): number => {
+    const c = value / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrastRatio(l1: number, l2: number): number {
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function parseCssColor(
+  color: string
+): { r: number; g: number; b: number } | null {
+  const match = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(color);
+  if (!match) return null;
+  return {
+    r: Number(match[1]),
+    g: Number(match[2]),
+    b: Number(match[3]),
+  };
+}
+
+function percentile(sorted: readonly number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.floor((p / 100) * (sorted.length - 1)))
+  );
+  return sorted[index];
+}
+
+async function scanCandidates(page: Page): Promise<PageScan> {
+  return page.evaluate(hideAttribute => {
+    const root = document.querySelector('main') ?? document.body;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    const round = (value: number): number => Math.round(value * 100) / 100;
+    const isRendered = (element: Element): boolean => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      const style = getComputedStyle(element);
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        style.visibility !== 'collapse' &&
+        Number.parseFloat(style.opacity || '1') > 0
+      );
+    };
+    const intersectViewport = (
+      rect: DOMRect
+    ): { x: number; y: number; width: number; height: number } | null => {
+      const x = Math.max(0, rect.left);
+      const y = Math.max(0, rect.top);
+      const right = Math.min(viewportWidth, rect.right);
+      const bottom = Math.min(viewportHeight, rect.bottom);
+      if (right - x <= 0 || bottom - y <= 0) return null;
+      return {
+        x: round(x),
+        y: round(y),
+        width: round(right - x),
+        height: round(bottom - y),
+      };
+    };
+    const describe = (element: Element): string => {
+      const testId = element.getAttribute('data-testid');
+      if (testId)
+        return `${element.tagName.toLowerCase()}[data-testid="${testId}"]`;
+      if (element.id) return `${element.tagName.toLowerCase()}#${element.id}`;
+      const role = element.getAttribute('role');
+      if (role) return `${element.tagName.toLowerCase()}[role="${role}"]`;
+      const siblings = Array.from(element.parentElement?.children ?? []).filter(
+        candidate => candidate.tagName === element.tagName
+      );
+      const suffix =
+        siblings.length > 1
+          ? `:nth-of-type(${siblings.indexOf(element) + 1})`
+          : '';
+      return `${element.tagName.toLowerCase()}${suffix}`;
+    };
+
+    // Painted image layers: replaced media elements plus elements whose own
+    // box paints a CSS image (hero photo, editorial card, gradient art).
+    const imageLayers: { element: Element; rect: DOMRect }[] = [];
+    const paintsCssImage = (element: Element): boolean => {
+      const style = getComputedStyle(element);
+      if (style.backgroundImage !== 'none') return true;
+      for (const pseudo of ['::before', '::after'] as const) {
+        const pseudoStyle = getComputedStyle(element, pseudo);
+        if (
+          pseudoStyle.backgroundImage !== 'none' &&
+          pseudoStyle.content !== 'none' &&
+          pseudoStyle.content !== 'normal'
+        ) {
+          return true;
+        }
+      }
+      return false;
+    };
+    for (const element of Array.from(root.querySelectorAll('*'))) {
+      if (!isRendered(element)) continue;
+      const isMedia =
+        element instanceof HTMLImageElement ||
+        element instanceof HTMLVideoElement ||
+        element instanceof HTMLCanvasElement;
+      if (!isMedia && !paintsCssImage(element)) continue;
+      const rect = element.getBoundingClientRect();
+      if (intersectViewport(rect)) imageLayers.push({ element, rect });
+    }
+
+    const isInteractive = (element: Element): boolean =>
+      element instanceof HTMLAnchorElement ||
+      element instanceof HTMLButtonElement ||
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLSelectElement ||
+      element instanceof HTMLTextAreaElement ||
+      element.closest(
+        '[role="button"], [role="link"], [role="menuitem"], [role="tab"], summary'
+      ) === element;
+
+    const hasDirectText = (element: Element): string => {
+      let text = '';
+      for (const node of Array.from(element.childNodes)) {
+        if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? '';
+      }
+      return text.replace(/\s+/g, ' ').trim();
+    };
+
+    const candidates: CandidateRecord[] = [];
+    const seen = new Set<Element>();
+    const pushCandidate = (element: Element, text: string): void => {
+      if (seen.has(element) || !isRendered(element)) return;
+      const clipped = intersectViewport(element.getBoundingClientRect());
+      if (!clipped) return;
+      const layersBehind = imageLayers.filter(({ element: layer, rect }) => {
+        if (element.contains(layer)) return false;
+        const overlapX =
+          Math.min(clipped.x + clipped.width, rect.right) -
+          Math.max(clipped.x, rect.left);
+        const overlapY =
+          Math.min(clipped.y + clipped.height, rect.bottom) -
+          Math.max(clipped.y, rect.top);
+        if (overlapX <= 0 || overlapY <= 0) return false;
+        if (layer.contains(element)) return true;
+        // The layer must stack below the candidate at the overlap point.
+        const sampleX = Math.min(
+          viewportWidth - 1,
+          Math.max(0, clipped.x + clipped.width / 2)
+        );
+        const sampleY = Math.min(
+          viewportHeight - 1,
+          Math.max(0, clipped.y + clipped.height / 2)
+        );
+        const stack = document.elementsFromPoint(sampleX, sampleY);
+        const candidateDepth = stack.findIndex(
+          item => item === element || element.contains(item)
+        );
+        const layerDepth = stack.findIndex(
+          item => item === layer || layer.contains(item)
+        );
+        return (
+          candidateDepth !== -1 &&
+          layerDepth !== -1 &&
+          layerDepth > candidateDepth
+        );
+      });
+      if (layersBehind.length === 0) return;
+      seen.add(element);
+      const index = candidates.length;
+      element.setAttribute(hideAttribute, String(index));
+      const style = getComputedStyle(element);
+      candidates.push({
+        index,
+        element: describe(element),
+        text: text.slice(0, 80),
+        box: clipped,
+        color: style.color,
+        fontSize: Number.parseFloat(style.fontSize || '16'),
+        fontWeight: Number.parseInt(style.fontWeight || '400', 10) || 400,
+      });
+    };
+
+    for (const element of Array.from(root.querySelectorAll('*'))) {
+      const directText = hasDirectText(element);
+      if (directText) {
+        pushCandidate(element, directText);
+        continue;
+      }
+      // Interactive controls whose label lives in a descendant: certify the
+      // control's box itself (e.g. icon-labeled buttons over imagery).
+      if (isInteractive(element)) {
+        const label = (
+          element.getAttribute('aria-label') ??
+          element.textContent ??
+          ''
+        )
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (label) pushCandidate(element, label);
+      }
+    }
+
+    return {
+      candidates,
+      deviceScaleFactor: window.devicePixelRatio || 1,
+    };
+  }, HIDE_ATTRIBUTE);
+}
+
+async function sampleRegionLuminances(
+  screenshot: Buffer,
+  box: { x: number; y: number; width: number; height: number },
+  scale: number
+): Promise<number[]> {
+  const left = Math.max(0, Math.floor(box.x * scale));
+  const top = Math.max(0, Math.floor(box.y * scale));
+  const width = Math.max(1, Math.round(box.width * scale));
+  const height = Math.max(1, Math.round(box.height * scale));
+  const { data, info } = await sharp(screenshot)
+    .extract({ left, top, width, height })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const luminances: number[] = [];
+  const stride = Math.max(1, Math.floor((width * height) / 20000));
+  const channels = info.channels;
+  for (let pixel = 0; pixel < width * height; pixel += stride) {
+    const offset = pixel * channels;
+    luminances.push(
+      relativeLuminance(data[offset], data[offset + 1], data[offset + 2])
+    );
+  }
+  return luminances.sort((a, b) => a - b);
+}
+
+/**
+ * Inspect the rendered page for text and interactive controls painted over
+ * image layers, then measure real contrast by hiding the glyph ink and
+ * sampling the pixels exposed behind each glyph box.
+ *
+ * WCAG AA is applied against the worst-case background percentile: for light
+ * foregrounds the 90th-percentile background luminance, for dark foregrounds
+ * the 10th. Large text (>=24px, or >=18.66px bold) requires 3:1; everything
+ * else requires 4.5:1.
+ */
+export async function inspectImageContrast(
+  page: Page
+): Promise<ImageContrastSnapshot> {
+  const { candidates, deviceScaleFactor } = await scanCandidates(page);
+  const findings: ImageContrastFinding[] = [];
+  const receipts: ImageContrastReceipt[] = [];
+
+  if (candidates.length === 0) {
+    return {
+      schemaVersion: IMAGE_CONTRAST_CERTIFICATION_SCHEMA,
+      findings,
+      receipts,
+      inspectedAt: new Date().toISOString(),
+    };
+  }
+
+  // Hide glyph ink only; control backgrounds stay painted so the sampled
+  // region is exactly what sits behind each glyph.
+  const styleTag = await page.addStyleTag({
+    content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; }`,
+  });
+  let screenshot: Buffer;
+  try {
+    screenshot = await page.screenshot({ type: 'png' });
+  } finally {
+    await styleTag.evaluate(tag => tag.remove());
+  }
+
+  const metadata = await sharp(screenshot).metadata();
+  const imageWidth = metadata.width ?? 0;
+  const imageHeight = metadata.height ?? 0;
+
+  for (const candidate of candidates) {
+    const box = {
+      x: candidate.box.x,
+      y: candidate.box.y,
+      width: Math.min(
+        candidate.box.width,
+        imageWidth / deviceScaleFactor - candidate.box.x
+      ),
+      height: Math.min(
+        candidate.box.height,
+        imageHeight / deviceScaleFactor - candidate.box.y
+      ),
+    };
+    if (box.width <= 0 || box.height <= 0) continue;
+
+    const luminances = await sampleRegionLuminances(
+      screenshot,
+      box,
+      deviceScaleFactor
+    );
+    if (luminances.length === 0) continue;
+
+    const color = parseCssColor(candidate.color);
+    if (!color) continue;
+    const fgLuminance = relativeLuminance(color.r, color.g, color.b);
+    const p10 = percentile(luminances, 10);
+    const p50 = percentile(luminances, 50);
+    const p90 = percentile(luminances, 90);
+    const largeText =
+      candidate.fontSize >= 24 ||
+      (candidate.fontSize >= 18.66 && candidate.fontWeight >= 700);
+    const requiredRatio = largeText ? 3 : 4.5;
+    // Worst case: light text fails on the brightest sampled background,
+    // dark text on the darkest.
+    const worstBg = fgLuminance >= 0.18 ? p90 : p10;
+    const worstRatio = contrastRatio(fgLuminance, worstBg);
+    const pass = worstRatio >= requiredRatio;
+
+    receipts.push({
+      element: candidate.element,
+      text: candidate.text,
+      box,
+      foreground: candidate.color,
+      foregroundLuminance: Math.round(fgLuminance * 1000) / 1000,
+      backgroundLuminance: {
+        p10: Math.round(p10 * 1000) / 1000,
+        p50: Math.round(p50 * 1000) / 1000,
+        p90: Math.round(p90 * 1000) / 1000,
+      },
+      worstContrastRatio: Math.round(worstRatio * 100) / 100,
+      requiredRatio,
+      largeText,
+      pass,
+    });
+
+    if (!pass) {
+      findings.push({
+        kind: 'image-contrast',
+        message: `"${candidate.text}" on ${candidate.element} renders ${worstRatio.toFixed(2)}:1 against the worst-case sampled image background (requires ${requiredRatio}:1).`,
+        elements: [candidate.element],
+        measurements: {
+          worstContrastRatio: Math.round(worstRatio * 100) / 100,
+          requiredRatio,
+        },
+      });
+    }
+  }
+
+  return {
+    schemaVersion: IMAGE_CONTRAST_CERTIFICATION_SCHEMA,
+    findings,
+    receipts,
+    inspectedAt: new Date().toISOString(),
+  };
+}

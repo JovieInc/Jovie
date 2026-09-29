@@ -197,6 +197,15 @@ describe('Rate Limit Config', () => {
         );
       });
 
+      it('should throttle private library asset share pages per IP', () => {
+        expect(RATE_LIMITERS.libraryAssetShareAccess).toBeDefined();
+        expect(RATE_LIMITERS.libraryAssetShareAccess.limit).toBe(30);
+        expect(RATE_LIMITERS.libraryAssetShareAccess.window).toBe('1 m');
+        expect(RATE_LIMITERS.libraryAssetShareAccess.prefix).toBe(
+          'public:library-asset-share'
+        );
+      });
+
       it('isolates public profile traffic while preserving the aggregate abuse budget', () => {
         const capture = RATE_LIMITERS.publicProfileCaptureDismissal;
         const pac = RATE_LIMITERS.publicProfilePacEvent;

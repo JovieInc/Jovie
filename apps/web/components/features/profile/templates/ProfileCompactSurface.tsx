@@ -37,6 +37,7 @@ import {
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { findVenmoLink } from '@/features/profile/utils/venmo';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
@@ -47,7 +48,12 @@ import {
   type ProfilePacAssignment,
 } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import {
+  DEFAULT_ARTWORK_ACCENT,
+  resolveProfileModeCardAccents,
+} from '@/lib/profile/mode-card-accent';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import {
@@ -157,6 +163,8 @@ function getNewestPublicRelease(
 }
 
 interface ProfileCompactSurfaceProps {
+  /** Opens the release credits sheet from the overflow menu. */
+  readonly onOpenReleaseCredits?: () => void;
   readonly renderMode?: ProfileRenderMode;
   readonly presentation?: ProfileSurfacePresentation;
   readonly artist: Artist;
@@ -174,9 +182,19 @@ interface ProfileCompactSurfaceProps {
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly profilePacAssignment?: ProfilePacAssignment;
+  /**
+   * False while the per-user experiment assignment is still resolving
+   * (AnonCookieBootstrap fetch in flight). Variant-dependent fan-capture
+   * CTAs stay unmounted until this is true so the assigned control never
+   * morphs post-paint. Defaults to true for surfaces without bootstrap
+   * (marketing embeds, previews).
+   */
+  readonly visitorAssignmentResolved?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly showSubscriptionConfirmedBanner?: boolean;
@@ -262,6 +280,7 @@ function resolveActivePrimaryTab(params: {
 export function ProfileCompactSurface({
   renderMode = 'interactive',
   presentation = 'standalone',
+  onOpenReleaseCredits,
   artist,
   socialLinks,
   contacts,
@@ -274,9 +293,11 @@ export function ProfileCompactSurface({
   subscribeTwoStep = false,
   alertOptInVariant = 'button',
   profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  visitorAssignmentResolved = true,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  creditSegments,
   photoDownloadSizes = [],
   tourDates = [],
   showSubscriptionConfirmedBanner = false,
@@ -473,6 +494,16 @@ export function ProfileCompactSurface({
     forceHidden: hideBackButton || isNotificationsFlowOpen,
   });
 
+  // A pending reveal buffered before the hero CTA mounts is satisfied by the
+  // subscribe tab itself (its inline capture flow opens on mount). Clear it
+  // once the subscribe tab is active so returning home does not unexpectedly
+  // re-open the overlay.
+  useEffect(() => {
+    if (activeVisiblePrimaryTab === 'subscribe') {
+      pendingNotificationsOpenRef.current = false;
+    }
+  }, [activeVisiblePrimaryTab]);
+
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
       notificationsRevealRef.current = reveal;
@@ -571,11 +602,33 @@ export function ProfileCompactSurface({
     },
     [handleTabSelect, renderMode]
   );
+  const handleGetUpdatesClick = useCallback(() => {
+    if (renderMode !== 'interactive') return;
+    openNotifications();
+  }, [openNotifications, renderMode]);
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
     renderMode === 'interactive' && renderInteractiveOverlays && canGetUpdates;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
+  const hasListenDestination =
+    mergedDSPs.length > 0 || Boolean(homeLatestRelease) || releases.length > 0;
+  // Founder accent rotation across the mode cards. The featured Listen card
+  // shows artwork (release art or the profile photo), so it anchors the
+  // rotation and the other mode cards continue from it.
+  const hasListenArtwork = Boolean(
+    homeLatestRelease?.artworkUrl ||
+      releases.some(release => release.artworkUrl) ||
+      resolvedHeroImageUrl
+  );
+  const modeCardAccents = useMemo(
+    () =>
+      resolveProfileModeCardAccents({
+        listenArtworkAccent: hasListenArtwork ? DEFAULT_ARTWORK_ACCENT : null,
+      }),
+    [hasListenArtwork]
+  );
+  const paymentsVenmoLink = hasTip ? findVenmoLink(socialLinks) : null;
   const homeProfileSettings = homeLatestRelease
     ? { ...profileSettings, showOldReleases: true }
     : profileSettings;
@@ -662,6 +715,7 @@ export function ProfileCompactSurface({
           )}
         >
           {canGetUpdates &&
+          visitorAssignmentResolved &&
           shouldRenderInteractiveOverlays &&
           activeVisiblePrimaryTab !== 'subscribe' ? (
             <ProfileInlineNotificationsCTA
@@ -721,6 +775,11 @@ export function ProfileCompactSurface({
               listenHref={`/${artist.handle}/listen`}
               isListenActive={isMusicMode}
               onListenClick={handleListenClick}
+              onGetUpdatesClick={
+                canGetUpdates ? handleGetUpdatesClick : undefined
+              }
+              isSubscribed={homeAlertsSubscribed}
+              hasListenDestination={hasListenDestination}
               socialLinks={visibleSocialLinks}
               onSocialClick={handleSocialClick}
               headingAs={IdentityHeading}
@@ -756,6 +815,7 @@ export function ProfileCompactSurface({
                 releases={releases}
                 hasTip={hasTip}
                 pacArtPriority={!resolvedHeroImageUrl}
+                featuredAccent={modeCardAccents.listen}
               />
             ) : (
               <ProfilePrimaryTabPanel
@@ -769,6 +829,7 @@ export function ProfileCompactSurface({
                 enableDynamicEngagement={enableDynamicEngagement}
                 subscribeTwoStep={subscribeTwoStep}
                 alertOptInVariant={alertOptInVariant}
+                visitorAssignmentResolved={visitorAssignmentResolved}
                 isSubscribed={isSubscribed}
                 contentPrefs={contentPrefs}
                 onTogglePref={onTogglePref}
@@ -777,6 +838,8 @@ export function ProfileCompactSurface({
                 genres={genres}
                 pressPhotos={pressPhotos}
                 allowPhotoDownloads={allowPhotoDownloads}
+                contacts={availableContacts}
+                creditSegments={creditSegments}
                 tourDates={tourDates}
                 releases={releases}
                 catalogLoadFailed={catalogLoadFailed}
@@ -784,6 +847,8 @@ export function ProfileCompactSurface({
                 previewNotificationsState={previewNotificationsState}
                 onFlowClosed={returnToProfileAfterNotifications}
                 onSubscriptionActivated={handleSubscriptionActivated}
+                modeCardAccents={modeCardAccents}
+                paymentsVenmoLink={paymentsVenmoLink}
               />
             )}
           </div>
@@ -827,8 +892,10 @@ export function ProfileCompactSurface({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
+          creditSegments={creditSegments}
           tourDates={tourDates}
           releases={releases}
+          onOpenReleaseCredits={onOpenReleaseCredits}
         />
       ) : null}
     </div>

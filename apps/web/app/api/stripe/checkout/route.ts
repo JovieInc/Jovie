@@ -15,9 +15,11 @@ import {
   MIN_REFERRAL_CODE_LENGTH,
   REFERRAL_CODE_PATTERN,
 } from '@/lib/referrals/config';
+import { trackServerEvent } from '@/lib/server-analytics';
 import {
   CheckoutCorrelationValidationError,
   hasCheckoutCorrelation,
+  mergeCheckoutCorrelation,
   parseCheckoutCorrelation,
 } from '@/lib/stripe/checkout-correlation';
 import { checkoutCorrelationIdempotencyPart } from '@/lib/stripe/checkout-correlation.server';
@@ -38,6 +40,7 @@ import {
   StripeRetryExhaustedError,
   withStripeRetry,
 } from '@/lib/stripe/retry';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -171,7 +174,12 @@ export async function POST(request: NextRequest) {
 
     let correlation;
     try {
-      correlation = parseCheckoutCorrelation(parsedBody.data);
+      correlation = mergeCheckoutCorrelation(
+        parseCheckoutCorrelation(parsedBody.data),
+        parseCheckoutCorrelation({
+          acquisitionId: request.cookies.get(ACQUISITION_COOKIE_NAME)?.value,
+        })
+      );
     } catch (error) {
       if (error instanceof CheckoutCorrelationValidationError) {
         return jsonError(error.message, 400);
@@ -282,6 +290,21 @@ export async function POST(request: NextRequest) {
       customerId,
       url: session.url,
     });
+
+    // Durable funnel event: checkout start is revenue-critical and must not
+    // depend on client gtag delivery. Identity keyed to the Stripe session
+    // makes it idempotent across refreshes and retries. A sink failure is
+    // captured to Sentry inside trackServerEvent and never blocks checkout.
+    await trackServerEvent(
+      'checkout_initiated',
+      {
+        checkoutSessionId: session.id,
+        plan: selectedPlan,
+        source: checkoutSource ?? 'default',
+      },
+      undefined,
+      { eventIdentity: `checkout:${session.id}` }
+    );
 
     return NextResponse.json(
       { sessionId: session.id, url: session.url },

@@ -672,7 +672,7 @@ class ClosureClassificationTests(unittest.TestCase):
         )
         for source in (ruleset, guard):
             self.assertRegex(source, r"check_response_timeout_minutes:\s*60")
-            self.assertRegex(source, r"max_entries_to_build:\s*2")
+            self.assertRegex(source, r"max_entries_to_build:\s*10")
             self.assertRegex(source, r"max_entries_to_merge:\s*5")
 
     def test_clean_pr_with_stale_base_is_repair_not_promote(self):

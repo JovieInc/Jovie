@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { ASK_JOVIE_INTENTS } from '@/lib/ask-jovie/intent';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -21,6 +22,7 @@ const payloadSchema = z.object({
   pathname: z.string().trim().max(512).nullable().optional(),
   suggestedActionId: z.string().uuid().optional(),
   rating: z.enum(['positive', 'negative']).optional(),
+  intent: z.enum(ASK_JOVIE_INTENTS).optional(),
 });
 
 export const runtime = 'nodejs';
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
           ? { suggestedActionId: parsed.data.suggestedActionId }
           : {}),
         ...(parsed.data.rating ? { rating: parsed.data.rating } : {}),
+        ...(parsed.data.intent ? { intent: parsed.data.intent } : {}),
       },
     });
 

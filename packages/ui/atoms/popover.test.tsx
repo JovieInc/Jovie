@@ -370,7 +370,7 @@ describe('Popover', () => {
     });
   });
 
-  describe('anchor lifecycle (JOV-INV-036)', () => {
+  describe('anchor lifecycle', () => {
     function RemovableAnchor({
       onOpenChange,
     }: {

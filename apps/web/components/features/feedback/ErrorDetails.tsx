@@ -95,7 +95,8 @@ export function ErrorDetails({
             type='button'
             onClick={handleCopy}
             className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors duration-normal ease-interactive'
-            aria-label='Copy Error Details To Clipboard'
+            // ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)
+            aria-label='Copy error details to clipboard'
           >
             <Copy className='h-3.5 w-3.5' aria-hidden='true' />
             Copy error details

@@ -285,7 +285,7 @@ describe('Dialog', () => {
   });
 });
 
-describe('Dialog overlay layer contract (JOV-INV-036)', () => {
+describe('Dialog overlay layer contract', () => {
   it('paints on the modal layer so it covers sheets it opens from', () => {
     render(<TestDialog open />);
     expect(screen.getByTestId('dialog-content').className).toContain('z-modal');

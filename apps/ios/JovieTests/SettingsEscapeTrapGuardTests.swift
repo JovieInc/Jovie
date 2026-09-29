@@ -98,6 +98,8 @@ struct SettingsStyleGuardTests {
 
     #expect(source.contains("Link(destination:"))
     #expect(source.contains("LabeledContent"))
+    #expect(source.contains("Toggle(isOn: $isBiometricLockEnabled)"))
+    #expect(source.contains("settings-biometric-lock-toggle"))
     #expect(source.contains(".jovieSurface(radius: JovieRadius.medium"))
     #expect(source.contains(".jovieSurface(radius: JovieRadius.medium, interactive: true)"))
     #expect(source.contains("SettingsLayout.reservedActionMinHeight"))

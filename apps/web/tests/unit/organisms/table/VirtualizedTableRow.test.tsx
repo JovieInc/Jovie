@@ -216,6 +216,9 @@ describe('VirtualizedTableRow', () => {
       .closest('td');
     expect(row).toHaveClass('system-b-table-row-height');
     expect(actionCell).toHaveClass('system-b-table-contextual-action-cell');
+    expect(
+      actionCell?.querySelector('[data-table-cell-content="stable"]')
+    ).toHaveClass('h-8', 'max-h-8', 'overflow-hidden');
   });
 
   it('applies column meta alignment to rendered cells', () => {

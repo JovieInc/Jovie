@@ -12,12 +12,12 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "4149040ddbbf67f7a6ce0da23fb9a5a75cd62f4dd7011e48244d28c150e0cc59"
+    "bodySha256": "c8f21e6b30a961274109217859deaf8a58f2f3b141d2620d21540a584c63596a"
   },
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "f63b9f10c6a648253edb94de57708f6ae569eef6834638b2e8f9569115e26656"
+    "bodySha256": "4e1b3dc1066ae0ce224369eac942cbc97d07e4d30c518c47ec1885ff429688b0"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "24aea12457f61413c4674d614e8c83b1ae8334acfd6276d28366b190951f4571"
+    "bodySha256": "c5958c1f456d5ea6248c3bd8264502578ff7f84547ce0339dbb39741dd8a9eda"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -105,7 +105,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "a276e906765da3c307c2525e9acfea510977aaf186dc853456a6f69427768d25"
+    "bodySha256": "495a259afa9c8904898c29057911ea55b552aa43185d80c9aa75a43f4e1b27ea"
   },
   {
     "file": ".claude/rules/security.md",

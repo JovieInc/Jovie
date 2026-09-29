@@ -29,12 +29,15 @@ export interface AtomicBillingUpdateInput {
 export type AtomicBillingUpdateResult = {
   readonly appUserId: string;
   readonly billingVersion: number;
+  readonly deduplicated: boolean;
 };
 
 /**
  * Persist an entitlement mutation and its audit receipt as one PostgreSQL
  * statement. A failed audit insert rolls back the update automatically, while
- * a lost optimistic lock produces no audit row and returns `null`.
+ * a lost optimistic lock produces no audit row and returns `null`. When a
+ * Stripe event receipt already exists, the statement returns that receipt
+ * without repeating the entitlement mutation or incrementing its version.
  */
 export async function applyBillingUpdateWithAudit(
   input: AtomicBillingUpdateInput
@@ -52,7 +55,18 @@ export async function applyBillingUpdateWithAudit(
   const preserveLastBillingEventAt = input.lastBillingEventAt === undefined;
 
   const result = await db.execute<AtomicBillingUpdateResult>(drizzleSql`
-    with updated_user as (
+    with existing_audit as (
+      select
+        ${billingAuditLog.userId} as "appUserId",
+        ${users.billingVersion} as "billingVersion"
+      from ${billingAuditLog}
+      inner join ${users}
+        on ${users.id} = ${billingAuditLog.userId}
+      where ${input.stripeEventId !== undefined}
+        and ${billingAuditLog.stripeEventId} = ${input.stripeEventId ?? null}
+      order by ${billingAuditLog.createdAt} asc
+      limit 1
+    ), updated_user as (
       update ${users}
       set
         ${drizzleSql.identifier(users.isPro.name)} = ${input.isPro},
@@ -77,6 +91,7 @@ export async function applyBillingUpdateWithAudit(
         ${drizzleSql.identifier(users.billingVersion.name)} = ${users.billingVersion} + 1
       where ${users.id} = ${input.userId}
         and ${users.billingVersion} = ${input.expectedBillingVersion}
+        and not exists (select 1 from existing_audit)
       returning ${users.id}, ${users.billingVersion}
     ), inserted_audit as (
       insert into ${billingAuditLog} (
@@ -101,10 +116,17 @@ export async function applyBillingUpdateWithAudit(
     )
     select
       updated_user."id" as "appUserId",
-      updated_user."billing_version" as "billingVersion"
+      updated_user."billing_version" as "billingVersion",
+      false as "deduplicated"
     from updated_user
     inner join inserted_audit
       on inserted_audit."user_id" = updated_user."id"
+    union all
+    select
+      existing_audit."appUserId",
+      existing_audit."billingVersion",
+      true as "deduplicated"
+    from existing_audit
   `);
 
   const row = result.rows[0];
@@ -112,6 +134,7 @@ export async function applyBillingUpdateWithAudit(
     ? {
         appUserId: row.appUserId,
         billingVersion: Number(row.billingVersion),
+        deduplicated: row.deduplicated,
       }
     : null;
 }

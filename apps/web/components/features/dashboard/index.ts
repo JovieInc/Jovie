@@ -1,4 +1,3 @@
-export { ProfileLinkCard } from './molecules';
 export {
   ArtistSelectionForm,
   DashboardPreview,

@@ -5,6 +5,15 @@
  * using explicit named exports for deterministic tree-shaking.
  */
 
+// Pixel Tracking (Events, Creator Configs)
+export {
+  type AcquisitionFirstTouch,
+  type AcquisitionJourney,
+  acquisitionJourneys,
+  insertAcquisitionJourneySchema,
+  type NewAcquisitionJourney,
+  selectAcquisitionJourneySchema,
+} from './acquisition';
 // Admin
 export {
   type AdminAuditLog,
@@ -238,6 +247,19 @@ export {
   workflowRunOutcomes,
   workflowRuns,
 } from './connectors';
+// Canonical Contacts (customer lifecycle)
+export {
+  type Contact,
+  type ContactStageTransition,
+  contactStageTransitions,
+  contacts,
+  insertContactSchema,
+  insertContactStageTransitionSchema,
+  type NewContact,
+  type NewContactStageTransition,
+  selectContactSchema,
+  selectContactStageTransitionSchema,
+} from './contacts';
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
@@ -303,6 +325,19 @@ export {
   type TrackArtist,
   trackArtists,
 } from './content';
+// Conversation Insights (JOV-6784)
+export {
+  type ConversationObjection,
+  type ConversationSignal,
+  conversationObjections,
+  conversationSignals,
+  insertConversationObjectionSchema,
+  insertConversationSignalSchema,
+  type NewConversationObjection,
+  type NewConversationSignal,
+  selectConversationObjectionSchema,
+  selectConversationSignalSchema,
+} from './conversation-insights';
 // Private creator documents and exact-revision capture handoffs (JOV-5173)
 export {
   type CreatorDocument,
@@ -408,9 +443,11 @@ export {
   connectorProviderEnum,
   connectorStatusEnum,
   contactChannelEnum,
+  contactLifecycleStageEnum,
   contactRoleEnum,
   contentSlugTypeEnum,
   contextFactKindEnum,
+  conversationFunnelStageEnum,
   creatorDistributionEventTypeEnum,
   creatorDistributionPlatformEnum,
   creatorTypeEnum,
@@ -457,6 +494,7 @@ export {
   metadataSubmissionIssueStatusEnum,
   metadataSubmissionStatusEnum,
   notificationChannelEnum,
+  objectionStatusEnum,
   outreachChannelEnum,
   outreachStatusEnum,
   photoStatusEnum,
@@ -975,7 +1013,6 @@ export {
   type OvieOperatingKvRow,
   ovieOperatingKv,
 } from './ovie';
-// Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
   creatorPixels,
@@ -1017,6 +1054,13 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+export {
+  insertProfileInquirySchema,
+  type NewProfileInquiry,
+  type ProfileInquiry,
+  profileInquiries,
+  selectProfileInquirySchema,
+} from './profile-inquiries';
 // Provider-neutral artist search monitoring and issue evidence
 export {
   type ProfileSearchQuery,

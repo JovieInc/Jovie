@@ -13,6 +13,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  args: { children: 'Release title' },
   render: () => (
     <table>
       <tbody>
@@ -26,6 +27,7 @@ export const Default: Story = {
 };
 
 export const SecondaryTone: Story = {
+  args: { children: 'Secondary row' },
   render: () => (
     <table>
       <tbody>

@@ -368,7 +368,7 @@ export const MENU_ICON_TRIGGER_BASE =
  * Keeps a submenu inside the viewport when neither side of its parent has
  * room for the default 12rem width (three-level menus on a phone). Radix
  * exposes the space left on the chosen side as a CSS variable; the submenu
- * narrows into it instead of overflowing the screen edge (JOV-INV-036).
+ * narrows into it instead of overflowing the screen edge.
  */
 export function submenuViewportFitStyle(
   menu: 'dropdown-menu' | 'context-menu'
