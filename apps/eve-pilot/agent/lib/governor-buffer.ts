@@ -1,4 +1,5 @@
 export const GOVERNOR_BUFFER_SCHEMA = 'jovie.eve.governor.buffer/v1' as const;
+export * from './governor-reservoir';
 export const GOVERNOR_BUFFER_VERSION = '2026-09-06' as const;
 export const DEFAULT_SYMPHONY_WORKFLOW_CAPACITY = 30 as const;
 

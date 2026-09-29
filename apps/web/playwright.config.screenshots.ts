@@ -38,6 +38,8 @@ export default defineConfig({
     '**/hud-isolated-screen-proof.spec.ts',
     '**/smartlink-release-screen-proof.spec.ts',
     '**/smartlink-track-screen-proof.spec.ts',
+    '**/tasks-screen-proof.spec.ts',
+    '**/contacts-screen-proof.spec.ts',
     '**/public-export-serving.spec.ts',
   ],
   fullyParallel: false, // Run sequentially for deterministic screenshots

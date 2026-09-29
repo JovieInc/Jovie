@@ -130,6 +130,12 @@ html[data-desktop-runtime="electron"] body {
   display: none;
 }
 
+/* Preload identifies Electron before hydration. Hide both the web toggle slot
+   and its divider without changing React's initial server/client tree. */
+html[data-desktop-runtime="electron"] [data-web-sidebar-control="true"] {
+  display: none;
+}
+
 html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
   box-sizing: border-box;
 }
