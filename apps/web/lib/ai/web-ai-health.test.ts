@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const sdkMocks = vi.hoisted(() => ({
+  gateway: vi.fn((model: string) => model),
+  generateObject: vi.fn(),
+  generateText: vi.fn(),
+  streamText: vi.fn(),
+}));
+
+vi.mock('@/lib/ai/sdk', () => sdkMocks);
+
 import {
+  executeWebAiHealthProbe,
   runWebAiHealth,
   WEB_AI_HEALTH_PROBES,
   WEB_AI_HEALTH_RECEIPT_SCHEMA,
@@ -15,6 +26,44 @@ import {
 } from '@/lib/constants/ai-models';
 
 describe('runWebAiHealth', () => {
+  it('reserves output tokens for always-on GLM reasoning in every SDK mode', async () => {
+    sdkMocks.streamText.mockReturnValue({ text: Promise.resolve('healthy') });
+    sdkMocks.generateText.mockResolvedValue({ text: 'healthy' });
+    sdkMocks.generateObject.mockResolvedValue({
+      object: { response: 'healthy' },
+    });
+
+    await Promise.all([
+      executeWebAiHealthProbe({
+        surface: 'web_chat',
+        model: CHAT_MODEL,
+        mode: 'stream',
+        prompt: 'healthy',
+      }),
+      executeWebAiHealthProbe({
+        surface: 'titles',
+        model: TITLE_MODEL,
+        mode: 'text',
+        prompt: 'healthy',
+      }),
+      executeWebAiHealthProbe({
+        surface: 'insights',
+        model: INSIGHT_MODEL,
+        mode: 'structured',
+        prompt: 'healthy',
+      }),
+    ]);
+
+    const expectedOptions = expect.objectContaining({
+      maxOutputTokens: 1_024,
+      maxRetries: 0,
+      reasoning: 'low',
+    });
+    expect(sdkMocks.streamText).toHaveBeenCalledWith(expectedOptions);
+    expect(sdkMocks.generateText).toHaveBeenCalledWith(expectedOptions);
+    expect(sdkMocks.generateObject).toHaveBeenCalledWith(expectedOptions);
+  });
+
   it('runs one bounded probe for every production Web AI surface', async () => {
     const executeProbe = vi.fn().mockResolvedValue('healthy');
 
