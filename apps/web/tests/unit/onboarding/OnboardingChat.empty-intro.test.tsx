@@ -152,4 +152,26 @@ describe('OnboardingChat empty intro', () => {
     });
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
+
+  it.each([
+    ['default', undefined, 'pt-5'],
+    ['headerOverlay', true, 'pt-16'],
+  ] as const)(
+    'reserves %s top clearance in the scroll region (JOV-7192)',
+    (_label, headerOverlay, expected) => {
+      const { container } = render(
+        <OnboardingChat
+          headerOverlay={headerOverlay}
+          turnstileToken='token'
+          turnstileStatus='verified'
+        />
+      );
+
+      const scrollRegion = container.querySelector(
+        '[aria-live="polite"].overflow-y-auto'
+      );
+      expect(scrollRegion).not.toBeNull();
+      expect(scrollRegion).toHaveClass(expected);
+    }
+  );
 });

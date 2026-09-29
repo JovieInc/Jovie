@@ -854,7 +854,7 @@ export function ProfileCompactSurface({
           </div>
         </div>
 
-        {showBottomNav ? (
+        {showBottomNav && renderMode !== 'preview' ? (
           <BottomTabBar
             activeTab={visibleNavTab}
             hasTourDates={hasTourDates}
