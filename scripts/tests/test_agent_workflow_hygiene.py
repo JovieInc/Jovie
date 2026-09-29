@@ -1266,6 +1266,20 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
     assert "'0 9 * * 2'" in harness
 
 
+def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
+    """Main pushes outpace the serial matrix; only the freshest run should
+    survive, and supersession must be a workflow-level cancellation rather
+    than an external mid-test runner kill (JOV-7167)."""
+    workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
+
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
+        "\njobs:\n", 1
+    )[0]
+    assert "group: e2e-full-matrix-" in concurrency
+    assert "github.event_name" in concurrency
+    assert "cancel-in-progress: true" in concurrency
+
+
 def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     """Storybook provenance receipts need more than the depth-1 HEAD commit."""
     job = _job_block("nightly-tests.yml", "unit-tests")
