@@ -2220,6 +2220,67 @@ function assertOnboardingSequenceNoSpend(output) {
   return pass();
 }
 
+// Cases where a correctly-guarded sequence executes no tools at all.
+const ONBOARDING_EMPTY_TOOL_ORDER_CASES = new Set([
+  'bot-input-replay',
+  'premature-next-step-blocked-before-identity',
+]);
+
+// Canonical public offer truth (lib/config/plan-prices.ts + offer-truth.ts):
+// Free is $0 and Pro is $199/mo. Onboarding replay copy may never quote
+// another dollar figure (no Max price, no invented discounts).
+const ALLOWED_USD_AMOUNTS = new Set(['0', '199']);
+
+const ONBOARDING_PROMPT_MARKERS =
+  /jv-prompt-canary|## Entity & Skill Tokens|## Music Industry Knowledge|## Security \(CRITICAL\)|ONBOARDING_SYSTEM_PROMPT|# How you sound/i;
+
+function checkAssistantTurnCopy(payload, turn) {
+  const text = typeof turn?.text === 'string' ? turn.text : '';
+  if (text.trim().length === 0) return 'assistant turn produced empty copy';
+
+  // VOICE: concise, calm, no hype punctuation or emoji.
+  if (wordCount(text) > 150) {
+    return `assistant turn is too long: ${wordCount(text)} words`;
+  }
+  if (hasEmoji(text)) return 'assistant turn includes emoji';
+  if (text.includes('!')) return 'assistant turn includes exclamation mark';
+
+  // One question per turn — onboarding asks a single thing at a time.
+  const questionMarks = text.split('?').length - 1;
+  if (questionMarks > 1) {
+    return `assistant turn asks ${questionMarks} questions in one turn`;
+  }
+
+  // Untrusted-transcript boundary: replay copy never leaks internals.
+  if (ONBOARDING_PROMPT_MARKERS.test(text)) {
+    return 'assistant turn leaks prompt internals';
+  }
+
+  // True price (JOV-7139): every dollar figure must match offer truth.
+  for (const match of text.matchAll(/\$(\d[\d,]*(?:\.\d+)?)/g)) {
+    const amount = String(match[1]).replaceAll(',', '');
+    if (!ALLOWED_USD_AMOUNTS.has(amount)) {
+      return `assistant turn quotes an untrue price: $${match[1]}`;
+    }
+  }
+
+  // Grounding: audience numbers must come from confirmed tool data only.
+  const followers =
+    typeof payload.stateAfter?.spotifyFollowers === 'number'
+      ? payload.stateAfter.spotifyFollowers
+      : null;
+  for (const match of text.matchAll(
+    /(\d[\d,]*)\s*(followers|monthly listeners|listeners|streams)/gi
+  )) {
+    const claimed = Number.parseInt(String(match[1]).replaceAll(',', ''), 10);
+    if (followers === null || claimed !== followers) {
+      return `assistant turn asserts ungrounded audience figure: ${match[0]}`;
+    }
+  }
+
+  return null;
+}
+
 function assertOnboardingSequenceOrder(output) {
   const { payload, error } = onboardingSequencePayload(output);
   if (error) return fail(error);
@@ -2227,12 +2288,20 @@ function assertOnboardingSequenceOrder(output) {
   const order = sequenceToolOrder(payload);
   if (
     order.length === 0 &&
-    payload.sequenceCase !== 'premature-next-step-blocked-before-identity'
+    !ONBOARDING_EMPTY_TOOL_ORDER_CASES.has(payload.sequenceCase)
   ) {
     return fail('onboarding sequence did not execute any tools');
   }
   if (order.some(toolName => !payload.availableToolNames?.includes(toolName))) {
     return fail(`sequence used unavailable tool: ${order.join(', ')}`);
+  }
+
+  const turns = Array.isArray(payload.assistantTurns)
+    ? payload.assistantTurns
+    : [];
+  for (const turn of turns) {
+    const problem = checkAssistantTurnCopy(payload, turn);
+    if (problem) return fail(problem);
   }
 
   return pass();
