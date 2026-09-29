@@ -7,7 +7,7 @@ import { getSocialLinksVerificationColumnSupport } from '@/lib/db/queries/social
 import { socialLinks } from '@/lib/db/schema/links';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { authorizeRiskyProfileAction } from '@/lib/team/approvals';
+import { enforceLinksMutationAccess } from './route.shared';
 
 interface VerifyWebsiteBody {
   profileId?: string;
@@ -51,25 +51,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const authz = await authorizeRiskyProfileAction(tx, {
-      appUserId: clerkUserId,
+    const accessDenied = await enforceLinksMutationAccess(
+      tx,
       profileId,
-      action: 'links.mutate',
-    });
-    if (authz.status !== 'allowed') {
-      return NextResponse.json(
-        {
-          error:
-            authz.status === 'requires_approval'
-              ? 'This action requires owner approval.'
-              : 'You do not have permission to modify links for this profile.',
-          code:
-            authz.status === 'requires_approval'
-              ? 'owner_approval_required'
-              : 'forbidden',
-        },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
+      clerkUserId,
+      NO_STORE_HEADERS
+    );
+    if (accessDenied) {
+      return accessDenied;
     }
 
     const hasVerificationColumns =

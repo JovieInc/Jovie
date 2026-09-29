@@ -249,15 +249,17 @@ export type ApprovalDecisionResult =
  * Owner decision on a pending approval. Only the profile owner may decide;
  * the check is server-enforced from claims so no API variant can bypass it.
  */
-export async function decideProfileApproval(
+async function loadApprovalForActor(
   tx: DbOrTransaction,
-  input: {
-    approvalId: string;
-    actorUserId: string;
-    decision: 'approved' | 'rejected';
-    reason?: string;
-  }
-): Promise<ApprovalDecisionResult> {
+  input: { approvalId: string; actorUserId: string }
+): Promise<
+  | {
+      ok: true;
+      approval: typeof profileActionApprovals.$inferSelect;
+      role: TeamRole | null;
+    }
+  | { ok: false; reason: 'invalid' | 'not_found' }
+> {
   if (!UUID_RE.test(input.approvalId) || !UUID_RE.test(input.actorUserId)) {
     return { ok: false, reason: 'invalid' };
   }
@@ -273,6 +275,21 @@ export async function decideProfileApproval(
     approval.creatorProfileId,
     input.actorUserId
   );
+  return { ok: true, approval, role };
+}
+
+export async function decideProfileApproval(
+  tx: DbOrTransaction,
+  input: {
+    approvalId: string;
+    actorUserId: string;
+    decision: 'approved' | 'rejected';
+    reason?: string;
+  }
+): Promise<ApprovalDecisionResult> {
+  const loaded = await loadApprovalForActor(tx, input);
+  if (!loaded.ok) return { ok: false, reason: loaded.reason };
+  const { approval, role } = loaded;
   if (role !== 'owner') return { ok: false, reason: 'forbidden' };
 
   await expireStaleApprovals(tx, approval.creatorProfileId);
@@ -313,21 +330,9 @@ export async function revokeProfileApproval(
   tx: DbOrTransaction,
   input: { approvalId: string; actorUserId: string }
 ): Promise<ApprovalDecisionResult> {
-  if (!UUID_RE.test(input.approvalId) || !UUID_RE.test(input.actorUserId)) {
-    return { ok: false, reason: 'invalid' };
-  }
-  const [approval] = await tx
-    .select()
-    .from(profileActionApprovals)
-    .where(eq(profileActionApprovals.id, input.approvalId))
-    .limit(1);
-  if (!approval) return { ok: false, reason: 'not_found' };
-
-  const { role } = await getProfileTeamRole(
-    tx,
-    approval.creatorProfileId,
-    input.actorUserId
-  );
+  const loaded = await loadApprovalForActor(tx, input);
+  if (!loaded.ok) return { ok: false, reason: loaded.reason };
+  const { approval, role } = loaded;
   const isRequester = approval.requestedBy === input.actorUserId;
   if (role !== 'owner' && !isRequester) {
     return { ok: false, reason: 'forbidden' };

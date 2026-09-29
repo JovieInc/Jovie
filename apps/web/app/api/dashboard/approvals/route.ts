@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
@@ -9,6 +8,7 @@ import {
   requestProfileApproval,
 } from '@/lib/team/approvals';
 import { isRiskyProfileAction } from '@/lib/team/permissions';
+import { approvalFailureStatus, handleApprovalsError } from './route.shared';
 
 export const runtime = 'nodejs';
 
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
       );
     });
   } catch (error) {
-    return handleError(error, 'GET /api/dashboard/approvals');
+    return handleApprovalsError(error, 'GET /api/dashboard/approvals');
   }
 }
 
@@ -80,15 +80,12 @@ export async function POST(req: Request) {
         payload: parsed.data.payload,
       });
       if (!result.ok) {
-        const status =
-          result.reason === 'forbidden'
-            ? 403
-            : result.reason === 'not_needed'
-              ? 409
-              : 400;
         return NextResponse.json(
           { error: 'Approval request rejected', code: result.reason },
-          { status, headers: NO_STORE_HEADERS }
+          {
+            status: approvalFailureStatus(result.reason),
+            headers: NO_STORE_HEADERS,
+          }
         );
       }
       return NextResponse.json(
@@ -100,20 +97,6 @@ export async function POST(req: Request) {
       );
     });
   } catch (error) {
-    return handleError(error, 'POST /api/dashboard/approvals');
+    return handleApprovalsError(error, 'POST /api/dashboard/approvals');
   }
-}
-
-function handleError(error: unknown, route: string) {
-  captureError('Approvals API error', error, { route });
-  if (error instanceof Error && error.message === 'Unauthorized') {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  return NextResponse.json(
-    { error: 'Internal server error' },
-    { status: 500, headers: NO_STORE_HEADERS }
-  );
 }

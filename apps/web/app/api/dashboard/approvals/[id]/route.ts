@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
   decideProfileApproval,
   revokeProfileApproval,
 } from '@/lib/team/approvals';
+import { approvalFailureStatus, handleApprovalsError } from '../route.shared';
 
 export const runtime = 'nodejs';
 
@@ -46,17 +46,12 @@ export async function POST(req: Request, context: RouteContext) {
         reason: parsed.data.reason,
       });
       if (!result.ok) {
-        const status =
-          result.reason === 'forbidden'
-            ? 403
-            : result.reason === 'not_found'
-              ? 404
-              : result.reason === 'not_pending'
-                ? 409
-                : 400;
         return NextResponse.json(
           { error: 'Decision rejected', code: result.reason },
-          { status, headers: NO_STORE_HEADERS }
+          {
+            status: approvalFailureStatus(result.reason),
+            headers: NO_STORE_HEADERS,
+          }
         );
       }
       return NextResponse.json(
@@ -65,7 +60,7 @@ export async function POST(req: Request, context: RouteContext) {
       );
     });
   } catch (error) {
-    return handleError(error, 'POST /api/dashboard/approvals/[id]');
+    return handleApprovalsError(error, 'POST /api/dashboard/approvals/[id]');
   }
 }
 
@@ -83,17 +78,12 @@ export async function DELETE(_req: Request, context: RouteContext) {
         actorUserId: appUserId,
       });
       if (!result.ok) {
-        const status =
-          result.reason === 'forbidden'
-            ? 403
-            : result.reason === 'not_found'
-              ? 404
-              : result.reason === 'not_pending'
-                ? 409
-                : 400;
         return NextResponse.json(
           { error: 'Revocation rejected', code: result.reason },
-          { status, headers: NO_STORE_HEADERS }
+          {
+            status: approvalFailureStatus(result.reason),
+            headers: NO_STORE_HEADERS,
+          }
         );
       }
       return NextResponse.json(
@@ -102,20 +92,6 @@ export async function DELETE(_req: Request, context: RouteContext) {
       );
     });
   } catch (error) {
-    return handleError(error, 'DELETE /api/dashboard/approvals/[id]');
+    return handleApprovalsError(error, 'DELETE /api/dashboard/approvals/[id]');
   }
-}
-
-function handleError(error: unknown, route: string) {
-  captureError('Approvals API error', error, { route });
-  if (error instanceof Error && error.message === 'Unauthorized') {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  return NextResponse.json(
-    { error: 'Internal server error' },
-    { status: 500, headers: NO_STORE_HEADERS }
-  );
 }
