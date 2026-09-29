@@ -270,6 +270,31 @@ class OrphanPrTest(unittest.TestCase):
         self.assertNotIn("orphan-prs", doctor.judge(obs(reconcile={**sweep, "atEpoch": 0})), "a stale sweep proves nothing")
 
 
+class AgedPrTest(unittest.TestCase):
+    def test_held_dispositions_do_not_keep_the_alert_firing(self):
+        """JOV-7132: a hold is the answer to "why is this still open" — parked PRs stay in
+        oldest_prs, but counting them makes the alert permanent noise nobody can clear."""
+        sweep = {"atEpoch": 1_000_000.0 - 60, "dispositions": [
+            {"pr": 1, "ageH": 460.0, "state": "hold:hold"},
+            {"pr": 2, "ageH": 350.0, "state": "hold:exhausted"},
+            {"pr": 3, "ageH": 300.0, "state": "hold:dependency", "reason": "waits on #9"},
+            {"pr": 4, "ageH": 400.0, "state": "closing"},
+        ]}
+        self.assertNotIn("aged-prs", doctor.judge(obs(reconcile=sweep)))
+
+    def test_aged_undecided_prs_still_alert_with_their_state(self):
+        sweep = {"atEpoch": 1_000_000.0 - 60, "dispositions": [
+            {"pr": 10, "ageH": 200.0, "state": "draft", "reason": "past the 48h stale SLO"},
+            {"pr": 11, "ageH": 260.0, "state": "orphaned"},
+            {"pr": 12, "ageH": 100.0, "state": "draft"},
+        ]}
+        alert = doctor.judge(obs(reconcile=sweep))["aged-prs"]
+        self.assertIn("2 open PRs", alert)
+        self.assertIn("#10 8.0d draft", alert)
+        self.assertIn("#11 10.0d orphaned", alert)
+        self.assertNotIn("#12", alert, "under the 7d SLO")
+
+
 class StatusFeedTest(unittest.TestCase):
     def test_feed_counts_running_and_idle_slots_per_lane(self):
         import fcntl
