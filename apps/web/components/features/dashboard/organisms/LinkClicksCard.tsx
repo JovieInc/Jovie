@@ -77,9 +77,9 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
           return (
             <li
               key={stat.platform}
-              className='border-t border-subtle/40 py-2.5 first:border-t-0 first:pt-0'
+              className='border-t border-subtle/40 py-3 first:border-t-0 first:pt-0'
             >
-              <div className='flex items-center gap-2.5'>
+              <div className='flex items-center gap-3'>
                 <div className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
                   <SocialIcon
                     platform={stat.platform}

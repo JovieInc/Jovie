@@ -14,7 +14,7 @@ export function EmailNotificationMockup() {
         />
 
         {/* Email header */}
-        <div className='border-b border-white/6 px-4 pb-2.5 pt-3'>
+        <div className='border-b border-white/6 px-4 pb-3 pt-3'>
           <div className='flex items-center gap-2'>
             <div className='flex h-5 w-5 items-center justify-center rounded-full bg-(--color-border-focus)'>
               <span className='text-3xs font-bold text-white dark:text-white'>

@@ -135,7 +135,7 @@ export function ProfileSkeleton() {
             {/* Connect / social links section placeholder */}
             <div className='space-y-3'>
               <div className={`h-4 w-16 rounded bg-white/[0.06] ${pulse}`} />
-              <div className='flex flex-wrap gap-2.5'>
+              <div className='flex flex-wrap gap-3'>
                 <div
                   className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
                 />

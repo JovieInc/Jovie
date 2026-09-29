@@ -31,20 +31,20 @@ export function DspPresenceCard({
   return (
     <ContentSurfaceCard
       className={cn(
-        'cursor-pointer p-3.5 transition-[border-color,background-color,box-shadow] duration-subtle',
-        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-surface-0',
+        'cursor-pointer p-4 transition-[border-color,background-color,box-shadow] duration-subtle',
+        'bg-[color-mix(in_oklab,var(--color-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-surface-0',
         isSelected &&
-          'border-(--linear-border-focus) bg-surface-0 ring-1 ring-ring'
+          'border-(--color-border-focus) bg-surface-0 ring-1 ring-ring'
       )}
       data-testid={`presence-card-${item.providerId}`}
     >
       <button
         type='button'
         onClick={onSelect}
-        className='w-full space-y-2.5 text-left'
+        className='w-full space-y-3 text-left'
       >
-        <div className='flex items-start justify-between gap-2.5'>
-          <div className='flex items-center gap-2.5'>
+        <div className='flex items-start justify-between gap-3'>
+          <div className='flex items-center gap-3'>
             {item.externalArtistImageUrl ? (
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
                 <Image
@@ -80,7 +80,7 @@ export function DspPresenceCard({
           </div>
         </div>
 
-        <div className='flex min-h-5 items-center gap-2.5 text-xs text-tertiary-token'>
+        <div className='flex min-h-5 items-center gap-3 text-xs text-tertiary-token'>
           {isConfirmed && (
             <ConfidenceBadge score={item.confidenceScore ?? 0} size='sm' />
           )}
@@ -91,7 +91,7 @@ export function DspPresenceCard({
       </button>
 
       {item.externalArtistUrl && (
-        <div className='border-t border-subtle pt-2.5'>
+        <div className='border-t border-subtle pt-3'>
           <a
             href={item.externalArtistUrl}
             target='_blank'

@@ -21,7 +21,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
         <div
           className='overflow-hidden rounded-full p-1'
           style={{
-            boxShadow: '0 0 0 1px var(--linear-border-subtle)',
+            boxShadow: '0 0 0 1px var(--color-border-subtle)',
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -59,10 +59,10 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
       {/* Big CTA — matches TwoStepNotificationsCTA */}
       <div className='mt-auto w-full px-5 pb-6'>
         <div
-          className='flex w-full items-center justify-center gap-2.5 rounded-xl py-4 text-mid font-semibold'
+          className='flex w-full items-center justify-center gap-3 rounded-xl py-4 text-mid font-semibold'
           style={{
-            backgroundColor: 'var(--linear-text-primary)',
-            color: 'var(--linear-bg-page)',
+            backgroundColor: 'var(--color-text-primary-token)',
+            color: 'var(--color-bg-page)',
           }}
         >
           <Bell className='h-5 w-5' aria-hidden='true' />

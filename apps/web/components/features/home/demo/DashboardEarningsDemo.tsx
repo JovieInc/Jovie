@@ -50,7 +50,7 @@ export function DashboardEarningsDemo() {
         ].map(card => (
           <div
             key={card.label}
-            className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
+            className='rounded-lg px-3 py-3 bg-surface-1 border border-subtle'
           >
             <p className='text-2xs text-tertiary-token'>{card.label}</p>
             <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
@@ -78,7 +78,7 @@ export function DashboardEarningsDemo() {
                     className='w-full rounded-t-sm'
                     style={{
                       height: visible ? `${heightPct}%` : '0%',
-                      backgroundColor: 'var(--linear-success)',
+                      backgroundColor: 'var(--color-success)',
                       opacity: 0.8,
                       transition: `height 0.6s var(--ds-motion-cinematic-easing) ${i * 60}ms`,
                     }}

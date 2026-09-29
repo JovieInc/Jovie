@@ -148,7 +148,7 @@ export function CTAShowcase() {
             </h3>
             <ul className='space-y-2 text-sm text-secondary-token'>
               {FEATURE_ITEMS.map(({ icon: Icon, title, description }) => (
-                <li key={title} className='flex items-start gap-2.5'>
+                <li key={title} className='flex items-start gap-3'>
                   <Icon
                     className='mt-0.5 h-4 w-4 shrink-0 text-tertiary-token'
                     aria-hidden='true'

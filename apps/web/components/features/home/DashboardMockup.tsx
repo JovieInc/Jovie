@@ -22,10 +22,10 @@ export function DashboardMockup({
 
   return (
     <div
-      className='relative overflow-hidden rounded-[0.95rem] md:rounded-xl'
+      className='relative overflow-hidden rounded-2xl md:rounded-xl'
       style={{
-        border: '1px solid var(--linear-border-subtle)',
-        backgroundColor: 'var(--linear-bg-surface-0)',
+        border: '1px solid var(--color-border-subtle)',
+        backgroundColor: 'var(--color-bg-surface-0)',
         boxShadow: isHero
           ? [
               '0 0 0 1px rgba(255,255,255,0.03)',
@@ -66,7 +66,7 @@ export function DashboardMockup({
       {/* Column headers */}
       <div
         className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2 max-md:hidden'
-        style={{ borderBottom: '1px solid var(--linear-border-subtle)' }}
+        style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
       >
         <span className='text-3xs font-medium uppercase tracking-[0.08em] text-quaternary-token'>
           Release
@@ -93,12 +93,12 @@ export function DashboardMockup({
                 : 'transparent',
               borderBottom:
                 i < RELEASES.length - 1
-                  ? '1px solid var(--linear-border-subtle)'
+                  ? '1px solid var(--color-border-subtle)'
                   : undefined,
             }}
           >
             {/* Desktop row layout */}
-            <div className='max-md:hidden md:grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5'>
+            <div className='max-md:hidden md:grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-3'>
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-2'>
                 <Image
                   src={release.artwork}
@@ -156,8 +156,8 @@ export function DashboardMockup({
                   className='font-mono text-xs transition-colors duration-slower'
                   style={{
                     color: isActive
-                      ? 'var(--linear-text-secondary)'
-                      : 'var(--linear-text-tertiary)',
+                      ? 'var(--color-text-secondary-token)'
+                      : 'var(--color-text-tertiary-token)',
                   }}
                 >
                   jov.ie/{release.slug}
@@ -166,7 +166,7 @@ export function DashboardMockup({
             </div>
 
             {/* Mobile row layout — stacked */}
-            <div className='md:hidden px-5 py-2.5'>
+            <div className='md:hidden px-5 py-3'>
               <div className='flex items-center gap-3'>
                 <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-2'>
                   <Image
@@ -222,7 +222,7 @@ export function DashboardMockup({
       {isHero ? null : (
         <div
           ref={footerRef}
-          className='flex items-center justify-center px-5 py-2.5'
+          className='flex items-center justify-center px-5 py-3'
         >
           <p className='text-xs text-quaternary-token'>
             + pre-save ready, matched across platforms, and shareable in one

@@ -117,7 +117,7 @@ export function ProfileEmptyBentoCard({
     'group relative w-full min-w-0 overflow-hidden rounded-(--profile-inner-radius) border border-white/14 text-left text-white shadow-[0_18px_46px_rgba(0,0,0,0.34)] transition-[transform,opacity] duration-subtle dark:text-white',
     (href || onClick) &&
       'cursor-pointer hover:brightness-[1.04] active:opacity-90',
-    isInline && 'flex min-h-16 items-center gap-3 px-3.5 py-3',
+    isInline && 'flex min-h-16 items-center gap-3 px-4 py-3',
     isProminent && 'flex min-h-44 flex-col justify-between p-4',
     layout === 'compact' && 'flex min-h-36 flex-col justify-between p-4',
     className

@@ -65,7 +65,7 @@ export function WaitlistSocialStep({
   return (
     <>
       <div className={FORM_LAYOUT.headerSection}>
-        <h1 className={FORM_LAYOUT.title}>Where do fans find you?</h1>
+        <h1 className={FORM_LAYOUT.title}>Where Do Fans Find You?</h1>
       </div>
 
       <div>
@@ -82,7 +82,7 @@ export function WaitlistSocialStep({
                 className={cn(
                   AUTH_SURFACE.pillOption,
                   isSelected && AUTH_SURFACE.pillOptionActive,
-                  'cursor-pointer focus-within:border-(--linear-border-focus) focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16'
+                  'cursor-pointer focus-within:border-(--color-border-focus) focus-within:ring-2 focus-within:ring-(--color-border-focus)/16'
                 )}
               >
                 <input
@@ -149,7 +149,7 @@ export function WaitlistSocialStep({
               onChange={e => onUrlChange(e.target.value)}
               maxLength={2048}
               required
-              aria-label='Social profile username'
+              aria-label='Social Profile Username'
               aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
               aria-describedby={
                 fieldErrors.primarySocialUrl
@@ -157,7 +157,7 @@ export function WaitlistSocialStep({
                   : undefined
               }
               className={AUTH_SURFACE.fieldInput}
-              placeholder='yourusername'
+              placeholder='Yourusername'
               disabled={isSubmitting}
               onKeyDown={handleKeyDown}
             />

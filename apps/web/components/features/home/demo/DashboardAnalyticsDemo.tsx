@@ -46,7 +46,7 @@ export function DashboardAnalyticsDemo() {
         ].map(card => (
           <div
             key={card.label}
-            className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
+            className='rounded-lg px-3 py-3 bg-surface-1 border border-subtle'
           >
             <p className='text-2xs text-tertiary-token'>{card.label}</p>
             <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
@@ -70,7 +70,7 @@ export function DashboardAnalyticsDemo() {
                 className='flex-1 rounded-t-sm'
                 style={{
                   height: visible ? `${heightPct}%` : '0%',
-                  backgroundColor: 'var(--linear-accent)',
+                  backgroundColor: 'var(--color-accent)',
                   opacity: 0.7 + (i / DAILY_CLICKS.length) * 0.3,
                   transition: `height 0.6s var(--ds-motion-cinematic-easing) ${i * 20}ms`,
                 }}

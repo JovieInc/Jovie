@@ -51,7 +51,7 @@ export function ClaimPageContent({
 
           <Link
             href={signupUrl}
-            className='inline-flex items-center gap-2 rounded-full bg-btn-primary px-6 py-2.5 text-sm font-semibold text-btn-primary-foreground shadow-sm ring-1 ring-subtle transition-opacity hover:opacity-95 focus-ring-transparent-offset'
+            className='inline-flex items-center gap-2 rounded-full bg-btn-primary px-6 py-3 text-sm font-semibold text-btn-primary-foreground shadow-sm ring-1 ring-subtle transition-opacity hover:opacity-95 focus-ring-transparent-offset'
             data-testid='claim-page-cta'
           >
             Sign Up to Claim
