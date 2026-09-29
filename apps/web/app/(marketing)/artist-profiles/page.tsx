@@ -3,7 +3,6 @@ import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
 
@@ -48,25 +47,5 @@ export const metadata: Metadata = {
 };
 
 export default function ArtistProfilesPage() {
-  return (
-    <>
-      <script type='application/ld+json'>
-        {safeJsonLdStringify({
-          '@context': 'https://schema.org',
-          '@type': 'WebPage',
-          '@id': `${ARTIST_PROFILES_URL}#webpage`,
-          url: ARTIST_PROFILES_URL,
-          name: ARTIST_PROFILES_TITLE,
-          description: ARTIST_PROFILES_DESCRIPTION,
-          isPartOf: {
-            '@type': 'WebSite',
-            '@id': `${BASE_URL}/#website`,
-            url: BASE_URL,
-            name: APP_NAME,
-          },
-        })}
-      </script>
-      <ArtistProfileLandingRoute />
-    </>
-  );
+  return <ArtistProfileLandingRoute />;
 }
