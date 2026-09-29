@@ -2,7 +2,7 @@ import { isRenderFixtureEnabled } from '@/lib/render-fixture-policy';
 
 /**
  * Reserved fixture identity for authenticated app-shell screen-certification
- * producers (tasks: JOV-7XXX, contacts: JOV-7XXX). This is the same
+ * producers (web.tasks, web.contacts). This is the same
  * hardcoded profile the visual-capture synthetic dashboard fallback already
  * returns for any bypass session once `E2E_FAST_ONBOARDING`/
  * `NEXT_PUBLIC_E2E_MODE` is set — see `createE2EDashboardCoreData` in

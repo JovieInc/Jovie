@@ -42,18 +42,25 @@ const enterUrl = `/api/dev/test-auth/enter?persona=creator&redirect=${encodeURIC
 // on the person's name rather than the full combined string.
 const SELECTED_CONTACT_NAME = 'Priya Anand';
 
-// The app shell polls a few chrome widgets on unrelated APIs this producer
-// does not fixture, and neither has any noop-DB fallback of its own:
-// - /api/chat/conversations (the assistant panel's conversation list) —
-//   genuinely 500s against the noop DB, not gated by this producer's
-//   reserved-profile fixture.
-// - a background RSC refetch of this exact proof route (React Query
-//   revalidation / the sidebar's hover-prefetch touching the same query
-//   key) — the DOM this test already asserted on before this check runs is
-//   what the screenshot captures, not a later background refetch.
-// A 503 is an already-controlled "service unavailable" signal for anything
-// else. This screen itself renders correctly regardless, so only an
-// unexpected status class or path fails this proof.
+// Specific, unrelated app-shell chrome paths that degrade against the noop
+// DB (verified locally) — none has a noop-DB fallback of its own, and none
+// is gated by this producer's reserved-profile fixture:
+// - /api/analytics/navigation: a 503 is this app's own "service
+//   unavailable" convention for a degraded analytics beacon.
+// - /api/chat/conversations: the assistant panel's conversation list
+//   genuinely 500s (an uncaught exception, not a controlled response).
+// Plus a background RSC refetch of this exact proof route (React Query
+// revalidation / the sidebar's hover-prefetch touching the same query
+// key), which can also 500 — not the initial render this test already
+// asserted on before this check runs.
+// Scoped to exactly these paths and statuses, not a blanket allowance, so
+// a real failure from this producer's own fixtured endpoint
+// (GET /api/dashboard/contacts) still fails this proof.
+const EXPECTED_DEGRADED_RESPONSES = new Map<string, number>([
+  ['/api/analytics/navigation', 503],
+  ['/api/chat/conversations', 500],
+]);
+
 function isExpectedDegradedResponse(entry: string): boolean {
   const match = /^(\d{3}) (\S+)$/.exec(entry);
   if (!match) return false;
@@ -65,20 +72,12 @@ function isExpectedDegradedResponse(entry: string): boolean {
       return '';
     }
   })();
-  if (status === 503) return true;
-  if ((status === 401 || status === 403) && pathname.startsWith('/api/')) {
-    return true;
-  }
-  return (
-    status === 500 &&
-    (pathname === '/api/chat/conversations' || pathname === proofRoute)
-  );
+  if (pathname === proofRoute) return status === 500;
+  return EXPECTED_DEGRADED_RESPONSES.get(pathname) === status;
 }
 
 function isExpectedDegradedConsoleError(entry: string): boolean {
-  return /the server responded with a status of (401|403|500|503)\b/.test(
-    entry
-  );
+  return /the server responded with a status of (500|503)\b/.test(entry);
 }
 
 function isExpectedDegradedRequestFailure(entry: string): boolean {
@@ -137,14 +136,17 @@ test('emits exact-head contacts desktop and mobile evidence', async ({
     expect(finalUrl.pathname).toBe(proofRoute);
     await waitForHydration(page);
 
-    const root = page.getByTestId('contacts-table');
+    // Like TasksPageClient, the app shell can mount more than one layout
+    // instance carrying this testid (CSS-hidden, not unmounted) — scope to
+    // the one actually visible at the current viewport.
+    const root = page.locator('[data-testid="contacts-table"]:visible');
     await expect(root).toBeVisible();
 
     // Select a contact so the capture shows the populated list plus the
     // open detail sidebar, per JOV-7127-pattern review parity with Pen.
     await root.getByText(SELECTED_CONTACT_NAME, { exact: false }).click();
     await expect(
-      page.getByTestId('contact-detail-entity-header')
+      page.locator('[data-testid="contact-detail-entity-header"]:visible')
     ).toBeVisible();
 
     await page.evaluate(async () => {

@@ -58,6 +58,9 @@ function baseTask(
     position: overrides.taskNumber * 1024,
     sourceTemplateId: null,
     metadata: null,
+    // mapTaskRow (task-actions.ts) defaults every real row to `?? 1`, so
+    // match that floor rather than leaving this optional field unset.
+    mutationVersion: 1,
     createdAt: at(-overrides.taskNumber * DAY),
     updatedAt: at(-overrides.taskNumber * HOUR),
     ...overrides,
