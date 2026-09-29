@@ -7,6 +7,7 @@ import {
   type KeyframeRecord,
   type KeyframeVerdict,
   main,
+  mergeModelVerdicts,
   parseModelVerdict,
   pathOf,
   readFirstVerdictKeyframes,
@@ -254,6 +255,21 @@ describe('golden path visual review', () => {
     }
   });
 
+  it('flags a keyframe when either model sample finds a blocker', () => {
+    const pass = { verdict: 'pass', findings: [] } as const;
+    const block = {
+      verdict: 'blocker',
+      findings: ['layout: CTA clipped'],
+    } as const;
+    const down = { verdict: 'unknown', reason: 'gateway 503' } as const;
+    expect(mergeModelVerdicts([pass, block])).toEqual(block);
+    expect(mergeModelVerdicts([block, block])).toEqual(block);
+    expect(mergeModelVerdicts([down, pass])).toEqual(pass);
+    expect(mergeModelVerdicts([down, down])).toMatchObject({
+      verdict: 'unknown',
+    });
+  });
+
   describe('main', () => {
     const dirs: string[] = [];
     afterEach(() => {
@@ -310,6 +326,37 @@ describe('golden path visual review', () => {
         verdict: 'pass',
         findings: [],
       });
+    });
+
+    it('samples the model twice and suspects a keyframe one sample flags', async () => {
+      const dir = setupDir(record());
+      const out = join(dir, 'verdict.json');
+      let calls = 0;
+      const flakyFetch = async () => {
+        calls += 1;
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content:
+                  calls === 1
+                    ? '{"verdict":"pass","findings":[]}'
+                    : '{"verdict":"blocker","findings":["layout: dock over card"]}',
+              },
+            },
+          ],
+        });
+      };
+      await main(
+        ['--dir', dir, '--out', out],
+        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        flakyFetch
+      );
+      const written = JSON.parse(readFileSync(out, 'utf8'));
+      expect(calls).toBe(2);
+      expect(written.rubricVersion).toBe('golden-path-user-blocking/v2');
+      expect(written.suspected).toEqual(['public-profile']);
+      expect(written.keyframes[0].modelSamples).toHaveLength(2);
     });
 
     it('exits 1 only when the replay confirms a suspected keyframe', async () => {
