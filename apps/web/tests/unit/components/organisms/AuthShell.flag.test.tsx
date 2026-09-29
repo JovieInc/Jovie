@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as renderUI, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AuthShell,
   isWhatsNewBannerEnabled,
@@ -10,8 +10,12 @@ import { SidebarProvider } from '@/components/organisms/sidebar';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
-const { unifiedSidebarMock } = vi.hoisted(() => ({
+const { unifiedSidebarMock, sidebarMock } = vi.hoisted(() => ({
   unifiedSidebarMock: vi.fn(),
+  sidebarMock: {
+    isMobile: false,
+    state: 'open' as 'open' | 'closed',
+  },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
@@ -50,8 +54,19 @@ vi.mock('@/components/organisms/sidebar', () => ({
     <div>{children}</div>
   ),
   SidebarTrigger: () => <button type='button'>Toggle Sidebar</button>,
-  useSidebar: () => ({ isMobile: false, state: 'open' }),
+  useSidebar: () => sidebarMock,
 }));
+
+vi.mock(
+  '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton',
+  () => ({
+    SidebarCollapseButton: () => (
+      <button type='button' data-testid='sidebar-rail-toggle'>
+        Expand sidebar
+      </button>
+    ),
+  })
+);
 
 vi.mock('@/components/organisms/UnifiedSidebar', () => ({
   UnifiedSidebar: ({
@@ -159,6 +174,28 @@ describe('AuthShell runtime update wiring', () => {
 });
 
 describe('AuthShell canonical wiring', () => {
+  beforeEach(() => {
+    sidebarMock.isMobile = false;
+    sidebarMock.state = 'open';
+    delete document.documentElement.dataset.desktopRuntime;
+  });
+
+  it('mounts the header collapse control in the browser when the rail is closed', () => {
+    sidebarMock.state = 'closed';
+    renderAuthShell();
+
+    expect(screen.getByTestId('sidebar-rail-toggle')).toBeInTheDocument();
+  });
+
+  it('does not mount a second left-sidebar control in Electron (JOV-7207)', () => {
+    // The desktop window-control row owns the single canonical toggle.
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    sidebarMock.state = 'closed';
+    renderAuthShell();
+
+    expect(screen.queryByTestId('sidebar-rail-toggle')).not.toBeInTheDocument();
+  });
+
   it('uses the single shell frame and in-sidebar collapse control', () => {
     renderAuthShell();
 
