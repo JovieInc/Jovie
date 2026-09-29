@@ -15,6 +15,7 @@ import { SettingsAppearanceSection } from '@/features/dashboard/organisms/Settin
 import { SettingsNotificationsSection } from '@/features/dashboard/organisms/SettingsNotificationsSection';
 import { useSessionSafe, useUserSafe } from '@/hooks/useJovieAuth';
 
+import { SecurityCard } from './SecurityCard';
 import { SessionManagementCard } from './SessionManagementCard';
 
 function AccountIdentitySummary() {
@@ -105,9 +106,14 @@ export function AccountSettingsSection({
         <AccountIdentitySummary />
       </SettingsPanel>
       {isSignedIn ? (
-        <SettingsPanel title='Active Sessions'>
-          <SessionManagementCard activeSessionId={session?.id} />
-        </SettingsPanel>
+        <>
+          <SettingsPanel title='Security'>
+            <SecurityCard />
+          </SettingsPanel>
+          <SettingsPanel title='Active Sessions'>
+            <SessionManagementCard activeSessionId={session?.id} />
+          </SettingsPanel>
+        </>
       ) : null}
       <SettingsAppearanceSection />
       <SettingsNotificationsSection isGrowth={isGrowth} />

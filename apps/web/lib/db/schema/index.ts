@@ -1267,6 +1267,20 @@ export {
   type NewArtistRevenueCohortRow,
   selectArtistRevenueCohortSchema,
 } from './revenue-cohorts';
+// Account security audit + link snapshots (JOV-6600)
+export {
+  insertSecurityEventSchema,
+  insertSocialLinkSnapshotSchema,
+  type NewSecurityEvent,
+  type NewSocialLinkSnapshot,
+  type SecurityEvent,
+  type SocialLinkSnapshot,
+  type SocialLinkSnapshotEntry,
+  securityEvents,
+  selectSecurityEventSchema,
+  selectSocialLinkSnapshotSchema,
+  socialLinkSnapshots,
+} from './security';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,

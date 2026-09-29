@@ -24,6 +24,10 @@ vi.mock('./SessionManagementCard', () => ({
   SessionManagementCard: () => <div data-testid='session-management-card' />,
 }));
 
+vi.mock('./SecurityCard', () => ({
+  SecurityCard: () => <div data-testid='security-card' />,
+}));
+
 describe('AccountSettingsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -84,6 +88,8 @@ describe('AccountSettingsSection', () => {
     expect(screen.queryByText(/connected accounts/i)).toBeNull();
     expect(screen.getByText('Active Sessions')).toBeTruthy();
     expect(screen.getByTestId('session-management-card')).toBeTruthy();
+    expect(screen.getByText('Security')).toBeTruthy();
+    expect(screen.getByTestId('security-card')).toBeTruthy();
   });
 
   it('shows a loading skeleton while the session is pending', () => {

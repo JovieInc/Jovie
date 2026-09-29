@@ -11,6 +11,10 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { capProfileLinkInputs } from '@/lib/profile/social-link-limits';
 import {
+  captureSocialLinksSnapshot,
+  SNAPSHOT_REASONS,
+} from '@/lib/security/account-security';
+import {
   applyRateLimiting,
   buildSocialLinksInsertPayload,
   checkIdempotencyKey,
@@ -152,6 +156,15 @@ export async function PUT(req: Request) {
       const removableIds = existingLinks
         .filter(link => (link.sourceType ?? 'manual') !== 'ingested')
         .map(link => link.id);
+      // Capture a restorable snapshot of the current set before mutating
+      // (link version history / one-click revert, JOV-6600).
+      if (existingLinks.length > 0) {
+        await captureSocialLinksSnapshot(tx, {
+          creatorProfileId: profileId,
+          reason: SNAPSHOT_REASONS.UPDATE,
+          createdByUserId: clerkUserId,
+        });
+      }
       if (removableIds.length > 0) {
         await tx
           .delete(socialLinks)
