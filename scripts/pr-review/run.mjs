@@ -8,7 +8,7 @@ import {
   validateFinding,
 } from '../lib/pr-review-contracts.mjs';
 import { excerptForFinding, renderContext } from './context.mjs';
-import { costUsd, REVIEW_ROUTES } from './models.mjs';
+import { costUsd } from './models.mjs';
 import { SPECIALISTS, VERIFIER } from './specialists.mjs';
 
 export const DEFAULT_RUN_LIMITS = Object.freeze({
@@ -88,7 +88,7 @@ async function mapLimit(items, limit, worker) {
  *   prices: Record<string, {family: string, inPerMillion: number, outPerMillion: number}>,
  *   readLiveHead: () => Promise<string>,
  *   limits?: typeof DEFAULT_RUN_LIMITS,
- *   routes?: typeof REVIEW_ROUTES,
+ *   routes: {discovery: string, verification: string},
  *   signal?: AbortSignal,
  *   now?: () => string,
  * }} input
@@ -104,7 +104,7 @@ export async function runReview({
   prices,
   readLiveHead,
   limits = DEFAULT_RUN_LIMITS,
-  routes = REVIEW_ROUTES,
+  routes,
   signal,
   now = () => new Date().toISOString(),
 }) {
@@ -113,7 +113,13 @@ export async function runReview({
     /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path)
   );
   const plan = planReview({ riskRuleIds, advisedTier, testsChanged });
-  const stats = { invalidCandidates: 0, droppedOverCap: 0, callErrors: 0 };
+  const stats = {
+    invalidCandidates: 0,
+    droppedOverCap: 0,
+    callErrors: 0,
+    usage: {},
+  };
+  const startedAt = Date.now();
   let spent = 0;
   let failure = null;
 
@@ -131,7 +137,7 @@ export async function runReview({
     }),
     plan,
     routes,
-    stats,
+    stats: { ...stats, minutes: (Date.now() - startedAt) / 60_000 },
   });
 
   const contextGaps = [
@@ -164,6 +170,14 @@ export async function runReview({
         signal,
       });
       spent += costUsd(prices, model, result.usage);
+      const usage = (stats.usage[model] ??= {
+        calls: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+      });
+      usage.calls += 1;
+      usage.inputTokens += Number(result.usage?.inputTokens) || 0;
+      usage.outputTokens += Number(result.usage?.outputTokens) || 0;
       return result.text;
     } catch {
       stats.callErrors += 1;
