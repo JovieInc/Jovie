@@ -9,10 +9,10 @@ import type { CustomerNavTier, NavItem } from './types';
  */
 export const CUSTOMER_NAV_CAPACITY = {
   /**
-   * Desktop sidebar direct rows. Sized to the approved core set so every core
-   * destination stays on the rail; experimental extras overflow into More.
+   * Desktop sidebar direct rows. The JOV-7159 job-level root is intentionally
+   * capped at four; any proposed addition requires an explicit IA decision.
    */
-  desktopPrimaryVisible: 7,
+  desktopPrimaryVisible: 4,
   /**
    * Mobile bottom-bar direct tabs. Remaining destinations (core that do not
    * fit + experimental extras) share the single More menu.

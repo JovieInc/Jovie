@@ -1,13 +1,12 @@
 'use client';
 
 import { ExternalLink } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
 import {
   artistNavigation,
   CUSTOMER_NAV_CAPACITY,
-  isLibraryNavigationRoute,
+  isNavigationItemActive,
   partitionCustomerNavigation,
   primaryNavigation,
   settingsNavItem,
@@ -32,22 +31,6 @@ function toMenuItem(item: NavItem): LiquidGlassMenuItem {
 
 const UTILITY_ITEMS = [settingsNavItem].map(toMenuItem);
 
-function isMobileNavItemActive(
-  item: Pick<NavItem, 'id' | 'href'>,
-  pathname: string
-): boolean {
-  if (item.id === 'library') {
-    return isLibraryNavigationRoute(pathname);
-  }
-  if (item.href === APP_ROUTES.DASHBOARD) {
-    return pathname === item.href;
-  }
-  if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {
-    return pathname === APP_ROUTES.CHAT;
-  }
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
-
 export interface DashboardMobileTabsProps {
   readonly className?: string;
 }
@@ -57,6 +40,11 @@ export function DashboardMobileTabs({
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { signOut } = useAuthSafe();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentNavigationHref = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const isElectron = useIsElectronRuntime();
   const { profileHref } = useProfileData(true);
@@ -71,10 +59,10 @@ export function DashboardMobileTabs({
 
   const activeItemId = useMemo(() => {
     const active = primaryNavigation.find(item =>
-      isMobileNavItemActive(item, pathname)
+      isNavigationItemActive(item, pathname, searchParams)
     );
     return active?.id ?? null;
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   const { primaryItems, expandedItems } = useMemo(() => {
     const partition = partitionCustomerNavigation(primaryNavigation, {
@@ -120,12 +108,12 @@ export function DashboardMobileTabs({
     ) =>
       startNavigationTelemetry({
         itemId: item.id,
-        sourcePathname: pathname,
+        sourcePathname: currentNavigationHref,
         destinationHref: item.href,
         inputMethod,
         context: telemetryContext,
       }),
-    [pathname, telemetryContext]
+    [currentNavigationHref, telemetryContext]
   );
 
   const handleExpandedItemsVisible = useCallback(
@@ -153,7 +141,7 @@ export function DashboardMobileTabs({
       onExpandedItemsVisible={handleExpandedItemsVisible}
       onSignOut={handleSignOut}
       isItemActive={(item, currentPathname) =>
-        isMobileNavItemActive(item, currentPathname)
+        isNavigationItemActive(item, currentPathname, searchParams)
       }
       inFlow
       className={cn('lg:hidden', className)}

@@ -113,7 +113,7 @@ broken (user cannot finish without outside help).
 | First launch after update | works (handler re-registered at launch) | works |
 | Multiple Macs | works (independent sessions per app) | works |
 | Session expiry, silent refresh | works (7-day rolling cookie, refreshed daily on use) | works |
-| Sign out, then sign in again | degraded (full browser round trip) | degraded (Touch ID below) |
+| Sign out, then sign in again | degraded (full browser round trip) | works once Touch ID is enrolled (signed build with profile) |
 
 ## Touch ID sign-in: decision
 
@@ -128,19 +128,47 @@ Rejected: `systemPreferences.promptTouchID` gating a refresh credential in
 `safeStorage`. The prompt is a UI gate, not a cryptographic binding, and it
 needs a long-lived bearer secret on disk plus a new server credential type.
 
-Blocked on external authority, tracked separately:
+Enrollment policy (founder decision 2026-09-26): a sign-in from the last 10
+minutes may add a passkey even when the account already has one. A passkey
+added that way next to existing ones is a device passkey
+(`device-passkey:<credentialId>` in `ba_verifications`): it signs in on that
+Mac but writes no admin step-up receipt, so phishing a normal sign-in still
+cannot mint an admin factor. The first passkey and passkeys added under a
+live step-up keep their admin role. Delete and rename still need a step-up.
 
-1. `configureWebAuthn` needs the `keychain-access-groups` entitlement
-   (`<TEAM_ID>.app.jov.ie.webauthn`), which macOS only honors with an embedded
-   Developer ID provisioning profile (TN3125). Adding the entitlement without
-   the profile stops the app from launching, so it ships disabled until the
-   profile exists in the signing pipeline.
-2. Enrollment policy. `adminPasskeyStepUp` only allows a first passkey on a
-   fresh session, or another passkey after a live passkey step-up. A user who
-   already has an iCloud passkey cannot use it inside Electron (the Touch ID
-   authenticator is app-scoped), so they could never add the Mac passkey.
-   Either Mac passkeys stay out of the admin factor, or fresh sign-in may add
-   a device passkey. That is a security policy call.
+Flow: after a browser sign-in, `/auth/native-complete` offers "Sign In With
+Touch ID Next Time?" once (the session is fresh at that moment). "Turn On
+Touch ID" adds a platform passkey named "Jovie for Mac"; the choice is kept
+in `userData/desktop-passkey.json` (enrolled or dismissed, no secrets, mode
+600). Later handoffs show "Sign In With Touch ID" above "Continue in Browser"
+and finish in the app with no browser trip. If Touch ID fails or is
+cancelled, the browser path is right there.
+
+Enablement: Touch ID turns on only in a packaged, signed build whose bundle
+contains `Contents/embedded.provisionprofile` (Developer ID profile for
+`app.jov.ie` or `app.jov.ie.staging`, team `G24T327LXT`), with the
+`keychain-access-groups` entitlement `G24T327LXT.<bundle id>.webauthn`.
+macOS only honors that entitlement when the profile authorizes it (TN3125);
+without the profile the entitlement stops the app from launching, so the
+entitlement and profiles land together. Local builds stay browser-only.
+
+The profiles are committed (`apps/desktop/build/jovie-mac*.provisionprofile`,
+App Store Connect names "Jovie Mac Developer ID" and "Jovie Mac Staging
+Developer ID", bound to the Developer ID Application certificate that signs
+releases, valid to 2031-05-10). A profile is not a secret; every shipped app
+embeds it. Each channel's builder config pairs its own entitlements file with
+its own profile, and the shell contract test checks the bundle IDs match. When
+the signing certificate is renewed, regenerate both profiles against the new
+certificate before the old one expires, or signed builds stop launching.
+
+### Password managers (1Password, iCloud Keychain)
+
+Passkeys saved in 1Password or iCloud Keychain do not work inside the Mac app.
+They reach websites through a browser extension or the system credential
+provider for browsers, and Electron's authenticator is its own Secure Enclave
+store, separate from both. In the Mac app, Touch ID uses the device passkey
+created for that Mac. In any browser, including the browser handoff,
+1Password and iCloud passkeys work normally.
 
 ## Design brief (for the Pen design session)
 
@@ -166,8 +194,11 @@ Browser return page (`/auth/native-return`, web card): under "Return to
 Jovie", a divider, then "Jovie did not open? Enter this code in the app." and
 the code in large mono, selectable.
 
-Touch ID (not built yet, pending the two decisions above): after a first
-sign-in, a one-time sheet "Sign in with Touch ID next time?" with "Turn On
-Touch ID" and "Not Now"; on the handoff, a primary "Sign In With Touch ID"
-above "Continue in Browser" only when the platform authenticator is
-available.
+Touch ID: after a first sign-in on a Mac that supports it, the completion
+screen asks once, "Sign In With Touch ID Next Time?" with "Turn On Touch ID"
+(primary) and "Not Now" (secondary), both canonical `@jovie/ui` buttons. Once
+enrolled, the handoff adds "Sign In With Touch ID" as the first row in both
+the browser and code modes (so switching modes keeps the row count), and
+"Continue in Browser" drops to the secondary style. Status while waiting:
+"Waiting for Touch ID..."; on failure: "Touch ID did not sign you in.
+Continue in the browser instead."

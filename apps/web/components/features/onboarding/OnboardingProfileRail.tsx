@@ -293,6 +293,18 @@ function DspMatchStrip({
   );
 }
 
+/**
+ * Non-artists (JOV-3379) have no Spotify match; once they pick a handle and
+ * share a public profile, preview jov.ie/<handle> from those alone.
+ */
+export function resolvePreviewArtist(
+  state: OnboardingProfileBuilderState
+): OnboardingProfileArtist | null {
+  if (state.artist) return state.artist;
+  if (!state.handle || state.socialLinks.length === 0) return null;
+  return { id: `handle-${state.handle}`, name: state.handle, url: '' };
+}
+
 export function OnboardingProfileRail({
   placement = 'side',
   state,
@@ -300,7 +312,7 @@ export function OnboardingProfileRail({
   readonly placement?: 'inline' | 'side';
   readonly state: OnboardingProfileBuilderState;
 }) {
-  const artist = state.artist;
+  const artist = resolvePreviewArtist(state);
   const isInline = placement === 'inline';
 
   if (!artist) return null;

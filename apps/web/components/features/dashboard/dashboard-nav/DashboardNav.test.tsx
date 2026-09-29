@@ -56,21 +56,21 @@ describe('DashboardNav route warming', () => {
     for (const label of [
       'Inbox',
       'New Chat',
-      'Library',
-      'Contacts',
+      'Home',
       'Presence',
+      'Links',
+      'Audience',
     ]) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
         'true'
       );
     }
-    expect(
-      screen.queryByRole('link', { name: 'Calendar' })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Tasks' })
-    ).not.toBeInTheDocument();
+    for (const label of ['Library', 'Contacts', 'Calendar', 'Tasks']) {
+      expect(
+        screen.queryByRole('link', { name: label })
+      ).not.toBeInTheDocument();
+    }
   });
 
   it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {

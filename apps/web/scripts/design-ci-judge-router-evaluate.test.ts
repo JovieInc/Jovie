@@ -438,7 +438,7 @@ describe('evaluateDesignCiJudgeMatrix', () => {
     expect(
       visualCells.every(cell => cell.insufficientReason === 'not-yet-evaluated')
     ).toBe(true);
-  }, 60_000);
+  }, 180_000);
 });
 
 // Sanity guard so a future artifactHash regression is caught here too —

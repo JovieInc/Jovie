@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { primaryNavigation } from '@/components/features/dashboard/dashboard-nav/config';
+import { APP_ROUTES } from '@/constants/routes';
 import { SuggestedDspMatches } from '@/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches';
 
 // ---------------------------------------------------------------------------
@@ -434,8 +435,11 @@ describe('SuggestedDspMatches', () => {
 });
 
 describe('Navigation config', () => {
-  it('does not include presence in primaryNavigation', () => {
+  it('includes Presence as a job-level root destination', () => {
     const presenceItem = primaryNavigation.find(item => item.id === 'presence');
-    expect(presenceItem).toBeUndefined();
+    expect(presenceItem).toMatchObject({
+      name: 'Presence',
+      href: APP_ROUTES.PRESENCE,
+    });
   });
 });
