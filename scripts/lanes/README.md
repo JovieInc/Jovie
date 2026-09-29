@@ -177,7 +177,10 @@ LANES_REPO=~/devin-sweep/Jovie scripts/lanes/install.sh
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.
-State and receipts live under `~/.local/state/jovie-lanes`.
+State and receipts live under `~/.local/state/jovie-lanes`. Every gated run records
+`gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
+`gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
+second host is decided on measured queue time, not on timeouts alone.
 
 ## Tests
 

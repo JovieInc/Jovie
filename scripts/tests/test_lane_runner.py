@@ -291,6 +291,27 @@ class VerifyAndLandTest(unittest.TestCase):
         self.assertTrue(seat.held)
         seat.release()
 
+    def test_gate_wait_time_is_recorded_on_the_receipt(self):
+        result = self.run_gate(FakeShell([self.pr]))
+        self.assertIsInstance(result["gateWaitS"], int)
+        self.assertGreaterEqual(result["gateWaitS"], 0)
+
+    def test_gate_slot_reports_the_time_spent_queued_for_a_seat(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), gate_slots=1)
+            seat = lane.Locked(host.state / "slots" / "gate.0.lock", blocking=False)
+            self.assertTrue(seat.held)
+            clock = iter([1000.0, 1030.0])
+            real_time = lane.time
+            lane.time = SimpleNamespace(time=lambda: next(clock), sleep=lambda _s: seat.release())
+            try:
+                lock, waited = lane.gate_slot(host)
+            finally:
+                lane.time = real_time
+            self.assertEqual(waited, 30)
+            self.assertTrue(lock.held)
+            lock.release()
+
     def test_a_new_head_resets_the_timeout_count(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))

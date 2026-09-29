@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import statistics
 import subprocess
 import sys
 import time
@@ -126,9 +127,15 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         hud_beat = now - (state / "hud.heartbeat").stat().st_mtime
     except OSError:
         pass
+    gate_waits = [r["gateWaitS"] for r in receipts if isinstance(r.get("gateWaitS"), (int, float))]
     return {
         "now": now, "tick": tick, "tickAge": age_s(tick.get("at"), now),
         "gateTimeouts24h": sum(1 for r in receipts if r.get("verdict") == "gate-timeout"),
+        # Per-PR seat-queue time from run receipts: the measured input for gate-capacity
+        # decisions (more seats vs a second host), not an assumption.
+        "gateWaits24h": len(gate_waits),
+        "gateWaitMedianS24h": int(statistics.median(gate_waits)) if gate_waits else None,
+        "gateWaitMaxS24h": int(max(gate_waits)) if gate_waits else None,
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
@@ -565,6 +572,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(c["slots"] - c["running"] for c in counts.values()),
             "pool": obs.get("pool"), "lastLandingAgeS": obs.get("lastLandingAge"),
+            "gateWaits24h": obs.get("gateWaits24h"),
+            "gateWaitMedianS24h": obs.get("gateWaitMedianS24h"),
+            "gateWaitMaxS24h": obs.get("gateWaitMaxS24h"),
             "codexAvailable": len((obs.get("codex") or {}).get("available") or []),
             "alerts": alerts, "conditions": conditions or {},
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
