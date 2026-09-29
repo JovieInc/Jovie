@@ -599,10 +599,15 @@ export function OnboardingHandleCheckCard({
   const fieldId = useId();
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
   const [confirmed, setConfirmed] = useState(false);
+  const outputConfirmed = output?.action === 'handle_confirmed';
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
   const availabilityQuery = useHandleAvailabilityQuery({
     handle: normalizedDraft || null,
-    enabled: Boolean(normalizedDraft) && !isRunning(state) && !isFailed(state),
+    enabled:
+      Boolean(normalizedDraft) &&
+      !isRunning(state) &&
+      !isFailed(state) &&
+      !outputConfirmed,
   });
 
   useEffect(() => {
@@ -632,6 +637,17 @@ export function OnboardingHandleCheckCard({
         }
         title='Checking the handle'
         body={handle ? `@${handle}` : undefined}
+      />
+    );
+  }
+
+  if (outputConfirmed) {
+    return (
+      <StatusShell
+        icon={<Check className='h-3.5 w-3.5' />}
+        title='Handle confirmed'
+        body={`@${handle}`}
+        tone='success'
       />
     );
   }
@@ -786,6 +802,17 @@ export function OnboardingSocialLinkCard({
           <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
         }
         title='Reading the link'
+      />
+    );
+  }
+
+  if (output?.action === 'social_attached') {
+    return (
+      <StatusShell
+        icon={<Check className='h-3.5 w-3.5' />}
+        title='Social account attached'
+        body={hostnameFor(output.url ?? undefined) ?? undefined}
+        tone='success'
       />
     );
   }
