@@ -247,7 +247,7 @@ function printRegionForProduct(productType: string | null | undefined) {
 function garmentSvgForProduct(productType: string | null | undefined): string {
   switch (productFamily(productType)) {
     case 'hoodie':
-      return '<path d="M560 260 L720 420 H1080 L1240 260 L1560 420 L1390 760 L1260 690 V1880 H540 V690 L410 760 L240 420 Z" fill="#111" stroke="#050505" stroke-width="8"/><path d="M720 420 C780 560 1020 560 1080 420" fill="none" stroke="#242424" stroke-width="16"/><path d="M742 422 C710 580 640 690 570 790" fill="none" stroke="#2f2f2f" stroke-width="12"/><path d="M1058 422 C1090 580 1160 690 1230 790" fill="none" stroke="#2f2f2f" stroke-width="12"/>';
+      return '<path d="M690 470 C620 80 1180 80 1110 470 L1030 540 C990 440 810 440 770 540 Z" fill="#111" stroke="#050505" stroke-width="8"/><path d="M560 260 L720 420 H1080 L1240 260 L1560 420 L1390 760 L1260 690 V1880 H540 V690 L410 760 L240 420 Z" fill="#111" stroke="#050505" stroke-width="8"/><path d="M720 420 C780 560 1020 560 1080 420" fill="none" stroke="#242424" stroke-width="16"/><path d="M742 422 C710 580 640 690 570 790 M1058 422 C1090 580 1160 690 1230 790" fill="none" stroke="#2f2f2f" stroke-width="12"/><path d="M810 500 L780 810 M990 500 L1020 810" fill="none" stroke="#d8d8d2" stroke-width="8"/><path d="M690 1320 H1110 L1200 1570 H600 Z" fill="none" stroke="#242424" stroke-width="14"/>';
     case 'hat':
       return '<path d="M420 770 C480 480 1320 480 1380 770 L1380 920 H420 Z" fill="#111" stroke="#050505" stroke-width="8"/><path d="M660 775 C760 915 1040 915 1140 775" fill="none" stroke="#242424" stroke-width="16"/><path d="M610 930 C820 1030 1210 1010 1510 910 C1390 1120 650 1130 300 950 Z" fill="#0b0b0c" stroke="#050505" stroke-width="8"/>';
     case 'tee':

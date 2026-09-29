@@ -58,8 +58,8 @@ describe('InstantMerchLanding', () => {
     expect(heading.textContent).toBe(copy.hero.title);
     expect(heading.className).not.toMatch(/line-clamp-/);
     expect(heading.className).not.toMatch(/marketing-h1-max-two-lines/);
-    expect(heading.getAttribute('style') ?? '').not.toMatch(
-      /max-block-size|webkit-line-clamp/i
+    expect(heading.getAttribute('style')).toBe(
+      'display: block; max-block-size: none; overflow: visible; -webkit-box-orient: initial; -webkit-line-clamp: unset;'
     );
   });
 

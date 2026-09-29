@@ -204,12 +204,20 @@ function MarketingHeroTitle({
         className
       )}
       style={
-        maxLines === 3
+        maxLines === 'none'
           ? ({
-              WebkitLineClamp: 3,
-              maxBlockSize: 'calc(3 * 1lh)',
+              display: 'block',
+              maxBlockSize: 'none',
+              overflow: 'visible',
+              WebkitBoxOrient: 'initial',
+              WebkitLineClamp: 'unset',
             } satisfies CSSProperties)
-          : undefined
+          : maxLines === 3
+            ? ({
+                WebkitLineClamp: 3,
+                maxBlockSize: 'calc(3 * 1lh)',
+              } satisfies CSSProperties)
+            : undefined
       }
     >
       {children}

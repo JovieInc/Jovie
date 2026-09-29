@@ -170,7 +170,9 @@ describe('MarketingHero source-backed default story', () => {
       'line-clamp-3',
       'marketing-h1-max-two-lines'
     );
-    expect(heading).not.toHaveStyle({ WebkitLineClamp: '3' });
+    expect(heading.getAttribute('style')).toBe(
+      'display: block; max-block-size: none; overflow: visible; -webkit-box-orient: initial; -webkit-line-clamp: unset;'
+    );
   });
 
   it('uses the canonical growing action contract for a landing secondary CTA', () => {

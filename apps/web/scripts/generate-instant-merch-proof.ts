@@ -15,12 +15,13 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { buildPrintSvg, renderMockup } from '@/lib/merch/artwork';
 import type { MerchDesignLane } from '@/lib/merch/types';
 
-const OUT_DIR = join(process.cwd(), 'public', 'images', 'merch');
+const DEFAULT_OUT_DIR = join(process.cwd(), 'public', 'images', 'merch');
 
 interface ProofConcept {
   readonly slug: string;
@@ -54,8 +55,12 @@ const CONCEPTS: readonly ProofConcept[] = [
   },
 ];
 
-async function main() {
-  mkdirSync(OUT_DIR, { recursive: true });
+export async function generateInstantMerchProofs(
+  outDir = DEFAULT_OUT_DIR
+): Promise<readonly string[]> {
+  mkdirSync(outDir, { recursive: true });
+  const outputPaths: string[] = [];
+
   for (const item of CONCEPTS) {
     const printFile = await sharp(
       buildPrintSvg({
@@ -79,16 +84,25 @@ async function main() {
       .webp({ quality: 88 })
       .toBuffer();
 
-    const printPath = join(OUT_DIR, `${item.slug}-print.webp`);
-    const mockupPath = join(OUT_DIR, `${item.slug}-mockup.webp`);
+    const printPath = join(outDir, `${item.slug}-print.webp`);
+    const mockupPath = join(outDir, `${item.slug}-mockup.webp`);
     writeFileSync(printPath, printProof);
     writeFileSync(mockupPath, mockupProof);
+    outputPaths.push(printPath, mockupPath);
     console.log(`wrote ${printPath}`);
     console.log(`wrote ${mockupPath}`);
   }
+
+  return outputPaths;
 }
 
-main().catch(error => {
-  console.error(error);
-  process.exit(1);
-});
+const invokedDirectly =
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  generateInstantMerchProofs().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
