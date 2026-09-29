@@ -55,14 +55,6 @@ const REPRESENTATIVE_PROFILE_ENTRYPOINTS = [
     'molecules',
     'ProfilePreview.tsx'
   ),
-  join(
-    ROOT,
-    'components',
-    'features',
-    'dashboard',
-    'organisms',
-    'DashboardPreview.tsx'
-  ),
 ] as const;
 
 describe('public profile contract guard', () => {
