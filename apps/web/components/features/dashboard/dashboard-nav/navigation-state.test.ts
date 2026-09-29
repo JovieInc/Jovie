@@ -4,7 +4,7 @@ import {
   audienceNavItem,
   homeNavItem,
   linksNavItem,
-  profilesNavItem,
+  presenceNavItem,
 } from './config';
 import { isNavigationItemActive } from './navigation-state';
 
@@ -57,8 +57,8 @@ describe('isNavigationItemActive', () => {
   it('matches Presence throughout its workspace', () => {
     expect(
       isNavigationItemActive(
-        profilesNavItem,
-        `${APP_ROUTES.PROFILES}/spotify`,
+        presenceNavItem,
+        `${APP_ROUTES.PRESENCE}/spotify`,
         new URLSearchParams()
       )
     ).toBe(true);

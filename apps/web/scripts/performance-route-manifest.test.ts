@@ -155,17 +155,23 @@ describe('performance route manifest', () => {
     expect(releaseTasks?.path).toBe('/app/releases/[releaseId]/tasks');
   });
 
-  it('accepts both Profiles workspace rollout destinations for Presence', () => {
-    const presence = getEndUserPerfRouteManifest().find(
-      route => route.id === 'creator-presence'
+  it('measures Presence canonically and keeps Profiles as a legacy redirect', () => {
+    const routes = getEndUserPerfRouteManifest();
+    const presence = routes.find(route => route.id === 'creator-presence');
+    const legacyProfiles = routes.find(
+      route => route.id === 'creator-profiles-legacy'
     );
 
-    expect(presence?.measureMode).toBe('redirect');
-    expect(presence?.readySelectors.redirectDestinations).toEqual([
-      APP_ROUTES.PROFILES,
+    expect(presence?.path).toBe(APP_ROUTES.PRESENCE);
+    expect(presence?.measureMode).toBe('warm-navigation');
+    expect(presence?.navigationItemId).toBe('presence');
+    expect(legacyProfiles?.path).toBe(APP_ROUTES.PROFILES);
+    expect(legacyProfiles?.measureMode).toBe('redirect');
+    expect(legacyProfiles?.readySelectors.redirectDestinations).toEqual([
+      APP_ROUTES.PRESENCE,
       `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
     ]);
-    expect(presence?.readySelectors.content).toEqual([
+    expect(legacyProfiles?.readySelectors.content).toEqual([
       '[data-testid="profiles-workspace"]',
       'section#artist-profile',
     ]);

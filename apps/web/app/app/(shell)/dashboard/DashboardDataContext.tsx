@@ -13,7 +13,11 @@ import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import { applyCacheScope } from '@/lib/queries/cache-isolation';
 import type { DashboardData } from './actions';
 
-interface DashboardDataContextValue extends DashboardData {
+export interface DashboardDataContextValue extends DashboardData {
+  /** Managed objects available to the account. */
+  readonly identities: DashboardData['creatorProfiles'];
+  /** Identity whose data and actions scope the current dashboard. */
+  readonly activeIdentity: DashboardData['selectedProfile'];
   readonly updateSelectedProfileSettings?: (
     profileId: string,
     settings: Record<string, unknown>
@@ -80,6 +84,8 @@ export function DashboardDataProvider({
   const normalizedValue = useMemo(
     () => ({
       ...normalizeDashboardData(value),
+      identities: value.creatorProfiles,
+      activeIdentity: selectedProfile,
       selectedProfile,
       updateSelectedProfileSettings,
     }),

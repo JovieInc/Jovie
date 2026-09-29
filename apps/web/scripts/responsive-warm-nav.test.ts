@@ -33,7 +33,7 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     ]);
     expect(canonicalSidebarNavigation.map(item => item.href)).toEqual([
       APP_ROUTES.DASHBOARD,
-      APP_ROUTES.PROFILES,
+      APP_ROUTES.PRESENCE,
       APP_ROUTES.CHAT_PROFILE_PANEL,
       APP_ROUTES.CONTACTS_AUDIENCE,
     ]);
@@ -41,7 +41,7 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
 
   it('measures desktop-visible Presence via the real rail link', () => {
     const measurement = resolveResponsiveWarmNavMeasurement({
-      destinationHref: APP_ROUTES.PROFILES,
+      destinationHref: APP_ROUTES.PRESENCE,
       desktopVisibleHrefs,
       mobileMoreHrefs,
     });
@@ -50,7 +50,7 @@ describe('resolveResponsiveWarmNavMeasurement', () => {
     expect(measurement.measureMode).toBe('warm-navigation');
     expect(measurement.warmupStrategy).toBe('authenticated-shell');
     expect(measurement.navTrigger).toEqual(
-      hrefNavTriggers(APP_ROUTES.PROFILES)
+      hrefNavTriggers(APP_ROUTES.PRESENCE)
     );
   });
 

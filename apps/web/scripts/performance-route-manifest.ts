@@ -1449,17 +1449,17 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
-    id: 'creator-presence',
+    id: 'creator-profiles-legacy',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.PRESENCE,
+    path: APP_ROUTES.PROFILES,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
       content: ['[data-testid="profiles-workspace"]', 'section#artist-profile'],
       redirectDestinations: [
-        APP_ROUTES.PROFILES,
+        APP_ROUTES.PRESENCE,
         `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
       ],
     },
@@ -1590,10 +1590,10 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
-    id: 'creator-profiles',
+    id: 'creator-presence',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.PROFILES,
+    path: APP_ROUTES.PRESENCE,
     navigationItemId: 'presence',
     warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
@@ -1603,8 +1603,8 @@ const CREATOR_SHELL_ROUTES = [
       shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="profiles-workspace"]'],
       navTrigger: [
-        `a[href="${APP_ROUTES.PROFILES}"]`,
-        `a[href^="${APP_ROUTES.PROFILES}?"]`,
+        `a[href="${APP_ROUTES.PRESENCE}"]`,
+        `a[href^="${APP_ROUTES.PRESENCE}?"]`,
       ],
     },
     timings: [

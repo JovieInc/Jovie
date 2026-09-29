@@ -150,12 +150,14 @@ function renderUnifiedSidebar({
   section = 'library',
   isAdmin = false,
   variant,
+  data,
 }: {
   readonly overrideContent?: ReactNode;
   readonly pathname?: string;
   readonly section?: 'admin' | 'dashboard' | 'library' | 'ov' | 'settings';
   readonly isAdmin?: boolean;
   readonly variant?: 'jovie' | 'ov';
+  readonly data?: Partial<DashboardData>;
 } = {}) {
   unifiedPathnameMock.mockReturnValue(pathname);
   const queryClient = new QueryClient({
@@ -165,7 +167,7 @@ function renderUnifiedSidebar({
   return render(
     <QueryClientProvider client={queryClient}>
       <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <DashboardDataProvider value={{ ...dashboardData, isAdmin }}>
+        <DashboardDataProvider value={{ ...dashboardData, isAdmin, ...data }}>
           <TooltipProvider>
             <SidebarProvider>
               <ShellSidebarOverrideProvider>
@@ -234,6 +236,40 @@ describe('UnifiedSidebar library route', () => {
     expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
       collapsed: false,
     });
+  });
+
+  it('shows the identity switcher when the account has multiple identities', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+      data: {
+        creatorProfiles: [
+          dashboardData.creatorProfiles[0],
+          {
+            id: 'profile_456',
+            avatarUrl: null,
+            displayName: 'Second Act',
+            username: 'secondact',
+            usernameNormalized: 'secondact',
+          } as DashboardData['creatorProfiles'][number],
+        ],
+      },
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Switch Identity' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides the identity switcher for a single-identity account', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    expect(
+      screen.queryByRole('button', { name: 'Switch Identity' })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps pending Inbox work reachable without a sidebar notifications region', () => {

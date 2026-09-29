@@ -143,7 +143,9 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
     user: null,
     creatorProfiles: [],
+    identities: [],
     selectedProfile: null,
+    activeIdentity: null,
     needsOnboarding: false,
     sidebarCollapsed: false,
     hasSocialLinks: false,

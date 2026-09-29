@@ -125,7 +125,7 @@ describe('DashboardMobileTabs', () => {
     );
     expect(links.slice(0, 4).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.DASHBOARD,
-      APP_ROUTES.PROFILES,
+      APP_ROUTES.PRESENCE,
       APP_ROUTES.CHAT_PROFILE_PANEL,
       APP_ROUTES.CONTACTS_AUDIENCE,
     ]);

@@ -82,9 +82,9 @@ export const contactsNavItem: NavItem = {
   description: 'Manage artist contacts',
 };
 
-export const profilesNavItem: NavItem = {
+export const presenceNavItem: NavItem = {
   name: 'Presence',
-  href: APP_ROUTES.PROFILES,
+  href: APP_ROUTES.PRESENCE,
   id: 'presence',
   icon: Waypoints,
   iconName: 'Waypoints',
@@ -148,7 +148,7 @@ export const artistNavigation = [] as const satisfies readonly NavItem[];
  */
 export const primaryNavigation = [
   homeNavItem,
-  profilesNavItem,
+  presenceNavItem,
   linksNavItem,
   audienceNavItem,
 ] as const satisfies readonly NavItem[];

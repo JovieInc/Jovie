@@ -128,7 +128,7 @@ describe('DashboardNav interactions', () => {
 
     expect(screen.getByRole('link', { name: 'Presence' })).toHaveAttribute(
       'href',
-      APP_ROUTES.PROFILES
+      APP_ROUTES.PRESENCE
     );
     expect(
       screen.queryByRole('button', { name: 'Open Tim White profile' })

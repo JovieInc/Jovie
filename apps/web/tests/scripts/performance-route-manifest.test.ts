@@ -82,12 +82,12 @@ const CREATOR_SHELL_SLICE_ROUTES = [
     navTrigger: `a[href="${APP_ROUTES.CHAT_PROFILE_PANEL}"]`,
   },
   {
-    id: 'creator-profiles',
-    path: APP_ROUTES.PROFILES,
+    id: 'creator-presence',
+    path: APP_ROUTES.PRESENCE,
     measureMode: 'warm-navigation',
     warmupStrategy: 'authenticated-shell',
     primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.PROFILES}"]`,
+    navTrigger: `a[href="${APP_ROUTES.PRESENCE}"]`,
   },
   {
     id: 'creator-calendar',

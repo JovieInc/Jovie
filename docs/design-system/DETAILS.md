@@ -714,7 +714,7 @@ or mutually exclusive surfaces, not additions to the four-item root IA.
 | Group | Item | Canonical destination | Behavior |
 |-------|------|-----------------------|----------|
 | Primary | Home | `/app` | Opens the opportunity and work queue without exposing its internal entity model |
-| Primary | Presence | `/app/profiles` | Monitors identity across DSPs, social networks, and public surfaces |
+| Primary | Presence | `/app/presence` | Monitors identity across DSPs, social networks, and public surfaces |
 | Primary | Links | `/app/chat?panel=profile` | Opens the identity context where public links and attached entity views are managed |
 | Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace |
 | Utility | Inbox | `/app` | Compact shell action for pending opportunities and runtime attention |
