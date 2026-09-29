@@ -1453,6 +1453,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           expect(response?.status() ?? 0).toBeLessThan(500);
 
           await waitForHydration(screenPage);
+          await expect(
+            screenPage.getByTestId('profile-compact-shell')
+          ).toHaveAttribute('data-visitor-assignment-resolved', 'true');
+          await expect(screenPage.locator(screen.rootSelector)).toBeVisible();
           await waitForAnyVisible(
             screenPage,
             screen.readySelectors,
@@ -1464,6 +1468,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
             screenPage,
             screen.rootSelector
           );
+          await testInfo.attach('profile-viewport-geometry', {
+            body: JSON.stringify({ viewport, screen: screen.id, snapshot }),
+            contentType: 'application/json',
+          });
           expectMobileShellStable(
             snapshot,
             viewport,
