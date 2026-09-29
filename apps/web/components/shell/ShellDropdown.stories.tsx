@@ -86,5 +86,13 @@ function RadioGroupDemo() {
 }
 
 export const WithRadioGroup: Story = {
+  args: {
+    trigger: (
+      <Button type='button' variant='secondary' size='sm'>
+        Sort
+      </Button>
+    ),
+    children: null,
+  },
   render: () => <RadioGroupDemo />,
 };

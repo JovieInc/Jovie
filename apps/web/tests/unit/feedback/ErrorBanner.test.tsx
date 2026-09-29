@@ -139,7 +139,7 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Dismissible error' onDismiss={onDismiss} />);
 
       const closeButton = screen.getByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
       expect(closeButton).toBeInTheDocument();
     });
@@ -148,7 +148,7 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Non-dismissible error' />);
 
       const closeButton = screen.queryByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
       expect(closeButton).not.toBeInTheDocument();
     });
@@ -158,7 +158,7 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Dismissible error' onDismiss={onDismiss} />);
 
       const closeButton = screen.getByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
       fireEvent.click(closeButton);
 
@@ -170,9 +170,9 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Dismissible error' onDismiss={onDismiss} />);
 
       const closeButton = screen.getByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
-      expect(closeButton).toHaveAttribute('aria-label', 'Dismiss Error');
+      expect(closeButton).toHaveAttribute('aria-label', 'Dismiss error');
     });
   });
 });
@@ -243,7 +243,7 @@ describe('ErrorBanner semantic color and target ownership', () => {
 
     const retry = screen.getByRole('button', { name: 'Try again' });
     const secondary = screen.getByRole('link', { name: 'Return to Jovie' });
-    const dismiss = screen.getByRole('button', { name: 'Dismiss Error' });
+    const dismiss = screen.getByRole('button', { name: 'Dismiss error' });
 
     expect(retry).toHaveAttribute('data-variant', 'primary');
     expect(retry).toHaveAttribute('data-size', ERROR_BANNER_ACTION_SIZE);
@@ -286,11 +286,11 @@ describe('ErrorBanner semantic color and target ownership', () => {
     );
 
     expect(screen.queryByText('Error ID: abc123')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show Error details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show error details' }));
 
     expect(screen.getByText('Error ID: abc123')).toBeInTheDocument();
     const copy = screen.getByRole('button', {
-      name: 'Copy Error Details To Clipboard',
+      name: 'Copy error details to clipboard',
     });
     expect(copy).toHaveAttribute('data-size', ERROR_BANNER_COPY_SIZE);
     expect(copy).toHaveClass(
@@ -315,9 +315,9 @@ describe('ErrorBanner semantic color and target ownership', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show Error details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show error details' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Copy Error Details To Clipboard' })
+      screen.getByRole('button', { name: 'Copy error details to clipboard' })
     );
 
     await act(async () => {
@@ -346,9 +346,9 @@ describe('ErrorBanner semantic color and target ownership', () => {
     });
 
     render(<ErrorBanner title='Failed to save changes' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Show Error details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show error details' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Copy Error Details To Clipboard' })
+      screen.getByRole('button', { name: 'Copy error details to clipboard' })
     );
 
     await act(async () => {
@@ -420,9 +420,9 @@ describe('ErrorBanner semantic color and target ownership', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show Error details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show error details' }));
     expect(screen.getByText('Error ID: abc123')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Hide Error details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide error details' }));
     expect(screen.queryByText('Error ID: abc123')).not.toBeInTheDocument();
     expect(getBanner()).toHaveClass(
       ...ERROR_BANNER_SHELL_GEOMETRY_CLASS.split(' ')

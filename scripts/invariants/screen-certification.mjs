@@ -50,6 +50,12 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.developers': '/developers',
   'web.api-versioning-policy': '/api-versioning',
   'web.cli-landing': '/cli',
+  // JOV-7110: web.engineering-publication used to cover both engineering
+  // routes as one screen, but the schema binds one route per screen. Split
+  // into the index (this binding) and preview (below) screens so each keeps
+  // its own exact-head proof instead of extending the schema to N routes.
+  'web.engineering-publication': '/engineering',
+  'web.engineering-preview': '/engineering/preview',
   'web.marketing-ai': '/ai',
   'web.marketing-compare': '/compare',
   'web.marketing-alternatives': '/alternatives',
@@ -79,6 +85,13 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
   'web.artists': '/artists',
+  // JOV-7127: unlike web.artists, these revenue-sensitive dynamic routes have
+  // no no-DB fallback branch on the real production path, so the producer
+  // captures a reserved, env-gated fixture route instead — see
+  // apps/web/app/[username]/[slug]/_lib/screen-cert-fixture.ts.
+  'web.smartlink-release': '/jovie-screen-fixture/screen-cert-release',
+  'web.smartlink-track':
+    '/jovie-screen-fixture/screen-cert-release/screen-cert-track',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
@@ -143,7 +156,8 @@ web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
-web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/|desktop,mobile
+web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/page.tsx,apps/web/app/(marketing)/engineering/[slug]/page.tsx|desktop,mobile
+web.engineering-preview|web|engineering-preview|apps/web/app/(marketing)/engineering/preview/|desktop,mobile
 web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
 web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile

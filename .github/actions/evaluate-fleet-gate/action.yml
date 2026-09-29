@@ -21,6 +21,22 @@ inputs:
     description: When set, receipt main.sha must match this exact subject.
     required: false
     default: ''
+  surface:
+    description: Exact affected surface for this admission decision.
+    required: false
+    default: fleet-control
+  mutation:
+    description: Exact requested mutation.
+    required: false
+    default: refresh-fleet-admission
+  risk-lane:
+    description: Exact CI risk lane from the JOV-5937 receipt.
+    required: false
+    default: not_applicable
+  health-signals-json:
+    description: Additional typed dependency observations as a JSON array.
+    required: false
+    default: '[]'
   github-token:
     description: Token for live GitHub observation.
     required: true
@@ -82,6 +98,10 @@ runs:
         GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
         FLEET_GATE_DRY_RUN: ${{ inputs.dry-run == 'true' && '1' || '0' }}
         FLEET_GATE_CONSUMER: ${{ inputs.consumer }}
+        FLEET_GATE_SURFACE: ${{ inputs.surface }}
+        FLEET_GATE_MUTATION: ${{ inputs.mutation }}
+        FLEET_GATE_RISK_LANE: ${{ inputs.risk-lane }}
+        FLEET_GATE_HEALTH_SIGNALS_JSON: ${{ inputs.health-signals-json }}
         EXPECTED_SHA: ${{ inputs.expected-sha }}
       shell: bash
       run: bash scripts/fleet-gate/evaluate-fleet-gate.sh

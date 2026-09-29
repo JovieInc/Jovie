@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 describe('WorkspaceLockScreen', () => {
-  it('renders the locked state with a red fingerprint and unlock copy', () => {
+  it('renders the locked state with a calm, uncircled fingerprint and unlock copy', () => {
     render(<WorkspaceLockScreen />);
     expect(
       screen.getAllByRole('button', { name: /unlock to continue/i }).length
@@ -65,6 +65,11 @@ describe('WorkspaceLockScreen', () => {
       screen.getByText('Unlock to continue').closest('button')
     ).toBeTruthy();
     expect(document.querySelector('[data-workspace-lock="true"]')).toBeTruthy();
+    // Tim 2026-09-29: no circle around the fingerprint, desaturated and quiet.
+    const glyph = screen.getByTestId('workspace-lock-glyph');
+    expect(glyph.getAttribute('class')).toContain('text-tertiary-token');
+    expect(glyph.getAttribute('class')).not.toContain('destructive');
+    expect(glyph.parentElement?.className ?? '').not.toContain('rounded-full');
   });
 
   it('unlocks via passkey, clears the lock cookie, and reloads', async () => {
@@ -150,6 +155,9 @@ describe('WorkspaceLockScreen', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toContain('Passkey denied')
     );
+    // Tim 2026-09-29: the error state is calmer and smaller, not red.
+    expect(screen.getByRole('alert').className).not.toContain('destructive');
+    expect(screen.getByRole('alert').className).toContain('text-xs');
     expect(reload).not.toHaveBeenCalled();
     expect(document.cookie).toContain('jovie_workspace_lock=1');
   });
