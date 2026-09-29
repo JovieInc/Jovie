@@ -81,10 +81,6 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   ),
 }));
 
-vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
-  SidebarInstallBanner: () => <div data-testid='sidebar-install-banner' />,
-}));
-
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
   SidebarBottomNowPlayingBridge: (props: { readonly collapsed?: boolean }) => {
     nowPlayingBridgePropsMock(props);

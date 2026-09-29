@@ -47,10 +47,6 @@ vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
   SidebarUpgradeBanner: () => null,
 }));
 
-vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
-  SidebarInstallBanner: () => null,
-}));
-
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
   SidebarBottomNowPlayingBridge: () => null,
 }));

@@ -100,7 +100,6 @@
         "apps/web/app/billing/success/page.tsx",
         "apps/web/app/out/[id]/page.tsx",
         "apps/web/app/sandbox/page.tsx",
-        "apps/web/app/sentry-example-page/SentryExamplePageClient.tsx",
         "apps/web/app/spinner-test/page.tsx",
         "apps/web/components/features/admin/FunnelMetricsStrip.tsx",
         "apps/web/components/features/admin/OperationalControlPanel.tsx",
