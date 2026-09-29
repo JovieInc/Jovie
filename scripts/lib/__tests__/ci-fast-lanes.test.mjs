@@ -23,6 +23,7 @@ import {
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
   runDesignConformance,
+  runMergeGroupGuards,
   runStructural,
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
@@ -462,6 +463,27 @@ describe('runStructural screenshot contract discovery', () => {
     );
     // Consumed, so nested lane suites see the unsplit pool.
     expect(process.env.CI_FAST_STRUCTURAL_WEB).toBeUndefined();
+  });
+
+  it('shell-quotes merge-group guard tests under route groups', () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+    runMergeGroupGuards({
+      execute,
+      changed: [
+        'apps/web/app/app/(shell)/library/page.test.tsx',
+        'apps/web/tests/e2e/skipped.test.ts',
+        'apps/web/gone.test.ts',
+      ],
+      exists: file => file !== 'apps/web/gone.test.ts',
+    });
+    const command = execute.mock.calls[0][0];
+    expect(command).toContain("'app/app/(shell)/library/page.test.tsx'");
+    expect(command).not.toContain('skipped.test.ts');
+    expect(command).not.toContain('gone.test.ts');
+    // The composed command must parse under /bin/sh; unquoted route-group
+    // parens used to break it with `Syntax error: "(" unexpected`.
+    expect(spawnSync('/bin/sh', ['-n'], { input: command }).status).toBe(0);
   });
 
   it('uses the default executor on the structural skip path', async () => {
