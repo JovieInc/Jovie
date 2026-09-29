@@ -28,7 +28,7 @@ describe('WaitlistOutcomeView pending receipt', () => {
       <WaitlistOutcomeView outcome='pending' email='artist@example.com' />
     );
 
-    expect(screen.getByText(/request saved/i)).toBeInTheDocument();
+    expect(screen.getByText(/request is saved/i)).toBeInTheDocument();
     expect(screen.queryByText(/jov\.ie\//)).not.toBeInTheDocument();
   });
 });
