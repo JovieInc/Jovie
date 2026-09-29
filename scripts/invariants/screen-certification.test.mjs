@@ -864,6 +864,86 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('keeps the smartlink screen-fixture producer identity synchronized with the trusted resolver (JOV-7127)', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.smartlink-release'],
+      '/jovie-screen-fixture/screen-cert-release'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.smartlink-track'],
+      '/jovie-screen-fixture/screen-cert-release/screen-cert-track'
+    );
+    // Every SCREEN_PROOF_ROUTES-style producer gets its own dedicated
+    // artifact name so single-screen producers never collide inside one
+    // workflow run's artifact namespace.
+    assert.equal(
+      screenProofArtifactName('web.smartlink-release'),
+      `${PRODUCER.artifact}-smartlink-release`
+    );
+    assert.equal(
+      screenProofArtifactName('web.smartlink-track'),
+      `${PRODUCER.artifact}-smartlink-track`
+    );
+    assert.notEqual(
+      screenProofArtifactName('web.smartlink-release'),
+      screenProofArtifactName('web.smartlink-track')
+    );
+
+    assert.match(workflow, /--screen=web\.smartlink-release/);
+    assert.match(
+      workflow,
+      new RegExp(`name: ${screenProofArtifactName('web.smartlink-release')}`)
+    );
+    assert.match(workflow, /--screen-id=web\.smartlink-release/);
+    assert.match(
+      workflow,
+      /smartlink-release-artifact-id: \$\{\{ steps\.smartlink-release-proof\.outputs\.artifact-id \}\}/
+    );
+
+    assert.match(workflow, /--screen=web\.smartlink-track/);
+    assert.match(
+      workflow,
+      new RegExp(`name: ${screenProofArtifactName('web.smartlink-track')}`)
+    );
+    assert.match(workflow, /--screen-id=web\.smartlink-track/);
+    assert.match(
+      workflow,
+      /smartlink-track-artifact-id: \$\{\{ steps\.smartlink-track-proof\.outputs\.artifact-id \}\}/
+    );
+
+    const releaseSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/smartlink-release-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.match(
+      releaseSpec,
+      new RegExp(
+        `const smartlinkReleaseRoute = '${SCREEN_PROOF_ROUTES['web.smartlink-release']}'`
+      )
+    );
+
+    const trackSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/smartlink-track-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.match(
+      trackSpec,
+      new RegExp(
+        `const smartlinkTrackRoute =\\s*\\n\\s*'${SCREEN_PROOF_ROUTES['web.smartlink-track'].replace(/\//g, '\\/')}'`
+      )
+    );
+  });
+
   it('routes changed screens to their matching artifacts in one certification pass', () => {
     const homepage = home();
     const profile = SCREEN_REGISTRY.find(
