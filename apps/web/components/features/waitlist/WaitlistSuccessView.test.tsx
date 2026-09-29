@@ -41,6 +41,31 @@ describe('WaitlistSuccessView', () => {
     ).toHaveAttribute('href', '/start');
   });
 
+  it('shows the held jov.ie handle when a reservation profile exists', () => {
+    render(<WaitlistSuccessView reservedHandle='tim' />);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: "You're on the list" })
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "jov.ie/tim is yours. Your name and profile are reserved, and we'll email you the moment your spot opens."
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/Request saved\./)).toBeNull();
+  });
+
+  it('falls back to the standard receipt copy for a blank reserved handle', () => {
+    render(<WaitlistSuccessView reservedHandle='   ' />);
+
+    expect(
+      screen.getByText(
+        "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens."
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/jov\.ie\//)).toBeNull();
+  });
+
   it.each([
     { label: 'desktop', width: 1024, height: 900 },
     { label: 'mobile', width: 390, height: 844 },

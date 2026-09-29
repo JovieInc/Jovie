@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
     origin: 'https://summer.jov.ie',
     deploymentId: 'dpl_live',
   })),
+  bridgeEvents: [] as Record<string, unknown>[],
 }));
 
 vi.mock('@vercel/oidc', () => ({
@@ -17,7 +18,7 @@ vi.mock('@vercel/oidc', () => ({
 vi.mock('@/lib/ovie/summer-production-pin', () => ({
   resolveSummerEveCallerOrigin: mocks.resolveSummerEveCallerOrigin,
   logSummerBridgeEvent: (entry: Readonly<Record<string, unknown>>) => {
-    console.error(entry);
+    mocks.bridgeEvents.push(entry);
   },
   SummerPinInvalidError: class SummerPinInvalidError extends Error {
     readonly code = 'summer_pin_invalid';
@@ -193,6 +194,7 @@ function fixtureProjection(
 describe('POST /api/internal/ovie/summer-bottleneck', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.bridgeEvents.length = 0;
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW));
     vi.stubEnv('VERCEL_ENV', 'production');
@@ -1188,6 +1190,76 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     await expect(response.json()).resolves.toMatchObject({
       code: 'stale_bottleneck_snapshot',
     });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('logs schema issue paths for an invalid snapshot without raw values', async () => {
+    const leaked = 'LEAKED_SNAPSHOT_VALUE_9f3a';
+    const snapshot = validSnapshot();
+    const response = await POST(
+      request({
+        ...snapshot,
+        sourceVersion: leaked,
+        signals: {
+          ...snapshot.signals,
+          queue: {
+            ...snapshot.signals.queue,
+            queuedPrs: leaked,
+          },
+        },
+      })
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'invalid_bottleneck_snapshot',
+    });
+    expect(mocks.bridgeEvents).toHaveLength(1);
+    const event = mocks.bridgeEvents[0] as {
+      event: string;
+      code: string;
+      issues: { path: string; code: string }[];
+    };
+    expect(event).toMatchObject({
+      event: 'invalid_bottleneck_snapshot',
+      code: 'invalid_bottleneck_snapshot',
+    });
+    expect(event.issues).toEqual(
+      expect.arrayContaining([
+        { path: 'sourceVersion', code: 'invalid_format' },
+        { path: 'signals.queue.queuedPrs', code: 'invalid_type' },
+      ])
+    );
+    expect(event.issues.length).toBeLessThanOrEqual(20);
+    for (const issue of event.issues) {
+      expect(Object.keys(issue).sort()).toEqual(['code', 'path']);
+    }
+    expect(JSON.stringify(mocks.bridgeEvents)).not.toContain(leaked);
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('logs stale_bottleneck_snapshot with freshness metadata and no payload', async () => {
+    const observedAt = '2026-09-04T19:30:00.000Z';
+    const response = await POST(request(validSnapshot(observedAt)));
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'stale_bottleneck_snapshot',
+    });
+    expect(mocks.bridgeEvents).toEqual([
+      {
+        event: 'stale_bottleneck_snapshot',
+        code: 'stale_bottleneck_snapshot',
+        ageSeconds: 30 * 60,
+        maxAgeSeconds: 15 * 60,
+        maxClockSkewSeconds: 60,
+      },
+    ]);
+    const logged = JSON.stringify(mocks.bridgeEvents);
+    expect(logged).not.toContain(observedAt);
+    expect(logged).not.toContain(SOURCE);
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 

@@ -1,7 +1,7 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
-import { ChevronLeft, MoreHorizontal } from 'lucide-react';
+import { ArrowRight, ChevronLeft, MoreHorizontal } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   type MouseEvent,
@@ -27,6 +27,7 @@ import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader'
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import { ProofClaimCtaLink } from '@/features/profile/ProofClaimCtaLink';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
@@ -163,6 +164,11 @@ function getNewestPublicRelease(
 }
 
 interface ProfileCompactSurfaceProps {
+  /** Proof profiles only: phone claim bar above the dock (JOV-7114). */
+  readonly proofClaimCta?: {
+    readonly href: string;
+    readonly label: string;
+  } | null;
   /** Opens the release credits sheet from the overflow menu. */
   readonly onOpenReleaseCredits?: () => void;
   readonly renderMode?: ProfileRenderMode;
@@ -278,6 +284,7 @@ function resolveActivePrimaryTab(params: {
 }
 
 export function ProfileCompactSurface({
+  proofClaimCta = null,
   renderMode = 'interactive',
   presentation = 'standalone',
   onOpenReleaseCredits,
@@ -315,7 +322,6 @@ export function ProfileCompactSurface({
   onDrawerViewChange,
   onBack,
   onOpenMenu,
-  onPlayClick,
   profileHref,
   isSubscribed = false,
   contentPrefs = DEFAULT_CONTENT_PREFS,
@@ -745,8 +751,9 @@ export function ProfileCompactSurface({
               // overflow-y-auto, overflow-x computes to auto (CSS Overflow 3),
               // so the region clips at its own padding box. The parent column
               // already pads by --page-pad, which puts that clip under the
-              // side padding. Home needs the catalog carousel to peek to the
-              // surface edge (JOV-3377). Music uses the same bleed so the
+              // side padding. Home keeps the bleed so the single editorial
+              // card clips at the surface edge (JOV-3377, JOV-7123). Music
+              // uses the same bleed so the
               // release rows stay inside the inset, and locks the cross axis
               // so a vertical drag cannot pan the leftover overflow (JOV-6573).
               (isHomeMode || isMusicMode) && '-mx-(--page-pad) px-(--page-pad)',
@@ -754,7 +761,7 @@ export function ProfileCompactSurface({
               'min-h-0 flex-1',
               isHomeMode && 'profile-home-content-scroll',
               // Home mode: the scroll region becomes a flex column so the
-              // carousel rail can flex into the full remaining height
+              // home rail can flex into the full remaining height
               // (percentage heights fail against flexed parents).
               isHomeMode && 'flex flex-col',
               // Exactly one stable reservation. The navigation material floats
@@ -799,14 +806,10 @@ export function ProfileCompactSurface({
                 artist={artist}
                 latestRelease={homeLatestRelease}
                 profileSettings={homeProfileSettings}
-                featuredPlaylistFallback={featuredPlaylistFallback}
                 tourDates={tourDates}
                 hasPlayableDestinations={mergedDSPs.length > 0}
                 captureEnabled={allowFanCapture}
                 renderMode={renderMode}
-                onPlayClick={onPlayClick}
-                onAlertsClick={openNotifications}
-                showAlertsCard={canGetUpdates}
                 isSubscribed={homeAlertsSubscribed}
                 profilePacAssignment={profilePacAssignment}
                 viewerLocation={viewerLocation}
@@ -861,6 +864,29 @@ export function ProfileCompactSurface({
             showAlerts={allowFanCapture}
             isMenuOpen={isMenuActive}
             onTabSelect={handleTabSelect}
+            aboveNav={
+              proofClaimCta ? (
+                <div
+                  className='pointer-events-auto mb-2 md:hidden'
+                  data-testid='profile-proof-claim-bar'
+                >
+                  <ProofClaimCtaLink
+                    href={proofClaimCta.href}
+                    label={proofClaimCta.label}
+                    testId='profile-proof-claim-bar-cta'
+                    className='flex h-11 w-full items-center justify-between rounded-full border border-(--profile-dock-border) bg-(--profile-dock-solid-bg) px-4 text-sm font-medium text-white/88 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+                  >
+                    <span>
+                      <span className='text-white/55'>jov.ie/</span>you
+                    </span>
+                    <span className='inline-flex items-center gap-1.5'>
+                      {proofClaimCta.label}
+                      <ArrowRight className='size-4' aria-hidden='true' />
+                    </span>
+                  </ProofClaimCtaLink>
+                </div>
+              ) : null
+            }
           />
         ) : null}
       </div>

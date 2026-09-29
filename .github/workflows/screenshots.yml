@@ -19,6 +19,18 @@ on:
       - 'apps/web/app/hud/**'
       - 'apps/web/lib/admin/roles.ts'
       - 'apps/web/lib/auth/gate.ts'
+      - 'apps/web/app/app/(shell)/tasks/**'
+      - 'apps/web/app/app/(shell)/dashboard/tasks/**'
+      - 'apps/web/app/app/(shell)/contacts/**'
+      - 'apps/web/app/api/dashboard/contacts/**'
+      - 'apps/web/lib/screen-cert/**'
+      - 'apps/web/lib/tasks/**'
+      - 'apps/web/lib/contacts/**'
+      - 'apps/web/lib/render-fixture-policy.ts'
+      - 'apps/web/lib/e2e/**'
+      - 'apps/web/app/app/(shell)/dashboard/actions/**'
+      - 'apps/web/components/features/dashboard/tasks/**'
+      - 'apps/web/components/features/dashboard/organisms/contacts-table/**'
       - 'apps/web/app/(marketing)/**'
       - 'apps/web/app/(home)/**'
       - 'apps/web/app/(dynamic)/**'
@@ -75,6 +87,8 @@ jobs:
       smartlink-release-artifact-id: ${{ steps.smartlink-release-proof.outputs.artifact-id }}
       smartlink-track-artifact-id: ${{ steps.smartlink-track-proof.outputs.artifact-id }}
       hud-isolated-artifact-id: ${{ steps.hud-isolated-proof.outputs.artifact-id }}
+      tasks-artifact-id: ${{ steps.tasks-proof.outputs.artifact-id }}
+      contacts-artifact-id: ${{ steps.contacts-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
     defaults:
       run:
@@ -93,6 +107,17 @@ jobs:
       # lib/admin/roles.ts and lib/auth/gate.ts; see the hud-isolated
       # capture step below for why this must be job-level env.
       E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+      # web.tasks / web.contacts producers: server-only, read by
+      # isE2EFastOnboardingEnabled() (lib/e2e/runtime.ts). This is what lets
+      # createE2EDashboardCoreData's synthetic profile fallback
+      # (dashboard-data.ts) activate for any bypass session, which the tasks
+      # and contacts fixtures gate on — see
+      # apps/web/lib/screen-cert/app-shell-fixture-gate.ts. Its only other
+      # readers (releases/actions.ts, onboarding/actions/connect-spotify.ts)
+      # are not on any existing producer's render path, so this cannot
+      # change bytes for the marketing catalog or the five screen-proof
+      # producers above.
+      E2E_FAST_ONBOARDING: '1'
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -507,6 +532,117 @@ jobs:
           public-images: true
           diagnostic-paths: true
 
+      # web.tasks and web.contacts are authenticated app-shell screens with
+      # no no-DB fallback on the real production path, so they capture the
+      # real routes under a reserved, env-gated synthetic profile instead of
+      # a separate fixture URL — see
+      # apps/web/lib/screen-cert/app-shell-fixture-gate.ts.
+      - name: Capture tasks screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/tasks-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-tasks
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-tasks-measurements.json
+
+      - name: Bind tasks proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.tasks \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-tasks \
+            --measurements=apps/web/test-results/screen-browser-proof-tasks-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-tasks/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload tasks screen proof
+        id: tasks-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-tasks
+          path: |
+            apps/web/test-results/screen-browser-proof-tasks/screen-proof.json
+            apps/web/test-results/screen-browser-proof-tasks/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-tasks/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Capture contacts screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/contacts-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-contacts
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-contacts-measurements.json
+
+      - name: Bind contacts proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.contacts \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-contacts \
+            --measurements=apps/web/test-results/screen-browser-proof-contacts-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-contacts/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload contacts screen proof
+        id: contacts-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-contacts
+          path: |
+            apps/web/test-results/screen-browser-proof-contacts/screen-proof.json
+            apps/web/test-results/screen-browser-proof-contacts/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-contacts/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
       # Keep this readback before catalog.spec.ts refreshes canonical screenshots.
       - name: Verify public screenshot exports from production build
         timeout-minutes: 5
@@ -785,6 +921,14 @@ jobs:
             --artifact-id=${{ needs.generate.outputs.hud-isolated-artifact-id }} \
             --screen-id=web.hud-isolated \
             --receipt-out=.artifacts/screen-certification/hud-isolated.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.tasks-artifact-id }} \
+            --screen-id=web.tasks \
+            --receipt-out=.artifacts/screen-certification/tasks.json || STATUS=$?
+          node scripts/invariants/screen-certification.mjs \
+            --artifact-id=${{ needs.generate.outputs.contacts-artifact-id }} \
+            --screen-id=web.contacts \
+            --receipt-out=.artifacts/screen-certification/contacts.json || STATUS=$?
           exit "$STATUS"
 
       - name: Upload screen certification receipts

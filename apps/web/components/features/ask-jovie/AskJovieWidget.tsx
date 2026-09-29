@@ -353,6 +353,7 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
           variant='secondary'
           onClick={openWidget}
           aria-label={`Ask Jovie about ${artistName}`}
+          data-ask-jovie-launcher=''
           className={cn(
             'group fixed right-4 bottom-4',
             PROFILE_Z.DRAWER_CONTENT

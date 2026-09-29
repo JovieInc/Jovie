@@ -89,13 +89,6 @@ final class JovieUITests: XCTestCase {
 
     XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
-    XCTAssertTrue(app.buttons["shell-actions-menu"].exists)
-    app.buttons["shell-actions-menu"].tap()
-    XCTAssertTrue(
-      app.buttons["Open Settings"].waitForExistence(timeout: 3),
-      "Settings must stay reachable from the shell Actions menu.\n\(app.debugDescription)"
-    )
-    app.buttons["shell-actions-menu"].tap()
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
     XCTAssertTrue(app.buttons["Open Public Profile"].exists)
@@ -105,6 +98,14 @@ final class JovieUITests: XCTestCase {
       "Apple Wallet isn't available for this profile yet."
     )
     attachScreenshot(named: "profile", app: app)
+
+    let actionsMenu = app.buttons["shell-actions-menu"]
+    XCTAssertTrue(actionsMenu.exists)
+    actionsMenu.tap()
+    XCTAssertTrue(
+      app.buttons["Open Settings"].waitForExistence(timeout: 3),
+      "Settings must stay reachable from the shell Actions menu.\n\(app.debugDescription)"
+    )
   }
 
   func testPublicProfileOpensInFullScreenEmbeddedBrowser() {
@@ -356,6 +357,7 @@ final class JovieUITests: XCTestCase {
         "Settings row \(linkTitle) did not appear in the accessibility tree.\n\(app.debugDescription)"
       )
     }
+    app.swipeUp()
     for valueTitle in ["Version", "Build"] {
       XCTAssertTrue(
         app.staticTexts[valueTitle].waitForExistence(timeout: 2),
@@ -511,12 +513,6 @@ final class JovieUITests: XCTestCase {
       app.buttons["shell-actions-menu"].exists,
       "The Actions overflow must be the shell's single trailing control.\n\(app.debugDescription)"
     )
-    app.buttons["shell-actions-menu"].tap()
-    XCTAssertTrue(
-      app.descendants(matching: .any)["shell-talk-fab"].waitForExistence(timeout: 3),
-      "Talk must stay reachable from the Actions menu.\n\(app.debugDescription)"
-    )
-    app.buttons["shell-actions-menu"].tap()
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
       "Composer mic should stay removed.\n\(app.debugDescription)"
@@ -672,6 +668,11 @@ final class JovieUITests: XCTestCase {
       $0.textFields["chat-composer-input"]
     }
 
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
+    )
+
     let actionsMenu = app.buttons["shell-actions-menu"]
     XCTAssertTrue(
       actionsMenu.waitForExistence(timeout: 3),
@@ -681,11 +682,6 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(
       app.descendants(matching: .any)["shell-talk-fab"].waitForExistence(timeout: 3),
       "Talk did not appear in the shell Actions menu.\n\(app.debugDescription)"
-    )
-    actionsMenu.tap()
-    XCTAssertFalse(
-      shellControlExists(app, identifier: "shell-tab-bar"),
-      "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,

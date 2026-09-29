@@ -290,6 +290,86 @@ describe('Product Screenshots provenance cleanliness', () => {
     );
   });
 
+  it('emits and certifies a source-bound tasks browser proof', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture tasks screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind tasks proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload tasks screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/app/(shell)/tasks/**'");
+    expect(workflow).toContain(
+      'tasks-artifact-id: ${{ steps.tasks-proof.outputs.artifact-id }}'
+    );
+    // The reserved-fixture profile only activates once E2E_FAST_ONBOARDING
+    // is visible to the long-lived production server process, same
+    // ordering constraint as E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH above.
+    expect(workflow).toContain("E2E_FAST_ONBOARDING: '1'");
+    expect(workflow.indexOf("E2E_FAST_ONBOARDING: '1'")).toBeLessThan(
+      stepIndex(workflow, 'Start production server')
+    );
+    expect(capture).toContain('tasks-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.tasks');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    expect(upload).toContain('name: screen-browser-proof-tasks');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.tasks');
+    expect(certify).toContain('needs.generate.outputs.tasks-artifact-id');
+    expect(
+      stepIndex(workflow, 'Capture hud-isolated screen proof')
+    ).toBeLessThan(stepIndex(workflow, 'Capture tasks screen proof'));
+    expect(stepIndex(workflow, 'Upload tasks screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Certify exact screen captures')
+    );
+    expect(stepIndex(workflow, 'Upload tasks screen proof')).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
+  it('emits and certifies a source-bound contacts browser proof', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture contacts screen proof');
+    const bind = getStepBlock(
+      workflow,
+      'Bind contacts proof to producer provenance'
+    );
+    const upload = getStepBlock(workflow, 'Upload contacts screen proof');
+    const certify = getStepBlock(workflow, 'Certify exact screen captures');
+
+    expect(workflow).toContain("- 'apps/web/app/app/(shell)/contacts/**'");
+    expect(workflow).toContain("- 'apps/web/app/api/dashboard/contacts/**'");
+    expect(workflow).toContain(
+      'contacts-artifact-id: ${{ steps.contacts-proof.outputs.artifact-id }}'
+    );
+    expect(capture).toContain('contacts-screen-proof.spec.ts');
+    expect(bind).toContain('--screen=web.contacts');
+    expect(bind).toContain('--producer-job-id="$PRODUCER_JOB_ID"');
+    expect(upload).toContain('name: screen-browser-proof-contacts');
+    expect(upload).toContain('screenshots/desktop.png');
+    expect(upload).toContain('screenshots/mobile.png');
+    expect(certify).toContain('--screen-id=web.contacts');
+    expect(certify).toContain('needs.generate.outputs.contacts-artifact-id');
+    expect(stepIndex(workflow, 'Capture tasks screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Capture contacts screen proof')
+    );
+    expect(stepIndex(workflow, 'Upload contacts screen proof')).toBeLessThan(
+      stepIndex(workflow, 'Certify exact screen captures')
+    );
+    expect(stepIndex(workflow, 'Upload contacts screen proof')).toBeLessThan(
+      stepIndex(
+        workflow,
+        'Verify public screenshot exports from production build'
+      )
+    );
+  });
+
   it('pins the production server to a loopback hostname', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const start = getStepBlock(workflow, 'Start production server');

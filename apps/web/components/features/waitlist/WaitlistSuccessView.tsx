@@ -19,12 +19,15 @@ interface WaitlistSuccessViewProps {
   readonly onRetry?: () => void;
   /** Optional contact email shown in the completion receipt. */
   readonly email?: string | null;
+  /** jov.ie handle held by the reservation profile, when one exists. */
+  readonly reservedHandle?: string | null;
 }
 
 export function WaitlistSuccessView({
   outcome = 'pending',
   onRetry,
   email,
+  reservedHandle,
 }: Readonly<WaitlistSuccessViewProps>) {
   useEffect(() => {
     if (
@@ -62,7 +65,12 @@ export function WaitlistSuccessView({
       layoutVariant='stack'
       chrome='splash-b'
     >
-      <WaitlistOutcomeView outcome={outcome} onRetry={onRetry} email={email} />
+      <WaitlistOutcomeView
+        outcome={outcome}
+        onRetry={onRetry}
+        email={email}
+        reservedHandle={reservedHandle}
+      />
     </AuthLayout>
   );
 }

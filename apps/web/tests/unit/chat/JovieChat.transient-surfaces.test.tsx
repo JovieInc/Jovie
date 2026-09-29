@@ -139,6 +139,11 @@ vi.mock('@/lib/queries', () => ({
     isLoading: false,
     isError: false,
   }),
+  useInsightsSummaryQuery: () => ({
+    data: { insights: [], totalActive: 0, lastGeneratedAt: null },
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 vi.mock('@/components/jovie/hooks', async importOriginal => {

@@ -14,10 +14,7 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
-import {
-  isElectronRuntime,
-  useIsElectronRuntime,
-} from '@/lib/desktop/electron-bridge';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
@@ -88,11 +85,11 @@ function AuthShellInner({
     isAutomatedTest: env.IS_TEST || env.IS_E2E,
   });
   // The desktop window-control row (DesktopTitlebar) owns the single canonical
-  // left-sidebar toggle in Electron; the header must not mount a second one.
-  // isElectronRuntime() is read synchronously (not via the effect-gated hook)
-  // so the duplicate control never flashes in during hydration.
+  // left-sidebar toggle in Electron. Keep the initial client tree identical to
+  // SSR; the runtime CSS hides the header slot before paint, and this hook
+  // removes it after hydration without replacing the shell or losing drafts.
   const sidebarTrigger =
-    isMobile || isElectronRuntime() ? null : sidebarState === 'closed' ? (
+    isMobile || isElectron ? null : sidebarState === 'closed' ? (
       <SidebarCollapseButton />
     ) : null;
 
