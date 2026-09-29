@@ -343,6 +343,35 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
         self.assertEqual(feed["failed_by_reason"], {"agent-timeout": 1, "legacy": 2})
 
+    def test_observe_aggregates_gate_wait_time_from_run_receipts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "runs").mkdir(parents=True)
+            (state / "slots").mkdir()
+            now = 1_800_000_000.0
+            rows = [{"endedAt": doctor.epoch_iso(now - 60), "verdict": "landing", "gateWaitS": 120},
+                    {"endedAt": doctor.epoch_iso(now - 120), "verdict": "held", "gateWaitS": 300},
+                    {"endedAt": doctor.epoch_iso(now - 30), "verdict": "no-change"},
+                    {"endedAt": doctor.epoch_iso(now - 90000), "verdict": "landing", "gateWaitS": 9999}]
+            (state / "runs" / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+            host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
+            lane = type("Lane", (), {"Linear": staticmethod(lambda env: (_ for _ in ()).throw(OSError("x"))),
+                                     "load_providers": staticmethod(lambda: {}),
+                                     "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
+                                     "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
+            codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
+            try:
+                observed = doctor.observe(host, lane, codex, now=now)
+                feed = doctor.status_feed(host, lane, observed, {}, {})
+            finally:
+                os.environ.pop("LANES_SELFTEST", None)
+        self.assertEqual(observed["gateWaits24h"], 2)
+        self.assertEqual(observed["gateWaitMedianS24h"], 210)
+        self.assertEqual(observed["gateWaitMaxS24h"], 300)
+        self.assertEqual(feed["gateWaitMedianS24h"], 210)
+        self.assertEqual(feed["gateWaitMaxS24h"], 300)
+
     def test_feed_tracks_available_codex_capacity_idle_while_compatible_work_waits(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
