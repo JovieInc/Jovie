@@ -194,4 +194,17 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     expect(source).toContain("'@/lib/tanstack-table'");
     expect(source).not.toContain("'@tanstack/react-table'");
   });
+
+  it('renders issue/provider-count flags with the error token, not raw red-* (JOV-6773)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\bred-\d/);
+    expect(source).toContain('text-error');
+  });
 });
