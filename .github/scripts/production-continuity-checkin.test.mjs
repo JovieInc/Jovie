@@ -44,11 +44,11 @@ describe('production continuity Sentry check-in', () => {
       check_in_id: CHECK_IN_ID,
       environment: 'production',
       monitor_config: {
-        checkin_margin: 5,
+        checkin_margin: 60,
         failure_issue_threshold: 1,
         max_runtime: 3,
         recovery_threshold: 1,
-        schedule: { type: 'crontab', value: '*/5 * * * *' },
+        schedule: { type: 'interval', unit: 'hour', value: 4 },
         timezone: 'UTC',
       },
       status: 'in_progress',
