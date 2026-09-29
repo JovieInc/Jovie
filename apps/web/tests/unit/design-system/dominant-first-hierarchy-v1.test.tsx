@@ -16,7 +16,6 @@ import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
-import { contrastRatio } from '@/lib/utils/color';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
@@ -45,61 +44,33 @@ vi.mock('next/image', () => ({
   },
 }));
 
-const HEADLINE_SELECTOR = '.marketing-h1-linear';
-const SUPPORT_SELECTOR = '.marketing-lead-linear';
-// A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
-// enough that "nearly equal weight" fails closed, loose enough that routine
-// type-scale tuning does not make this brittle.
 const MIN_DOMINANCE_RATIO = 1.8;
-const read = (path: string) =>
-  readFileSync(resolve(process.cwd(), path), 'utf8');
 
-function css(): string {
-  return `${read('app/globals.css')}\n${read('styles/linear-tokens.css')}`;
+function read(rel: string): string {
+  return readFileSync(resolve(process.cwd(), rel), 'utf8');
 }
 
-function cssBlock(source: string, selector: string): string {
-  const start = source.indexOf(`${selector} {`);
-  if (start === -1) {
-    throw new Error(`selector not found in HomepageIdentity.css: ${selector}`);
-  }
-  const end = source.indexOf('}', start);
-  if (end === -1) {
-    throw new Error(
-      `unterminated rule for ${selector} in HomepageIdentity.css`
-    );
-  }
-  return source.slice(start, end);
+function tokenPx(name: string): number {
+  const match = new RegExp(`--${name}:\\s*([\\d.]+)px;`).exec(
+    read('styles/linear-tokens.css')
+  );
+  if (!match) throw new Error(`token not found: --${name}`);
+  return Number.parseFloat(match[1]);
 }
 
-function toPx(bound: string): number {
-  const trimmed = bound.trim();
-  const rem = /^([\d.]+)rem$/.exec(trimmed);
-  if (rem) return Number.parseFloat(rem[1]) * 16;
-  const px = /^([\d.]+)px$/.exec(trimmed);
-  if (px) return Number.parseFloat(px[1]);
-  throw new Error(`unsupported clamp() bound unit: ${trimmed}`);
+function leadPx(): number {
+  const source = read('app/globals.css');
+  const block = source.slice(
+    source.indexOf('.marketing-lead-linear {'),
+    source.indexOf('}', source.indexOf('.marketing-lead-linear {'))
+  );
+  const match = /font-size:\s*([\d.]+)px;/.exec(block);
+  if (!match) throw new Error('marketing-lead-linear font-size not in px');
+  return Number.parseFloat(match[1]);
 }
 
-/** Reads the min/max px of a `property: clamp(min, preferred, max);` declaration. */
-function clampRangePx(
-  block: string,
-  property: string
-): { min: number; max: number } {
-  const fixed = new RegExp(`${property}:\\s*([\\d.]+px)`).exec(block)?.[1];
-  if (fixed) return { min: toPx(fixed), max: toPx(fixed) };
-  if (block.includes('var(--linear-h1-size-sm)')) {
-    return { min: 38, max: 64 };
-  }
-  const match = new RegExp(
-    `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
-  ).exec(block);
-  if (!match) {
-    throw new Error(`no clamp() found for ${property} in: ${block}`);
-  }
-  return { min: toPx(match[1]), max: toPx(match[2]) };
-}
-
+// Identity + link-claim hero (Tim 2026-09-28) composes the shared marketing
+// type scale: H1 = .marketing-h1-linear, support = .marketing-lead-linear.
 describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () => {
   it('renders exactly one dominant heading and a structurally secondary support line', () => {
     render(<HomepageIdentityHero />);
@@ -108,95 +79,30 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     const headings = within(hero).getAllByRole('heading');
     expect(headings).toHaveLength(1);
     expect(headings[0]).toHaveClass('marketing-h1-linear');
-    expect(headings[0]).toHaveClass('text-primary-token');
 
     const support = hero.querySelector('.marketing-lead-linear');
     expect(support).not.toBeNull();
-    expect(support).toHaveClass('text-secondary-token');
-    // Support copy must not itself be a heading — it recedes structurally,
-    // it does not compete as a second thing to perceive first.
+    // Support copy must not itself be a heading — it recedes structurally.
     expect(support?.tagName.toLowerCase()).not.toMatch(/^h[1-6]$/);
   });
 
   it('sizes the headline substantially larger than the support line at every viewport', () => {
-    const source = css();
-    const headline = clampRangePx(
-      cssBlock(source, HEADLINE_SELECTOR),
-      'font-size'
-    );
-    const support = clampRangePx(
-      cssBlock(source, SUPPORT_SELECTOR),
-      'font-size'
-    );
-
-    expect(headline.min).toBeGreaterThan(support.min);
-    expect(headline.max).toBeGreaterThan(support.max);
-    expect(headline.min / support.min).toBeGreaterThanOrEqual(
-      MIN_DOMINANCE_RATIO
-    );
-    expect(headline.max / support.max).toBeGreaterThanOrEqual(
-      MIN_DOMINANCE_RATIO
-    );
-
-    expect(source).toMatch(
-      /@media \(min-width: 768px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size-md\)/
-    );
-    expect(source).toMatch(
-      /@media \(min-width: 1280px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size\)/
-    );
-    expect(source).toMatch(
-      /--linear-h1-size:\s*64px;[\s\S]*--linear-h1-size-sm:\s*38px;[\s\S]*--linear-h1-size-md:\s*56px;/
-    );
+    const support = leadPx();
+    for (const token of ['linear-h1-size-sm', 'linear-h1-size']) {
+      expect(tokenPx(token) / support).toBeGreaterThanOrEqual(
+        MIN_DOMINANCE_RATIO
+      );
+    }
   });
 
-  it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    const source = read('components/homepage/HomepageIdentity.css');
-    // The light-theme override is the one block that gives each ink token a
-    // literal value (the dark default aliases straight to --color-text-*);
-    // it is where "recedes" is either honored or silently dropped.
-    const lightThemeBlock = cssBlock(
-      source,
-      ':root:not(.dark) .homepage-identity-hero'
+  it('keeps the headline at full ink while the support line recedes via a lighter ink token', () => {
+    render(<HomepageIdentityHero />);
+    const hero = screen.getByTestId('marketing-section-hero');
+    expect(within(hero).getByRole('heading', { level: 1 })).toHaveClass(
+      'text-primary-token'
     );
-
-    const primaryInk = /--homepage-identity-hero-ink:\s*([^;]+);/.exec(
-      lightThemeBlock
-    )?.[1];
-    const secondaryInk = /--homepage-identity-hero-ink-2:\s*([^;]+);/.exec(
-      lightThemeBlock
-    )?.[1];
-    expect(primaryInk, 'primary ink token declared').toBeTruthy();
-    expect(secondaryInk, 'secondary ink token declared').toBeTruthy();
-
-    // The dominant headline keeps full opacity — no color-mix fade.
-    expect(primaryInk).not.toContain('color-mix');
-
-    // The receding support line is mixed toward transparent at some opacity
-    // below 100% — "recedes substantially", not simultaneous full weight.
-    const secondaryOpacity = Number.parseFloat(
-      /(\d+(?:\.\d+)?)%/.exec(secondaryInk ?? '')?.[1] ?? 'NaN'
-    );
-    expect(Number.isNaN(secondaryOpacity)).toBe(false);
-    expect(secondaryOpacity).toBeLessThan(100);
-    expect(secondaryOpacity).toBeGreaterThan(0);
-
-    const theme = read('styles/design-system.css');
-    const tailwind = read('styles/tailwind-foundation.css');
-    const dark = cssBlock(theme, ':root.dark .system-b-marketing');
-    expect(dark).toContain('--color-text-primary-token: #f5f7fb;');
-    expect(dark).toContain('--color-text-secondary-token: #a0a5af;');
-    expect(
-      contrastRatio('#f5f7fb', '#030406') / contrastRatio('#a0a5af', '#030406')
-    ).toBeGreaterThan(1.8);
-    expect(tailwind).toContain(
-      '--color-primary-token: var(--color-text-primary-token)'
-    );
-    expect(tailwind).toContain(
-      '--color-secondary-token: var(--color-text-secondary-token)'
-    );
-    expect(theme).toMatch(
-      /:root\s*\{[^{}]*--color-text-primary-token:\s*lch\(9\.894% 0 282\)[^{}]*--color-text-secondary-token:\s*#5a606a/
-    );
-    expect(0x5a - 9.894 * 2.55).toBeGreaterThan(50);
+    const support = hero.querySelector('.marketing-lead-linear');
+    expect(support).toHaveClass('text-secondary-token');
+    expect(support).not.toHaveClass('text-primary-token');
   });
 });

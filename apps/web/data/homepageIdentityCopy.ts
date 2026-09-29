@@ -22,16 +22,15 @@ export const HOMEPAGE_IDENTITY_COPY = {
       placeholder: 'you',
       action: 'Claim',
     },
-    // Illustrative preview of a claimed page (Pen xm2iz). Labeled as
-    // illustrative on the card; never presented as a real customer.
+    // Real first-party proof (JOV-6946, JOV-INV-038 proximal proof): the
+    // claim card shows Tim White's real claimed jov.ie/tim, never a
+    // fictional placeholder person (Tim 2026-09-28).
     preview: {
-      label: 'Profile preview',
-      handle: 'avery',
-      name: 'Avery Chen',
-      role: 'Product designer',
-      note: 'Illustrative profile · Ready to claim',
-      portraitAlt: 'Illustrative portrait for the Avery Chen profile preview',
+      label: 'Claimed',
+      name: 'Tim White',
+      role: 'Founder, Jovie',
     },
+    proofAlt: 'Tim White’s Jovie profile at jov.ie/tim',
   },
   // Presence and structure chapters, then the close.
   sections: [
