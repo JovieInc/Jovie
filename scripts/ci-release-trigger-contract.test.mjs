@@ -35,10 +35,7 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
     /^  merge_group:\n    types: \[checks_requested\]$/m
   );
   assert.doesNotMatch(triggerBlock, /^    paths(?:-ignore)?:/m);
-  assert.doesNotMatch(
-    sourceValidationTriggerBlock,
-    /^    paths(?:-ignore)?:/m
-  );
+  assert.doesNotMatch(sourceValidationTriggerBlock, /^    paths(?:-ignore)?:/m);
   assert.match(
     sourceValidationWorkflow,
     /node scripts\/ci-release-incident-contract\.mjs/
