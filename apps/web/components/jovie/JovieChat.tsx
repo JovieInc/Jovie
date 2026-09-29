@@ -912,7 +912,7 @@ export function JovieChat({
                       ) : undefined
                     }
                   >
-                    {!composerHasIntent ? (
+                    {!composerHasIntent && emptyStateAffordance === 'none' ? (
                       <FeatureIntroHost
                         catalog={featureIntroCatalog}
                         onHighlightCTA={() => {
