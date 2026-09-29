@@ -163,6 +163,14 @@ export interface RouteManifestEntry {
   readonly recipeId?: RecipeId;
   /** Ordered production bindings. Repeated section ids are legal recipe beats. */
   readonly renderedSections: readonly RenderedSectionBinding[];
+  /**
+   * Evidence that `renderedSections` matches the mounted source. `verified`
+   * certifies section bindings only — NOT design-invariant compliance. A
+   * verified route can still carry invariant debt; that lives in
+   * tests/unit/marketing/marketing-route-source-invariants.baseline.json
+   * (source) and tests/product-screenshots/route-dom-marketing-baseline.json
+   * (rendered DOM), both decrease-only.
+   */
   readonly bindingEvidence: {
     readonly status: 'verified' | 'unverified' | 'exempt';
     readonly source: string;
