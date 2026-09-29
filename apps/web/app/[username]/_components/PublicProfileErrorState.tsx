@@ -57,13 +57,13 @@ export function PublicProfileErrorState({
             <div className='mt-4 flex flex-col gap-2 sm:flex-row'>
               <Link
                 href={retryHref}
-                className='inline-flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-error-subtle)] dark:bg-white dark:text-black'
+                className='inline-flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-error dark:bg-white dark:text-black'
               >
                 Try Again
               </Link>
               <Link
                 href='/'
-                className='inline-flex min-h-11 items-center justify-center rounded-full border border-error-foreground/20 px-4 text-sm font-semibold text-error-foreground transition-colors hover:bg-error-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--color-error-subtle)]'
+                className='inline-flex min-h-11 items-center justify-center rounded-full border border-error-foreground/20 px-4 text-sm font-semibold text-error-foreground transition-colors hover:bg-error-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-error'
               >
                 Go Home
               </Link>
