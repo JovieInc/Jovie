@@ -98,6 +98,13 @@ async function waitForDrawerToSettle(page: Page): Promise<void> {
     previous = current;
     await page.waitForTimeout(50);
   }
+  // Retry budget exhausted without two consecutive matching reads: surface
+  // it instead of silently proceeding on a transform that may still be
+  // moving, so a future flake here points straight at this wait rather than
+  // back through the same false-positive investigation that added it.
+  console.warn(
+    `waitForDrawerToSettle: transform did not stabilize after 1s (last read: ${previous})`
+  );
 }
 
 async function prepareProfileState(
