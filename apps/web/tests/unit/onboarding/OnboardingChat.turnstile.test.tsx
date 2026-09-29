@@ -233,7 +233,7 @@ function TurnstileHarness({
         if (resetTokenOnRejected) {
           setTurnstileToken(null);
         }
-        setInstruction('Verify you are human to send');
+        setInstruction('One quick check before we send');
       }}
       onConversationActivity={onConversationActivity}
       starterHandoff={
@@ -366,7 +366,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(input).toHaveValue('help me launch a song');
     expect(onTurnstileRequired).toHaveBeenCalledWith(
-      'Verify you are human to send'
+      'One quick check before we send'
     );
     expect(screen.getByTestId('onboarding-flow-status')).toBeInTheDocument();
     expect(screen.getByTestId('test-turnstile-panel')).toBeInTheDocument();
@@ -424,7 +424,7 @@ describe('OnboardingChat Turnstile gating', () => {
 
     await waitFor(() => {
       expect(onTurnstileRequired).toHaveBeenCalledWith(
-        'Verify you are human to send'
+        'One quick check before we send'
       );
     });
 
@@ -646,7 +646,7 @@ describe('OnboardingChat Turnstile gating', () => {
       screen.queryByTestId('onboarding-message-recovery')
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('onboarding-flow-status')).toHaveTextContent(
-      'Verify you are human to send'
+      'One quick check before we send'
     );
     expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'I am Test Artist'
@@ -685,7 +685,7 @@ describe('OnboardingChat Turnstile gating', () => {
             onTurnstileRejected={() => {
               onTurnstileRejected();
               setTurnstileToken(null);
-              setInstruction('Verify you are human to send');
+              setInstruction('One quick check before we send');
             }}
           />
         </>
@@ -751,7 +751,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'I am Test Artist'
     );
-    expect(screen.getByText('Verify you are human to send')).toBeVisible();
+    expect(screen.getByText('One quick check before we send')).toBeVisible();
 
     chatMocks.sendMessage.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
@@ -761,7 +761,7 @@ describe('OnboardingChat Turnstile gating', () => {
       'I am Test Artist'
     );
     expect(onTurnstileRequired).toHaveBeenCalledWith(
-      'Verify you are human to send'
+      'One quick check before we send'
     );
   });
 });

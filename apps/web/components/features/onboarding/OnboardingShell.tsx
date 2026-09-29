@@ -58,7 +58,7 @@ export function OnboardingShell({
   const [turnstileState, setTurnstileState] =
     useState<OnboardingTurnstileState>({
       status: 'loading',
-      message: 'Checking your browser before the first message.',
+      message: 'Starting your chat.',
     });
   const [turnstileInstruction, setTurnstileInstruction] = useState<
     string | null
@@ -96,7 +96,7 @@ export function OnboardingShell({
   );
 
   const requestTurnstileVerification = useCallback(
-    (message = 'Verify you are human to send') => {
+    (message = 'One quick check before we send') => {
       setTurnstileInstruction(message);
       setTurnstileFocusSignal(current => current + 1);
     },
@@ -104,7 +104,7 @@ export function OnboardingShell({
   );
 
   const resetTurnstileVerification = useCallback(
-    (message = 'Verify you are human to send') => {
+    (message = 'One quick check before we send') => {
       setTurnstileToken(null);
       setTurnstileInstruction(message);
       setTurnstileResetSignal(current => current + 1);
@@ -137,7 +137,8 @@ export function OnboardingShell({
     turnstileState.status === 'unsupported' ||
     turnstileState.status === 'unconfigured';
   const turnstileFailureMessage = isTurnstileUnavailable
-    ? (turnstileState.message ?? 'Verification failed. Try again.')
+    ? (turnstileState.message ??
+      "We couldn't start your chat. Refresh the page to try again.")
     : null;
 
   const handleTurnstileRequired = useCallback(
@@ -148,7 +149,7 @@ export function OnboardingShell({
   );
 
   const handleTurnstileRejected = useCallback(() => {
-    resetTurnstileVerification('Verify you are human to send');
+    resetTurnstileVerification('One quick check before we send');
   }, [resetTurnstileVerification]);
 
   // Auto-claim any anonymous transcript once Better Auth reports the user is
