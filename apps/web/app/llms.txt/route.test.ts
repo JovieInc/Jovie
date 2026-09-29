@@ -23,6 +23,9 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('GET https://jov.ie/api/v1');
     expect(body).toContain('https://jov.ie/developers');
     expect(body).toContain('https://jov.ie/cli');
+    expect(body).toContain('npm install --global @jovie/cli');
+    expect(body).toContain('**Jovie API docs**: https://jov.ie/developers');
+    expect(body).toContain('**Jovie OpenAPI 3.1 spec**');
     expect(body).toContain('active v1 lifecycle boundary');
     expect(body).toContain(
       '**API versioning and deprecation policy**: https://jov.ie/api-versioning'
