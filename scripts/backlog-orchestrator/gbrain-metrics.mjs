@@ -63,7 +63,7 @@ function errorCode(error) {
 
 export function resolveTelemetryFile({
   env = process.env,
-  orchestratorDir,
+  orchestratorDir = MODULE_DIR,
 } = {}) {
   const override = String(env.JOVIE_GBRAIN_TELEMETRY || '').trim();
   if (override === GBRAIN_TELEMETRY_DISABLE_VALUE) return null;
