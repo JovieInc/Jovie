@@ -841,6 +841,29 @@
   flex: 0 0 auto;
 }
 
+/* Reserve the floating dock outside the scroll box at every viewport. The
+   existing padding utility reserves the same space inside the box, which
+   would make the layout metrics report content underneath the dock after the
+   hero is pinned to its token. The desktop shell is a fixed-height phone
+   card, so without this the last card renders half-covered by the dock at
+   rest even though it can technically scroll into view (JOV-7192). Embedded
+   previews render no dock, so they keep the in-box padding instead. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]:not(
+      [data-presentation="embedded"]
+    )
+    > .profile-home-content-column
+) {
+  margin-bottom: var(--profile-bottom-nav-height);
+}
+
+[data-testid="profile-compact-surface"][data-mode="profile"]:not(
+    [data-presentation="embedded"]
+  )
+  .profile-home-content-scroll {
+  padding-bottom: 0;
+}
+
 /* From md up the compact surface is a fixed-height phone card with overflow
    hidden. Natural-height content ran past the card, under the tab bar, and
    could never be scrolled into view (jov.ie/tim dogfood 2026-09-27). Bound the
@@ -879,22 +902,6 @@
     flex: 1 1 0%;
     justify-content: flex-start;
     min-height: 0;
-  }
-
-  /* Reserve the floating dock outside the scroll box. The existing padding
-     utility reserves the same space inside the box, which would make the
-     layout metrics report content underneath the dock after the hero is
-     pinned to its token. */
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      > .profile-home-content-column
-  ) {
-    margin-bottom: var(--profile-bottom-nav-height);
-  }
-
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    .profile-home-content-scroll {
-    padding-bottom: 0;
   }
 
   /* Large text can make the in-flow identity taller than the phone viewport.

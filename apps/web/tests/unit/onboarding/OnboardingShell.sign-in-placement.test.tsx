@@ -16,7 +16,12 @@ vi.mock('@/components/organisms/sidebar', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingChat', () => ({
-  OnboardingChat: () => <div data-testid='onboarding-chat' />,
+  OnboardingChat: ({ headerOverlay }: { readonly headerOverlay?: boolean }) => (
+    <div
+      data-testid='onboarding-chat'
+      data-header-overlay={headerOverlay ? 'true' : 'false'}
+    />
+  ),
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingTurnstile', () => ({
@@ -47,6 +52,23 @@ describe('onboarding sign-in placement', () => {
 
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
   });
+
+  it.each([
+    ['anonymous', undefined, 'true'],
+    ['signed-in', true, 'false'],
+  ] as const)(
+    'reserves chat top clearance under the floating sign-in only while %s (JOV-7192)',
+    (_label, isSignedIn, expected) => {
+      render(
+        <OnboardingShell sessionLabel='pending' isSignedIn={isSignedIn} />
+      );
+
+      expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+        'data-header-overlay',
+        expected
+      );
+    }
+  );
 
   it('removes the centered duplicate and starter rail from the blank entry', () => {
     render(<OnboardingChatEmptyIntro mode='blank' />);

@@ -115,6 +115,12 @@ interface OnboardingChatProps {
   ) => void;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+  /**
+   * Reserves extra top clearance inside the scroll region while a floating
+   * header control (the anonymous "Sign in" link) overlays the top-right
+   * corner, so the first right-aligned user bubble never renders beneath it.
+   */
+  readonly headerOverlay?: boolean;
 }
 
 class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
@@ -685,6 +691,7 @@ function OnboardingMessageRegion({
 }
 
 export function OnboardingChat({
+  headerOverlay = false,
   intentId,
   onConversationActivity,
   onProfileBuilderChange,
@@ -1120,7 +1127,10 @@ export function OnboardingChat({
       <div
         ref={scrollContainerRef}
         onScroll={onScroll}
-        className='relative flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8'
+        className={cn(
+          'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
+          headerOverlay ? 'pt-16' : 'pt-5'
+        )}
         aria-live='polite'
       >
         <div

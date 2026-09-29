@@ -190,6 +190,7 @@ export function OnboardingShell({
               </div>
             ) : null}
             <OnboardingChat
+              headerOverlay={!isSignedIn}
               intentId={intentId}
               onConversationActivity={handleConversationActivity}
               onProfileBuilderChange={setProfileBuilderState}
