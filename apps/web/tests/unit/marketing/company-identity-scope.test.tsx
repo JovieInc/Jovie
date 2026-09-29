@@ -68,7 +68,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     ).toBe(false);
     expect(
       isArtistOnlyCompanyDefinition(
-        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like Tory Lanez.'
+        'Jovie was founded by Tim White, a music marketing veteran who ran campaigns for artists like some named artist.'
       )
     ).toBe(false);
   });

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
+import type { PublicMerchCard } from '@/lib/merch/types';
 import { type AskJovieProfileContext, answerProfileQuestion } from './answer';
+
+const merch: PublicMerchCard = {
+  id: 'merch_1',
+  artistId: 'artist_1',
+  status: 'live',
+  title: 'Glasshouse Tour Tee',
+  description: '',
+  productType: 'Tee',
+  primaryImageUrl: 'https://cdn.test/tee.jpg',
+  mockupUrls: [],
+  printful: {} as PublicMerchCard['printful'],
+  pricing: {
+    artistPayoutPerUnitEstimateCents: 1000,
+  } as PublicMerchCard['pricing'],
+  retailPriceCents: 3500,
+  rankScore: 1,
+  position: 0,
+  pinned: true,
+};
 
 const ctx: AskJovieProfileContext = {
   username: 'luna',
@@ -8,18 +28,43 @@ const ctx: AskJovieProfileContext = {
   location: 'Los Angeles',
   genres: ['indie pop', 'dream pop'],
   releases: [
-    { title: 'Glasshouse', releaseType: 'album', releaseDate: '2026-03-01' },
-    { title: 'Waves', releaseType: 'single', releaseDate: '2025-11-10' },
+    {
+      id: 'release_1',
+      title: 'Glasshouse',
+      releaseType: 'album',
+      releaseDate: '2026-03-01',
+      slug: 'glasshouse',
+      artworkUrl: 'https://cdn.test/glasshouse.jpg',
+      artistNames: ['Luna Vale', 'Guest Artist'],
+    },
+    {
+      id: 'release_2',
+      title: 'Waves',
+      releaseType: 'single',
+      releaseDate: '2025-11-10',
+      slug: 'waves',
+    },
+    {
+      id: 'video_1',
+      title: 'Glasshouse Live',
+      releaseType: 'music_video',
+      releaseDate: '2025-10-01',
+      slug: 'glasshouse-live',
+    },
   ],
   tourDates: [
     {
+      id: 'show_1',
       startDate: '2026-10-14',
       venueName: 'The Wiltern',
       city: 'Los Angeles',
       region: 'CA',
       country: 'US',
+      ticketUrl: 'https://tickets.test/wiltern',
+      ticketStatus: 'available',
     },
     {
+      id: 'show_2',
       startDate: '2026-11-02',
       venueName: 'Brooklyn Steel',
       city: 'Brooklyn',
@@ -31,6 +76,15 @@ const ctx: AskJovieProfileContext = {
     { platform: 'spotify', url: 'https://open.spotify.com/artist/x' },
     { platform: 'apple_music', url: 'https://music.apple.com/artist/x' },
     { platform: 'instagram', url: 'https://instagram.com/luna' },
+  ],
+  merch: [merch],
+  contacts: [
+    {
+      id: 'contact_1',
+      roleLabel: 'Booking',
+      contactName: 'Morgan Lee',
+      companyLabel: 'Northstar Talent',
+    },
   ],
 };
 
@@ -73,8 +127,70 @@ describe('answerProfileQuestion', () => {
 
   it('answers questions about a named release', () => {
     const text = answer('Tell me about Waves');
-    expect(text).toContain('"Waves"');
+    expect(text).toContain('Waves');
     expect(text).toContain('Luna Vale');
+  });
+
+  it('returns a tier-zero canonical release card for newest-song questions', () => {
+    const result = answerProfileQuestion('Does Luna have a newest song?', ctx);
+    expect(result).toMatchObject({
+      kind: 'answer',
+      intent: 'latest_release',
+      routing: {
+        answerTier: 0,
+        modelCalls: 0,
+        fullyLoadedCostUsd: 0,
+      },
+      card: {
+        id: 'glasshouse',
+        kind: 'music',
+        title: 'Glasshouse',
+        cta: { label: 'Listen', href: '/luna/glasshouse' },
+      },
+      followUp: { intent: 'new_release_alerts' },
+    });
+    expect(result.provenance.cacheKey).not.toContain('Does Luna');
+  });
+
+  it('returns canonical event, merch, video, and contact cards', () => {
+    expect(answerProfileQuestion('Any upcoming shows?', ctx)).toMatchObject({
+      kind: 'answer',
+      card: { kind: 'show', cta: { label: 'Tickets' } },
+    });
+    expect(answerProfileQuestion('Where is the merch?', ctx)).toMatchObject({
+      kind: 'answer',
+      card: { kind: 'merch', cta: { label: 'Shop' } },
+    });
+    expect(
+      answerProfileQuestion('What video should I watch?', ctx)
+    ).toMatchObject({
+      kind: 'answer',
+      card: { kind: 'video', cta: { label: 'Watch' } },
+    });
+    expect(answerProfileQuestion('How do I book Luna?', ctx)).toMatchObject({
+      kind: 'answer',
+      card: { kind: 'person', cta: { label: 'Continue Inquiry' } },
+    });
+  });
+
+  it('changes the cache revision when canonical latest-release data changes', () => {
+    const before = answerProfileQuestion('latest release', ctx);
+    const after = answerProfileQuestion('latest release', {
+      ...ctx,
+      releases: [
+        {
+          id: 'release_new',
+          title: 'Afterglow',
+          releaseDate: '2026-09-01',
+          slug: 'afterglow',
+        },
+        ...(ctx.releases ?? []),
+      ],
+    });
+    expect(after.provenance.sourceRevision).not.toBe(
+      before.provenance.sourceRevision
+    );
+    expect(after.provenance.cacheKey).not.toBe(before.provenance.cacheKey);
   });
 
   it('returns unknown for questions the data cannot answer', () => {

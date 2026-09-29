@@ -69,7 +69,7 @@ describe('AboutPageContent', () => {
       {
         question: 'Who founded Jovie?',
         answer:
-          'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for artists like Tory Lanez and Megan Thee Stallion, and brands like Google and the NFL.',
+          'Jovie was founded by Tim White, a music marketing veteran with 15+ years of experience working with labels like Armada Music and Universal Music, and running digital campaigns for recording artists and brands like Google and the NFL.',
       },
       {
         question: 'What does Jovie do?',
@@ -92,6 +92,14 @@ describe('AboutPageContent', () => {
     for (const { question } of ABOUT_FAQ_ITEMS) {
       expect(screen.getByRole('button', { name: question })).toBeVisible();
     }
+  });
+
+  it('does not name unverified artists in founder copy', () => {
+    const founderAnswer = ABOUT_FAQ_ITEMS.find(
+      item => item.question === 'Who founded Jovie?'
+    )?.answer;
+    expect(founderAnswer).toBeDefined();
+    expect(founderAnswer).not.toMatch(/artists like /);
   });
 
   it('keeps metadata and schema ownership in the route and binds the exact story', () => {

@@ -66,7 +66,7 @@ Independent artists don’t have any of this. They have themselves, maybe a mana
 
 The ones who break through either have teams handling all of this, or they burn out trying to do it alone.
 
-This is why I started working on Jovie. After spending 15 years building these systems—working with Armada, Universal, doing digital for Megan Thee Stallion, driving songs to 90 million streams and getting them used by thousands of influencers, running campaigns for brands like Google and the NFL—I kept seeing the same problem. The artists who needed this infrastructure the most were the ones who could never afford it.
+This is why I started working on Jovie. I spent 15 years building these systems: working with Armada and Universal, running digital campaigns for recording artists, driving songs to 90 million streams and getting them used by thousands of influencers, and running campaigns for brands like Google and the NFL. Through all of it, I kept seeing the same problem. The artists who needed this infrastructure the most were the ones who could never afford it.
 
 Musicians should be making music. Not learning how to be marketing coordinators.
 

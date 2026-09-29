@@ -54,7 +54,26 @@ describe('AskJovieWidget', () => {
     const fetchMock = mockFetch(body =>
       Promise.resolve(
         body.action === 'question'
-          ? { answered: true, text: 'Start with “Neon Skyline”.' }
+          ? {
+              answered: true,
+              text: 'Start with “Neon Skyline”.',
+              intent: 'release_recommendation',
+              provenance: { sourceRevision: 'ask-jovie-v1-release' },
+              followUp: {
+                intent: 'new_release_alerts',
+                label: 'Want release alerts?',
+              },
+              card: {
+                id: 'neon-skyline',
+                kind: 'music',
+                href: '/test/neon-skyline',
+                imageUrl: null,
+                imageAlt: 'Neon Skyline artwork',
+                title: 'Neon Skyline',
+                meta: 'Single · 2026',
+                cta: { label: 'Listen', href: '/test/neon-skyline' },
+              },
+            }
           : {}
       )
     );
@@ -69,6 +88,26 @@ describe('AskJovieWidget', () => {
       '/api/profile/test/ask',
       expect.objectContaining({ method: 'POST' })
     );
+    expect(screen.getByTestId('ask-jovie-music-card')).toHaveTextContent(
+      'Listen'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Want release alerts?' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ask-jovie-music-card'));
+    await waitFor(() => {
+      const outcomeCall = fetchMock.mock.calls
+        .map(c => JSON.parse(String(c[1]?.body)))
+        .find(b => b.action === 'outcome');
+      expect(outcomeCall).toMatchObject({
+        intent: 'release_recommendation',
+        outcome: 'listen',
+        entityType: 'music',
+        entityId: 'neon-skyline',
+        sourceRevision: 'ask-jovie-v1-release',
+      });
+    });
   });
 
   it('escalates an unanswered question to the owner with contact info', async () => {

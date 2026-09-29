@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicProfileLoaderResult } from '@/app/[username]/_lib/public-profile-loader';
 
-const { mockGetProfileAndLinks, mockGetReleases, mockGetTourDates } =
-  vi.hoisted(() => ({
-    mockGetProfileAndLinks: vi.fn(),
-    mockGetReleases: vi.fn(),
-    mockGetTourDates: vi.fn(),
-  }));
+const {
+  mockGetProfileAndLinks,
+  mockGetReleases,
+  mockGetTourDates,
+  mockGetMerch,
+} = vi.hoisted(() => ({
+  mockGetProfileAndLinks: vi.fn(),
+  mockGetReleases: vi.fn(),
+  mockGetTourDates: vi.fn(),
+  mockGetMerch: vi.fn(),
+}));
 
 vi.mock('@/app/[username]/_lib/public-profile-loader', () => ({
   getProfileAndLinks: mockGetProfileAndLinks,
@@ -18,6 +23,10 @@ vi.mock('@/lib/releases/public-release-loader', () => ({
 
 vi.mock('@/lib/tour-dates/queries', () => ({
   getUpcomingTourDatesForProfile: mockGetTourDates,
+}));
+
+vi.mock('@/lib/merch/service', () => ({
+  getLiveMerchCardsForProfile: mockGetMerch,
 }));
 
 import { loadAskJovieContext } from './context';
@@ -52,6 +61,7 @@ describe('loadAskJovieContext', () => {
     vi.clearAllMocks();
     mockGetReleases.mockResolvedValue([]);
     mockGetTourDates.mockResolvedValue([]);
+    mockGetMerch.mockResolvedValue([]);
   });
 
   it('returns null context when the profile is missing', async () => {
@@ -90,10 +100,13 @@ describe('loadAskJovieContext', () => {
     mockGetProfileAndLinks.mockResolvedValue(loaderResult());
     mockGetReleases.mockResolvedValue([
       {
+        id: 'release_1',
         title: 'Waves',
         releaseType: 'single',
         releaseDate: new Date('2025-11-10T00:00:00.000Z'),
         slug: 'waves',
+        artworkUrl: null,
+        artistNames: [],
       },
     ]);
 

@@ -80,6 +80,10 @@ const FORK_GATE_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/fork-pr-gate.yml'),
   'utf8'
 );
+const AUTO_MERGE_DEFAULT_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/auto-merge-default.yml'),
+  'utf8'
+);
 const SIZE_GUARD_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/pr-size-guard.yml'),
   'utf8'
@@ -129,7 +133,7 @@ function getJobBlock(workflow, jobKey) {
   return block.join('\n');
 }
 
-function getStepRunScript(jobBlock, stepName) {
+function getStepBlock(jobBlock, stepName) {
   const lines = jobBlock.split('\n');
   const stepStart = lines.findIndex(
     line => line === `      - name: ${stepName}`
@@ -141,10 +145,13 @@ function getStepRunScript(jobBlock, stepName) {
   const stepEnd = lines.findIndex(
     (line, index) => index > stepStart && /^      - /.test(line)
   );
-  const stepLines = lines.slice(
-    stepStart,
-    stepEnd === -1 ? lines.length : stepEnd
-  );
+  return lines
+    .slice(stepStart, stepEnd === -1 ? lines.length : stepEnd)
+    .join('\n');
+}
+
+function getStepRunScript(jobBlock, stepName) {
+  const stepLines = getStepBlock(jobBlock, stepName).split('\n');
   // `run: &anchor |` shares the script with ci-fast (structural python).
   const runStart = stepLines.findIndex(line =>
     /^ {8}run: (?:&[\w-]+ )?\|$/.test(line)
@@ -2528,6 +2535,26 @@ ${selectedGateScript}`,
     );
     expect(dependabotGate).toContain('actions/create-github-app-token');
     expect(dependabotGate).toContain('-f context="Fork PR Gate"');
+  });
+
+  it('skips the auto-merge app token for Dependabot-authored PRs and forks', () => {
+    const enable = getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable');
+    const tokenStep = getStepBlock(enable, 'Generate Jovie Bot token');
+    const enableStep = getStepBlock(enable, 'Enable auto-merge');
+    const enableScript = getStepRunScript(enable, 'Enable auto-merge');
+
+    expect(tokenStep).toContain(`        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.user.login != 'dependabot[bot]'
+        id: app-token`);
+    expect(tokenStep).not.toContain("github.actor != 'dependabot[bot]'");
+    expect(enableStep).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(enableScript).toMatch(
+      /^set -euo pipefail\nif \[\[ -z "\$GH_TOKEN" \]\]; then\n/
+    );
+    expect(enableScript).toContain('exit 0');
   });
 
   it.each([
