@@ -53,6 +53,11 @@ function macosTopLevelDirs() {
   return readdirSync(join(ROOT, 'apps/macos'), { withFileTypes: true })
     .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
     .map(entry => entry.name)
+    .filter(
+      name =>
+        walkFiles(join('apps/macos', name), abs => abs.endsWith('.swift'))
+          .length > 0
+    )
     .sort();
 }
 
