@@ -78,6 +78,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
 });
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
+  'web.artists': '/artists',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
