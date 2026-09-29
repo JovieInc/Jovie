@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * JOV-INV-036: overlay layer contract.
+ * JOV-INV-039: overlay layer contract.
  *
  * Check class: overlay-collision
  *
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readInvariantRegistry } from './registry.mjs';
 
-export const OVERLAY_LAYER_INVARIANT_ID = 'JOV-INV-036';
+export const OVERLAY_LAYER_INVARIANT_ID = 'JOV-INV-039';
 export const OVERLAY_LAYER_SCHEMA = 'jovie-overlay-layer-contract/v1';
 export const OVERLAY_LAYER_CHECK_CLASS = 'overlay-collision';
 export const BASELINE_SCHEMA = 'jovie.overlay-raw-z-index/v1';

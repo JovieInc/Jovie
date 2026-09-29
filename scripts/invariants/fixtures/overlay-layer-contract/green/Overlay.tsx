@@ -1,4 +1,4 @@
-// Green fixture for JOV-INV-036: semantic layers and local stacking only.
+// Green fixture for JOV-INV-039: semantic layers and local stacking only.
 export function Overlay() {
   return (
     <div className='fixed inset-0 z-modal'>

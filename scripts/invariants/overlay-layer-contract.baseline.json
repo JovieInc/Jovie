@@ -1,6 +1,6 @@
 {
   "schema": "jovie.overlay-raw-z-index/v1",
-  "invariant": "JOV-INV-036",
+  "invariant": "JOV-INV-039",
   "scope": [
     "apps/web/app",
     "apps/web/components",

@@ -33,9 +33,9 @@ function scanFixture(name) {
   return scanRawZIndex(rel, source);
 }
 
-describe('JOV-INV-036 overlay-layer-contract', () => {
+describe('JOV-INV-039 overlay-layer-contract', () => {
   it('keeps the overlay collision check class and layer order', () => {
-    assert.equal(OVERLAY_LAYER_INVARIANT_ID, 'JOV-INV-036');
+    assert.equal(OVERLAY_LAYER_INVARIANT_ID, 'JOV-INV-039');
     assert.equal(OVERLAY_LAYER_CHECK_CLASS, 'overlay-collision');
     assert.equal(OVERLAY_LAYER_SCHEMA, 'jovie-overlay-layer-contract/v1');
     assert.deepEqual(LAYER_ORDER, [
@@ -110,7 +110,7 @@ describe('JOV-INV-036 overlay-layer-contract', () => {
     assert.ok(errors.some(error => error.includes('uses raw z-[999]')));
   });
 
-  it('binds JOV-INV-036 in the adopted registry', () => {
+  it('binds JOV-INV-039 in the adopted registry', () => {
     const invariant = readInvariantRegistry().invariants.find(
       item => item.id === OVERLAY_LAYER_INVARIANT_ID
     );
