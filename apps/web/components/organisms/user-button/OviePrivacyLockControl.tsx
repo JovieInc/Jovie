@@ -169,13 +169,15 @@ export function OviePrivacyLockControl({
           className='mt-1 w-full justify-start'
           disabled={busy}
           onClick={() =>
-            void lockWorkspace().catch(caught =>
-              setError(
-                caught instanceof Error
-                  ? caught.message
-                  : 'Could not lock Ovie.'
+            void Promise.resolve()
+              .then(lockWorkspace)
+              .catch(caught =>
+                setError(
+                  caught instanceof Error
+                    ? caught.message
+                    : 'Could not lock Ovie.'
+                )
               )
-            )
           }
           size='sm'
           variant='ghost'

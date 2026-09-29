@@ -167,11 +167,11 @@ describe('server-owned Ovie privacy lock client', () => {
 
   it('aborts a stalled request and settles with a bounded error', async () => {
     vi.useFakeTimers();
-    let requestSignal: AbortSignal | null = null;
+    const requestSignals: AbortSignal[] = [];
     fetchMock.mockImplementation((_url: string, init: RequestInit) => {
-      requestSignal = init.signal ?? null;
+      if (init.signal) requestSignals.push(init.signal);
       return new Promise((_, reject) => {
-        requestSignal?.addEventListener('abort', () =>
+        init.signal?.addEventListener('abort', () =>
           reject(new Error('aborted'))
         );
       });
@@ -185,6 +185,6 @@ describe('server-owned Ovie privacy lock client', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     await rejection;
 
-    expect(requestSignal?.aborted).toBe(true);
+    expect(requestSignals[0]?.aborted).toBe(true);
   });
 });
