@@ -789,6 +789,7 @@ describe('ProfilePacCard landscape states', () => {
     const card = screen.getByTestId('profile-pac');
     await waitFor(() => expect(card).toHaveAttribute('data-state', 'prompt'));
     expect(screen.queryByTestId('profile-pac-featured-art')).toBeNull();
+    expect(screen.getByText('New music, shows, and merch.')).toBeVisible();
     const email = screen.getByRole('textbox', { name: /email address/i });
     expect(email.closest('form')).toHaveClass('flex-col');
     expect(screen.getByRole('button', { name: 'Get Updates' })).toHaveClass(

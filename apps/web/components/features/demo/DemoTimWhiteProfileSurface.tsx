@@ -20,7 +20,6 @@ import {
   type ProfileMode,
   type ProfileShowcaseStateId,
 } from '@/features/profile/contracts';
-import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import {
   ProfilePrimaryActionCard,
   type ProfilePrimaryActionCardRelease,
@@ -459,23 +458,6 @@ function renderActionCardPreview({
   );
 }
 
-function renderAlertsFallbackPreview(dataTestId: string) {
-  return (
-    <div className='w-full' data-testid={dataTestId}>
-      <ProfileHomeRail
-        artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
-        latestRelease={null}
-        profileSettings={SHOWCASE_PROFILE_SETTINGS}
-        tourDates={[]}
-        hasPlayableDestinations
-        renderMode='preview'
-        isSubscribed={false}
-        resolveNearbyTour={false}
-      />
-    </div>
-  );
-}
-
 function formatSubscribeStateLabel(
   stateId: (typeof SUBSCRIBE_SHOWCASE_STATE_IDS)[number]
 ) {
@@ -552,13 +534,6 @@ function ActionCardShowcaseBoard() {
         tourDates: [],
         hasPlayableDestinations: false,
       }),
-    },
-    {
-      id: 'alerts-fallback',
-      label: 'Alerts Fallback',
-      description:
-        'Useful fallback when no release, tour date, playlist, or merch item can lead.',
-      card: renderAlertsFallbackPreview('tim-white-cards-alerts-fallback'),
     },
   ] as const;
 
