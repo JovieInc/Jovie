@@ -233,6 +233,13 @@ test.describe('Homepage', () => {
       return range.getClientRects().length;
     };
 
+    // Same split the component itself renders (HomepageIdentityHero.tsx),
+    // so the sentences stay derived from the one copy source rather than
+    // duplicated as literals.
+    const [firstSentence, secondSentence] =
+      HOMEPAGE_IDENTITY_COPY.hero.headline.split(/(?<=\.) /);
+    const roleText = HOMEPAGE_IDENTITY_COPY.hero.preview.role;
+
     for (const viewport of [
       { width: 390, height: 844 },
       { width: 768, height: 1024 },
@@ -244,18 +251,18 @@ test.describe('Homepage', () => {
 
       const heading = page.getByRole('heading', { level: 1 });
       await expect(heading).toBeVisible();
-      await expect(heading).toHaveText('Be found.Be understood.');
+      await expect(heading).toHaveText(firstSentence + secondSentence);
 
       // Each sentence is its own <span class="block">. The shared two-line
       // clamp only ever truncates when the second span itself needs a
       // second visual line (three lines total for the h1).
       const secondLine = heading.locator('span', {
-        hasText: 'Be understood.',
+        hasText: secondSentence,
       });
       const secondLineCount = await secondLine.evaluate(countVisualLines);
       expect(
         secondLineCount,
-        `"Be understood." wrapped to ${secondLineCount} lines at ${viewport.width}px, so the two-line clamp truncates it`
+        `"${secondSentence}" wrapped to ${secondLineCount} lines at ${viewport.width}px, so the two-line clamp truncates it`
       ).toBe(1);
 
       const headingBox = await heading.evaluate(el => ({
@@ -267,12 +274,12 @@ test.describe('Homepage', () => {
         `headline overflows its own box at ${viewport.width}px: ${JSON.stringify(headingBox)}`
       ).toBeLessThanOrEqual(headingBox.clientWidth + 1);
 
-      const role = page.getByText('Founder, Jovie');
+      const role = page.getByText(roleText);
       await expect(role).toBeVisible();
       const roleLineCount = await role.evaluate(countVisualLines);
       expect(
         roleLineCount,
-        `"Founder, Jovie" wrapped to ${roleLineCount} lines at ${viewport.width}px`
+        `"${roleText}" wrapped to ${roleLineCount} lines at ${viewport.width}px`
       ).toBe(1);
     }
   });
