@@ -10,7 +10,7 @@
     "packages/ui"
   ],
   "localStackingMax": 30,
-  "totalFindings": 82,
+  "totalFindings": 81,
   "files": {
     "apps/web/app/exp/component-checker/ComponentCheckerClient.tsx": {
       "z-50": 1
@@ -111,9 +111,6 @@
     },
     "apps/web/components/features/home/HomeTrustSection.tsx": {
       "z-[1]": 1
-    },
-    "apps/web/components/features/monitoring/PerformanceDashboard.tsx": {
-      "z-50": 1
     },
     "apps/web/components/features/onboarding/OnboardingShell.tsx": {
       "z-40": 2
