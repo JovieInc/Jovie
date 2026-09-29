@@ -44,6 +44,7 @@ export type OvieCertificationTierStatus =
 
 export const OVIE_CERTIFICATION_DOMAINS = [
   'marketing_components',
+  'customers',
   'flows',
   'public_profiles',
   'smart_links',
@@ -128,6 +129,14 @@ export interface OvieCertificationRow {
   readonly links: readonly OvieCertificationLink[];
   readonly history: readonly OvieCertificationHistoryEvent[];
   readonly decision: OvieCertificationDecisionAvailability;
+  /**
+   * Customers domain only (CERTIFICATION_V2_CUSTOMERS section 11): the
+   * pipeline ranking fields. Absent on every other domain's row.
+   */
+  readonly rank?: number | null;
+  readonly payScore?: number | null;
+  readonly fitScore?: number | null;
+  readonly heldFor?: readonly string[];
   readonly source: {
     readonly repository: string;
     readonly sha: string;
@@ -184,6 +193,7 @@ export const OVIE_CERTIFICATION_DOMAIN_LABELS: Readonly<
   Record<OvieCertificationDomainId, string>
 > = {
   marketing_components: 'Marketing Components',
+  customers: 'Customers',
   flows: 'Flows',
   public_profiles: 'Public Profiles',
   smart_links: 'Smart Links',

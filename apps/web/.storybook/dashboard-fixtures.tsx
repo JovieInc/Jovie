@@ -1,5 +1,6 @@
 import type { Decorator } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import type { ReactNode } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -116,6 +117,20 @@ export const withDashboardProviders: Decorator = Story => (
   <DashboardStoryProviders>
     <Story />
   </DashboardStoryProviders>
+);
+
+/**
+ * Decorator for components that read URL search-param state via `nuqs`
+ * (e.g. `useQueryState`/`useQueryStates`), such as DashboardAudienceClient.
+ * `nuqs` v2 requires an explicit adapter; `NuqsTestingAdapter` is the
+ * package's own in-memory adapter for exactly this (no real Next.js router
+ * needed). `hasMemory: true` so filter/sort interactions in a story
+ * actually update visually instead of freezing at the initial params.
+ */
+export const withNuqsTestingAdapter: Decorator = Story => (
+  <NuqsTestingAdapter hasMemory>
+    <Story />
+  </NuqsTestingAdapter>
 );
 
 /** Same as `withDashboardProviders`, for a profile still mid-onboarding. */

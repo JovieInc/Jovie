@@ -151,6 +151,11 @@ describe('GET /api/ovie/certifications', () => {
         (domain: { domain: string }) => domain.domain === 'acquisition'
       )
     ).toMatchObject({ status: 'not_connected', rowCount: 0 });
+    expect(
+      body.domains.find(
+        (domain: { domain: string }) => domain.domain === 'customers'
+      )
+    ).toMatchObject({ status: 'not_connected', rowCount: 0 });
     const serialized = JSON.stringify(body);
     expect(serialized).not.toContain('canonicalReferences');
     expect(serialized).not.toContain('auditHistory');
