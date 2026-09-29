@@ -826,7 +826,6 @@ jobs:
             scripts/invariants/ios-web-no-scroll-jank.mjs
             scripts/invariants/latency-sensitive-execution-paths.mjs
             scripts/invariants/latency-sensitive-execution-allowlist.json
-            scripts/invariants/overlay-layer-contract.mjs
             scripts/invariants/registry.mjs
             scripts/design-conformance-paths.mjs
             scripts/run-affected-tests.mjs
