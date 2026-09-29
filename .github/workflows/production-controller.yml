@@ -256,6 +256,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
           SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -264,6 +266,19 @@ jobs:
           risk_lane=unknown
           if gh run download "$SOURCE_RUN_ID" --name "$artifact" --dir "$root"; then
             risk_lane="$(jq -r '.riskLevel // "unknown"' "$root/ci-risk-classification.json")"
+          else
+            # Queue-proven main pushes skip the classifier by design; the exact SHA
+            # was classified in its successful merge-group CI run (same head SHA).
+            proof_run="$(gh api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
+              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml")] | max_by(.run_attempt) | .id // empty')"
+            if [[ "$proof_run" =~ ^[0-9]+$ ]]; then
+              proof_artifact="$(gh api "repos/$REPO/actions/runs/$proof_run/artifacts" \
+                --jq '[.artifacts[] | select(.name | startswith("ci-risk-classification-'"$proof_run"'-")) | select(.expired == false)] | max_by(.name) | .name // empty')"
+              if [[ -n "$proof_artifact" ]] && gh run download "$proof_run" --name "$proof_artifact" --dir "$root"; then
+                risk_lane="$(jq -r '.riskLevel // "unknown"' "$root/ci-risk-classification.json")"
+                echo "::notice::Risk lane $risk_lane from merge-group CI run $proof_run for $SOURCE_SHA."
+              fi
+            fi
           fi
           [[ "$risk_lane" =~ ^(low|medium|high)$ ]] || risk_lane=unknown
           echo "risk_lane=$risk_lane" >> "$GITHUB_OUTPUT"
