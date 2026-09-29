@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ATOM_MOLECULE_INVENTORY_RATCHET,
   COMPARATIVE_DELIBERATE_RED_FIXTURES,
@@ -19,6 +19,11 @@ import {
   validateDimensionRequirements,
 } from '../../component-comparative-quality-bar.mjs';
 import { OUTCOME_INVENTORY } from '../../component-shadcn-outcome-inventory.mjs';
+
+// runComparativeQualityBar shells out to git (merge-base, show) and spawns a
+// node subprocess to read the trusted-base registry; the default 5s test
+// timeout is not enough on a loaded CI runner.
+vi.setConfig({ testTimeout: 30_000 });
 
 const clone = value => structuredClone(value);
 const details = result => result.findings.map(item => item.detail).join('\n');
