@@ -49,13 +49,6 @@ function walkFiles(relDir, predicate) {
   return found.sort();
 }
 
-function macosTopLevelDirs() {
-  return readdirSync(join(ROOT, 'apps/macos'), { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
-    .map(entry => entry.name)
-    .sort();
-}
-
 describe('Mac Swift-control invariants (JOV-5359)', () => {
   it('names four proposed reviewed-invariant slugs without adopting them', () => {
     const report = read(REPORT_PATH);
@@ -86,11 +79,14 @@ describe('Mac Swift-control invariants (JOV-5359)', () => {
   });
 
   it('keeps MenuMonitor as the only macOS Swift target and without a webview', () => {
-    assert.deepEqual(macosTopLevelDirs(), ['MenuMonitor']);
     const macosSwift = walkFiles(
       'apps/macos',
       abs => abs.endsWith('.swift') && !abs.includes('/.build/')
     );
+    const swiftTopLevelDirs = new Set(
+      macosSwift.map(file => file.split('/')[2])
+    );
+    assert.deepEqual([...swiftTopLevelDirs].sort(), ['MenuMonitor']);
     assert.equal(
       macosSwift.every(file => file.startsWith('apps/macos/MenuMonitor/')),
       true
