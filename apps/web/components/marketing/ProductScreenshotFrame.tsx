@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/product-screenshot-frame.test.tsx
 'use client';
 
 import Image from 'next/image';
