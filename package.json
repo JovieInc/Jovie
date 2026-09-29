@@ -305,7 +305,7 @@
     "lint-staged": "^17.5.1",
     "playwright": "1.60.0",
     "tsx": "^4.23.15",
-    "turbo": "^2.11.4",
+    "turbo": "^2.11.5",
     "typescript": "^6.0.3",
     "vercel": "56.3.2",
     "vitest": "5.0.2"

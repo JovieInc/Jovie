@@ -24,4 +24,8 @@
 /docs/ @itstimwhite
 
 # CI/CD
-/.github/ @itstimwhite 
+/.github/ @itstimwhite
+# Onboarding learning-loop protection (JOV-7148): evaluators, fixtures,
+# thresholds and promotion receipts are outside the optimizer's reach.
+/apps/web/tests/eval/ @itstimwhite
+/apps/web/data/onboarding-script-promotions/ @itstimwhite
