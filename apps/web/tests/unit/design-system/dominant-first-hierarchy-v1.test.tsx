@@ -7,16 +7,15 @@
 // Representative surface: the canonical homepage hero
 // (apps/web/components/homepage/HomepageIdentityHero.tsx), the flagship
 // marketing surface named in that component's own doc comment. This renders
-// the real component tree (not a source-text scan) and reads the shared
-// marketing type scale, so a refactor that makes the headline and support
-// copy compete at nearly equal weight fails this test, not just a taste
-// review.
+// the real component tree (not a source-text scan) and reads the actual
+// declared type-scale and ink tokens from its stylesheet, so a refactor that
+// makes the headline and support copy compete at nearly equal weight fails
+// this test, not just a taste review.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
@@ -47,107 +46,81 @@ vi.mock('next/image', () => ({
 
 const HEADLINE_SELECTOR = '.marketing-h1-linear';
 const SUPPORT_SELECTOR = '.marketing-lead-linear';
-// A minimum ratio, not the exact locked value (currently ~2.1x-3.6x): tight
+// A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
 // enough that "nearly equal weight" fails closed, loose enough that routine
 // type-scale tuning does not make this brittle.
 const MIN_DOMINANCE_RATIO = 1.8;
-const MIN_INK_CONTRAST_RATIO = 1.8;
 
-function css(relativePath: string): string {
-  return readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+function css(): string {
+  return [
+    'app/globals.css',
+    'styles/linear-tokens.css',
+    'styles/design-system.css',
+    'styles/tailwind-foundation.css',
+    'components/homepage/HomepageIdentity.css',
+  ]
+    .map(path => readFileSync(resolve(process.cwd(), path), 'utf8'))
+    .join('\n');
 }
 
 function cssBlock(source: string, selector: string): string {
   const start = source.indexOf(`${selector} {`);
   if (start === -1) {
-    throw new Error(`selector not found: ${selector}`);
+    throw new Error(`selector not found in HomepageIdentity.css: ${selector}`);
   }
-  return balancedBlock(source, source.indexOf('{', start), selector);
+  const end = source.indexOf('}', start);
+  if (end === -1) {
+    throw new Error(
+      `unterminated rule for ${selector} in HomepageIdentity.css`
+    );
+  }
+  return source.slice(start, end);
 }
 
-function balancedBlock(source: string, openingBrace: number, label: string) {
-  let depth = 0;
-  for (let index = openingBrace; index < source.length; index += 1) {
-    if (source[index] === '{') depth += 1;
-    if (source[index] === '}') depth -= 1;
-    if (depth === 0) return source.slice(openingBrace + 1, index);
-  }
-  throw new Error(`unterminated block for ${label}`);
+function toPx(bound: string): number {
+  const trimmed = bound.trim();
+  const rem = /^([\d.]+)rem$/.exec(trimmed);
+  if (rem) return Number.parseFloat(rem[1]) * 16;
+  const px = /^([\d.]+)px$/.exec(trimmed);
+  if (px) return Number.parseFloat(px[1]);
+  throw new Error(`unsupported clamp() bound unit: ${trimmed}`);
 }
 
-function atRuleBlock(
-  source: string,
-  marker: string,
-  requiredSelector: string
-): string {
-  let offset = 0;
-  while (offset < source.length) {
-    const start = source.indexOf(marker, offset);
-    if (start === -1) break;
-    const block = balancedBlock(source, source.indexOf('{', start), marker);
-    if (block.includes(`${requiredSelector} {`)) return block;
-    offset = start + marker.length;
-  }
-  throw new Error(`at-rule not found for ${requiredSelector}: ${marker}`);
+function hexLightness(hex: string): number {
+  const channels = hex.match(/[\da-f]{2}/gi);
+  if (!channels || channels.length !== 3)
+    throw new Error(`invalid hex: ${hex}`);
+  return (
+    channels.reduce((sum, value) => sum + Number.parseInt(value, 16), 0) / 3
+  );
 }
 
-function pxDeclaration(source: string, name: string): number {
-  const match = new RegExp(`${name}:\\s*([\\d.]+)px;`).exec(source);
-  if (!match) {
-    throw new Error(`pixel declaration not found for ${name}`);
-  }
-  return Number.parseFloat(match[1]);
-}
+/** Reads the min/max px of a `property: clamp(min, preferred, max);` declaration. */
+function clampRangePx(
+  block: string,
+  property: string
+): { min: number; max: number } {
+  const clamp = new RegExp(
+    `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
+  ).exec(block);
+  if (clamp) return { min: toPx(clamp[1]), max: toPx(clamp[2]) };
 
-function declaration(source: string, name: string): string {
-  const value = new RegExp(`${name}:\\s*([^;]+);`).exec(source)?.[1]?.trim();
-  if (!value) throw new Error(`declaration not found for ${name}`);
-  return value;
-}
+  const fixed = new RegExp(`${property}:\\s*([\\d.]+px)`).exec(block)?.[1];
+  if (fixed) return { min: toPx(fixed), max: toPx(fixed) };
 
-function declarationBlock(
-  source: string,
-  names: readonly string[],
-  direct = false
-): string {
-  for (const match of source.matchAll(/\{([^{}]*)\}/gs)) {
-    if (!names.every(name => match[1].includes(`${name}:`))) continue;
-    if (
-      direct &&
-      names.some(name => declaration(match[1], name).includes('var('))
-    ) {
-      continue;
-    }
-    return match[1];
-  }
-  throw new Error(`declaration block not found for ${names.join(', ')}`);
-}
-
-function relativeLuminance(color: string): number {
-  const hex = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color);
-  if (hex) {
-    const channels = hex.slice(1).map(channel => {
-      const srgb = Number.parseInt(channel, 16) / 255;
-      return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-  }
-
-  const neutralLch = /^lch\(([\d.]+)%\s+0(?:\.0+)?\s+[\d.]+\)$/i.exec(color);
-  if (neutralLch) {
-    const lightness = Number.parseFloat(neutralLch[1]);
-    return lightness > 8 ? ((lightness + 16) / 116) ** 3 : lightness / 903.3;
-  }
-
-  throw new Error(`unsupported ink color: ${color}`);
-}
-
-function contrastRatio(first: string, second: string): number {
-  const firstLuminance = relativeLuminance(first);
-  const secondLuminance = relativeLuminance(second);
-  const lighter = Math.max(firstLuminance, secondLuminance);
-  const darker = Math.min(firstLuminance, secondLuminance);
-  return (lighter + 0.05) / (darker + 0.05);
+  const token = new RegExp(`${property}:\\s*var\\((--[^)]+)\\)`).exec(
+    block
+  )?.[1];
+  const stem = token?.replace(/-(?:sm|md)$/, '');
+  const values = stem
+    ? [
+        ...css().matchAll(
+          new RegExp(`${stem}(?:-(?:sm|md))?:\\s*([\\d.]+px)`, 'g')
+        ),
+      ].map(match => toPx(match[1]))
+    : [];
+  if (values.length === 0) throw new Error(`no type scale found in: ${block}`);
+  return { min: Math.min(...values), max: Math.max(...values) };
 }
 
 describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () => {
@@ -157,110 +130,83 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
     const hero = screen.getByTestId('marketing-section-hero');
     const headings = within(hero).getAllByRole('heading');
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toHaveClass(HEADLINE_SELECTOR.slice(1));
+    expect(headings[0]).toHaveClass(
+      HEADLINE_SELECTOR.slice(1),
+      'text-primary-token'
+    );
 
-    const support = within(hero).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead);
-    expect(support).toHaveClass(SUPPORT_SELECTOR.slice(1));
+    const support = hero.querySelector(SUPPORT_SELECTOR);
+    expect(support).not.toBeNull();
+    expect(support).toHaveClass('text-secondary-token');
     // Support copy must not itself be a heading — it recedes structurally,
     // it does not compete as a second thing to perceive first.
     expect(support?.tagName.toLowerCase()).not.toMatch(/^h[1-6]$/);
   });
 
   it('sizes the headline substantially larger than the support line at every viewport', () => {
-    const globalStyles = css('app/globals.css');
-    const typeTokens = css('styles/linear-tokens.css');
-    const headlineBlock = cssBlock(globalStyles, HEADLINE_SELECTOR);
-    const supportBlock = cssBlock(globalStyles, SUPPORT_SELECTOR);
+    const source = css();
+    const headline = clampRangePx(
+      cssBlock(source, HEADLINE_SELECTOR),
+      'font-size'
+    );
+    const support = clampRangePx(
+      cssBlock(source, SUPPORT_SELECTOR),
+      'font-size'
+    );
+    expect(source).toMatch(
+      /@media \(min-width: 768px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size-md\);?[^}]*\}\s*\}/
+    );
+    expect(source).toMatch(
+      /@media \(min-width: 1280px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size\);?[^}]*\}\s*\}/
+    );
 
-    expect(headlineBlock).toContain('var(--linear-h1-size-sm)');
-    const headlineSizes = [
-      '--linear-h1-size-sm',
-      '--linear-h1-size-md',
-      '--linear-h1-size',
-    ].map(token => pxDeclaration(typeTokens, token));
-    const supportSize = pxDeclaration(supportBlock, 'font-size');
-
-    expect(
-      cssBlock(
-        atRuleBlock(
-          globalStyles,
-          '@media (min-width: 768px)',
-          HEADLINE_SELECTOR
-        ),
-        HEADLINE_SELECTOR
-      )
-    ).toContain('var(--linear-h1-size-md)');
-    expect(
-      cssBlock(
-        atRuleBlock(
-          globalStyles,
-          '@media (min-width: 1280px)',
-          HEADLINE_SELECTOR
-        ),
-        HEADLINE_SELECTOR
-      )
-    ).toContain('var(--linear-h1-size)');
-
-    for (const headlineSize of headlineSizes) {
-      expect(headlineSize).toBeGreaterThan(supportSize);
-      expect(headlineSize / supportSize).toBeGreaterThanOrEqual(
-        MIN_DOMINANCE_RATIO
-      );
-    }
+    expect(headline.min).toBeGreaterThan(support.min);
+    expect(headline.max).toBeGreaterThan(support.max);
+    expect(headline.min / support.min).toBeGreaterThanOrEqual(
+      MIN_DOMINANCE_RATIO
+    );
+    expect(headline.max / support.max).toBeGreaterThanOrEqual(
+      MIN_DOMINANCE_RATIO
+    );
   });
 
   it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    render(<HomepageIdentityHero />);
-
-    const hero = screen.getByTestId('marketing-section-hero');
-    const heading = within(hero).getByRole('heading', { level: 1 });
-    const support = within(hero).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead);
-    expect(heading).toHaveClass('text-primary-token');
-    expect(support).toHaveClass('text-secondary-token');
-
-    const tokenAliases = css('styles/tailwind-foundation.css');
-    expect(tokenAliases).toContain(
+    const source = css();
+    const darkTheme = cssBlock(source, ':root.dark .system-b-marketing');
+    expect(darkTheme).toContain('--color-text-primary-token: #f5f7fb;');
+    expect(darkTheme).toContain('--color-text-secondary-token: #a0a5af;');
+    const inks = [
+      ...darkTheme.matchAll(
+        /--color-text-(?:primary|secondary)-token:\s*(#[\da-f]{6})/gi
+      ),
+    ].map(match => match[1]);
+    expect(inks).toHaveLength(2);
+    expect(hexLightness(inks[0]) - hexLightness(inks[1])).toBeGreaterThan(60);
+    expect(source).toContain(
       '--color-primary-token: var(--color-text-primary-token)'
     );
-    expect(tokenAliases).toContain(
+    expect(source).toContain(
       '--color-secondary-token: var(--color-text-secondary-token)'
     );
-
-    const themeTokens = css('styles/design-system.css');
-    const lightTheme = declarationBlock(themeTokens, [
-      '--noir-ion-canvas',
-      '--color-text-primary-token',
-      '--color-text-secondary-token',
-    ]);
-    const darkTheme = declarationBlock(
-      themeTokens,
-      [
-        '--noir-ion-canvas',
-        '--noir-ion-text-primary',
-        '--noir-ion-text-secondary',
-      ],
-      true
+    const lightStart = source.indexOf(
+      '--color-text-primary-token: lch(9.894% 0 282)'
     );
-    const themeInk = [
-      {
-        background: declaration(lightTheme, '--noir-ion-canvas'),
-        primary: declaration(lightTheme, '--color-text-primary-token'),
-        secondary: declaration(lightTheme, '--color-text-secondary-token'),
-      },
-      {
-        background: declaration(darkTheme, '--noir-ion-canvas'),
-        primary: declaration(darkTheme, '--noir-ion-text-primary'),
-        secondary: declaration(darkTheme, '--noir-ion-text-secondary'),
-      },
-    ];
-
-    for (const { background, primary, secondary } of themeInk) {
-      const primaryContrast = contrastRatio(primary, background);
-      const secondaryContrast = contrastRatio(secondary, background);
-      expect(primaryContrast).toBeGreaterThan(secondaryContrast);
-      expect(primaryContrast / secondaryContrast).toBeGreaterThanOrEqual(
-        MIN_INK_CONTRAST_RATIO
-      );
-    }
+    const lightTheme = source.slice(
+      source.lastIndexOf(':root {', lightStart),
+      source.indexOf('}', lightStart)
+    );
+    expect(lightTheme).toContain(
+      '--color-text-primary-token: lch(9.894% 0 282)'
+    );
+    expect(lightTheme).toContain('--color-text-secondary-token: #5a606a');
+    const lightPrimary = Number(
+      /--color-text-primary-token:\s*lch\(([\d.]+)%/.exec(lightTheme)?.[1]
+    );
+    const lightSecondary =
+      /--color-text-secondary-token:\s*(#[\da-f]{6})/i.exec(lightTheme)?.[1] ??
+      '';
+    expect(hexLightness(lightSecondary) - lightPrimary * 2.55).toBeGreaterThan(
+      50
+    );
   });
 });

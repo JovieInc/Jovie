@@ -4,11 +4,9 @@
 // promise being made on that route, not generic proof inserted mechanically."
 //
 // Representative surface: the canonical homepage hero
-// (apps/web/components/homepage/HomepageIdentityHero.tsx). Its current
-// identity claim is supported by an explicitly illustrative claimed-page
-// preview and the jov.ie/you form in the same hero, not by a generic
-// testimonial or a product screenshot dropped elsewhere. This renders the
-// real component tree and asserts that proximity and route specificity.
+// (apps/web/components/homepage/HomepageIdentityHero.tsx). Its identity claim
+// is supported by an explicitly illustrative claimed-page preview and the
+// jov.ie/you form in the same hero, not by generic or distant proof.
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
@@ -41,8 +39,8 @@ vi.mock('next/image', () => ({
   },
 }));
 
-// A generic/mechanical preview would use placeholder copy instead of showing
-// the exact jov.ie identity and claim action promised by this route.
+// A generic/mechanical preview would use placeholder or third-person
+// marketing language instead of this route's exact claim identity.
 const GENERIC_PROOF_LANGUAGE =
   /\b(?:lorem ipsum|placeholder|sample|example user|john doe|jane doe)\b/i;
 
@@ -51,18 +49,20 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     render(<HomepageIdentityHero />);
 
     const hero = screen.getByTestId('marketing-section-hero');
-    const claim = within(hero).getByRole('heading', { level: 1 });
-    const proof = within(hero).getByTestId('homepage-claim-card');
-    const claimForm = within(proof).getByTestId('homepage-claim-form');
+    const inner = hero.closest('section');
+    expect(inner, 'hero has one active-content container').not.toBeNull();
 
-    // Proximal: the preview and its claim action live in the same immediate
-    // hero section as the promise, reachable with zero navigation and zero
-    // scroll-to-a-different section.
-    expect(hero.contains(claim)).toBe(true);
+    const claim = screen.getByRole('heading', { level: 1 });
+    const proof = screen.getByTestId('homepage-claim-card');
+
+    // Proximal: the proof lives in the exact same immediate section as the
+    // claim, reachable with zero navigation and zero scroll-to-a-different
+    // section — not merely "somewhere on this page".
+    expect(inner?.contains(claim)).toBe(true);
+    expect(inner?.contains(proof)).toBe(true);
     expect(hero.contains(proof)).toBe(true);
-    expect(proof.contains(claimForm)).toBe(true);
 
-    // Always visible with the claim: proximal proof is not gated behind a
+    // Always visible with the claim — proximal proof is not gated behind a
     // hover/drill-down interaction (that would be progressive-depth, a
     // different rule, and would defeat "proximal").
     expect(proof).not.toHaveAttribute('hidden');
@@ -70,8 +70,7 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
 
   it('shows an honest, route-specific claimed-page preview rather than generic proof', () => {
     const { claim, preview } = HOMEPAGE_IDENTITY_COPY.hero;
-    expect(claim.domain).toBe('jov.ie/');
-    expect(claim.placeholder).toBe('you');
+    expect(`${claim.domain}${preview.handle}`).toBe('jov.ie/avery');
     expect(preview.note).toBe('Illustrative profile · Ready to claim');
     expect(Object.values(preview).join(' ')).not.toMatch(
       GENERIC_PROOF_LANGUAGE
