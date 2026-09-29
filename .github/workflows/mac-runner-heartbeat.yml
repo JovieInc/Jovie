@@ -1,6 +1,7 @@
 name: Mac Runner Heartbeat
 # clock-class: production-liveness
-# accountable-writer: tims-macbook-air
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim
 # necessary-trust-boundary: A hosted schedule proves the single self-hosted Mac runner can accept work without granting it any credentials.
 # revisit-trigger: Remove when the Mac pool has a native GitHub capacity signal or is retired.
 
