@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -112,6 +112,16 @@ describe('/artists page', () => {
     expect(mocks.directoryProps).toHaveBeenCalledWith(
       expect.objectContaining({ profiles: [], total: 0 })
     );
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it('renders the no-DB fallback instead of the directory when the catalog is unavailable (JOV-7125)', async () => {
+    mocks.profiles.mockResolvedValue({ status: 'unavailable' });
+
+    render(await ArtistsPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByTestId('artists-directory')).toBeInTheDocument();
+    expect(mocks.directoryProps).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });
