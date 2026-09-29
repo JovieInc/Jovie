@@ -87,6 +87,10 @@ describe('TourModePanel', () => {
       'href',
       'https://tickets.example.com/the-novo'
     );
+    // JOV-INV-019 image-contrast: the group label measured 4.5:1-adjacent
+    // against a real photo background at text-tertiary-token; keep it on
+    // text-secondary-token.
+    expect(screen.getByText('Upcoming')).toHaveClass('text-secondary-token');
   });
 
   it('keeps the empty state quiet and cardless with the alerts CTA as the single action', () => {
