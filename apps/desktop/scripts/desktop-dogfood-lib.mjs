@@ -178,12 +178,13 @@ export function createCoverageLedger({ observations = [], accountRole }) {
     if (observation) return { ...item, ...observation };
     if (
       item.scope === 'operator' &&
+      nonEmptyString(accountRole) &&
       !['operator', 'admin', 'founder'].includes(accountRole)
     ) {
       return {
         ...item,
         disposition: 'not-applicable',
-        reason: `operator-only surface; authorized account role is ${accountRole ?? 'unreported'}`,
+        reason: `operator-only surface; authorized account role is ${accountRole}`,
       };
     }
     return { ...item, disposition: 'not-visited' };

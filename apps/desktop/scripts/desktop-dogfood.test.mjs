@@ -188,6 +188,16 @@ test('coverage never treats unvisited or unauthorized operator states as pass', 
       .every(row => row.disposition === 'not-applicable'),
     true
   );
+  const unreportedRole = createCoverageLedger({
+    observations: [],
+    accountRole: null,
+  });
+  assert.equal(
+    unreportedRole
+      .filter(row => row.scope === 'operator')
+      .every(row => row.disposition === 'not-visited'),
+    true
+  );
 });
 
 test('report stays queued until the native runner receipt is verified', () => {
