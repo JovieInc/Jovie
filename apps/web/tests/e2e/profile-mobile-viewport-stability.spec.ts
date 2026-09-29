@@ -22,7 +22,11 @@ import {
 test.use({
   deviceScaleFactor: 3,
   hasTouch: true,
-  isMobile: true,
+  // Firefox supports viewport/touch checks but not Playwright's isMobile
+  // context option. Preserve every layout assertion in that engine.
+  isMobile: async ({ browserName }, provideMobile) => {
+    await provideMobile(browserName !== 'firefox');
+  },
   storageState: { cookies: [], origins: [] },
 });
 test.describe.configure({ mode: 'serial' });
