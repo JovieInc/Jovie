@@ -100,7 +100,7 @@ describe('experimental app import boundary', () => {
         "export { x } from\n'@/app/exp/private';",
         "const x = import(\ufeff'@/app/exp/private');",
         "\0import { x } from '@/app/exp/private';",
-        "import { x } from '@/components/safe';",
+        "import { x } from '@/constants/safe';",
       ];
       const files = sources.map((source, index) => {
         const file = join(directory, `${index}.ts`);
