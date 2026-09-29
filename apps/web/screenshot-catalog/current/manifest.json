@@ -243,7 +243,7 @@
     "route": "/demo/showcase/tim-white-profile?release=live",
     "viewport": "desktop",
     "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
+    "consumers": ["admin", "marketing-export", "investor-ready"],
     "capturedAt": "2026-09-29T22:21:29.170Z",
     "gitSha": "4c4c8b0aebd9dae5f093008cfa7c7068b4916b83",
     "imagePath": "tim-white-profile-live-desktop.png",
