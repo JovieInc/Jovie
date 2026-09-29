@@ -17,7 +17,7 @@ export function SectionVariantPreview({
 
   if (!variant) {
     return (
-      <p className='p-6 text-sm text-red-500'>
+      <p className='p-6 text-sm text-error'>
         Unknown section variant: {variantId}
       </p>
     );
