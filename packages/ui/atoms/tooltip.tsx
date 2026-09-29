@@ -9,6 +9,7 @@ import {
   OVERLAY_CONTENT_RADIUS,
   OVERLAY_SIDE_OFFSET,
   TOOLTIP_SURFACE_BASE,
+  TOOLTIP_SURFACE_DANGER,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
@@ -70,6 +71,13 @@ interface TooltipContentProps
    * @default "tooltip-content"
    */
   readonly testId?: string;
+  /**
+   * `danger` swaps the tokenized tooltip surface for the shared error
+   * tokens (same ones as MENU_ITEM_DESTRUCTIVE and Banner's error variant)
+   * for content that reports a validation or failure state.
+   * @default "default"
+   */
+  readonly tone?: 'default' | 'danger';
 }
 
 /**
@@ -94,6 +102,7 @@ const TooltipContent = React.forwardRef<
       collisionPadding = OVERLAY_COLLISION_PADDING,
       showArrow = false,
       contentVariant = 'rich',
+      tone = 'default',
       children,
       testId = 'tooltip-content',
       ...props
@@ -111,7 +120,7 @@ const TooltipContent = React.forwardRef<
           // content contract only controls wrapping; compact labels are
           // provably one line while rich content may wrap without clipping.
           'z-tooltip px-2 py-1 text-xs font-normal tracking-tight',
-          TOOLTIP_SURFACE_BASE,
+          tone === 'danger' ? TOOLTIP_SURFACE_DANGER : TOOLTIP_SURFACE_BASE,
           OVERLAY_CONTENT_RADIUS,
           contentVariant === 'compact'
             ? 'whitespace-nowrap'
